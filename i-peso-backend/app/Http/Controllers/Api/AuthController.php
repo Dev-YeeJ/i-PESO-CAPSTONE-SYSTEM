@@ -1,0 +1,347 @@
+<?php
+
+namespace App\Http\Controllers\Api;
+
+use App\Http\Controllers\Controller;
+use App\Mail\OtpMail;
+use App\Models\Administrator;
+use App\Models\Employer;
+use App\Models\JobSeeker;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Validation\Rules\Password;
+use Illuminate\Validation\Rule;
+
+class AuthController extends Controller
+{
+    // ── PRIVATE HELPERS ──────────────────────────────────────────────────────
+
+    /**
+     * Search all three user tables for a given email address.
+     *
+     * @return array{model: JobSeeker|Employer|Administrator, role: string}|null
+     */
+    private function findUserByEmail(string $email): ?array
+    {
+        $seeker = JobSeeker::where('email', $email)->first();
+        if ($seeker) return ['model' => $seeker, 'role' => 'seeker'];
+
+        $employer = Employer::where('email', $email)->first();
+        if ($employer) return ['model' => $employer, 'role' => 'employer'];
+
+        $admin = Administrator::where('email', $email)->first();
+        if ($admin) return ['model' => $admin, 'role' => 'admin'];
+
+        return null;
+    }
+
+    /**
+     * Generate a 6-digit OTP, cache it under a verify-specific key,
+     * and send it via the OtpMail mailable.
+     */
+    private function generateAndSendOtp(string $email): void
+    {
+        $otp = str_pad(random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+        Cache::put("ipeso_otp_{$email}", $otp, now()->addMinutes(10));
+        Mail::to($email)->send(new OtpMail($otp));
+    }
+
+    /**
+     * Build the consistent user payload shape returned in every auth response.
+     */
+    private function buildUserPayload(
+        JobSeeker|Employer|Administrator $user,
+        string $role
+    ): array {
+        $name = match ($role) {
+            'seeker'   => trim("{$user->first_name} {$user->last_name}"),
+            'employer' => $user->company_name,
+            'admin'    => trim("{$user->first_name} {$user->last_name}"),
+        };
+
+        return [
+            'id'                => $user->getKey(),
+            'name'              => $name,
+            'email'             => $user->email,
+            'role'              => $role,
+            'email_verified_at' => $user->email_verified_at,
+        ];
+    }
+
+    // ── PUBLIC ENDPOINTS ─────────────────────────────────────────────────────
+
+    /**
+     * POST /api/auth/register
+     */
+    public function register(Request $request): JsonResponse
+    {
+        $role = $request->input('role');
+
+        $rules = [
+            'role'             => ['required', 'in:seeker,employer'],
+            'email'            => ['required', 'email', 'max:255'],
+            'password'         => ['required', 'confirmed', Password::min(8)],
+            'mobile_number'    => ['required', 'string', 'max:20'],
+            'complete_address' => ['required', 'string', 'max:500'],
+        ];
+
+        if ($role === 'seeker') {
+            $rules['first_name']      = ['required', 'string', 'max:100'];
+            $rules['last_name']       = ['required', 'string', 'max:100'];
+            $rules['educ_attainment'] = ['required', 'string', 'max:100'];
+            $rules['email'][]         = Rule::unique('job_seekers', 'email');
+        } else {
+            $rules['company_name']        = ['required', 'string', 'max:255'];
+            $rules['representative_name'] = ['required', 'string', 'max:255'];
+            $rules['industry_type']       = ['required', 'string', 'max:100'];
+            $rules['email'][]             = Rule::unique('employers', 'email');
+        }
+
+        $validated = $request->validate($rules);
+
+        if ($role === 'seeker') {
+            JobSeeker::create([
+                'first_name'       => $validated['first_name'],
+                'last_name'        => $validated['last_name'],
+                'email'            => $validated['email'],
+                'password'         => Hash::make($validated['password']),
+                'mobile_number'    => $validated['mobile_number'],
+                'complete_address' => $validated['complete_address'],
+                'educ_attainment'  => $validated['educ_attainment'],
+            ]);
+        } else {
+            Employer::create([
+                'company_name'        => $validated['company_name'],
+                'representative_name' => $validated['representative_name'],
+                'email'               => $validated['email'],
+                'password'            => Hash::make($validated['password']),
+                'mobile_number'       => $validated['mobile_number'],
+                'complete_address'    => $validated['complete_address'],
+                'industry_type'       => $validated['industry_type'],
+            ]);
+        }
+
+        $this->generateAndSendOtp($validated['email']);
+
+        return response()->json([
+            'message' => 'Registration successful. Please check your email for your verification code.',
+            'email'   => $validated['email'],
+        ], 201);
+    }
+
+    /**
+     * POST /api/auth/verify-otp
+     */
+    public function verifyOtp(Request $request): JsonResponse
+    {
+        $request->validate([
+            'email' => ['required', 'email'],
+            'otp'   => ['required', 'string', 'size:6'],
+        ]);
+
+        $email     = $request->input('email');
+        $submitted = $request->input('otp');
+        $cached    = Cache::get("ipeso_otp_{$email}");
+
+        if (!$cached || $cached !== $submitted) {
+            return response()->json([
+                'message' => 'The verification code is invalid or has expired.',
+            ], 422);
+        }
+
+        $result = $this->findUserByEmail($email);
+
+        if (!$result) {
+            return response()->json(['message' => 'User account not found.'], 404);
+        }
+
+        ['model' => $user, 'role' => $role] = $result;
+
+        // ✅ Use Carbon::now() with explicit Illuminate Carbon class
+        // and forceFill to bypass any primary key confusion on save
+        $user->forceFill(['email_verified_at' => Carbon::now()])->save();
+
+        Cache::forget("ipeso_otp_{$email}");
+
+        $token = $user->createToken('ipeso_access_token')->plainTextToken;
+
+        return response()->json([
+            'message' => 'Email verified successfully. Welcome to i-PESO!',
+            'token'   => $token,
+            'user'    => $this->buildUserPayload($user, $role),
+        ], 200);
+    }
+
+    /**
+     * POST /api/auth/login
+     */
+    public function login(Request $request): JsonResponse
+    {
+        $request->validate([
+            'email'    => ['required', 'email'],
+            'password' => ['required', 'string'],
+        ]);
+
+        $result = $this->findUserByEmail($request->input('email'));
+
+        if (!$result || !Hash::check($request->input('password'), $result['model']->password)) {
+            return response()->json([
+                'message' => 'These credentials do not match our records.',
+            ], 401);
+        }
+
+        ['model' => $user, 'role' => $role] = $result;
+
+        if (!$user->email_verified_at) {
+            $this->generateAndSendOtp($user->email);
+
+            return response()->json([
+                'message'          => 'Your email is not verified. A new code has been sent to your inbox.',
+                'email_unverified' => true,
+                'email'            => $user->email,
+            ], 403);
+        }
+
+        // Revoke previous tokens — one active session per user
+        $user->tokens()->delete();
+
+        $token = $user->createToken('ipeso_access_token')->plainTextToken;
+
+        return response()->json([
+            'message' => 'Login successful.',
+            'token'   => $token,
+            'user'    => $this->buildUserPayload($user, $role),
+        ], 200);
+    }
+
+    /**
+     * POST /api/auth/resend-otp
+     */
+    public function resendOtp(Request $request): JsonResponse
+    {
+        $request->validate(['email' => ['required', 'email']]);
+
+        $result = $this->findUserByEmail($request->input('email'));
+
+        if (!$result) {
+            return response()->json([
+                'message' => 'If that email exists, a new code has been sent.',
+            ], 200);
+        }
+
+        if ($result['model']->email_verified_at) {
+            return response()->json([
+                'message' => 'This email address is already verified.',
+            ], 422);
+        }
+
+        $this->generateAndSendOtp($request->input('email'));
+
+        return response()->json([
+            'message' => 'A new 6-digit verification code has been sent to your email.',
+        ], 200);
+    }
+
+    /**
+     * POST /api/auth/forgot-password
+     */
+    public function forgotPassword(Request $request): JsonResponse
+    {
+        $request->validate(['email' => ['required', 'email']]);
+
+        $result = $this->findUserByEmail($request->input('email'));
+
+        if (!$result) {
+            return response()->json([
+                'message' => 'If that email is registered, a reset code has been sent.',
+            ], 200);
+        }
+
+        $email = $request->input('email');
+        $otp   = str_pad(random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+
+        Cache::put("ipeso_reset_{$email}", $otp, now()->addMinutes(10));
+        Mail::to($email)->send(new OtpMail($otp));
+
+        return response()->json([
+            'message' => 'A 6-digit reset code has been sent to your email.',
+            'email'   => $email,
+        ], 200);
+    }
+
+    /**
+     * POST /api/auth/reset-password
+     */
+    public function resetPassword(Request $request): JsonResponse
+    {
+        $request->validate([
+            'email'                 => ['required', 'email'],
+            'otp'                   => ['required', 'string', 'size:6'],
+            'password'              => ['required', 'confirmed', Password::min(8)],
+        ]);
+
+        $email     = $request->input('email');
+        $submitted = $request->input('otp');
+        $cached    = Cache::get("ipeso_reset_{$email}");
+
+        if (!$cached || $cached !== $submitted) {
+            return response()->json([
+                'message' => 'The reset code is invalid or has expired.',
+            ], 422);
+        }
+
+        $result = $this->findUserByEmail($email);
+
+        if (!$result) {
+            return response()->json(['message' => 'User not found.'], 404);
+        }
+
+        ['model' => $user] = $result;
+
+        // ✅ forceFill + save avoids the primary key column mismatch
+        $user->forceFill([
+            'password' => Hash::make($request->input('password')),
+        ])->save();
+
+        Cache::forget("ipeso_reset_{$email}");
+
+        return response()->json([
+            'message' => 'Password reset successfully. You can now log in.',
+        ], 200);
+    }
+
+    /**
+     * GET /api/auth/me  [auth:sanctum]
+     */
+    public function me(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        $role = match (true) {
+            $user instanceof JobSeeker    => 'seeker',
+            $user instanceof Employer     => 'employer',
+            $user instanceof Administrator => 'admin',
+            default                       => 'unknown',
+        };
+
+        return response()->json([
+            'user' => $this->buildUserPayload($user, $role),
+        ], 200);
+    }
+
+    /**
+     * POST /api/auth/logout  [auth:sanctum]
+     */
+    public function logout(Request $request): JsonResponse
+    {
+        $request->user()->currentAccessToken()->delete();
+
+        return response()->json([
+            'message' => 'Logged out successfully.',
+        ], 200);
+    }
+}

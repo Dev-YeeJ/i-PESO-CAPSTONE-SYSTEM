@@ -1,150 +1,141 @@
-// src/layouts/EmployerLayout.jsx
+// i-peso-frontend/src/layouts/EmployerLayout.jsx
+import { useState } from 'react'
 import { Outlet, NavLink, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '@/stores/authStore'
-import { useState } from 'react'
 
-const NAV = [
-  { to: '/employer/dashboard', label: 'Dashboard',   icon: '⊞' },
-  // Sprint 2+
-  { to: '/employer/vacancies', label: 'Vacancies',   icon: '📋', disabled: true },
-  { to: '/employer/applicants',label: 'Applicants',  icon: '👥', disabled: true },
-  { to: '/employer/interviews', label: 'Interviews', icon: '🗓', disabled: true },
+const navItems = [
+  {
+    to: '/employer/dashboard',
+    label: 'Dashboard',
+    icon: <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>,
+  },
+  {
+    to: '/employer/post-job',
+    label: 'Post a Job',
+    icon: <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v6m3-3H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
+  },
+  {
+    to: '/employer/vacancies',
+    label: 'My Vacancies',
+    icon: <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M20.25 14.15v4.25c0 1.094-.787 2.036-1.872 2.18-2.087.277-4.216.42-6.378.42s-4.291-.143-6.378-.42c-1.085-.144-1.872-1.086-1.872-2.18v-4.25m16.5 0a2.18 2.18 0 00.75-1.661V8.706c0-1.081-.768-2.015-1.837-2.175a48.114 48.114 0 00-3.413-.387m4.5 8.006c-.194.165-.42.295-.673.38A23.978 23.978 0 0112 15.75c-2.648 0-5.195-.429-7.577-1.22a2.016 2.016 0 01-.673-.38m0 0A2.18 2.18 0 013 12.489V8.706c0-1.081.768-2.015 1.837-2.175a48.111 48.111 0 013.413-.387m7.5 0V5.25A2.25 2.25 0 0013.5 3h-3a2.25 2.25 0 00-2.25 2.25v.894m7.5 0a48.667 48.667 0 00-7.5 0" /></svg>,
+  },
+  {
+    to: '/employer/applicants',
+    label: 'Applicants',
+    icon: <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" /></svg>,
+  },
+  {
+    to: '/employer/interviews',
+    label: 'Interviews',
+    icon: <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" /></svg>,
+  },
 ]
 
-export default function EmployerLayout() {
-  const { user, logout } = useAuthStore()
-  const navigate = useNavigate()
-  const [sidebarOpen, setSidebarOpen] = useState(true)
+const EmployerLayout = () => {
+  const navigate  = useNavigate()
+  const logout    = useAuthStore((s) => s.logout)
+  const user      = useAuthStore((s) => s.user)
+  const [collapsed, setCollapsed] = useState(false)
 
   const handleLogout = async () => {
     await logout()
-    navigate('/login')
+    navigate('/login', { replace: true })
   }
 
+  const initials = user?.name?.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase() ?? 'EM'
+
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--color-bg)' }}>
-      {/* Sidebar */}
-      <aside style={{
-        width: sidebarOpen ? 240 : 64,
-        background: 'var(--color-primary-dark)',
-        display: 'flex',
-        flexDirection: 'column',
-        transition: 'width 0.25s cubic-bezier(0.4,0,0.2,1)',
-        flexShrink: 0,
-        position: 'sticky',
-        top: 0,
-        height: '100vh',
-        overflow: 'hidden',
-      }}>
-        {/* Logo area */}
-        <div style={{
-          padding: '20px 16px',
-          borderBottom: '1px solid rgba(255,255,255,0.08)',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 10,
-          minHeight: 64,
-        }}>
-          <div style={{
-            width: 32, height: 32, borderRadius: 8, flexShrink: 0,
-            background: 'var(--color-accent)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontWeight: 700, color: '#fff', fontSize: 14,
-          }}>iP</div>
-          {sidebarOpen && (
+    <div className="min-h-screen bg-slate-50 flex">
+
+      {/* ── SIDEBAR ── */}
+      <aside className={`hidden md:flex flex-col bg-white border-r border-slate-200 transition-all duration-200 ${collapsed ? 'w-16' : 'w-60'}`}>
+
+        {/* Logo */}
+        <div className={`h-16 flex items-center border-b border-slate-200 ${collapsed ? 'justify-center px-4' : 'px-5 gap-3'}`}>
+          <div className="w-8 h-8 bg-blue-700 rounded-lg flex items-center justify-center flex-shrink-0">
+            <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6z" />
+            </svg>
+          </div>
+          {!collapsed && (
             <div>
-              <div style={{ color: '#fff', fontWeight: 600, fontSize: 14, lineHeight: 1.2 }}>i-PESO</div>
-              <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11 }}>Employer Portal</div>
+              <p className="font-bold text-blue-800 text-sm leading-none">i-PESO</p>
+              <p className="text-[10px] text-slate-500 mt-0.5">Employer Portal</p>
             </div>
           )}
         </div>
 
-        {/* Nav */}
-        <nav style={{ flex: 1, padding: '12px 8px' }}>
-          {NAV.map(({ to, label, icon, disabled }) => (
+        {/* Nav Items */}
+        <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
+          {navItems.map(({ to, label, icon }) => (
             <NavLink
               key={to}
-              to={disabled ? '#' : to}
-              onClick={e => disabled && e.preventDefault()}
-              style={({ isActive }) => ({
-                display: 'flex', alignItems: 'center', gap: 10,
-                padding: '10px 10px',
-                borderRadius: 8, marginBottom: 2,
-                color: disabled ? 'rgba(255,255,255,0.25)'
-                     : isActive ? '#fff' : 'rgba(255,255,255,0.65)',
-                background: isActive ? 'rgba(255,255,255,0.12)' : 'transparent',
-                textDecoration: 'none', fontSize: 14, fontWeight: 500,
-                cursor: disabled ? 'not-allowed' : 'pointer',
-                transition: 'all 0.15s',
-                whiteSpace: 'nowrap', overflow: 'hidden',
-              })}
+              to={to}
+              end={to === '/employer/dashboard'}
+              title={collapsed ? label : undefined}
+              className={({ isActive }) =>
+                `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${
+                  isActive
+                    ? 'bg-blue-50 text-blue-700'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                } ${collapsed ? 'justify-center' : ''}`
+              }
             >
-              <span style={{ fontSize: 16, flexShrink: 0 }}>{icon}</span>
-              {sidebarOpen && <span>{label}</span>}
+              <span className="flex-shrink-0">{icon}</span>
+              {!collapsed && label}
             </NavLink>
           ))}
         </nav>
 
-        {/* User + Logout */}
-        <div style={{ padding: '12px 8px', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
-          {sidebarOpen && user && (
-            <div style={{ padding: '8px 10px', marginBottom: 4 }}>
-              <div style={{ color: '#fff', fontSize: 13, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {user.company_name || user.first_name}
-              </div>
-              <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {user.email}
-              </div>
-            </div>
-          )}
+        {/* Collapse toggle */}
+        <div className="p-3 border-t border-slate-200">
           <button
-            onClick={handleLogout}
-            style={{
-              width: '100%', display: 'flex', alignItems: 'center', gap: 10,
-              padding: '10px 10px', borderRadius: 8,
-              background: 'transparent', border: 'none',
-              color: 'rgba(255,255,255,0.5)', fontSize: 14, fontWeight: 500,
-              cursor: 'pointer', transition: 'all 0.15s',
-              whiteSpace: 'nowrap', overflow: 'hidden',
-            }}
-            onMouseOver={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.08)'; e.currentTarget.style.color = '#fff' }}
-            onMouseOut={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'rgba(255,255,255,0.5)' }}
+            onClick={() => setCollapsed(!collapsed)}
+            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-slate-500 hover:bg-slate-100 transition-colors"
           >
-            <span style={{ fontSize: 16, flexShrink: 0 }}>→</span>
-            {sidebarOpen && <span>Log out</span>}
+            <svg className={`w-5 h-5 flex-shrink-0 transition-transform ${collapsed ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M11.25 9l-3 3m0 0l3 3m-3-3h7.5M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            {!collapsed && <span>Collapse</span>}
           </button>
         </div>
       </aside>
 
-      {/* Main content */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-        {/* Top header */}
-        <header style={{
-          height: 64, background: 'var(--color-surface)',
-          borderBottom: '1px solid var(--color-border)',
-          display: 'flex', alignItems: 'center',
-          padding: '0 24px', gap: 16,
-          position: 'sticky', top: 0, zIndex: 10,
-        }}>
-          <button
-            onClick={() => setSidebarOpen(o => !o)}
-            style={{ background: 'none', border: 'none', fontSize: 20, color: 'var(--color-text-2)', padding: 4, borderRadius: 6, cursor: 'pointer' }}
-          >☰</button>
-          <span style={{ flex: 1 }} />
-          <div style={{
-            width: 36, height: 36, borderRadius: '50%',
-            background: 'var(--color-primary-50)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontWeight: 600, fontSize: 14, color: 'var(--color-primary)',
-          }}>
-            {user?.company_name?.[0] || user?.first_name?.[0] || 'E'}
+      {/* ── MAIN AREA ── */}
+      <div className="flex-1 flex flex-col min-w-0">
+
+        {/* Top Header */}
+        <header className="sticky top-0 z-30 h-16 bg-white border-b border-slate-200 flex items-center justify-between px-6">
+          <div>
+            <p className="text-sm font-semibold text-slate-800">{user?.name}</p>
+            <p className="text-xs text-slate-500">Employer Account</p>
+          </div>
+
+          <div className="flex items-center gap-3">
+            {/* Notification bell (Sprint 2+) */}
+            <button className="p-2 rounded-lg text-slate-500 hover:bg-slate-100 transition-colors">
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" />
+              </svg>
+            </button>
+            <div className="flex items-center gap-2 border-l border-slate-200 pl-3">
+              <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-white text-xs font-bold">
+                {initials}
+              </div>
+              <button onClick={handleLogout} className="text-xs font-medium text-red-600 hover:text-red-700">
+                Sign out
+              </button>
+            </div>
           </div>
         </header>
 
-        <main style={{ flex: 1, padding: 32, overflow: 'auto' }} className="page-enter">
+        {/* Page Content */}
+        <main className="flex-1 p-6 overflow-y-auto">
           <Outlet />
         </main>
       </div>
     </div>
   )
 }
+
+export default EmployerLayout

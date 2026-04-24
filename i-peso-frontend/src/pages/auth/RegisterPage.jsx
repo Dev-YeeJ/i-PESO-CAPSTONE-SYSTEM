@@ -1,288 +1,417 @@
-// src/pages/auth/RegisterPage.jsx
-import { useState } from 'react'
-import { useNavigate, useSearchParams, Link } from 'react-router-dom'
-import { useAuthStore } from '@/stores/authStore'
+import { useState, useCallback } from 'react'
+import { useNavigate, useLocation, Link } from 'react-router-dom'
 import { authService } from '@/services/authService'
-import AppInput from '@/components/common/AppInput'
-import AppButton from '@/components/common/AppButton'
-import AppAlert from '@/components/common/AppAlert'
 
 const EDUC_OPTIONS = [
-  'Elementary Graduate', 'High School Graduate', 'Vocational / Technical',
-  'College Level', "Bachelor's Degree", "Master's Degree", 'Doctorate',
+  'Elementary Graduate', 'High School Graduate', 'Senior High School Graduate',
+  'Vocational / Technical', 'College Undergraduate', 'College Graduate',
+  "Master's Degree", 'Doctorate',
 ]
 
 const INDUSTRY_OPTIONS = [
   'Agriculture', 'Construction', 'Education', 'Finance & Banking',
-  'Healthcare', 'Hospitality & Tourism', 'Information Technology',
-  'Manufacturing', 'Retail & Commerce', 'Transportation', 'Other',
+  'Food & Beverage', 'Healthcare', 'Information Technology',
+  'Manufacturing', 'Retail & Commerce', 'Transportation', 'Tourism & Hospitality', 'Other',
 ]
 
-function SeekerForm({ onSuccess }) {
-  const [form, setForm] = useState({
-    first_name: '', last_name: '', email: '', mobile_number: '',
-    complete_address: '', educ_attainment: '', password: '', password_confirmation: '',
-  })
-  const [errors, setErrors] = useState({})
-  const [apiError, setApiError] = useState('')
-  const [loading, setLoading] = useState(false)
-  const setAuth = useAuthStore((s) => s.setAuth)
-
-  const set = (e) => {
-    setForm(f => ({ ...f, [e.target.name]: e.target.value }))
-    setErrors(er => ({ ...er, [e.target.name]: '' }))
-    setApiError('')
-  }
-
-  const validate = () => {
-    const errs = {}
-    if (!form.first_name.trim()) errs.first_name = 'Required'
-    if (!form.last_name.trim())  errs.last_name  = 'Required'
-    if (!form.email.trim() || !/\S+@\S+\.\S+/.test(form.email)) errs.email = 'Valid email required'
-    if (!form.mobile_number.trim()) errs.mobile_number = 'Required'
-    if (!form.complete_address.trim()) errs.complete_address = 'Required'
-    if (!form.educ_attainment) errs.educ_attainment = 'Required'
-    if (!form.password || form.password.length < 8) errs.password = 'At least 8 characters'
-    if (form.password !== form.password_confirmation) errs.password_confirmation = 'Passwords do not match'
-    return errs
-  }
-
-  const handleSubmit = async (e) => {
-    e.preventDefault()
-    const errs = validate()
-    if (Object.keys(errs).length) { setErrors(errs); return }
-    setLoading(true)
-    try {
-      const { user, token } = await authService.registerSeeker(form)
-      setAuth(user, token)
-      onSuccess()
-    } catch (err) {
-      const data = err.response?.data
-      if (data?.errors) {
-        // Laravel validation errors
-        const mapped = {}
-        Object.entries(data.errors).forEach(([k, v]) => { mapped[k] = v[0] })
-        setErrors(mapped)
-      } else {
-        setApiError(data?.message || 'Registration failed. Please try again.')
-      }
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  return (
-    <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-      {apiError && <AppAlert variant="error" onDismiss={() => setApiError('')}>{apiError}</AppAlert>}
-
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-        <AppInput id="first_name" name="first_name" label="First name" value={form.first_name} onChange={set} error={errors.first_name} required />
-        <AppInput id="last_name"  name="last_name"  label="Last name"  value={form.last_name}  onChange={set} error={errors.last_name}  required />
-      </div>
-      <AppInput id="email"        name="email"        label="Email address"  type="email"  value={form.email}        onChange={set} error={errors.email}        required />
-      <AppInput id="mobile_number" name="mobile_number" label="Mobile number" type="tel" value={form.mobile_number} onChange={set} error={errors.mobile_number} required placeholder="09XX XXX XXXX" />
-      <AppInput id="complete_address" name="complete_address" label="Complete address" value={form.complete_address} onChange={set} error={errors.complete_address} required />
-
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-        <label htmlFor="educ_attainment" style={{ fontSize: 14, fontWeight: 500 }}>
-          Educational attainment <span style={{ color: 'var(--color-error)' }}>*</span>
-        </label>
-        <select
-          id="educ_attainment" name="educ_attainment"
-          value={form.educ_attainment} onChange={set}
-          style={{
-            padding: '10px 14px', fontSize: 15, fontFamily: 'var(--font-body)',
-            border: `1px solid ${errors.educ_attainment ? 'var(--color-error)' : 'var(--color-border)'}`,
-            borderRadius: 'var(--radius-md)', background: 'var(--color-surface)',
-            color: form.educ_attainment ? 'var(--color-text)' : 'var(--color-text-3)',
-            outline: 'none',
-          }}
-        >
-          <option value="">Select attainment…</option>
-          {EDUC_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
-        </select>
-        {errors.educ_attainment && <span style={{ fontSize: 13, color: 'var(--color-error)' }}>⚠ {errors.educ_attainment}</span>}
-      </div>
-
-      <AppInput id="password"              name="password"              label="Password"         type="password" value={form.password}              onChange={set} error={errors.password}              required hint="Minimum 8 characters" />
-      <AppInput id="password_confirmation" name="password_confirmation" label="Confirm password" type="password" value={form.password_confirmation} onChange={set} error={errors.password_confirmation} required />
-
-      <AppButton type="submit" loading={loading} style={{ width: '100%', marginTop: 4 }}>
-        Create Seeker Account
-      </AppButton>
-    </form>
-  )
+// ── Password Strength ────────────────────────────────────────
+const getPasswordStrength = (pw) => {
+  if (!pw) return { score: 0, label: '', color: '' }
+  let score = 0
+  if (pw.length >= 8)           score++
+  if (pw.length >= 12)          score++
+  if (/[A-Z]/.test(pw))         score++
+  if (/[0-9]/.test(pw))         score++
+  if (/[^A-Za-z0-9]/.test(pw))  score++
+  if (score <= 1) return { score, label: 'Weak',   color: 'bg-red-400' }
+  if (score <= 3) return { score, label: 'Fair',   color: 'bg-amber-400' }
+  if (score === 4) return { score, label: 'Good',  color: 'bg-blue-500' }
+  return { score, label: 'Strong', color: 'bg-green-500' }
 }
 
-function EmployerForm({ onSuccess }) {
-  const [form, setForm] = useState({
-    company_name: '', representative_name: '', email: '', mobile_number: '',
-    complete_address: '', industry_type: '', password: '', password_confirmation: '',
-  })
-  const [errors, setErrors] = useState({})
-  const [apiError, setApiError] = useState('')
-  const [loading, setLoading] = useState(false)
-  const setAuth = useAuthStore((s) => s.setAuth)
-
-  const set = (e) => {
-    setForm(f => ({ ...f, [e.target.name]: e.target.value }))
-    setErrors(er => ({ ...er, [e.target.name]: '' }))
-    setApiError('')
-  }
-
-  const validate = () => {
-    const errs = {}
-    if (!form.company_name.trim())       errs.company_name       = 'Required'
-    if (!form.representative_name.trim()) errs.representative_name = 'Required'
-    if (!form.email.trim() || !/\S+@\S+\.\S+/.test(form.email)) errs.email = 'Valid email required'
-    if (!form.mobile_number.trim())      errs.mobile_number      = 'Required'
-    if (!form.complete_address.trim())   errs.complete_address   = 'Required'
-    if (!form.industry_type)             errs.industry_type      = 'Required'
-    if (!form.password || form.password.length < 8) errs.password = 'At least 8 characters'
-    if (form.password !== form.password_confirmation) errs.password_confirmation = 'Passwords do not match'
-    return errs
-  }
-
-  const handleSubmit = async (e) => {
-    e.preventDefault()
-    const errs = validate()
-    if (Object.keys(errs).length) { setErrors(errs); return }
-    setLoading(true)
-    try {
-      const { user, token } = await authService.registerEmployer(form)
-      setAuth(user, token)
-      onSuccess()
-    } catch (err) {
-      const data = err.response?.data
-      if (data?.errors) {
-        const mapped = {}
-        Object.entries(data.errors).forEach(([k, v]) => { mapped[k] = v[0] })
-        setErrors(mapped)
-      } else {
-        setApiError(data?.message || 'Registration failed. Please try again.')
-      }
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  return (
-    <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-      {apiError && <AppAlert variant="error" onDismiss={() => setApiError('')}>{apiError}</AppAlert>}
-
-      <AppInput id="company_name"       name="company_name"       label="Company name"          value={form.company_name}       onChange={set} error={errors.company_name}       required />
-      <AppInput id="representative_name" name="representative_name" label="Representative name"  value={form.representative_name} onChange={set} error={errors.representative_name} required />
-      <AppInput id="email"              name="email"              label="Company email"  type="email" value={form.email}        onChange={set} error={errors.email}              required />
-      <AppInput id="mobile_number"      name="mobile_number"      label="Mobile number"  type="tel"   value={form.mobile_number}   onChange={set} error={errors.mobile_number}      required placeholder="09XX XXX XXXX" />
-      <AppInput id="complete_address"   name="complete_address"   label="Business address"       value={form.complete_address}   onChange={set} error={errors.complete_address}   required />
-
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-        <label htmlFor="industry_type" style={{ fontSize: 14, fontWeight: 500 }}>
-          Industry type <span style={{ color: 'var(--color-error)' }}>*</span>
-        </label>
-        <select
-          id="industry_type" name="industry_type"
-          value={form.industry_type} onChange={set}
-          style={{
-            padding: '10px 14px', fontSize: 15, fontFamily: 'var(--font-body)',
-            border: `1px solid ${errors.industry_type ? 'var(--color-error)' : 'var(--color-border)'}`,
-            borderRadius: 'var(--radius-md)', background: 'var(--color-surface)',
-            color: form.industry_type ? 'var(--color-text)' : 'var(--color-text-3)',
-            outline: 'none',
-          }}
-        >
-          <option value="">Select industry…</option>
-          {INDUSTRY_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
-        </select>
-        {errors.industry_type && <span style={{ fontSize: 13, color: 'var(--color-error)' }}>⚠ {errors.industry_type}</span>}
-      </div>
-
-      <AppInput id="password"              name="password"              label="Password"         type="password" value={form.password}              onChange={set} error={errors.password}              required hint="Minimum 8 characters" />
-      <AppInput id="password_confirmation" name="password_confirmation" label="Confirm password" type="password" value={form.password_confirmation} onChange={set} error={errors.password_confirmation} required />
-
-      <AppButton type="submit" loading={loading} style={{ width: '100%', marginTop: 4 }} variant="primary">
-        Create Employer Account
-      </AppButton>
-    </form>
-  )
+// ── Validation ───────────────────────────────────────────────
+const validateSeeker = (f) => {
+  const e = {}
+  if (!f.first_name?.trim())          e.first_name      = 'First name is required.'
+  if (!f.last_name?.trim())           e.last_name       = 'Last name is required.'
+  if (!f.educ_attainment)             e.educ_attainment = 'Please select your educational attainment.'
+  if (!f.email?.trim())               e.email           = 'Email is required.'
+  else if (!/\S+@\S+\.\S+/.test(f.email)) e.email       = 'Enter a valid email address.'
+  if (!f.mobile_number?.trim())       e.mobile_number   = 'Mobile number is required.'
+  else if (!/^09\d{9}$/.test(f.mobile_number.replace(/[-\s]/g, '')))
+                                      e.mobile_number   = 'Enter a valid PH mobile number (09XXXXXXXXX).'
+  if (!f.complete_address?.trim())    e.complete_address = 'Complete address is required.'
+  if (!f.password)                    e.password        = 'Password is required.'
+  else if (f.password.length < 8)     e.password        = 'Password must be at least 8 characters.'
+  if (!f.password_confirmation)       e.password_confirmation = 'Please confirm your password.'
+  else if (f.password !== f.password_confirmation)
+                                      e.password_confirmation = 'Passwords do not match.'
+  return e
 }
 
-export default function RegisterPage() {
+const validateEmployer = (f) => {
+  const e = {}
+  if (!f.company_name?.trim())            e.company_name        = 'Company name is required.'
+  if (!f.representative_name?.trim())     e.representative_name = 'Representative name is required.'
+  if (!f.industry_type)                   e.industry_type       = 'Please select an industry.'
+  if (!f.email?.trim())                   e.email               = 'Email is required.'
+  else if (!/\S+@\S+\.\S+/.test(f.email)) e.email              = 'Enter a valid email address.'
+  if (!f.mobile_number?.trim())           e.mobile_number       = 'Mobile number is required.'
+  if (!f.complete_address?.trim())        e.complete_address    = 'Complete address is required.'
+  if (!f.password)                        e.password            = 'Password is required.'
+  else if (f.password.length < 8)         e.password            = 'Password must be at least 8 characters.'
+  if (!f.password_confirmation)           e.password_confirmation = 'Please confirm your password.'
+  else if (f.password !== f.password_confirmation)
+                                          e.password_confirmation = 'Passwords do not match.'
+  return e
+}
+
+// ── Eye Icon ─────────────────────────────────────────────────
+const EyeIcon = ({ open }) => open ? (
+  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
+    <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+  </svg>
+) : (
+  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.242 4.242L9.88 9.88" />
+  </svg>
+)
+
+// ── Field Component (OUTSIDE RegisterPage) ───────────────────
+const Field = ({ label, name, type = 'text', placeholder, value, onChange, onBlur, error, rightElement }) => (
+  <div>
+    <label className="block text-sm font-medium text-slate-700 mb-1.5">{label}</label>
+    <div className="relative">
+      <input
+        type={type}
+        name={name}
+        value={value}
+        onChange={onChange}
+        onBlur={onBlur}
+        placeholder={placeholder}
+        className={`w-full px-3.5 py-2.5 text-sm rounded-xl border bg-white transition-all focus:outline-none focus:ring-2 focus:ring-blue-500/20 ${
+          rightElement ? 'pr-11' : ''
+        } ${
+          error ? 'border-red-400 focus:border-red-400' : 'border-slate-300 focus:border-blue-400'
+        }`}
+      />
+      {rightElement && (
+        <div className="absolute right-3 top-1/2 -translate-y-1/2">
+          {rightElement}
+        </div>
+      )}
+    </div>
+    {error && (
+      <p className="mt-1.5 text-xs text-red-600 flex items-center gap-1">
+        <svg className="w-3 h-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+          <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+        </svg>
+        {error}
+      </p>
+    )}
+  </div>
+)
+
+const RegisterPage = () => {
   const navigate = useNavigate()
-  const [searchParams] = useSearchParams()
-  const initialRole = searchParams.get('role') === 'employer' ? 'employer' : 'seeker'
-  const [activeTab, setActiveTab] = useState(initialRole)
+  const location = useLocation()
 
-  const handleSuccess = () => {
-    // After registration, always go to verify-email
-    navigate('/verify-email', { replace: true })
+  const [role, setRole]         = useState(location.state?.preselectedRole ?? 'seeker')
+  const [form, setForm]         = useState({})
+  const [errors, setErrors]     = useState({})
+  const [touched, setTouched]   = useState({})
+  const [isLoading, setIsLoading] = useState(false)
+  const [apiError, setApiError] = useState('')
+  const [showPw, setShowPw]     = useState(false)
+  const [showConfirmPw, setShowConfirmPw] = useState(false)
+
+  const strength = getPasswordStrength(form.password ?? '')
+
+  const handleChange = useCallback((e) => {
+    const { name, value } = e.target
+    setForm((f) => ({ ...f, [name]: value }))
+    setApiError('')
+    // Live-clear field error once user starts correcting
+    setErrors((err) => ({ ...err, [name]: undefined }))
+  }, [])
+
+  const handleBlur = useCallback((e) => {
+    setTouched((t) => ({ ...t, [e.target.name]: true }))
+  }, [])
+
+  const handleRoleSwitch = (newRole) => {
+    setRole(newRole)
+    setForm({})
+    setErrors({})
+    setTouched({})
+    setApiError('')
   }
 
-  const tabStyle = (tab) => ({
-    flex: 1, padding: '12px 8px', border: 'none', cursor: 'pointer',
-    fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 600,
-    background: activeTab === tab ? 'var(--color-surface)' : 'transparent',
-    color: activeTab === tab ? 'var(--color-primary)' : 'var(--color-text-2)',
-    borderBottom: activeTab === tab ? '2px solid var(--color-primary)' : '2px solid transparent',
-    transition: 'all 0.15s',
-  })
+  const getError = (name) => touched[name] ? errors[name] : undefined
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+
+    // Mark all fields touched to show all errors
+    const allFields = role === 'seeker'
+      ? ['first_name','last_name','educ_attainment','email','mobile_number','complete_address','password','password_confirmation']
+      : ['company_name','representative_name','industry_type','email','mobile_number','complete_address','password','password_confirmation']
+
+    setTouched(Object.fromEntries(allFields.map((f) => [f, true])))
+
+    const errs = role === 'seeker' ? validateSeeker(form) : validateEmployer(form)
+    setErrors(errs)
+    if (Object.keys(errs).length) return
+
+    setIsLoading(true)
+    setApiError('')
+
+    try {
+      const data = await authService.register({ ...form, role })
+      localStorage.setItem('ipeso_pending_email', data.email)
+      navigate('/verify-email', { state: { email: data.email } })
+    } catch (err) {
+      if (err.response?.status === 422) {
+        setErrors(err.response.data.errors ?? {})
+      } else {
+        setApiError(err.response?.data?.message ?? 'Registration failed. Please try again.')
+      }
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
-      background: 'linear-gradient(135deg, #f8f9fb 0%, #e8f0fc 100%)',
-      padding: '40px 24px',
-    }}>
-      <div style={{ width: '100%', maxWidth: 520 }}>
-        <div style={{
-          background: 'var(--color-surface)',
-          borderRadius: 'var(--radius-2xl)',
-          border: '1px solid var(--color-border)',
-          boxShadow: 'var(--shadow-xl)',
-          overflow: 'hidden',
-        }}>
-          {/* Header */}
-          <div style={{ padding: '32px 40px 24px', textAlign: 'center', borderBottom: '1px solid var(--color-border)' }}>
-            <div style={{
-              width: 52, height: 52, borderRadius: 14, margin: '0 auto 14px',
-              background: 'var(--color-primary)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 22, fontWeight: 800, color: '#fff',
-            }}>iP</div>
-            <h1 style={{ fontSize: 22, fontWeight: 700, color: 'var(--color-text)', marginBottom: 4 }}>
-              Create an account
-            </h1>
-            <p style={{ fontSize: 14, color: 'var(--color-text-2)' }}>
-              Join i-PESO and start your employment journey
-            </p>
-          </div>
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-white flex items-center justify-center p-4 py-10">
 
-          {/* Tabs */}
-          <div style={{ display: 'flex', borderBottom: '1px solid var(--color-border)', background: 'var(--color-surface-2)' }}>
-            <button style={tabStyle('seeker')}   onClick={() => setActiveTab('seeker')}>👤 Job Seeker</button>
-            <button style={tabStyle('employer')} onClick={() => setActiveTab('employer')}>🏢 Employer</button>
-          </div>
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute -top-40 -right-40 w-96 h-96 bg-blue-100 rounded-full opacity-30 blur-3xl" />
+        <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-indigo-100 rounded-full opacity-30 blur-3xl" />
+      </div>
 
-          {/* Form */}
-          <div style={{ padding: '28px 40px 32px' }}>
-            {activeTab === 'seeker'
-              ? <SeekerForm   onSuccess={handleSuccess} />
-              : <EmployerForm onSuccess={handleSuccess} />
-            }
+      <div className="w-full max-w-lg relative">
+
+        {/* Header */}
+        <div className="text-center mb-8">
+          <div className="inline-flex items-center gap-2.5 mb-5">
+            <div className="w-10 h-10 bg-blue-700 rounded-xl flex items-center justify-center shadow-lg shadow-blue-200">
+              <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z" />
+              </svg>
+            </div>
+            <div className="text-left">
+              <p className="text-base font-bold text-blue-900 leading-none">i-PESO</p>
+              <p className="text-[10px] text-slate-500 leading-none mt-0.5 uppercase tracking-wide">Urdaneta City</p>
+            </div>
           </div>
+          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Create your account</h1>
+          <p className="text-sm text-slate-500 mt-1">Public Employment Service Office — Urdaneta City</p>
         </div>
 
-        <p style={{ textAlign: 'center', marginTop: 16, fontSize: 14, color: 'var(--color-text-2)' }}>
-          Already have an account?{' '}
-          <Link to="/login" style={{ color: 'var(--color-primary)', fontWeight: 600, textDecoration: 'none' }}>
-            Log in
-          </Link>
-        </p>
-        <p style={{ textAlign: 'center', marginTop: 8, fontSize: 13, color: 'var(--color-text-3)' }}>
-          <Link to="/" style={{ color: 'var(--color-text-3)', textDecoration: 'none' }}>← Back to home</Link>
-        </p>
+        {/* Card */}
+        <div className="bg-white border border-slate-200 rounded-2xl shadow-sm shadow-slate-100 p-8">
+
+          {/* Role Toggle */}
+          <div className="flex gap-1 bg-slate-100 p-1 rounded-xl mb-6">
+            {[
+              { value: 'seeker',   label: 'Job Seeker',
+                icon: <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0" /></svg>
+              },
+              { value: 'employer', label: 'Employer',
+                icon: <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M20.25 14.15v4.25c0 1.094-.787 2.036-1.872 2.18-2.087.277-4.216.42-6.378.42s-4.291-.143-6.378-.42c-1.085-.144-1.872-1.086-1.872-2.18v-4.25m16.5 0a2.18 2.18 0 00.75-1.661V8.706c0-1.081-.768-2.015-1.837-2.175a48.114 48.114 0 00-3.413-.387m4.5 8.006c-.194.165-.42.295-.673.38A23.978 23.978 0 0112 15.75c-2.648 0-5.195-.429-7.577-1.22a2.016 2.016 0 01-.673-.38m0 0A2.18 2.18 0 013 12.489V8.706c0-1.081.768-2.015 1.837-2.175a48.111 48.111 0 013.413-.387m7.5 0V5.25A2.25 2.25 0 0013.5 3h-3a2.25 2.25 0 00-2.25 2.25v.894m7.5 0a48.667 48.667 0 00-7.5 0" /></svg>
+              },
+            ].map(({ value, label, icon }) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => handleRoleSwitch(value)}
+                className={`flex-1 flex items-center justify-center gap-2 py-2.5 text-sm font-semibold rounded-lg transition-all ${
+                  role === value
+                    ? 'bg-white text-blue-700 shadow-sm'
+                    : 'text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                {icon}{label}
+              </button>
+            ))}
+          </div>
+
+          {/* API Error */}
+          {apiError && (
+            <div className="mb-5 flex items-start gap-3 p-3.5 bg-red-50 border border-red-200 rounded-xl">
+              <svg className="w-4 h-4 text-red-500 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+              </svg>
+              <p className="text-sm text-red-700">{apiError}</p>
+            </div>
+          )}
+
+          <form onSubmit={handleSubmit} noValidate className="space-y-4">
+
+            {/* ── SEEKER FIELDS ── */}
+            {role === 'seeker' && (
+              <>
+                <div className="grid grid-cols-2 gap-3">
+                  <Field label="First Name" name="first_name" placeholder="Juan"
+                    value={form.first_name ?? ''} onChange={handleChange} onBlur={handleBlur}
+                    error={getError('first_name')} />
+                  <Field label="Last Name" name="last_name" placeholder="dela Cruz"
+                    value={form.last_name ?? ''} onChange={handleChange} onBlur={handleBlur}
+                    error={getError('last_name')} />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1.5">Educational Attainment</label>
+                  <select name="educ_attainment" value={form.educ_attainment ?? ''}
+                    onChange={handleChange} onBlur={handleBlur}
+                    className={`w-full px-3.5 py-2.5 text-sm rounded-xl border bg-white transition-all focus:outline-none focus:ring-2 focus:ring-blue-500/20 ${
+                      getError('educ_attainment') ? 'border-red-400' : 'border-slate-300 focus:border-blue-400'
+                    }`}>
+                    <option value="">Select highest attainment</option>
+                    {EDUC_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
+                  </select>
+                  {getError('educ_attainment') && (
+                    <p className="mt-1.5 text-xs text-red-600 flex items-center gap-1">
+                      <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" /></svg>
+                      {getError('educ_attainment')}
+                    </p>
+                  )}
+                </div>
+              </>
+            )}
+
+            {/* ── EMPLOYER FIELDS ── */}
+            {role === 'employer' && (
+              <>
+                <Field label="Company Name" name="company_name" placeholder="ACME Corporation"
+                  value={form.company_name ?? ''} onChange={handleChange} onBlur={handleBlur}
+                  error={getError('company_name')} />
+                <Field label="Representative Name" name="representative_name" placeholder="Full name of HR/contact person"
+                  value={form.representative_name ?? ''} onChange={handleChange} onBlur={handleBlur}
+                  error={getError('representative_name')} />
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1.5">Industry Type</label>
+                  <select name="industry_type" value={form.industry_type ?? ''}
+                    onChange={handleChange} onBlur={handleBlur}
+                    className={`w-full px-3.5 py-2.5 text-sm rounded-xl border bg-white transition-all focus:outline-none focus:ring-2 focus:ring-blue-500/20 ${
+                      getError('industry_type') ? 'border-red-400' : 'border-slate-300 focus:border-blue-400'
+                    }`}>
+                    <option value="">Select industry</option>
+                    {INDUSTRY_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
+                  </select>
+                  {getError('industry_type') && (
+                    <p className="mt-1.5 text-xs text-red-600 flex items-center gap-1">
+                      <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" /></svg>
+                      {getError('industry_type')}
+                    </p>
+                  )}
+                </div>
+              </>
+            )}
+
+            {/* ── SHARED FIELDS ── */}
+            <Field label="Email Address" name="email" type="email" placeholder="you@example.com"
+              value={form.email ?? ''} onChange={handleChange} onBlur={handleBlur}
+              error={getError('email')} />
+
+            <Field label="Mobile Number" name="mobile_number" placeholder="09XXXXXXXXX"
+              value={form.mobile_number ?? ''} onChange={handleChange} onBlur={handleBlur}
+              error={getError('mobile_number')} />
+
+            <Field label="Complete Address" name="complete_address" placeholder="Barangay, City, Province"
+              value={form.complete_address ?? ''} onChange={handleChange} onBlur={handleBlur}
+              error={getError('complete_address')} />
+
+            {/* Password with strength meter */}
+            <div>
+              <Field label="Password" name="password" type={showPw ? 'text' : 'password'}
+                placeholder="Minimum 8 characters"
+                value={form.password ?? ''} onChange={handleChange} onBlur={handleBlur}
+                error={getError('password')}
+                rightElement={
+                  <button type="button" onClick={() => setShowPw(!showPw)}
+                    className="text-slate-400 hover:text-slate-600 transition-colors" tabIndex={-1}>
+                    <EyeIcon open={showPw} />
+                  </button>
+                }
+              />
+              {/* Password strength bar */}
+              {form.password && (
+                <div className="mt-2">
+                  <div className="flex gap-1 mb-1">
+                    {[1,2,3,4,5].map((i) => (
+                      <div key={i} className={`h-1 flex-1 rounded-full transition-all duration-300 ${
+                        i <= strength.score ? strength.color : 'bg-slate-200'
+                      }`} />
+                    ))}
+                  </div>
+                  <p className={`text-xs font-medium ${
+                    strength.score <= 1 ? 'text-red-500' :
+                    strength.score <= 3 ? 'text-amber-500' :
+                    strength.score === 4 ? 'text-blue-600' : 'text-green-600'
+                  }`}>
+                    {strength.label} password
+                    {strength.score < 3 && ' — add uppercase, numbers, or symbols'}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Confirm Password */}
+            <Field label="Confirm Password" name="password_confirmation"
+              type={showConfirmPw ? 'text' : 'password'}
+              placeholder="Re-enter your password"
+              value={form.password_confirmation ?? ''} onChange={handleChange} onBlur={handleBlur}
+              error={getError('password_confirmation')}
+              rightElement={
+                <button type="button" onClick={() => setShowConfirmPw(!showConfirmPw)}
+                  className="text-slate-400 hover:text-slate-600 transition-colors" tabIndex={-1}>
+                  <EyeIcon open={showConfirmPw} />
+                </button>
+              }
+            />
+
+            {/* Password match checkmark */}
+            {form.password && form.password_confirmation && form.password === form.password_confirmation && (
+              <div className="flex items-center gap-1.5 -mt-1">
+                <svg className="w-3.5 h-3.5 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                </svg>
+                <p className="text-xs text-green-600 font-medium">Passwords match</p>
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="w-full py-3 mt-2 bg-blue-700 hover:bg-blue-800 active:scale-[0.99] disabled:opacity-60 disabled:cursor-not-allowed text-white text-sm font-semibold rounded-xl transition-all flex items-center justify-center gap-2 shadow-sm shadow-blue-200"
+            >
+              {isLoading ? (
+                <>
+                  <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/>
+                  </svg>
+                  Sending verification email…
+                </>
+              ) : 'Create Account'}
+            </button>
+          </form>
+
+          <div className="mt-6 pt-5 border-t border-slate-100 text-center">
+            <p className="text-sm text-slate-500">
+              Already have an account?{' '}
+              <Link to="/login" className="font-semibold text-blue-700 hover:text-blue-800 hover:underline transition-colors">
+                Sign in
+              </Link>
+            </p>
+          </div>
+        </div>
       </div>
     </div>
   )
 }
+
+export default RegisterPage

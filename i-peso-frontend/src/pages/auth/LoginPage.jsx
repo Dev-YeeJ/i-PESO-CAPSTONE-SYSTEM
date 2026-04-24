@@ -1,152 +1,240 @@
-// src/pages/auth/LoginPage.jsx
 import { useState } from 'react'
-import { useNavigate, useSearchParams, Link } from 'react-router-dom'
-import { useAuthStore } from '@/stores/authStore'
+import { useNavigate, Link, useLocation } from 'react-router-dom'
 import { authService } from '@/services/authService'
-import AppInput from '@/components/common/AppInput'
-import AppButton from '@/components/common/AppButton'
-import AppAlert from '@/components/common/AppAlert'
+import { useAuthStore } from '@/stores/authStore'
 
-export default function LoginPage() {
-  const navigate = useNavigate()
-  const [searchParams] = useSearchParams()
-  const setAuth = useAuthStore((s) => s.setAuth)
+const ROLE_ROUTES = {
+  seeker:   '/seeker/dashboard',
+  employer: '/employer/dashboard',
+  admin:    '/admin/dashboard',
+}
 
-  const [form, setForm] = useState({ email: '', password: '' })
-  const [errors, setErrors] = useState({})
-  const [apiError, setApiError] = useState('')
-  const [loading, setLoading] = useState(false)
+const validate = (email, password) => {
+  const errs = {}
+  if (!email)                           errs.email    = 'Email is required.'
+  else if (!/\S+@\S+\.\S+/.test(email)) errs.email    = 'Enter a valid email address.'
+  if (!password)                        errs.password = 'Password is required.'
+  else if (password.length < 8)         errs.password = 'Password must be at least 8 characters.'
+  return errs
+}
 
-  const handleChange = (e) => {
-    setForm(f => ({ ...f, [e.target.name]: e.target.value }))
-    setErrors(er => ({ ...er, [e.target.name]: '' }))
-    setApiError('')
-  }
+const EyeIcon = ({ open }) => open ? (
+  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
+    <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+  </svg>
+) : (
+  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.242 4.242L9.88 9.88" />
+  </svg>
+)
 
-  const validate = () => {
-    const errs = {}
-    if (!form.email) errs.email = 'Email is required'
-    else if (!/\S+@\S+\.\S+/.test(form.email)) errs.email = 'Enter a valid email address'
-    if (!form.password) errs.password = 'Password is required'
-    return errs
+const LoginPage = () => {
+  const navigate  = useNavigate()
+  const location  = useLocation()
+
+  const [email, setEmail]         = useState('')
+  const [password, setPassword]   = useState('')
+  const [showPw, setShowPw]       = useState(false)
+  const [errors, setErrors]       = useState({})
+  const [apiError, setApiError]   = useState('')
+  const [isLoading, setIsLoading] = useState(false)
+  const [touched, setTouched]     = useState({})
+
+  const handleBlur  = (field) => setTouched((t) => ({ ...t, [field]: true }))
+
+  const getFieldError = (field) => {
+    if (!touched[field]) return ''
+    return validate(email, password)[field] ?? ''
   }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    const errs = validate()
+    setTouched({ email: true, password: true })
+    const errs = validate(email, password)
     if (Object.keys(errs).length) { setErrors(errs); return }
 
-    setLoading(true)
-    try {
-      const { user, token } = await authService.login(form.email, form.password)
-      setAuth(user, token)
+    setIsLoading(true)
+    setApiError('')
+    setErrors({})
 
-      // Redirect to intended page or role dashboard
-      const redirect = searchParams.get('redirect')
-      if (redirect) {
-        navigate(redirect, { replace: true })
-      } else {
-        navigate(`/${user.role}/dashboard`, { replace: true })
-      }
+    try {
+      const data = await authService.login(email, password)
+
+      // ✅ Set auth state AND isInitialized atomically — same fix as VerifyEmailPage
+      useAuthStore.setState({
+        user            : data.user,
+        token           : data.token,
+        isAuthenticated : true,
+        isInitialized   : true,
+      })
+      localStorage.setItem('ipeso_token', data.token)
+
+      const params   = new URLSearchParams(location.search)
+      const redirect = params.get('redirect')
+      navigate(redirect ?? ROLE_ROUTES[data.user.role] ?? '/', { replace: true })
+
     } catch (err) {
-      const msg = err.response?.data?.message || 'Invalid credentials. Please try again.'
-      setApiError(msg)
+      const status = err.response?.status
+
+      if (status === 403 && err.response?.data?.email_unverified) {
+        const unverifiedEmail = err.response.data.email
+        localStorage.setItem('ipeso_pending_email', unverifiedEmail)
+        navigate('/verify-email', { state: { email: unverifiedEmail } })
+        return
+      }
+
+      setApiError(err.response?.data?.message ?? 'Login failed. Please check your credentials.')
     } finally {
-      setLoading(false)
+      setIsLoading(false)
     }
   }
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      background: 'linear-gradient(135deg, #f8f9fb 0%, #e8f0fc 100%)',
-      padding: 24,
-    }}>
-      <div style={{ width: '100%', maxWidth: 440 }}>
-        {/* Card */}
-        <div style={{
-          background: 'var(--color-surface)',
-          borderRadius: 'var(--radius-2xl)',
-          border: '1px solid var(--color-border)',
-          boxShadow: 'var(--shadow-xl)',
-          padding: '40px 40px',
-        }}>
-          {/* Brand */}
-          <div style={{ textAlign: 'center', marginBottom: 32 }}>
-            <div style={{
-              width: 52, height: 52, borderRadius: 14, margin: '0 auto 14px',
-              background: 'var(--color-primary)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 22, fontWeight: 800, color: '#fff',
-            }}>iP</div>
-            <h1 style={{ fontSize: 24, fontWeight: 700, color: 'var(--color-text)', marginBottom: 4 }}>
-              Welcome back
-            </h1>
-            <p style={{ fontSize: 14, color: 'var(--color-text-2)' }}>
-              Sign in to your i-PESO account
-            </p>
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-white flex items-center justify-center p-4">
+
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute -top-40 -right-40 w-96 h-96 bg-blue-100 rounded-full opacity-30 blur-3xl" />
+        <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-indigo-100 rounded-full opacity-30 blur-3xl" />
+      </div>
+
+      <div className="w-full max-w-md relative">
+
+        {/* Header */}
+        <div className="text-center mb-8">
+          <div className="inline-flex items-center gap-2.5 mb-5">
+            <div className="w-10 h-10 bg-blue-700 rounded-xl flex items-center justify-center shadow-lg shadow-blue-200">
+              <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z" />
+              </svg>
+            </div>
+            <div className="text-left">
+              <p className="text-base font-bold text-blue-900 leading-none">i-PESO</p>
+              <p className="text-[10px] text-slate-500 leading-none mt-0.5 uppercase tracking-wide">Urdaneta City</p>
+            </div>
           </div>
+          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Welcome back</h1>
+          <p className="text-sm text-slate-500 mt-1">Sign in to your i-PESO account to continue</p>
+        </div>
+
+        {/* Card */}
+        <div className="bg-white border border-slate-200 rounded-2xl shadow-sm shadow-slate-100 p-8">
 
           {apiError && (
-            <div style={{ marginBottom: 20 }}>
-              <AppAlert variant="error" onDismiss={() => setApiError('')}>{apiError}</AppAlert>
+            <div className="mb-5 flex items-start gap-3 p-3.5 bg-red-50 border border-red-200 rounded-xl">
+              <svg className="w-4 h-4 text-red-500 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+              </svg>
+              <p className="text-sm text-red-700">{apiError}</p>
             </div>
           )}
 
-          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <AppInput
-              id="email"
-              name="email"
-              label="Email address"
-              type="email"
-              value={form.email}
-              onChange={handleChange}
-              error={errors.email}
-              placeholder="you@example.com"
-              required
-              autoComplete="email"
-            />
-            <AppInput
-              id="password"
-              name="password"
-              label="Password"
-              type="password"
-              value={form.password}
-              onChange={handleChange}
-              error={errors.password}
-              placeholder="••••••••"
-              required
-              autoComplete="current-password"
-            />
+          <form onSubmit={handleSubmit} noValidate className="space-y-5">
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: -6 }}>
-              <Link to="/forgot-password" style={{ fontSize: 13, color: 'var(--color-primary)', textDecoration: 'none', fontWeight: 500 }}>
-                Forgot password?
-              </Link>
+            {/* Email */}
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                Email Address
+              </label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => { setEmail(e.target.value); setApiError('') }}
+                onBlur={() => handleBlur('email')}
+                placeholder="you@example.com"
+                className={`w-full px-3.5 py-2.5 text-sm rounded-xl border bg-white transition-all focus:outline-none focus:ring-2 focus:ring-blue-500/20 ${
+                  getFieldError('email')
+                    ? 'border-red-400 focus:border-red-400'
+                    : 'border-slate-300 focus:border-blue-400'
+                }`}
+              />
+              {getFieldError('email') && (
+                <p className="mt-1.5 text-xs text-red-600 flex items-center gap-1">
+                  <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                  </svg>
+                  {getFieldError('email')}
+                </p>
+              )}
             </div>
 
-            <AppButton type="submit" loading={loading} style={{ width: '100%', marginTop: 4 }}>
-              Sign in
-            </AppButton>
+            {/* Password */}
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-sm font-medium text-slate-700">Password</label>
+                <Link
+                  to="/forgot-password"
+                  className="text-xs font-medium text-blue-600 hover:text-blue-700 hover:underline transition-colors"
+                >
+                  Forgot password?
+                </Link>
+              </div>
+              <div className="relative">
+                <input
+                  type={showPw ? 'text' : 'password'}
+                  value={password}
+                  onChange={(e) => { setPassword(e.target.value); setApiError('') }}
+                  onBlur={() => handleBlur('password')}
+                  placeholder="Enter your password"
+                  className={`w-full px-3.5 py-2.5 pr-11 text-sm rounded-xl border bg-white transition-all focus:outline-none focus:ring-2 focus:ring-blue-500/20 ${
+                    getFieldError('password')
+                      ? 'border-red-400 focus:border-red-400'
+                      : 'border-slate-300 focus:border-blue-400'
+                  }`}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPw(!showPw)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors p-0.5"
+                  tabIndex={-1}
+                >
+                  <EyeIcon open={showPw} />
+                </button>
+              </div>
+              {getFieldError('password') && (
+                <p className="mt-1.5 text-xs text-red-600 flex items-center gap-1">
+                  <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                  </svg>
+                  {getFieldError('password')}
+                </p>
+              )}
+            </div>
+
+            {/* Submit */}
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="w-full py-3 mt-1 bg-blue-700 hover:bg-blue-800 active:scale-[0.99] disabled:opacity-60 disabled:cursor-not-allowed text-white text-sm font-semibold rounded-xl transition-all flex items-center justify-center gap-2 shadow-sm shadow-blue-200"
+            >
+              {isLoading ? (
+                <>
+                  <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/>
+                  </svg>
+                  Signing in…
+                </>
+              ) : 'Sign In'}
+            </button>
           </form>
 
-          <div style={{
-            marginTop: 24, paddingTop: 24,
-            borderTop: '1px solid var(--color-border)',
-            textAlign: 'center', fontSize: 14, color: 'var(--color-text-2)',
-          }}>
-            Don't have an account?{' '}
-            <Link to="/register" style={{ color: 'var(--color-primary)', fontWeight: 600, textDecoration: 'none' }}>
-              Register here
-            </Link>
+          <div className="mt-6 pt-5 border-t border-slate-100 text-center">
+            <p className="text-sm text-slate-500">
+              Don't have an account?{' '}
+              <Link to="/register" className="font-semibold text-blue-700 hover:text-blue-800 hover:underline transition-colors">
+                Register here
+              </Link>
+            </p>
           </div>
         </div>
 
-        <p style={{ textAlign: 'center', marginTop: 20, fontSize: 13, color: 'var(--color-text-3)' }}>
-          <Link to="/" style={{ color: 'var(--color-text-3)', textDecoration: 'none' }}>← Back to home</Link>
+        <p className="text-center text-xs text-slate-400 mt-4">
+          For PESO Admin access, contact your system administrator.
         </p>
       </div>
     </div>
   )
 }
+
+export default LoginPage
