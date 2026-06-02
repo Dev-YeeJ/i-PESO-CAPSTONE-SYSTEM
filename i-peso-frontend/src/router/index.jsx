@@ -4,21 +4,27 @@ import { useAuthStore } from '@/stores/authStore'
 
 import GuestLayout    from '@/layouts/GuestLayout'
 import EmployerLayout from '@/layouts/EmployerLayout'
-import AdminLayout    from '@/layouts/AdminLayout'
 import SeekerLayout   from '@/layouts/SeekerLayout'
 import App            from '@/App'
-// Add with the other lazy imports
+
+// --- LAZY LOADED PAGES ---
+const LandingPage        = lazy(() => import('@/pages/landing/LandingPage'))
+const LoginPage          = lazy(() => import('@/pages/auth/LoginPage'))
+const VerifyEmailPage    = lazy(() => import('@/pages/auth/VerifyEmailPage'))
 const ForgotPasswordPage = lazy(() => import('@/pages/auth/ForgotPasswordPage'))
 const ResetPasswordPage  = lazy(() => import('@/pages/auth/ResetPasswordPage'))
 
-const LandingPage       = lazy(() => import('@/pages/landing/LandingPage'))
-const LoginPage         = lazy(() => import('@/pages/auth/LoginPage'))
-const RegisterPage      = lazy(() => import('@/pages/auth/RegisterPage'))
-const VerifyEmailPage   = lazy(() => import('@/pages/auth/VerifyEmailPage'))
-const EmployerDashboard = lazy(() => import('@/pages/employer/DashboardPage'))
-const AdminDashboard    = lazy(() => import('@/pages/admin/DashboardPage'))
-const SeekerDashboard   = lazy(() => import('@/pages/seeker/DashboardPage'))
+// Split Registration Pages
+const RegisterGateway      = lazy(() => import('@/pages/auth/register/RegisterGateway'))
+const SeekerRegistration   = lazy(() => import('@/pages/auth/register/SeekerRegistration'))
+const EmployerRegistration = lazy(() => import('@/pages/auth/register/EmployerRegistration'))
 
+// Dashboards
+const EmployerDashboard = lazy(() => import('@/pages/employer/DashboardPage'))
+const SeekerDashboard   = lazy(() => import('@/pages/seeker/DashboardPage'))
+const SeekerOnboarding  = lazy(() => import('@/pages/auth/onboarding/SeekerOnboarding'))
+
+// --- LOADER & SUSPENSE ---
 function PageLoader() {
   const spinnerStyle = {
     width: 32,
@@ -51,6 +57,7 @@ const S = (Component) => (
   </Suspense>
 )
 
+// --- ROUTE GUARDS ---
 function RequireAuth() {
   const isInitialized   = useAuthStore((s) => s.isInitialized)
   const token           = useAuthStore((s) => s.token)
@@ -73,10 +80,23 @@ function RequireVerified() {
   return <Outlet />
 }
 
+function RequireProfileComplete() {
+  const user = useAuthStore((s) => s.user)
+  if (user?.role === 'seeker' && !user?.profile_completed) {
+    return <Navigate to="/seeker/onboarding" replace />
+  }
+  return <Outlet />
+}
+
 function RequireRole({ role }) {
   const user     = useAuthStore((s) => s.user)
-  const userRole = user?.role ?? null
-  if (userRole !== role) return <Navigate to={'/' + userRole + '/dashboard'} replace />
+  const userRole = user?.role
+
+  if (userRole !== role) {
+    if (!userRole) return <Navigate to="/login" replace />
+    return <Navigate to={`/${userRole}/dashboard`} replace />
+  }
+  
   return <Outlet />
 }
 
@@ -85,31 +105,40 @@ function GuestOnly() {
   const token           = useAuthStore((s) => s.token)
   const user            = useAuthStore((s) => s.user)
   const isAuthenticated = !!token && !!user
-  const userRole        = user?.role ?? null
+  const userRole        = user?.role
 
   if (!isInitialized) return <PageLoader />
-  if (isAuthenticated && userRole) return <Navigate to={'/' + userRole + '/dashboard'} replace />
+  
+  if (isAuthenticated) {
+    if (!userRole) {
+        return <Navigate to="/login" replace />
+    }
+    return <Navigate to={`/${userRole}/dashboard`} replace />
+  }
+  
   return <Outlet />
 }
 
+// --- ROUTER CONFIGURATION ---
 export const router = createBrowserRouter([
   {
     element: <App />,
     children: [
-
+      
       {
         element: <GuestLayout />,
         children: [
-          { path: '/',             element: S(LandingPage) },
+          { path: '/', element: S(LandingPage) },
           { path: '/verify-email', element: S(VerifyEmailPage) },
-
           {
             element: <GuestOnly />,
             children: [
-              { path: '/login',    element: S(LoginPage) },
-              { path: '/register', element: S(RegisterPage) },
-              { path: '/forgot-password', element: S(ForgotPasswordPage) },
-              { path: '/reset-password', element: S(ResetPasswordPage) },
+              { path: '/login',             element: S(LoginPage) },
+              { path: '/register',          element: S(RegisterGateway) },
+              { path: '/register/seeker',   element: S(SeekerRegistration) },
+              { path: '/register/employer', element: S(EmployerRegistration) },
+              { path: '/forgot-password',   element: S(ForgotPasswordPage) },
+              { path: '/reset-password',    element: S(ResetPasswordPage) },
             ],
           },
         ],
@@ -117,56 +146,46 @@ export const router = createBrowserRouter([
 
       {
         element: <RequireAuth />,
-        children: [{
-          element: <RequireVerified />,
-          children: [{
-            element: <RequireRole role="employer" />,
-            children: [{
-              path: '/employer',
-              element: <EmployerLayout />,
-              children: [
-                { index: true, element: <Navigate to="dashboard" replace /> },
-                { path: 'dashboard', element: S(EmployerDashboard) },
-              ],
-            }],
-          }],
-        }],
-      },
+        children: [
+          { path: '/seeker/onboarding', element: S(SeekerOnboarding) },
 
-      {
-        element: <RequireAuth />,
-        children: [{
-          element: <RequireVerified />,
-          children: [{
-            element: <RequireRole role="admin" />,
-            children: [{
-              path: '/admin',
-              element: <AdminLayout />,
-              children: [
-                { index: true, element: <Navigate to="dashboard" replace /> },
-                { path: 'dashboard', element: S(AdminDashboard) },
-              ],
-            }],
-          }],
-        }],
-      },
-
-      {
-        element: <RequireAuth />,
-        children: [{
-          element: <RequireVerified />,
-          children: [{
-            element: <RequireRole role="seeker" />,
-            children: [{
-              path: '/seeker',
-              element: <SeekerLayout />,
-              children: [
-                { index: true, element: <Navigate to="dashboard" replace /> },
-                { path: 'dashboard', element: S(SeekerDashboard) },
-              ],
-            }],
-          }],
-        }],
+          {
+            element: <RequireVerified />,
+            children: [
+              {
+                path: '/employer',
+                element: <RequireRole role="employer" />,
+                children: [
+                  {
+                    element: <EmployerLayout />,
+                    children: [
+                      { index: true, element: <Navigate to="dashboard" replace /> },
+                      { path: 'dashboard', element: S(EmployerDashboard) },
+                    ],
+                  }
+                ],
+              },
+              {
+                path: '/seeker',
+                element: <RequireRole role="seeker" />,
+                children: [
+                  {
+                    element: <RequireProfileComplete />,
+                    children: [
+                      {
+                        element: <SeekerLayout />,
+                        children: [
+                          { index: true, element: <Navigate to="dashboard" replace /> },
+                          { path: 'dashboard', element: S(SeekerDashboard) },
+                        ],
+                      }
+                    ],
+                  }
+                ],
+              },
+            ],
+          },
+        ],
       },
 
       { path: '*', element: <Navigate to="/" replace /> },

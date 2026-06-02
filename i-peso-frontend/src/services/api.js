@@ -19,17 +19,27 @@ const apiClient = axios.create({
 // here because this runs outside React's component/hook system.
 apiClient.interceptors.request.use(
   (config) => {
-    // Zustand persist stores the token under 'ipeso-auth' as JSON
+    // Try Zustand persist format first ('ipeso-auth')
+    let token = null
     try {
       const stored = localStorage.getItem('ipeso-auth')
       if (stored) {
         const { state } = JSON.parse(stored)
         if (state?.token) {
-          config.headers['Authorization'] = `Bearer ${state.token}`
+          token = state.token
         }
       }
     } catch {
       // Malformed storage — ignore
+    }
+    
+    // Fall back to direct 'ipeso_token' key (used by VerifyEmailPage)
+    if (!token) {
+      token = localStorage.getItem('ipeso_token')
+    }
+    
+    if (token) {
+      config.headers['Authorization'] = `Bearer ${token}`
     }
     return config
   },
@@ -37,13 +47,17 @@ apiClient.interceptors.request.use(
 )
 
 // ── RESPONSE INTERCEPTOR ─────────────────────────────────────
-// 401 anywhere = token dead → wipe and redirect to login
+// 401 anywhere = token dead → clear auth (but let component handle navigation)
 apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
+      // Clear invalid token from localStorage
+      localStorage.removeItem('ipeso_token')
       localStorage.removeItem('ipeso-auth')
-      window.location.href = '/login'
+      
+      // Let the error propagate so components can handle it gracefully
+      // Router guards will naturally redirect to login if needed
     }
     return Promise.reject(error)
   }

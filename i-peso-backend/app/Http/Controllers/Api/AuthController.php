@@ -63,13 +63,23 @@ class AuthController extends Controller
             'admin'    => trim("{$user->first_name} {$user->last_name}"),
         };
 
-        return [
+        $payload = [
             'id'                => $user->getKey(),
             'name'              => $name,
             'email'             => $user->email,
             'role'              => $role,
             'email_verified_at' => $user->email_verified_at,
         ];
+
+        // Add seeker-specific field
+        if ($role === 'seeker' && $user instanceof JobSeeker) {
+            $payload['profile_completed'] = $user->profile_completed;
+            $payload['first_name']        = $user->first_name;
+            $payload['last_name']         = $user->last_name;
+            $payload['mobile_number']     = $user->mobile_number;
+        }
+
+        return $payload;
     }
 
     // ── PUBLIC ENDPOINTS ─────────────────────────────────────────────────────
@@ -82,36 +92,34 @@ class AuthController extends Controller
         $role = $request->input('role');
 
         $rules = [
-            'role'             => ['required', 'in:seeker,employer'],
-            'email'            => ['required', 'email', 'max:255'],
-            'password'         => ['required', 'confirmed', Password::min(8)],
-            'mobile_number'    => ['required', 'string', 'max:20'],
-            'complete_address' => ['required', 'string', 'max:500'],
+            'role'          => ['required', 'in:seeker,employer'],
+            'email'         => ['required', 'email', 'max:255'],
+            'password'      => ['required', 'confirmed', Password::min(8)],
+            'mobile_number' => ['required', 'string', 'max:20'],
         ];
 
         if ($role === 'seeker') {
-            $rules['first_name']      = ['required', 'string', 'max:100'];
-            $rules['last_name']       = ['required', 'string', 'max:100'];
-            $rules['educ_attainment'] = ['required', 'string', 'max:100'];
-            $rules['email'][]         = Rule::unique('job_seekers', 'email');
+            $rules['first_name'] = ['required', 'string', 'max:100'];
+            $rules['last_name']  = ['required', 'string', 'max:100'];
+            $rules['email'][]    = Rule::unique('job_seekers', 'email');
         } else {
             $rules['company_name']        = ['required', 'string', 'max:255'];
             $rules['representative_name'] = ['required', 'string', 'max:255'];
             $rules['industry_type']       = ['required', 'string', 'max:100'];
             $rules['email'][]             = Rule::unique('employers', 'email');
+            $rules['complete_address']    = ['required', 'string', 'max:500'];
         }
 
         $validated = $request->validate($rules);
 
         if ($role === 'seeker') {
             JobSeeker::create([
-                'first_name'       => $validated['first_name'],
-                'last_name'        => $validated['last_name'],
-                'email'            => $validated['email'],
-                'password'         => Hash::make($validated['password']),
-                'mobile_number'    => $validated['mobile_number'],
-                'complete_address' => $validated['complete_address'],
-                'educ_attainment'  => $validated['educ_attainment'],
+                'first_name'    => $validated['first_name'],
+                'last_name'     => $validated['last_name'],
+                'email'         => $validated['email'],
+                'password'      => Hash::make($validated['password']),
+                'mobile_number' => $validated['mobile_number'],
+                'complete_address' => $validated['complete_address'] ?? null,
             ]);
         } else {
             Employer::create([
@@ -120,7 +128,7 @@ class AuthController extends Controller
                 'email'               => $validated['email'],
                 'password'            => Hash::make($validated['password']),
                 'mobile_number'       => $validated['mobile_number'],
-                'complete_address'    => $validated['complete_address'],
+                'complete_address'    => $validated['complete_address'] ?? null,
                 'industry_type'       => $validated['industry_type'],
             ]);
         }
