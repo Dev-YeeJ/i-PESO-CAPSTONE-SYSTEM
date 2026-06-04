@@ -4,21 +4,66 @@ import { useAuthStore } from '@/stores/authStore'
 
 import GuestLayout    from '@/layouts/GuestLayout'
 import EmployerLayout from '@/layouts/EmployerLayout'
-import AdminLayout    from '@/layouts/AdminLayout'
 import SeekerLayout   from '@/layouts/SeekerLayout'
+import AdminLayout    from '@/layouts/AdminLayout'
 import App            from '@/App'
-// Add with the other lazy imports
+
+// --- LAZY LOADED PAGES ---
+const LandingPage        = lazy(() => import('@/pages/landing/LandingPage'))
+const LoginPage          = lazy(() => import('@/pages/auth/LoginPage'))
+const VerifyEmailPage    = lazy(() => import('@/pages/auth/VerifyEmailPage'))
 const ForgotPasswordPage = lazy(() => import('@/pages/auth/ForgotPasswordPage'))
 const ResetPasswordPage  = lazy(() => import('@/pages/auth/ResetPasswordPage'))
 
-const LandingPage       = lazy(() => import('@/pages/landing/LandingPage'))
-const LoginPage         = lazy(() => import('@/pages/auth/LoginPage'))
-const RegisterPage      = lazy(() => import('@/pages/auth/RegisterPage'))
-const VerifyEmailPage   = lazy(() => import('@/pages/auth/VerifyEmailPage'))
-const EmployerDashboard = lazy(() => import('@/pages/employer/DashboardPage'))
-const AdminDashboard    = lazy(() => import('@/pages/admin/DashboardPage'))
-const SeekerDashboard   = lazy(() => import('@/pages/seeker/DashboardPage'))
+// Split Registration Pages
+const RegisterGateway      = lazy(() => import('@/pages/auth/register/RegisterGateway'))
+const SeekerRegistration   = lazy(() => import('@/pages/auth/register/SeekerRegistration'))
+const EmployerRegistration = lazy(() => import('@/pages/auth/register/EmployerRegistration'))
 
+// Dashboards
+const EmployerDashboard = lazy(() => import('@/pages/employer/DashboardPage'))
+const SeekerDashboard   = lazy(() => import('@/pages/seeker/DashboardPage'))
+const SeekerOnboarding  = lazy(() => import('@/pages/auth/onboarding/SeekerOnboarding'))
+
+// Admin Pages - CATEGORY 1: OVERVIEW
+const AdminDashboard = lazy(() => import('@/pages/admin/1-overview/dashboard/DashboardPage'))
+
+// Admin Pages - CATEGORY 2: CONSTITUENT CRM
+const AdminVerificationQueue = lazy(() => import('@/pages/admin/2-constituent-crm/job-seekers/VerificationQueuePage'))
+const AdminJobSeekersList    = lazy(() => import('@/pages/admin/2-constituent-crm/job-seekers/JobSeekersListPage'))
+const AdminJobSeekerDetail   = lazy(() => import('@/pages/admin/2-constituent-crm/job-seekers/JobSeekerDetailPage'))
+const AdminEmployersList     = lazy(() => import('@/pages/admin/2-constituent-crm/employers/EmployersListPage'))
+const AdminEmployerDetail    = lazy(() => import('@/pages/admin/2-constituent-crm/employers/EmployerDetailPage'))
+
+// Admin Pages - CATEGORY 3: EMPLOYMENT HUB
+const AdminJobPostingsList = lazy(() => import('@/pages/admin/3-employment-hub/job-postings/JobPostingsListPage'))
+const AdminSmartMatches = lazy(() => import('@/pages/admin/3-employment-hub/smart-matches/SmartMatchesPage'))
+const AdminMatchResults = lazy(() => import('@/pages/admin/3-employment-hub/smart-matches/MatchResultsPage'))
+
+// Admin Pages - CATEGORY 4: GOVERNMENT & DOLE
+const AdminGovernmentProgramsList = lazy(() => import('@/pages/admin/4-government-dole/government-programs/GovernmentProgramsListPage'))
+const AdminGovernmentProgramForm = lazy(() => import('@/pages/admin/4-government-dole/government-programs/GovernmentProgramFormPage'))
+const AdminProgramApplicants    = lazy(() => import('@/pages/admin/4-government-dole/government-programs/ProgramApplicantsPage'))
+const AdminJobFairsList         = lazy(() => import('@/pages/admin/4-government-dole/government-programs/JobFairsListPage'))
+const AdminJobFairForm          = lazy(() => import('@/pages/admin/4-government-dole/government-programs/JobFairFormPage'))
+const AdminDOLEReporting       = lazy(() => import('@/pages/admin/4-government-dole/dole-reporting/DOLEReportingPage'))
+const AdminPEISExport          = lazy(() => import('@/pages/admin/4-government-dole/dole-reporting/PEISExportPage'))
+
+// Admin Pages - CATEGORY 5: SYSTEM & REPORTS
+const AdminLaborAnalytics = lazy(() => import('@/pages/admin/5-system-reports/labor-analytics/LaborAnalyticsPage'))
+const AdminAnalyticsDetail = lazy(() => import('@/pages/admin/5-system-reports/labor-analytics/AnalyticsDetailPage'))
+const AdminActivityLogs    = lazy(() => import('@/pages/admin/5-system-reports/activity-logs/ActivityLogsPage'))
+const AdminSMSNotifications = lazy(() => import('@/pages/admin/5-system-reports/sms-notifications/SMSNotificationsPage'))
+const AdminSMSTemplates = lazy(() => import('@/pages/admin/5-system-reports/sms-notifications/SMSTemplatesPage'))
+
+// Admin Pages - CATEGORY 6: CONFIGURATION
+const AdminStaffList = lazy(() => import('@/pages/admin/6-configuration/staff/StaffListPage'))
+const AdminRolePermissions = lazy(() => import('@/pages/admin/6-configuration/staff/RolePermissionsPage'))
+const AdminAnnouncements = lazy(() => import('@/pages/admin/6-configuration/content/AnnouncementsPage'))
+const AdminContentModules = lazy(() => import('@/pages/admin/6-configuration/content/ContentModuleListPage'))
+const AdminSystemSettings = lazy(() => import('@/pages/admin/6-configuration/settings/SystemSettingsPage'))
+
+// --- LOADER & SUSPENSE ---
 function PageLoader() {
   const spinnerStyle = {
     width: 32,
@@ -51,6 +96,7 @@ const S = (Component) => (
   </Suspense>
 )
 
+// --- ROUTE GUARDS ---
 function RequireAuth() {
   const isInitialized   = useAuthStore((s) => s.isInitialized)
   const token           = useAuthStore((s) => s.token)
@@ -73,10 +119,26 @@ function RequireVerified() {
   return <Outlet />
 }
 
+function RequireProfileComplete() {
+  const user = useAuthStore((s) => s.user)
+  if (user?.role === 'seeker' && !user?.profile_completed) {
+    return <Navigate to="/seeker/onboarding" replace />
+  }
+  return <Outlet />
+}
+
 function RequireRole({ role }) {
+  const isInitialized = useAuthStore((s) => s.isInitialized)
   const user     = useAuthStore((s) => s.user)
-  const userRole = user?.role ?? null
-  if (userRole !== role) return <Navigate to={'/' + userRole + '/dashboard'} replace />
+  const userRole = user?.role
+
+  if (!isInitialized) return <PageLoader />
+
+  if (userRole !== role) {
+    if (!userRole) return <Navigate to="/login" replace />
+    return <Navigate to={`/${userRole}/dashboard`} replace />
+  }
+  
   return <Outlet />
 }
 
@@ -85,31 +147,40 @@ function GuestOnly() {
   const token           = useAuthStore((s) => s.token)
   const user            = useAuthStore((s) => s.user)
   const isAuthenticated = !!token && !!user
-  const userRole        = user?.role ?? null
+  const userRole        = user?.role
 
   if (!isInitialized) return <PageLoader />
-  if (isAuthenticated && userRole) return <Navigate to={'/' + userRole + '/dashboard'} replace />
+  
+  if (isAuthenticated) {
+    if (!userRole) {
+        return <Navigate to="/login" replace />
+    }
+    return <Navigate to={`/${userRole}/dashboard`} replace />
+  }
+  
   return <Outlet />
 }
 
+// --- ROUTER CONFIGURATION ---
 export const router = createBrowserRouter([
   {
     element: <App />,
     children: [
-
+      
       {
         element: <GuestLayout />,
         children: [
-          { path: '/',             element: S(LandingPage) },
+          { path: '/', element: S(LandingPage) },
           { path: '/verify-email', element: S(VerifyEmailPage) },
-
           {
             element: <GuestOnly />,
             children: [
-              { path: '/login',    element: S(LoginPage) },
-              { path: '/register', element: S(RegisterPage) },
-              { path: '/forgot-password', element: S(ForgotPasswordPage) },
-              { path: '/reset-password', element: S(ResetPasswordPage) },
+              { path: '/login',             element: S(LoginPage) },
+              { path: '/register',          element: S(RegisterGateway) },
+              { path: '/register/seeker',   element: S(SeekerRegistration) },
+              { path: '/register/employer', element: S(EmployerRegistration) },
+              { path: '/forgot-password',   element: S(ForgotPasswordPage) },
+              { path: '/reset-password',    element: S(ResetPasswordPage) },
             ],
           },
         ],
@@ -117,56 +188,98 @@ export const router = createBrowserRouter([
 
       {
         element: <RequireAuth />,
-        children: [{
-          element: <RequireVerified />,
-          children: [{
-            element: <RequireRole role="employer" />,
-            children: [{
-              path: '/employer',
-              element: <EmployerLayout />,
-              children: [
-                { index: true, element: <Navigate to="dashboard" replace /> },
-                { path: 'dashboard', element: S(EmployerDashboard) },
-              ],
-            }],
-          }],
-        }],
-      },
+        children: [
+          { path: '/seeker/onboarding', element: S(SeekerOnboarding) },
 
-      {
-        element: <RequireAuth />,
-        children: [{
-          element: <RequireVerified />,
-          children: [{
-            element: <RequireRole role="admin" />,
-            children: [{
-              path: '/admin',
-              element: <AdminLayout />,
-              children: [
-                { index: true, element: <Navigate to="dashboard" replace /> },
-                { path: 'dashboard', element: S(AdminDashboard) },
-              ],
-            }],
-          }],
-        }],
-      },
-
-      {
-        element: <RequireAuth />,
-        children: [{
-          element: <RequireVerified />,
-          children: [{
-            element: <RequireRole role="seeker" />,
-            children: [{
-              path: '/seeker',
-              element: <SeekerLayout />,
-              children: [
-                { index: true, element: <Navigate to="dashboard" replace /> },
-                { path: 'dashboard', element: S(SeekerDashboard) },
-              ],
-            }],
-          }],
-        }],
+          {
+            element: <RequireVerified />,
+            children: [
+              {
+                path: '/employer',
+                element: <RequireRole role="employer" />,
+                children: [
+                  {
+                    element: <EmployerLayout />,
+                    children: [
+                      { index: true, element: <Navigate to="dashboard" replace /> },
+                      { path: 'dashboard', element: S(EmployerDashboard) },
+                    ],
+                  }
+                ],
+              },
+              {
+                path: '/admin',
+                element: <RequireRole role="administrator" />,
+                children: [
+                  {
+                    element: <AdminLayout />,
+                    children: [
+                      { index: true, element: <Navigate to="dashboard" replace /> },
+                      
+                      // CATEGORY 1: OVERVIEW
+                      { path: 'dashboard', element: S(AdminDashboard) },
+                      
+                      // CATEGORY 2: CONSTITUENT CRM
+                      { path: 'verification-queue', element: S(AdminVerificationQueue) },
+                      { path: 'job-seekers', element: S(AdminJobSeekersList) },
+                      { path: 'job-seekers/:id', element: S(AdminJobSeekerDetail) },
+                      { path: 'employers', element: S(AdminEmployersList) },
+                      { path: 'employers/:id', element: S(AdminEmployerDetail) },
+                      
+                      // CATEGORY 3: EMPLOYMENT HUB
+                      { path: 'job-postings', element: S(AdminJobPostingsList) },
+                      { path: 'smart-matches', element: S(AdminSmartMatches) },
+                      { path: 'smart-matches/:matchId', element: S(AdminMatchResults) },
+                      
+                      // CATEGORY 4: GOVERNMENT & DOLE
+                      { path: 'government-programs', element: S(AdminGovernmentProgramsList) },
+                      { path: 'government-programs/create', element: S(AdminGovernmentProgramForm) },
+                      { path: 'government-programs/:id/edit', element: S(AdminGovernmentProgramForm) },
+                      { path: 'government-programs/:id/applicants', element: S(AdminProgramApplicants) },
+                      { path: 'job-fairs', element: S(AdminJobFairsList) },
+                      { path: 'job-fairs/create', element: S(AdminJobFairForm) },
+                      { path: 'job-fairs/:id/edit', element: S(AdminJobFairForm) },
+                      { path: 'dole-reporting', element: S(AdminDOLEReporting) },
+                      { path: 'peis-export', element: S(AdminPEISExport) },
+                      
+                      // CATEGORY 5: SYSTEM & REPORTS
+                      { path: 'labor-analytics', element: S(AdminLaborAnalytics) },
+                      { path: 'labor-analytics/:id', element: S(AdminAnalyticsDetail) },
+                      { path: 'activity-logs', element: S(AdminActivityLogs) },
+                      { path: 'sms-notifications', element: S(AdminSMSNotifications) },
+                      { path: 'sms-templates', element: S(AdminSMSTemplates) },
+                      
+                      // CATEGORY 6: CONFIGURATION
+                      { path: 'staff', element: S(AdminStaffList) },
+                      { path: 'role-permissions', element: S(AdminRolePermissions) },
+                      { path: 'announcements', element: S(AdminAnnouncements) },
+                      { path: 'content-modules', element: S(AdminContentModules) },
+                      { path: 'settings', element: S(AdminSystemSettings) },
+                    ],
+                  }
+                ],
+              },
+              {
+                path: '/seeker',
+                element: <RequireRole role="seeker" />,
+                children: [
+                  {
+                    element: <RequireProfileComplete />,
+                    children: [
+                      {
+                        element: <SeekerLayout />,
+                        children: [
+                          { index: true, element: <Navigate to="dashboard" replace /> },
+                          { path: 'dashboard', element: S(SeekerDashboard) },
+                        ],
+                      }
+                    ],
+                  }
+                ],
+              },
+            ],
+          },
+        ],
       },
 
       { path: '*', element: <Navigate to="/" replace /> },

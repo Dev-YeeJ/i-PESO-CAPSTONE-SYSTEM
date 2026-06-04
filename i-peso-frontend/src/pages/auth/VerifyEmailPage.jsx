@@ -1,252 +1,179 @@
-import { useState, useRef, useEffect } from 'react'
-import { useNavigate, useLocation } from 'react-router-dom'
+import { useState, useRef } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { authService } from '@/services/authService'
 import { useAuthStore } from '@/stores/authStore'
 
-const RESEND_COUNTDOWN_SECONDS = 60
-
-const ROLE_ROUTES = {
-  seeker:   '/seeker/dashboard',
-  employer: '/employer/dashboard',
-  admin:    '/admin/dashboard',
-}
-
 const VerifyEmailPage = () => {
-  const navigate  = useNavigate()
-  const location  = useLocation()
+  const navigate = useNavigate()
+  const inputRef = useRef(null)
 
-  const email = location.state?.email
-    ?? localStorage.getItem('ipeso_pending_email')
-    ?? ''
+  const [otp, setOtp] = useState('')
+  const [error, setError] = useState('')
+  const [apiError, setApiError] = useState('')
+  const [isLoading, setIsLoading] = useState(false)
+  const [resending, setResending] = useState(false)
+  const [resendSuccess, setResendSuccess] = useState(false)
 
-  const [digits, setDigits]           = useState(Array(6).fill(''))
-  const inputRefs                     = useRef([])
-  const [isVerifying, setIsVerifying] = useState(false)
-  const [isResending, setIsResending] = useState(false)
-  const [apiError, setApiError]       = useState('')
-  const [countdown, setCountdown]     = useState(RESEND_COUNTDOWN_SECONDS)
-  const [canResend, setCanResend]     = useState(false)
+  // Get email from localStorage (set by login page after 403 unverified)
+  const email = localStorage.getItem('ipeso_pending_email') || ''
 
-  useEffect(() => {
-    if (countdown <= 0) { setCanResend(true); return }
-    const timer = setTimeout(() => setCountdown((c) => c - 1), 1000)
-    return () => clearTimeout(timer)
-  }, [countdown])
-
-  useEffect(() => {
-    inputRefs.current[0]?.focus()
-  }, [])
-
-  useEffect(() => {
-    if (!email) navigate('/register', { replace: true })
-  }, [email, navigate])
-
-  const handleDigitChange = (index, value) => {
-    const sanitized = value.replace(/\D/g, '').slice(-1)
-    const updated   = [...digits]
-    updated[index]  = sanitized
-    setDigits(updated)
+  const handleOtpChange = (e) => {
+    const value = e.target.value.replace(/\D/g, '').slice(0, 6)
+    setOtp(value)
+    setError('')
     setApiError('')
-    if (sanitized && index < 5) {
-      inputRefs.current[index + 1]?.focus()
-    }
   }
 
-  const handleKeyDown = (index, e) => {
-    if (e.key === 'Backspace' && !digits[index] && index > 0) {
-      inputRefs.current[index - 1]?.focus()
+  const validateOtp = () => {
+    if (!otp) {
+      setError('Please enter the verification code.')
+      return false
     }
+    if (otp.length !== 6) {
+      setError('Verification code must be exactly 6 digits.')
+      return false
+    }
+    return true
   }
 
-  const handlePaste = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
-    const pasted  = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6)
-    const updated = Array(6).fill('')
-    pasted.split('').forEach((char, i) => { updated[i] = char })
-    setDigits(updated)
-    inputRefs.current[Math.min(pasted.length, 5)]?.focus()
-  }
+    if (!validateOtp()) return
 
-  const handleVerify = async () => {
-    const otp = digits.join('')
-    if (otp.length < 6) {
-      setApiError('Please enter all 6 digits of your verification code.')
-      return
-    }
-
-    setIsVerifying(true)
+    setIsLoading(true)
     setApiError('')
 
     try {
       const data = await authService.verifyOtp(email, otp)
 
-      // ✅ Set auth state AND isInitialized atomically
-      // This prevents RequireAuth from seeing an uninitialized state
-      // and kicking the user to /login before the store settles
-      useAuthStore.setState({
-        user            : data.user,
-        token           : data.token,
-        isAuthenticated : true,
-        isInitialized   : true,
-      })
-      localStorage.setItem('ipeso_token', data.token)
+      // ✅ Use the proper setAuth method from authStore
+      const { setAuth } = useAuthStore.getState()
+      setAuth(data.user, data.token)
+
+      // Clean up pending email
       localStorage.removeItem('ipeso_pending_email')
 
-      // ✅ Navigate to the correct dashboard based on role
-      navigate(ROLE_ROUTES[data.user.role] ?? '/', { replace: true })
+      // Navigate to onboarding
+      navigate('/seeker/onboarding', { replace: true })
 
     } catch (err) {
       setApiError(err.response?.data?.message ?? 'Verification failed. Please try again.')
-      setDigits(Array(6).fill(''))
-      inputRefs.current[0]?.focus()
+      setOtp('')
+      inputRef.current?.focus()
     } finally {
-      setIsVerifying(false)
+      setIsLoading(false)
     }
   }
 
   const handleResend = async () => {
-    if (!canResend) return
-    setIsResending(true)
+    setResending(true)
     setApiError('')
 
     try {
       await authService.resendOtp(email)
-      setCountdown(RESEND_COUNTDOWN_SECONDS)
-      setCanResend(false)
-      setDigits(Array(6).fill(''))
-      inputRefs.current[0]?.focus()
+      setResendSuccess(true)
+      setTimeout(() => setResendSuccess(false), 3000)
     } catch (err) {
-      setApiError(err.response?.data?.message ?? 'Could not resend code. Please try again.')
+      setApiError(err.response?.data?.message ?? 'Failed to resend code.')
     } finally {
-      setIsResending(false)
+      setResending(false)
     }
   }
 
-  const maskedEmail = email.replace(/(.{2}).+(@.+)/, '$1***$2')
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-white flex items-center justify-center p-4">
-
+      {/* Background decorative blobs */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute -top-40 -right-40 w-96 h-96 bg-blue-100 rounded-full opacity-30 blur-3xl" />
         <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-indigo-100 rounded-full opacity-30 blur-3xl" />
       </div>
 
-      <div className="w-full max-w-md relative">
-
-        {/* Header */}
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center gap-2.5 mb-5">
-            <div className="w-10 h-10 bg-blue-700 rounded-xl flex items-center justify-center shadow-lg shadow-blue-200">
-              <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z" />
+      {/* Card Container */}
+      <div className="relative w-full max-w-md">
+        <div className="bg-white rounded-2xl shadow-xl p-8">
+          {/* Header */}
+          <div className="text-center mb-8">
+            <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-100 rounded-full mb-4">
+              <svg className="w-8 h-8 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
               </svg>
             </div>
-            <div className="text-left">
-              <p className="text-base font-bold text-blue-900 leading-none">i-PESO</p>
-              <p className="text-[10px] text-slate-500 leading-none mt-0.5 uppercase tracking-wide">Urdaneta City</p>
-            </div>
+            <h1 className="text-2xl font-bold text-slate-900 mb-2">Verify Your Email</h1>
+            <p className="text-slate-600 text-sm">
+              We've sent a 6-digit code to
+              <span className="font-semibold text-slate-900 block mt-1">{email}</span>
+            </p>
           </div>
-          <div className="w-16 h-16 bg-blue-50 border border-blue-200 rounded-2xl flex items-center justify-center mx-auto mb-5">
-            <svg className="w-8 h-8 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
-            </svg>
-          </div>
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Check your email</h1>
-          <p className="text-sm text-slate-500 mt-2 leading-relaxed">
-            We sent a 6-digit verification code to<br />
-            <span className="font-semibold text-slate-700">{maskedEmail}</span>
-          </p>
-        </div>
 
-        {/* Card */}
-        <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-8">
-
-          {apiError && (
-            <div className="mb-5 flex items-start gap-3 p-3.5 bg-red-50 border border-red-200 rounded-xl">
-              <svg className="w-4 h-4 text-red-500 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
-              </svg>
-              <p className="text-sm text-red-700">{apiError}</p>
-            </div>
-          )}
-
-          {/* 6-Box OTP Input */}
-          <div className="flex gap-2.5 justify-center mb-6" onPaste={handlePaste}>
-            {digits.map((digit, index) => (
+          {/* Form */}
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {/* OTP Input */}
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-3">Verification Code</label>
               <input
-                key={index}
-                ref={(el) => (inputRefs.current[index] = el)}
+                ref={inputRef}
                 type="text"
-                inputMode="numeric"
-                maxLength={1}
-                value={digit}
-                onChange={(e) => handleDigitChange(index, e.target.value)}
-                onKeyDown={(e) => handleKeyDown(index, e)}
-                className={`w-12 h-14 text-center text-xl font-bold rounded-xl border-2 transition-all focus:outline-none focus:ring-2 focus:ring-blue-500/30 ${
-                  apiError
-                    ? 'border-red-300 bg-red-50'
-                    : digit
-                    ? 'border-blue-500 bg-blue-50 text-blue-800'
-                    : 'border-slate-300 bg-white text-slate-900 focus:border-blue-400'
+                value={otp}
+                onChange={handleOtpChange}
+                placeholder="000000"
+                maxLength="6"
+                className={`w-full px-4 py-3.5 text-center text-2xl font-bold tracking-widest rounded-xl border-2 transition-all focus:outline-none ${
+                  error || apiError
+                    ? 'border-red-400 text-red-600 focus:border-red-500'
+                    : 'border-slate-300 text-slate-900 focus:border-blue-500 focus:ring-4 focus:ring-blue-100'
                 }`}
+                inputMode="numeric"
               />
-            ))}
-          </div>
+              {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
+              {apiError && <p className="mt-2 text-sm text-red-600">{apiError}</p>}
+            </div>
 
-          {/* Verify Button */}
-          <button
-            onClick={handleVerify}
-            disabled={isVerifying || digits.join('').length < 6}
-            className="w-full py-3 bg-blue-700 hover:bg-blue-800 active:scale-[0.99] disabled:opacity-60 disabled:cursor-not-allowed text-white text-sm font-semibold rounded-xl transition-all flex items-center justify-center gap-2 shadow-sm shadow-blue-200"
-          >
-            {isVerifying ? (
-              <>
-                <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/>
-                </svg>
-                Verifying…
-              </>
-            ) : 'Verify Email'}
-          </button>
+            {/* Verify Button */}
+            <button
+              type="submit"
+              disabled={isLoading || otp.length !== 6}
+              className="w-full py-3 px-4 bg-gradient-to-r from-blue-600 to-blue-700 text-white font-semibold rounded-xl transition-all hover:shadow-lg hover:from-blue-700 hover:to-blue-800 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            >
+              {isLoading ? (
+                <>
+                  <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 4.5a10 10 0 0 1-18.8 4.2" />
+                  </svg>
+                  Verifying...
+                </>
+              ) : (
+                'Verify Code'
+              )}
+            </button>
 
-          {/* Resend */}
-          <div className="mt-5 text-center">
-            {canResend ? (
+            {/* Resend Link */}
+            <div className="flex items-center justify-center gap-2">
+              <span className="text-slate-600 text-sm">Didn't receive the code?</span>
               <button
+                type="button"
                 onClick={handleResend}
-                disabled={isResending}
-                className="text-sm font-semibold text-blue-700 hover:text-blue-800 disabled:opacity-60 flex items-center gap-1.5 mx-auto transition-colors"
+                disabled={resending}
+                className="text-blue-600 font-semibold text-sm hover:text-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
-                {isResending ? (
-                  <>
-                    <svg className="w-3.5 h-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/>
-                    </svg>
-                    Sending…
-                  </>
-                ) : 'Resend verification code'}
+                {resending ? 'Resending...' : 'Resend Code'}
               </button>
-            ) : (
-              <p className="text-sm text-slate-500">
-                Resend code in{' '}
-                <span className="font-semibold text-slate-700 tabular-nums">{countdown}s</span>
-              </p>
+            </div>
+
+            {/* Resend Success Message */}
+            {resendSuccess && (
+              <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
+                <p className="text-sm text-green-700 font-medium">Code resent successfully!</p>
+              </div>
             )}
+          </form>
+
+          {/* Footer */}
+          <div className="mt-8 pt-6 border-t border-slate-200">
+            <p className="text-center text-xs text-slate-500">
+              Having trouble? Contact our support team for assistance.
+            </p>
           </div>
         </div>
-
-        <p className="text-center text-xs text-slate-400 mt-4">
-          Wrong email?{' '}
-          <span
-            className="text-blue-600 cursor-pointer hover:underline"
-            onClick={() => navigate('/register')}
-          >
-            Go back to register
-          </span>
-        </p>
       </div>
     </div>
   )

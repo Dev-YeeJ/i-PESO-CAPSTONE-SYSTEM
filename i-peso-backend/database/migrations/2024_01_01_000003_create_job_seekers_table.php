@@ -15,8 +15,8 @@ return new class extends Migration
             $table->string('mobile_number', 20);
             $table->string('email', 255)->unique();
             $table->string('password');
-            $table->string('complete_address', 500);
-            $table->string('educ_attainment', 100);
+            $table->string('complete_address', 500)->nullable();
+            $table->string('educ_attainment', 100)->nullable();
             // Stored as JSON array: ["PHP", "React", "Laravel"]
             $table->json('skills')->nullable();
             $table->string('resume_path', 500)->nullable();

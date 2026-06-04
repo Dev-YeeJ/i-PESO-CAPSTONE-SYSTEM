@@ -45,4 +45,38 @@ export const authService = {
   async logout() {
     await apiClient.post('/auth/logout')
   },
+
+  // ===== STEP-BY-STEP PROFILE COMPLETION =====
+  
+  async saveStep1(data) {
+    const res = await apiClient.post('/seeker/step-1', data)
+    return res.data
+  },
+
+  async saveStep2(data) {
+    const res = await apiClient.post('/seeker/step-2', data)
+    return res.data
+  },
+
+  async saveStep3(data) {
+    const res = await apiClient.post('/seeker/step-3', data)
+    return res.data
+  },
+
+  async saveStep4(data) {
+    const res = await apiClient.post('/seeker/step-4', data)
+    return res.data
+  },
+
+  // ===== LEGACY: Single-submit endpoint =====
+  
+  async saveSeekerProfile(profileData) {
+    const res = await apiClient.post('/seeker/profile', profileData)
+    return res.data
+  },
+
+  async getSeekerProfile() {
+    const res = await apiClient.get('/seeker/profile')
+    return res.data.user
+  },
 }

@@ -11,9 +11,9 @@ import { Navigate } from 'react-router-dom'
 import { useAuthStore } from '@/stores/authStore'
 
 const ROLE_HOME = {
-  employer : '/employer/dashboard',
-  seeker   : '/seeker/dashboard',
-  admin    : '/admin/dashboard',
+  employer      : '/employer/dashboard',
+  seeker        : '/seeker/dashboard',
+  administrator : '/admin/dashboard',
 }
 
 const GuestOnlyRoute = ({ children }) => {
