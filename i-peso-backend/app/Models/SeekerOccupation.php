@@ -7,7 +7,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class SeekerOccupation extends Model
 {
-    protected $table    = 'seeker_occupations';
+    protected $table      = 'seeker_occupations';
+    protected $primaryKey = 'id';
+    protected $keyType    = 'int';
+    public $timestamps    = true;
+    
     protected $fillable = ['seeker_id', 'occupation_title', 'preference_order'];
 
     public function seeker(): BelongsTo

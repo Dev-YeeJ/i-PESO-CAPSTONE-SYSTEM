@@ -7,7 +7,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class SeekerDisability extends Model
 {
-    protected $table    = 'seeker_disabilities';
+    protected $table      = 'seeker_disabilities';
+    protected $primaryKey = 'id';
+    protected $keyType    = 'int';
+    public $timestamps    = true;
+    
     protected $fillable = ['seeker_id', 'disability_type', 'disability_specification'];
 
     public function seeker(): BelongsTo

@@ -5,6 +5,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import PageHeader from '@/pages/admin/_components/PageHeader'
 import StatusBadge from '@/pages/admin/_components/StatusBadge'
 import ConfirmModal from '@/pages/admin/_components/ConfirmModal'
+import { DownloadNSRPButton } from '@/pages/admin/_components'
 import { adminService } from '@/services/adminService'
 
 export default function SeekerDetailPage() {
@@ -13,10 +14,6 @@ export default function SeekerDetailPage() {
   const [seeker, setSeeker] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-  const [modalOpen, setModalOpen] = useState(false)
-  const [modalAction, setModalAction] = useState(null)
-  const [verifying, setVerifying] = useState(false)
-
   useEffect(() => {
     const fetchSeeker = async () => {
       try {
@@ -34,29 +31,6 @@ export default function SeekerDetailPage() {
 
     fetchSeeker()
   }, [id])
-
-  const handleVerify = useCallback((action) => {
-    setModalAction(action)
-    setModalOpen(true)
-  }, [])
-
-  const handleVerifyConfirm = useCallback(async (remarks) => {
-    try {
-      setVerifying(true)
-      await adminService.verifySeekerProfile(id, modalAction, remarks)
-      
-      // Refresh seeker data
-      const data = await adminService.getSeekerDetail(id)
-      setSeeker(data)
-      setModalOpen(false)
-      setModalAction(null)
-      setError(null)
-    } catch (err) {
-      setError(err?.response?.data?.message || 'Failed to verify profile')
-    } finally {
-      setVerifying(false)
-    }
-  }, [id, modalAction])
 
   if (loading) {
     return (
@@ -80,8 +54,6 @@ export default function SeekerDetailPage() {
 
   if (!seeker) return null
 
-  const isPendingVerification = seeker.profile_completed && !seeker.is_verified
-
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -89,52 +61,19 @@ export default function SeekerDetailPage() {
           title={`${seeker.first_name} ${seeker.last_name}`}
           subtitle="NSRP Profile Information"
         />
-        <button
-          onClick={() => navigate('/admin/seekers')}
-          className="text-slate-600 hover:text-slate-900 font-medium text-sm"
-        >
-          ← Back
-        </button>
+        <div className="flex items-center gap-3">
+          <DownloadNSRPButton 
+            seekerId={seeker.seeker_id} 
+            seekerName={`${seeker.first_name}_${seeker.last_name}`}
+          />
+          <button
+            onClick={() => navigate('/admin/job-seekers')}
+            className="text-slate-600 hover:text-slate-900 font-medium text-sm"
+          >
+            ← Back
+          </button>
+        </div>
       </div>
-
-      {/* Verification Banner */}
-      {isPendingVerification && (
-        <div className="bg-amber-50 border-2 border-amber-200 rounded-2xl p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="font-bold text-amber-900">Pending Verification</h3>
-              <p className="text-amber-800 text-sm mt-1">This profile is complete and ready for verification</p>
-            </div>
-            <div className="flex gap-2">
-              <button
-                onClick={() => handleVerify('reject')}
-                disabled={verifying}
-                className="bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white rounded-xl px-4 py-2 font-semibold text-sm"
-              >
-                {verifying ? 'Processing...' : 'Reject'}
-              </button>
-              <button
-                onClick={() => handleVerify('approve')}
-                disabled={verifying}
-                className="bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white rounded-xl px-4 py-2 font-semibold text-sm"
-              >
-                {verifying ? 'Processing...' : 'Approve'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {seeker.is_verified && (
-        <div className="bg-green-50 border border-green-200 rounded-2xl p-4">
-          <div className="flex items-center gap-2">
-            <StatusBadge status="completed" />
-            <span className="text-sm text-green-700">
-              Verified by admin on {new Date(seeker.verified_at).toLocaleDateString()}
-            </span>
-          </div>
-        </div>
-      )}
 
       {error && (
         <div className="bg-red-50 border border-red-200 rounded-2xl p-4">
@@ -261,20 +200,6 @@ export default function SeekerDetailPage() {
         </div>
       </div>
 
-      <ConfirmModal
-        isOpen={modalOpen}
-        title={modalAction === 'approve' ? 'Approve Profile' : 'Reject Profile'}
-        message={
-          modalAction === 'approve'
-            ? 'Are you sure you want to approve this profile?'
-            : 'Are you sure you want to reject this profile? The seeker will be notified.'
-        }
-        requiresReason={modalAction === 'reject'}
-        onConfirm={handleVerifyConfirm}
-        onCancel={() => setModalOpen(false)}
-        confirmText={modalAction === 'approve' ? 'Approve' : 'Reject'}
-        isDangerous={modalAction === 'reject'}
-      />
     </div>
   )
 }

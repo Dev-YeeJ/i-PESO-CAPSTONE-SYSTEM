@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\Admin\GovernmentDole\ProgramController as AdminProg
 use App\Http\Controllers\Api\Admin\GovernmentDole\JobFairController as AdminJobFairController;
 use App\Http\Controllers\Api\Admin\SystemReports\ReportController as AdminReportController;
 use App\Http\Controllers\Api\Admin\SystemReports\ActivityController as AdminActivityController;
+use App\Http\Controllers\Api\Admin\NSRPPdfExportController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('auth')->group(function () {
@@ -44,6 +45,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/seekers/{id}', [AdminSeekerController::class, 'show']);
         Route::post('/seekers/{id}/verify', [AdminSeekerController::class, 'verify']);
         Route::get('/seekers/verification-queue', [AdminSeekerController::class, 'verificationQueue']);
+        Route::get('/job-seekers/{id}/export-nsrp-pdf', [NSRPPdfExportController::class, 'exportNSRPPdf']);
 
         // Employers
         Route::get('/employers', [AdminEmployerController::class, 'index']);

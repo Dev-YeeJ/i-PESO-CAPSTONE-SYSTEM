@@ -58,9 +58,9 @@ class SeekerController extends Controller
         }
 
         $seeker = JobSeeker::with([
-            'disabilities' => function($q) { $q->select('disability_id', 'seeker_id', 'disability_type', 'disability_specification'); },
-            'languages' => function($q) { $q->select('lang_id', 'seeker_id', 'language', 'read', 'write', 'speak', 'understand'); },
-            'occupations' => function($q) { $q->select('occ_id', 'seeker_id', 'occupation_title'); },
+            'disabilities:id,seeker_id,disability_type,disability_specification',
+            'languages:id,seeker_id,language,language_other,can_read,can_write,can_speak,can_understand',
+            'occupations:id,seeker_id,occupation_title,preference_order',
         ])->findOrFail($id);
 
         return response()->json($seeker);

@@ -37,6 +37,8 @@ const AdminEmployerDetail    = lazy(() => import('@/pages/admin/2-constituent-cr
 
 // Admin Pages - CATEGORY 3: EMPLOYMENT HUB
 const AdminJobPostingsList = lazy(() => import('@/pages/admin/3-employment-hub/job-postings/JobPostingsListPage'))
+const AdminSmartMatches = lazy(() => import('@/pages/admin/3-employment-hub/smart-matches/SmartMatchesPage'))
+const AdminMatchResults = lazy(() => import('@/pages/admin/3-employment-hub/smart-matches/MatchResultsPage'))
 
 // Admin Pages - CATEGORY 4: GOVERNMENT & DOLE
 const AdminGovernmentProgramsList = lazy(() => import('@/pages/admin/4-government-dole/government-programs/GovernmentProgramsListPage'))
@@ -44,11 +46,22 @@ const AdminGovernmentProgramForm = lazy(() => import('@/pages/admin/4-government
 const AdminProgramApplicants    = lazy(() => import('@/pages/admin/4-government-dole/government-programs/ProgramApplicantsPage'))
 const AdminJobFairsList         = lazy(() => import('@/pages/admin/4-government-dole/government-programs/JobFairsListPage'))
 const AdminJobFairForm          = lazy(() => import('@/pages/admin/4-government-dole/government-programs/JobFairFormPage'))
+const AdminDOLEReporting       = lazy(() => import('@/pages/admin/4-government-dole/dole-reporting/DOLEReportingPage'))
+const AdminPEISExport          = lazy(() => import('@/pages/admin/4-government-dole/dole-reporting/PEISExportPage'))
 
 // Admin Pages - CATEGORY 5: SYSTEM & REPORTS
 const AdminLaborAnalytics = lazy(() => import('@/pages/admin/5-system-reports/labor-analytics/LaborAnalyticsPage'))
 const AdminAnalyticsDetail = lazy(() => import('@/pages/admin/5-system-reports/labor-analytics/AnalyticsDetailPage'))
 const AdminActivityLogs    = lazy(() => import('@/pages/admin/5-system-reports/activity-logs/ActivityLogsPage'))
+const AdminSMSNotifications = lazy(() => import('@/pages/admin/5-system-reports/sms-notifications/SMSNotificationsPage'))
+const AdminSMSTemplates = lazy(() => import('@/pages/admin/5-system-reports/sms-notifications/SMSTemplatesPage'))
+
+// Admin Pages - CATEGORY 6: CONFIGURATION
+const AdminStaffList = lazy(() => import('@/pages/admin/6-configuration/staff/StaffListPage'))
+const AdminRolePermissions = lazy(() => import('@/pages/admin/6-configuration/staff/RolePermissionsPage'))
+const AdminAnnouncements = lazy(() => import('@/pages/admin/6-configuration/content/AnnouncementsPage'))
+const AdminContentModules = lazy(() => import('@/pages/admin/6-configuration/content/ContentModuleListPage'))
+const AdminSystemSettings = lazy(() => import('@/pages/admin/6-configuration/settings/SystemSettingsPage'))
 
 // --- LOADER & SUSPENSE ---
 function PageLoader() {
@@ -215,6 +228,8 @@ export const router = createBrowserRouter([
                       
                       // CATEGORY 3: EMPLOYMENT HUB
                       { path: 'job-postings', element: S(AdminJobPostingsList) },
+                      { path: 'smart-matches', element: S(AdminSmartMatches) },
+                      { path: 'smart-matches/:matchId', element: S(AdminMatchResults) },
                       
                       // CATEGORY 4: GOVERNMENT & DOLE
                       { path: 'government-programs', element: S(AdminGovernmentProgramsList) },
@@ -224,11 +239,22 @@ export const router = createBrowserRouter([
                       { path: 'job-fairs', element: S(AdminJobFairsList) },
                       { path: 'job-fairs/create', element: S(AdminJobFairForm) },
                       { path: 'job-fairs/:id/edit', element: S(AdminJobFairForm) },
+                      { path: 'dole-reporting', element: S(AdminDOLEReporting) },
+                      { path: 'peis-export', element: S(AdminPEISExport) },
                       
                       // CATEGORY 5: SYSTEM & REPORTS
                       { path: 'labor-analytics', element: S(AdminLaborAnalytics) },
                       { path: 'labor-analytics/:id', element: S(AdminAnalyticsDetail) },
                       { path: 'activity-logs', element: S(AdminActivityLogs) },
+                      { path: 'sms-notifications', element: S(AdminSMSNotifications) },
+                      { path: 'sms-templates', element: S(AdminSMSTemplates) },
+                      
+                      // CATEGORY 6: CONFIGURATION
+                      { path: 'staff', element: S(AdminStaffList) },
+                      { path: 'role-permissions', element: S(AdminRolePermissions) },
+                      { path: 'announcements', element: S(AdminAnnouncements) },
+                      { path: 'content-modules', element: S(AdminContentModules) },
+                      { path: 'settings', element: S(AdminSystemSettings) },
                     ],
                   }
                 ],

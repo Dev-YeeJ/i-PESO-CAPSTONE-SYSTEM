@@ -7,7 +7,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class SeekerLanguage extends Model
 {
-    protected $table    = 'seeker_languages';
+    protected $table      = 'seeker_languages';
+    protected $primaryKey = 'id';
+    protected $keyType    = 'int';
+    public $timestamps    = true;
+    
     protected $fillable = [
         'seeker_id', 'language', 'language_other',
         'can_read', 'can_write', 'can_speak', 'can_understand',
