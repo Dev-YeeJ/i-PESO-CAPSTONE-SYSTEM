@@ -12,26 +12,31 @@ export const useAuthStore = create((set, get) => ({
   // ── ACTIONS ───────────────────────────────────────────────
 
   initializeAuth: async () => {
+    // If already initialized, skip completely
     if (get().isInitialized) return
 
-    // ✅ If setAuth was already called (e.g. just verified OTP), skip the /me call
-    if (get().isAuthenticated && get().user) {
+    // If already has auth data in memory from login, just mark initialized
+    if (get().isAuthenticated && get().user && get().token) {
       set({ isInitialized: true })
       return
     }
 
+    // Try to restore from localStorage (page refresh case)
     const storedToken = localStorage.getItem('ipeso_token')
 
     if (storedToken) {
       set({ token: storedToken })
       try {
         const user = await authService.getAuthenticatedUser()
-        set({ user, isAuthenticated: true })
-      } catch {
+        set({ user, isAuthenticated: true, isInitialized: true })
+        return
+      } catch (error) {
+        console.error('Failed to fetch authenticated user:', error)
         get().clearAuth()
       }
     }
 
+    // No token found or auth failed - mark as initialized (not authenticated)
     set({ isInitialized: true })
   },
 

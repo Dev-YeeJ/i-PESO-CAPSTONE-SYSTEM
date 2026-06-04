@@ -34,7 +34,7 @@ class AuthController extends Controller
         if ($employer) return ['model' => $employer, 'role' => 'employer'];
 
         $admin = Administrator::where('email', $email)->first();
-        if ($admin) return ['model' => $admin, 'role' => 'admin'];
+        if ($admin) return ['model' => $admin, 'role' => 'administrator'];
 
         return null;
     }
@@ -58,9 +58,9 @@ class AuthController extends Controller
         string $role
     ): array {
         $name = match ($role) {
-            'seeker'   => trim("{$user->first_name} {$user->last_name}"),
-            'employer' => $user->company_name,
-            'admin'    => trim("{$user->first_name} {$user->last_name}"),
+            'seeker'        => trim("{$user->first_name} {$user->last_name}"),
+            'employer'      => $user->company_name,
+            'administrator' => trim("{$user->first_name} {$user->last_name}"),
         };
 
         $payload = [
@@ -194,23 +194,37 @@ class AuthController extends Controller
             'password' => ['required', 'string'],
         ]);
 
-        $result = $this->findUserByEmail($request->input('email'));
+        $email = $request->input('email');
+        $password = $request->input('password');
+        
+        $result = $this->findUserByEmail($email);
 
-        if (!$result || !Hash::check($request->input('password'), $result['model']->password)) {
+        // Check if user exists AND password matches
+        if (!$result) {
+            \Log::warning("Login attempt: User not found for email {$email}");
             return response()->json([
                 'message' => 'These credentials do not match our records.',
             ], 401);
         }
 
-        ['model' => $user, 'role' => $role] = $result;
+        $user = $result['model'];
+        $role = $result['role'];
 
+        // Verify password
+        if (!Hash::check($password, $user->password)) {
+            \Log::warning("Login attempt: Password mismatch for email {$email}");
+            return response()->json([
+                'message' => 'These credentials do not match our records.',
+            ], 401);
+        }
+
+        // Check if email is verified
         if (!$user->email_verified_at) {
-            $this->generateAndSendOtp($user->email);
-
+            $this->generateAndSendOtp($email);
             return response()->json([
                 'message'          => 'Your email is not verified. A new code has been sent to your inbox.',
                 'email_unverified' => true,
-                'email'            => $user->email,
+                'email'            => $email,
             ], 403);
         }
 
@@ -218,6 +232,8 @@ class AuthController extends Controller
         $user->tokens()->delete();
 
         $token = $user->createToken('ipeso_access_token')->plainTextToken;
+
+        \Log::info("Login successful for user {$email} with role {$role}");
 
         return response()->json([
             'message' => 'Login successful.',

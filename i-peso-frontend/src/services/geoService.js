@@ -6,7 +6,7 @@ import {
   findProvinceByName,
   findCityByName,
   findBarangayByName,
-} from './psgcService'
+} from './psgcServices'
 
 const NOMINATIM_URL = 'https://nominatim.openstreetmap.org/reverse'
 

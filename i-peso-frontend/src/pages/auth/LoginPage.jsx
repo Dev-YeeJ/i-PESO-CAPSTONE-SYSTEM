@@ -4,9 +4,9 @@ import { authService } from '@/services/authService'
 import { useAuthStore } from '@/stores/authStore'
 
 const ROLE_ROUTES = {
-  seeker:   '/seeker/dashboard',
-  employer: '/employer/dashboard',
-  admin:    '/admin/dashboard',
+  seeker:        '/seeker/dashboard',
+  employer:      '/employer/dashboard',
+  administrator: '/admin/dashboard',
 }
 
 const validate = (email, password) => {
@@ -61,7 +61,7 @@ const LoginPage = () => {
     try {
       const data = await authService.login(email, password)
 
-      // ✅ Set auth state AND isInitialized atomically — same fix as VerifyEmailPage
+      // ✅ Set auth state atomically
       useAuthStore.setState({
         user            : data.user,
         token           : data.token,
@@ -70,9 +70,23 @@ const LoginPage = () => {
       })
       localStorage.setItem('ipeso_token', data.token)
 
+      // ✅ Get the updated store to ensure state is committed
+      const store = useAuthStore.getState()
+      console.log('Auth state after login:', {
+        isAuthenticated: store.isAuthenticated,
+        userRole: store.user?.role,
+        token: !!store.token,
+      })
+
+      // Small delay to let React process the state change
+      await new Promise(resolve => setTimeout(resolve, 50))
+
+      // Navigate to dashboard
       const params   = new URLSearchParams(location.search)
       const redirect = params.get('redirect')
-      navigate(redirect ?? ROLE_ROUTES[data.user.role] ?? '/', { replace: true })
+      const destination = redirect ?? ROLE_ROUTES[data.user.role] ?? '/'
+      console.log('Navigating to:', destination)
+      navigate(destination, { replace: true })
 
     } catch (err) {
       const status = err.response?.status

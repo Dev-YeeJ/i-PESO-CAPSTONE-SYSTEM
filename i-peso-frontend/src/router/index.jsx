@@ -5,6 +5,7 @@ import { useAuthStore } from '@/stores/authStore'
 import GuestLayout    from '@/layouts/GuestLayout'
 import EmployerLayout from '@/layouts/EmployerLayout'
 import SeekerLayout   from '@/layouts/SeekerLayout'
+import AdminLayout    from '@/layouts/AdminLayout'
 import App            from '@/App'
 
 // --- LAZY LOADED PAGES ---
@@ -23,6 +24,23 @@ const EmployerRegistration = lazy(() => import('@/pages/auth/register/EmployerRe
 const EmployerDashboard = lazy(() => import('@/pages/employer/DashboardPage'))
 const SeekerDashboard   = lazy(() => import('@/pages/seeker/DashboardPage'))
 const SeekerOnboarding  = lazy(() => import('@/pages/auth/onboarding/SeekerOnboarding'))
+
+// Admin Pages
+const AdminDashboard        = lazy(() => import('@/pages/admin/DashboardPage'))
+const AdminVerificationQueue = lazy(() => import('@/pages/admin/seekers/VerificationQueuePage'))
+const AdminSeekersList      = lazy(() => import('@/pages/admin/seekers/SeekersListPage'))
+const AdminSeekerDetail     = lazy(() => import('@/pages/admin/seekers/SeekerDetailPage'))
+const AdminEmployersList    = lazy(() => import('@/pages/admin/employers/EmployersListPage'))
+const AdminEmployerDetail   = lazy(() => import('@/pages/admin/employers/EmployerDetailPage'))
+const AdminVacanciesList    = lazy(() => import('@/pages/admin/vacancies/VacanciesListPage'))
+const AdminProgramsList     = lazy(() => import('@/pages/admin/programs/ProgramsListPage'))
+const AdminProgramForm      = lazy(() => import('@/pages/admin/programs/ProgramFormPage'))
+const AdminProgramApplicants = lazy(() => import('@/pages/admin/programs/ProgramApplicantsPage'))
+const AdminJobFairsList     = lazy(() => import('@/pages/admin/job-fairs/JobFairsListPage'))
+const AdminJobFairForm      = lazy(() => import('@/pages/admin/job-fairs/JobFairFormPage'))
+const AdminReports          = lazy(() => import('@/pages/admin/reports/ReportsPage'))
+const AdminReportDetail     = lazy(() => import('@/pages/admin/reports/ReportDetailPage'))
+const AdminActivityLog      = lazy(() => import('@/pages/admin/activity/ActivityLogPage'))
 
 // --- LOADER & SUSPENSE ---
 function PageLoader() {
@@ -89,8 +107,11 @@ function RequireProfileComplete() {
 }
 
 function RequireRole({ role }) {
+  const isInitialized = useAuthStore((s) => s.isInitialized)
   const user     = useAuthStore((s) => s.user)
   const userRole = user?.role
+
+  if (!isInitialized) return <PageLoader />
 
   if (userRole !== role) {
     if (!userRole) return <Navigate to="/login" replace />
@@ -161,6 +182,49 @@ export const router = createBrowserRouter([
                     children: [
                       { index: true, element: <Navigate to="dashboard" replace /> },
                       { path: 'dashboard', element: S(EmployerDashboard) },
+                    ],
+                  }
+                ],
+              },
+              {
+                path: '/admin',
+                element: <RequireRole role="administrator" />,
+                children: [
+                  {
+                    element: <AdminLayout />,
+                    children: [
+                      { index: true, element: <Navigate to="dashboard" replace /> },
+                      { path: 'dashboard', element: S(AdminDashboard) },
+                      { path: 'verification-queue', element: S(AdminVerificationQueue) },
+                      
+                      // Seekers
+                      { path: 'seekers', element: S(AdminSeekersList) },
+                      { path: 'seekers/:id', element: S(AdminSeekerDetail) },
+                      
+                      // Employers
+                      { path: 'employers', element: S(AdminEmployersList) },
+                      { path: 'employers/:id', element: S(AdminEmployerDetail) },
+                      
+                      // Vacancies
+                      { path: 'vacancies', element: S(AdminVacanciesList) },
+                      
+                      // Programs
+                      { path: 'programs', element: S(AdminProgramsList) },
+                      { path: 'programs/new', element: S(AdminProgramForm) },
+                      { path: 'programs/:id/edit', element: S(AdminProgramForm) },
+                      { path: 'programs/:id/applicants', element: S(AdminProgramApplicants) },
+                      
+                      // Job Fairs
+                      { path: 'job-fairs', element: S(AdminJobFairsList) },
+                      { path: 'job-fairs/new', element: S(AdminJobFairForm) },
+                      { path: 'job-fairs/:id/edit', element: S(AdminJobFairForm) },
+                      
+                      // Reports
+                      { path: 'reports', element: S(AdminReports) },
+                      { path: 'reports/:id', element: S(AdminReportDetail) },
+                      
+                      // Activity Log
+                      { path: 'activity-log', element: S(AdminActivityLog) },
                     ],
                   }
                 ],

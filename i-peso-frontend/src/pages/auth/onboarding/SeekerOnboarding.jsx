@@ -6,8 +6,8 @@ import { useNavigate } from 'react-router-dom'
 import { authService } from '@/services/authService'
 import { useAuthStore } from '@/stores/authStore'
 // ── Add these imports at the top of SeekerOnboarding.jsx ──
-import { useState, useCallback, useEffect, useRef } from 'react'
-import { getProvinces, getCitiesByProvince, getBarangaysByCity } from '@/services/psgcService'
+
+import { getProvinces, getCitiesByProvince, getBarangaysByCity } from '@/services/psgcServices'
 import { detectAddress } from '@/services/geoService'
 
 // ── Constants ─────────────────────────────────────────────────────────────
