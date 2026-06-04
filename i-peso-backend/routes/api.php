@@ -3,12 +3,12 @@
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\SeekerController;
 use App\Http\Controllers\Api\Admin\AdminDashboardController;
-use App\Http\Controllers\Api\Admin\AdminSeekerController;
-use App\Http\Controllers\Api\Admin\AdminEmployerController;
-use App\Http\Controllers\Api\Admin\AdminProgramController;
-use App\Http\Controllers\Api\Admin\AdminJobFairController;
-use App\Http\Controllers\Api\Admin\AdminReportController;
-use App\Http\Controllers\Api\Admin\AdminActivityController;
+use App\Http\Controllers\Api\Admin\ConstituentCRM\SeekerController as AdminSeekerController;
+use App\Http\Controllers\Api\Admin\ConstituentCRM\EmployerController as AdminEmployerController;
+use App\Http\Controllers\Api\Admin\GovernmentDole\ProgramController as AdminProgramController;
+use App\Http\Controllers\Api\Admin\GovernmentDole\JobFairController as AdminJobFairController;
+use App\Http\Controllers\Api\Admin\SystemReports\ReportController as AdminReportController;
+use App\Http\Controllers\Api\Admin\SystemReports\ActivityController as AdminActivityController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('auth')->group(function () {

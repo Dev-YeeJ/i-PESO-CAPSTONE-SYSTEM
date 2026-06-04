@@ -25,22 +25,30 @@ const EmployerDashboard = lazy(() => import('@/pages/employer/DashboardPage'))
 const SeekerDashboard   = lazy(() => import('@/pages/seeker/DashboardPage'))
 const SeekerOnboarding  = lazy(() => import('@/pages/auth/onboarding/SeekerOnboarding'))
 
-// Admin Pages
-const AdminDashboard        = lazy(() => import('@/pages/admin/DashboardPage'))
-const AdminVerificationQueue = lazy(() => import('@/pages/admin/seekers/VerificationQueuePage'))
-const AdminSeekersList      = lazy(() => import('@/pages/admin/seekers/SeekersListPage'))
-const AdminSeekerDetail     = lazy(() => import('@/pages/admin/seekers/SeekerDetailPage'))
-const AdminEmployersList    = lazy(() => import('@/pages/admin/employers/EmployersListPage'))
-const AdminEmployerDetail   = lazy(() => import('@/pages/admin/employers/EmployerDetailPage'))
-const AdminVacanciesList    = lazy(() => import('@/pages/admin/vacancies/VacanciesListPage'))
-const AdminProgramsList     = lazy(() => import('@/pages/admin/programs/ProgramsListPage'))
-const AdminProgramForm      = lazy(() => import('@/pages/admin/programs/ProgramFormPage'))
-const AdminProgramApplicants = lazy(() => import('@/pages/admin/programs/ProgramApplicantsPage'))
-const AdminJobFairsList     = lazy(() => import('@/pages/admin/job-fairs/JobFairsListPage'))
-const AdminJobFairForm      = lazy(() => import('@/pages/admin/job-fairs/JobFairFormPage'))
-const AdminReports          = lazy(() => import('@/pages/admin/reports/ReportsPage'))
-const AdminReportDetail     = lazy(() => import('@/pages/admin/reports/ReportDetailPage'))
-const AdminActivityLog      = lazy(() => import('@/pages/admin/activity/ActivityLogPage'))
+// Admin Pages - CATEGORY 1: OVERVIEW
+const AdminDashboard = lazy(() => import('@/pages/admin/1-overview/dashboard/DashboardPage'))
+
+// Admin Pages - CATEGORY 2: CONSTITUENT CRM
+const AdminVerificationQueue = lazy(() => import('@/pages/admin/2-constituent-crm/job-seekers/VerificationQueuePage'))
+const AdminJobSeekersList    = lazy(() => import('@/pages/admin/2-constituent-crm/job-seekers/JobSeekersListPage'))
+const AdminJobSeekerDetail   = lazy(() => import('@/pages/admin/2-constituent-crm/job-seekers/JobSeekerDetailPage'))
+const AdminEmployersList     = lazy(() => import('@/pages/admin/2-constituent-crm/employers/EmployersListPage'))
+const AdminEmployerDetail    = lazy(() => import('@/pages/admin/2-constituent-crm/employers/EmployerDetailPage'))
+
+// Admin Pages - CATEGORY 3: EMPLOYMENT HUB
+const AdminJobPostingsList = lazy(() => import('@/pages/admin/3-employment-hub/job-postings/JobPostingsListPage'))
+
+// Admin Pages - CATEGORY 4: GOVERNMENT & DOLE
+const AdminGovernmentProgramsList = lazy(() => import('@/pages/admin/4-government-dole/government-programs/GovernmentProgramsListPage'))
+const AdminGovernmentProgramForm = lazy(() => import('@/pages/admin/4-government-dole/government-programs/GovernmentProgramFormPage'))
+const AdminProgramApplicants    = lazy(() => import('@/pages/admin/4-government-dole/government-programs/ProgramApplicantsPage'))
+const AdminJobFairsList         = lazy(() => import('@/pages/admin/4-government-dole/government-programs/JobFairsListPage'))
+const AdminJobFairForm          = lazy(() => import('@/pages/admin/4-government-dole/government-programs/JobFairFormPage'))
+
+// Admin Pages - CATEGORY 5: SYSTEM & REPORTS
+const AdminLaborAnalytics = lazy(() => import('@/pages/admin/5-system-reports/labor-analytics/LaborAnalyticsPage'))
+const AdminAnalyticsDetail = lazy(() => import('@/pages/admin/5-system-reports/labor-analytics/AnalyticsDetailPage'))
+const AdminActivityLogs    = lazy(() => import('@/pages/admin/5-system-reports/activity-logs/ActivityLogsPage'))
 
 // --- LOADER & SUSPENSE ---
 function PageLoader() {
@@ -194,37 +202,33 @@ export const router = createBrowserRouter([
                     element: <AdminLayout />,
                     children: [
                       { index: true, element: <Navigate to="dashboard" replace /> },
+                      
+                      // CATEGORY 1: OVERVIEW
                       { path: 'dashboard', element: S(AdminDashboard) },
+                      
+                      // CATEGORY 2: CONSTITUENT CRM
                       { path: 'verification-queue', element: S(AdminVerificationQueue) },
-                      
-                      // Seekers
-                      { path: 'seekers', element: S(AdminSeekersList) },
-                      { path: 'seekers/:id', element: S(AdminSeekerDetail) },
-                      
-                      // Employers
+                      { path: 'job-seekers', element: S(AdminJobSeekersList) },
+                      { path: 'job-seekers/:id', element: S(AdminJobSeekerDetail) },
                       { path: 'employers', element: S(AdminEmployersList) },
                       { path: 'employers/:id', element: S(AdminEmployerDetail) },
                       
-                      // Vacancies
-                      { path: 'vacancies', element: S(AdminVacanciesList) },
+                      // CATEGORY 3: EMPLOYMENT HUB
+                      { path: 'job-postings', element: S(AdminJobPostingsList) },
                       
-                      // Programs
-                      { path: 'programs', element: S(AdminProgramsList) },
-                      { path: 'programs/new', element: S(AdminProgramForm) },
-                      { path: 'programs/:id/edit', element: S(AdminProgramForm) },
-                      { path: 'programs/:id/applicants', element: S(AdminProgramApplicants) },
-                      
-                      // Job Fairs
+                      // CATEGORY 4: GOVERNMENT & DOLE
+                      { path: 'government-programs', element: S(AdminGovernmentProgramsList) },
+                      { path: 'government-programs/create', element: S(AdminGovernmentProgramForm) },
+                      { path: 'government-programs/:id/edit', element: S(AdminGovernmentProgramForm) },
+                      { path: 'government-programs/:id/applicants', element: S(AdminProgramApplicants) },
                       { path: 'job-fairs', element: S(AdminJobFairsList) },
-                      { path: 'job-fairs/new', element: S(AdminJobFairForm) },
+                      { path: 'job-fairs/create', element: S(AdminJobFairForm) },
                       { path: 'job-fairs/:id/edit', element: S(AdminJobFairForm) },
                       
-                      // Reports
-                      { path: 'reports', element: S(AdminReports) },
-                      { path: 'reports/:id', element: S(AdminReportDetail) },
-                      
-                      // Activity Log
-                      { path: 'activity-log', element: S(AdminActivityLog) },
+                      // CATEGORY 5: SYSTEM & REPORTS
+                      { path: 'labor-analytics', element: S(AdminLaborAnalytics) },
+                      { path: 'labor-analytics/:id', element: S(AdminAnalyticsDetail) },
+                      { path: 'activity-logs', element: S(AdminActivityLogs) },
                     ],
                   }
                 ],
