@@ -29,6 +29,23 @@ const SUFFIX_OPTIONS = [
   { value: 'V', label: 'V' },
 ]
 
+const RELIGION_OPTIONS = [
+  { value: '', label: 'Select religion' },
+  { value: 'roman_catholic', label: 'Roman Catholic' },
+  { value: 'islam', label: 'Islam' },
+  { value: 'iglesia_ni_cristo', label: 'Iglesia ni Cristo' },
+  { value: 'aglipayan', label: 'Aglipayan (Philippine Independent Church)' },
+  { value: 'evangelical', label: 'Evangelical / Born Again' },
+  { value: 'seventh_day_adventist', label: 'Seventh-day Adventist' },
+  { value: 'jehovah_witness', label: 'Jehovah\'s Witness' },
+  { value: 'buddhist', label: 'Buddhist' },
+  { value: 'hindu', label: 'Hindu' },
+  { value: 'jewish', label: 'Jewish' },
+  { value: 'agnostic_atheist', label: 'Agnostic / Atheist' },
+  { value: 'declined', label: 'Declined to answer' },
+  { value: 'other', label: 'Other (please specify)' },
+]
+
 // Helper function to calculate age
 const calculateAge = (birthDate) => {
   if (!birthDate) return 0
@@ -220,8 +237,12 @@ const Step1 = ({ form, errors, onChange, user, onGpsDetect, gpsState }) => {
             value={form.middle_name ?? ''} onChange={onChange} placeholder="Santos" />
         </FormField>
         <FormField label="Suffix" required={false} error={errors.suffix}>
-          <input style={inputStyle(!!errors.suffix)} name="suffix"
-            value={form.suffix ?? ''} onChange={onChange} placeholder="Jr., Sr., III" />
+          <select style={selectStyle(!!errors.suffix)} name="suffix"
+            value={form.suffix ?? ''} onChange={onChange}>
+            {SUFFIX_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
+          </select>
         </FormField>
       </div>
 
@@ -251,9 +272,19 @@ const Step1 = ({ form, errors, onChange, user, onGpsDetect, gpsState }) => {
           </select>
         </FormField>
         <FormField label="Religion" error={errors.religion}>
-          <input style={inputStyle(!!errors.religion)} name="religion"
-            value={form.religion ?? ''} onChange={onChange} placeholder="e.g., Roman Catholic" />
+          <select style={selectStyle(!!errors.religion)} name="religion"
+            value={form.religion ?? ''} onChange={onChange}>
+            {RELIGION_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
+          </select>
         </FormField>
+        {form.religion === 'other' && (
+          <FormField label="Please specify your religion" error={errors.religion_other}>
+            <input style={inputStyle(!!errors.religion_other)} name="religion_other"
+              value={form.religion_other ?? ''} onChange={onChange} placeholder="Specify your religion" />
+          </FormField>
+        )}
         <FormField label="Height (in feet)" error={errors.height_ft} help="Range: 2.5 – 8.5 ft">
           <input type="number" style={inputStyle(!!errors.height_ft)} name="height_ft"
             value={form.height_ft ?? ''} onChange={onChange}
@@ -988,6 +1019,7 @@ export default function SeekerOnboarding() {
     sex          : '',
     civil_status : '',
     religion     : '',
+    religion_other: '',
     height_ft    : '',
     tin          : '',
     educ_attainment: '',
@@ -1031,7 +1063,7 @@ export default function SeekerOnboarding() {
     }
     
     // Trim text fields
-    if (typeof value === 'string' && (name.includes('_name') || name === 'religion' || name === 'tin' || name === 'ofw_country' || name === 'former_ofw_country' || name === 'unemployment_terminated_country' || name === 'address_house_street' || name === 'occupation_1' || name === 'occupation_2' || name === 'occupation_3' || name === 'disability_specification' || name === 'self_employed_type_others' || name === 'unemployment_reason_others' || name === 'household_id_4ps' || name === 'lang_other_name')) {
+    if (typeof value === 'string' && (name.includes('_name') || name === 'religion' || name === 'religion_other' || name === 'tin' || name === 'ofw_country' || name === 'former_ofw_country' || name === 'unemployment_terminated_country' || name === 'address_house_street' || name === 'occupation_1' || name === 'occupation_2' || name === 'occupation_3' || name === 'disability_specification' || name === 'self_employed_type_others' || name === 'unemployment_reason_others' || name === 'household_id_4ps' || name === 'lang_other_name')) {
       value = value.trim()
     }
     
@@ -1050,32 +1082,24 @@ export default function SeekerOnboarding() {
       const updates = {}
 
       // ── Province ──────────────────────────────────────────────────────
-      if (result.provinceCode) {
-        updates.address_province = result.provinceCode
+      // Use the pre-matched PSGC object from geoService
+      if (result.province) {
+        updates.address_province_code = result.province.code
+        updates.address_province = result.province.name
       } else if (result.provinceName) {
-        // GPS found a province name but it's not in our map
-        // Still set it so the user knows what was detected
         console.warn('GPS province not in map:', result.provinceName)
       }
 
       // ── City / Municipality ────────────────────────────────────────────
-      // Only set if we have a valid province (cascade dependency)
-      if (result.city && updates.address_province) {
-        const { getCitiesByProvince } = await import('@/constants/philippines')
-        const availableCities = getCitiesByProvince(updates.address_province)
-        // Try exact match first, then partial match
-        const exactMatch   = availableCities.find((c) => c.toLowerCase() === result.city.toLowerCase())
-        const partialMatch = availableCities.find((c) => c.toLowerCase().includes(result.city.toLowerCase()) || result.city.toLowerCase().includes(c.toLowerCase()))
-        updates.address_municipality_city = exactMatch ?? partialMatch ?? ''
+      if (result.city) {
+        updates.address_city_code = result.city.code
+        updates.address_municipality_city = result.city.name
       }
 
       // ── Barangay ───────────────────────────────────────────────────────
-      if (result.barangay && updates.address_municipality_city) {
-        const { getBarangaysByCity } = await import('@/constants/philippines')
-        const availableBarangays = getBarangaysByCity(updates.address_municipality_city)
-        const exactMatch   = availableBarangays.find((b) => b.toLowerCase() === result.barangay.toLowerCase())
-        const partialMatch = availableBarangays.find((b) => b.toLowerCase().includes(result.barangay.toLowerCase()) || result.barangay.toLowerCase().includes(b.toLowerCase()))
-        updates.address_barangay = exactMatch ?? partialMatch ?? ''
+      if (result.barangay) {
+        updates.address_barangay_code = result.barangay.code
+        updates.address_barangay = result.barangay.name
       }
 
       // ── House / Street ─────────────────────────────────────────────────
@@ -1100,6 +1124,7 @@ export default function SeekerOnboarding() {
         success : true,
         error   : null,
         accuracy: result.accuracy,
+        warnings: result.warnings // Pass warnings to UI so user knows if something didn't match
       })
 
     } catch (errorMessage) {
@@ -1129,6 +1154,8 @@ export default function SeekerOnboarding() {
       if (!form.sex)                           e.sex             = 'Required.'
       if (!form.civil_status)                  e.civil_status    = 'Required.'
       if (!form.religion?.trim())              e.religion        = 'Required.'
+      if (form.religion === 'other' && !form.religion_other?.trim())
+        e.religion_other = 'Please specify your religion.'
       if (!form.height_ft)                     e.height_ft       = 'Required.'
       else if (form.height_ft < 2.5 || form.height_ft > 8.5) e.height_ft = '2.5–8.5 ft only.'
       if (!form.educ_attainment)               e.educ_attainment = 'Required.'
@@ -1204,7 +1231,7 @@ export default function SeekerOnboarding() {
     date_of_birth            : form.date_of_birth,
     sex                      : form.sex,
     civil_status             : form.civil_status,
-    religion                 : form.religion,
+    religion                 : form.religion === 'other' ? form.religion_other : form.religion,
     height_ft                : parseFloat(form.height_ft),
     tin                      : form.tin || null,
     educ_attainment          : form.educ_attainment,

@@ -28,12 +28,16 @@ function getCurrentPosition() {
       (err) => {
         const msgs = {
           1: 'Location access was denied. Please allow it in your browser settings and try again.',
-          2: 'Your location could not be determined. Please try again or enter your address manually.',
-          3: 'Location request timed out. Please try again.',
+          2: 'Your location could not be determined. Please ensure your device location/GPS is turned on.',
+          3: 'Location request timed out. We tried to get an exact lock but it took too long. Please try again outside.',
         }
         reject(msgs[err.code] ?? 'Unable to get your location.')
       },
-      { enableHighAccuracy: true, timeout: 12000, maximumAge: 30000 }
+      { 
+        enableHighAccuracy: true, 
+        timeout: 20000,     // INCREASED: Give the GPS chip 20 seconds to find satellites
+        maximumAge: 0       // CHANGED TO 0: Force a fresh lock. NEVER use cached cell-tower data.
+      }
     )
   })
 }

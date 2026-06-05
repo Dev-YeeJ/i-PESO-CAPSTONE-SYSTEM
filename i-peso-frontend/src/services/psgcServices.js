@@ -8,6 +8,7 @@
 //
 // Strategy: In-memory cache so each list is only fetched once
 //           per browser session. No API key required.
+//           Includes Levenshtein distance for fuzzy matching GPS data.
 // ============================================================
 
 const BASE_URL = 'https://psgc.cloud/api'
@@ -149,8 +150,51 @@ export async function findCityByName(provinceCode, searchName) {
 }
 
 /**
+ * Clears the in-memory cache.
+ * Call this if you need to force a data refresh.
+ */
+export function clearCache() {
+  cache.clear()
+}
+
+
+// ── HELPER: Levenshtein Distance (Fuzzy Matcher) ──────────────────────────
+// Calculates how many typos/differences exist between two strings
+function getLevenshteinDistance(a, b) {
+  if (a.length === 0) return b.length;
+  if (b.length === 0) return a.length;
+
+  const matrix = [];
+  for (let i = 0; i <= b.length; i++) matrix[i] = [i];
+  for (let j = 0; j <= a.length; j++) matrix[0][j] = j;
+
+  for (let i = 1; i <= b.length; i++) {
+    for (let j = 1; j <= a.length; j++) {
+      if (b.charAt(i - 1) === a.charAt(j - 1)) {
+        matrix[i][j] = matrix[i - 1][j - 1];
+      } else {
+        matrix[i][j] = Math.min(
+          matrix[i - 1][j - 1] + 1, // substitution
+          Math.min(matrix[i][j - 1] + 1, matrix[i - 1][j] + 1) // insertion/deletion
+        );
+      }
+    }
+  }
+  return matrix[b.length][a.length];
+}
+
+// ── HELPER: Address Sanitizer ─────────────────────────────────────────────
+// Strips out "Brgy", "Barangay", "Pob.", spaces, and special characters
+function sanitizeAddress(str) {
+  return str.toLowerCase()
+    .replace(/^(barangay|brgy\.?|barrio)\s+/i, '')
+    .replace(/\s+\(pob\.?|poblacion\)/i, '')
+    .replace(/[^a-z0-9]/g, ''); // Remove all spaces and punctuation
+}
+
+/**
  * Searches barangays within a city for a name match.
- * Used by GPS detection to match Nominatim results.
+ * UPGRADED: Now uses text sanitization and Fuzzy Typo Matching.
  *
  * @param {string} cityCode
  * @param {string} searchName - Barangay name to search for
@@ -160,27 +204,36 @@ export async function findBarangayByName(cityCode, searchName) {
   if (!cityCode || !searchName) return null
 
   const barangays  = await getBarangaysByCity(cityCode)
-  const normalized = searchName.toLowerCase().trim()
+  const searchClean = sanitizeAddress(searchName)
 
-  // 1. Exact match
-  const exact = barangays.find(
-    (b) => b.name.toLowerCase() === normalized
-  )
-  if (exact) return exact
+  // 1. Strict Sanitized Match (Handles "Brgy. Mabanogbog" vs "Mabanogbog")
+  let exactMatch = barangays.find((b) => {
+    const bClean = sanitizeAddress(b.name);
+    return bClean === searchClean || bClean.includes(searchClean) || searchClean.includes(bClean);
+  });
+  
+  if (exactMatch) return exactMatch;
 
-  // 2. Contains match
-  const contains = barangays.find(
-    (b) =>
-      b.name.toLowerCase().includes(normalized) ||
-      normalized.includes(b.name.toLowerCase())
-  )
-  return contains ?? null
-}
+  // 2. Fuzzy Match (Handles Typos like "Mabanognog" vs "Mabanogbog")
+  let bestMatch = null;
+  let lowestDistance = Infinity;
 
-/**
- * Clears the in-memory cache.
- * Call this if you need to force a data refresh.
- */
-export function clearCache() {
-  cache.clear()
+  for (const b of barangays) {
+    const bClean = sanitizeAddress(b.name);
+    const distance = getLevenshteinDistance(searchClean, bClean);
+    
+    if (distance < lowestDistance) {
+      lowestDistance = distance;
+      bestMatch = b;
+    }
+  }
+
+  // If the word is very similar (e.g., 1 or 2 letters off), accept it as a match!
+  // We use 2 as the threshold to prevent matching completely wrong barangays.
+  if (lowestDistance <= 2) {
+    console.log(`Fuzzy Matched: "${searchName}" to official PSGC "${bestMatch.name}" (Typo distance: ${lowestDistance})`);
+    return bestMatch;
+  }
+
+  return null
 }

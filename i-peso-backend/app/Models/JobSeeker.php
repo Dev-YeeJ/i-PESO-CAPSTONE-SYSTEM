@@ -140,4 +140,34 @@ class JobSeeker extends Authenticatable
                      $this->form_validation_state['step3'],
                      $this->form_validation_state['step4']);
     }
+
+    /**
+     * Format religion for display (converts enum values to readable format)
+     * Examples: 'roman_catholic' → 'Roman Catholic', 'Custom Religion' → 'Custom Religion'
+     */
+    public function getFormattedReligion(): string
+    {
+        if (!$this->religion) {
+            return 'N/A';
+        }
+
+        // Enum value mapping for standardized religions
+        $enumMap = [
+            'roman_catholic'      => 'Roman Catholic',
+            'islam'               => 'Islam',
+            'iglesia_ni_cristo'   => 'Iglesia ni Cristo',
+            'aglipayan'           => 'Aglipayan',
+            'evangelical'         => 'Evangelical / Born Again',
+            'seventh_day_adventist' => 'Seventh-day Adventist',
+            'jehovah_witness'     => 'Jehovah\'s Witness',
+            'buddhist'            => 'Buddhist',
+            'hindu'               => 'Hindu',
+            'jewish'              => 'Jewish',
+            'agnostic_atheist'    => 'Agnostic / Atheist',
+            'declined'            => 'Declined to answer',
+        ];
+
+        // Return mapped value or custom value as-is
+        return $enumMap[$this->religion] ?? $this->religion;
+    }
 }

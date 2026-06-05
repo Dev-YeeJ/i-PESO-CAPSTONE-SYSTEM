@@ -253,13 +253,13 @@
             </tr>
             <tr>
                 <td class="field-label">SEX:</td>
-                <td class="field-value">{{ ucfirst($seeker->sex) ?? 'N/A' }}</td>
+                <td class="field-value">{{ ucfirst(str_replace('_', ' ', $seeker->sex ?? '')) ?: 'N/A' }}</td>
                 <td class="field-label">CIVIL STATUS:</td>
-                <td class="field-value">{{ ucfirst($seeker->civil_status) ?? 'N/A' }}</td>
+                <td class="field-value">{{ ucfirst(str_replace('_', ' ', $seeker->civil_status ?? '')) ?: 'N/A' }}</td>
             </tr>
             <tr>
                 <td class="field-label">RELIGION:</td>
-                <td class="field-value">{{ $seeker->religion ?? 'N/A' }}</td>
+                <td class="field-value">{{ $seeker->getFormattedReligion() }}</td>
                 <td class="field-label">HEIGHT (FT):</td>
                 <td class="field-value">{{ $seeker->height_ft ?? 'N/A' }}</td>
             </tr>
@@ -324,7 +324,7 @@
             <tr>
                 <td class="field-label">Employment Status:</td>
                 <td class="field-value" colspan="3">
-                    <strong>{{ ucfirst($seeker->employment_status) ?? 'N/A' }}</strong>
+                    <strong>{{ ucfirst(str_replace('_', ' ', $seeker->employment_status ?? '')) ?: 'N/A' }}</strong>
                 </td>
             </tr>
             <tr>
