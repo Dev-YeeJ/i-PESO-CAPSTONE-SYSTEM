@@ -1,0 +1,32 @@
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+
+class SeekerTraining extends Model
+{
+    protected $table      = 'seeker_trainings';
+    protected $primaryKey = 'id';
+    protected $keyType    = 'int';
+    public $timestamps    = true;
+
+    protected $fillable = [
+        'seeker_id',
+        'course',
+        'hours_of_training',
+        'training_institution',
+        'skills_acquired',
+        'certificates_received',
+    ];
+
+    protected $casts = [
+        'hours_of_training' => 'integer',
+    ];
+
+    public function seeker(): BelongsTo
+    {
+        return $this->belongsTo(JobSeeker::class, 'seeker_id', 'seeker_id');
+    }
+}

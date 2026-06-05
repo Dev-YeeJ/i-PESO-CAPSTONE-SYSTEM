@@ -99,11 +99,58 @@ const UNEMPLOYMENT_REASONS = [
 
 const LANGUAGES = ['English', 'Filipino', 'Mandarin', 'Spanish', 'Japanese', 'Korean', 'Arabic', 'Others']
 
+const EDUCATION_LEVELS = [
+  { value: 'elementary', label: 'Elementary' },
+  { value: 'secondary_non_k12', label: 'Secondary (Non-K12)' },
+  { value: 'secondary_k12', label: 'Secondary (K-12)' },
+  { value: 'senior_high_strand', label: 'Senior High Strand' },
+  { value: 'tertiary', label: 'Tertiary/College' },
+  { value: 'graduate_studies', label: 'Graduate Studies/Post-graduate' },
+]
+
+const OTHER_SKILLS = [
+  { value: 'auto_mechanic', label: 'Auto Mechanic' },
+  { value: 'beautician', label: 'Beautician' },
+  { value: 'carpentry', label: 'Carpentry Work' },
+  { value: 'computer_literate', label: 'Computer Literate' },
+  { value: 'domestic_chores', label: 'Domestic Chores' },
+  { value: 'driver', label: 'Driver' },
+  { value: 'electrician', label: 'Electrician' },
+  { value: 'embroidery', label: 'Embroidery' },
+  { value: 'gardening', label: 'Gardening' },
+  { value: 'masonry', label: 'Masonry' },
+  { value: 'painter_artist', label: 'Painter/Artist' },
+  { value: 'painting_jobs', label: 'Painting Jobs' },
+  { value: 'photography', label: 'Photography' },
+  { value: 'plumbing', label: 'Plumbing' },
+  { value: 'sewing_dresses', label: 'Sewing Dresses' },
+  { value: 'stenography', label: 'Stenography' },
+  { value: 'tailoring', label: 'Tailoring' },
+  { value: 'others', label: 'Others (specify)' },
+]
+
+const ELIGIBILITY_TYPES = [
+  { value: 'civil_service', label: 'Civil Service Exam/Eligibility' },
+  { value: 'professional_license', label: 'Professional License (PRC)' },
+]
+
+const EMPLOYMENT_STATUS_OPTIONS = [
+  { value: 'permanent', label: 'Permanent' },
+  { value: 'contractual', label: 'Contractual' },
+  { value: 'part_time', label: 'Part-time' },
+  { value: 'probationary', label: 'Probationary' },
+  { value: 'temporary', label: 'Temporary' },
+  { value: 'seasonal', label: 'Seasonal' },
+]
+
 const STEPS = [
   { num: 1, label: 'Personal Info',  icon: '👤', section: 'I' },
   { num: 2, label: 'Employment',     icon: '💼', section: 'II' },
   { num: 3, label: 'Job Preference', icon: '🎯', section: 'III' },
   { num: 4, label: 'Language',       icon: '🌐', section: 'IV' },
+  { num: 5, label: 'Education',      icon: '🎓', section: 'V' },
+  { num: 6, label: 'Training & Elig.', icon: '📜', section: 'VI' },
+  { num: 7, label: 'Work Experience', icon: '💪', section: 'VII' },
 ]
 
 // ── Reusable sub-components ───────────────────────────────────────────────
@@ -760,6 +807,38 @@ const Step4 = ({ form, onChange, errors }) => {
 
 // ── Handles all address dropdown state including API loading ──────────────
 
+const SelectDropdown = ({ label, name, codeName, value, codeValue, options, loading, disabled, error, onChange, placeholder }) => (
+  <FormField label={label} error={error}>
+    <div style={{ position: 'relative' }}>
+      <select
+        style={{
+          ...selectStyle(!!error),
+          opacity: disabled || loading ? 0.7 : 1,
+          paddingRight: '36px',
+        }}
+        value={codeValue ?? ''}
+        disabled={disabled || loading}
+        onChange={(e) => {
+          const selected = options.find((o) => o.code === e.target.value)
+          // Fire two changes: the code (for API cascade) and the name (for display/storage)
+          onChange({ target: { name: codeName, value: e.target.value } })
+          onChange({ target: { name,           value: selected?.name ?? '' } })
+        }}
+      >
+        <option value="">
+          {loading ? 'Loading…' : disabled ? placeholder : `Select ${label.toLowerCase()}`}
+        </option>
+        {options.map((o) => (
+          <option key={o.code} value={o.code}>{o.name}</option>
+        ))}
+      </select>
+      {loading && (
+        <span style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', display: 'inline-block', width: '14px', height: '14px', border: '2px solid #e2e8f0', borderTopColor: '#1d4ed8', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
+      )}
+    </div>
+  </FormField>
+)
+
 const AddressSection = ({ form, errors, onChange, gpsState, onGpsDetect }) => {
   const [provinces,  setProvinces]  = useState([])
   const [cities,     setCities]     = useState([])
@@ -771,16 +850,19 @@ const AddressSection = ({ form, errors, onChange, gpsState, onGpsDetect }) => {
 
   // ── Load provinces on mount ───────────────────────────────────────────
   useEffect(() => {
+    let isMounted = true
     setLoadingProv(true)
     setApiError(null)
     getProvinces()
-      .then(setProvinces)
-      .catch(() => setApiError('Failed to load provinces. Please check your internet connection.'))
-      .finally(() => setLoadingProv(false))
+      .then((data) => { if (isMounted) setProvinces(data) })
+      .catch(() => { if (isMounted) setApiError('Failed to load provinces. Please check your internet connection.') })
+      .finally(() => { if (isMounted) setLoadingProv(false) })
+    return () => { isMounted = false }
   }, [])
 
   // ── Load cities when province changes ────────────────────────────────
   useEffect(() => {
+    let isMounted = true
     if (!form.address_province_code) {
       setCities([])
       setBarangays([])
@@ -790,13 +872,15 @@ const AddressSection = ({ form, errors, onChange, gpsState, onGpsDetect }) => {
     setCities([])
     setBarangays([])
     getCitiesByProvince(form.address_province_code)
-      .then(setCities)
-      .catch(() => setApiError('Failed to load cities. Please try again.'))
-      .finally(() => setLoadingCity(false))
+      .then((data) => { if (isMounted) setCities(data) })
+      .catch(() => { if (isMounted) setApiError('Failed to load cities. Please try again.') })
+      .finally(() => { if (isMounted) setLoadingCity(false) })
+    return () => { isMounted = false }
   }, [form.address_province_code])
 
   // ── Load barangays when city changes ─────────────────────────────────
   useEffect(() => {
+    let isMounted = true
     if (!form.address_city_code) {
       setBarangays([])
       return
@@ -804,42 +888,11 @@ const AddressSection = ({ form, errors, onChange, gpsState, onGpsDetect }) => {
     setLoadingBrgy(true)
     setBarangays([])
     getBarangaysByCity(form.address_city_code)
-      .then(setBarangays)
-      .catch(() => setApiError('Failed to load barangays. Please try again.'))
-      .finally(() => setLoadingBrgy(false))
+      .then((data) => { if (isMounted) setBarangays(data) })
+      .catch(() => { if (isMounted) setApiError('Failed to load barangays. Please try again.') })
+      .finally(() => { if (isMounted) setLoadingBrgy(false) })
+    return () => { isMounted = false }
   }, [form.address_city_code])
-
-  const SelectDropdown = ({ label, name, codeName, value, codeValue, options, loading, disabled, error, onChange, placeholder }) => (
-    <FormField label={label} error={error}>
-      <div style={{ position: 'relative' }}>
-        <select
-          style={{
-            ...selectStyle(!!error),
-            opacity: disabled || loading ? 0.7 : 1,
-            paddingRight: '36px',
-          }}
-          value={codeValue ?? ''}
-          disabled={disabled || loading}
-          onChange={(e) => {
-            const selected = options.find((o) => o.code === e.target.value)
-            // Fire two changes: the code (for API cascade) and the name (for display/storage)
-            onChange({ target: { name: codeName, value: e.target.value } })
-            onChange({ target: { name,           value: selected?.name ?? '' } })
-          }}
-        >
-          <option value="">
-            {loading ? 'Loading…' : disabled ? placeholder : `Select ${label.toLowerCase()}`}
-          </option>
-          {options.map((o) => (
-            <option key={o.code} value={o.code}>{o.name}</option>
-          ))}
-        </select>
-        {loading && (
-          <span style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', display: 'inline-block', width: '14px', height: '14px', border: '2px solid #e2e8f0', borderTopColor: '#1d4ed8', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
-        )}
-      </div>
-    </FormField>
-  )
 
   return (
     <div>
@@ -989,6 +1042,551 @@ const AddressSection = ({ form, errors, onChange, gpsState, onGpsDetect }) => {
   )
 }
 
+// ── STEP 5: EDUCATION & OTHER SKILLS ──────────────────────────────────────
+
+function Step5({ form, errors, onChange, onAddEducation, onRemoveEducation, onUpdateEducation }) {
+  const educationTemplate = { level: '', course_strand: '', year_graduated: '', undergrad_level_reached: '', undergrad_year_last_attended: '' }
+  const techSkillsInputRef = useRef(null)
+  const softSkillsInputRef = useRef(null)
+
+  // ── Helper: Handle DOLE skill checkbox changes ─────────────────────────
+  const handleDoleSkillChange = (skillLabel, checked) => {
+    const currentDoleSkills = (form.dole_skills ?? []).slice()
+    if (checked) {
+      if (!currentDoleSkills.includes(skillLabel)) {
+        currentDoleSkills.push(skillLabel)
+      }
+    } else {
+      const idx = currentDoleSkills.indexOf(skillLabel)
+      if (idx > -1) {
+        currentDoleSkills.splice(idx, 1)
+      }
+    }
+    onChange({ target: { name: 'dole_skills', value: currentDoleSkills } })
+  }
+
+  // ── Helper: Handle tag/pill input for technical skills ─────────────────
+  const handleTechKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      const val = e.target.value.trim()
+      if (val) {
+        const current = (form.technical_skills ?? []).slice()
+        // Avoid duplicates
+        if (!current.some((s) => s.toLowerCase() === val.toLowerCase())) {
+          current.push(val)
+          onChange({ target: { name: 'technical_skills', value: current } })
+        }
+        e.target.value = ''
+      }
+    }
+  }
+
+  // ── Helper: Handle tag/pill input for soft skills ──────────────────────
+  const handleSoftKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      const val = e.target.value.trim()
+      if (val) {
+        const current = (form.soft_skills ?? []).slice()
+        // Avoid duplicates
+        if (!current.some((s) => s.toLowerCase() === val.toLowerCase())) {
+          current.push(val)
+          onChange({ target: { name: 'soft_skills', value: current } })
+        }
+        e.target.value = ''
+      }
+    }
+  }
+
+  // ── Helper: Remove technical skill pill ──────────────────────────────────
+  const removeTechSkill = (idx) => {
+    const current = (form.technical_skills ?? []).slice()
+    current.splice(idx, 1)
+    onChange({ target: { name: 'technical_skills', value: current } })
+  }
+
+  // ── Helper: Remove soft skill pill ───────────────────────────────────────
+  const removeSoftSkill = (idx) => {
+    const current = (form.soft_skills ?? []).slice()
+    current.splice(idx, 1)
+    onChange({ target: { name: 'soft_skills', value: current } })
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+      {/* Header: Detailed Educational Background */}
+      <SectionHeader
+        icon="🎓"
+        title="V. DETAILED EDUCATIONAL BACKGROUND"
+        subtitle="Optional: Add your school history here. Your highest attainment is already saved in Step 1"
+      />
+
+      {/* Currently in school */}
+      <div>
+        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+          <input
+            type="checkbox"
+            checked={form.currently_in_school ?? false}
+            onChange={(e) => onChange({ target: { name: 'currently_in_school', value: e.target.checked } })}
+            style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+          />
+          <span style={{ fontSize: '14px', fontWeight: '500', color: '#374151' }}>Currently enrolled in school</span>
+        </label>
+      </div>
+
+      {/* Education table */}
+      <div>
+        <h4 style={{ fontSize: '13px', fontWeight: '600', color: '#1f2937', marginBottom: '12px' }}>Education Levels</h4>
+        <div style={{ border: '1px solid #e2e8f0', borderRadius: '10px', overflow: 'hidden', backgroundColor: '#fff' }}>
+          <table style={{ width: '100%', fontSize: '13px', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr style={{ backgroundColor: '#f1f5f9', borderBottom: '1px solid #e2e8f0' }}>
+                <th style={{ padding: '10px', textAlign: 'left', fontWeight: '600', color: '#475569' }}>Level</th>
+                <th style={{ padding: '10px', textAlign: 'left', fontWeight: '600', color: '#475569' }}>Year Graduated</th>
+                <th style={{ padding: '10px', textAlign: 'center', fontWeight: '600', color: '#475569', width: '50px' }}>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {form.educations?.map((edu, i) => (
+                <tr key={i} style={{ borderBottom: '1px solid #e2e8f0' }}>
+                  <td style={{ padding: '10px' }}>
+                    <select
+                      value={edu.level || ''}
+                      onChange={(e) => onUpdateEducation('educations', i, { level: e.target.value })}
+                      style={{ width: '100%', padding: '6px', fontSize: '13px', border: '1px solid #d1d5db', borderRadius: '6px' }}
+                    >
+                      <option value="">Select level</option>
+                      {EDUCATION_LEVELS.map((l) => (
+                        <option key={l.value} value={l.value}>{l.label}</option>
+                      ))}
+                    </select>
+                  </td>
+                  <td style={{ padding: '10px' }}>
+                    <input
+                      type="number"
+                      min="1900"
+                      max={new Date().getFullYear()}
+                      placeholder="YYYY"
+                      value={edu.year_graduated || ''}
+                      onChange={(e) => onUpdateEducation('educations', i, { year_graduated: e.target.value || null })}
+                      style={{ width: '100%', padding: '6px', fontSize: '13px', border: '1px solid #d1d5db', borderRadius: '6px' }}
+                    />
+                  </td>
+                  <td style={{ padding: '10px', textAlign: 'center' }}>
+                    <button
+                      type="button"
+                      onClick={() => onRemoveEducation('educations', i)}
+                      style={{ padding: '4px 8px', fontSize: '12px', color: '#dc2626', backgroundColor: '#fef2f2', border: '1px solid #fecaca', borderRadius: '6px', cursor: 'pointer' }}
+                    >
+                      Remove
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <button
+          type="button"
+          onClick={() => onAddEducation('educations', educationTemplate)}
+          style={{ marginTop: '12px', padding: '8px 12px', fontSize: '13px', color: '#1d4ed8', backgroundColor: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '8px', cursor: 'pointer', fontWeight: '500' }}
+        >
+          + Add Education
+        </button>
+        {errors.educations && <p style={{ color: '#dc2626', fontSize: '12px', marginTop: '8px' }}>✕ {errors.educations}</p>}
+      </div>
+
+      {/* Skills Integration */}
+      <div style={{ borderTop: '1px solid #e5e7eb', paddingTop: '20px' }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', marginBottom: '20px', padding: '14px 16px', backgroundColor: '#eff6ff', borderRadius: '12px', border: '1px solid #bfdbfe' }}>
+          <span style={{ fontSize: '20px' }}>💼</span>
+          <div>
+            <p style={{ fontSize: '13px', fontWeight: '700', color: '#1e40af', margin: 0 }}>SKILLS & COMPETENCIES</p>
+            <p style={{ fontSize: '11px', color: '#3b82f6', margin: '2px 0 0', lineHeight: '1.4' }}>Select official DOLE vocational skills and add your professional expertise</p>
+          </div>
+        </div>
+
+        {/* Official DOLE Vocational Skills */}
+        <div style={{ marginBottom: '24px' }}>
+          <h5 style={{ fontSize: '13px', fontWeight: '600', color: '#1f2937', marginBottom: '12px' }}>
+            🏢 Official DOLE Vocational Skills
+          </h5>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '10px' }}>
+            {OTHER_SKILLS.map((skillOption) => {
+              const doleSkillsArray = form.dole_skills ?? []
+              const isChecked = doleSkillsArray.includes(skillOption.label)
+
+              return (
+                <label
+                  key={skillOption.value}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    cursor: 'pointer',
+                    padding: '8px 10px',
+                    borderRadius: '8px',
+                    border: `1px solid ${isChecked ? '#86efac' : '#e2e8f0'}`,
+                    backgroundColor: isChecked ? '#dcfce7' : '#fafafa',
+                    transition: 'all 0.15s',
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={isChecked}
+                    onChange={(e) => handleDoleSkillChange(skillOption.label, e.target.checked)}
+                    style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: '#15803d' }}
+                  />
+                  <span style={{ fontSize: '13px', color: isChecked ? '#15803d' : '#374151', fontWeight: isChecked ? '600' : '400' }}>
+                    {skillOption.label}
+                  </span>
+                </label>
+              )
+            })}
+          </div>
+        </div>
+
+        {/* Specialized & Professional Skills + Soft Skills */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+          {/* Specialized & Professional Skills */}
+          <div style={{ backgroundColor: '#f9fafb', padding: '16px', borderRadius: '12px', border: '1px solid #e5e7eb' }}>
+            <h5 style={{ fontSize: '13px', fontWeight: '600', color: '#1f2937', marginBottom: '4px' }}>
+              🔧 Specialized & Professional Skills
+            </h5>
+            <p style={{ fontSize: '11px', color: '#6b7280', marginBottom: '12px' }}>
+              e.g., React, Data Analysis, Accounting. Press Enter to add.
+            </p>
+            <input
+              ref={techSkillsInputRef}
+              type="text"
+              placeholder="Add skill and press Enter…"
+              onKeyDown={handleTechKeyDown}
+              style={{
+                width: '100%',
+                padding: '8px 12px',
+                fontSize: '13px',
+                border: '1px solid #d1d5db',
+                borderRadius: '8px',
+                fontFamily: 'inherit',
+                marginBottom: '12px',
+              }}
+            />
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+              {(form.technical_skills ?? []).map((skill, idx) => (
+                <div
+                  key={idx}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    backgroundColor: '#dbeafe',
+                    color: '#1e40af',
+                    padding: '6px 12px',
+                    borderRadius: '20px',
+                    fontSize: '12px',
+                    fontWeight: '500',
+                    gap: '6px',
+                  }}
+                >
+                  {skill}
+                  <button
+                    type="button"
+                    onClick={() => removeTechSkill(idx)}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: '#1e40af',
+                      cursor: 'pointer',
+                      fontSize: '16px',
+                      lineHeight: '1',
+                      padding: '0',
+                      display: 'flex',
+                      alignItems: 'center',
+                    }}
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Interpersonal / Soft Skills */}
+          <div style={{ backgroundColor: '#f9fafb', padding: '16px', borderRadius: '12px', border: '1px solid #e5e7eb' }}>
+            <h5 style={{ fontSize: '13px', fontWeight: '600', color: '#1f2937', marginBottom: '4px' }}>
+              🤝 Interpersonal / Soft Skills
+            </h5>
+            <p style={{ fontSize: '11px', color: '#6b7280', marginBottom: '12px' }}>
+              e.g., Leadership, Communication, Teamwork. Press Enter to add.
+            </p>
+            <input
+              ref={softSkillsInputRef}
+              type="text"
+              placeholder="Add skill and press Enter…"
+              onKeyDown={handleSoftKeyDown}
+              style={{
+                width: '100%',
+                padding: '8px 12px',
+                fontSize: '13px',
+                border: '1px solid #d1d5db',
+                borderRadius: '8px',
+                fontFamily: 'inherit',
+                marginBottom: '12px',
+              }}
+            />
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+              {(form.soft_skills ?? []).map((skill, idx) => (
+                <div
+                  key={idx}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    backgroundColor: '#f3e8ff',
+                    color: '#6b21a8',
+                    padding: '6px 12px',
+                    borderRadius: '20px',
+                    fontSize: '12px',
+                    fontWeight: '500',
+                    gap: '6px',
+                  }}
+                >
+                  {skill}
+                  <button
+                    type="button"
+                    onClick={() => removeSoftSkill(idx)}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: '#6b21a8',
+                      cursor: 'pointer',
+                      fontSize: '16px',
+                      lineHeight: '1',
+                      padding: '0',
+                      display: 'flex',
+                      alignItems: 'center',
+                    }}
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── STEP 6: TRAININGS & ELIGIBILITIES ─────────────────────────────────────
+
+function Step6({ form, errors, onAddTraining, onRemoveTraining, onUpdateTraining, onAddEligibility, onRemoveEligibility, onUpdateEligibility }) {
+  const trainingTemplate = { course: '', hours_of_training: '', training_institution: '', skills_acquired: '', certificates_received: '' }
+  const eligibilityTemplate = { type: '', name: '', date_taken: '', valid_until: '' }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+      <SectionHeader title="Trainings & Eligibilities" num={6} />
+
+      {/* Trainings table */}
+      <div>
+        <h4 style={{ fontSize: '13px', fontWeight: '600', color: '#1f2937', marginBottom: '12px' }}>Trainings</h4>
+        <div style={{ border: '1px solid #e2e8f0', borderRadius: '10px', overflow: 'hidden', backgroundColor: '#fff' }}>
+          <table style={{ width: '100%', fontSize: '13px', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr style={{ backgroundColor: '#f1f5f9', borderBottom: '1px solid #e2e8f0' }}>
+                <th style={{ padding: '10px', textAlign: 'left', fontWeight: '600', color: '#475569' }}>Course</th>
+                <th style={{ padding: '10px', textAlign: 'left', fontWeight: '600', color: '#475569', width: '80px' }}>Hours</th>
+                <th style={{ padding: '10px', textAlign: 'center', fontWeight: '600', color: '#475569', width: '50px' }}>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {form.trainings?.map((train, i) => (
+                <tr key={i} style={{ borderBottom: '1px solid #e2e8f0' }}>
+                  <td style={{ padding: '10px' }}>
+                    <input
+                      type="text"
+                      placeholder="Course name"
+                      value={train.course || ''}
+                      onChange={(e) => onUpdateTraining('trainings', i, { course: e.target.value })}
+                      style={{ width: '100%', padding: '6px', fontSize: '13px', border: '1px solid #d1d5db', borderRadius: '6px' }}
+                    />
+                  </td>
+                  <td style={{ padding: '10px' }}>
+                    <input
+                      type="number"
+                      placeholder="0"
+                      value={train.hours_of_training || ''}
+                      onChange={(e) => onUpdateTraining('trainings', i, { hours_of_training: e.target.value || null })}
+                      style={{ width: '100%', padding: '6px', fontSize: '13px', border: '1px solid #d1d5db', borderRadius: '6px' }}
+                    />
+                  </td>
+                  <td style={{ padding: '10px', textAlign: 'center' }}>
+                    <button
+                      type="button"
+                      onClick={() => onRemoveTraining('trainings', i)}
+                      style={{ padding: '4px 8px', fontSize: '12px', color: '#dc2626', backgroundColor: '#fef2f2', border: '1px solid #fecaca', borderRadius: '6px', cursor: 'pointer' }}
+                    >
+                      Remove
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <button
+          type="button"
+          onClick={() => onAddTraining('trainings', trainingTemplate)}
+          style={{ marginTop: '12px', padding: '8px 12px', fontSize: '13px', color: '#1d4ed8', backgroundColor: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '8px', cursor: 'pointer', fontWeight: '500' }}
+        >
+          + Add Training
+        </button>
+      </div>
+
+      {/* Eligibilities table */}
+      <div>
+        <h4 style={{ fontSize: '13px', fontWeight: '600', color: '#1f2937', marginBottom: '12px' }}>Professional Licenses & Civil Service Eligibilities</h4>
+        <div style={{ border: '1px solid #e2e8f0', borderRadius: '10px', overflow: 'hidden', backgroundColor: '#fff' }}>
+          <table style={{ width: '100%', fontSize: '13px', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr style={{ backgroundColor: '#f1f5f9', borderBottom: '1px solid #e2e8f0' }}>
+                <th style={{ padding: '10px', textAlign: 'left', fontWeight: '600', color: '#475569' }}>Type</th>
+                <th style={{ padding: '10px', textAlign: 'left', fontWeight: '600', color: '#475569' }}>Name</th>
+                <th style={{ padding: '10px', textAlign: 'center', fontWeight: '600', color: '#475569', width: '50px' }}>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {form.eligibilities?.map((elig, i) => (
+                <tr key={i} style={{ borderBottom: '1px solid #e2e8f0' }}>
+                  <td style={{ padding: '10px' }}>
+                    <select
+                      value={elig.type || ''}
+                      onChange={(e) => onUpdateEligibility('eligibilities', i, { type: e.target.value })}
+                      style={{ width: '100%', padding: '6px', fontSize: '13px', border: '1px solid #d1d5db', borderRadius: '6px' }}
+                    >
+                      <option value="">Select type</option>
+                      {ELIGIBILITY_TYPES.map((t) => (
+                        <option key={t.value} value={t.value}>{t.label}</option>
+                      ))}
+                    </select>
+                  </td>
+                  <td style={{ padding: '10px' }}>
+                    <input
+                      type="text"
+                      placeholder="License/Eligibility name"
+                      value={elig.name || ''}
+                      onChange={(e) => onUpdateEligibility('eligibilities', i, { name: e.target.value })}
+                      style={{ width: '100%', padding: '6px', fontSize: '13px', border: '1px solid #d1d5db', borderRadius: '6px' }}
+                    />
+                  </td>
+                  <td style={{ padding: '10px', textAlign: 'center' }}>
+                    <button
+                      type="button"
+                      onClick={() => onRemoveEligibility('eligibilities', i)}
+                      style={{ padding: '4px 8px', fontSize: '12px', color: '#dc2626', backgroundColor: '#fef2f2', border: '1px solid #fecaca', borderRadius: '6px', cursor: 'pointer' }}
+                    >
+                      Remove
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <button
+          type="button"
+          onClick={() => onAddEligibility('eligibilities', eligibilityTemplate)}
+          style={{ marginTop: '12px', padding: '8px 12px', fontSize: '13px', color: '#1d4ed8', backgroundColor: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '8px', cursor: 'pointer', fontWeight: '500' }}
+        >
+          + Add License/Eligibility
+        </button>
+        {errors.trainings && <p style={{ color: '#dc2626', fontSize: '12px', marginTop: '8px' }}>✕ {errors.trainings}</p>}
+      </div>
+    </div>
+  )
+}
+
+// ── STEP 7: WORK EXPERIENCE ────────────────────────────────────────────────
+
+function Step7({ form, errors, onAddExperience, onRemoveExperience, onUpdateExperience }) {
+  const experienceTemplate = { company_name: '', company_address: '', position: '', number_of_months: '', employment_status: '' }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+      <SectionHeader title="Work Experience" num={7} />
+
+      {/* Work experiences table */}
+      <div>
+        <h4 style={{ fontSize: '13px', fontWeight: '600', color: '#1f2937', marginBottom: '12px' }}>Work Experiences (required)</h4>
+        <div style={{ border: '1px solid #e2e8f0', borderRadius: '10px', overflow: 'hidden', backgroundColor: '#fff' }}>
+          <table style={{ width: '100%', fontSize: '13px', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr style={{ backgroundColor: '#f1f5f9', borderBottom: '1px solid #e2e8f0' }}>
+                <th style={{ padding: '10px', textAlign: 'left', fontWeight: '600', color: '#475569' }}>Company</th>
+                <th style={{ padding: '10px', textAlign: 'left', fontWeight: '600', color: '#475569' }}>Position</th>
+                <th style={{ padding: '10px', textAlign: 'left', fontWeight: '600', color: '#475569', width: '80px' }}>Months</th>
+                <th style={{ padding: '10px', textAlign: 'center', fontWeight: '600', color: '#475569', width: '50px' }}>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {form.work_experiences?.map((exp, i) => (
+                <tr key={i} style={{ borderBottom: '1px solid #e2e8f0' }}>
+                  <td style={{ padding: '10px' }}>
+                    <input
+                      type="text"
+                      placeholder="Company name"
+                      value={exp.company_name || ''}
+                      onChange={(e) => onUpdateExperience('work_experiences', i, { company_name: e.target.value })}
+                      style={{ width: '100%', padding: '6px', fontSize: '13px', border: '1px solid #d1d5db', borderRadius: '6px' }}
+                    />
+                  </td>
+                  <td style={{ padding: '10px' }}>
+                    <input
+                      type="text"
+                      placeholder="Position"
+                      value={exp.position || ''}
+                      onChange={(e) => onUpdateExperience('work_experiences', i, { position: e.target.value })}
+                      style={{ width: '100%', padding: '6px', fontSize: '13px', border: '1px solid #d1d5db', borderRadius: '6px' }}
+                    />
+                  </td>
+                  <td style={{ padding: '10px' }}>
+                    <input
+                      type="number"
+                      placeholder="0"
+                      min="0"
+                      value={exp.number_of_months || ''}
+                      onChange={(e) => onUpdateExperience('work_experiences', i, { number_of_months: e.target.value || null })}
+                      style={{ width: '100%', padding: '6px', fontSize: '13px', border: '1px solid #d1d5db', borderRadius: '6px' }}
+                    />
+                  </td>
+                  <td style={{ padding: '10px', textAlign: 'center' }}>
+                    <button
+                      type="button"
+                      onClick={() => onRemoveExperience('work_experiences', i)}
+                      style={{ padding: '4px 8px', fontSize: '12px', color: '#dc2626', backgroundColor: '#fef2f2', border: '1px solid #fecaca', borderRadius: '6px', cursor: 'pointer' }}
+                    >
+                      Remove
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <button
+          type="button"
+          onClick={() => onAddExperience('work_experiences', experienceTemplate)}
+          style={{ marginTop: '12px', padding: '8px 12px', fontSize: '13px', color: '#1d4ed8', backgroundColor: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '8px', cursor: 'pointer', fontWeight: '500' }}
+        >
+          + Add Work Experience
+        </button>
+        {errors.work_experiences && <p style={{ color: '#dc2626', fontSize: '12px', marginTop: '8px' }}>✕ {errors.work_experiences}</p>}
+      </div>
+    </div>
+  )
+}
+
 // ── MAIN COMPONENT ────────────────────────────────────────────────────────
 
 export default function SeekerOnboarding() {
@@ -1052,6 +1650,18 @@ export default function SeekerOnboarding() {
     work_type_preference: '',
     preferred_work_location: '',
     preferred_locations_details: [],
+    // Step 4 (Languages - handled dynamically via lang_${key}_${skill} fields)
+    // Step 5: Education & Other Skills
+    currently_in_school: false,
+    educations: [], // Array of { level, course_strand, year_graduated, undergrad_level_reached, undergrad_year_last_attended }
+    dole_skills: [], // Array of DOLE skill strings (e.g., ['Auto Mechanic', 'Carpentry Work'])
+    technical_skills: [], // Array of custom technical/hard skills
+    soft_skills: [], // Array of custom soft/interpersonal skills
+    // Step 6: Trainings & Eligibilities
+    trainings: [], // Array of { course, hours_of_training, training_institution, skills_acquired, certificates_received }
+    eligibilities: [], // Array of { type, name, date_taken, valid_until }
+    // Step 7: Work Experience
+    work_experiences: [], // Array of { company_name, company_address, position, number_of_months, employment_status }
   })
 
   const handleChange = useCallback((e) => {
@@ -1219,7 +1829,47 @@ export default function SeekerOnboarding() {
         e.lang_other_name = 'Please specify the language.'
     }
 
+    if (s === 5) {
+      if (!form.educations?.length)
+        e.educations = 'Please add at least one education level.'
+    }
+
+    if (s === 6) {
+      // Both trainings and eligibilities are optional at this step
+      // No mandatory validation unless both are empty
+      if (!form.trainings?.length && !form.eligibilities?.length)
+        e.trainings = 'Please add at least one training or eligibility.'
+    }
+
+    if (s === 7) {
+      if (!form.work_experiences?.length)
+        e.work_experiences = 'Please add at least one work experience.'
+    }
+
     return e
+  }
+
+  // ── Array Helper Functions ───────────────────────────────────────────────
+
+  const addArrayItem = (fieldName, newItem) => {
+    setForm((f) => ({
+      ...f,
+      [fieldName]: [...(f[fieldName] || []), newItem],
+    }))
+  }
+
+  const removeArrayItem = (fieldName, index) => {
+    setForm((f) => ({
+      ...f,
+      [fieldName]: f[fieldName].filter((_, i) => i !== index),
+    }))
+  }
+
+  const updateArrayItem = (fieldName, index, updates) => {
+    setForm((f) => ({
+      ...f,
+      [fieldName]: f[fieldName].map((item, i) => (i === index ? { ...item, ...updates } : item)),
+    }))
   }
 
   // ── Build API payloads ───────────────────────────────────────────────────
@@ -1231,7 +1881,8 @@ export default function SeekerOnboarding() {
     date_of_birth            : form.date_of_birth,
     sex                      : form.sex,
     civil_status             : form.civil_status,
-    religion                 : form.religion === 'other' ? form.religion_other : form.religion,
+   religion                 : form.religion, 
+    religion_other           : form.religion === 'other' ? form.religion_other : null,
     height_ft                : parseFloat(form.height_ft),
     tin                      : form.tin || null,
     educ_attainment          : form.educ_attainment,
@@ -1287,6 +1938,23 @@ export default function SeekerOnboarding() {
     return { languages }
   }
 
+  const buildStep5Payload = () => ({
+    currently_in_school : form.currently_in_school,
+    educations          : form.educations || [],
+    dole_skills         : form.dole_skills || [],
+    technical_skills    : form.technical_skills || [],
+    soft_skills         : form.soft_skills || [],
+  })
+
+  const buildStep6Payload = () => ({
+    trainings      : form.trainings || [],
+    eligibilities  : form.eligibilities || [],
+  })
+
+  const buildStep7Payload = () => ({
+    work_experiences : form.work_experiences || [],
+  })
+
   // ── Navigation ───────────────────────────────────────────────────────────
   const handleNext = async () => {
     const errs = validateStep(step)
@@ -1300,8 +1968,11 @@ export default function SeekerOnboarding() {
       if (step === 1) data = await authService.saveStep1(buildStep1Payload())
       if (step === 2) data = await authService.saveStep2(buildStep2Payload())
       if (step === 3) data = await authService.saveStep3(buildStep3Payload())
-      if (step === 4) {
-        data = await authService.saveStep4(buildStep4Payload())
+      if (step === 4) data = await authService.saveStep4(buildStep4Payload())
+      if (step === 5) data = await authService.saveStep5(buildStep5Payload())
+      if (step === 6) data = await authService.saveStep6(buildStep6Payload())
+      if (step === 7) {
+        data = await authService.saveStep7(buildStep7Payload())
         // Update store with completed profile
         updateUser({ ...data.user, profile_completed: true })
         navigate('/seeker/dashboard', { replace: true })
@@ -1329,7 +2000,7 @@ export default function SeekerOnboarding() {
     if (step > 1) { setStep((s) => s - 1); setErrors({}); setApiError('') }
   }
 
-  const progressPct = ((step - 1) / 4) * 100
+  const progressPct = ((step - 1) / 6) * 100
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#f8fafc', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '32px 16px 60px' }}>
@@ -1388,6 +2059,39 @@ export default function SeekerOnboarding() {
             {step === 2 && <Step2 form={form} errors={errors} onChange={handleChange} />}
             {step === 3 && <Step3 form={form} errors={errors} onChange={handleChange} />}
             {step === 4 && <Step4 form={form} errors={errors} onChange={handleChange} />}
+            {step === 5 && (
+              <Step5
+                form={form}
+                errors={errors}
+                onChange={handleChange}
+                onAddEducation={addArrayItem}
+                onRemoveEducation={removeArrayItem}
+                onUpdateEducation={updateArrayItem}
+                onAddSkill={addArrayItem}
+                onRemoveSkill={removeArrayItem}
+              />
+            )}
+            {step === 6 && (
+              <Step6
+                form={form}
+                errors={errors}
+                onAddTraining={addArrayItem}
+                onRemoveTraining={removeArrayItem}
+                onUpdateTraining={updateArrayItem}
+                onAddEligibility={addArrayItem}
+                onRemoveEligibility={removeArrayItem}
+                onUpdateEligibility={updateArrayItem}
+              />
+            )}
+            {step === 7 && (
+              <Step7
+                form={form}
+                errors={errors}
+                onAddExperience={addArrayItem}
+                onRemoveExperience={removeArrayItem}
+                onUpdateExperience={updateArrayItem}
+              />
+            )}
 
             {/* Navigation */}
             <div style={{ display: 'flex', gap: '12px', marginTop: '32px', paddingTop: '24px', borderTop: '1px solid #f1f5f9' }}>
@@ -1408,7 +2112,7 @@ export default function SeekerOnboarding() {
                     <span style={{ display: 'inline-block', width: '14px', height: '14px', border: '2px solid rgba(255,255,255,0.3)', borderTop: '2px solid #fff', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
                     Saving…
                   </>
-                ) : step === 4 ? (
+                ) : step === 7 ? (
                   '✓ Complete Profile'
                 ) : (
                   `Save & Continue →`

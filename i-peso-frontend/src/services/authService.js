@@ -68,6 +68,21 @@ export const authService = {
     return res.data
   },
 
+  async saveStep5(data) {
+    const res = await apiClient.post('/seeker/step-5', data)
+    return res.data
+  },
+
+  async saveStep6(data) {
+    const res = await apiClient.post('/seeker/step-6', data)
+    return res.data
+  },
+
+  async saveStep7(data) {
+    const res = await apiClient.post('/seeker/step-7', data)
+    return res.data
+  },
+
   // ===== LEGACY: Single-submit endpoint =====
   
   async saveSeekerProfile(profileData) {

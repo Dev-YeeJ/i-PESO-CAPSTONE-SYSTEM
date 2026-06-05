@@ -12,6 +12,7 @@ class NSRPPdfExportController extends Controller
 {
     /**
      * Export a Job Seeker's NSRP profile as PDF
+     * Properly loads skills grouped by type for rendering
      */
     public function exportNSRPPdf(int $seekerId): Response
     {
@@ -21,17 +22,30 @@ class NSRPPdfExportController extends Controller
             abort(403, 'Unauthorized');
         }
 
-        // Fetch job seeker with all related data
+        // Fetch job seeker with all related data (Steps 1-7)
         $seeker = JobSeeker::with([
             'disabilities',
             'occupations',
             'languages',
             'workLocations',
+            'educations',      // Step 5
+            'skills',          // All skills (will be filtered in template)
+            'trainings',       // Step 6
+            'eligibilities',   // Step 6
+            'workExperiences', // Step 7
         ])->findOrFail($seekerId);
+
+        // Organize skills by type for cleaner template rendering
+        $skillsByType = [
+            'dole_standard' => $seeker->skills->where('skill_type', 'dole_standard')->pluck('skill_name')->toArray(),
+            'technical'     => $seeker->skills->where('skill_type', 'technical')->pluck('skill_name')->toArray(),
+            'soft'          => $seeker->skills->where('skill_type', 'soft')->pluck('skill_name')->toArray(),
+        ];
 
         // Generate PDF from Blade template
         $pdf = Pdf::loadView('pdf.nsrp-form', [
-            'seeker' => $seeker,
+            'seeker'      => $seeker,
+            'skillsByType' => $skillsByType,
             'generatedDate' => now(),
         ]);
 

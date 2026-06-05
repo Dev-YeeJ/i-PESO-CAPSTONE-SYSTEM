@@ -32,6 +32,9 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/step-2',        [SeekerController::class, 'saveStep2']);
         Route::post('/step-3',        [SeekerController::class, 'saveStep3']);
         Route::post('/step-4',        [SeekerController::class, 'saveStep4']);
+        Route::post('/step-5',        [SeekerController::class, 'saveStep5']);
+        Route::post('/step-6',        [SeekerController::class, 'saveStep6']);
+        Route::post('/step-7',        [SeekerController::class, 'saveStep7']);
         Route::post('/profile',       [SeekerController::class, 'saveProfile']); // Legacy single-submit endpoint
     });
 
