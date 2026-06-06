@@ -7,6 +7,10 @@ use App\Models\JobSeeker;
 use App\Models\SeekerDisability;
 use App\Models\SeekerOccupation;
 use App\Models\SeekerLanguage;
+use App\Models\SeekerEducation;
+use App\Models\SeekerTraining;
+use App\Models\SeekerEligibility;
+use App\Models\SeekerWorkExperience;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -68,13 +72,31 @@ class SeekerController extends Controller
      *
      * Returns the full seeker profile including all related data.
      * Used to pre-fill the onboarding form on return visits.
+     * Skills are organized by type for form initialization.
      */
     public function getProfile(Request $request): JsonResponse
     {
         $seeker = $this->getSeeker($request);
         if ($seeker instanceof JsonResponse) return $seeker;
 
-        $seeker->load(['disabilities', 'occupations', 'languages']);
+        $seeker->load(['disabilities', 'occupations', 'languages', 'educations', 'trainings', 'eligibilities', 'workExperiences', 'skills']);
+
+        // Organize skills by type for frontend form initialization
+        $doleSkills = [];
+        $technicalSkills = [];
+        $softSkills = [];
+        
+        if ($seeker->skills && is_iterable($seeker->skills)) {
+            foreach ($seeker->skills as $skill) {
+                if ($skill->skill_type === 'dole_standard') {
+                    $doleSkills[] = $skill->skill_name;
+                } elseif ($skill->skill_type === 'technical') {
+                    $technicalSkills[] = $skill->skill_name;
+                } elseif ($skill->skill_type === 'soft') {
+                    $softSkills[] = $skill->skill_name;
+                }
+            }
+        }
 
         return response()->json([
             'user' => array_merge($this->buildPayload($seeker), [
@@ -109,6 +131,14 @@ class SeekerController extends Controller
                 'preferred_locations_details' => $seeker->preferred_locations_details,
                 'occupations'                => $seeker->occupations,
                 'languages'                  => $seeker->languages,
+                'currently_in_school'        => $seeker->currently_in_school,
+                'dole_skills'                => $doleSkills,
+                'technical_skills'           => $technicalSkills,
+                'soft_skills'                => $softSkills,
+                'educations'                 => $seeker->educations,
+                'trainings'                  => $seeker->trainings,
+                'eligibilities'              => $seeker->eligibilities,
+                'work_experiences'           => $seeker->workExperiences,
             ]),
         ]);
     }
@@ -128,11 +158,12 @@ class SeekerController extends Controller
             'first_name'                => ['required', 'string', 'max:100'],
             'middle_name'               => ['nullable', 'string', 'max:100'],
             'last_name'                 => ['required', 'string', 'max:100'],
-            'suffix'                    => ['nullable', 'string', 'max:20'],
+            'suffix'                    => ['nullable', 'string', 'in:,Jr.,Sr.,II,III,IV,V'],
             'date_of_birth'             => ['required', 'date', 'before:today'],
             'sex'                       => ['required', 'in:male,female'],
             'civil_status'              => ['required', 'in:single,married,widowed,separated'],
-            'religion'                  => ['required', 'string', 'max:100'],
+            'religion'                  => ['required', 'string', 'in:roman_catholic,islam,iglesia_ni_cristo,aglipayan,evangelical,seventh_day_adventist,jehovah_witness,buddhist,hindu,jewish,agnostic_atheist,declined,other'],
+            'religion_other'            => ['nullable', 'string', 'max:100', 'required_if:religion,other'],
             'height_ft'                 => ['required', 'numeric', 'between:2.5,8.5'],
             'tin'                       => ['nullable', 'string', 'max:20'],
             'educ_attainment'           => ['required', 'string', 'max:100'],
@@ -155,7 +186,9 @@ class SeekerController extends Controller
             'date_of_birth'             => $validated['date_of_birth'],
             'sex'                       => $validated['sex'],
             'civil_status'              => $validated['civil_status'],
-            'religion'                  => $validated['religion'],
+            'religion'                  => $validated['religion'] === 'other'
+                ? ($validated['religion_other'] ?? null)
+                : $validated['religion'],
             'height_ft'                 => $validated['height_ft'],
             'tin'                       => $validated['tin'] ?? null,
             'educ_attainment'           => $validated['educ_attainment'],
@@ -341,6 +374,208 @@ class SeekerController extends Controller
 
         $this->markStepComplete($seeker, 'step4');
 
+        return response()->json([
+            'message' => 'Language proficiency saved.',
+            'user'    => $this->buildPayload($seeker),
+        ]);
+    }
+
+    /**
+     * POST /api/seeker/step-5   [auth:sanctum]
+     *
+     * Saves: Educational Background (writes to seeker_educations table) and
+     *        Other Skills (JSON array in job_seekers table).
+     */
+    public function saveStep5(Request $request): JsonResponse
+    {
+        $seeker = $this->getSeeker($request);
+        if ($seeker instanceof JsonResponse) return $seeker;
+
+        $validated = $request->validate([
+            'currently_in_school'    => ['required', 'boolean'],
+            // Education array: one record per level (required, min 1)
+            'educations'             => ['required', 'array', 'min:1'],
+            'educations.*.level'     => ['required', 'string', 'in:elementary,secondary_non_k12,secondary_k12,senior_high_strand,tertiary,graduate_studies'],
+            'educations.*.course_strand'           => ['nullable', 'string', 'max:255'],
+            'educations.*.year_graduated'          => ['nullable', 'integer', 'min:1900', 'max:2100'],
+            'educations.*.undergrad_level_reached' => ['nullable', 'string', 'max:255'],
+            'educations.*.undergrad_year_last_attended' => ['nullable', 'integer', 'min:1900', 'max:2100'],
+            
+            // ── SKILLS: Three separate arrays (all optional) ──────────────────────
+            // DOLE standard skills (Section VIII of NSRP Form)
+            'dole_skills'            => ['nullable', 'array'],
+            'dole_skills.*'          => ['required_with:dole_skills', 'string', 'max:255'],
+            
+            // Technical/Professional skills (custom, not on official NSRP form)
+            'technical_skills'       => ['nullable', 'array'],
+            'technical_skills.*'     => ['required_with:technical_skills', 'string', 'max:255'],
+            
+            // Soft/Interpersonal skills (custom, not on official NSRP form)
+            'soft_skills'            => ['nullable', 'array'],
+            'soft_skills.*'          => ['required_with:soft_skills', 'string', 'max:255'],
+        ]);
+
+        // ── Save main seeker fields ──
+        $seeker->forceFill([
+            'currently_in_school' => $validated['currently_in_school'],
+        ])->save();
+
+        // ── Sync educations (delete + re-insert) ──
+        $seeker->educations()->delete();
+        foreach ($validated['educations'] as $edu) {
+            SeekerEducation::create([
+                'seeker_id'                    => $seeker->getKey(),
+                'level'                        => $edu['level'],
+                'course_strand'                => $edu['course_strand'] ?? null,
+                'year_graduated'               => $edu['year_graduated'] ?? null,
+                'undergrad_level_reached'      => $edu['undergrad_level_reached'] ?? null,
+                'undergrad_year_last_attended' => $edu['undergrad_year_last_attended'] ?? null,
+            ]);
+        }
+
+        // ── Sync all skills (delete + re-insert) ──
+        // Delete existing skills for this seeker
+        $seeker->skills()->delete();
+        
+        // Insert DOLE standard skills
+        if (!empty($validated['dole_skills'])) {
+            foreach ($validated['dole_skills'] as $skillName) {
+                $seeker->skills()->create([
+                    'skill_name' => trim($skillName),
+                    'skill_type' => 'dole_standard',
+                ]);
+            }
+        }
+        
+        // Insert technical/professional skills
+        if (!empty($validated['technical_skills'])) {
+            foreach ($validated['technical_skills'] as $skillName) {
+                $seeker->skills()->create([
+                    'skill_name' => trim($skillName),
+                    'skill_type' => 'technical',
+                ]);
+            }
+        }
+        
+        // Insert soft/interpersonal skills
+        if (!empty($validated['soft_skills'])) {
+            foreach ($validated['soft_skills'] as $skillName) {
+                $seeker->skills()->create([
+                    'skill_name' => trim($skillName),
+                    'skill_type' => 'soft',
+                ]);
+            }
+        }
+
+        $this->markStepComplete($seeker, 'step5');
+
+        return response()->json([
+            'message' => 'Educational background and skills saved.',
+            'user'    => $this->buildPayload($seeker),
+        ]);
+    }
+
+    /**
+     * POST /api/seeker/step-6   [auth:sanctum]
+     *
+     * Saves: Vocational/Technical Trainings (writes to seeker_trainings table) and
+     *        Professional Eligibilities/Licenses (writes to seeker_eligibilities table).
+     *        Both support dynamic Add/Remove rows.
+     */
+    public function saveStep6(Request $request): JsonResponse
+    {
+        $seeker = $this->getSeeker($request);
+        if ($seeker instanceof JsonResponse) return $seeker;
+
+        $validated = $request->validate([
+            // Vocational trainings
+            'trainings'                      => ['nullable', 'array'],
+            'trainings.*.course'             => ['required_with:trainings', 'string', 'max:255'],
+            'trainings.*.hours_of_training'  => ['nullable', 'integer', 'min:1'],
+            'trainings.*.training_institution' => ['nullable', 'string', 'max:255'],
+            'trainings.*.skills_acquired'    => ['nullable', 'string', 'max:1000'],
+            'trainings.*.certificates_received' => ['nullable', 'string', 'max:1000'],
+            // Professional eligibilities/licenses
+            'eligibilities'                  => ['nullable', 'array'],
+            'eligibilities.*.type'           => ['required_with:eligibilities', 'string', 'in:civil_service,professional_license'],
+            'eligibilities.*.name'           => ['required_with:eligibilities', 'string', 'max:255'],
+            'eligibilities.*.date_taken'     => ['nullable', 'date'],
+            'eligibilities.*.valid_until'    => ['nullable', 'date'],
+        ]);
+
+        // ── Sync trainings (delete + re-insert) ──
+        $seeker->trainings()->delete();
+        if (!empty($validated['trainings'])) {
+            foreach ($validated['trainings'] as $training) {
+                SeekerTraining::create([
+                    'seeker_id'              => $seeker->getKey(),
+                    'course'                 => $training['course'],
+                    'hours_of_training'      => $training['hours_of_training'] ?? null,
+                    'training_institution'   => $training['training_institution'] ?? null,
+                    'skills_acquired'        => $training['skills_acquired'] ?? null,
+                    'certificates_received'  => $training['certificates_received'] ?? null,
+                ]);
+            }
+        }
+
+        // ── Sync eligibilities (delete + re-insert) ──
+        $seeker->eligibilities()->delete();
+        if (!empty($validated['eligibilities'])) {
+            foreach ($validated['eligibilities'] as $elig) {
+                SeekerEligibility::create([
+                    'seeker_id'    => $seeker->getKey(),
+                    'type'         => $elig['type'],
+                    'name'         => $elig['name'],
+                    'date_taken'   => $elig['date_taken'] ?? null,
+                    'valid_until'  => $elig['valid_until'] ?? null,
+                ]);
+            }
+        }
+
+        $this->markStepComplete($seeker, 'step6');
+
+        return response()->json([
+            'message' => 'Trainings and eligibilities saved.',
+            'user'    => $this->buildPayload($seeker),
+        ]);
+    }
+
+    /**
+     * POST /api/seeker/step-7   [auth:sanctum]
+     *
+     * Saves: Work Experience (writes to seeker_work_experiences table).
+     *        Supports dynamic Add/Remove rows.
+     *        Final step — marks profile_completed = true upon success.
+     */
+    public function saveStep7(Request $request): JsonResponse
+    {
+        $seeker = $this->getSeeker($request);
+        if ($seeker instanceof JsonResponse) return $seeker;
+
+        $validated = $request->validate([
+            'work_experiences'          => ['required', 'array', 'min:1'],
+            'work_experiences.*.company_name' => ['required', 'string', 'max:255'],
+            'work_experiences.*.company_address' => ['nullable', 'string', 'max:500'],
+            'work_experiences.*.position' => ['required', 'string', 'max:255'],
+            'work_experiences.*.number_of_months' => ['nullable', 'integer', 'min:0', 'max:600'],
+            'work_experiences.*.employment_status' => ['nullable', 'string', 'in:permanent,contractual,part_time,probationary,temporary,seasonal'],
+        ]);
+
+        // ── Sync work experiences (delete + re-insert) ──
+        $seeker->workExperiences()->delete();
+        foreach ($validated['work_experiences'] as $exp) {
+            SeekerWorkExperience::create([
+                'seeker_id'           => $seeker->getKey(),
+                'company_name'        => $exp['company_name'],
+                'company_address'     => $exp['company_address'] ?? null,
+                'position'            => $exp['position'],
+                'number_of_months'    => $exp['number_of_months'] ?? null,
+                'employment_status'   => $exp['employment_status'] ?? null,
+            ]);
+        }
+
+        $this->markStepComplete($seeker, 'step7');
+
         // ── Mark profile as fully complete ──
         $seeker->forceFill([
             'profile_completed'    => true,
@@ -351,5 +586,20 @@ class SeekerController extends Controller
             'message' => 'Profile completed! Welcome to i-PESO.',
             'user'    => $this->buildPayload($seeker),
         ]);
+    }
+
+    /**
+     * Helper: Build other_skills JSON array, including custom "others" value if provided.
+     */
+    private function buildOtherSkillsArray(array $validated): array
+    {
+        $skills = $validated['other_skills'] ?? [];
+        
+        // If 'others' is selected and custom text provided, add it
+        if (in_array('others', $skills) && !empty($validated['other_skills_others'])) {
+            $skills[] = $validated['other_skills_others'];
+        }
+        
+        return array_filter($skills);
     }
 }

@@ -253,13 +253,13 @@
             </tr>
             <tr>
                 <td class="field-label">SEX:</td>
-                <td class="field-value">{{ ucfirst($seeker->sex) ?? 'N/A' }}</td>
+                <td class="field-value">{{ ucfirst(str_replace('_', ' ', $seeker->sex ?? '')) ?: 'N/A' }}</td>
                 <td class="field-label">CIVIL STATUS:</td>
-                <td class="field-value">{{ ucfirst($seeker->civil_status) ?? 'N/A' }}</td>
+                <td class="field-value">{{ ucfirst(str_replace('_', ' ', $seeker->civil_status ?? '')) ?: 'N/A' }}</td>
             </tr>
             <tr>
                 <td class="field-label">RELIGION:</td>
-                <td class="field-value">{{ $seeker->religion ?? 'N/A' }}</td>
+                <td class="field-value">{{ $seeker->getFormattedReligion() }}</td>
                 <td class="field-label">HEIGHT (FT):</td>
                 <td class="field-value">{{ $seeker->height_ft ?? 'N/A' }}</td>
             </tr>
@@ -324,7 +324,7 @@
             <tr>
                 <td class="field-label">Employment Status:</td>
                 <td class="field-value" colspan="3">
-                    <strong>{{ ucfirst($seeker->employment_status) ?? 'N/A' }}</strong>
+                    <strong>{{ ucfirst(str_replace('_', ' ', $seeker->employment_status ?? '')) ?: 'N/A' }}</strong>
                 </td>
             </tr>
             <tr>
@@ -413,11 +413,227 @@
             @endif
         </table>
 
+        <!-- V. EDUCATION & OTHER SKILLS -->
+        <div class="section-title">V. EDUCATION & OTHER SKILLS</div>
+
+        <!-- Currently in School Status -->
+        <table>
+            <tr>
+                <td class="field-label">Currently in School:</td>
+                <td class="field-value" colspan="3">
+                    <strong>{{ $seeker->currently_in_school ? 'Yes' : 'No' }}</strong>
+                </td>
+            </tr>
+        </table>
+
+        <!-- Education Levels -->
+        <div style="font-size: 10px; margin-top: 8px; margin-bottom: 4px; font-weight: bold; padding: 0 6px;">Education Levels</div>
+        <table>
+            <tr>
+                <th style="width: 30%;">Education Level</th>
+                <th style="width: 25%;">Course/Strand</th>
+                <th style="width: 20%;">Year Graduated</th>
+                <th style="width: 25%;">Undergraduate Level/Year</th>
+            </tr>
+            @if($seeker->educations && $seeker->educations->count() > 0)
+                @foreach($seeker->educations as $edu)
+                    <tr>
+                        <td>{{ ucfirst(str_replace('_', ' ', $edu->level)) }}</td>
+                        <td>{{ $edu->course_strand ?? 'N/A' }}</td>
+                        <td>{{ $edu->year_graduated ?? '—' }}</td>
+                        <td>{{ ($edu->undergrad_level_reached ?? '') . ($edu->undergrad_year_last_attended ? ' (' . $edu->undergrad_year_last_attended . ')' : '') ?: '—' }}</td>
+                    </tr>
+                @endforeach
+            @else
+                <tr>
+                    <td colspan="4" style="text-align: center; color: #999;">No education records</td>
+                </tr>
+            @endif
+        </table>
+
+        <!-- VIII. OTHER SKILLS ACQUIRED WITHOUT CERTIFICATE (DOLE Standard Skills) -->
+        <div style="font-size: 10px; margin-top: 8px; margin-bottom: 4px; font-weight: bold; padding: 0 6px;">
+            VIII. OTHER SKILLS ACQUIRED WITHOUT CERTIFICATE (DOLE Standard Skills)
+        </div>
+        <div style="padding: 6px; border: 1px solid #999; min-height: 24px; background-color: white;">
+            @php
+                $doleSkills = $skillsByType['dole_standard'] ?? [];
+            @endphp
+            @if(count($doleSkills) > 0)
+                <div style="font-size: 9px; line-height: 1.5;">
+                    @foreach($doleSkills as $skill)
+                        <span style="display: inline-block; margin-right: 12px; margin-bottom: 3px;">
+                            ✓ {{ $skill }}
+                        </span>
+                    @endforeach
+                </div>
+            @else
+                <span style="color: #999; font-size: 10px;">None reported</span>
+            @endif
+        </div>
+
+        <!-- Additional Professional Skills (Not on official NSRP form, but captured) -->
+        <div style="font-size: 10px; margin-top: 6px; margin-bottom: 4px; font-weight: bold; padding: 0 6px;">
+            Additional Professional Skills (Technical/Specialized)
+        </div>
+        <div style="padding: 6px; border: 1px solid #999; min-height: 20px; background-color: white;">
+            @php
+                $technicalSkills = $skillsByType['technical'] ?? [];
+            @endphp
+            @if(count($technicalSkills) > 0)
+                <div style="font-size: 9px;">
+                    {{ implode(', ', $technicalSkills) }}
+                </div>
+            @else
+                <span style="color: #999; font-size: 10px;">None reported</span>
+            @endif
+        </div>
+
+        <!-- Soft/Interpersonal Skills (Not on official NSRP form, but captured) -->
+        <div style="font-size: 10px; margin-top: 6px; margin-bottom: 4px; font-weight: bold; padding: 0 6px;">
+            Soft/Interpersonal Skills
+        </div>
+        <div style="padding: 6px; border: 1px solid #999; min-height: 20px; background-color: white;">
+            @php
+                $softSkills = $skillsByType['soft'] ?? [];
+            @endphp
+            @if(count($softSkills) > 0)
+                <div style="font-size: 9px;">
+                    {{ implode(', ', $softSkills) }}
+                </div>
+            @else
+                <span style="color: #999; font-size: 10px;">None reported</span>
+            @endif
+        </div>
+
+        <!-- VI. TRAININGS & PROFESSIONAL LICENSES / ELIGIBILITIES -->
+        <div class="section-title">VI. TRAININGS & PROFESSIONAL LICENSES / ELIGIBILITIES</div>
+
+        <!-- Trainings -->
+        <div style="font-size: 10px; margin-bottom: 4px; font-weight: bold; padding: 0 6px; margin-top: 6px;">Vocational/Technical Trainings</div>
+        <table>
+            <tr>
+                <th style="width: 25%;">Course</th>
+                <th style="width: 15%;">Hours</th>
+                <th style="width: 30%;">Training Institution</th>
+                <th style="width: 30%;">Skills Acquired/Certificates</th>
+            </tr>
+            @if($seeker->trainings && $seeker->trainings->count() > 0)
+                @foreach($seeker->trainings as $train)
+                    <tr>
+                        <td>{{ $train->course ?? 'N/A' }}</td>
+                        <td style="text-align: center;">{{ $train->hours_of_training ?? '—' }}</td>
+                        <td>{{ $train->training_institution ?? '—' }}</td>
+                        <td>{{ $train->skills_acquired ?? '—' }} {{ $train->certificates_received ? '(✓ ' . $train->certificates_received . ')' : '' }}</td>
+                    </tr>
+                @endforeach
+            @else
+                <tr>
+                    <td colspan="4" style="text-align: center; color: #999;">No training records</td>
+                </tr>
+            @endif
+        </table>
+
+        <!-- Professional Licenses & Eligibilities -->
+        <div style="font-size: 10px; margin-bottom: 4px; font-weight: bold; padding: 0 6px; margin-top: 6px;">Professional Licenses & Civil Service Eligibilities</div>
+        <table>
+            <tr>
+                <th style="width: 25%;">Type</th>
+                <th style="width: 35%;">License/Eligibility Name</th>
+                <th style="width: 20%;">Date Taken</th>
+                <th style="width: 20%;">Valid Until</th>
+            </tr>
+            @if($seeker->eligibilities && $seeker->eligibilities->count() > 0)
+                @foreach($seeker->eligibilities as $elig)
+                    <tr>
+                        <td>{{ ucfirst(str_replace('_', ' ', $elig->type)) }}</td>
+                        <td>{{ $elig->name ?? 'N/A' }}</td>
+                        <td>{{ $elig->date_taken ? \Carbon\Carbon::parse($elig->date_taken)->format('m/d/Y') : '—' }}</td>
+                        <td>{{ $elig->valid_until ? \Carbon\Carbon::parse($elig->valid_until)->format('m/d/Y') : '—' }}</td>
+                    </tr>
+                @endforeach
+            @else
+                <tr>
+                    <td colspan="4" style="text-align: center; color: #999;">No professional licenses or eligibilities recorded</td>
+                </tr>
+            @endif
+        </table>
+
+        <!-- VII. WORK EXPERIENCE -->
+        <div class="section-title">VII. WORK EXPERIENCE</div>
+
+        <table>
+            <tr>
+                <th style="width: 20%;">Company Name</th>
+                <th style="width: 20%;">Position</th>
+                <th style="width: 20%;">Company Address</th>
+                <th style="width: 15%;">Months</th>
+                <th style="width: 25%;">Employment Status</th>
+            </tr>
+            @if($seeker->workExperiences && $seeker->workExperiences->count() > 0)
+                @foreach($seeker->workExperiences as $exp)
+                    <tr>
+                        <td>{{ $exp->company_name ?? 'N/A' }}</td>
+                        <td>{{ $exp->position ?? 'N/A' }}</td>
+                        <td>{{ $exp->company_address ?? '—' }}</td>
+                        <td style="text-align: center;">{{ $exp->number_of_months ?? '—' }}</td>
+                        <td>{{ ucfirst(str_replace('_', ' ', $exp->employment_status ?? '')) ?: '—' }}</td>
+                    </tr>
+                @endforeach
+            @else
+                <tr>
+                    <td colspan="5" style="text-align: center; color: #999;">No work experience records</td>
+                </tr>
+            @endif
+        </table>
+
+        <!-- Profile Completion Status -->
+        <div class="section-title">PROFILE COMPLETION STATUS</div>
+
+        <table>
+            <tr>
+                <td class="field-label">Profile Complete:</td>
+                <td class="field-value" colspan="3">
+                    @if($seeker->profile_completed)
+                        <span class="badge badge-verified">✓ COMPLETE</span>
+                        <span style="font-size: 9px; color: #666; margin-left: 8px;">Completed on {{ \Carbon\Carbon::parse($seeker->profile_completed_at)->format('F d, Y \a\t H:i A') }}</span>
+                    @else
+                        <span class="badge badge-pending">⚠ INCOMPLETE</span>
+                    @endif
+                </td>
+            </tr>
+            <tr>
+                <td class="field-label">Verification Status:</td>
+                <td class="field-value" colspan="3">
+                    @if($seeker->is_verified)
+                        <span class="badge badge-verified">✓ VERIFIED</span>
+                        <span style="font-size: 9px; color: #666; margin-left: 8px;">by admin on {{ \Carbon\Carbon::parse($seeker->verified_at)->format('F d, Y') }}</span>
+                    @else
+                        <span class="badge badge-pending">⏳ PENDING VERIFICATION</span>
+                    @endif
+                </td>
+            </tr>
+            @if($seeker->verification_remarks)
+                <tr>
+                    <td class="field-label">Remarks:</td>
+                    <td class="field-value" colspan="3" style="font-size: 9px;">{{ $seeker->verification_remarks }}</td>
+                </tr>
+            @endif
+        </table>
+
         <!-- Footer -->
         <div class="footer">
-            <p>This is an official digitized record generated from the i-PESO Employment Portal.</p>
-            <p>For official requests, please contact the Public Employment Service Office (PESO) in your area.</p>
-            <p style="margin-top: 8px; color: #999;">Document ID: NSRP-{{ $seeker->seeker_id }}-{{ $generatedDate->format('YmdHis') }}</p>
+            <p><strong>CERTIFICATION:</strong></p>
+            <p style="margin-bottom: 8px; font-size: 9px; line-height: 1.5;">
+                I hereby certify that the information provided in this NSRP Form 1 is true, accurate, and complete to the best of my knowledge. 
+                I understand that any false or misleading information may result in disqualification from employment assistance and government programs.
+            </p>
+            <p style="margin-top: 12px; color: #999; font-size: 8px;">
+                This is an official digitized record generated from the i-PESO Employment Portal.<br />
+                For official requests or clarifications, please contact the Public Employment Service Office (PESO) in your area.<br />
+                <strong>Document ID:</strong> NSRP-{{ $seeker->seeker_id }}-{{ $generatedDate->format('YmdHis') }}<br />
+                <strong>Generated:</strong> {{ $generatedDate->format('F d, Y \a\t H:i A') }}
+            </p>
         </div>
     </div>
 </body>

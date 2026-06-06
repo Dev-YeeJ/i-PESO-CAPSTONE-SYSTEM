@@ -198,6 +198,129 @@ export default function SeekerDetailPage() {
             </div>
           </div>
         </div>
+
+        {/* STEP 5: Education & Other Skills */}
+        {seeker.educations && seeker.educations.length > 0 && (
+          <div className="bg-white border border-slate-200 rounded-2xl p-6 lg:col-span-2">
+            <h3 className="font-bold text-slate-900 mb-4">Education Levels</h3>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-slate-200">
+                    <th className="text-left py-2 px-3 font-semibold text-slate-900">Level</th>
+                    <th className="text-left py-2 px-3 font-semibold text-slate-900">Course/Strand</th>
+                    <th className="text-left py-2 px-3 font-semibold text-slate-900">Year Graduated</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {seeker.educations.map((edu, idx) => (
+                    <tr key={idx} className="border-b border-slate-100 hover:bg-slate-50">
+                      <td className="py-2 px-3 text-slate-700">{edu.level || 'N/A'}</td>
+                      <td className="py-2 px-3 text-slate-700">{edu.course_strand || '—'}</td>
+                      <td className="py-2 px-3 text-slate-700">{edu.year_graduated || '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {seeker.other_skills && seeker.other_skills.length > 0 && (
+          <div className="bg-white border border-slate-200 rounded-2xl p-6 lg:col-span-2">
+            <h3 className="font-bold text-slate-900 mb-4">Other Skills (Without Certificate)</h3>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-sm">
+              {seeker.other_skills.map((skill, idx) => (
+                <span key={idx} className="inline-block px-3 py-1 bg-blue-50 text-blue-700 rounded-lg border border-blue-200">
+                  {skill}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* STEP 6: Trainings */}
+        {seeker.trainings && seeker.trainings.length > 0 && (
+          <div className="bg-white border border-slate-200 rounded-2xl p-6 lg:col-span-2">
+            <h3 className="font-bold text-slate-900 mb-4">Training Records</h3>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-slate-200">
+                    <th className="text-left py-2 px-3 font-semibold text-slate-900">Course</th>
+                    <th className="text-left py-2 px-3 font-semibold text-slate-900">Hours</th>
+                    <th className="text-left py-2 px-3 font-semibold text-slate-900">Institution</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {seeker.trainings.map((train, idx) => (
+                    <tr key={idx} className="border-b border-slate-100 hover:bg-slate-50">
+                      <td className="py-2 px-3 text-slate-700">{train.course || 'N/A'}</td>
+                      <td className="py-2 px-3 text-slate-700">{train.hours_of_training || '—'}</td>
+                      <td className="py-2 px-3 text-slate-700">{train.training_institution || '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* STEP 6: Eligibilities */}
+        {seeker.eligibilities && seeker.eligibilities.length > 0 && (
+          <div className="bg-white border border-slate-200 rounded-2xl p-6 lg:col-span-2">
+            <h3 className="font-bold text-slate-900 mb-4">Professional Licenses & Eligibilities</h3>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-slate-200">
+                    <th className="text-left py-2 px-3 font-semibold text-slate-900">Type</th>
+                    <th className="text-left py-2 px-3 font-semibold text-slate-900">Name</th>
+                    <th className="text-left py-2 px-3 font-semibold text-slate-900">Date Taken</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {seeker.eligibilities.map((elig, idx) => (
+                    <tr key={idx} className="border-b border-slate-100 hover:bg-slate-50">
+                      <td className="py-2 px-3 text-slate-700">{elig.type || 'N/A'}</td>
+                      <td className="py-2 px-3 text-slate-700">{elig.name || 'N/A'}</td>
+                      <td className="py-2 px-3 text-slate-700">{elig.date_taken || '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* STEP 7: Work Experience */}
+        {seeker.work_experiences && seeker.work_experiences.length > 0 && (
+          <div className="bg-white border border-slate-200 rounded-2xl p-6 lg:col-span-2">
+            <h3 className="font-bold text-slate-900 mb-4">Work Experience</h3>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-slate-200">
+                    <th className="text-left py-2 px-3 font-semibold text-slate-900">Company</th>
+                    <th className="text-left py-2 px-3 font-semibold text-slate-900">Position</th>
+                    <th className="text-left py-2 px-3 font-semibold text-slate-900">Months</th>
+                    <th className="text-left py-2 px-3 font-semibold text-slate-900">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {seeker.work_experiences.map((exp, idx) => (
+                    <tr key={idx} className="border-b border-slate-100 hover:bg-slate-50">
+                      <td className="py-2 px-3 text-slate-700">{exp.company_name || 'N/A'}</td>
+                      <td className="py-2 px-3 text-slate-700">{exp.position || 'N/A'}</td>
+                      <td className="py-2 px-3 text-slate-700">{exp.number_of_months || '—'}</td>
+                      <td className="py-2 px-3 text-slate-700">{exp.employment_status || '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
       </div>
 
     </div>

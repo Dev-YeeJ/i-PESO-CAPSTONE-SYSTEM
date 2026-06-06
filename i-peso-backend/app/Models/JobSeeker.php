@@ -63,6 +63,9 @@ class JobSeeker extends Authenticatable
         'work_type_preference',
         'preferred_work_location',
         'preferred_locations_details',
+        // === STEP 5: EDUCATION & OTHER SKILLS ===
+        'currently_in_school',
+        'other_skills',
         // === TRACKING ===
         'profile_completed',
         'profile_completed_at',
@@ -88,6 +91,8 @@ class JobSeeker extends Authenticatable
         'unemployment_months'               => 'integer',
         'preferred_locations_details'       => 'array',
         'form_validation_state'             => 'array',
+        'currently_in_school'               => 'boolean',
+        'other_skills'                      => 'array',
     ];
 
     // === RELATIONSHIPS ===
@@ -111,6 +116,31 @@ class JobSeeker extends Authenticatable
     public function languages(): HasMany
     {
         return $this->hasMany(SeekerLanguage::class, 'seeker_id', 'seeker_id');
+    }
+
+    public function educations(): HasMany
+    {
+        return $this->hasMany(SeekerEducation::class, 'seeker_id', 'seeker_id');
+    }
+
+    public function trainings(): HasMany
+    {
+        return $this->hasMany(SeekerTraining::class, 'seeker_id', 'seeker_id');
+    }
+
+    public function eligibilities(): HasMany
+    {
+        return $this->hasMany(SeekerEligibility::class, 'seeker_id', 'seeker_id');
+    }
+
+    public function workExperiences(): HasMany
+    {
+        return $this->hasMany(SeekerWorkExperience::class, 'seeker_id', 'seeker_id');
+    }
+
+    public function skills(): HasMany
+    {
+        return $this->hasMany(SeekerSkill::class, 'seeker_id', 'seeker_id');
     }
 
     // ===== HELPER METHODS =====
@@ -138,6 +168,39 @@ class JobSeeker extends Authenticatable
                isset($this->form_validation_state['step1'], 
                      $this->form_validation_state['step2'],
                      $this->form_validation_state['step3'],
-                     $this->form_validation_state['step4']);
+                     $this->form_validation_state['step4'],
+                     $this->form_validation_state['step5'],
+                     $this->form_validation_state['step6'],
+                     $this->form_validation_state['step7']);
+    }
+
+    /**
+     * Format religion for display (converts enum values to readable format)
+     * Examples: 'roman_catholic' → 'Roman Catholic', 'Custom Religion' → 'Custom Religion'
+     */
+    public function getFormattedReligion(): string
+    {
+        if (!$this->religion) {
+            return 'N/A';
+        }
+
+        // Enum value mapping for standardized religions
+        $enumMap = [
+            'roman_catholic'      => 'Roman Catholic',
+            'islam'               => 'Islam',
+            'iglesia_ni_cristo'   => 'Iglesia ni Cristo',
+            'aglipayan'           => 'Aglipayan',
+            'evangelical'         => 'Evangelical / Born Again',
+            'seventh_day_adventist' => 'Seventh-day Adventist',
+            'jehovah_witness'     => 'Jehovah\'s Witness',
+            'buddhist'            => 'Buddhist',
+            'hindu'               => 'Hindu',
+            'jewish'              => 'Jewish',
+            'agnostic_atheist'    => 'Agnostic / Atheist',
+            'declined'            => 'Declined to answer',
+        ];
+
+        // Return mapped value or custom value as-is
+        return $enumMap[$this->religion] ?? $this->religion;
     }
 }
