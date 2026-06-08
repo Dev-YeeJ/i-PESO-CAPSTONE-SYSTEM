@@ -80,9 +80,11 @@ export default function SeekersListPage() {
           { key: 'educ_attainment', label: 'Education' },
           { key: 'address_province', label: 'Province' },
           {
-            key: 'profile_completed',
-            label: 'Status',
-            render: (val) => val ? <StatusBadge status="completed" /> : <StatusBadge status="pending" />,
+            key: 'verification_status',
+            label: 'Verification',
+            render: (status, row) => (
+              <StatusBadge status={status ?? (row.is_verified ? 'verified' : 'pending')} />
+            ),
           },
           {
             key: 'created_at',

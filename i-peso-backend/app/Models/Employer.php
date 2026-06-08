@@ -2,25 +2,59 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
+use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 
 class Employer extends Authenticatable
 {
-    use HasApiTokens;
+    use HasApiTokens, Notifiable, SoftDeletes;
 
-    protected $table      = 'employers';
+    protected $table = 'employers';
+
     protected $primaryKey = 'employer_id';
 
     protected $fillable = [
-        'company_name',
-        'representative_name',
+        // Basic account info
         'email',
         'password',
-        'mobile_number',
+
+        // Step 1: Company Type
+        'company_type',
+
+        // Step 2: Company Profile
+        'company_name',
+        'tin',
+        'trade_name',
+        'industry',
+        'company_size',
+        'province',
+        'city_municipality',
+        'barangay',
+        'house_unit_street',
         'complete_address',
+        'company_description',
+        'company_logo',
         'industry_type',
+
+        // Step 4: Representative Details
+        'representative_name',
+        'representative_first_name',
+        'representative_middle_name',
+        'representative_last_name',
+        'representative_designation',
+        'mobile_number',
+        'representative_contact_number',
+        'representative_is_owner',
         'profile_image',
+
+        // Verification & Admin
+        'verification_status',
+        'verified_at',
+        'rejection_reason',
+        'verified_by_admin_id',
         'email_verified_at',
     ];
 
@@ -31,6 +65,78 @@ class Employer extends Authenticatable
 
     protected $casts = [
         'email_verified_at' => 'datetime',
-        'password'          => 'hashed',
+        'verified_at' => 'datetime',
+        'password' => 'hashed',
+        'representative_is_owner' => 'boolean',
     ];
+
+    /**
+     * Get all documents uploaded by this employer.
+     */
+    public function documents(): HasMany
+    {
+        return $this->hasMany(EmployerDocument::class, 'employer_id', 'employer_id');
+    }
+
+    public function vacancies(): HasMany
+    {
+        return $this->hasMany(JobVacancy::class, 'employer_id', 'employer_id');
+    }
+
+    /**
+     * Get only required documents for this employer's company type
+     */
+    public function getRequiredDocuments()
+    {
+        $required = [
+            'mayors_permit',
+            'bir_certificate',
+        ];
+
+        switch ($this->company_type) {
+            case 'sole_proprietorship':
+                $required[] = 'dti_certificate';
+                break;
+            case 'corporation_partnership':
+                $required[] = 'sec_certificate';
+                break;
+            case 'local_recruitment_agency':
+                $required[] = 'sec_certificate';
+                $required[] = 'prpa_license';
+                break;
+            case 'overseas_recruitment_agency':
+                $required[] = 'sec_certificate';
+                $required[] = 'dme_poea_license';
+                break;
+        }
+
+        return $required;
+    }
+
+    public function getOptionalDocuments(): array
+    {
+        return ['philJobnet_proof'];
+    }
+
+    /**
+     * Check if all required documents are uploaded
+     */
+    public function hasAllRequiredDocuments(): bool
+    {
+        $required = $this->getRequiredDocuments();
+        $uploaded = $this->documents()
+            ->whereIn('document_type', $required)
+            ->pluck('document_type')
+            ->toArray();
+
+        return count(array_diff($required, $uploaded)) === 0;
+    }
+
+    /**
+     * Check if employer can post jobs
+     */
+    public function canPostJobs(): bool
+    {
+        return $this->verification_status === 'verified';
+    }
 }

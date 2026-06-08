@@ -2,6 +2,7 @@
 import { useState } from 'react'
 import { Outlet, NavLink, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '@/stores/authStore'
+import NotificationBell from '@/pages/employer/components/NotificationBell'
 
 const navItems = [
   {
@@ -19,16 +20,6 @@ const navItems = [
     label: 'My Vacancies',
     icon: <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M20.25 14.15v4.25c0 1.094-.787 2.036-1.872 2.18-2.087.277-4.216.42-6.378.42s-4.291-.143-6.378-.42c-1.085-.144-1.872-1.086-1.872-2.18v-4.25m16.5 0a2.18 2.18 0 00.75-1.661V8.706c0-1.081-.768-2.015-1.837-2.175a48.114 48.114 0 00-3.413-.387m4.5 8.006c-.194.165-.42.295-.673.38A23.978 23.978 0 0112 15.75c-2.648 0-5.195-.429-7.577-1.22a2.016 2.016 0 01-.673-.38m0 0A2.18 2.18 0 013 12.489V8.706c0-1.081.768-2.015 1.837-2.175a48.111 48.111 0 013.413-.387m7.5 0V5.25A2.25 2.25 0 0013.5 3h-3a2.25 2.25 0 00-2.25 2.25v.894m7.5 0a48.667 48.667 0 00-7.5 0" /></svg>,
   },
-  {
-    to: '/employer/applicants',
-    label: 'Applicants',
-    icon: <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" /></svg>,
-  },
-  {
-    to: '/employer/interviews',
-    label: 'Interviews',
-    icon: <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" /></svg>,
-  },
 ]
 
 const EmployerLayout = () => {
@@ -36,6 +27,9 @@ const EmployerLayout = () => {
   const logout    = useAuthStore((s) => s.logout)
   const user      = useAuthStore((s) => s.user)
   const [collapsed, setCollapsed] = useState(false)
+  const visibleNavItems = user?.verification_status === 'verified'
+    ? navItems
+    : navItems.filter((item) => item.to === '/employer/dashboard')
 
   const handleLogout = async () => {
     await logout()
@@ -67,7 +61,7 @@ const EmployerLayout = () => {
 
         {/* Nav Items */}
         <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
-          {navItems.map(({ to, label, icon }) => (
+          {visibleNavItems.map(({ to, label, icon }) => (
             <NavLink
               key={to}
               to={to}
@@ -112,12 +106,7 @@ const EmployerLayout = () => {
           </div>
 
           <div className="flex items-center gap-3">
-            {/* Notification bell (Sprint 2+) */}
-            <button className="p-2 rounded-lg text-slate-500 hover:bg-slate-100 transition-colors">
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" />
-              </svg>
-            </button>
+            <NotificationBell />
             <div className="flex items-center gap-2 border-l border-slate-200 pl-3">
               <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-white text-xs font-bold">
                 {initials}

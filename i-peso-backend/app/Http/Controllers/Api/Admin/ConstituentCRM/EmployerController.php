@@ -1,4 +1,5 @@
 <?php
+
 // i-peso-backend/app/Http/Controllers/Api/Admin/ConstituentCRM/EmployerController.php
 
 namespace App\Http\Controllers\Api\Admin\ConstituentCRM;
@@ -14,8 +15,8 @@ class EmployerController extends Controller
     public function index(Request $request): JsonResponse
     {
         $admin = auth()->user();
-        
-        if (!$admin instanceof Administrator) {
+
+        if (! $admin instanceof Administrator) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
@@ -23,13 +24,20 @@ class EmployerController extends Controller
 
         if ($request->has('search') && $request->search) {
             $search = $request->search;
-            $query->where(function($q) use ($search) {
+            $query->where(function ($q) use ($search) {
                 $q->where('company_name', 'like', "%$search%")
-                  ->orWhere('email', 'like', "%$search%");
+                    ->orWhere('email', 'like', "%$search%");
             });
         }
 
-        $employers = $query->paginate($request->get('per_page', 15));
+        if ($request->filled('verification_status')) {
+            $query->where('verification_status', $request->verification_status);
+        }
+
+        $employers = $query
+            ->withCount('documents')
+            ->latest()
+            ->paginate($request->get('per_page', 15));
 
         return response()->json($employers);
     }
@@ -37,8 +45,8 @@ class EmployerController extends Controller
     public function show(int $id): JsonResponse
     {
         $admin = auth()->user();
-        
-        if (!$admin instanceof Administrator) {
+
+        if (! $admin instanceof Administrator) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 

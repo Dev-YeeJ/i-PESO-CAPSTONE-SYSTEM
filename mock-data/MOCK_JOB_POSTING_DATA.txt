@@ -1,0 +1,74 @@
+I-PESO EMPLOYER JOB POSTING MOCK DATA
+=====================================
+
+Notes:
+- The employer must first be approved by an administrator.
+- Required Skills must be entered as comma-separated text.
+- Salary fields contain monthly Philippine peso amounts.
+- Publishing Status may be active or draft.
+
+
+MOCK JOB 1
+----------
+Job title: Junior Web Developer
+Employment type: Full-time
+Location: Urdaneta City, Pangasinan
+Number of vacancies: 3
+Publishing status: active
+Minimum salary: 20000
+Maximum salary: 28000
+Required skills: HTML, CSS, JavaScript, React, Git
+Job description: Develop and maintain responsive web applications for local business clients. Work with the development team to implement interfaces, resolve defects, test features, and document completed work. Fresh graduates with a strong portfolio are encouraged to apply.
+
+
+MOCK JOB 2
+----------
+Job title: Production Line Operator
+Employment type: Full-time
+Location: Nancayasan, Urdaneta City, Pangasinan
+Number of vacancies: 10
+Publishing status: active
+Minimum salary: 15000
+Maximum salary: 18000
+Required skills: Machine Operation, Quality Inspection, Workplace Safety, Teamwork
+Job description: Operate assigned food production equipment, inspect products for quality, maintain a clean work area, and follow company safety and sanitation procedures. Applicants must be willing to work on shifting schedules.
+
+
+MOCK JOB 3
+----------
+Job title: Recruitment Assistant
+Employment type: Contract
+Location: Urdaneta City, Pangasinan
+Number of vacancies: 2
+Publishing status: active
+Minimum salary: 18000
+Maximum salary: 23000
+Required skills: Applicant Screening, Interview Scheduling, Microsoft Office, Communication, Record Keeping
+Job description: Assist recruiters with applicant screening, interview coordination, document checking, database updates, and communication with candidates and partner employers. Relevant office or human resources experience is preferred.
+
+
+MOCK JOB 4
+----------
+Job title: Logistics Coordinator
+Employment type: Full-time
+Location: Pinmaludpod, Urdaneta City, Pangasinan
+Number of vacancies: 4
+Publishing status: draft
+Minimum salary: 22000
+Maximum salary: 30000
+Required skills: Dispatch Coordination, Inventory Management, Microsoft Excel, Route Planning, Customer Service
+Job description: Coordinate daily delivery schedules, monitor shipment status, prepare dispatch records, communicate with drivers and customers, and report delivery concerns. The applicant must be organized and comfortable working with spreadsheets.
+
+
+MOCK JOB 5
+----------
+Job title: Marketing Intern
+Employment type: Internship
+Location: Urdaneta City, Pangasinan
+Number of vacancies: 2
+Publishing status: active
+Minimum salary: 8000
+Maximum salary: 10000
+Required skills: Social Media, Canva, Content Writing, Basic Photography, Communication
+Job description: Support the marketing team in preparing social media content, simple promotional graphics, event materials, and campaign reports. This internship is suitable for students or recent graduates seeking practical marketing experience.
+

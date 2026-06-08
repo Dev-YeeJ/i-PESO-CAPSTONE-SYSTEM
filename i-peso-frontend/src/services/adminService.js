@@ -39,9 +39,55 @@ export const adminService = {
     return data
   },
 
+  getPendingEmployers: async () => {
+    const { data } = await api.get('/admin/employers/pending')
+    return data
+  },
+
   getEmployerDetail: async (id) => {
     const { data } = await api.get(`/admin/employers/${id}`)
     return data
+  },
+
+  getEmployerReview: async (id) => {
+    const { data } = await api.get(`/admin/employers/${id}/review`)
+    return data
+  },
+
+  approveEmployer: async (id, remarks = null) => {
+    const { data } = await api.post(`/admin/employers/${id}/approve`, { remarks })
+    return data
+  },
+
+  rejectEmployer: async (id, rejectionReason) => {
+    const { data } = await api.post(`/admin/employers/${id}/reject`, {
+      rejection_reason: rejectionReason,
+    })
+    return data
+  },
+
+  reviewEmployerDocument: async (id, verificationStatus, adminNotes = null) => {
+    const { data } = await api.post(`/admin/documents/${id}/review`, {
+      verification_status: verificationStatus,
+      admin_notes: adminNotes,
+    })
+    return data
+  },
+
+  getEmployerDocument: async (id) => {
+    const { data } = await api.get(`/admin/documents/${id}/view`, {
+      responseType: 'blob',
+    })
+    return data
+  },
+
+  downloadEmployerDocument: async (id, reason) => {
+    const response = await api.post(
+      `/admin/documents/${id}/download`,
+      { reason },
+      { responseType: 'blob' },
+    )
+    return response
   },
 
   // ── PROGRAMS ───────────────────────────────────────────────────

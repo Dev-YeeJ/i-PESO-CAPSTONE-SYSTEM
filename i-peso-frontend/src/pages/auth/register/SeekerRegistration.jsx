@@ -95,6 +95,7 @@ const SeekerRegistration = () => {
       console.log('Register Payload:', payload)
       const data = await authService.register(payload)
       localStorage.setItem('ipeso_pending_email', data.email)
+      localStorage.setItem('ipeso_pending_role', 'seeker')
       navigate('/verify-email', { state: { email: data.email } })
     } catch (err) {
       if (err.response?.status === 422) {

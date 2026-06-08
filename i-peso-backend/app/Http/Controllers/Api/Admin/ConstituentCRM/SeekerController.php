@@ -4,6 +4,8 @@
 namespace App\Http\Controllers\Api\Admin\ConstituentCRM;
 
 use App\Http\Controllers\Controller;
+use App\Mail\AccountVerificationStatusMail;
+use App\Models\ActivityLog;
 use App\Models\Administrator;
 use App\Models\JobSeeker;
 use App\Models\SeekerDisability;
@@ -11,6 +13,9 @@ use App\Models\SeekerLanguage;
 use App\Models\SeekerOccupation;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 
 class SeekerController extends Controller
 {
@@ -74,37 +79,75 @@ class SeekerController extends Controller
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
+        $remarksRules = $request->input('action') === 'reject'
+            ? ['required', 'string', 'min:10', 'max:1000']
+            : ['nullable', 'string', 'max:1000'];
+
         $validated = $request->validate([
-            'action' => 'required|in:approve,reject',
-            'remarks' => 'nullable|string',
+            'action' => ['required', 'in:approve,reject'],
+            'remarks' => $remarksRules,
         ]);
 
         $seeker = JobSeeker::findOrFail($id);
+        $status = $validated['action'] === 'approve' ? 'verified' : 'rejected';
+        $remarks = $validated['remarks'] ?? null;
 
-        if ($validated['action'] === 'approve') {
+        DB::transaction(function () use ($admin, $request, $remarks, $seeker, $status) {
             $seeker->update([
-                'is_verified' => true,
+                'is_verified' => $status === 'verified',
+                'verification_status' => $status,
                 'verified_at' => now(),
                 'verified_by' => $admin->admin_id,
-                'verification_remarks' => $validated['remarks'] ?? null,
+                'verification_remarks' => $remarks,
             ]);
 
-            return response()->json([
-                'message' => 'Seeker profile approved',
-                'seeker' => $seeker,
+            ActivityLog::create([
+                'user_type' => $admin::class,
+                'user_id' => $admin->getKey(),
+                'action' => $status === 'verified' ? 'approved_job_seeker' : 'rejected_job_seeker',
+                'description' => sprintf(
+                    '%s job seeker #%d (%s).%s',
+                    ucfirst($status),
+                    $seeker->seeker_id,
+                    $seeker->email,
+                    $remarks ? " Remarks: {$remarks}" : ''
+                ),
+                'ip_address' => $request->ip(),
             ]);
-        } else {
-            $seeker->update([
-                'is_verified' => false,
-                'verified_at' => now(),
-                'verified_by' => $admin->admin_id,
-                'verification_remarks' => $validated['remarks'] ?? null,
+        });
+
+        $notificationQueued = $this->queueStatusEmail(
+            $seeker->email,
+            new AccountVerificationStatusMail(
+                trim("{$seeker->first_name} {$seeker->last_name}"),
+                'Job Seeker',
+                $status,
+                $remarks,
+            )
+        );
+
+        return response()->json([
+            'message' => $status === 'verified'
+                ? 'Seeker profile approved and notification queued.'
+                : 'Seeker profile rejected and notification queued.',
+            'notification_queued' => $notificationQueued,
+            'seeker' => $seeker->fresh(),
+        ]);
+    }
+
+    private function queueStatusEmail(string $email, AccountVerificationStatusMail $mail): bool
+    {
+        try {
+            Mail::to($email)->queue($mail);
+
+            return true;
+        } catch (\Throwable $exception) {
+            Log::error('Unable to queue seeker verification status email.', [
+                'email' => $email,
+                'error' => $exception->getMessage(),
             ]);
 
-            return response()->json([
-                'message' => 'Seeker profile rejected',
-                'seeker' => $seeker,
-            ]);
+            return false;
         }
     }
 
@@ -117,7 +160,7 @@ class SeekerController extends Controller
         }
 
         $seekers = JobSeeker::where('profile_completed', true)
-            ->where('is_verified', false)
+            ->where('verification_status', 'pending')
             ->paginate(15);
 
         return response()->json($seekers);

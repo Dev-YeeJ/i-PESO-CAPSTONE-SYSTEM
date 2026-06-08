@@ -15,6 +15,8 @@ return [
 
     'default' => env('FILESYSTEM_DISK', 'local'),
 
+    'employer_documents_disk' => env('EMPLOYER_DOCUMENTS_DISK', 'local'),
+
     /*
     |--------------------------------------------------------------------------
     | Filesystem Disks

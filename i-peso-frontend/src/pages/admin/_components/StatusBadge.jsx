@@ -15,6 +15,7 @@ const statusStyles = {
   ongoing: { bg: 'bg-blue-50', text: 'text-blue-700', label: 'Ongoing' },
   completed: { bg: 'bg-green-50', text: 'text-green-700', label: 'Completed' },
   approved: { bg: 'bg-green-50', text: 'text-green-700', label: 'Approved' },
+  verified: { bg: 'bg-green-50', text: 'text-green-700', label: 'Verified' },
 
   // Vacancy & Job Fair statuses
   active: { bg: 'bg-green-50', text: 'text-green-700', label: 'Active' },

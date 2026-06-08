@@ -16,6 +16,7 @@ const VerifyEmailPage = () => {
 
   // Get email from localStorage (set by login page after 403 unverified)
   const email = localStorage.getItem('ipeso_pending_email') || ''
+  const pendingRole = localStorage.getItem('ipeso_pending_role') || 'seeker'
 
   const handleOtpChange = (e) => {
     const value = e.target.value.replace(/\D/g, '').slice(0, 6)
@@ -52,9 +53,9 @@ const VerifyEmailPage = () => {
 
       // Clean up pending email
       localStorage.removeItem('ipeso_pending_email')
+      localStorage.removeItem('ipeso_pending_role')
 
-      // Navigate to onboarding
-      navigate('/seeker/onboarding', { replace: true })
+      navigate(data.user.role === 'employer' ? '/employer/onboarding' : '/seeker/onboarding', { replace: true })
 
     } catch (err) {
       setApiError(err.response?.data?.message ?? 'Verification failed. Please try again.')
@@ -90,9 +91,16 @@ const VerifyEmailPage = () => {
 
       {/* Card Container */}
       <div className="relative w-full max-w-md">
-        <div className="bg-white rounded-2xl shadow-xl p-8">
+        <div className="overflow-hidden bg-white rounded-2xl shadow-xl">
+          <div className="h-1 bg-slate-100">
+            <div className={`h-full bg-blue-700 ${pendingRole === 'employer' ? 'w-2/5' : 'w-full'}`} />
+          </div>
+          <div className="p-8">
           {/* Header */}
           <div className="text-center mb-8">
+            {pendingRole === 'employer' && (
+              <p className="mb-3 text-xs font-bold uppercase tracking-wider text-blue-700">Step 2 of 5</p>
+            )}
             <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-100 rounded-full mb-4">
               <svg className="w-8 h-8 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
@@ -172,6 +180,7 @@ const VerifyEmailPage = () => {
             <p className="text-center text-xs text-slate-500">
               Having trouble? Contact our support team for assistance.
             </p>
+          </div>
           </div>
         </div>
       </div>

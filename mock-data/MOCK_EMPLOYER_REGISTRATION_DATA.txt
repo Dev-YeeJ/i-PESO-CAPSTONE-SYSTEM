@@ -1,0 +1,188 @@
+I-PESO EMPLOYER REGISTRATION MOCK DATA
+======================================
+
+Notes:
+- These records are fictional and intended only for local testing.
+- Use a different email for every registration.
+- Password and Confirm Password must match.
+- TIN format must be 000-000-000-000.
+- Contact numbers must use the Philippine format 09XXXXXXXXX.
+- Upload fields require actual JPG, PNG, or PDF files. Suggested filenames are listed below.
+
+
+MOCK EMPLOYER 1
+---------------
+Email Address: northstar.tech01@example.com
+Password: TestEmployer#2026
+Confirm Password: TestEmployer#2026
+Company Type: Sole Proprietorship
+
+Company Name: Northstar Digital Solutions
+TIN: 123-456-789-001
+Trade Name (Optional): Northstar Tech
+Industry: Information Technology
+Company Size: micro
+Province: Pangasinan
+City/Municipality: Urdaneta City
+Barangay: Poblacion
+Street Address: 21 Alexander Street
+Company Description: Northstar Digital Solutions is a local software and IT support company serving small businesses in Urdaneta City and nearby municipalities.
+Company Logo: northstar-logo.jpg
+
+Required Documents:
+Mayor's Permit: northstar-mayors-permit.pdf
+BIR Certificate: northstar-bir-certificate.pdf
+DTI Certificate: northstar-dti-certificate.pdf
+PhilJobNet Proof (Optional): northstar-philjobnet-proof.pdf
+
+First Name: Maria
+Last Name: Santos
+Middle Name (Optional): Reyes
+Designation / Position: Owner and General Manager
+Direct Contact Number: 09171234501
+Is the authorized representative the business owner?: Yes, owner
+Company ID / Valid Government ID (Photo): maria-santos-government-id.jpg
+Authorization Letter / Secretary's Certificate: Not required for owner
+
+
+MOCK EMPLOYER 2
+---------------
+Email Address: goldenfields.foods02@example.com
+Password: TestEmployer#2026
+Confirm Password: TestEmployer#2026
+Company Type: Corporation / Partnership
+
+Company Name: Golden Fields Food Manufacturing Corporation
+TIN: 123-456-789-002
+Trade Name (Optional): Golden Fields Foods
+Industry: Food & Beverage
+Company Size: small
+Province: Pangasinan
+City/Municipality: Urdaneta City
+Barangay: Nancayasan
+Street Address: 88 MacArthur Highway
+Company Description: Golden Fields Foods manufactures packaged snacks and baked products for groceries, schools, and institutional customers throughout Pangasinan.
+Company Logo: golden-fields-logo.png
+
+Required Documents:
+Mayor's Permit: golden-fields-mayors-permit.pdf
+BIR Certificate: golden-fields-bir-certificate.pdf
+SEC Certificate: golden-fields-sec-certificate.pdf
+PhilJobNet Proof (Optional): golden-fields-philjobnet-proof.pdf
+
+First Name: Roberto
+Last Name: Mendoza
+Middle Name (Optional): Cruz
+Designation / Position: Human Resources Manager
+Direct Contact Number: 09181234502
+Is the authorized representative the business owner?: No, representative
+Company ID / Valid Government ID (Photo): roberto-mendoza-company-id.jpg
+Authorization Letter / Secretary's Certificate: golden-fields-authorization-letter.pdf
+
+
+MOCK EMPLOYER 3
+---------------
+Email Address: primework.recruitment03@example.com
+Password: TestEmployer#2026
+Confirm Password: TestEmployer#2026
+Company Type: Local Recruitment Agency
+
+Company Name: PrimeWork Recruitment Services Incorporated
+TIN: 123-456-789-003
+Trade Name (Optional): PrimeWork
+Industry: Other
+Company Size: medium
+Province: Pangasinan
+City/Municipality: Urdaneta City
+Barangay: San Vicente
+Street Address: 15 Perez Boulevard
+Company Description: PrimeWork connects qualified local applicants with accredited employers in retail, manufacturing, hospitality, and administrative services.
+Company Logo: primework-logo.jpg
+
+Required Documents:
+Mayor's Permit: primework-mayors-permit.pdf
+BIR Certificate: primework-bir-certificate.pdf
+SEC Certificate: primework-sec-certificate.pdf
+PRPA License: primework-prpa-license.pdf
+PhilJobNet Proof (Optional): primework-philjobnet-proof.pdf
+
+First Name: Angela
+Last Name: Villanueva
+Middle Name (Optional): Garcia
+Designation / Position: Recruitment Director
+Direct Contact Number: 09191234503
+Is the authorized representative the business owner?: No, representative
+Company ID / Valid Government ID (Photo): angela-villanueva-government-id.png
+Authorization Letter / Secretary's Certificate: primework-secretarys-certificate.pdf
+
+
+MOCK EMPLOYER 4
+---------------
+Email Address: globalpath.overseas04@example.com
+Password: TestEmployer#2026
+Confirm Password: TestEmployer#2026
+Company Type: Overseas Recruitment Agency
+
+Company Name: GlobalPath Overseas Employment Corporation
+TIN: 123-456-789-004
+Trade Name (Optional): GlobalPath Careers
+Industry: Other
+Company Size: large
+Province: Pangasinan
+City/Municipality: Urdaneta City
+Barangay: Anonas
+Street Address: 240 National Road
+Company Description: GlobalPath is an overseas recruitment agency that processes qualified Filipino workers for verified international employers and lawful deployment programs.
+Company Logo: globalpath-logo.png
+
+Required Documents:
+Mayor's Permit: globalpath-mayors-permit.pdf
+BIR Certificate: globalpath-bir-certificate.pdf
+SEC Certificate: globalpath-sec-certificate.pdf
+DMW/POEA License: globalpath-dmw-poea-license.pdf
+PhilJobNet Proof (Optional): globalpath-philjobnet-proof.pdf
+
+First Name: Daniel
+Last Name: Navarro
+Middle Name (Optional): Lim
+Designation / Position: Compliance Officer
+Direct Contact Number: 09201234504
+Is the authorized representative the business owner?: No, representative
+Company ID / Valid Government ID (Photo): daniel-navarro-company-id.jpg
+Authorization Letter / Secretary's Certificate: globalpath-authorization-letter.pdf
+
+
+MOCK EMPLOYER 5
+---------------
+Email Address: bluebridge.logistics05@example.com
+Password: TestEmployer#2026
+Confirm Password: TestEmployer#2026
+Company Type: Corporation / Partnership
+
+Company Name: BlueBridge Logistics and Distribution Incorporated
+TIN: 123-456-789-005
+Trade Name (Optional): BlueBridge Logistics
+Industry: Transportation & Logistics
+Company Size: medium
+Province: Pangasinan
+City/Municipality: Urdaneta City
+Barangay: Pinmaludpod
+Street Address: 56 Logistics Avenue
+Company Description: BlueBridge provides warehousing, inventory handling, and regional delivery services to retailers and manufacturers across Northern Luzon.
+Company Logo: bluebridge-logo.jpg
+
+Required Documents:
+Mayor's Permit: bluebridge-mayors-permit.pdf
+BIR Certificate: bluebridge-bir-certificate.pdf
+SEC Certificate: bluebridge-sec-certificate.pdf
+PhilJobNet Proof (Optional): bluebridge-philjobnet-proof.pdf
+
+First Name: Patricia
+Last Name: Ramos
+Middle Name (Optional): Aquino
+Designation / Position: Administrative Manager
+Direct Contact Number: 09211234505
+Is the authorized representative the business owner?: No, representative
+Company ID / Valid Government ID (Photo): patricia-ramos-government-id.jpg
+Authorization Letter / Secretary's Certificate: bluebridge-authorization-letter.pdf
+

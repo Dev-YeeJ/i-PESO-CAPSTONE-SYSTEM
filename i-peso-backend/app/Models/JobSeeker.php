@@ -2,8 +2,8 @@
 
 namespace App\Models;
 
-use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Foundation\Auth\User as Authenticatable;
 use Laravel\Sanctum\HasApiTokens;
 
 class JobSeeker extends Authenticatable
@@ -12,9 +12,9 @@ class JobSeeker extends Authenticatable
 
     // We will assign `seeker_id` manually to support gap-filling
     // and predictable sequential IDs. Disable auto-incrementing.
-   
 
-    protected $table      = 'job_seekers';
+    protected $table = 'job_seekers';
+
     protected $primaryKey = 'seeker_id';
 
     protected $fillable = [
@@ -30,6 +30,11 @@ class JobSeeker extends Authenticatable
         'resume_path',
         'profile_image',
         'email_verified_at',
+        'is_verified',
+        'verification_status',
+        'verified_at',
+        'verified_by',
+        'verification_remarks',
         // === STEP 1: PERSONAL INFORMATION ===
         'date_of_birth',
         'sex',
@@ -78,21 +83,23 @@ class JobSeeker extends Authenticatable
     ];
 
     protected $casts = [
-        'email_verified_at'                 => 'datetime',
-        'profile_completed_at'              => 'datetime',
-        'date_of_birth'                     => 'date',
-        'former_ofw_return_date'            => 'date',
-        'password'                          => 'hashed',
-        'skills'                            => 'array',
-        'is_4ps_beneficiary'                => 'boolean',
-        'is_ofw'                            => 'boolean',
-        'is_former_ofw'                     => 'boolean',
-        'profile_completed'                 => 'boolean',
-        'unemployment_months'               => 'integer',
-        'preferred_locations_details'       => 'array',
-        'form_validation_state'             => 'array',
-        'currently_in_school'               => 'boolean',
-        'other_skills'                      => 'array',
+        'email_verified_at' => 'datetime',
+        'is_verified' => 'boolean',
+        'verified_at' => 'datetime',
+        'profile_completed_at' => 'datetime',
+        'date_of_birth' => 'date',
+        'former_ofw_return_date' => 'date',
+        'password' => 'hashed',
+        'skills' => 'array',
+        'is_4ps_beneficiary' => 'boolean',
+        'is_ofw' => 'boolean',
+        'is_former_ofw' => 'boolean',
+        'profile_completed' => 'boolean',
+        'unemployment_months' => 'integer',
+        'preferred_locations_details' => 'array',
+        'form_validation_state' => 'array',
+        'currently_in_school' => 'boolean',
+        'other_skills' => 'array',
     ];
 
     // === RELATIONSHIPS ===
@@ -143,6 +150,17 @@ class JobSeeker extends Authenticatable
         return $this->hasMany(SeekerSkill::class, 'seeker_id', 'seeker_id');
     }
 
+    public function seekerSkills(): HasMany
+    {
+        return $this->hasMany(SeekerSkill::class, 'seeker_id', 'seeker_id');
+    }
+
+    public function certificates(): HasMany
+    {
+        return $this->hasMany(SeekerCertificate::class, 'seeker_id', 'seeker_id')
+            ->latest();
+    }
+
     // ===== HELPER METHODS =====
 
     /**
@@ -163,15 +181,15 @@ class JobSeeker extends Authenticatable
      */
     public function isProfileComplete(): bool
     {
-        return $this->profile_completed && 
+        return $this->profile_completed &&
                $this->form_validation_state &&
-               isset($this->form_validation_state['step1'], 
-                     $this->form_validation_state['step2'],
-                     $this->form_validation_state['step3'],
-                     $this->form_validation_state['step4'],
-                     $this->form_validation_state['step5'],
-                     $this->form_validation_state['step6'],
-                     $this->form_validation_state['step7']);
+               isset($this->form_validation_state['step1'],
+                   $this->form_validation_state['step2'],
+                   $this->form_validation_state['step3'],
+                   $this->form_validation_state['step4'],
+                   $this->form_validation_state['step5'],
+                   $this->form_validation_state['step6'],
+                   $this->form_validation_state['step7']);
     }
 
     /**
@@ -180,24 +198,24 @@ class JobSeeker extends Authenticatable
      */
     public function getFormattedReligion(): string
     {
-        if (!$this->religion) {
+        if (! $this->religion) {
             return 'N/A';
         }
 
         // Enum value mapping for standardized religions
         $enumMap = [
-            'roman_catholic'      => 'Roman Catholic',
-            'islam'               => 'Islam',
-            'iglesia_ni_cristo'   => 'Iglesia ni Cristo',
-            'aglipayan'           => 'Aglipayan',
-            'evangelical'         => 'Evangelical / Born Again',
+            'roman_catholic' => 'Roman Catholic',
+            'islam' => 'Islam',
+            'iglesia_ni_cristo' => 'Iglesia ni Cristo',
+            'aglipayan' => 'Aglipayan',
+            'evangelical' => 'Evangelical / Born Again',
             'seventh_day_adventist' => 'Seventh-day Adventist',
-            'jehovah_witness'     => 'Jehovah\'s Witness',
-            'buddhist'            => 'Buddhist',
-            'hindu'               => 'Hindu',
-            'jewish'              => 'Jewish',
-            'agnostic_atheist'    => 'Agnostic / Atheist',
-            'declined'            => 'Declined to answer',
+            'jehovah_witness' => 'Jehovah\'s Witness',
+            'buddhist' => 'Buddhist',
+            'hindu' => 'Hindu',
+            'jewish' => 'Jewish',
+            'agnostic_atheist' => 'Agnostic / Atheist',
+            'declined' => 'Declined to answer',
         ];
 
         // Return mapped value or custom value as-is

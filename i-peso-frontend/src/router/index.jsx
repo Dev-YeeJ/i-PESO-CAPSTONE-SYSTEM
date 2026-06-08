@@ -19,10 +19,14 @@ const ResetPasswordPage  = lazy(() => import('@/pages/auth/ResetPasswordPage'))
 const RegisterGateway      = lazy(() => import('@/pages/auth/register/RegisterGateway'))
 const SeekerRegistration   = lazy(() => import('@/pages/auth/register/SeekerRegistration'))
 const EmployerRegistration = lazy(() => import('@/pages/auth/register/EmployerRegistration'))
+const EmployerOnboarding   = lazy(() => import('@/pages/employer/EmployerRegistration'))
 
 // Dashboards
 const EmployerDashboard = lazy(() => import('@/pages/employer/DashboardPage'))
+const EmployerPostJob   = lazy(() => import('@/pages/employer/PostJobPage'))
+const EmployerVacancies = lazy(() => import('@/pages/employer/VacanciesPage'))
 const SeekerDashboard   = lazy(() => import('@/pages/seeker/DashboardPage'))
+const SeekerProfile     = lazy(() => import('@/pages/seeker/SeekerProfile'))
 const SeekerOnboarding  = lazy(() => import('@/pages/auth/onboarding/SeekerOnboarding'))
 
 // Admin Pages - CATEGORY 1: OVERVIEW
@@ -127,6 +131,14 @@ function RequireProfileComplete() {
   return <Outlet />
 }
 
+function RequireApprovedEmployer() {
+  const user = useAuthStore((s) => s.user)
+  if (user?.role !== 'employer' || user?.verification_status !== 'verified') {
+    return <Navigate to="/employer/dashboard" replace />
+  }
+  return <Outlet />
+}
+
 function RequireRole({ role }) {
   const isInitialized = useAuthStore((s) => s.isInitialized)
   const user     = useAuthStore((s) => s.user)
@@ -198,11 +210,19 @@ export const router = createBrowserRouter([
                 path: '/employer',
                 element: <RequireRole role="employer" />,
                 children: [
+                  { path: 'onboarding', element: S(EmployerOnboarding) },
                   {
                     element: <EmployerLayout />,
                     children: [
                       { index: true, element: <Navigate to="dashboard" replace /> },
                       { path: 'dashboard', element: S(EmployerDashboard) },
+                      {
+                        element: <RequireApprovedEmployer />,
+                        children: [
+                          { path: 'post-job', element: S(EmployerPostJob) },
+                          { path: 'vacancies', element: S(EmployerVacancies) },
+                        ],
+                      },
                     ],
                   }
                 ],
@@ -271,6 +291,7 @@ export const router = createBrowserRouter([
                         children: [
                           { index: true, element: <Navigate to="dashboard" replace /> },
                           { path: 'dashboard', element: S(SeekerDashboard) },
+                          { path: 'profile', element: S(SeekerProfile) },
                         ],
                       }
                     ],

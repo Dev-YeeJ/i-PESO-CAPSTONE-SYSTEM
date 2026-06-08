@@ -19,7 +19,10 @@ return [
 
     'allowed_methods' => ['*'],
 
-    'allowed_origins' => ['http://localhost:5173'],
+    'allowed_origins' => array_values(array_filter(array_map(
+        'trim',
+        explode(',', env('CORS_ALLOWED_ORIGINS', 'http://localhost:5173'))
+    ))),
 
     'allowed_origins_patterns' => [],
 
@@ -27,7 +30,7 @@ return [
 
     'exposed_headers' => [],
 
-    'max_age' => 0,
+    'max_age' => (int) env('CORS_MAX_AGE', 3600),
 
     'supports_credentials' => true,
 

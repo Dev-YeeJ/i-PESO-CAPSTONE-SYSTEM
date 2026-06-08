@@ -1,10 +1,9 @@
 // i-peso-frontend/src/pages/admin/seekers/SeekerDetailPage.jsx
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import PageHeader from '@/pages/admin/_components/PageHeader'
 import StatusBadge from '@/pages/admin/_components/StatusBadge'
-import ConfirmModal from '@/pages/admin/_components/ConfirmModal'
 import { DownloadNSRPButton } from '@/pages/admin/_components'
 import { adminService } from '@/services/adminService'
 
@@ -14,6 +13,9 @@ export default function SeekerDetailPage() {
   const [seeker, setSeeker] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [remarks, setRemarks] = useState('')
+  const [verifying, setVerifying] = useState(false)
+  const [success, setSuccess] = useState('')
   useEffect(() => {
     const fetchSeeker = async () => {
       try {
@@ -31,6 +33,35 @@ export default function SeekerDetailPage() {
 
     fetchSeeker()
   }, [id])
+
+  const verifySeeker = async (action) => {
+    if (action === 'reject' && remarks.trim().length < 10) {
+      setError('A rejection reason of at least 10 characters is required.')
+      return
+    }
+
+    setVerifying(true)
+    setError(null)
+    setSuccess('')
+    try {
+      const result = await adminService.verifySeekerProfile(
+        id,
+        action,
+        remarks.trim() || null,
+      )
+      setSeeker(result.seeker)
+      setRemarks('')
+      setSuccess(
+        result.notification_queued
+          ? `${result.message} An email notification was queued.`
+          : `${result.message} The status changed, but the email could not be queued.`,
+      )
+    } catch (err) {
+      setError(err?.response?.data?.message || 'Unable to update seeker verification.')
+    } finally {
+      setVerifying(false)
+    }
+  }
 
   if (loading) {
     return (
@@ -80,6 +111,49 @@ export default function SeekerDetailPage() {
           <p className="text-red-700 text-sm">{error}</p>
         </div>
       )}
+
+      {success && (
+        <div className="rounded-2xl border border-green-200 bg-green-50 p-4">
+          <p className="text-sm text-green-700">{success}</p>
+        </div>
+      )}
+
+      <div className="rounded-2xl border border-slate-200 bg-white p-6">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h3 className="font-bold text-slate-900">Account Verification</h3>
+            <p className="mt-1 text-sm text-slate-500">
+              The job seeker receives an email after approval or rejection.
+            </p>
+          </div>
+          <StatusBadge status={seeker.verification_status ?? (seeker.is_verified ? 'verified' : 'pending')} />
+        </div>
+        <textarea
+          value={remarks}
+          onChange={(event) => setRemarks(event.target.value)}
+          placeholder="PESO remarks. Required when rejecting."
+          rows={3}
+          className="mt-4 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+        />
+        <div className="mt-4 flex justify-end gap-3">
+          <button
+            type="button"
+            disabled={verifying}
+            onClick={() => verifySeeker('reject')}
+            className="rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+          >
+            Reject Account
+          </button>
+          <button
+            type="button"
+            disabled={verifying}
+            onClick={() => verifySeeker('approve')}
+            className="rounded-xl bg-green-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+          >
+            Approve Account
+          </button>
+        </div>
+      </div>
 
       {/* Profile Sections */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
