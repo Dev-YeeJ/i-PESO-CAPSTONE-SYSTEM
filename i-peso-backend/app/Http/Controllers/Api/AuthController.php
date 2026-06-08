@@ -65,34 +65,34 @@ class AuthController extends Controller
         string $role
     ): array {
         $name = match ($role) {
-            'seeker' => trim("{$user->first_name} {$user->last_name}"),
-            'employer' => $user->company_name,
+            'seeker'        => trim("{$user->first_name} {$user->last_name}"),
+            'employer'      => $user->company_name,
             'administrator' => trim("{$user->first_name} {$user->last_name}"),
         };
 
         $payload = [
-            'id' => $user->getKey(),
-            'name' => $name,
-            'email' => $user->email,
-            'role' => $role,
+            'id'                => $user->getKey(),
+            'name'              => $name,
+            'email'             => $user->email,
+            'role'              => $role,
             'email_verified_at' => $user->email_verified_at,
         ];
 
-        // Add seeker-specific field
+        // Add seeker-specific fields
         if ($role === 'seeker' && $user instanceof JobSeeker) {
-            $payload['profile_completed'] = $user->profile_completed;
-            $payload['verification_status'] = $user->verification_status ?? ($user->is_verified ? 'verified' : 'pending');
-            $payload['first_name'] = $user->first_name;
-            $payload['last_name'] = $user->last_name;
-            $payload['mobile_number'] = $user->mobile_number;
+            $payload['profile_completed']    = $user->profile_completed;
+            $payload['verification_status']  = $user->verification_status ?? ($user->is_verified ? 'verified' : 'pending');
+            $payload['first_name']           = $user->first_name;
+            $payload['last_name']            = $user->last_name;
+            $payload['mobile_number']        = $user->mobile_number;
         }
 
         if ($role === 'employer' && $user instanceof Employer) {
-            $payload['company_name'] = $user->company_name;
-            $payload['tin'] = $user->tin;
-            $payload['industry'] = $user->industry;
-            $payload['company_type'] = $user->company_type;
-            $payload['mobile_number'] = $user->mobile_number;
+            $payload['company_name']        = $user->company_name;
+            $payload['tin']                 = $user->tin;
+            $payload['industry']            = $user->industry;
+            $payload['company_type']        = $user->company_type;
+            $payload['mobile_number']       = $user->mobile_number;
             $payload['verification_status'] = $user->verification_status;
         }
 
@@ -112,7 +112,7 @@ class AuthController extends Controller
         ]);
 
         $rules = [
-            'role' => ['required', 'in:seeker,employer'],
+            'role'  => ['required', 'in:seeker,employer'],
             'email' => [
                 'required',
                 'email',
@@ -125,9 +125,10 @@ class AuthController extends Controller
         ];
 
         if ($role === 'seeker') {
-            $rules['first_name'] = ['required', 'string', 'max:100'];
-            $rules['last_name'] = ['required', 'string', 'max:100'];
-            $rules['mobile_number'] = ['required', 'regex:/^09\d{9}$/'];
+            $rules['first_name']      = ['required', 'string', 'max:100'];
+            $rules['last_name']       = ['required', 'string', 'max:100'];
+            $rules['mobile_number']   = ['required', 'regex:/^09\d{9}$/'];
+            $rules['educ_attainment'] = ['required', 'string', 'max:100']; // ← FIXED
         } else {
             $rules['company_type'] = ['required', Rule::in([
                 'sole_proprietorship',
@@ -142,24 +143,25 @@ class AuthController extends Controller
         if ($this->findUserByEmail($validated['email'])) {
             return response()->json([
                 'message' => 'The email address has already been registered.',
-                'errors' => ['email' => ['The email address has already been registered.']],
+                'errors'  => ['email' => ['The email address has already been registered.']],
             ], 422);
         }
 
         DB::transaction(function () use ($role, $validated) {
             if ($role === 'seeker') {
                 JobSeeker::create([
-                    'first_name' => $validated['first_name'],
-                    'last_name' => $validated['last_name'],
-                    'email' => $validated['email'],
-                    'password' => Hash::make($validated['password']),
-                    'mobile_number' => $validated['mobile_number'],
+                    'first_name'      => $validated['first_name'],
+                    'last_name'       => $validated['last_name'],
+                    'email'           => $validated['email'],
+                    'password'        => Hash::make($validated['password']),
+                    'mobile_number'   => $validated['mobile_number'],
+                    'educ_attainment' => $validated['educ_attainment'], // ← FIXED
                 ]);
             } else {
                 Employer::create([
-                    'email' => $validated['email'],
-                    'password' => Hash::make($validated['password']),
-                    'company_type' => $validated['company_type'],
+                    'email'               => $validated['email'],
+                    'password'            => Hash::make($validated['password']),
+                    'company_type'        => $validated['company_type'],
                     'verification_status' => 'pending',
                 ]);
             }
@@ -169,7 +171,7 @@ class AuthController extends Controller
 
         return response()->json([
             'message' => 'Registration successful. Please check your email for your verification code.',
-            'email' => $validated['email'],
+            'email'   => $validated['email'],
         ], 201);
     }
 
@@ -180,12 +182,12 @@ class AuthController extends Controller
     {
         $request->validate([
             'email' => ['required', 'email'],
-            'otp' => ['required', 'string', 'size:6'],
+            'otp'   => ['required', 'string', 'size:6'],
         ]);
 
-        $email = mb_strtolower(trim($request->input('email')));
-        $submitted = $request->input('otp');
-        $cached = Cache::get("ipeso_otp_{$email}");
+        $email      = mb_strtolower(trim($request->input('email')));
+        $submitted  = $request->input('otp');
+        $cached     = Cache::get("ipeso_otp_{$email}");
         $attemptKey = "ipeso_otp_attempts_{$email}";
 
         if ((int) Cache::get($attemptKey, 0) >= 5) {
@@ -210,8 +212,6 @@ class AuthController extends Controller
 
         ['model' => $user, 'role' => $role] = $result;
 
-        // ✅ Use Carbon::now() with explicit Illuminate Carbon class
-        // and forceFill to bypass any primary key confusion on save
         $user->forceFill(['email_verified_at' => Carbon::now()])->save();
 
         Cache::forget("ipeso_otp_{$email}");
@@ -221,8 +221,8 @@ class AuthController extends Controller
 
         return response()->json([
             'message' => 'Email verified successfully. Welcome to i-PESO!',
-            'token' => $token,
-            'user' => $this->buildUserPayload($user, $role),
+            'token'   => $token,
+            'user'    => $this->buildUserPayload($user, $role),
         ], 200);
     }
 
@@ -232,16 +232,15 @@ class AuthController extends Controller
     public function login(Request $request): JsonResponse
     {
         $request->validate([
-            'email' => ['required', 'email'],
+            'email'    => ['required', 'email'],
             'password' => ['required', 'string'],
         ]);
 
-        $email = $request->input('email');
+        $email    = $request->input('email');
         $password = $request->input('password');
 
         $result = $this->findUserByEmail($email);
 
-        // Check if user exists AND password matches
         if (! $result) {
             \Log::warning("Login attempt: User not found for email {$email}");
 
@@ -253,7 +252,6 @@ class AuthController extends Controller
         $user = $result['model'];
         $role = $result['role'];
 
-        // Verify password
         if (! Hash::check($password, $user->password)) {
             \Log::warning("Login attempt: Password mismatch for email {$email}");
 
@@ -262,14 +260,13 @@ class AuthController extends Controller
             ], 401);
         }
 
-        // Check if email is verified
         if (! $user->email_verified_at) {
             $this->generateAndSendOtp($email);
 
             return response()->json([
-                'message' => 'Your email is not verified. A new code has been sent to your inbox.',
+                'message'          => 'Your email is not verified. A new code has been sent to your inbox.',
                 'email_unverified' => true,
-                'email' => $email,
+                'email'            => $email,
             ], 403);
         }
 
@@ -282,8 +279,8 @@ class AuthController extends Controller
 
         return response()->json([
             'message' => 'Login successful.',
-            'token' => $token,
-            'user' => $this->buildUserPayload($user, $role),
+            'token'   => $token,
+            'user'    => $this->buildUserPayload($user, $role),
         ], 200);
     }
 
@@ -340,14 +337,14 @@ class AuthController extends Controller
         }
 
         $email = $request->input('email');
-        $otp = str_pad(random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+        $otp   = str_pad(random_int(0, 999999), 6, '0', STR_PAD_LEFT);
 
         Cache::put("ipeso_reset_{$email}", $otp, now()->addMinutes(10));
         Mail::to($email)->send(new OtpMail($otp));
 
         return response()->json([
             'message' => 'A 6-digit reset code has been sent to your email.',
-            'email' => $email,
+            'email'   => $email,
         ], 200);
     }
 
@@ -357,14 +354,14 @@ class AuthController extends Controller
     public function resetPassword(Request $request): JsonResponse
     {
         $request->validate([
-            'email' => ['required', 'email'],
-            'otp' => ['required', 'string', 'size:6'],
+            'email'    => ['required', 'email'],
+            'otp'      => ['required', 'string', 'size:6'],
             'password' => ['required', 'confirmed', Password::min(8)],
         ]);
 
-        $email = $request->input('email');
+        $email     = $request->input('email');
         $submitted = $request->input('otp');
-        $cached = Cache::get("ipeso_reset_{$email}");
+        $cached    = Cache::get("ipeso_reset_{$email}");
 
         if (! $cached || $cached !== $submitted) {
             return response()->json([
@@ -380,7 +377,6 @@ class AuthController extends Controller
 
         ['model' => $user] = $result;
 
-        // ✅ forceFill + save avoids the primary key column mismatch
         $user->forceFill([
             'password' => Hash::make($request->input('password')),
         ])->save();
@@ -400,10 +396,10 @@ class AuthController extends Controller
         $user = $request->user();
 
         $role = match (true) {
-            $user instanceof JobSeeker => 'seeker',
-            $user instanceof Employer => 'employer',
+            $user instanceof JobSeeker     => 'seeker',
+            $user instanceof Employer      => 'employer',
             $user instanceof Administrator => 'admin',
-            default => 'unknown',
+            default                        => 'unknown',
         };
 
         return response()->json([
