@@ -54,6 +54,7 @@ Find these lines and remove the semicolon `;` at the beginning:
 ```ini
 extension=curl
 extension=fileinfo
+extension=gd
 extension=mbstring
 extension=mysqli
 extension=openssl
@@ -308,4 +309,3 @@ API: http://localhost:8000/api
 Press `Ctrl + C` in all three PowerShell terminals.
 
 Stop Apache and MySQL in XAMPP.
-

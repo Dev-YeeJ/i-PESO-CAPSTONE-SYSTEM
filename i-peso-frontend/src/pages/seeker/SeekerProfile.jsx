@@ -2,6 +2,7 @@ import { createElement, useEffect, useMemo, useState } from 'react'
 import {
   Award,
   BriefcaseBusiness,
+  Camera,
   Check,
   CheckCircle2,
   Download,
@@ -18,10 +19,12 @@ import {
 import { useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import CertificateUploadModal from './components/CertificateUploadModal'
+import ProfilePhotoUploadModal from './components/ProfilePhotoUploadModal'
 import {
   deleteCertificate,
   generateSmartResume,
   getCertificateFile,
+  getProfileImage,
   getSeekerProfile,
 } from '@/services/seekerService'
 import { useAuthStore } from '@/stores/authStore'
@@ -36,6 +39,9 @@ export default function SeekerProfile() {
   const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
   const [uploadOpen, setUploadOpen] = useState(false)
+  const [photoUploadOpen, setPhotoUploadOpen] = useState(false)
+  const [photoUrl, setPhotoUrl] = useState(null)
+  const [photoVersion, setPhotoVersion] = useState(0)
   const [generating, setGenerating] = useState(false)
   const [openingCertificate, setOpeningCertificate] = useState(null)
   const updateUser = useAuthStore((state) => state.updateUser)
@@ -50,6 +56,29 @@ export default function SeekerProfile() {
       .catch((error) => toast.error(error.response?.data?.message ?? 'Unable to load your profile.'))
       .finally(() => setLoading(false))
   }, [updateUser])
+
+  useEffect(() => {
+    if (!profile?.has_profile_image) {
+      setPhotoUrl(null)
+      return undefined
+    }
+
+    let active = true
+    let objectUrl
+    getProfileImage()
+      .then((file) => {
+        objectUrl = URL.createObjectURL(file)
+        if (active) setPhotoUrl(objectUrl)
+      })
+      .catch(() => {
+        if (active) setPhotoUrl(null)
+      })
+
+    return () => {
+      active = false
+      if (objectUrl) URL.revokeObjectURL(objectUrl)
+    }
+  }, [profile?.has_profile_image, photoVersion])
 
   const allSkills = useMemo(
     () => skillGroups.flatMap(([key]) => profile?.[key] ?? []),
@@ -79,17 +108,7 @@ export default function SeekerProfile() {
       link.download = `i-PESO_Resume_${profile.last_name}.pdf`
       link.click()
       URL.revokeObjectURL(url)
-      setProfile((current) => ({
-        ...current,
-        has_resume: true,
-        profile_strength: {
-          ...current.profile_strength,
-          items: current.profile_strength.items.map((item) => (
-            item.key === 'resume' ? { ...item, complete: true } : item
-          )),
-          percentage: Math.min(100, current.profile_strength.percentage + (current.profile_strength.items.find((item) => item.key === 'resume' && !item.complete) ? 13 : 0)),
-        },
-      }))
+      setProfile((current) => updateStrength({ ...current, has_resume: true }, { resume: true }))
       toast.success('Smart resume generated.', { id: toastId })
     } catch (error) {
       toast.error(error.response?.data?.message ?? 'Unable to generate your resume.', { id: toastId })
@@ -143,10 +162,20 @@ export default function SeekerProfile() {
       <div className="relative mx-auto -mt-20 max-w-6xl px-4 pb-10 sm:px-6">
         <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-xl shadow-blue-950/10">
           <div className="flex flex-col gap-5 p-6 md:flex-row md:items-center">
-            <div className="flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-2xl border-4 border-white bg-blue-100 text-2xl font-bold text-blue-800 shadow-lg">
-              {profile.profile_image_url
-                ? <img src={profile.profile_image_url} alt={fullName(profile)} className="h-full w-full object-cover" />
-                : initials(profile)}
+            <div className="relative shrink-0">
+              <div className="flex h-24 w-24 items-center justify-center overflow-hidden rounded-2xl border-4 border-white bg-blue-100 text-2xl font-bold text-blue-800 shadow-lg">
+                {photoUrl
+                  ? <img src={photoUrl} alt={fullName(profile)} className="h-full w-full object-cover" />
+                  : initials(profile)}
+              </div>
+              <button
+                type="button"
+                onClick={() => setPhotoUploadOpen(true)}
+                title={profile.has_profile_image ? 'Change 2x2 photo' : 'Upload 2x2 photo'}
+                className="absolute -bottom-2 -right-2 rounded-full border-4 border-white bg-blue-700 p-2 text-white shadow-md hover:bg-blue-800"
+              >
+                <Camera className="h-4 w-4" />
+              </button>
             </div>
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-3">
@@ -289,10 +318,16 @@ export default function SeekerProfile() {
             <section className="overflow-hidden rounded-3xl bg-gradient-to-br from-blue-900 to-blue-700 p-6 text-white shadow-lg">
               <span className="inline-flex rounded-xl bg-white/10 p-2.5"><FileText className="h-6 w-6" /></span>
               <h2 className="mt-4 text-xl font-bold">Resume Management</h2>
-              <p className="mt-2 text-sm leading-6 text-blue-100">Generate a clean, employer-ready resume using the information already saved in your DOLE NSRP profile.</p>
+              <p className="mt-2 text-sm leading-6 text-blue-100">Generate a professional, employer-ready resume using your verified DOLE NSRP information and 2x2 portrait.</p>
+              {!profile.has_profile_image && (
+                <button type="button" onClick={() => setPhotoUploadOpen(true)} className="mt-4 flex w-full items-center gap-3 rounded-xl border border-amber-300/40 bg-amber-300/15 p-3 text-left text-xs text-amber-50">
+                  <Camera className="h-5 w-5 shrink-0" />
+                  <span><strong className="block text-sm">2x2 photo required</strong>Upload a square professional portrait before generating your resume.</span>
+                </button>
+              )}
               <button
                 onClick={generateResume}
-                disabled={generating}
+                disabled={generating || !profile.has_profile_image}
                 className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-white px-4 py-3 text-sm font-bold text-blue-800 shadow-sm disabled:opacity-60"
               >
                 {generating ? <Download className="h-4 w-4 animate-bounce" /> : <Sparkles className="h-4 w-4" />}
@@ -310,6 +345,20 @@ export default function SeekerProfile() {
         onUploaded={(certificate) => {
           setProfile((current) => ({ ...current, certificates: [certificate, ...(current.certificates ?? [])] }))
           toast.success('Certificate added to your vault.')
+        }}
+      />
+      <ProfilePhotoUploadModal
+        open={photoUploadOpen}
+        onClose={() => setPhotoUploadOpen(false)}
+        onUploaded={() => {
+          setProfile((current) => updateStrength({
+            ...current,
+            has_profile_image: true,
+            profile_image_url: '/api/seeker/profile-image',
+            has_resume: false,
+          }, { photo: true, resume: false }))
+          setPhotoVersion((current) => current + 1)
+          toast.success('Your 2x2 photo is ready for the resume.')
         }}
       />
     </div>
@@ -360,4 +409,19 @@ function fullName(profile) {
 
 function initials(profile) {
   return [profile.first_name, profile.last_name].filter(Boolean).map((name) => name[0]).join('').toUpperCase()
+}
+
+function updateStrength(profile, states) {
+  const items = profile.profile_strength.items.map((item) => (
+    Object.hasOwn(states, item.key) ? { ...item, complete: states[item.key] } : item
+  ))
+
+  return {
+    ...profile,
+    profile_strength: {
+      ...profile.profile_strength,
+      items,
+      percentage: Math.round((items.filter((item) => item.complete).length / items.length) * 100),
+    },
+  }
 }

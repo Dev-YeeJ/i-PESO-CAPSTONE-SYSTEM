@@ -101,6 +101,37 @@ class SeekerProfileFeaturesTest extends TestCase
             ->assertJsonStructure(['user' => ['profile_strength' => ['percentage', 'items']]]);
     }
 
+    public function test_seeker_can_upload_and_view_a_private_square_profile_photo(): void
+    {
+        Storage::fake('local');
+        $seeker = $this->createSeeker();
+        Sanctum::actingAs($seeker);
+
+        $this->post('/api/seeker/profile-image', [
+            'profile_image' => $this->fakeSquarePng('profile.png'),
+        ])
+            ->assertOk()
+            ->assertJsonPath('profile_image_url', '/api/seeker/profile-image');
+
+        $seeker->refresh();
+        Storage::disk('local')->assertExists($seeker->profile_image);
+
+        $this->get('/api/seeker/profile-image')
+            ->assertOk()
+            ->assertHeader('content-type', 'image/png');
+    }
+
+    public function test_resume_generation_requires_a_profile_photo(): void
+    {
+        Storage::fake('local');
+        $seeker = $this->createSeeker();
+        Sanctum::actingAs($seeker);
+
+        $this->postJson('/api/seeker/resume/generate')
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('profile_image');
+    }
+
     public function test_seeker_can_generate_a_resume_from_nsrp_data(): void
     {
         Storage::fake('local');
@@ -125,11 +156,16 @@ class SeekerProfileFeaturesTest extends TestCase
         ]);
 
         Sanctum::actingAs($seeker);
+        $this->post('/api/seeker/profile-image', [
+            'profile_image' => $this->fakeSquarePng('resume-photo.png'),
+        ])->assertOk();
 
-        $this->post('/api/seeker/resume/generate')
+        $response = $this->post('/api/seeker/resume/generate')
             ->assertOk()
             ->assertHeader('content-type', 'application/pdf');
 
+        $this->assertStringContainsString('/BaseFont /Helvetica', $response->getContent());
+        $this->assertStringNotContainsString('DejaVuSans', $response->getContent());
         Storage::disk('local')->assertExists("seeker_resumes/{$seeker->getKey()}/latest-resume.pdf");
         $this->assertDatabaseHas('job_seekers', [
             'seeker_id' => $seeker->getKey(),
@@ -163,6 +199,26 @@ class SeekerProfileFeaturesTest extends TestCase
             $name,
             base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=')
         );
+    }
+
+    private function fakeSquarePng(string $name): UploadedFile
+    {
+        $width = 300;
+        $height = 300;
+        $header = pack('NNC5', $width, $height, 8, 2, 0, 0, 0);
+        $row = "\x00".str_repeat("\xF1\xF5\xF9", $width);
+        $pixels = str_repeat($row, $height);
+        $contents = "\x89PNG\r\n\x1a\n"
+            .$this->pngChunk('IHDR', $header)
+            .$this->pngChunk('IDAT', gzcompress($pixels, 9))
+            .$this->pngChunk('IEND', '');
+
+        return UploadedFile::fake()->createWithContent($name, $contents);
+    }
+
+    private function pngChunk(string $type, string $data): string
+    {
+        return pack('N', strlen($data)).$type.$data.pack('N', crc32($type.$data));
     }
 
     private function createTables(): void

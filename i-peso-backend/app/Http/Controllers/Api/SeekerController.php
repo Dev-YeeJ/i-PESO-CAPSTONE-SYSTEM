@@ -16,7 +16,6 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
-use Illuminate\Support\Facades\Storage;
 
 class SeekerController extends Controller
 {
@@ -162,9 +161,10 @@ class SeekerController extends Controller
                     'file_size' => $certificate->file_size,
                     'created_at' => $certificate->created_at,
                 ]),
-                'profile_image_url' => $seeker->profile_image
-                    ? Storage::disk('public')->url($seeker->profile_image)
+                'profile_image_url' => filled($seeker->profile_image)
+                    ? '/api/seeker/profile-image'
                     : null,
+                'has_profile_image' => filled($seeker->profile_image),
                 'has_resume' => filled($seeker->resume_path),
                 'dashboard_stats' => [
                     'active_applications' => Schema::hasTable('applications')
@@ -184,6 +184,7 @@ class SeekerController extends Controller
     private function profileStrength(JobSeeker $seeker): array
     {
         $items = [
+            ['key' => 'photo', 'label' => 'Professional 2x2 photo', 'complete' => filled($seeker->profile_image)],
             ['key' => 'personal_information', 'label' => 'Personal information', 'complete' => filled($seeker->date_of_birth) && filled($seeker->mobile_number)],
             ['key' => 'address', 'label' => 'Complete address', 'complete' => filled($seeker->address_barangay) && filled($seeker->address_municipality_city)],
             ['key' => 'education', 'label' => 'Education', 'complete' => $seeker->educations->isNotEmpty()],

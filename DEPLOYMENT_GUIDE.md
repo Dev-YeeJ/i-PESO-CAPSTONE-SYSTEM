@@ -6,7 +6,7 @@ This guide targets an Ubuntu server using Nginx, PHP-FPM, MySQL, Node.js, Superv
 
 - Ubuntu 22.04 or newer
 - Nginx
-- PHP 8.2+ with `curl`, `fileinfo`, `mbstring`, `openssl`, `pdo_mysql`, `tokenizer`, `xml`, and `zip`
+- PHP 8.2+ with `curl`, `fileinfo`, `gd`, `mbstring`, `openssl`, `pdo_mysql`, `tokenizer`, `xml`, and `zip`
 - Composer 2
 - Node.js 22 and npm
 - MySQL 8

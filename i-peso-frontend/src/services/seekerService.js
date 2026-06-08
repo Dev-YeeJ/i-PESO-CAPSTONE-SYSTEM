@@ -23,8 +23,35 @@ export const deleteCertificate = async (id) => {
 }
 
 export const generateSmartResume = async () => {
-  const response = await apiClient.post('/seeker/resume/generate', null, {
+  try {
+    return await apiClient.post('/seeker/resume/generate', null, {
+      responseType: 'blob',
+    })
+  } catch (error) {
+    if (error.response?.data instanceof Blob) {
+      try {
+        error.response.data = JSON.parse(await error.response.data.text())
+      } catch {
+        // Preserve the original response when the server did not return JSON.
+      }
+    }
+    throw error
+  }
+}
+
+export const uploadProfileImage = async (formData) => {
+  const response = await apiClient.post('/seeker/profile-image', formData)
+  return response.data
+}
+
+export const getProfileImage = async () => {
+  const response = await apiClient.get('/seeker/profile-image', {
     responseType: 'blob',
   })
-  return response
+  return response.data
+}
+
+export const deleteProfileImage = async () => {
+  const response = await apiClient.delete('/seeker/profile-image')
+  return response.data
 }

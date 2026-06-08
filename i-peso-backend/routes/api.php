@@ -15,6 +15,7 @@ use App\Http\Controllers\Api\EmployerNotificationController;
 use App\Http\Controllers\Api\EmployerRegistrationController;
 use App\Http\Controllers\Api\SeekerCertificateController;
 use App\Http\Controllers\Api\SeekerController;
+use App\Http\Controllers\Api\SeekerProfileImageController;
 use App\Http\Controllers\Api\SeekerResumeController;
 use Illuminate\Support\Facades\Route;
 
@@ -58,6 +59,9 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/step-6', [SeekerController::class, 'saveStep6']);
         Route::post('/step-7', [SeekerController::class, 'saveStep7']);
         Route::post('/profile', [SeekerController::class, 'saveProfile']); // Legacy single-submit endpoint
+        Route::post('/profile-image', [SeekerProfileImageController::class, 'store']);
+        Route::get('/profile-image', [SeekerProfileImageController::class, 'show']);
+        Route::delete('/profile-image', [SeekerProfileImageController::class, 'destroy']);
         Route::post('/certificates', [SeekerCertificateController::class, 'store']);
         Route::get('/certificates/{certificate}/view', [SeekerCertificateController::class, 'view']);
         Route::delete('/certificates/{certificate}', [SeekerCertificateController::class, 'destroy']);
