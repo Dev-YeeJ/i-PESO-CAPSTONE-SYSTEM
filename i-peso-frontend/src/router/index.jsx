@@ -33,7 +33,7 @@ const SeekerOnboarding  = lazy(() => import('@/pages/auth/onboarding/SeekerOnboa
 const AdminDashboard = lazy(() => import('@/pages/admin/1-overview/dashboard/DashboardPage'))
 
 // Admin Pages - CATEGORY 2: CONSTITUENT CRM
-const AdminVerificationQueue = lazy(() => import('@/pages/admin/2-constituent-crm/job-seekers/VerificationQueuePage'))
+const AdminVerificationQueue = lazy(() => import('@/pages/admin/2-constituent-crm/employers/VerificationQueuePage'))
 const AdminJobSeekersList    = lazy(() => import('@/pages/admin/2-constituent-crm/job-seekers/JobSeekersListPage'))
 const AdminJobSeekerDetail   = lazy(() => import('@/pages/admin/2-constituent-crm/job-seekers/JobSeekerDetailPage'))
 const AdminEmployersList     = lazy(() => import('@/pages/admin/2-constituent-crm/employers/EmployersListPage'))

@@ -1,42 +1,25 @@
-// i-peso-frontend/src/components/admin/PageHeader.jsx
+import Button from '@/components/ui/Button'
 
-export function PageHeader({ title, subtitle, actions = [] }) {
+export function PageHeader({ title, subtitle, actions = [], eyebrow = 'PESO Operations' }) {
   return (
-    <div className="flex items-center justify-between mb-8">
+    <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
       <div>
-        <h1 className="text-3xl font-bold text-slate-900">{title}</h1>
-        {subtitle && <p className="text-sm text-slate-600 mt-1">{subtitle}</p>}
+        <p className="portal-eyebrow">{eyebrow}</p>
+        <h1 className="portal-title mt-1">{title}</h1>
+        {subtitle && <p className="portal-subtitle">{subtitle}</p>}
       </div>
-
       {actions.length > 0 && (
-        <div className="flex items-center gap-3">
-          {actions.map((action, idx) => {
-            const isVariantPrimary = action.variant === 'primary' || !action.variant
-            const isVariantDanger = action.variant === 'danger'
-            const isVariantGhost = action.variant === 'ghost'
-
-            const buttonClass = isVariantPrimary
-              ? 'bg-blue-700 hover:bg-blue-800 text-white'
-              : isVariantDanger
-              ? 'bg-red-600 hover:bg-red-700 text-white'
-              : isVariantGhost
-              ? 'text-blue-700 hover:underline'
-              : 'border border-slate-300 text-slate-700 hover:bg-slate-50'
-
-            const baseClass = isVariantGhost
-              ? 'text-sm font-medium'
-              : 'rounded-xl px-4 py-2 text-sm font-semibold'
-
-            return (
-              <button
-                key={idx}
-                onClick={action.onClick}
-                className={`${baseClass} ${buttonClass} transition-colors`}
-              >
-                {action.label}
-              </button>
-            )
-          })}
+        <div className="flex flex-wrap items-center gap-2">
+          {actions.map((action) => (
+            <Button
+              key={action.label}
+              onClick={action.onClick}
+              variant={action.variant === 'danger' ? 'danger' : action.variant === 'ghost' ? 'ghost' : action.variant === 'outline' ? 'outline' : 'primary'}
+              size="sm"
+            >
+              {action.label}
+            </Button>
+          ))}
         </div>
       )}
     </div>

@@ -32,7 +32,7 @@ export function StatCard({ icon: IconComponent, label, value, subtitle, color = 
   const colors = colorClasses[color] || colorClasses.blue
 
   return (
-    <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-6">
+    <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
       <div className="flex items-start justify-between">
         <div>
           <p className="text-sm font-medium text-slate-600">{label}</p>

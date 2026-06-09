@@ -5,6 +5,8 @@ import { useState, useCallback, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { authService } from '@/services/authService'
 import { useAuthStore } from '@/stores/authStore'
+import OnboardingShell from '@/components/auth/OnboardingShell'
+import { seekerRegistrationSteps } from '@/components/auth/registrationJourneys'
 // ── Add these imports at the top of SeekerOnboarding.jsx ──
 
 import { getProvinces, getCitiesByProvince, getBarangaysByCity } from '@/services/psgcServices'
@@ -156,11 +158,11 @@ const STEPS = [
 // ── Reusable sub-components ───────────────────────────────────────────────
 
 const SectionHeader = ({ icon, title, subtitle }) => (
-  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', marginBottom: '20px', padding: '14px 16px', backgroundColor: '#eff6ff', borderRadius: '12px', border: '1px solid #bfdbfe' }}>
+  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', marginBottom: '20px', padding: '14px 16px', backgroundColor: '#f8fafc', borderRadius: '10px', border: '1px solid #cbd5e1' }}>
     <span style={{ fontSize: '20px' }}>{icon}</span>
     <div>
-      <p style={{ fontSize: '13px', fontWeight: '700', color: '#1e40af', margin: 0 }}>{title}</p>
-      {subtitle && <p style={{ fontSize: '11px', color: '#3b82f6', margin: '2px 0 0', lineHeight: '1.4' }}>{subtitle}</p>}
+      <p style={{ fontSize: '13px', fontWeight: '800', color: '#0f172a', margin: 0 }}>{title}</p>
+      {subtitle && <p style={{ fontSize: '11px', color: '#64748b', margin: '2px 0 0', lineHeight: '1.4' }}>{subtitle}</p>}
     </div>
   </div>
 )
@@ -184,9 +186,9 @@ const FormField = ({ label, required = true, error, children, help }) => (
 const inputStyle = (hasError) => ({
   width: '100%', boxSizing: 'border-box',
   padding: '10px 13px', fontSize: '13px',
-  color: '#0f172a', backgroundColor: '#f8fafc',
+  color: '#0f172a', backgroundColor: '#ffffff',
   border: `1px solid ${hasError ? '#fca5a5' : '#e2e8f0'}`,
-  borderRadius: '10px', outline: 'none',
+  borderRadius: '8px', outline: 'none',
   transition: 'border-color 0.15s',
 })
 
@@ -212,16 +214,16 @@ const StepIndicator = ({ current, completed }) => (
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               fontSize: isCompleted ? '16px' : '14px',
               fontWeight: '700',
-              backgroundColor: isCompleted ? '#dcfce7' : isActive ? '#1d4ed8' : '#f1f5f9',
+              backgroundColor: isCompleted ? '#dcfce7' : isActive ? '#0f172a' : '#f1f5f9',
               color: isCompleted ? '#15803d' : isActive ? '#ffffff' : '#94a3b8',
-              border: isCompleted ? '2px solid #86efac' : isActive ? '2px solid #1d4ed8' : '2px solid #e2e8f0',
+              border: isCompleted ? '2px solid #86efac' : isActive ? '2px solid #0f172a' : '2px solid #e2e8f0',
               transition: 'all 0.3s',
             }}>
               {isCompleted ? '✓' : step.num}
             </div>
             <span style={{
               fontSize: '10px', fontWeight: '600',
-              color: isActive ? '#1d4ed8' : isCompleted ? '#15803d' : '#94a3b8',
+              color: isActive ? '#0f172a' : isCompleted ? '#15803d' : '#94a3b8',
               whiteSpace: 'nowrap', letterSpacing: '0.2px',
             }}>
               {step.label}
@@ -807,7 +809,7 @@ const Step4 = ({ form, onChange, errors }) => {
 
 // ── Handles all address dropdown state including API loading ──────────────
 
-const SelectDropdown = ({ label, name, codeName, value, codeValue, options, loading, disabled, error, onChange, placeholder }) => (
+const SelectDropdown = ({ label, name, codeName, codeValue, options, loading, disabled, error, onChange, placeholder }) => (
   <FormField label={label} error={error}>
     <div style={{ position: 'relative' }}>
       <select
@@ -851,6 +853,8 @@ const AddressSection = ({ form, errors, onChange, gpsState, onGpsDetect }) => {
   // ── Load provinces on mount ───────────────────────────────────────────
   useEffect(() => {
     let isMounted = true
+    // Loading state starts with the request initiated by this mount effect.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoadingProv(true)
     setApiError(null)
     getProvinces()
@@ -864,6 +868,8 @@ const AddressSection = ({ form, errors, onChange, gpsState, onGpsDetect }) => {
   useEffect(() => {
     let isMounted = true
     if (!form.address_province_code) {
+      // Reset dependent options when the parent selection is cleared.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setCities([])
       setBarangays([])
       return
@@ -882,6 +888,8 @@ const AddressSection = ({ form, errors, onChange, gpsState, onGpsDetect }) => {
   useEffect(() => {
     let isMounted = true
     if (!form.address_city_code) {
+      // Reset dependent options when the parent selection is cleared.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setBarangays([])
       return
     }
@@ -2003,39 +2011,30 @@ export default function SeekerOnboarding() {
   const progressPct = ((step - 1) / 6) * 100
 
   return (
-    <div style={{ minHeight: '100vh', backgroundColor: '#f8fafc', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '32px 16px 60px' }}>
-
-      <div style={{ width: '100%', maxWidth: '720px' }}>
-
-        {/* Header */}
-        <div style={{ textAlign: 'center', marginBottom: '28px' }}>
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
-            <div style={{ backgroundColor: '#1d4ed8', borderRadius: '12px', padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <span style={{ color: '#93c5fd', fontSize: '16px', fontWeight: '700' }}>i</span>
-              <span style={{ color: '#60a5fa', fontSize: '16px' }}>-</span>
-              <span style={{ color: '#fff', fontSize: '16px', fontWeight: '700', letterSpacing: '1px' }}>PESO</span>
-            </div>
-          </div>
-          <h1 style={{ fontSize: '22px', fontWeight: '700', color: '#0f172a', margin: '0 0 4px' }}>
-            Complete Your Profile
-          </h1>
-          <p style={{ fontSize: '13px', color: '#64748b', margin: 0 }}>
-            NSRP Form 1 — National Skills Registration Program · DOLE Philippines
-          </p>
-        </div>
-
+    <OnboardingShell
+      eyebrow="Job seeker registration"
+      title="Complete your NSRP profile"
+      subtitle="National Skills Registration Program Form 1 · Department of Labor and Employment"
+      progress={progressPct}
+      progressLabel={`Step ${step} of ${STEPS.length} · ${STEPS[step - 1].label}`}
+      maxWidth="max-w-4xl"
+      role="seeker"
+      steps={seekerRegistrationSteps}
+      currentStep={step + 2}
+    >
+      <div className="seeker-onboarding">
         {/* Card */}
-        <div ref={cardRef} style={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', overflow: 'hidden' }}>
+        <div ref={cardRef} className="registration-step-card" style={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: '16px', boxShadow: '0 18px 45px rgba(15,23,42,0.12)', overflow: 'hidden' }}>
 
           {/* Progress bar */}
           <div style={{ height: '4px', backgroundColor: '#f1f5f9' }}>
-            <div style={{ height: '100%', backgroundColor: '#1d4ed8', width: `${progressPct}%`, transition: 'width 0.4s ease' }} />
+            <div style={{ height: '100%', backgroundColor: '#f59e0b', width: `${progressPct}%`, transition: 'width 0.4s ease' }} />
           </div>
 
           <div style={{ padding: '32px' }}>
 
             {/* Step Indicator */}
-            <StepIndicator current={step} completed={completed} />
+            <div className="lg:hidden"><StepIndicator current={step} completed={completed} /></div>
 
             {/* API Error */}
             {apiError && (
@@ -2105,7 +2104,7 @@ export default function SeekerOnboarding() {
               <button
                 onClick={handleNext}
                 disabled={isLoading}
-                style={{ flex: 2, padding: '13px', fontSize: '14px', fontWeight: '700', color: '#fff', backgroundColor: isLoading ? '#93c5fd' : '#1d4ed8', border: 'none', borderRadius: '12px', cursor: isLoading ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', transition: 'all 0.15s' }}
+                style={{ flex: 2, padding: '13px', fontSize: '14px', fontWeight: '800', color: '#0f172a', backgroundColor: isLoading ? '#fde68a' : '#f59e0b', border: '1px solid #f59e0b', borderRadius: '8px', cursor: isLoading ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', transition: 'all 0.15s' }}
               >
                 {isLoading ? (
                   <>
@@ -2123,14 +2122,8 @@ export default function SeekerOnboarding() {
           </div>
         </div>
 
-        {/* Footer note */}
-        <p style={{ textAlign: 'center', fontSize: '11px', color: '#94a3b8', marginTop: '16px', lineHeight: '1.5' }}>
-          Your information is protected under the Data Privacy Act of 2012 (RA 10173).<br />
-          This form is for official PESO use only.
-        </p>
-
         <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       </div>
-    </div>
+    </OnboardingShell>
   )
 }

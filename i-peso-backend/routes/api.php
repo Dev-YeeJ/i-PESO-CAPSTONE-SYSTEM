@@ -77,8 +77,6 @@ Route::middleware('auth:sanctum')->group(function () {
         // Seekers
         Route::get('/seekers', [AdminSeekerController::class, 'index']);
         Route::get('/seekers/{id}', [AdminSeekerController::class, 'show']);
-        Route::post('/seekers/{id}/verify', [AdminSeekerController::class, 'verify']);
-        Route::get('/seekers/verification-queue', [AdminSeekerController::class, 'verificationQueue']);
         Route::get('/job-seekers/{id}/export-nsrp-pdf', [NSRPPdfExportController::class, 'exportNSRPPdf']);
 
         // Employers (Verification)

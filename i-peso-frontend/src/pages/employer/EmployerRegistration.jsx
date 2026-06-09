@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '@/stores/authStore'
 import * as employerService from '@/services/employerService'
+import OnboardingShell from '@/components/auth/OnboardingShell'
+import { employerRegistrationSteps } from '@/components/auth/registrationJourneys'
 import Step2CompanyProfile from './steps/Step2CompanyProfile'
 import Step3DocumentUpload from './steps/Step3DocumentUpload'
 import Step4Representative from './steps/Step4Representative'
@@ -28,13 +30,13 @@ const StepIndicator = ({ current, completed }) => (
               done
                 ? 'border-green-300 bg-green-100 text-green-700'
                 : active
-                  ? 'border-blue-700 bg-blue-700 text-white'
+                  ? 'border-brand-navy bg-brand-navy text-white'
                   : 'border-slate-200 bg-slate-100 text-slate-400'
             }`}>
               {done ? '\u2713' : step.number}
             </div>
             <span className={`whitespace-nowrap text-[10px] font-semibold ${
-              active ? 'text-blue-700' : done ? 'text-green-700' : 'text-slate-400'
+              active ? 'text-brand-navy' : done ? 'text-green-700' : 'text-slate-400'
             }`}>
               {step.label}
             </span>
@@ -103,33 +105,37 @@ export default function EmployerRegistration() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-50">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-slate-200 border-t-blue-700" />
+      <div className="pre-dashboard-shell flex min-h-screen items-center justify-center bg-[#0A192F]">
+        <div className="text-center">
+          <div className="mx-auto h-9 w-9 animate-spin rounded-full border-4 border-white/20 border-t-brand-gold" />
+          <p className="mt-4 text-sm font-semibold text-slate-300">Preparing employer registration...</p>
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 px-4 py-8 sm:px-6">
-      <div className="mx-auto w-full max-w-3xl">
-        <div className="mb-7 text-center">
-          <div className="mb-3 inline-flex rounded-xl bg-blue-700 px-4 py-2 text-base font-bold tracking-wide text-white">
-            i-PESO
-          </div>
-          <h1 className="text-2xl font-bold text-slate-900">Complete Your Employer Profile</h1>
-          <p className="mt-1 text-sm text-slate-500">Employer accreditation and document verification</p>
-        </div>
-
-        <div ref={cardRef} className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+    <OnboardingShell
+      eyebrow="Employer accreditation"
+      title="Complete your employer profile"
+      subtitle="Provide the company information and legal requirements PESO needs to review your organization."
+      progress={(step / STEPS.length) * 100}
+      progressLabel={`Step ${step} of ${STEPS.length} · ${STEPS[step - 1].title}`}
+      maxWidth="max-w-4xl"
+      role="employer"
+      steps={employerRegistrationSteps}
+      currentStep={step}
+    >
+        <div ref={cardRef} className="registration-step-card overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-elevated">
           <div className="h-1 bg-slate-100">
             <div
-              className="h-full bg-blue-700 transition-all duration-300"
+              className="h-full bg-brand-gold transition-all duration-300"
               style={{ width: `${(step / STEPS.length) * 100}%` }}
             />
           </div>
 
           <div className="p-6 sm:p-8">
-            <StepIndicator current={step} completed={completed} />
+            <div className="lg:hidden"><StepIndicator current={step} completed={completed} /></div>
 
             {loadError && (
               <div className="mb-5 rounded-xl border border-red-200 bg-red-50 p-3.5 text-sm text-red-700">
@@ -137,9 +143,9 @@ export default function EmployerRegistration() {
               </div>
             )}
 
-            <div className="mb-6 rounded-xl border border-blue-200 bg-blue-50 p-4">
-              <p className="text-sm font-bold text-blue-900">Step {step} of 5: {STEPS[step - 1].title}</p>
-              <p className="mt-1 text-xs text-blue-700">{STEPS[step - 1].subtitle}</p>
+            <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-4">
+              <p className="text-sm font-extrabold text-amber-950">Step {step} of 5: {STEPS[step - 1].title}</p>
+              <p className="mt-1 text-xs leading-5 text-amber-800">{STEPS[step - 1].subtitle}</p>
             </div>
 
             {step === 3 && (
@@ -162,10 +168,6 @@ export default function EmployerRegistration() {
           </div>
         </div>
 
-        <p className="mt-4 text-center text-xs leading-5 text-slate-400">
-          Your information is protected under the Data Privacy Act of 2012 (RA 10173).
-        </p>
-      </div>
-    </div>
+    </OnboardingShell>
   )
 }

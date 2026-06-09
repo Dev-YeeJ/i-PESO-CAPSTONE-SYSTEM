@@ -200,7 +200,7 @@ const ResetPasswordPage = () => {
   // ── Success screen ───────────────────────────────────────
   if (success) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-white flex items-center justify-center p-4">
+      <div className="pre-dashboard-shell reset-auth-shell flex min-h-screen items-center justify-center bg-[#0A192F] p-4">
         <div className="w-full max-w-md">
           <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-10 text-center">
             <div className="w-20 h-20 bg-green-50 border-2 border-green-200 rounded-3xl flex items-center justify-center mx-auto mb-6">
@@ -227,7 +227,7 @@ const ResetPasswordPage = () => {
 
   // ── Main page ────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-white flex items-center justify-center p-4 py-10">
+    <div className="pre-dashboard-shell reset-auth-shell flex min-h-screen items-center justify-center bg-[#0A192F] p-4 py-10">
 
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute -top-40 -right-40 w-96 h-96 bg-blue-100 rounded-full opacity-30 blur-3xl" />

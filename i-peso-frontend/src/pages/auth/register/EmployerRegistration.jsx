@@ -1,37 +1,33 @@
 import { useCallback, useState } from 'react'
+import { ArrowLeft, Building2, Eye, EyeOff } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
-import EyeIcon from '@/components/form/EyeIcon'
+import AuthShell from '@/components/auth/AuthShell'
+import { employerRegistrationSteps } from '@/components/auth/registrationJourneys'
 import Field from '@/components/form/Field'
 import FormError from '@/components/form/FormError'
 import PasswordStrengthMeter from '@/components/form/PasswordStrengthMeter'
+import { Button, Card } from '@/components/ui'
 import { authService } from '@/services/authService'
 import { getPasswordStrength } from '@/services/validationHelpers'
 
-const COMPANY_TYPES = [
+const companyTypes = [
   { value: 'sole_proprietorship', label: 'Sole Proprietorship' },
   { value: 'corporation_partnership', label: 'Corporation / Partnership' },
   { value: 'local_recruitment_agency', label: 'Local Recruitment Agency' },
   { value: 'overseas_recruitment_agency', label: 'Overseas Recruitment Agency' },
 ]
 
-const FIELDS = ['email', 'password', 'password_confirmation', 'company_type']
+const fields = ['email', 'password', 'password_confirmation', 'company_type']
 
 const validate = (form) => {
   const errors = {}
-
   if (!form.email?.trim()) errors.email = 'Email is required.'
-  else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) {
-    errors.email = 'Enter a valid email address.'
-  }
+  else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) errors.email = 'Enter a valid email address.'
   if (!form.password) errors.password = 'Password is required.'
   else if (form.password.length < 8) errors.password = 'Password must be at least 8 characters.'
-  if (!form.password_confirmation) {
-    errors.password_confirmation = 'Please confirm your password.'
-  } else if (form.password !== form.password_confirmation) {
-    errors.password_confirmation = 'Passwords do not match.'
-  }
+  if (!form.password_confirmation) errors.password_confirmation = 'Please confirm your password.'
+  else if (form.password !== form.password_confirmation) errors.password_confirmation = 'Passwords do not match.'
   if (!form.company_type) errors.company_type = 'Please select a company type.'
-
   return errors
 }
 
@@ -40,37 +36,30 @@ export default function EmployerRegistration() {
   const [form, setForm] = useState({})
   const [errors, setErrors] = useState({})
   const [touched, setTouched] = useState({})
-  const [isLoading, setIsLoading] = useState(false)
+  const [loading, setLoading] = useState(false)
   const [apiError, setApiError] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmation, setShowConfirmation] = useState(false)
-
   const strength = getPasswordStrength(form.password ?? '')
 
-  const handleChange = useCallback((event) => {
+  const change = useCallback((event) => {
     const { name, value } = event.target
     setForm((current) => ({ ...current, [name]: value }))
     setErrors((current) => ({ ...current, [name]: undefined }))
     setApiError('')
   }, [])
+  const blur = useCallback((event) => setTouched((current) => ({ ...current, [event.target.name]: true })), [])
+  const fieldError = (name) => touched[name] ? errors[name] : undefined
 
-  const handleBlur = useCallback((event) => {
-    setTouched((current) => ({ ...current, [event.target.name]: true }))
-  }, [])
-
-  const fieldError = (name) => (touched[name] ? errors[name] : undefined)
-
-  const handleSubmit = async (event) => {
+  const submit = async (event) => {
     event.preventDefault()
-    setTouched(Object.fromEntries(FIELDS.map((field) => [field, true])))
-
+    setTouched(Object.fromEntries(fields.map((field) => [field, true])))
     const nextErrors = validate(form)
     setErrors(nextErrors)
     if (Object.keys(nextErrors).length) return
 
-    setIsLoading(true)
+    setLoading(true)
     setApiError('')
-
     try {
       const data = await authService.register({
         role: 'employer',
@@ -79,131 +68,58 @@ export default function EmployerRegistration() {
         password_confirmation: form.password_confirmation,
         company_type: form.company_type,
       })
-
       localStorage.setItem('ipeso_pending_email', data.email)
       localStorage.setItem('ipeso_pending_role', 'employer')
       navigate('/verify-email', { replace: true })
     } catch (error) {
-      if (error.response?.status === 422) {
-        setErrors(error.response.data.errors ?? {})
-      } else {
-        setApiError(error.response?.data?.message ?? 'Registration failed. Please try again.')
-      }
+      if (error.response?.status === 422) setErrors(error.response.data.errors ?? {})
+      else setApiError(error.response?.data?.message ?? 'Registration failed. Please try again.')
     } finally {
-      setIsLoading(false)
+      setLoading(false)
     }
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4 py-10">
-      <div className="w-full max-w-lg">
-        <Link
-          to="/register"
-          className="mb-6 inline-flex items-center gap-1 text-sm font-medium text-slate-500 hover:text-blue-600"
-        >
-          &larr; Back to selection
-        </Link>
-
-        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-          <div className="h-1 bg-slate-100">
-            <div className="h-full w-1/5 bg-blue-700" />
+    <AuthShell
+      title="Create an employer account"
+      subtitle="Set up the company login and legal organization type. Company details and documents follow after email verification."
+      maxWidth="max-w-2xl"
+      journey={{ role: 'employer', steps: employerRegistrationSteps, currentStep: 1 }}
+      sideTitle="Join the verified employer network."
+      sideText="PESO accreditation protects job seekers and enables trusted companies to publish local employment opportunities."
+      sideItems={['Legal document review', 'Email and dashboard status notifications', 'Job posting access after approval']}
+    >
+      <Link to="/register" className="registration-change-role"><ArrowLeft className="h-4 w-4" />Change account type</Link>
+      <Card>
+        <FormError message={apiError} />
+        <form onSubmit={submit} noValidate className="space-y-4">
+          <Field label="Company email address" name="email" type="email" placeholder="company@example.com" value={form.email ?? ''} onChange={change} onBlur={blur} error={fieldError('email')} />
+          <div>
+            <Field label="Password" name="password" type={showPassword ? 'text' : 'password'} placeholder="Minimum 8 characters" value={form.password ?? ''} onChange={change} onBlur={blur} error={fieldError('password')} rightElement={<VisibilityButton shown={showPassword} onClick={() => setShowPassword((current) => !current)} />} />
+            <PasswordStrengthMeter password={form.password} strength={strength} />
           </div>
+          <Field label="Confirm password" name="password_confirmation" type={showConfirmation ? 'text' : 'password'} placeholder="Re-enter your password" value={form.password_confirmation ?? ''} onChange={change} onBlur={blur} error={fieldError('password_confirmation')} rightElement={<VisibilityButton shown={showConfirmation} onClick={() => setShowConfirmation((current) => !current)} />} />
 
-          <div className="p-6 sm:p-8">
-            <div className="mb-7">
-              <p className="mb-1 text-xs font-bold uppercase tracking-wider text-blue-700">Step 1 of 5</p>
-              <h1 className="text-2xl font-bold tracking-tight text-slate-900">Account Setup</h1>
-              <p className="mt-1 text-sm text-slate-500">Create the employer login and select the legal company type.</p>
+          <fieldset>
+            <legend className="mb-2 text-sm font-bold text-slate-700">Legal company type</legend>
+            <div className="grid gap-2">
+              {companyTypes.map((type) => (
+                <label key={type.value} className={`flex cursor-pointer items-center gap-3 rounded-lg border p-3.5 transition ${form.company_type === type.value ? 'border-brand-navy bg-slate-50 ring-1 ring-brand-navy' : 'border-slate-200 hover:border-slate-300'}`}>
+                  <input type="radio" name="company_type" value={type.value} checked={form.company_type === type.value} onChange={change} onBlur={blur} className="h-4 w-4 accent-slate-900" />
+                  <span className="text-sm font-semibold text-slate-700">{type.label}</span>
+                </label>
+              ))}
             </div>
-
-            <FormError message={apiError} />
-
-            <form onSubmit={handleSubmit} noValidate className="space-y-4">
-              <Field
-                label="Email Address"
-                name="email"
-                type="email"
-                placeholder="company@example.com"
-                value={form.email ?? ''}
-                onChange={handleChange}
-                onBlur={handleBlur}
-                error={fieldError('email')}
-              />
-
-              <div>
-                <Field
-                  label="Password"
-                  name="password"
-                  type={showPassword ? 'text' : 'password'}
-                  placeholder="Minimum 8 characters"
-                  value={form.password ?? ''}
-                  onChange={handleChange}
-                  onBlur={handleBlur}
-                  error={fieldError('password')}
-                  rightElement={(
-                    <button type="button" onClick={() => setShowPassword((shown) => !shown)} className="text-slate-400 hover:text-slate-600">
-                      <EyeIcon open={showPassword} />
-                    </button>
-                  )}
-                />
-                <PasswordStrengthMeter password={form.password} strength={strength} />
-              </div>
-
-              <Field
-                label="Confirm Password"
-                name="password_confirmation"
-                type={showConfirmation ? 'text' : 'password'}
-                placeholder="Re-enter your password"
-                value={form.password_confirmation ?? ''}
-                onChange={handleChange}
-                onBlur={handleBlur}
-                error={fieldError('password_confirmation')}
-                rightElement={(
-                  <button type="button" onClick={() => setShowConfirmation((shown) => !shown)} className="text-slate-400 hover:text-slate-600">
-                    <EyeIcon open={showConfirmation} />
-                  </button>
-                )}
-              />
-
-              <div>
-                <label className="mb-2 block text-sm font-medium text-slate-700">Company Type</label>
-                <div className="space-y-2">
-                  {COMPANY_TYPES.map((type) => (
-                    <label
-                      key={type.value}
-                      className={`flex cursor-pointer items-center gap-3 rounded-xl border p-3 transition-colors ${
-                        form.company_type === type.value
-                          ? 'border-blue-500 bg-blue-50'
-                          : 'border-slate-300 hover:bg-slate-50'
-                      }`}
-                    >
-                      <input
-                        type="radio"
-                        name="company_type"
-                        value={type.value}
-                        checked={form.company_type === type.value}
-                        onChange={handleChange}
-                        onBlur={handleBlur}
-                        className="h-4 w-4 accent-blue-700"
-                      />
-                      <span className="text-sm font-medium text-slate-700">{type.label}</span>
-                    </label>
-                  ))}
-                </div>
-                {fieldError('company_type') && <p className="mt-1.5 text-xs text-red-600">{fieldError('company_type')}</p>}
-              </div>
-
-              <button
-                type="submit"
-                disabled={isLoading}
-                className="mt-2 flex w-full items-center justify-center rounded-xl bg-blue-700 py-3 font-semibold text-white hover:bg-blue-800 disabled:opacity-60"
-              >
-                {isLoading ? 'Creating account...' : 'Continue to Email Verification'}
-              </button>
-            </form>
-          </div>
-        </div>
-      </div>
-    </div>
+            {fieldError('company_type') && <p className="mt-1.5 text-xs font-medium text-red-600">{fieldError('company_type')}</p>}
+          </fieldset>
+          <Button type="submit" disabled={loading} icon={Building2} className="w-full">{loading ? 'Creating account...' : 'Continue to Email Verification'}</Button>
+        </form>
+        <p className="registration-secondary-action">Already registered? <Link to="/login">Sign in</Link></p>
+      </Card>
+    </AuthShell>
   )
+}
+
+function VisibilityButton({ shown, onClick }) {
+  return <button type="button" onClick={onClick} className="text-slate-400 hover:text-slate-700" aria-label={shown ? 'Hide password' : 'Show password'}>{shown ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button>
 }

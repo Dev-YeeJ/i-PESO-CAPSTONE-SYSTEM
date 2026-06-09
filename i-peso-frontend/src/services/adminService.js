@@ -20,19 +20,6 @@ export const adminService = {
     return data
   },
 
-  verifySeekerProfile: async (id, action, remarks = null) => {
-    const { data } = await api.post(`/admin/seekers/${id}/verify`, {
-      action,
-      remarks,
-    })
-    return data
-  },
-
-  getVerificationQueue: async (params = {}) => {
-    const { data } = await api.get('/admin/seekers/verification-queue', { params })
-    return data
-  },
-
   // ── EMPLOYERS ──────────────────────────────────────────────────
   getEmployers: async (params = {}) => {
     const { data } = await api.get('/admin/employers', { params })

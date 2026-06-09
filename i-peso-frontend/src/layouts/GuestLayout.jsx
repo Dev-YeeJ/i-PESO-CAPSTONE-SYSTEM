@@ -2,7 +2,7 @@
 import { Outlet } from 'react-router-dom'
 
 const GuestLayout = () => {
-  return <Outlet />
+  return <div className="guest-shell"><Outlet /></div>
 }
 
 export default GuestLayout

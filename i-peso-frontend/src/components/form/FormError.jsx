@@ -4,7 +4,7 @@ export default function FormError({ message }) {
   if (!message) return null
 
   return (
-    <div className="mb-5 flex items-start gap-3 p-3.5 bg-red-50 border border-red-200 rounded-xl">
+    <div className="mb-5 flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 p-3.5">
       <svg
         className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5"
         fill="currentColor"

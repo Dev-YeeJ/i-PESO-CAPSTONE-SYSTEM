@@ -51,7 +51,7 @@ export default function SeekerProfile() {
     getSeekerProfile()
       .then((result) => {
         setProfile(result)
-        updateUser({ name: fullName(result), verification_status: result.verification_status })
+        updateUser({ name: fullName(result) })
       })
       .catch((error) => toast.error(error.response?.data?.message ?? 'Unable to load your profile.'))
       .finally(() => setLoading(false))
@@ -93,7 +93,7 @@ export default function SeekerProfile() {
     return <div className="rounded-2xl border border-red-200 bg-red-50 p-6 text-red-700">Your profile could not be loaded.</div>
   }
 
-  const verified = profile.verification_status === 'verified' || profile.is_verified
+  const profileComplete = Boolean(profile.profile_completed)
   const strength = profile.profile_strength ?? { percentage: 0, items: [] }
   const certificates = profile.certificates ?? []
 
@@ -155,12 +155,12 @@ export default function SeekerProfile() {
         <div className="mx-auto max-w-6xl">
           <p className="text-xs font-semibold uppercase tracking-[0.22em] text-blue-200">DOLE NSRP Job Seeker Profile</p>
           <h1 className="mt-2 text-3xl font-bold">My Profile</h1>
-          <p className="mt-2 max-w-xl text-sm text-blue-100">Your verified skills, experience, training records, and employment documents in one place.</p>
+          <p className="mt-2 max-w-xl text-sm text-blue-100">Your skills, experience, training records, and employment documents in one place.</p>
         </div>
       </section>
 
       <div className="relative mx-auto -mt-20 max-w-6xl px-4 pb-10 sm:px-6">
-        <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-xl shadow-blue-950/10">
+        <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
           <div className="flex flex-col gap-5 p-6 md:flex-row md:items-center">
             <div className="relative shrink-0">
               <div className="flex h-24 w-24 items-center justify-center overflow-hidden rounded-2xl border-4 border-white bg-blue-100 text-2xl font-bold text-blue-800 shadow-lg">
@@ -181,10 +181,10 @@ export default function SeekerProfile() {
               <div className="flex flex-wrap items-center gap-3">
                 <h2 className="text-2xl font-bold text-slate-950">{fullName(profile)}</h2>
                 <span className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-bold ${
-                  verified ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'
+                  profileComplete ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'
                 }`}>
-                  {verified ? <ShieldCheck className="h-4 w-4" /> : null}
-                  {verified ? 'NSRP Verified' : 'Verification Pending'}
+                  {profileComplete ? <ShieldCheck className="h-4 w-4" /> : null}
+                  {profileComplete ? 'NSRP Profile Complete' : 'Profile Incomplete'}
                 </span>
               </div>
               <div className="mt-3 grid gap-2 text-sm text-slate-600 sm:grid-cols-2 lg:grid-cols-4">
@@ -315,10 +315,10 @@ export default function SeekerProfile() {
               </div>
             </Card>
 
-            <section className="overflow-hidden rounded-3xl bg-gradient-to-br from-blue-900 to-blue-700 p-6 text-white shadow-lg">
+            <section className="portal-card-hero relative overflow-hidden rounded-xl bg-brand-navy p-6 text-white shadow-lg">
               <span className="inline-flex rounded-xl bg-white/10 p-2.5"><FileText className="h-6 w-6" /></span>
               <h2 className="mt-4 text-xl font-bold">Resume Management</h2>
-              <p className="mt-2 text-sm leading-6 text-blue-100">Generate a professional, employer-ready resume using your verified DOLE NSRP information and 2x2 portrait.</p>
+              <p className="mt-2 text-sm leading-6 text-blue-100">Generate a professional, employer-ready resume using your DOLE NSRP information and 2x2 portrait.</p>
               {!profile.has_profile_image && (
                 <button type="button" onClick={() => setPhotoUploadOpen(true)} className="mt-4 flex w-full items-center gap-3 rounded-xl border border-amber-300/40 bg-amber-300/15 p-3 text-left text-xs text-amber-50">
                   <Camera className="h-5 w-5 shrink-0" />
@@ -367,7 +367,7 @@ export default function SeekerProfile() {
 
 function Card({ title, subtitle, action, children }) {
   return (
-    <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+    <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
       <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-lg font-bold text-slate-900">{title}</h2>

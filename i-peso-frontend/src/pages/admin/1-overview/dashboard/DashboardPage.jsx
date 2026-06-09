@@ -1,203 +1,142 @@
-// i-peso-frontend/src/pages/admin/DashboardPage.jsx
-
-import { useEffect, useState, useCallback } from 'react'
-import PageHeader from '@/pages/admin/_components/PageHeader'
-import StatCard from '@/pages/admin/_components/StatCard'
-import StatusBadge from '@/pages/admin/_components/StatusBadge'
+import { createElement, useEffect, useMemo, useState } from 'react'
+import {
+  ArrowRight,
+  BriefcaseBusiness,
+  Building2,
+  CalendarDays,
+  CheckCircle2,
+  ClipboardCheck,
+  FileChartColumn,
+  UsersRound,
+} from 'lucide-react'
+import { Badge, Button, Card, CardHeader } from '@/components/ui'
 import DataTable from '@/pages/admin/_components/DataTable'
+import PageHeader from '@/pages/admin/_components/PageHeader'
+import StatusBadge from '@/pages/admin/_components/StatusBadge'
 import { adminService } from '@/services/adminService'
-
-// Icons
-const UserIcon = () => (
-  <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-  </svg>
-)
-
-const BriefcaseIcon = () => (
-  <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-  </svg>
-)
-
-const DocumentIcon = () => (
-  <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-  </svg>
-)
-
-const CheckIcon = () => (
-  <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m7 0a9 9 0 11-18 0 9 9 0 0118 0z" />
-  </svg>
-)
 
 export default function DashboardPage() {
   const [stats, setStats] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
+  const [error, setError] = useState('')
 
   useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        setLoading(true)
-        const data = await adminService.getDashboardStats()
-        setStats(data)
-        setError(null)
-      } catch (err) {
-        setError(err?.response?.data?.message || 'Failed to load dashboard stats')
-        console.error('Dashboard error:', err)
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    fetchStats()
+    adminService.getDashboardStats()
+      .then(setStats)
+      .catch((requestError) => setError(requestError.response?.data?.message ?? 'Failed to load dashboard statistics.'))
+      .finally(() => setLoading(false))
   }, [])
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-96">
-        <div className="text-center">
-          <div className="w-12 h-12 border-4 border-slate-200 border-t-blue-600 rounded-full animate-spin mx-auto" />
-          <p className="mt-4 text-slate-600">Loading dashboard...</p>
-        </div>
-      </div>
-    )
-  }
+  const composition = useMemo(() => {
+    const seekers = Number(stats?.total_seekers ?? 0)
+    const employers = Number(stats?.total_employers ?? 0)
+    const total = Math.max(1, seekers + employers)
+    return [
+      { label: 'Job Seekers', value: seekers, percentage: (seekers / total) * 100, color: 'bg-brand-700' },
+      { label: 'Employers', value: employers, percentage: (employers / total) * 100, color: 'bg-accent-400' },
+    ]
+  }, [stats])
 
-  if (error) {
-    return (
-      <div className="bg-red-50 border border-red-200 rounded-2xl p-6">
-        <h3 className="font-semibold text-red-900">Error</h3>
-        <p className="text-red-700 text-sm mt-1">{error}</p>
-      </div>
-    )
-  }
+  if (loading) return <div className="portal-page animate-pulse"><div className="h-24 rounded-2xl bg-slate-200" /><div className="grid gap-4 lg:grid-cols-4">{[1, 2, 3, 4].map((item) => <div key={item} className="h-32 rounded-2xl bg-slate-200" />)}</div></div>
 
   return (
-    <div className="space-y-8">
-      <PageHeader
-        title="Dashboard"
-        subtitle="System overview and key metrics"
-      />
+    <div className="portal-page">
+      <PageHeader title="Operations Dashboard" subtitle="Monitor employment services, accreditation workload, and platform activity." />
+      {error && <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</div>}
 
-      {/* KPI Cards - 2x2 Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <StatCard
-          icon={UserIcon}
-          label="Total Job Seekers"
-          value={stats?.total_seekers?.toLocaleString() || 0}
-          color="blue"
-        />
-        <StatCard
-          icon={BriefcaseIcon}
-          label="Total Employers"
-          value={stats?.total_employers?.toLocaleString() || 0}
-          color="indigo"
-        />
-        <StatCard
-          icon={DocumentIcon}
-          label="Active Vacancies"
-          value={stats?.active_vacancies?.toLocaleString() || 0}
-          color="green"
-        />
-        <StatCard
-          icon={CheckIcon}
-          label="Applications (This Month)"
-          value={stats?.applications_this_month?.toLocaleString() || 0}
-          color="amber"
-        />
-      </div>
-
-      {/* Secondary Stats Row */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-4">
-          <p className="text-xs font-medium text-slate-600">Profile Completion</p>
-          <p className="text-2xl font-bold text-slate-900 mt-1">
-            {stats?.profile_completion_rate?.toFixed(1) || 0}%
-          </p>
-        </div>
-        <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-4">
-          <p className="text-xs font-medium text-slate-600">Open Programs</p>
-          <p className="text-2xl font-bold text-slate-900 mt-1">
-            {stats?.open_programs || 0}
-          </p>
-        </div>
-        <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-4">
-          <p className="text-xs font-medium text-slate-600">Upcoming Job Fairs</p>
-          <p className="text-2xl font-bold text-slate-900 mt-1">
-            {stats?.upcoming_job_fairs || 0}
-          </p>
-        </div>
-        <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-4">
-          <p className="text-xs font-medium text-slate-600">Pending Verifications</p>
-          <div className="flex items-center gap-2 mt-1">
-            <span className="inline-block w-6 h-6 bg-amber-100 text-amber-700 rounded-full text-xs font-bold flex items-center justify-center">
-              {stats?.pending_verifications || 0}
-            </span>
+      <section className="portal-card-hero relative overflow-hidden rounded-xl border border-blue-900 bg-brand-navy px-6 py-7 text-white shadow-elevated sm:px-8">
+        <div className="absolute -right-20 -top-24 h-64 w-64 rounded-full bg-brand-500/20 blur-3xl" />
+        <div className="relative flex flex-col justify-between gap-5 lg:flex-row lg:items-center">
+          <div>
+            <Badge variant={(stats?.pending_verifications ?? 0) > 0 ? 'pending' : 'verified'} className="border-white/10">
+              {stats?.pending_verifications ?? 0} pending employer accreditation{stats?.pending_verifications === 1 ? '' : 's'}
+            </Badge>
+            <h2 className="mt-4 text-2xl font-bold">Employer accreditation reviews are ready</h2>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-300">Review employer registration details and legal documents before allowing vacancy publication.</p>
           </div>
+          <Button to="/admin/verification-queue" variant="accent" icon={ClipboardCheck}>Open Employer Queue</Button>
         </div>
+      </section>
+
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <Kpi icon={UsersRound} label="Registered Seekers" value={stats?.total_seekers ?? 0} detail={`${stats?.profile_completion_rate?.toFixed(1) ?? 0}% profile completion`} tone="brand" />
+        <Kpi icon={Building2} label="Registered Employers" value={stats?.total_employers ?? 0} detail="Constituent employer accounts" tone="violet" />
+        <Kpi icon={BriefcaseBusiness} label="Active Vacancies" value={stats?.active_vacancies ?? 0} detail="Published opportunities" tone="emerald" />
+        <Kpi icon={CheckCircle2} label="Monthly Applications" value={stats?.applications_this_month ?? 0} detail="Submitted this month" tone="amber" />
       </div>
 
-      {/* Recent Registrations Table */}
-      <div>
-        <h2 className="text-xl font-bold text-slate-900 mb-4">Recent Registrations</h2>
-        <DataTable
-          columns={[
-            { key: 'name', label: 'Name' },
-            {
-              key: 'role',
-              label: 'Role',
-              render: (role) => <StatusBadge status={role.toLowerCase()} />,
-            },
-            { key: 'email', label: 'Email' },
-            {
-              key: 'registered_at',
-              label: 'Registered',
-              render: (date) => new Date(date).toLocaleDateString(),
-            },
-          ]}
-          data={stats?.recent_registrations || []}
-        />
-      </div>
-
-      {/* Recent Applications Feed */}
-      <div>
-        <h2 className="text-xl font-bold text-slate-900 mb-4">Recent Applications</h2>
-        <div className="space-y-3">
-          {stats?.recent_applications && stats.recent_applications.length > 0 ? (
-            stats.recent_applications.map((app) => (
-              <div
-                key={app.id}
-                className="bg-white border border-slate-200 rounded-2xl p-4 flex items-center justify-between hover:bg-slate-50 transition-colors"
-              >
-                <div className="flex-1">
-                  <p className="font-semibold text-slate-900">
-                    {app.seeker_name} → {app.job_title}
-                  </p>
-                  <p className="text-sm text-slate-600">{app.company_name}</p>
+      <div className="grid gap-6 xl:grid-cols-[0.8fr_1.2fr]">
+        <div className="space-y-6">
+          <Card>
+            <CardHeader title="Platform Composition" subtitle="Current registered constituent mix." />
+            <div className="space-y-5">
+              {composition.map((item) => (
+                <div key={item.label}>
+                  <div className="flex items-center justify-between text-sm"><span className="font-bold text-slate-800">{item.label}</span><span className="font-black text-slate-950">{item.value.toLocaleString()}</span></div>
+                  <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-slate-100"><div className={`h-full rounded-full ${item.color}`} style={{ width: `${item.percentage}%` }} /></div>
                 </div>
+              ))}
+            </div>
+          </Card>
 
-                <div className="flex items-center gap-4">
-                  <div className="text-right">
-                    <div className="inline-flex items-center gap-2 bg-blue-50 px-3 py-1 rounded-full">
-                      <span className="text-xs font-semibold text-blue-700">
-                        {app.match_percentage}% match
-                      </span>
-                    </div>
-                  </div>
-                  <StatusBadge status={app.status} />
+          <Card>
+            <CardHeader title="Service Indicators" subtitle="Programs and upcoming PESO activities." />
+            <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
+              <Indicator icon={FileChartColumn} label="Open Programs" value={stats?.open_programs ?? 0} />
+              <Indicator icon={CalendarDays} label="Upcoming Job Fairs" value={stats?.upcoming_job_fairs ?? 0} />
+              <Indicator icon={ClipboardCheck} label="Pending Employers" value={stats?.pending_verifications ?? 0} warning />
+            </div>
+          </Card>
+        </div>
+
+        <Card padding="none">
+          <div className="p-5 sm:p-6">
+            <CardHeader
+              title="Recent Registrations"
+              subtitle="Newest job seeker and employer accounts."
+              action={<Button to="/admin/job-seekers" variant="secondary" size="sm" icon={ArrowRight}>View Constituents</Button>}
+            />
+          </div>
+          <DataTable
+            columns={[
+              { key: 'name', label: 'Constituent' },
+              { key: 'role', label: 'Role', render: (role) => <StatusBadge status={role.toLowerCase()} /> },
+              { key: 'email', label: 'Email' },
+              { key: 'registered_at', label: 'Registered', render: (date) => new Date(date).toLocaleDateString() },
+            ]}
+            data={stats?.recent_registrations ?? []}
+          />
+        </Card>
+      </div>
+
+      <Card>
+        <CardHeader title="Recent Application Activity" subtitle="Latest seeker-to-vacancy movement and match quality." />
+        {stats?.recent_applications?.length ? (
+          <div className="grid gap-3 lg:grid-cols-2">
+            {stats.recent_applications.map((application) => (
+              <div key={application.id} className="rounded-2xl border border-slate-200 p-4 transition hover:border-brand-200 hover:bg-brand-50/40">
+                <div className="flex items-start justify-between gap-3">
+                  <div><p className="font-bold text-slate-950">{application.seeker_name}</p><p className="mt-1 text-sm text-slate-600">{application.job_title} at {application.company_name}</p></div>
+                  <StatusBadge status={application.status} />
+                </div>
+                <div className="mt-4 flex items-center gap-3">
+                  <div className="h-2 flex-1 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-brand-600" style={{ width: `${Math.min(100, application.match_percentage ?? 0)}%` }} /></div>
+                  <span className="text-xs font-black text-brand-800">{application.match_percentage ?? 0}% match</span>
                 </div>
               </div>
-            ))
-          ) : (
-            <div className="text-center py-8 text-slate-600">
-              No recent applications
-            </div>
-          )}
-        </div>
-      </div>
+            ))}
+          </div>
+        ) : <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 py-10 text-center text-sm text-slate-500">No recent application activity.</div>}
+      </Card>
     </div>
   )
+}
+
+function Kpi({ icon, label, value, detail, tone }) {
+  const tones = { brand: 'bg-brand-50 text-brand-700', violet: 'bg-violet-50 text-violet-700', emerald: 'bg-emerald-50 text-emerald-700', amber: 'bg-accent-50 text-accent-700' }
+  return <Card padding="sm"><div className="flex items-start justify-between gap-4"><div><p className="text-xs font-bold uppercase tracking-wide text-slate-500">{label}</p><p className="mt-2 text-3xl font-black text-slate-950">{Number(value).toLocaleString()}</p><p className="mt-1 text-xs text-slate-500">{detail}</p></div><span className={`rounded-xl p-2.5 ${tones[tone]}`}>{createElement(icon, { className: 'h-5 w-5' })}</span></div></Card>
+}
+
+function Indicator({ icon, label, value, warning }) {
+  return <div className={`flex items-center gap-4 rounded-2xl p-4 ${warning ? 'bg-accent-50' : 'bg-slate-50'}`}><span className={`rounded-xl p-2 ${warning ? 'bg-white text-accent-700' : 'bg-white text-brand-700'}`}>{createElement(icon, { className: 'h-5 w-5' })}</span><div><p className="text-xl font-black text-slate-950">{value}</p><p className="text-xs font-semibold text-slate-500">{label}</p></div></div>
 }

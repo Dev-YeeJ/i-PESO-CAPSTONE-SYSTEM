@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Outlet, NavLink, useNavigate } from 'react-router-dom'
+import { ChevronLeft, LogOut, Menu, X } from 'lucide-react'
 import { useAuthStore } from '@/stores/authStore'
 
 const navGroups = [
@@ -21,7 +22,7 @@ const navGroups = [
     items: [
       {
         to: '/admin/verification-queue',
-        label: 'Verification Queue',
+        label: 'Employer Verification',
         icon: <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
         badge: 'pending',
       },
@@ -142,6 +143,7 @@ const AdminLayout = () => {
   const logout    = useAuthStore((s) => s.logout)
   const user      = useAuthStore((s) => s.user)
   const [collapsed, setCollapsed] = useState(false)
+  const [mobileOpen, setMobileOpen] = useState(false)
 
   const handleLogout = async () => {
     await logout()
@@ -150,33 +152,27 @@ const AdminLayout = () => {
 
   const initials = user?.name?.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase() ?? 'AD'
 
-  return (
-    <div className="min-h-screen bg-slate-50 flex">
-
-      {/* SIDEBAR */}
-      <aside className={`hidden md:flex flex-col bg-[#1a2234] text-slate-300 transition-all duration-200 ${collapsed ? 'w-16' : 'w-60'}`}>
-
-        {/* Logo */}
-        <div className={`h-16 flex items-center border-b border-slate-700/50 ${collapsed ? 'justify-center px-4' : 'px-5 gap-3'}`}>
-          <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center flex-shrink-0">
-            <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+  const sidebar = (
+    <>
+        <div className={`flex h-[76px] items-center border-b border-white/10 ${collapsed ? 'justify-center px-4' : 'gap-3 px-5'}`}>
+          <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl bg-brand-gold text-brand-navy shadow-sm">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
             </svg>
           </div>
           {!collapsed && (
             <div>
-              <p className="font-bold text-white text-sm leading-none">i-PESO</p>
-              <p className="text-[10px] text-slate-400 mt-0.5">Admin Portal</p>
+              <p className="text-lg font-extrabold leading-none text-white">i-PESO</p>
+              <p className="mt-1 text-xs text-blue-200">PESO Admin Portal</p>
             </div>
           )}
         </div>
 
-        {/* Nav Items */}
-        <nav className="flex-1 p-3 space-y-6 overflow-y-auto">
+        <nav className="flex-1 space-y-5 overflow-y-auto p-3">
           {navGroups.map((group) => (
             <div key={group.name}>
               {!collapsed && (
-                <p className="px-3 py-2 text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">
+                <p className="portal-sidebar-eyebrow mb-2 px-3 py-2">
                   {group.name}
                 </p>
               )}
@@ -187,12 +183,13 @@ const AdminLayout = () => {
                     to={to}
                     end={to === '/admin/dashboard'}
                     title={collapsed ? label : undefined}
+                    onClick={() => setMobileOpen(false)}
                     className={({ isActive }) =>
-                      `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors relative ${
+                      `relative flex min-h-11 items-center rounded-xl px-3 py-2.5 text-sm font-bold transition-colors ${
                         isActive
-                          ? 'bg-blue-600/20 text-blue-400'
-                          : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
-                      } ${collapsed ? 'justify-center' : ''}`
+                          ? 'portal-sidebar-link-active'
+                          : 'portal-sidebar-link'
+                      } ${collapsed ? 'justify-center' : 'gap-3'}`
                     }
                   >
                     <span className="flex-shrink-0">{icon}</span>
@@ -209,44 +206,68 @@ const AdminLayout = () => {
           ))}
         </nav>
 
-        {/* Collapse toggle */}
-        <div className="p-3 border-t border-slate-700/50">
+        <div className="border-t border-white/10 p-3">
+          <div className={`mb-2 flex items-center ${collapsed ? 'justify-center' : 'gap-3 px-2 py-2'}`}>
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-gold text-xs font-black text-brand-navy">{initials}</span>
+            {!collapsed && <div className="min-w-0"><p className="truncate text-sm font-bold text-white">{user?.name}</p><p className="text-xs text-blue-200">Administrator Account</p></div>}
+          </div>
           <button
             onClick={() => setCollapsed(!collapsed)}
-            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-slate-500 hover:bg-slate-800 hover:text-slate-300 transition-colors"
+            className={`portal-sidebar-action hidden md:flex ${collapsed ? 'justify-center' : 'gap-3 px-3'}`}
           >
-            <svg className={`w-5 h-5 flex-shrink-0 transition-transform ${collapsed ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M11.25 9l-3 3m0 0l3 3m-3-3h7.5M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            {!collapsed && <span>Collapse</span>}
+            <ChevronLeft className={`h-5 w-5 transition ${collapsed ? 'rotate-180' : ''}`} />{!collapsed && 'Collapse sidebar'}
+          </button>
+          <button onClick={handleLogout} className={`flex w-full items-center rounded-lg py-2.5 text-sm font-semibold text-red-200 hover:bg-red-500/10 hover:text-red-100 ${collapsed ? 'justify-center' : 'gap-3 px-3'}`}>
+            <LogOut className="h-4 w-4" />{!collapsed && 'Sign out'}
           </button>
         </div>
+    </>
+  )
+
+  return (
+    <div className="portal-shell flex min-h-screen bg-brand-canvas">
+
+      <aside className={`portal-sidebar sticky top-0 hidden h-screen flex-col transition-all duration-200 md:flex ${collapsed ? 'w-20' : 'w-[280px]'}`}>
+        {sidebar}
       </aside>
 
-      {/* MAIN AREA */}
+      {mobileOpen && (
+        <div className="fixed inset-0 z-50 md:hidden">
+          <button className="absolute inset-0 bg-slate-950/50" onClick={() => setMobileOpen(false)} aria-label="Close navigation" />
+          <aside className="portal-sidebar relative flex h-full w-[280px] flex-col shadow-2xl">{sidebar}</aside>
+        </div>
+      )}
+
       <div className="flex-1 flex flex-col min-w-0">
 
         {/* Top Header */}
-        <header className="sticky top-0 z-30 h-16 bg-white border-b border-slate-200 flex items-center justify-between px-6">
-          <div>
-            <p className="text-sm font-semibold text-slate-800">{user?.name || 'Administrator'}</p>
-            <p className="text-xs text-slate-500">System Admin</p>
+        <header className="sticky top-0 z-30 flex h-[76px] items-center justify-between border-b border-slate-200 bg-white px-6">
+          <div className="flex items-center gap-3">
+            <button onClick={() => { setCollapsed(false); setMobileOpen(true) }} className="rounded-lg border border-slate-200 p-2 text-slate-700 md:hidden" aria-label="Open navigation">
+              {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+            </button>
+            <div className="flex items-center gap-2 text-sm font-bold">
+              <span className="text-brand-navy">i-PESO</span>
+              <span className="text-slate-300">/</span>
+              <span className="text-slate-600">PESO Administration</span>
+            </div>
           </div>
 
           <div className="flex items-center gap-3">
+            <span className="hidden items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-extrabold text-emerald-700 sm:inline-flex">
+              <span className="h-2 w-2 rounded-full bg-emerald-500" /> Live System
+            </span>
             <div className="flex items-center gap-2 border-l border-slate-200 pl-3">
-              <div className="w-8 h-8 bg-blue-700 rounded-full flex items-center justify-center text-white text-xs font-bold">
+              <div className="w-9 h-9 bg-brand-800 rounded-full flex items-center justify-center text-white text-xs font-bold">
                 {initials}
               </div>
-              <button onClick={handleLogout} className="text-xs font-medium text-red-600 hover:text-red-700">
-                Sign out
-              </button>
+              <span className="hidden text-xs font-bold text-slate-600 sm:inline">{user?.name}</span>
             </div>
           </div>
         </header>
 
         {/* Page Content */}
-        <main className="flex-1 p-6 overflow-y-auto">
+        <main className="flex-1 overflow-y-auto px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
           <Outlet />
         </main>
       </div>

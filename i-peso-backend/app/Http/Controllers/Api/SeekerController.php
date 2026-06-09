@@ -192,7 +192,6 @@ class SeekerController extends Controller
             ['key' => 'work_experience', 'label' => 'Work experience', 'complete' => $seeker->workExperiences->isNotEmpty()],
             ['key' => 'training', 'label' => 'Training or certificate', 'complete' => $seeker->trainings->isNotEmpty() || $seeker->certificates->isNotEmpty()],
             ['key' => 'resume', 'label' => 'Generated resume', 'complete' => filled($seeker->resume_path)],
-            ['key' => 'verification', 'label' => 'NSRP verification', 'complete' => $seeker->verification_status === 'verified' || $seeker->is_verified],
         ];
 
         $completed = collect($items)->where('complete', true)->count();

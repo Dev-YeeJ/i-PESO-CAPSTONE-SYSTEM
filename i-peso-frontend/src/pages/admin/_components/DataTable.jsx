@@ -9,7 +9,7 @@ export function DataTable({
 }) {
   if (loading) {
     return (
-      <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
         <div className="p-8 text-center">
           <div className="inline-block">
             <div
@@ -25,7 +25,7 @@ export function DataTable({
 
   if (!data || data.length === 0) {
     return (
-      <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
         <div className="p-8 text-center">
           <svg
             className="w-12 h-12 text-slate-400 mx-auto"
@@ -47,15 +47,15 @@ export function DataTable({
   }
 
   return (
-    <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+    <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
       <div className="overflow-x-auto">
         <table className="w-full">
           <thead>
-            <tr className="border-b border-slate-100 bg-slate-50">
+            <tr className="border-b border-slate-200 bg-brand-navy">
               {columns.map((col, idx) => (
                 <th
                   key={idx}
-                  className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide"
+                  className="px-5 py-3.5 text-left text-[11px] font-bold uppercase tracking-[0.12em] text-slate-300"
                 >
                   {col.label}
                 </th>
@@ -67,12 +67,12 @@ export function DataTable({
               <tr
                 key={rowIdx}
                 onClick={() => onRowClick && onRowClick(row)}
-                className={`border-b border-slate-100 hover:bg-slate-50 transition-colors ${
+                className={`border-b border-slate-100 transition-colors last:border-0 hover:bg-brand-50/60 ${
                   onRowClick ? 'cursor-pointer' : ''
                 }`}
               >
                 {columns.map((col, colIdx) => (
-                  <td key={colIdx} className="px-4 py-3 text-sm text-slate-900">
+                  <td key={colIdx} className="px-5 py-4 text-sm text-slate-800">
                     {col.render ? col.render(row[col.key], row) : row[col.key]}
                   </td>
                 ))}
