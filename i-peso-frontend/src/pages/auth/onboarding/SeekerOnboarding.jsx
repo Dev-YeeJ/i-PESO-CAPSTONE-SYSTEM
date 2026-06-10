@@ -7,6 +7,8 @@ import { authService } from '@/services/authService'
 import { useAuthStore } from '@/stores/authStore'
 import OnboardingShell from '@/components/auth/OnboardingShell'
 import { seekerRegistrationSteps } from '@/components/auth/registrationJourneys'
+import OccupationCombobox from '@/components/form/OccupationCombobox'
+import { ISO_COUNTRIES } from '@/data/jobPreferenceVocabularies'
 // ── Add these imports at the top of SeekerOnboarding.jsx ──
 
 import { getProvinces, getCitiesByProvince, getBarangaysByCity } from '@/services/psgcServices'
@@ -66,6 +68,24 @@ const capitalizeName = (str) => {
   if (!str) return ''
   return str.trim().split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()).join(' ')
 }
+
+const format4PsHouseholdId = (value) => {
+  const digits = String(value ?? '').replace(/\D/g, '').slice(0, 14)
+  const groups = [2, 2, 2, 3, 5]
+  const parts = []
+  let offset = 0
+
+  for (const size of groups) {
+    const part = digits.slice(offset, offset + size)
+    if (!part) break
+    parts.push(part)
+    offset += size
+  }
+
+  return parts.join('-')
+}
+
+const isComplete4PsHouseholdId = (value) => /^\d{2}-\d{2}-\d{2}-\d{3}-\d{5}$/.test(value ?? '')
 
 const DISABILITY_OPTIONS = [
   { value: 'visual',   label: 'Visual' },
@@ -616,8 +636,20 @@ const Step2 = ({ form, errors, onChange }) => (
 
     {(form.is_4ps_beneficiary === true || form.is_4ps_beneficiary === 'true') && (
       <FormField label="4Ps Household ID" error={errors.household_id_4ps}>
-        <input style={inputStyle(!!errors.household_id_4ps)} name="household_id_4ps"
-          value={form.household_id_4ps ?? ''} onChange={onChange} placeholder="Household ID number" />
+        <input
+          style={inputStyle(!!errors.household_id_4ps)}
+          name="household_id_4ps"
+          value={form.household_id_4ps ?? ''}
+          onChange={onChange}
+          placeholder="00-00-00-000-00000"
+          inputMode="numeric"
+          autoComplete="off"
+          maxLength={18}
+          aria-describedby="household-id-4ps-hint"
+        />
+        <p id="household-id-4ps-hint" style={{ margin: '6px 0 0', color: '#64748b', fontSize: '11px' }}>
+          Enter the 14-digit household ID. Dashes are added automatically.
+        </p>
       </FormField>
     )}
   </div>
@@ -625,102 +657,174 @@ const Step2 = ({ form, errors, onChange }) => (
 
 // ── STEP 3: Job Preferences ───────────────────────────────────────────────
 
-const Step3 = ({ form, errors, onChange }) => (
-  <div>
-    <SectionHeader
-      icon="🎯"
-      title="III. JOB PREFERENCE"
-      subtitle="Indicate your preferred occupation and work location"
-    />
-
-    {/* Preferred Occupations */}
-    <div style={{ marginBottom: '20px' }}>
-      <p style={{ fontSize: '13px', fontWeight: '700', color: '#374151', marginBottom: '10px' }}>
-        Preferred Occupation <span style={{ color: '#ef4444' }}>*</span>
-        <span style={{ fontSize: '11px', fontWeight: '400', color: '#94a3b8', marginLeft: '6px' }}>(at least 1, up to 3)</span>
-      </p>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-        {[1, 2, 3].map((num) => (
-          <div key={num} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <span style={{ fontSize: '11px', fontWeight: '700', color: '#94a3b8', minWidth: '16px' }}>{num}.</span>
-            <input
-              style={{ ...inputStyle(num === 1 && !!errors.occupation_1), flex: 1 }}
-              name={`occupation_${num}`}
-              value={form[`occupation_${num}`] ?? ''}
-              onChange={onChange}
-              placeholder={num === 1 ? 'e.g., Registered Nurse (required)' : `Optional occupation #${num}`}
-            />
-          </div>
-        ))}
-      </div>
-      {errors.occupation_1 && <p style={{ fontSize: '11px', color: '#ef4444', marginTop: '6px' }}>⚠ {errors.occupation_1}</p>}
-    </div>
-
-    {/* Work Type */}
-    <FormField label="Preferred Type of Work" error={errors.work_type_preference}>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-        {[
-          { value: 'part_time', label: 'Part-time' },
-          { value: 'full_time', label: 'Full-time' },
-        ].map((opt) => {
-          const active = form.work_type_preference === opt.value
-          return (
-            <label key={opt.value} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 14px', borderRadius: '10px', border: `2px solid ${active ? '#1d4ed8' : '#e2e8f0'}`, backgroundColor: active ? '#eff6ff' : '#fafafa', cursor: 'pointer', fontSize: '13px', fontWeight: active ? '700' : '400', color: active ? '#1d4ed8' : '#374151' }}>
-              <input type="radio" name="work_type_preference" value={opt.value}
-                checked={active} onChange={onChange} style={{ accentColor: '#1d4ed8' }} />
-              {opt.label}
-            </label>
-          )
-        })}
-      </div>
-    </FormField>
-
-    {/* Preferred Work Location */}
-    <FormField label="Preferred Work Location" error={errors.preferred_work_location}>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-        {[
-          { value: 'local',    label: '🇵🇭 Local (Philippines)' },
-          { value: 'overseas', label: '✈️ Overseas' },
-        ].map((opt) => {
-          const active = form.preferred_work_location === opt.value
-          return (
-            <label key={opt.value} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 14px', borderRadius: '10px', border: `2px solid ${active ? '#1d4ed8' : '#e2e8f0'}`, backgroundColor: active ? '#eff6ff' : '#fafafa', cursor: 'pointer', fontSize: '13px', fontWeight: active ? '700' : '400', color: active ? '#1d4ed8' : '#374151' }}>
-              <input type="radio" name="preferred_work_location" value={opt.value}
-                checked={active} onChange={onChange} style={{ accentColor: '#1d4ed8' }} />
-              {opt.label}
-            </label>
-          )
-        })}
-      </div>
-    </FormField>
-
-    {/* Location details */}
-    {form.preferred_work_location && (
-      <div style={{ backgroundColor: '#f8fafc', borderRadius: '12px', padding: '14px', marginTop: '4px' }}>
-        <p style={{ fontSize: '12px', fontWeight: '600', color: '#374151', marginBottom: '10px' }}>
-          Specify preferred {form.preferred_work_location === 'local' ? 'cities/municipalities' : 'countries'} (up to 3):
-        </p>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          {[0, 1, 2].map((i) => (
-            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <span style={{ fontSize: '11px', fontWeight: '700', color: '#94a3b8', minWidth: '16px' }}>{i + 1}.</span>
-              <input
-                style={{ ...inputStyle(false), flex: 1 }}
-                value={(form.preferred_locations_details ?? [])[i] ?? ''}
-                onChange={(e) => {
-                  const locs = [...(form.preferred_locations_details ?? ['', '', ''])]
-                  locs[i] = e.target.value
-                  onChange({ target: { name: 'preferred_locations_details', value: locs.filter(Boolean) } })
-                }}
-                placeholder={form.preferred_work_location === 'local' ? 'e.g., Urdaneta City, Pangasinan' : 'e.g., Japan'}
-              />
-            </div>
-          ))}
-        </div>
-      </div>
-    )}
+const PreferenceTags = ({ items, onRemove }) => (
+  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '7px', marginBottom: items.length ? '10px' : 0 }}>
+    {items.map((item) => (
+      <span key={item} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '6px 9px', borderRadius: '999px', backgroundColor: '#dbeafe', color: '#1e40af', fontSize: '11px', fontWeight: '700' }}>
+        {item}
+        <button type="button" onClick={() => onRemove(item)} aria-label={`Remove ${item}`} style={{ border: 0, background: 'transparent', color: '#1d4ed8', cursor: 'pointer', padding: 0, fontWeight: '900' }}>x</button>
+      </span>
+    ))}
   </div>
 )
+
+const SearchableMultiSelect = ({ options, selected, onChange, placeholder, limit = 3, error }) => {
+  const [query, setQuery] = useState('')
+  const search = query.trim().toLowerCase()
+  const matches = search
+    ? options.filter((option) => option.toLowerCase().includes(search) && !selected.includes(option)).slice(0, 8)
+    : []
+
+  const add = (option) => {
+    if (selected.length >= limit || selected.includes(option)) return
+    onChange([...selected, option])
+    setQuery('')
+  }
+
+  return (
+    <div>
+      <PreferenceTags items={selected} onRemove={(item) => onChange(selected.filter((value) => value !== item))} />
+      <div style={{ position: 'relative' }}>
+        <input
+          style={inputStyle(!!error)}
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder={selected.length >= limit ? `Maximum of ${limit} selected` : placeholder}
+          disabled={selected.length >= limit}
+          autoComplete="off"
+        />
+        {matches.length > 0 && (
+          <div style={{ position: 'absolute', zIndex: 20, top: 'calc(100% + 4px)', left: 0, right: 0, maxHeight: '220px', overflowY: 'auto', border: '1px solid #cbd5e1', borderRadius: '10px', backgroundColor: '#fff', boxShadow: '0 12px 28px rgba(15, 23, 42, 0.14)' }}>
+            {matches.map((option) => (
+              <button key={option} type="button" onClick={() => add(option)} style={{ width: '100%', padding: '10px 12px', border: 0, borderBottom: '1px solid #f1f5f9', background: '#fff', color: '#334155', cursor: 'pointer', textAlign: 'left', fontSize: '12px' }}>
+                {option}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+      <p style={{ margin: '6px 0 0', color: '#64748b', fontSize: '11px' }}>{selected.length} of {limit} selected</p>
+    </div>
+  )
+}
+
+const Step3 = ({ form, errors, onChange }) => {
+  const [provinceCode, setProvinceCode] = useState('')
+  const [provinceOptions, setProvinceOptions] = useState([])
+  const [cityOptions, setCityOptions] = useState([])
+  const [cityLoading, setCityLoading] = useState(false)
+
+  useEffect(() => {
+    getProvinces().then(setProvinceOptions).catch(() => setProvinceOptions([]))
+  }, [])
+
+  useEffect(() => {
+    if (!provinceCode) return
+    getCitiesByProvince(provinceCode)
+      .then(setCityOptions)
+      .catch(() => setCityOptions([]))
+      .finally(() => setCityLoading(false))
+  }, [provinceCode])
+
+  const occupations = form.preferred_occupations ?? []
+  const locations = form.preferred_locations_details ?? []
+  const setField = (name, value) => onChange({ target: { name, value } })
+  const selectedProvince = provinceOptions.find((province) => province.code === provinceCode)
+
+  const addLocalLocation = (cityCode) => {
+    const city = cityOptions.find((option) => option.code === cityCode)
+    if (!city || !selectedProvince || locations.length >= 3) return
+    const label = `${city.name}, ${selectedProvince.name}`
+    if (!locations.includes(label)) setField('preferred_locations_details', [...locations, label])
+  }
+
+  return (
+    <div>
+      <SectionHeader icon="🎯" title="III. JOB PREFERENCE" subtitle="Select standardized occupations and work locations" />
+
+      <div style={{ marginBottom: '20px' }}>
+        <p style={{ fontSize: '13px', fontWeight: '700', color: '#374151', marginBottom: '10px' }}>
+          Preferred Occupation <span style={{ color: '#ef4444' }}>*</span>
+          <span style={{ fontSize: '11px', fontWeight: '400', color: '#94a3b8', marginLeft: '6px' }}>(at least 1, up to 3)</span>
+        </p>
+        <OccupationCombobox
+          selected={occupations}
+          onChange={(value) => setField('preferred_occupations', value)}
+          multiple
+          limit={3}
+          placeholder="Search occupation, e.g. Registered Nurse"
+          error={errors.preferred_occupations}
+        />
+        {errors.preferred_occupations && <p style={{ fontSize: '11px', color: '#ef4444', marginTop: '6px' }}>{errors.preferred_occupations}</p>}
+      </div>
+
+      <FormField label="Preferred Type of Work" error={errors.work_type_preference}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+          {[{ value: 'part_time', label: 'Part-time' }, { value: 'full_time', label: 'Full-time' }].map((opt) => {
+            const active = form.work_type_preference === opt.value
+            return (
+              <label key={opt.value} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 14px', borderRadius: '10px', border: `2px solid ${active ? '#1d4ed8' : '#e2e8f0'}`, backgroundColor: active ? '#eff6ff' : '#fafafa', cursor: 'pointer', fontSize: '13px', fontWeight: active ? '700' : '400', color: active ? '#1d4ed8' : '#374151' }}>
+                <input type="radio" name="work_type_preference" value={opt.value} checked={active} onChange={onChange} style={{ accentColor: '#1d4ed8' }} />
+                {opt.label}
+              </label>
+            )
+          })}
+        </div>
+      </FormField>
+
+      <FormField label="Preferred Work Location" error={errors.preferred_work_location}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+          {[{ value: 'local', label: 'Local (Philippines)' }, { value: 'overseas', label: 'Overseas' }].map((opt) => {
+            const active = form.preferred_work_location === opt.value
+            return (
+              <label key={opt.value} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 14px', borderRadius: '10px', border: `2px solid ${active ? '#1d4ed8' : '#e2e8f0'}`, backgroundColor: active ? '#eff6ff' : '#fafafa', cursor: 'pointer', fontSize: '13px', fontWeight: active ? '700' : '400', color: active ? '#1d4ed8' : '#374151' }}>
+                <input type="radio" name="preferred_work_location" value={opt.value} checked={active} onChange={(event) => {
+                  onChange(event)
+                  setField('preferred_locations_details', [])
+                  setProvinceCode('')
+                }} style={{ accentColor: '#1d4ed8' }} />
+                {opt.label}
+              </label>
+            )
+          })}
+        </div>
+      </FormField>
+
+      {form.preferred_work_location && (
+        <div style={{ backgroundColor: '#f8fafc', borderRadius: '12px', padding: '14px', marginTop: '4px' }}>
+          <p style={{ fontSize: '12px', fontWeight: '600', color: '#374151', marginBottom: '10px' }}>
+            Select preferred {form.preferred_work_location === 'local' ? 'cities or municipalities' : 'countries'} (up to 3):
+          </p>
+          <PreferenceTags items={locations} onRemove={(item) => setField('preferred_locations_details', locations.filter((value) => value !== item))} />
+          {form.preferred_work_location === 'local' ? (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+              <select style={selectStyle(false)} value={provinceCode} onChange={(event) => {
+                const code = event.target.value
+                setProvinceCode(code)
+                setCityOptions([])
+                setCityLoading(Boolean(code))
+              }} disabled={locations.length >= 3}>
+                <option value="">Select province</option>
+                {provinceOptions.map((province) => <option key={province.code} value={province.code}>{province.name}</option>)}
+              </select>
+              <select style={selectStyle(false)} value="" onChange={(event) => addLocalLocation(event.target.value)} disabled={!provinceCode || cityLoading || locations.length >= 3}>
+                <option value="">{cityLoading ? 'Loading...' : 'Select city/municipality'}</option>
+                {cityOptions.map((city) => <option key={city.code} value={city.code}>{city.name}</option>)}
+              </select>
+            </div>
+          ) : (
+            <SearchableMultiSelect
+              options={ISO_COUNTRIES.map((country) => country.name)}
+              selected={locations}
+              onChange={(value) => setField('preferred_locations_details', value)}
+              placeholder="Search country, e.g. Japan"
+            />
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
 
 // ── STEP 4: Language Proficiency ──────────────────────────────────────────
 
@@ -1652,9 +1756,7 @@ export default function SeekerOnboarding() {
     is_4ps_beneficiary: false,
     household_id_4ps: '',
     // Step 3
-    occupation_1 : '',
-    occupation_2 : '',
-    occupation_3 : '',
+    preferred_occupations: [],
     work_type_preference: '',
     preferred_work_location: '',
     preferred_locations_details: [],
@@ -1674,6 +1776,10 @@ export default function SeekerOnboarding() {
 
   const handleChange = useCallback((e) => {
     let { name, value } = e.target
+
+    if (name === 'household_id_4ps') {
+      value = format4PsHouseholdId(value)
+    }
     
     // Auto-capitalize name fields
     if ((name === 'first_name' || name === 'last_name' || name === 'middle_name') && typeof value === 'string') {
@@ -1681,7 +1787,7 @@ export default function SeekerOnboarding() {
     }
     
     // Trim text fields
-    if (typeof value === 'string' && (name.includes('_name') || name === 'religion' || name === 'religion_other' || name === 'tin' || name === 'ofw_country' || name === 'former_ofw_country' || name === 'unemployment_terminated_country' || name === 'address_house_street' || name === 'occupation_1' || name === 'occupation_2' || name === 'occupation_3' || name === 'disability_specification' || name === 'self_employed_type_others' || name === 'unemployment_reason_others' || name === 'household_id_4ps' || name === 'lang_other_name')) {
+    if (typeof value === 'string' && (name.includes('_name') || name === 'religion' || name === 'religion_other' || name === 'tin' || name === 'ofw_country' || name === 'former_ofw_country' || name === 'unemployment_terminated_country' || name === 'address_house_street' || name === 'disability_specification' || name === 'self_employed_type_others' || name === 'unemployment_reason_others' || name === 'household_id_4ps' || name === 'lang_other_name')) {
       value = value.trim()
     }
     
@@ -1814,14 +1920,21 @@ export default function SeekerOnboarding() {
       }
       if (form.is_4ps_beneficiary === '' || form.is_4ps_beneficiary === undefined || form.is_4ps_beneficiary === null)
         e.is_4ps_beneficiary = 'Required.'
-      if ((form.is_4ps_beneficiary === true || form.is_4ps_beneficiary === 'true') && !form.household_id_4ps?.trim())
-        e.household_id_4ps = 'Required.'
+      if (form.is_4ps_beneficiary === true || form.is_4ps_beneficiary === 'true') {
+        if (!form.household_id_4ps?.trim()) {
+          e.household_id_4ps = 'Required.'
+        } else if (!isComplete4PsHouseholdId(form.household_id_4ps)) {
+          e.household_id_4ps = 'Enter the complete 14-digit 4Ps Household ID.'
+        }
+      }
     }
 
     if (s === 3) {
-      if (!form.occupation_1?.trim())          e.occupation_1 = 'At least 1 occupation required.'
+      if (!form.preferred_occupations?.length) e.preferred_occupations = 'Select at least one occupation.'
       if (!form.work_type_preference)          e.work_type_preference = 'Required.'
       if (!form.preferred_work_location)       e.preferred_work_location = 'Required.'
+      if (form.preferred_work_location && !form.preferred_locations_details?.length)
+        e.preferred_work_location = 'Select at least one preferred location.'
     }
 
     if (s === 4) {
@@ -1924,7 +2037,7 @@ export default function SeekerOnboarding() {
     work_type_preference       : form.work_type_preference,
     preferred_work_location    : form.preferred_work_location,
     preferred_locations_details: form.preferred_locations_details ?? [],
-    occupations                : [form.occupation_1, form.occupation_2, form.occupation_3].filter(Boolean),
+    occupation_ids             : (form.preferred_occupations ?? []).map((occupation) => occupation.id),
   })
 
   const buildStep4Payload = () => {
@@ -1995,7 +2108,12 @@ export default function SeekerOnboarding() {
       setErrors({})
     } catch (err) {
       if (err.response?.status === 422) {
-        setErrors(err.response.data.errors ?? {})
+        const serverErrors = err.response.data.errors ?? {}
+        if (serverErrors.occupation_ids || serverErrors['occupation_ids.0']) {
+          serverErrors.preferred_occupations = serverErrors.occupation_ids?.[0]
+            ?? serverErrors['occupation_ids.0']?.[0]
+        }
+        setErrors(serverErrors)
       } else {
         setApiError(err.response?.data?.message ?? 'Failed to save. Please try again.')
       }

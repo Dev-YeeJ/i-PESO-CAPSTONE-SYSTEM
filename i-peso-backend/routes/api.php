@@ -13,11 +13,14 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\EmployerJobVacancyController;
 use App\Http\Controllers\Api\EmployerNotificationController;
 use App\Http\Controllers\Api\EmployerRegistrationController;
+use App\Http\Controllers\Api\OccupationController;
 use App\Http\Controllers\Api\SeekerCertificateController;
 use App\Http\Controllers\Api\SeekerController;
 use App\Http\Controllers\Api\SeekerProfileImageController;
 use App\Http\Controllers\Api\SeekerResumeController;
 use Illuminate\Support\Facades\Route;
+
+Route::get('/occupations', [OccupationController::class, 'index'])->middleware('throttle:60,1');
 
 Route::prefix('auth')->group(function () {
     Route::post('/register', [AuthController::class, 'register'])->middleware('throttle:5,1');

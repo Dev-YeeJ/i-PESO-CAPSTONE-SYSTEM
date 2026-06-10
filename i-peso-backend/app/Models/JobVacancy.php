@@ -13,25 +13,58 @@ class JobVacancy extends Model
 
     protected $fillable = [
         'employer_id',
+        'occupation_id',
         'job_title',
         'employment_type',
+        'work_setup',
         'location',
+        'region',
+        'province',
+        'city_municipality',
+        'barangay',
+        'specific_address',
         'job_description',
         'vacancies_count',
+        'minimum_education',
+        'target_courses',
+        'experience_level',
         'salary_min',
         'salary_max',
+        'salary_type',
+        'hide_salary',
+        'benefits',
         'required_skills',
+        'soft_skills',
+        'required_certifications',
+        'application_deadline',
+        'open_to_pwds',
+        'open_to_senior_citizens',
+        'spes_tupad_eligible',
         'status',
     ];
 
     protected $casts = [
         'required_skills' => 'array',
+        'target_courses' => 'array',
+        'soft_skills' => 'array',
+        'required_certifications' => 'array',
+        'benefits' => 'array',
         'salary_min' => 'decimal:2',
         'salary_max' => 'decimal:2',
+        'hide_salary' => 'boolean',
+        'application_deadline' => 'date',
+        'open_to_pwds' => 'boolean',
+        'open_to_senior_citizens' => 'boolean',
+        'spes_tupad_eligible' => 'boolean',
     ];
 
     public function employer(): BelongsTo
     {
         return $this->belongsTo(Employer::class, 'employer_id', 'employer_id');
+    }
+
+    public function occupation(): BelongsTo
+    {
+        return $this->belongsTo(Occupation::class);
     }
 }

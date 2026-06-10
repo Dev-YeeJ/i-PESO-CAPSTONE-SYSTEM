@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Employer;
 use App\Models\JobVacancy;
+use App\Models\Occupation;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -14,6 +15,11 @@ class EmployerJobVacancyController extends Controller
     public function index(Request $request): JsonResponse
     {
         $employer = $this->employer($request);
+        $employer->vacancies()
+            ->where('status', 'active')
+            ->whereDate('application_deadline', '<', today())
+            ->update(['status' => 'closed']);
+
         $vacancies = $employer->vacancies()
             ->latest()
             ->paginate($request->integer('per_page', 15));
@@ -60,18 +66,73 @@ class EmployerJobVacancyController extends Controller
 
     private function validatedData(Request $request): array
     {
-        return $request->validate([
-            'job_title' => ['required', 'string', 'max:255'],
-            'employment_type' => ['required', 'string', 'max:50'],
-            'location' => ['required', 'string', 'max:255'],
+        $data = $request->validate([
+            'occupation_id' => ['required', 'integer', 'exists:occupations,id'],
+            'employment_type' => ['required', Rule::in([
+                'Permanent/Regular',
+                'Contractual',
+                'Project-Based',
+                'Seasonal',
+                'Part-Time',
+                'Freelance',
+            ])],
+            'work_setup' => ['required', Rule::in(['On-Site', 'Remote', 'Hybrid'])],
+            'region' => ['required', 'string', 'max:100'],
+            'province' => ['required', 'string', 'max:100'],
+            'city_municipality' => ['required', 'string', 'max:150'],
+            'barangay' => ['required', 'string', 'max:150'],
+            'specific_address' => ['nullable', 'string', 'max:255'],
             'job_description' => ['required', 'string', 'max:10000'],
             'vacancies_count' => ['required', 'integer', 'min:1', 'max:10000'],
-            'salary_min' => ['nullable', 'numeric', 'min:0'],
-            'salary_max' => ['nullable', 'numeric', 'gte:salary_min'],
-            'required_skills' => ['nullable', 'array'],
+            'minimum_education' => ['required', Rule::in([
+                'High School Graduate',
+                'College Undergraduate',
+                'College Graduate',
+                'TVET/Vocational Graduate',
+                'Post-Graduate',
+            ])],
+            'target_courses' => ['nullable', 'array', 'max:20'],
+            'target_courses.*' => ['string', 'max:150'],
+            'experience_level' => ['required', Rule::in([
+                'No Experience Required',
+                '1-3 Years',
+                '3-5 Years',
+                '5+ Years',
+            ])],
+            'required_skills' => ['required', 'array', 'min:1', 'max:30'],
             'required_skills.*' => ['string', 'max:100'],
+            'soft_skills' => ['nullable', 'array', 'max:20'],
+            'soft_skills.*' => ['string', 'max:100'],
+            'required_certifications' => ['nullable', 'array', 'max:20'],
+            'required_certifications.*' => ['string', 'max:150'],
+            'salary_type' => ['required', Rule::in(['Monthly', 'Daily', 'Hourly'])],
+            'salary_min' => ['required_unless:hide_salary,true', 'nullable', 'numeric', 'min:0'],
+            'salary_max' => ['required_unless:hide_salary,true', 'nullable', 'numeric', 'gte:salary_min'],
+            'hide_salary' => ['required', 'boolean'],
+            'benefits' => ['nullable', 'array', 'max:30'],
+            'benefits.*' => ['string', 'max:100'],
+            'application_deadline' => ['required', 'date', 'after_or_equal:today'],
+            'open_to_pwds' => ['required', 'boolean'],
+            'open_to_senior_citizens' => ['required', 'boolean'],
+            'spes_tupad_eligible' => ['required', 'boolean'],
             'status' => ['required', Rule::in(['active', 'closed', 'draft'])],
         ]);
+
+        $data['job_title'] = Occupation::findOrFail($data['occupation_id'])->title;
+
+        $data['location'] = collect([
+            $data['specific_address'] ?? null,
+            $data['barangay'],
+            $data['city_municipality'],
+            $data['province'],
+        ])->filter()->join(', ');
+
+        if ($data['hide_salary']) {
+            $data['salary_min'] = null;
+            $data['salary_max'] = null;
+        }
+
+        return $data;
     }
 
     private function employer(Request $request): Employer

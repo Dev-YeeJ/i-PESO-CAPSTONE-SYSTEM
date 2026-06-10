@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\JobSeeker;
+use App\Models\Occupation;
 use App\Models\SeekerCertificate;
 use App\Models\SeekerEducation;
 use App\Models\SeekerSkill;
@@ -24,6 +25,47 @@ class SeekerProfileFeaturesTest extends TestCase
         parent::setUp();
 
         $this->createTables();
+    }
+
+    public function test_step_three_rejects_unknown_occupation_ids(): void
+    {
+        $seeker = $this->createSeeker();
+        Sanctum::actingAs($seeker);
+
+        $this->postJson('/api/seeker/step-3', [
+            'work_type_preference' => 'full_time',
+            'preferred_work_location' => 'local',
+            'preferred_locations_details' => ['Urdaneta City, Pangasinan'],
+            'occupation_ids' => [999999],
+        ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('occupation_ids.0');
+    }
+
+    public function test_step_three_saves_controlled_occupations_and_locations(): void
+    {
+        $seeker = $this->createSeeker();
+        $registeredNurse = $this->createOccupation('2221', 'Registered Nurse');
+        $nursingAssistant = $this->createOccupation('5321', 'Nursing Assistant');
+        Sanctum::actingAs($seeker);
+
+        $this->postJson('/api/seeker/step-3', [
+            'work_type_preference' => 'full_time',
+            'preferred_work_location' => 'local',
+            'preferred_locations_details' => ['Urdaneta City, Pangasinan'],
+            'occupation_ids' => [$registeredNurse->id, $nursingAssistant->id],
+        ])->assertOk();
+
+        $this->assertDatabaseHas('seeker_occupations', [
+            'seeker_id' => $seeker->getKey(),
+            'occupation_id' => $registeredNurse->id,
+            'occupation_title' => 'Registered Nurse',
+            'preference_order' => 1,
+        ]);
+        $this->assertDatabaseHas('job_seekers', [
+            'seeker_id' => $seeker->getKey(),
+            'preferred_work_location' => 'local',
+        ]);
     }
 
     public function test_seeker_can_upload_and_view_a_private_certificate(): void
@@ -193,6 +235,17 @@ class SeekerProfileFeaturesTest extends TestCase
         ]);
     }
 
+    private function createOccupation(string $code, string $title): Occupation
+    {
+        return Occupation::create([
+            'psoc_code' => $code,
+            'title' => $title,
+            'version' => '2012',
+            'source' => 'psa',
+            'is_active' => true,
+        ]);
+    }
+
     private function fakePng(string $name): UploadedFile
     {
         return UploadedFile::fake()->createWithContent(
@@ -223,6 +276,20 @@ class SeekerProfileFeaturesTest extends TestCase
 
     private function createTables(): void
     {
+        if (! Schema::hasTable('occupations')) {
+            Schema::create('occupations', function (Blueprint $table) {
+                $table->id();
+                $table->string('psoc_code')->unique();
+                $table->string('title');
+                $table->text('description')->nullable();
+                $table->text('search_terms')->nullable();
+                $table->string('version')->default('2012');
+                $table->string('source')->default('psa');
+                $table->boolean('is_active')->default(true);
+                $table->timestamps();
+            });
+        }
+
         if (! Schema::hasTable('job_seekers')) {
             Schema::create('job_seekers', function (Blueprint $table) {
                 $table->id('seeker_id');
@@ -244,6 +311,7 @@ class SeekerProfileFeaturesTest extends TestCase
                 $table->json('preferred_locations_details')->nullable();
                 $table->boolean('currently_in_school')->default(false);
                 $table->boolean('profile_completed')->default(false);
+                $table->json('form_validation_state')->nullable();
                 $table->string('verification_status')->default('pending');
                 $table->boolean('is_verified')->default(false);
                 $table->string('profile_image')->nullable();
@@ -258,6 +326,7 @@ class SeekerProfileFeaturesTest extends TestCase
             $table->string('disability_specification')->nullable();
         });
         $this->createSimpleRelationTable('seeker_occupations', function (Blueprint $table) {
+            $table->unsignedBigInteger('occupation_id')->nullable();
             $table->string('occupation_title');
             $table->unsignedTinyInteger('preference_order')->default(1);
         });

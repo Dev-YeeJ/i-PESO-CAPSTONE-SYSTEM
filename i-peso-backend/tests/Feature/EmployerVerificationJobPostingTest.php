@@ -5,6 +5,8 @@ namespace Tests\Feature;
 use App\Models\Administrator;
 use App\Models\Employer;
 use App\Models\EmployerDocument;
+use App\Models\JobVacancy;
+use App\Models\Occupation;
 use App\Notifications\EmployerVerificationProgressUpdated;
 use App\Notifications\EmployerVerificationStatusChanged;
 use Illuminate\Database\Schema\Blueprint;
@@ -136,7 +138,34 @@ class EmployerVerificationJobPostingTest extends TestCase
         $this->assertDatabaseHas('job_vacancies', [
             'employer_id' => $employer->employer_id,
             'job_title' => 'Software Developer',
+            'province' => 'Pangasinan',
+            'city_municipality' => 'Urdaneta City',
+            'minimum_education' => 'College Graduate',
+            'salary_type' => 'Monthly',
             'status' => 'active',
+        ]);
+    }
+
+    public function test_expired_active_vacancy_is_closed_when_employer_lists_vacancies(): void
+    {
+        $employer = $this->createEmployer();
+        $employer->update(['verification_status' => 'verified']);
+
+        JobVacancy::create([
+            'employer_id' => $employer->employer_id,
+            'location' => 'Poblacion, Urdaneta City, Pangasinan',
+            ...$this->vacancyPayload(),
+            'application_deadline' => now()->subDay()->toDateString(),
+        ]);
+
+        Sanctum::actingAs($employer->fresh());
+        $this->getJson('/api/employer/vacancies')
+            ->assertOk()
+            ->assertJsonPath('data.0.status', 'closed');
+
+        $this->assertDatabaseHas('job_vacancies', [
+            'employer_id' => $employer->employer_id,
+            'status' => 'closed',
         ]);
     }
 
@@ -404,21 +433,63 @@ class EmployerVerificationJobPostingTest extends TestCase
 
     private function vacancyPayload(): array
     {
+        $occupation = Occupation::firstOrCreate(
+            ['psoc_code' => '2512'],
+            [
+                'title' => 'Software Developer',
+                'version' => '2012',
+                'source' => 'psa',
+                'is_active' => true,
+            ]
+        );
+
         return [
-            'job_title' => 'Software Developer',
-            'employment_type' => 'Full-time',
-            'location' => 'Urdaneta City',
+            'occupation_id' => $occupation->id,
+            'job_title' => $occupation->title,
+            'employment_type' => 'Permanent/Regular',
+            'work_setup' => 'Hybrid',
+            'region' => 'Region I - Ilocos Region',
+            'province' => 'Pangasinan',
+            'city_municipality' => 'Urdaneta City',
+            'barangay' => 'Poblacion',
+            'specific_address' => 'PESO Employment Center',
             'job_description' => 'Build and maintain employment services.',
             'vacancies_count' => 2,
+            'minimum_education' => 'College Graduate',
+            'target_courses' => ['BS Information Technology', 'BS Computer Science'],
+            'experience_level' => '1-3 Years',
             'salary_min' => 20000,
             'salary_max' => 30000,
+            'salary_type' => 'Monthly',
+            'hide_salary' => false,
+            'benefits' => ['HMO', '13th Month Pay'],
             'required_skills' => ['PHP', 'Laravel'],
+            'soft_skills' => ['Communication'],
+            'required_certifications' => [],
+            'application_deadline' => now()->addMonth()->toDateString(),
+            'open_to_pwds' => true,
+            'open_to_senior_citizens' => false,
+            'spes_tupad_eligible' => false,
             'status' => 'active',
         ];
     }
 
     private function createTables(): void
     {
+        if (! Schema::hasTable('occupations')) {
+            Schema::create('occupations', function (Blueprint $table) {
+                $table->id();
+                $table->string('psoc_code')->unique();
+                $table->string('title');
+                $table->text('description')->nullable();
+                $table->text('search_terms')->nullable();
+                $table->string('version')->default('2012');
+                $table->string('source')->default('psa');
+                $table->boolean('is_active')->default(true);
+                $table->timestamps();
+            });
+        }
+
         if (! Schema::hasTable('administrators')) {
             Schema::create('administrators', function (Blueprint $table) {
                 $table->id('admin_id');
@@ -478,14 +549,33 @@ class EmployerVerificationJobPostingTest extends TestCase
             Schema::create('job_vacancies', function (Blueprint $table) {
                 $table->id('post_id');
                 $table->unsignedBigInteger('employer_id');
+                $table->unsignedBigInteger('occupation_id')->nullable();
                 $table->string('job_title');
                 $table->string('employment_type');
+                $table->string('work_setup')->nullable();
                 $table->string('location');
+                $table->string('region')->nullable();
+                $table->string('province')->nullable();
+                $table->string('city_municipality')->nullable();
+                $table->string('barangay')->nullable();
+                $table->string('specific_address')->nullable();
                 $table->text('job_description');
                 $table->unsignedInteger('vacancies_count')->default(1);
+                $table->string('minimum_education')->nullable();
+                $table->json('target_courses')->nullable();
+                $table->string('experience_level')->nullable();
                 $table->decimal('salary_min', 10, 2)->nullable();
                 $table->decimal('salary_max', 10, 2)->nullable();
+                $table->string('salary_type')->nullable();
+                $table->boolean('hide_salary')->default(false);
+                $table->json('benefits')->nullable();
                 $table->json('required_skills')->nullable();
+                $table->json('soft_skills')->nullable();
+                $table->json('required_certifications')->nullable();
+                $table->date('application_deadline')->nullable();
+                $table->boolean('open_to_pwds')->default(false);
+                $table->boolean('open_to_senior_citizens')->default(false);
+                $table->boolean('spes_tupad_eligible')->default(false);
                 $table->string('status')->default('active');
                 $table->timestamps();
             });

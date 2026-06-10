@@ -61,7 +61,6 @@ export default function SeekerRegistration() {
         role: 'seeker',
         first_name: form.first_name,
         last_name: form.last_name,
-        educ_attainment: form.educ_attainment,
         email: form.email,
         mobile_number: form.mobile_number,
         password: form.password,

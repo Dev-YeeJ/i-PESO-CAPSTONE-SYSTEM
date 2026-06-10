@@ -24,5 +24,6 @@ class DatabaseSeeder extends Seeder
 
         // Seed admin user
         $this->call(AdminSeeder::class);
+        $this->call(OccupationSeeder::class);
     }
 }

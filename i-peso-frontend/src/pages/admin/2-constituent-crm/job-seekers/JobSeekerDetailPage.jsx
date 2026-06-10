@@ -1,326 +1,500 @@
-// i-peso-frontend/src/pages/admin/seekers/SeekerDetailPage.jsx
-
-import { useEffect, useState } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
-import PageHeader from '@/pages/admin/_components/PageHeader'
+import { createElement, useCallback, useEffect, useMemo, useState } from 'react'
+import { useNavigate, useParams } from 'react-router-dom'
+import {
+  ArrowLeft,
+  Award,
+  BookOpen,
+  BriefcaseBusiness,
+  CalendarDays,
+  CheckCircle2,
+  Clock3,
+  FileText,
+  GraduationCap,
+  Languages,
+  Mail,
+  MapPin,
+  Phone,
+  RefreshCw,
+  ShieldCheck,
+  Sparkles,
+  UserRound,
+} from 'lucide-react'
+import { Badge, Button, Card, CardHeader } from '@/components/ui'
 import { DownloadNSRPButton } from '@/pages/admin/_components'
 import { adminService } from '@/services/adminService'
 
-export default function SeekerDetailPage() {
+const formatValue = (value, fallback = 'Not provided') => {
+  if (value === null || value === undefined || value === '') return fallback
+  return String(value).replaceAll('_', ' ')
+}
+
+const formatDate = (value) => {
+  if (!value) return 'Not provided'
+  const date = new Date(value)
+  return Number.isNaN(date.getTime())
+    ? value
+    : date.toLocaleDateString('en-PH', { year: 'numeric', month: 'short', day: 'numeric' })
+}
+
+const fullName = (seeker) => [
+  seeker.first_name,
+  seeker.middle_name,
+  seeker.last_name,
+  seeker.suffix,
+].filter(Boolean).join(' ')
+
+export default function JobSeekerDetailPage() {
   const { id } = useParams()
   const navigate = useNavigate()
   const [seeker, setSeeker] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
-  useEffect(() => {
-    const fetchSeeker = async () => {
-      try {
-        setLoading(true)
-        const data = await adminService.getSeekerDetail(id)
-        setSeeker(data)
-        setError(null)
-      } catch (err) {
-        setError(err?.response?.data?.message || 'Failed to load seeker')
-        console.error('Detail error:', err)
-      } finally {
-        setLoading(false)
-      }
-    }
+  const [error, setError] = useState('')
 
-    fetchSeeker()
+  const loadSeeker = useCallback(async () => {
+    try {
+      setLoading(true)
+      setError('')
+      setSeeker(await adminService.getSeekerDetail(id))
+    } catch (requestError) {
+      setError(requestError?.response?.data?.message || 'Unable to load the job seeker profile.')
+    } finally {
+      setLoading(false)
+    }
   }, [id])
+
+  useEffect(() => {
+    loadSeeker()
+  }, [loadSeeker])
+
+  const profileScore = useMemo(() => {
+    if (!seeker) return 0
+
+    const checks = [
+      seeker.mobile_number && seeker.email,
+      seeker.date_of_birth && seeker.sex,
+      seeker.address_municipality_city && seeker.address_province,
+      seeker.employment_status,
+      seeker.occupations?.length,
+      seeker.educ_attainment || seeker.educations?.length,
+      seeker.seeker_skills?.length || seeker.other_skills?.length,
+      seeker.profile_completed,
+    ]
+
+    return Math.round((checks.filter(Boolean).length / checks.length) * 100)
+  }, [seeker])
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-96">
+      <div className="flex min-h-[420px] items-center justify-center">
         <div className="text-center">
-          <div className="w-12 h-12 border-4 border-slate-200 border-t-blue-600 rounded-full animate-spin mx-auto" />
-          <p className="mt-4 text-slate-600">Loading seeker profile...</p>
+          <div className="mx-auto h-11 w-11 animate-spin rounded-full border-4 border-slate-200 border-t-brand-navy" />
+          <p className="mt-4 text-sm font-medium text-slate-500">Loading NSRP case profile...</p>
         </div>
       </div>
     )
   }
 
-  if (error && !seeker) {
+  if (!seeker) {
     return (
-      <div className="bg-red-50 border border-red-200 rounded-2xl p-6">
-        <h3 className="font-semibold text-red-900">Error</h3>
-        <p className="text-red-700 text-sm mt-1">{error}</p>
-      </div>
+      <Card className="mx-auto max-w-xl">
+        <div className="text-center">
+          <p className="font-bold text-red-700">{error || 'Job seeker not found.'}</p>
+          <Button className="mt-4" variant="outline" icon={ArrowLeft} onClick={() => navigate('/admin/job-seekers')}>
+            Back to job seekers
+          </Button>
+        </div>
+      </Card>
     )
   }
 
-  if (!seeker) return null
+  const name = fullName(seeker)
+  const location = [
+    seeker.address_barangay,
+    seeker.address_municipality_city,
+    seeker.address_province,
+  ].filter(Boolean).join(', ')
+  const skills = seeker.seeker_skills ?? []
+  const occupations = seeker.occupations ?? []
+  const workLocations = seeker.work_locations ?? []
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <PageHeader
-          title={`${seeker.first_name} ${seeker.last_name}`}
-          subtitle="NSRP Profile Information"
-        />
-        <div className="flex items-center gap-3">
-          <DownloadNSRPButton 
-            seekerId={seeker.seeker_id} 
-            seekerName={`${seeker.first_name}_${seeker.last_name}`}
-          />
-          <button
-            onClick={() => navigate('/admin/job-seekers')}
-            className="text-slate-600 hover:text-slate-900 font-medium text-sm"
-          >
-            ← Back
-          </button>
-        </div>
+      <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+        <Button variant="ghost" icon={ArrowLeft} onClick={() => navigate('/admin/job-seekers')}>
+          Job Seeker Management
+        </Button>
+        <DownloadNSRPButton seekerId={seeker.seeker_id} seekerName={name} />
       </div>
 
       {error && (
-        <div className="bg-red-50 border border-red-200 rounded-2xl p-4">
-          <p className="text-red-700 text-sm">{error}</p>
+        <div className="flex items-center justify-between rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+          <span>{error}</span>
+          <button type="button" onClick={loadSeeker} className="inline-flex items-center gap-1 font-bold">
+            <RefreshCw className="h-4 w-4" /> Retry
+          </button>
         </div>
       )}
 
-      {/* Profile Sections */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Personal Information */}
-        <div className="bg-white border border-slate-200 rounded-2xl p-6">
-          <h3 className="font-bold text-slate-900 mb-4">Personal Information</h3>
-          <div className="space-y-3 text-sm">
-            <div>
-              <p className="text-slate-600">Name</p>
-              <p className="font-semibold text-slate-900">{seeker.first_name} {seeker.last_name}</p>
+      <Card
+        hero
+        padding="none"
+        heroContent={(
+          <div className="flex flex-col gap-6 lg:flex-row lg:items-center">
+            <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-2xl border border-white/20 bg-white/10 text-2xl font-black text-amber-300">
+              {seeker.first_name?.[0]}{seeker.last_name?.[0]}
             </div>
-            <div>
-              <p className="text-slate-600">Email</p>
-              <p className="font-semibold text-slate-900">{seeker.email}</p>
-            </div>
-            <div>
-              <p className="text-slate-600">Mobile</p>
-              <p className="font-semibold text-slate-900">{seeker.mobile_number || 'N/A'}</p>
-            </div>
-            <div>
-              <p className="text-slate-600">Date of Birth</p>
-              <p className="font-semibold text-slate-900">{seeker.date_of_birth || 'N/A'}</p>
-            </div>
-            <div>
-              <p className="text-slate-600">Sex</p>
-              <p className="font-semibold text-slate-900">{seeker.sex ? seeker.sex.toUpperCase() : 'N/A'}</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Address Information */}
-        <div className="bg-white border border-slate-200 rounded-2xl p-6">
-          <h3 className="font-bold text-slate-900 mb-4">Address</h3>
-          <div className="space-y-3 text-sm">
-            <div>
-              <p className="text-slate-600">Province</p>
-              <p className="font-semibold text-slate-900">{seeker.address_province || 'N/A'}</p>
-            </div>
-            <div>
-              <p className="text-slate-600">Municipality/City</p>
-              <p className="font-semibold text-slate-900">{seeker.address_municipality_city || 'N/A'}</p>
-            </div>
-            <div>
-              <p className="text-slate-600">Barangay</p>
-              <p className="font-semibold text-slate-900">{seeker.address_barangay || 'N/A'}</p>
-            </div>
-            <div>
-              <p className="text-slate-600">Street Address</p>
-              <p className="font-semibold text-slate-900">{seeker.address_street || 'N/A'}</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Education */}
-        <div className="bg-white border border-slate-200 rounded-2xl p-6">
-          <h3 className="font-bold text-slate-900 mb-4">Education</h3>
-          <div className="space-y-3 text-sm">
-            <div>
-              <p className="text-slate-600">Attainment</p>
-              <p className="font-semibold text-slate-900">{seeker.educ_attainment || 'N/A'}</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Employment Status */}
-        <div className="bg-white border border-slate-200 rounded-2xl p-6">
-          <h3 className="font-bold text-slate-900 mb-4">Employment Status</h3>
-          <div className="space-y-3 text-sm">
-            <div>
-              <p className="text-slate-600">Status</p>
-              <p className="font-semibold text-slate-900">{seeker.employment_status ? seeker.employment_status.toUpperCase() : 'N/A'}</p>
-            </div>
-            <div>
-              <p className="text-slate-600">Type</p>
-              <p className="font-semibold text-slate-900">{seeker.employment_type || 'N/A'}</p>
-            </div>
-            <div>
-              <p className="text-slate-600">Former OFW</p>
-              <p className="font-semibold text-slate-900">{seeker.is_former_ofw ? 'Yes' : 'No'}</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Special Status */}
-        <div className="bg-white border border-slate-200 rounded-2xl p-6">
-          <h3 className="font-bold text-slate-900 mb-4">Special Status</h3>
-          <div className="space-y-3 text-sm">
-            <div>
-              <p className="text-slate-600">4Ps Beneficiary</p>
-              <p className="font-semibold text-slate-900">{seeker.is_4ps_beneficiary ? 'Yes' : 'No'}</p>
-            </div>
-            <div>
-              <p className="text-slate-600">Person with Disability</p>
-              <p className="font-semibold text-slate-900">
-                {seeker.disabilities && seeker.disabilities.length > 0 ? 'Yes' : 'No'}
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="text-xs font-bold uppercase tracking-[0.18em] text-blue-200">DOLE NSRP Case Profile</p>
+                <Badge status={seeker.profile_completed ? 'verified' : 'pending'}>
+                  {seeker.profile_completed ? 'NSRP Complete' : 'Needs Completion'}
+                </Badge>
+              </div>
+              <h1 className="mt-2 text-2xl font-black sm:text-3xl">{name}</h1>
+              <p className="mt-2 text-sm text-blue-100">
+                Job Seeker ID #{seeker.seeker_id} · Registered {formatDate(seeker.created_at)}
               </p>
             </div>
+            <div className="w-full rounded-2xl border border-white/15 bg-white/10 p-4 lg:w-56">
+              <div className="flex items-end justify-between">
+                <span className="text-xs font-bold uppercase tracking-wide text-blue-200">Profile readiness</span>
+                <strong className="text-2xl text-white">{profileScore}%</strong>
+              </div>
+              <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/15">
+                <div className="h-full rounded-full bg-amber-400" style={{ width: `${profileScore}%` }} />
+              </div>
+              <p className="mt-2 text-xs text-blue-100">For PESO referral and matching services</p>
+            </div>
           </div>
+        )}
+      >
+        <div className="grid divide-y divide-slate-100 sm:grid-cols-2 sm:divide-x sm:divide-y-0 lg:grid-cols-4">
+          <HeroFact icon={Mail} label="Email" value={seeker.email} />
+          <HeroFact icon={Phone} label="Mobile" value={seeker.mobile_number} />
+          <HeroFact icon={MapPin} label="Location" value={location} />
+          <HeroFact icon={BriefcaseBusiness} label="Employment" value={seeker.employment_status} />
         </div>
+      </Card>
 
-        {/* Job Preferences */}
-        <div className="bg-white border border-slate-200 rounded-2xl p-6 lg:col-span-2">
-          <h3 className="font-bold text-slate-900 mb-4">Job Preferences</h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-            <div>
-              <p className="text-slate-600">Preferred Occupation</p>
-              <p className="font-semibold text-slate-900">{seeker.preferred_occupation || 'N/A'}</p>
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.7fr)_minmax(300px,0.8fr)]">
+        <main className="space-y-6">
+          <Card>
+            <CardHeader title="Personal and Contact Information" subtitle="Core information submitted in the NSRP registration." />
+            <div className="grid gap-x-8 gap-y-5 sm:grid-cols-2 lg:grid-cols-3">
+              <InfoItem label="Complete name" value={name} />
+              <InfoItem label="Date of birth" value={formatDate(seeker.date_of_birth)} />
+              <InfoItem label="Sex" value={seeker.sex} />
+              <InfoItem label="Civil status" value={seeker.civil_status} />
+              <InfoItem label="Email address" value={seeker.email} />
+              <InfoItem label="Mobile number" value={seeker.mobile_number} />
+              <InfoItem label="House / Street" value={seeker.address_house_street} />
+              <InfoItem label="Barangay" value={seeker.address_barangay} />
+              <InfoItem label="City / Municipality" value={seeker.address_municipality_city} />
+              <InfoItem label="Province" value={seeker.address_province} />
             </div>
-            <div>
-              <p className="text-slate-600">Employment Type Preference</p>
-              <p className="font-semibold text-slate-900">{seeker.employment_type_preference || 'N/A'}</p>
+          </Card>
+
+          <Card>
+            <CardHeader title="Employment Profile" subtitle="Information PESO staff can use for counseling, matching, and referrals." />
+            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+              <InfoItem label="Current employment status" value={seeker.employment_status} />
+              <InfoItem label="Employment type" value={seeker.employment_type} />
+              <InfoItem label="Work type preference" value={seeker.work_type_preference} />
+              <InfoItem label="Preferred work location" value={seeker.preferred_work_location} />
+              <InfoItem label="Educational attainment" value={seeker.educ_attainment} />
+              <InfoItem label="Unemployment duration" value={seeker.unemployment_months ? `${seeker.unemployment_months} months` : null} />
             </div>
-            <div>
-              <p className="text-slate-600">Preferred Work Location</p>
-              <p className="font-semibold text-slate-900">{seeker.preferred_work_location || 'N/A'}</p>
+
+            <SectionDivider />
+            <TagSection
+              title="Preferred occupations"
+              empty="No occupation preferences recorded."
+              items={occupations.map((item) => item.occupation_title)}
+              tone="navy"
+            />
+            <div className="mt-5">
+              <TagSection
+                title="Preferred locations"
+                empty="No detailed work locations recorded."
+                items={workLocations.map((item) => item.location_name)}
+                tone="blue"
+              />
+            </div>
+            <div className="mt-5">
+              <TagSection
+                title="Skills"
+                empty="No structured skills recorded."
+                items={[
+                  ...skills.map((item) => item.skill_name),
+                  ...(Array.isArray(seeker.other_skills) ? seeker.other_skills : []),
+                ]}
+                tone="amber"
+              />
+            </div>
+          </Card>
+
+          <RecordSection
+            icon={GraduationCap}
+            title="Education History"
+            subtitle="Formal education records included in the NSRP profile."
+            records={seeker.educations}
+            empty="No education history recorded."
+            render={(education) => (
+              <TimelineRecord
+                key={education.id}
+                title={formatValue(education.level)}
+                subtitle={formatValue(education.course_strand, 'Course or strand not specified')}
+                meta={education.year_graduated ? `Graduated ${education.year_graduated}` : 'Year not specified'}
+              />
+            )}
+          />
+
+          <RecordSection
+            icon={BriefcaseBusiness}
+            title="Work Experience"
+            subtitle="Previous employment that may support job referrals."
+            records={seeker.work_experiences}
+            empty="No work experience recorded."
+            render={(experience) => (
+              <TimelineRecord
+                key={experience.id}
+                title={formatValue(experience.position)}
+                subtitle={formatValue(experience.company_name)}
+                meta={[
+                  experience.number_of_months ? `${experience.number_of_months} months` : null,
+                  experience.employment_status ? formatValue(experience.employment_status) : null,
+                ].filter(Boolean).join(' · ') || 'Employment details not specified'}
+              />
+            )}
+          />
+
+          <div className="grid gap-6 lg:grid-cols-2">
+            <RecordSection
+              icon={BookOpen}
+              title="Trainings"
+              records={seeker.trainings}
+              empty="No training records."
+              render={(training) => (
+                <TimelineRecord
+                  key={training.id}
+                  title={formatValue(training.course)}
+                  subtitle={formatValue(training.training_institution, 'Institution not specified')}
+                  meta={training.hours_of_training ? `${training.hours_of_training} training hours` : 'Hours not specified'}
+                />
+              )}
+            />
+            <RecordSection
+              icon={Award}
+              title="Licenses and Eligibilities"
+              records={seeker.eligibilities}
+              empty="No eligibility records."
+              render={(eligibility) => (
+                <TimelineRecord
+                  key={eligibility.id}
+                  title={formatValue(eligibility.name)}
+                  subtitle={formatValue(eligibility.type)}
+                  meta={eligibility.date_taken ? `Taken ${formatDate(eligibility.date_taken)}` : 'Date not specified'}
+                />
+              )}
+            />
+          </div>
+        </main>
+
+        <aside className="space-y-6">
+          <Card>
+            <CardHeader title="PESO Service Summary" subtitle="Quick indicators for staff assessment." />
+            <div className="space-y-3">
+              <StatusRow
+                icon={seeker.profile_completed ? CheckCircle2 : Clock3}
+                label="NSRP registration"
+                value={seeker.profile_completed ? 'Complete' : 'Needs completion'}
+                complete={seeker.profile_completed}
+              />
+              <StatusRow icon={Sparkles} label="Skills recorded" value={`${skills.length} skill${skills.length === 1 ? '' : 's'}`} complete={skills.length > 0} />
+              <StatusRow icon={BriefcaseBusiness} label="Work experience" value={`${seeker.work_experiences?.length ?? 0} record(s)`} complete={seeker.work_experiences?.length > 0} />
+              <StatusRow icon={GraduationCap} label="Education history" value={`${seeker.educations?.length ?? 0} record(s)`} complete={seeker.educations?.length > 0} />
+            </div>
+          </Card>
+
+          <Card>
+            <CardHeader title="Program and Accommodation Notes" subtitle="Use only when relevant to PESO assistance." />
+            <div className="space-y-4">
+              <InfoItem label="4Ps beneficiary" value={seeker.is_4ps_beneficiary ? 'Yes' : 'No'} />
+              <InfoItem label="OFW status" value={seeker.is_ofw ? `Current OFW${seeker.ofw_country ? ` - ${seeker.ofw_country}` : ''}` : 'Not indicated'} />
+              <InfoItem label="Former OFW" value={seeker.is_former_ofw ? `Yes${seeker.former_ofw_country ? ` - ${seeker.former_ofw_country}` : ''}` : 'No'} />
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Disability / accommodation</p>
+                {seeker.disabilities?.length ? (
+                  <div className="mt-2 space-y-2">
+                    {seeker.disabilities.map((item) => (
+                      <p key={item.id} className="rounded-xl bg-slate-50 p-3 text-sm text-slate-700">
+                        {formatValue(item.disability_type)}
+                        {item.disability_specification ? `: ${item.disability_specification}` : ''}
+                      </p>
+                    ))}
+                  </div>
+                ) : <p className="mt-1 text-sm font-semibold text-slate-700">None indicated</p>}
+              </div>
+            </div>
+          </Card>
+
+          <Card>
+            <CardHeader title="Languages" />
+            {seeker.languages?.length ? (
+              <div className="space-y-3">
+                {seeker.languages.map((language) => {
+                  const capabilities = [
+                    language.can_read && 'Read',
+                    language.can_write && 'Write',
+                    language.can_speak && 'Speak',
+                    language.can_understand && 'Understand',
+                  ].filter(Boolean)
+
+                  return (
+                    <div key={language.id} className="rounded-xl border border-slate-200 p-3">
+                      <div className="flex items-center gap-2 font-bold text-slate-900">
+                        <Languages className="h-4 w-4 text-blue-700" />
+                        {language.language_other || formatValue(language.language)}
+                      </div>
+                      <p className="mt-1 text-xs text-slate-500">{capabilities.join(', ') || 'Proficiency not specified'}</p>
+                    </div>
+                  )
+                })}
+              </div>
+            ) : <EmptyText>No language records.</EmptyText>}
+          </Card>
+
+          <Card>
+            <CardHeader title="Certificate Vault" subtitle="Metadata for files submitted by the job seeker." />
+            {seeker.certificates?.length ? (
+              <div className="space-y-3">
+                {seeker.certificates.map((certificate) => (
+                  <div key={certificate.certificate_id} className="rounded-xl border border-slate-200 p-3">
+                    <div className="flex items-start gap-3">
+                      <span className="rounded-lg bg-amber-50 p-2 text-amber-700"><FileText className="h-4 w-4" /></span>
+                      <div className="min-w-0">
+                        <p className="font-bold text-slate-900">{certificate.title}</p>
+                        <p className="text-xs text-slate-500">{certificate.issuing_body || 'Issuing body not specified'}</p>
+                        <p className="mt-1 truncate text-xs text-slate-400">{certificate.original_filename}</p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : <EmptyText>No certificate files uploaded.</EmptyText>}
+          </Card>
+
+          <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm leading-6 text-blue-800">
+            <div className="flex gap-3">
+              <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0" />
+              <p><strong>Read-only case record.</strong> Job seekers are not approved or rejected here. PESO staff use this page for employment assistance, referrals, and NSRP reporting.</p>
             </div>
           </div>
-        </div>
-
-        {/* STEP 5: Education & Other Skills */}
-        {seeker.educations && seeker.educations.length > 0 && (
-          <div className="bg-white border border-slate-200 rounded-2xl p-6 lg:col-span-2">
-            <h3 className="font-bold text-slate-900 mb-4">Education Levels</h3>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-slate-200">
-                    <th className="text-left py-2 px-3 font-semibold text-slate-900">Level</th>
-                    <th className="text-left py-2 px-3 font-semibold text-slate-900">Course/Strand</th>
-                    <th className="text-left py-2 px-3 font-semibold text-slate-900">Year Graduated</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {seeker.educations.map((edu, idx) => (
-                    <tr key={idx} className="border-b border-slate-100 hover:bg-slate-50">
-                      <td className="py-2 px-3 text-slate-700">{edu.level || 'N/A'}</td>
-                      <td className="py-2 px-3 text-slate-700">{edu.course_strand || '—'}</td>
-                      <td className="py-2 px-3 text-slate-700">{edu.year_graduated || '—'}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
-        {seeker.other_skills && seeker.other_skills.length > 0 && (
-          <div className="bg-white border border-slate-200 rounded-2xl p-6 lg:col-span-2">
-            <h3 className="font-bold text-slate-900 mb-4">Other Skills (Without Certificate)</h3>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-sm">
-              {seeker.other_skills.map((skill, idx) => (
-                <span key={idx} className="inline-block px-3 py-1 bg-blue-50 text-blue-700 rounded-lg border border-blue-200">
-                  {skill}
-                </span>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* STEP 6: Trainings */}
-        {seeker.trainings && seeker.trainings.length > 0 && (
-          <div className="bg-white border border-slate-200 rounded-2xl p-6 lg:col-span-2">
-            <h3 className="font-bold text-slate-900 mb-4">Training Records</h3>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-slate-200">
-                    <th className="text-left py-2 px-3 font-semibold text-slate-900">Course</th>
-                    <th className="text-left py-2 px-3 font-semibold text-slate-900">Hours</th>
-                    <th className="text-left py-2 px-3 font-semibold text-slate-900">Institution</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {seeker.trainings.map((train, idx) => (
-                    <tr key={idx} className="border-b border-slate-100 hover:bg-slate-50">
-                      <td className="py-2 px-3 text-slate-700">{train.course || 'N/A'}</td>
-                      <td className="py-2 px-3 text-slate-700">{train.hours_of_training || '—'}</td>
-                      <td className="py-2 px-3 text-slate-700">{train.training_institution || '—'}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
-        {/* STEP 6: Eligibilities */}
-        {seeker.eligibilities && seeker.eligibilities.length > 0 && (
-          <div className="bg-white border border-slate-200 rounded-2xl p-6 lg:col-span-2">
-            <h3 className="font-bold text-slate-900 mb-4">Professional Licenses & Eligibilities</h3>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-slate-200">
-                    <th className="text-left py-2 px-3 font-semibold text-slate-900">Type</th>
-                    <th className="text-left py-2 px-3 font-semibold text-slate-900">Name</th>
-                    <th className="text-left py-2 px-3 font-semibold text-slate-900">Date Taken</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {seeker.eligibilities.map((elig, idx) => (
-                    <tr key={idx} className="border-b border-slate-100 hover:bg-slate-50">
-                      <td className="py-2 px-3 text-slate-700">{elig.type || 'N/A'}</td>
-                      <td className="py-2 px-3 text-slate-700">{elig.name || 'N/A'}</td>
-                      <td className="py-2 px-3 text-slate-700">{elig.date_taken || '—'}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
-        {/* STEP 7: Work Experience */}
-        {seeker.work_experiences && seeker.work_experiences.length > 0 && (
-          <div className="bg-white border border-slate-200 rounded-2xl p-6 lg:col-span-2">
-            <h3 className="font-bold text-slate-900 mb-4">Work Experience</h3>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-slate-200">
-                    <th className="text-left py-2 px-3 font-semibold text-slate-900">Company</th>
-                    <th className="text-left py-2 px-3 font-semibold text-slate-900">Position</th>
-                    <th className="text-left py-2 px-3 font-semibold text-slate-900">Months</th>
-                    <th className="text-left py-2 px-3 font-semibold text-slate-900">Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {seeker.work_experiences.map((exp, idx) => (
-                    <tr key={idx} className="border-b border-slate-100 hover:bg-slate-50">
-                      <td className="py-2 px-3 text-slate-700">{exp.company_name || 'N/A'}</td>
-                      <td className="py-2 px-3 text-slate-700">{exp.position || 'N/A'}</td>
-                      <td className="py-2 px-3 text-slate-700">{exp.number_of_months || '—'}</td>
-                      <td className="py-2 px-3 text-slate-700">{exp.employment_status || '—'}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
+        </aside>
       </div>
+    </div>
+  )
+}
 
+function HeroFact({ icon, label, value }) {
+  return (
+    <div className="flex min-w-0 items-center gap-3 p-4">
+      <span className="rounded-xl bg-slate-100 p-2 text-brand-navy">
+        {createElement(icon, { className: 'h-4 w-4' })}
+      </span>
+      <div className="min-w-0">
+        <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400">{label}</p>
+        <p className="truncate text-sm font-bold capitalize text-slate-800">{formatValue(value)}</p>
+      </div>
+    </div>
+  )
+}
+
+function InfoItem({ label, value }) {
+  return (
+    <div>
+      <p className="text-xs font-bold uppercase tracking-wide text-slate-400">{label}</p>
+      <p className="mt-1 text-sm font-semibold capitalize text-slate-800">{formatValue(value)}</p>
+    </div>
+  )
+}
+
+function SectionDivider() {
+  return <div className="my-6 border-t border-slate-100" />
+}
+
+function TagSection({ title, items, empty, tone }) {
+  const colors = {
+    navy: 'border-slate-300 bg-slate-100 text-brand-navy',
+    blue: 'border-blue-200 bg-blue-50 text-blue-700',
+    amber: 'border-amber-200 bg-amber-50 text-amber-800',
+  }
+  const uniqueItems = [...new Set(items.filter(Boolean))]
+
+  return (
+    <div>
+      <p className="text-xs font-bold uppercase tracking-wide text-slate-400">{title}</p>
+      {uniqueItems.length ? (
+        <div className="mt-2 flex flex-wrap gap-2">
+          {uniqueItems.map((item) => (
+            <span key={item} className={`rounded-full border px-3 py-1.5 text-xs font-bold ${colors[tone]}`}>
+              {formatValue(item)}
+            </span>
+          ))}
+        </div>
+      ) : <p className="mt-2 text-sm text-slate-500">{empty}</p>}
+    </div>
+  )
+}
+
+function RecordSection({ icon, title, subtitle, records = [], empty, render }) {
+  return (
+    <Card>
+      <CardHeader
+        title={title}
+        subtitle={subtitle}
+        action={(
+          <span className="rounded-xl bg-slate-100 p-2 text-brand-navy">
+            {createElement(icon, { className: 'h-5 w-5' })}
+          </span>
+        )}
+      />
+      {records?.length ? <div className="divide-y divide-slate-100">{records.map(render)}</div> : <EmptyText>{empty}</EmptyText>}
+    </Card>
+  )
+}
+
+function TimelineRecord({ title, subtitle, meta }) {
+  return (
+    <div className="py-4 first:pt-0 last:pb-0">
+      <p className="font-bold capitalize text-slate-900">{title}</p>
+      <p className="mt-0.5 text-sm capitalize text-slate-600">{subtitle}</p>
+      <p className="mt-1 flex items-center gap-1.5 text-xs capitalize text-slate-400">
+        <CalendarDays className="h-3.5 w-3.5" /> {meta}
+      </p>
+    </div>
+  )
+}
+
+function StatusRow({ icon, label, value, complete }) {
+  return (
+    <div className="flex items-center gap-3 rounded-xl bg-slate-50 p-3">
+      <span className={`rounded-lg p-2 ${complete ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+        {createElement(icon, { className: 'h-4 w-4' })}
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="text-xs text-slate-500">{label}</p>
+        <p className="text-sm font-bold text-slate-800">{value}</p>
+      </div>
+    </div>
+  )
+}
+
+function EmptyText({ children }) {
+  return (
+    <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 p-5 text-center">
+      <UserRound className="mx-auto h-5 w-5 text-slate-400" />
+      <p className="mt-2 text-sm text-slate-500">{children}</p>
     </div>
   )
 }

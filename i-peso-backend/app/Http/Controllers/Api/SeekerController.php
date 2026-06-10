@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\JobSeeker;
+use App\Models\Occupation;
 use App\Models\SeekerDisability;
 use App\Models\SeekerEducation;
 use App\Models\SeekerEligibility;
@@ -316,7 +317,15 @@ class SeekerController extends Controller
             'former_ofw_return_date' => ['nullable', 'date'],
             // 4Ps
             'is_4ps_beneficiary' => ['required', 'boolean'],
-            'household_id_4ps' => ['nullable', 'string', 'max:50'],
+            'household_id_4ps' => [
+                'nullable',
+                'required_if:is_4ps_beneficiary,true',
+                'string',
+                'regex:/^\d{2}-\d{2}-\d{2}-\d{3}-\d{5}$/',
+            ],
+        ], [
+            'household_id_4ps.required_if' => 'The 4Ps Household ID is required for beneficiaries.',
+            'household_id_4ps.regex' => 'The 4Ps Household ID must contain 14 digits in the format 00-00-00-000-00000.',
         ]);
 
         $seeker->forceFill([
@@ -361,11 +370,15 @@ class SeekerController extends Controller
         $validated = $request->validate([
             'work_type_preference' => ['required', 'in:part_time,full_time'],
             'preferred_work_location' => ['required', 'in:local,overseas'],
-            'preferred_locations_details' => ['nullable', 'array', 'max:3'],
-            'preferred_locations_details.*' => ['string', 'max:255'],
-            // At least 1 occupation required, up to 3
-            'occupations' => ['required', 'array', 'min:1', 'max:3'],
-            'occupations.*' => ['required', 'string', 'max:255'],
+            'preferred_locations_details' => ['required', 'array', 'min:1', 'max:3'],
+            'preferred_locations_details.*' => ['required', 'string', 'max:255', 'distinct'],
+            'occupation_ids' => ['required', 'array', 'min:1', 'max:3'],
+            'occupation_ids.*' => [
+                'required',
+                'integer',
+                'distinct',
+                'exists:occupations,id',
+            ],
         ]);
 
         $seeker->forceFill([
@@ -376,10 +389,17 @@ class SeekerController extends Controller
 
         // ── Sync occupations (delete + re-insert) ──
         $seeker->occupations()->delete();
-        foreach (array_filter($validated['occupations']) as $index => $name) {
+        $occupations = Occupation::query()
+            ->whereIn('id', $validated['occupation_ids'])
+            ->get()
+            ->keyBy('id');
+
+        foreach ($validated['occupation_ids'] as $index => $occupationId) {
+            $occupation = $occupations->get($occupationId);
             SeekerOccupation::create([
                 'seeker_id' => $seeker->getKey(),
-                'occupation_title' => $name,
+                'occupation_id' => $occupation->id,
+                'occupation_title' => $occupation->title,
                 'preference_order' => $index + 1,
             ]);
         }
