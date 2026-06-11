@@ -71,7 +71,11 @@ export default function SeekerRegistration() {
       navigate('/verify-email', { state: { email: data.email } })
     } catch (error) {
       if (error.response?.status === 422) setErrors(error.response.data.errors ?? {})
-      else setApiError(error.response?.data?.message ?? 'Registration failed. Please try again.')
+      else if (error.response?.status && error.response.status < 500) {
+        setApiError(error.response?.data?.message ?? 'Registration failed. Please try again.')
+      } else {
+        setApiError('Registration is temporarily unavailable. Please try again.')
+      }
     } finally {
       setLoading(false)
     }
