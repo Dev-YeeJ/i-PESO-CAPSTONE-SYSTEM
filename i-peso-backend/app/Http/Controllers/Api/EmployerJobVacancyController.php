@@ -6,8 +6,10 @@ use App\Http\Controllers\Controller;
 use App\Models\Employer;
 use App\Models\JobVacancy;
 use App\Models\Occupation;
+use App\Services\GeoapifyService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
 
 class EmployerJobVacancyController extends Controller
@@ -27,10 +29,10 @@ class EmployerJobVacancyController extends Controller
         return response()->json($vacancies);
     }
 
-    public function store(Request $request): JsonResponse
+    public function store(Request $request, GeoapifyService $geoapify): JsonResponse
     {
         $employer = $this->employer($request);
-        $vacancy = $employer->vacancies()->create($this->validatedData($request));
+        $vacancy = $employer->vacancies()->create($this->validatedData($request, $geoapify));
 
         return response()->json([
             'message' => 'Job vacancy created successfully.',
@@ -45,10 +47,10 @@ class EmployerJobVacancyController extends Controller
         return response()->json($vacancy);
     }
 
-    public function update(Request $request, JobVacancy $vacancy): JsonResponse
+    public function update(Request $request, JobVacancy $vacancy, GeoapifyService $geoapify): JsonResponse
     {
         $this->ensureOwnership($request, $vacancy);
-        $vacancy->update($this->validatedData($request));
+        $vacancy->update($this->validatedData($request, $geoapify));
 
         return response()->json([
             'message' => 'Job vacancy updated successfully.',
@@ -64,7 +66,7 @@ class EmployerJobVacancyController extends Controller
         return response()->json(['message' => 'Job vacancy deleted successfully.']);
     }
 
-    private function validatedData(Request $request): array
+    private function validatedData(Request $request, GeoapifyService $geoapify): array
     {
         $data = $request->validate([
             'occupation_id' => ['required', 'integer', 'exists:occupations,id'],
@@ -82,6 +84,12 @@ class EmployerJobVacancyController extends Controller
             'city_municipality' => ['required', 'string', 'max:150'],
             'barangay' => ['required', 'string', 'max:150'],
             'specific_address' => ['nullable', 'string', 'max:255'],
+            'province_code' => ['nullable', 'string', 'max:10'],
+            'city_code' => ['nullable', 'string', 'max:10'],
+            'barangay_code' => ['nullable', 'string', 'max:10'],
+            'latitude' => ['nullable', 'numeric', 'between:-90,90'],
+            'longitude' => ['nullable', 'numeric', 'between:-180,180'],
+            'geoapify_place_id' => ['nullable', 'string', 'max:255'],
             'job_description' => ['required', 'string', 'max:10000'],
             'vacancies_count' => ['required', 'integer', 'min:1', 'max:10000'],
             'minimum_education' => ['required', Rule::in([
@@ -126,6 +134,22 @@ class EmployerJobVacancyController extends Controller
             $data['city_municipality'],
             $data['province'],
         ])->filter()->join(', ');
+
+        if (
+            Schema::hasColumns('job_vacancies', ['latitude', 'longitude', 'geoapify_place_id'])
+            && ! isset($data['latitude'], $data['longitude'])
+        ) {
+            try {
+                $location = $geoapify->geocode($data['location'].', Philippines');
+                if ($location) {
+                    $data['latitude'] = $location['latitude'];
+                    $data['longitude'] = $location['longitude'];
+                    $data['geoapify_place_id'] = $location['place_id'];
+                }
+            } catch (\Throwable) {
+                // Preserve vacancy posting when optional coordinate lookup is unavailable.
+            }
+        }
 
         if ($data['hide_salary']) {
             $data['salary_min'] = null;

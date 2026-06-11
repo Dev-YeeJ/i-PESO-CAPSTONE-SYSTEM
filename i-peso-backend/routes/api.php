@@ -13,6 +13,7 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\EmployerJobVacancyController;
 use App\Http\Controllers\Api\EmployerNotificationController;
 use App\Http\Controllers\Api\EmployerRegistrationController;
+use App\Http\Controllers\Api\GeoapifyController;
 use App\Http\Controllers\Api\OccupationController;
 use App\Http\Controllers\Api\SeekerCertificateController;
 use App\Http\Controllers\Api\SeekerController;
@@ -34,6 +35,14 @@ Route::prefix('auth')->group(function () {
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/auth/me', [AuthController::class, 'me']);
     Route::post('/auth/logout', [AuthController::class, 'logout']);
+
+    Route::prefix('geo')->group(function () {
+        Route::get('/autocomplete', [GeoapifyController::class, 'autocomplete'])->middleware('throttle:30,1');
+        Route::get('/geocode', [GeoapifyController::class, 'geocode'])->middleware('throttle:20,1');
+        Route::get('/reverse', [GeoapifyController::class, 'reverse'])->middleware('throttle:20,1');
+        Route::post('/route', [GeoapifyController::class, 'route'])->middleware('throttle:15,1');
+        Route::post('/matrix', [GeoapifyController::class, 'matrix'])->middleware('throttle:5,1');
+    });
 
     // Employer authenticated endpoints
     Route::prefix('employer')->group(function () {

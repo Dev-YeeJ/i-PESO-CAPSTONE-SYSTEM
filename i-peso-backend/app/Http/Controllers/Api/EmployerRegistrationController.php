@@ -6,9 +6,11 @@ use App\Http\Controllers\Controller;
 use App\Models\Employer;
 use App\Models\EmployerDocument;
 use App\Notifications\EmployerVerificationProgressUpdated;
+use App\Services\GeoapifyService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 
@@ -66,7 +68,7 @@ class EmployerRegistrationController extends Controller
      * Step 2: Add company profile information
      * POST /api/employer/register/step-2
      */
-    public function registerStep2(Request $request): JsonResponse
+    public function registerStep2(Request $request, GeoapifyService $geoapify): JsonResponse
     {
         $validator = Validator::make($request->all(), [
             'company_name' => 'required|string|max:255',
@@ -78,6 +80,12 @@ class EmployerRegistrationController extends Controller
             'city_municipality' => 'required|string|max:100',
             'barangay' => 'required|string|max:100',
             'house_unit_street' => 'required|string|max:255',
+            'province_code' => 'nullable|string|max:10',
+            'city_code' => 'nullable|string|max:10',
+            'barangay_code' => 'nullable|string|max:10',
+            'latitude' => 'nullable|numeric|between:-90,90',
+            'longitude' => 'nullable|numeric|between:-180,180',
+            'geoapify_place_id' => 'nullable|string|max:255',
             'company_description' => 'required|string|max:5000',
             'company_logo' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:5120',
         ]);
@@ -100,6 +108,22 @@ class EmployerRegistrationController extends Controller
 
             // Build complete address from components
             $data['complete_address'] = "{$request->house_unit_street}, {$request->barangay}, {$request->city_municipality}, {$request->province}";
+
+            if (
+                Schema::hasColumns('employers', ['latitude', 'longitude', 'geoapify_place_id'])
+                && ! isset($data['latitude'], $data['longitude'])
+            ) {
+                try {
+                    $location = $geoapify->geocode($data['complete_address'].', Philippines');
+                    if ($location) {
+                        $data['latitude'] = $location['latitude'];
+                        $data['longitude'] = $location['longitude'];
+                        $data['geoapify_place_id'] = $location['place_id'];
+                    }
+                } catch (\Throwable) {
+                    // A valid PSGC address can still be saved during a temporary map-service outage.
+                }
+            }
 
             $employer->update($data);
 

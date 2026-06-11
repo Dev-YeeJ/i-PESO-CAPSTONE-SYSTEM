@@ -47,6 +47,13 @@ class JobSeeker extends Authenticatable
         'address_barangay',
         'address_municipality_city',
         'address_province',
+        'address_province_code',
+        'address_city_code',
+        'address_barangay_code',
+        'latitude',
+        'longitude',
+        'location_accuracy',
+        'geoapify_place_id',
         // === STEP 2: EDUCATION & DEMOGRAPHICS ===
         'is_4ps_beneficiary',
         'household_id_4ps',
@@ -100,6 +107,9 @@ class JobSeeker extends Authenticatable
         'form_validation_state' => 'array',
         'currently_in_school' => 'boolean',
         'other_skills' => 'array',
+        'latitude' => 'float',
+        'longitude' => 'float',
+        'location_accuracy' => 'integer',
     ];
 
     // === RELATIONSHIPS ===

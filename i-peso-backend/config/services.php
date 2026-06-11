@@ -26,6 +26,11 @@ return [
         'token' => env('PSOC_API_TOKEN'),
     ],
 
+    'geoapify' => [
+        'key' => env('GEOAPIFY_API_KEY'),
+        'base_url' => env('GEOAPIFY_BASE_URL', 'https://api.geoapify.com/v1'),
+    ],
+
     'ses' => [
         'key' => env('AWS_ACCESS_KEY_ID'),
         'secret' => env('AWS_SECRET_ACCESS_KEY'),

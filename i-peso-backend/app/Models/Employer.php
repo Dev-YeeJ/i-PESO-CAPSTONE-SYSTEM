@@ -31,9 +31,15 @@ class Employer extends Authenticatable
         'industry',
         'company_size',
         'province',
+        'province_code',
         'city_municipality',
+        'city_code',
         'barangay',
+        'barangay_code',
         'house_unit_street',
+        'latitude',
+        'longitude',
+        'geoapify_place_id',
         'complete_address',
         'company_description',
         'company_logo',
@@ -68,6 +74,8 @@ class Employer extends Authenticatable
         'verified_at' => 'datetime',
         'password' => 'hashed',
         'representative_is_owner' => 'boolean',
+        'latitude' => 'float',
+        'longitude' => 'float',
     ];
 
     /**

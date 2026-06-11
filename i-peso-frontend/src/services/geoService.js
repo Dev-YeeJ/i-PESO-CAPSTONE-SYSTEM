@@ -1,152 +1,160 @@
-// src/services/geoService.js
-// GPS detection + Nominatim reverse geocoding
-// Matched against real PSGC data instead of hardcoded arrays
-
+import apiClient from './api'
 import {
   findProvinceByName,
   findCityByName,
   findBarangayByName,
 } from './psgcServices'
 
-const NOMINATIM_URL = 'https://nominatim.openstreetmap.org/reverse'
-
-// ── Geolocation ───────────────────────────────────────────────────────────
-
 function getCurrentPosition() {
   return new Promise((resolve, reject) => {
     if (!navigator.geolocation) {
-      reject('Your browser does not support location detection.')
+      reject(new Error('Your browser does not support location detection.'))
       return
     }
 
     navigator.geolocation.getCurrentPosition(
-      (pos) => resolve({
-        lat      : pos.coords.latitude,
-        lng      : pos.coords.longitude,
-        accuracy : Math.round(pos.coords.accuracy),
+      (position) => resolve({
+        lat: position.coords.latitude,
+        lng: position.coords.longitude,
+        accuracy: Math.round(position.coords.accuracy),
       }),
-      (err) => {
-        const msgs = {
-          1: 'Location access was denied. Please allow it in your browser settings and try again.',
-          2: 'Your location could not be determined. Please ensure your device location/GPS is turned on.',
-          3: 'Location request timed out. We tried to get an exact lock but it took too long. Please try again outside.',
+      (error) => {
+        const messages = {
+          1: 'Location access was denied. Allow location access in your browser settings and try again.',
+          2: 'Your location could not be determined. Make sure device location is enabled.',
+          3: 'Location detection timed out. Move to an open area and try again.',
         }
-        reject(msgs[err.code] ?? 'Unable to get your location.')
+        reject(new Error(messages[error.code] ?? 'Unable to get your location.'))
       },
-      { 
-        enableHighAccuracy: true, 
-        timeout: 20000,     // INCREASED: Give the GPS chip 20 seconds to find satellites
-        maximumAge: 0       // CHANGED TO 0: Force a fresh lock. NEVER use cached cell-tower data.
-      }
+      {
+        enableHighAccuracy: true,
+        timeout: 20000,
+        maximumAge: 0,
+      },
     )
   })
 }
 
-// ── Nominatim Reverse Geocoding ───────────────────────────────────────────
-
-async function reverseGeocode(lat, lng) {
-  const params = new URLSearchParams({
-    lat           : lat.toString(),
-    lon           : lng.toString(),
-    format        : 'json',
-    addressdetails: '1',
-    zoom          : '18',
-    countrycodes  : 'ph',
-  })
-
-  const res = await fetch(`${NOMINATIM_URL}?${params}`, {
-    headers: {
-      'User-Agent'     : 'iPESO-Capstone/1.0 (Urdaneta City PESO)',
-      'Accept-Language': 'en',
+export async function autocompleteAddress(text, coordinates = {}) {
+  const response = await apiClient.get('/geo/autocomplete', {
+    params: {
+      text,
+      latitude: coordinates.latitude,
+      longitude: coordinates.longitude,
     },
   })
 
-  if (!res.ok) throw new Error('Address lookup service unavailable.')
+  return response.data.suggestions ?? []
+}
 
-  const data = await res.json()
-  if (!data?.address) throw new Error('Could not determine address from GPS coordinates.')
+export async function geocodeAddress(address) {
+  const response = await apiClient.get('/geo/geocode', {
+    params: { address },
+  })
 
-  const addr = data.address
+  return response.data.location
+}
+
+export async function reverseGeocode(latitude, longitude) {
+  const response = await apiClient.get('/geo/reverse', {
+    params: { latitude, longitude },
+  })
+
+  return response.data.location
+}
+
+async function matchPsgcLocation(location, accuracy = null) {
+  const warnings = []
+
+  const province = location?.province_name
+    ? await findProvinceByName(location.province_name)
+    : null
+  if (location?.province_name && !province) {
+    warnings.push(`Province "${location.province_name}" was not matched. Please select it manually.`)
+  }
+
+  const city = province && location?.city_name
+    ? await findCityByName(province.code, location.city_name)
+    : null
+  if (province && location?.city_name && !city) {
+    warnings.push(`City "${location.city_name}" was not found in ${province.name}. Please select it manually.`)
+  }
+
+  const barangay = city && location?.barangay_name
+    ? await findBarangayByName(city.code, location.barangay_name)
+    : null
+  if (city && location?.barangay_name && !barangay) {
+    warnings.push(`Barangay "${location.barangay_name}" was not matched. Please select it manually.`)
+  }
+
+  if (accuracy !== null && accuracy > 500) {
+    warnings.push(`GPS accuracy is low (+/-${accuracy}m). Please verify the detected address.`)
+  }
 
   return {
-    provinceName : addr.state ?? addr.region ?? null,
-    cityName     : addr.city ?? addr.town ?? addr.municipality ?? addr.county ?? null,
-    barangayName : addr.village ?? addr.suburb ?? addr.neighbourhood ?? addr.hamlet ?? null,
-    road         : addr.road ?? addr.pedestrian ?? null,
-    houseNumber  : addr.house_number ?? null,
-    displayName  : data.display_name ?? '',
+    lat: location?.latitude ?? null,
+    lng: location?.longitude ?? null,
+    accuracy,
+    placeId: location?.place_id ?? null,
+    province,
+    city,
+    barangay,
+    houseStreet: [location?.house_number, location?.street].filter(Boolean).join(' ') || location?.address_line1 || null,
+    displayName: location?.formatted ?? '',
+    warnings,
   }
 }
 
-// ── Main Export ───────────────────────────────────────────────────────────
+export async function resolveAddressSuggestion(suggestion) {
+  return matchPsgcLocation(suggestion)
+}
 
-/**
- * Full GPS + reverse geocode + PSGC matching pipeline.
- *
- * Returns PSGC codes (not just names) so the cascading
- * dropdowns can select the correct options.
- *
- * @returns {Promise<{
- *   lat: number, lng: number, accuracy: number,
- *   province: { code, name }|null,
- *   city:     { code, name }|null,
- *   barangay: { code, name }|null,
- *   houseStreet: string|null,
- *   displayName: string,
- *   warnings: string[],
- * }>}
- */
 export async function detectAddress() {
-  const warnings = []
-
-  // ── Step 1: Get coordinates ──────────────────────────────────────────
   const { lat, lng, accuracy } = await getCurrentPosition()
+  const location = await reverseGeocode(lat, lng)
 
-  // ── Step 2: Reverse geocode ──────────────────────────────────────────
-  const geo = await reverseGeocode(lat, lng)
-
-  // ── Step 3: Match against PSGC data ──────────────────────────────────
-
-  // Province
-  let province = null
-  if (geo.provinceName) {
-    province = await findProvinceByName(geo.provinceName)
-    if (!province) {
-      warnings.push(`Province "${geo.provinceName}" not matched — please select manually.`)
-    }
+  if (!location) {
+    throw new Error('Could not determine an address from your GPS location.')
   }
 
-  // City (only if province was matched)
-  let city = null
-  if (province && geo.cityName) {
-    city = await findCityByName(province.code, geo.cityName)
-    if (!city) {
-      warnings.push(`City "${geo.cityName}" not found in ${province.name} — please select manually.`)
-    }
-  }
+  return matchPsgcLocation(location, accuracy)
+}
 
-  // Barangay (only if city was matched)
-  let barangay = null
-  if (city && geo.barangayName) {
-    barangay = await findBarangayByName(city.code, geo.barangayName)
-    if (!barangay) {
-      warnings.push(`Barangay "${geo.barangayName}" not found — please select manually.`)
-    }
-  }
+export async function calculateRouteDistance(origin, destination, mode = 'drive') {
+  const response = await apiClient.post('/geo/route', {
+    origin_latitude: origin.latitude,
+    origin_longitude: origin.longitude,
+    destination_latitude: destination.latitude,
+    destination_longitude: destination.longitude,
+    mode,
+  })
 
-  // Low accuracy warning
-  if (accuracy > 500) {
-    warnings.push(`GPS accuracy is low (±${accuracy}m). Barangay detection may be incorrect — please verify.`)
-  }
+  return response.data.route
+}
 
-  // House / Street
-  const houseStreet = [geo.houseNumber, geo.road].filter(Boolean).join(' ') || null
+export async function calculateRouteMatrix(sources, targets, mode = 'drive') {
+  const response = await apiClient.post('/geo/matrix', {
+    sources,
+    targets,
+    mode,
+  })
 
-  return {
-    lat, lng, accuracy,
-    province, city, barangay,
-    houseStreet,
-    displayName: geo.displayName,
-    warnings,
-  }
+  return response.data.matrix
+}
+
+export function calculateStraightLineDistance(origin, destination) {
+  const earthRadiusKilometers = 6371
+  const toRadians = (degrees) => degrees * (Math.PI / 180)
+  const latitudeDelta = toRadians(destination.latitude - origin.latitude)
+  const longitudeDelta = toRadians(destination.longitude - origin.longitude)
+  const originLatitude = toRadians(origin.latitude)
+  const destinationLatitude = toRadians(destination.latitude)
+
+  const haversine =
+    Math.sin(latitudeDelta / 2) ** 2
+    + Math.cos(originLatitude)
+    * Math.cos(destinationLatitude)
+    * Math.sin(longitudeDelta / 2) ** 2
+
+  return earthRadiusKilometers * 2 * Math.atan2(Math.sqrt(haversine), Math.sqrt(1 - haversine))
 }

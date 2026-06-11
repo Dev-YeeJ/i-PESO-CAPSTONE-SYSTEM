@@ -8,11 +8,17 @@ import { useAuthStore } from '@/stores/authStore'
 import OnboardingShell from '@/components/auth/OnboardingShell'
 import { seekerRegistrationSteps } from '@/components/auth/registrationJourneys'
 import OccupationCombobox from '@/components/form/OccupationCombobox'
+import AddressAutocomplete from '@/components/form/AddressAutocomplete'
+import LocationMapPreview from '@/components/map/LocationMapPreview'
 import { ISO_COUNTRIES } from '@/data/jobPreferenceVocabularies'
 // ── Add these imports at the top of SeekerOnboarding.jsx ──
 
 import { getProvinces, getCitiesByProvince, getBarangaysByCity } from '@/services/psgcServices'
-import { detectAddress } from '@/services/geoService'
+import {
+  detectAddress,
+  geocodeAddress,
+  resolveAddressSuggestion,
+} from '@/services/geoService'
 
 // ── Constants ─────────────────────────────────────────────────────────────
 
@@ -266,7 +272,7 @@ const StepIndicator = ({ current, completed }) => (
 // ── STEP 1: Personal Information ──────────────────────────────────────────
 
 // ── Step1 component — replaces the existing one ──────────────────────────
-const Step1 = ({ form, errors, onChange, user, onGpsDetect, gpsState }) => {
+const Step1 = ({ form, errors, onChange, user, onGpsDetect, onAddressSelect, gpsState }) => {
   return (
     <div>
       <SectionHeader
@@ -382,6 +388,7 @@ const Step1 = ({ form, errors, onChange, user, onGpsDetect, gpsState }) => {
           onChange={onChange}
           gpsState={gpsState}
           onGpsDetect={onGpsDetect}
+          onAddressSelect={onAddressSelect}
         />
       </div>
 
@@ -945,7 +952,7 @@ const SelectDropdown = ({ label, name, codeName, codeValue, options, loading, di
   </FormField>
 )
 
-const AddressSection = ({ form, errors, onChange, gpsState, onGpsDetect }) => {
+const AddressSection = ({ form, errors, onChange, gpsState, onGpsDetect, onAddressSelect }) => {
   const [provinces,  setProvinces]  = useState([])
   const [cities,     setCities]     = useState([])
   const [barangays,  setBarangays]  = useState([])
@@ -1094,6 +1101,12 @@ const AddressSection = ({ form, errors, onChange, gpsState, onGpsDetect }) => {
         </div>
       )}
 
+      <AddressAutocomplete
+        onSelect={onAddressSelect}
+        latitude={form.latitude}
+        longitude={form.longitude}
+      />
+
       {/* Dropdowns */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
 
@@ -1150,6 +1163,13 @@ const AddressSection = ({ form, errors, onChange, gpsState, onGpsDetect }) => {
         </FormField>
 
       </div>
+
+      <LocationMapPreview latitude={form.latitude} longitude={form.longitude} />
+      {(form.latitude == null || form.longitude == null) && (
+        <p className="mt-3 text-xs text-amber-700">
+          Use address search or GPS to save coordinates for nearby-job distance matching.
+        </p>
+      )}
     </div>
   )
 }
@@ -1734,9 +1754,16 @@ export default function SeekerOnboarding() {
     tin          : '',
     educ_attainment: '',
     address_province: '',
+    address_province_code: '',
     address_municipality_city: '',
+    address_city_code: '',
     address_barangay: '',
+    address_barangay_code: '',
     address_house_street: '',
+    latitude: null,
+    longitude: null,
+    location_accuracy: null,
+    geoapify_place_id: null,
     disabilities : [],
     disability_specification: '',
     // Step 2
@@ -1791,9 +1818,62 @@ export default function SeekerOnboarding() {
       value = value.trim()
     }
     
-    setForm((f) => ({ ...f, [name]: value }))
+    const manualAddressFields = [
+      'address_province_code',
+      'address_city_code',
+      'address_barangay_code',
+      'address_house_street',
+    ]
+
+    setForm((f) => ({
+      ...f,
+      [name]: value,
+      ...(manualAddressFields.includes(name) ? {
+        latitude: null,
+        longitude: null,
+        location_accuracy: null,
+        geoapify_place_id: null,
+      } : {}),
+    }))
     setErrors((err) => ({ ...err, [name]: undefined }))
     setApiError('')
+  }, [])
+
+  const applyResolvedLocation = useCallback((result, replaceStreet = false) => {
+    setForm((current) => {
+      const updates = {
+        latitude: result.lat,
+        longitude: result.lng,
+        location_accuracy: result.accuracy,
+        geoapify_place_id: result.placeId,
+      }
+
+      if (result.province) {
+        updates.address_province_code = result.province.code
+        updates.address_province = result.province.name
+      }
+      if (result.city) {
+        updates.address_city_code = result.city.code
+        updates.address_municipality_city = result.city.name
+      }
+      if (result.barangay) {
+        updates.address_barangay_code = result.barangay.code
+        updates.address_barangay = result.barangay.name
+      }
+      if (result.houseStreet && (replaceStreet || !current.address_house_street)) {
+        updates.address_house_street = result.houseStreet
+      }
+
+      return { ...current, ...updates }
+    })
+
+    setErrors((current) => ({
+      ...current,
+      address_province: undefined,
+      address_municipality_city: undefined,
+      address_barangay: undefined,
+      address_house_street: undefined,
+    }))
   }, [])
 
   const handleGpsDetect = async () => {
@@ -1801,6 +1881,7 @@ export default function SeekerOnboarding() {
 
     try {
       const result = await detectAddress()
+      applyResolvedLocation(result)
 
       // Build changes to apply to the form
       const updates = {}
@@ -1855,7 +1936,30 @@ export default function SeekerOnboarding() {
       setGpsState({
         loading : false,
         success : false,
-        error   : typeof errorMessage === 'string' ? errorMessage : 'Location detection failed.',
+        error   : errorMessage instanceof Error ? errorMessage.message : 'Location detection failed.',
+        accuracy: null,
+      })
+    }
+  }
+
+  const handleAddressSelect = async (suggestion) => {
+    setGpsState({ loading: true, success: false, error: null, accuracy: null })
+
+    try {
+      const result = await resolveAddressSuggestion(suggestion)
+      applyResolvedLocation(result, true)
+      setGpsState({
+        loading: false,
+        success: false,
+        error: null,
+        accuracy: null,
+        warnings: result.warnings,
+      })
+    } catch {
+      setGpsState({
+        loading: false,
+        success: false,
+        error: 'The selected address could not be matched to PSGC. Please use the dropdowns.',
         accuracy: null,
       })
     }
@@ -2011,6 +2115,13 @@ export default function SeekerOnboarding() {
     address_municipality_city: form.address_municipality_city,
     address_barangay         : form.address_barangay,
     address_house_street     : form.address_house_street,
+    address_province_code    : form.address_province_code || null,
+    address_city_code        : form.address_city_code || null,
+    address_barangay_code    : form.address_barangay_code || null,
+    latitude                 : form.latitude,
+    longitude                : form.longitude,
+    location_accuracy        : form.location_accuracy,
+    geoapify_place_id        : form.geoapify_place_id,
     disabilities             : form.disabilities,
     disability_specification : form.disability_specification || null,
   })
@@ -2086,7 +2197,40 @@ export default function SeekerOnboarding() {
 
     try {
       let data
-      if (step === 1) data = await authService.saveStep1(buildStep1Payload())
+      if (step === 1) {
+        let payload = buildStep1Payload()
+
+        if (payload.latitude == null || payload.longitude == null) {
+          try {
+            const location = await geocodeAddress([
+              payload.address_house_street,
+              payload.address_barangay,
+              payload.address_municipality_city,
+              payload.address_province,
+              'Philippines',
+            ].filter(Boolean).join(', '))
+
+            if (location?.latitude != null && location?.longitude != null) {
+              payload = {
+                ...payload,
+                latitude: location.latitude,
+                longitude: location.longitude,
+                geoapify_place_id: location.place_id,
+              }
+              setForm((current) => ({
+                ...current,
+                latitude: location.latitude,
+                longitude: location.longitude,
+                geoapify_place_id: location.place_id,
+              }))
+            }
+          } catch {
+            // Coordinate lookup is optional; the verified PSGC address can still be saved.
+          }
+        }
+
+        data = await authService.saveStep1(payload)
+      }
       if (step === 2) data = await authService.saveStep2(buildStep2Payload())
       if (step === 3) data = await authService.saveStep3(buildStep3Payload())
       if (step === 4) data = await authService.saveStep4(buildStep4Payload())
@@ -2170,6 +2314,7 @@ export default function SeekerOnboarding() {
                 onChange={handleChange}
                 user={user}
                 onGpsDetect={handleGpsDetect}
+                onAddressSelect={handleAddressSelect}
                 gpsState={gpsState}
               />
             )}

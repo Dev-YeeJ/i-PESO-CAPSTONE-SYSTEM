@@ -20,9 +20,15 @@ class JobVacancy extends Model
         'location',
         'region',
         'province',
+        'province_code',
         'city_municipality',
+        'city_code',
         'barangay',
+        'barangay_code',
         'specific_address',
+        'latitude',
+        'longitude',
+        'geoapify_place_id',
         'job_description',
         'vacancies_count',
         'minimum_education',
@@ -56,6 +62,8 @@ class JobVacancy extends Model
         'open_to_pwds' => 'boolean',
         'open_to_senior_citizens' => 'boolean',
         'spes_tupad_eligible' => 'boolean',
+        'latitude' => 'float',
+        'longitude' => 'float',
     ];
 
     public function employer(): BelongsTo
