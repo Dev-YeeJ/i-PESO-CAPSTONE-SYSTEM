@@ -7,12 +7,28 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class SeekerOccupation extends Model
 {
-    protected $table      = 'seeker_occupations';
+    protected $table = 'seeker_occupations';
+
     protected $primaryKey = 'id';
-    protected $keyType    = 'int';
-    public $timestamps    = true;
-    
-    protected $fillable = ['seeker_id', 'occupation_id', 'occupation_title', 'preference_order'];
+
+    protected $keyType = 'int';
+
+    public $timestamps = true;
+
+    protected $fillable = [
+        'seeker_id',
+        'occupation_id',
+        'general_term',
+        'occupation_title',
+        'raw_job_title',
+        'status',
+        'mapped_at',
+        'preference_order',
+    ];
+
+    protected $casts = [
+        'mapped_at' => 'datetime',
+    ];
 
     public function seeker(): BelongsTo
     {

@@ -50,11 +50,8 @@ class NSRPPdfExportController extends Controller
         ]);
 
         // Configure PDF options
-        $pdf->setPaper('A4', 'portrait');
-        $pdf->setOption('margin-top', 0.5);
-        $pdf->setOption('margin-right', 0.5);
-        $pdf->setOption('margin-bottom', 0.5);
-        $pdf->setOption('margin-left', 0.5);
+        // NSRP Form 1 uses long/legal portrait paper.
+        $pdf->setPaper('legal', 'portrait');
         $pdf->setOption('dpi', 150);
 
         // Return PDF as download

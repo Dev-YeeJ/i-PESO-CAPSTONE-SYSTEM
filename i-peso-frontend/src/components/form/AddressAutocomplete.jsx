@@ -14,6 +14,7 @@ export default function AddressAutocomplete({
   const [error, setError] = useState('')
   const [activeIndex, setActiveIndex] = useState(-1)
   const requestSequence = useRef(0)
+  const sessionToken = useRef(crypto.randomUUID())
 
   useEffect(() => {
     const trimmed = query.trim()
@@ -27,7 +28,11 @@ export default function AddressAutocomplete({
       setError('')
 
       try {
-        const results = await autocompleteAddress(trimmed, { latitude, longitude })
+        const results = await autocompleteAddress(
+          trimmed,
+          { latitude, longitude },
+          sessionToken.current,
+        )
         if (requestSequence.current === sequence) {
           setSuggestions(results)
           setActiveIndex(-1)
@@ -49,7 +54,8 @@ export default function AddressAutocomplete({
     setQuery(suggestion.formatted ?? suggestion.address_line1 ?? '')
     setSuggestions([])
     setActiveIndex(-1)
-    onSelect(suggestion)
+    onSelect({ ...suggestion, session_token: sessionToken.current })
+    sessionToken.current = crypto.randomUUID()
   }
 
   const onKeyDown = (event) => {
@@ -70,9 +76,9 @@ export default function AddressAutocomplete({
   }
 
   return (
-    <div className="relative mb-4">
+    <div className="relative mb-3">
       <label className="mb-1.5 block text-xs font-semibold text-slate-700">
-        Find address automatically
+        Search address
       </label>
       <div className="relative">
         <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-blue-700" />
@@ -146,7 +152,7 @@ export default function AddressAutocomplete({
         </div>
       )}
       <p className="mt-1.5 text-[11px] text-slate-500">
-        Suggestions are limited to Philippine addresses. Verify the official PSGC fields below.
+        Select a suggestion to fill the location fields.
       </p>
     </div>
   )

@@ -39,7 +39,7 @@ class Employer extends Authenticatable
         'house_unit_street',
         'latitude',
         'longitude',
-        'geoapify_place_id',
+        'google_place_id',
         'complete_address',
         'company_description',
         'company_logo',

@@ -3,54 +3,67 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Services\GeoapifyService;
+use App\Services\GoogleMapsService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
-class GeoapifyController extends Controller
+class GoogleMapsController extends Controller
 {
-    public function autocomplete(Request $request, GeoapifyService $geoapify): JsonResponse
+    public function autocomplete(Request $request, GoogleMapsService $maps): JsonResponse
     {
         $validated = $request->validate([
             'text' => ['required', 'string', 'min:3', 'max:200'],
             'latitude' => ['nullable', 'numeric', 'between:-90,90'],
             'longitude' => ['nullable', 'numeric', 'between:-180,180'],
+            'session_token' => ['nullable', 'string', 'max:64'],
         ]);
 
         return response()->json([
-            'suggestions' => $geoapify->autocomplete(
+            'suggestions' => $maps->autocomplete(
                 $validated['text'],
                 isset($validated['latitude']) ? (float) $validated['latitude'] : null,
                 isset($validated['longitude']) ? (float) $validated['longitude'] : null,
+                $validated['session_token'] ?? null,
             ),
         ]);
     }
 
-    public function geocode(Request $request, GeoapifyService $geoapify): JsonResponse
+    public function place(Request $request, string $placeId, GoogleMapsService $maps): JsonResponse
+    {
+        $validated = $request->validate([
+            'session_token' => ['nullable', 'string', 'max:64'],
+        ]);
+
+        return response()->json([
+            'location' => $maps->place($placeId, $validated['session_token'] ?? null),
+        ]);
+    }
+
+    public function geocode(Request $request, GoogleMapsService $maps): JsonResponse
     {
         $validated = $request->validate([
             'address' => ['required', 'string', 'min:5', 'max:500'],
         ]);
 
         return response()->json([
-            'location' => $geoapify->geocode($validated['address']),
+            'location' => $maps->geocode($validated['address']),
         ]);
     }
 
-    public function reverse(Request $request, GeoapifyService $geoapify): JsonResponse
+    public function reverse(Request $request, GoogleMapsService $maps): JsonResponse
     {
         $validated = $this->validatePoint($request);
 
         return response()->json([
-            'location' => $geoapify->reverse(
+            'location' => $maps->reverse(
                 (float) $validated['latitude'],
                 (float) $validated['longitude'],
             ),
         ]);
     }
 
-    public function route(Request $request, GeoapifyService $geoapify): JsonResponse
+    public function route(Request $request, GoogleMapsService $maps): JsonResponse
     {
         $validated = $request->validate([
             'origin_latitude' => ['required', 'numeric', 'between:-90,90'],
@@ -61,7 +74,7 @@ class GeoapifyController extends Controller
         ]);
 
         return response()->json([
-            'route' => $geoapify->route(
+            'route' => $maps->route(
                 (float) $validated['origin_latitude'],
                 (float) $validated['origin_longitude'],
                 (float) $validated['destination_latitude'],
@@ -71,7 +84,7 @@ class GeoapifyController extends Controller
         ]);
     }
 
-    public function matrix(Request $request, GeoapifyService $geoapify): JsonResponse
+    public function matrix(Request $request, GoogleMapsService $maps): JsonResponse
     {
         $validated = $request->validate([
             'sources' => ['required', 'array', 'min:1', 'max:25'],
@@ -90,7 +103,7 @@ class GeoapifyController extends Controller
         );
 
         return response()->json([
-            'matrix' => $geoapify->matrix(
+            'matrix' => $maps->matrix(
                 $validated['sources'],
                 $validated['targets'],
                 $validated['mode'] ?? 'drive',

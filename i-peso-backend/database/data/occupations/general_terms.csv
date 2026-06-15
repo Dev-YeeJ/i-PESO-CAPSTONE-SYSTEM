@@ -1,0 +1,583 @@
+term,language,canonical_title,priority,source
+office work,en,Office clerk,10,local_peso
+office work,en,Administrative assistant,20,local_peso
+office work,en,Data entry clerk,30,local_peso
+office work,en,Receptionist,40,local_peso
+office work,en,Secretary,50,local_peso
+office staff,en,Office clerk,10,local_peso
+office staff,en,Administrative assistant,20,local_peso
+office staff,en,Data entry clerk,30,local_peso
+admin work,en,Administrative assistant,10,local_peso
+admin work,en,Office clerk,20,local_peso
+admin work,en,Secretary,30,local_peso
+factory worker,en,Machine Operator,10,local_peso
+factory worker,en,Production supervisor,20,local_peso
+factory worker,en,Hand packer,30,local_peso
+factory worker,en,Food production operator,40,local_peso
+factory worker,en,Sewing machine operator,50,local_peso
+production work,en,Machine Operator,10,local_peso
+production work,en,Production supervisor,20,local_peso
+production work,en,Hand packer,30,local_peso
+driver,en,Taxi driver,10,local_peso
+driver,en,Delivery Driver,20,local_peso
+driver,en,Cargo vehicle driver,30,local_peso
+driver,en,Bus driver,40,local_peso
+driver,en,Heavy Truck Driver,50,local_peso
+driver,en,Car and van delivery driver,60,local_peso
+delivery work,en,Motorcycle delivery person,10,local_peso
+delivery work,en,Delivery Driver,20,local_peso
+delivery work,en,Car and van delivery driver,30,local_peso
+healthcare work,en,Registered Nurse,10,local_peso
+healthcare work,en,Nursing Assistant,20,local_peso
+healthcare work,en,Community health worker,30,local_peso
+healthcare work,en,Midwife,40,local_peso
+healthcare work,en,Home care aide,50,local_peso
+medical work,en,General practitioner,10,local_peso
+medical work,en,Registered Nurse,20,local_peso
+medical work,en,Medical Technologist,30,local_peso
+medical work,en,Radiographer,40,local_peso
+caregiver work,en,Care home worker,10,local_peso
+caregiver work,en,Home care aide,20,local_peso
+caregiver work,en,Nursing Assistant,30,local_peso
+construction work,en,Construction Laborer,10,local_peso
+construction work,en,Carpenter,20,local_peso
+construction work,en,Mason,30,local_peso
+construction work,en,Electrician,40,local_peso
+construction work,en,Plumber,50,local_peso
+construction work,en,Welder,60,local_peso
+construction work,en,Construction painter,70,local_peso
+skilled trades,en,Electrician,10,local_peso
+skilled trades,en,Plumber,20,local_peso
+skilled trades,en,Welder,30,local_peso
+skilled trades,en,Carpenter,40,local_peso
+skilled trades,en,Automotive Mechanic,50,local_peso
+hospitality work,en,Hotel Receptionist,10,local_peso
+hospitality work,en,Room attendant,20,local_peso
+hospitality work,en,Waiter/waitress,30,local_peso
+hospitality work,en,Cook,40,local_peso
+hospitality work,en,Accommodation manager,50,local_peso
+hotel work,en,Hotel Receptionist,10,local_peso
+hotel work,en,Room attendant,20,local_peso
+hotel work,en,Accommodation manager,30,local_peso
+restaurant work,en,Quick service restaurant crew member,10,local_peso
+restaurant work,en,Waiter/waitress,20,local_peso
+restaurant work,en,Cook,30,local_peso
+restaurant work,en,Kitchen assistant,40,local_peso
+restaurant work,en,Restaurant manager,50,local_peso
+retail work,en,Retail Salesperson,10,local_peso
+retail work,en,Cashier,20,local_peso
+retail work,en,Shop assistant,30,local_peso
+retail work,en,Sales assistant,40,local_peso
+retail work,en,Merchandiser,50,local_peso
+sales work,en,Retail Salesperson,10,local_peso
+sales work,en,Sales assistant,20,local_peso
+sales work,en,Sales account manager,30,local_peso
+sales work,en,Sales manager,40,local_peso
+agriculture work,en,Crop production worker,10,local_peso
+agriculture work,en,Agricultural technician,20,local_peso
+agriculture work,en,Farm manager,30,local_peso
+agriculture work,en,Livestock worker,40,local_peso
+agriculture work,en,Poultry breeder,50,local_peso
+farm work,en,Crop production worker,10,local_peso
+farm work,en,Livestock worker,20,local_peso
+farm work,en,Farm manager,30,local_peso
+fishing work,en,Deep-sea fishery worker,10,local_peso
+fishing work,en,Fish preparation operator,20,local_peso
+IT work,en,Information Technology Support Technician,10,local_peso
+IT work,en,Computer Programmer,20,local_peso
+IT work,en,Software developer,30,local_peso
+IT work,en,Web developer,40,local_peso
+IT work,en,Data analyst,50,local_peso
+computer work,en,Data entry clerk,10,local_peso
+computer work,en,Information Technology Support Technician,20,local_peso
+computer work,en,Computer Programmer,30,local_peso
+education work,en,Elementary School Teacher,10,local_peso
+education work,en,Secondary school teacher,20,local_peso
+education work,en,Senior High School Teacher,30,local_peso
+education work,en,Teacher Aide,40,local_peso
+education work,en,Vocational teacher,50,local_peso
+teaching work,en,Elementary School Teacher,10,local_peso
+teaching work,en,Secondary school teacher,20,local_peso
+teaching work,en,Teacher Aide,30,local_peso
+warehouse work,en,Warehouse worker,10,local_peso
+warehouse work,en,Warehouse order picker,20,local_peso
+warehouse work,en,Forklift operator,30,local_peso
+warehouse work,en,Warehouse manager,40,local_peso
+logistics work,en,Warehouse worker,10,local_peso
+logistics work,en,Delivery Driver,20,local_peso
+logistics work,en,Supply chain assistant,30,local_peso
+logistics work,en,Cargo vehicle driver,40,local_peso
+beauty work,en,Hairdresser,10,local_peso
+beauty work,en,Barber,20,local_peso
+beauty work,en,Manicurist,30,local_peso
+beauty work,en,Make-up artist,40,local_peso
+beauty work,en,Massage therapist,50,local_peso
+household work,en,Domestic housekeeper,10,local_peso
+household work,en,Domestic cleaner,20,local_peso
+household work,en,Babysitter,30,local_peso
+household work,en,Laundry worker,40,local_peso
+government work,en,Civil enforcement officer,10,local_peso
+government work,en,Community health worker,20,local_peso
+government work,en,Social worker,30,local_peso
+government work,en,Civil registrar,40,local_peso
+government work,en,Firefighter,50,local_peso
+BPO work,en,Call centre agent,10,local_peso
+BPO work,en,Customer service representative,20,local_peso
+BPO work,en,Data entry clerk,30,local_peso
+online work,en,Administrative assistant,10,local_peso
+online work,en,Online sales channel manager,20,local_peso
+online work,en,Digital marketing manager,30,local_peso
+online work,en,Graphic designer,40,local_peso
+online work,en,Web developer,50,local_peso
+finance work,en,Accountant,10,local_peso
+finance work,en,Bookkeeper,20,local_peso
+finance work,en,Payroll clerk,30,local_peso
+engineering work,en,Civil engineer,10,local_peso
+engineering work,en,Electrical engineer,20,local_peso
+engineering work,en,Mechanical engineer,30,local_peso
+engineering work,en,Architect,40,local_peso
+security work,en,Security guard,10,local_peso
+security work,en,Security guard supervisor,20,local_peso
+human resources work,en,Human resources officer,10,local_peso
+human resources work,en,Human resources assistant,20,local_peso
+human resources work,en,Human resources manager,30,local_peso
+legal work,en,Lawyer,10,local_peso
+marketing work,en,Marketing manager,10,local_peso
+marketing work,en,Marketing assistant,20,local_peso
+marketing work,en,Digital marketing manager,30,local_peso
+creative work,en,Graphic designer,10,local_peso
+banking work,en,Bank teller,10,local_peso
+banking work,en,Bank account manager,20,local_peso
+banking work,en,Bank manager,30,local_peso
+real estate work,en,Real estate agent,10,local_peso
+social services work,en,Social worker,10,local_peso
+tourism work,en,Tour guide,10,local_peso
+office work,en,Data Entry Operator,60,local_peso
+office work,en,Data entry supervisor,70,local_peso
+office work,en,Front line medical receptionist,80,local_peso
+office work,en,Hospitality establishment receptionist,90,local_peso
+office work,en,Legal administrative assistant,100,local_peso
+office work,en,Medical administrative assistant,110,local_peso
+office work,en,Medical records clerk,120,local_peso
+office work,en,Veterinary receptionist,130,local_peso
+factory worker,en,Absorbent pad machine operator,60,local_peso
+factory worker,en,Aircraft assembler,70,local_peso
+factory worker,en,Aircraft engine assembler,80,local_peso
+factory worker,en,Ammunition assembler,90,local_peso
+factory worker,en,Anodising machine operator,100,local_peso
+factory worker,en,Automated cutting machine operator,110,local_peso
+factory worker,en,Battery assembler,120,local_peso
+factory worker,en,Bicycle assembler,130,local_peso
+factory worker,en,Block machine operator,140,local_peso
+factory worker,en,Blow moulding machine operator,150,local_peso
+factory worker,en,Book-sewing machine operator,160,local_peso
+factory worker,en,Boring machine operator,170,local_peso
+factory worker,en,Braiding machine operator,180,local_peso
+factory worker,en,Briquetting machine operator,190,local_peso
+factory worker,en,Candy machine operator,200,local_peso
+factory worker,en,Canvas goods assembler,210,local_peso
+factory worker,en,Capsule filling machine operator,220,local_peso
+factory worker,en,Casting machine operator,230,local_peso
+factory worker,en,Chain making machine operator,240,local_peso
+factory worker,en,Cigarette making machine operator,250,local_peso
+factory worker,en,Coating machine operator,260,local_peso
+factory worker,en,Compression moulding machine operator,270,local_peso
+factory worker,en,Computer numerical control machine operator,280,local_peso
+factory worker,en,Concrete products machine operator,290,local_peso
+factory worker,en,Container equipment assembler,300,local_peso
+factory worker,en,Control panel assembler,310,local_peso
+factory worker,en,Cosmetics production machine operator,320,local_peso
+factory worker,en,Cutting machine operator,330,local_peso
+driver,en,Armoured car driver,70,local_peso
+driver,en,Automotive test driver,80,local_peso
+driver,en,Carriage driver,90,local_peso
+driver,en,Dangerous goods driver,100,local_peso
+driver,en,Emergency ambulance driver,110,local_peso
+driver,en,Fire service vehicle operator,120,local_peso
+driver,en,Hearse driver,130,local_peso
+driver,en,Moving truck driver,140,local_peso
+driver,en,Patient transport services driver,150,local_peso
+driver,en,Private chauffeur,160,local_peso
+driver,en,Refuse vehicle driver,170,local_peso
+driver,en,Tow truck driver,180,local_peso
+driver,en,Train driver,190,local_peso
+driver,en,Tram driver,200,local_peso
+driver,en,Trolley bus driver,210,local_peso
+delivery work,en,Bicycle courier,40,local_peso
+healthcare work,en,Advanced nurse practitioner,60,local_peso
+healthcare work,en,Dental chairside assistant,70,local_peso
+healthcare work,en,Dental hygienist,80,local_peso
+healthcare work,en,Dental practitioner,90,local_peso
+healthcare work,en,Dental technician,100,local_peso
+healthcare work,en,Diagnostic radiographer,110,local_peso
+healthcare work,en,Doctors' surgery assistant,120,local_peso
+healthcare work,en,Hospital pharmacist,130,local_peso
+healthcare work,en,Industrial pharmacist,140,local_peso
+healthcare work,en,Nuclear medicine radiographer,150,local_peso
+healthcare work,en,Nurse assistant,160,local_peso
+healthcare work,en,Nurse responsible for general care,170,local_peso
+healthcare work,en,Pharmacist,180,local_peso
+healthcare work,en,Specialised doctor,190,local_peso
+healthcare work,en,Specialist nurse,200,local_peso
+healthcare work,en,Specialist pharmacist,210,local_peso
+healthcare work,en,Veterinary nurse,220,local_peso
+caregiver work,en,Adult community care worker,40,local_peso
+caregiver work,en,Child care worker,50,local_peso
+caregiver work,en,Child day care worker,60,local_peso
+caregiver work,en,Residential childcare worker,70,local_peso
+caregiver work,en,Residential home adult care worker,80,local_peso
+caregiver work,en,Residential home older adult care worker,90,local_peso
+caregiver work,en,Residential home young people care worker,100,local_peso
+caregiver work,en,Social care worker,110,local_peso
+construction work,en,Bricklayer,80,local_peso
+construction work,en,Bridge construction supervisor,90,local_peso
+construction work,en,Building construction worker,100,local_peso
+construction work,en,Carpenter supervisor,110,local_peso
+construction work,en,Construction commercial diver,120,local_peso
+construction work,en,Construction general contractor,130,local_peso
+construction work,en,Construction general supervisor,140,local_peso
+construction work,en,Construction manager,150,local_peso
+construction work,en,Construction painting supervisor,160,local_peso
+construction work,en,Construction quality inspector,170,local_peso
+construction work,en,Construction safety inspector,180,local_peso
+construction work,en,Construction scaffolder,190,local_peso
+construction work,en,Rail construction supervisor,200,local_peso
+construction work,en,Road construction supervisor,210,local_peso
+construction work,en,Road construction worker,220,local_peso
+construction work,en,Roofer,230,local_peso
+construction work,en,Sewer construction supervisor,240,local_peso
+skilled trades,en,ATM repair technician,60,local_peso
+skilled trades,en,Automotive electrician,70,local_peso
+skilled trades,en,Bicycle mechanic,80,local_peso
+skilled trades,en,Building electrician,90,local_peso
+skilled trades,en,Computer hardware repair technician,100,local_peso
+skilled trades,en,Consumer electronics repair technician,110,local_peso
+skilled trades,en,Diesel engine mechanic,120,local_peso
+skilled trades,en,Domestic electrician,130,local_peso
+skilled trades,en,Electrical mechanic,140,local_peso
+skilled trades,en,Electron beam welder,150,local_peso
+skilled trades,en,Event electrician,160,local_peso
+skilled trades,en,Household appliances repair technician,170,local_peso
+skilled trades,en,Industrial electrician,180,local_peso
+skilled trades,en,Industrial machinery mechanic,190,local_peso
+skilled trades,en,Laser beam welder,200,local_peso
+skilled trades,en,Marine electrician,210,local_peso
+skilled trades,en,Marine mechanic,220,local_peso
+skilled trades,en,Mining electrician,230,local_peso
+skilled trades,en,Mining equipment mechanic,240,local_peso
+skilled trades,en,Mobile phone repair technician,250,local_peso
+skilled trades,en,Office equipment repair technician,260,local_peso
+hospitality work,en,Cloak room attendant,60,local_peso
+hospitality work,en,Hotel butler,70,local_peso
+hospitality work,en,Hotel concierge,80,local_peso
+hospitality work,en,Hotel porter,90,local_peso
+hospitality work,en,Housekeeping supervisor,100,local_peso
+hospitality work,en,Linen room attendant,110,local_peso
+hospitality work,en,Locker room attendant,120,local_peso
+restaurant work,en,Chef,60,local_peso
+restaurant work,en,Diet cook,70,local_peso
+restaurant work,en,Fish cook,80,local_peso
+restaurant work,en,Food Service Counter Attendant,90,local_peso
+restaurant work,en,Food service worker,100,local_peso
+restaurant work,en,Grill cook,110,local_peso
+restaurant work,en,Head chef,120,local_peso
+restaurant work,en,Head pastry chef,130,local_peso
+restaurant work,en,Head waiter/head waitress,140,local_peso
+restaurant work,en,Industrial cook,150,local_peso
+restaurant work,en,Pastry chef,160,local_peso
+restaurant work,en,Private chef,170,local_peso
+restaurant work,en,Quick service restaurant team leader,180,local_peso
+restaurant work,en,Restaurant host/restaurant hostess,190,local_peso
+restaurant work,en,Restaurant Service Crew,200,local_peso
+retail work,en,Casino cashier,60,local_peso
+retail work,en,Foreign exchange cashier,70,local_peso
+retail work,en,Lottery cashier,80,local_peso
+retail work,en,Retail department manager,90,local_peso
+retail work,en,Retail entrepreneur,100,local_peso
+retail work,en,Textile sourcing merchandiser,110,local_peso
+retail work,en,Visual merchandiser,120,local_peso
+agriculture work,en,Agricultural engineer,60,local_peso
+agriculture work,en,Agricultural inspector,70,local_peso
+agriculture work,en,Agricultural machinery technician,80,local_peso
+agriculture work,en,Agricultural policy officer,90,local_peso
+agriculture work,en,Agricultural scientist,100,local_peso
+agriculture work,en,Agronomic crop production team leader,110,local_peso
+agriculture work,en,Crop production manager,120,local_peso
+agriculture work,en,Hop farmer,130,local_peso
+agriculture work,en,Livestock advisor,140,local_peso
+agriculture work,en,Mixed farmer,150,local_peso
+agriculture work,en,Poultry sexer,160,local_peso
+fishing work,en,Aquaculture cage mooring worker,30,local_peso
+fishing work,en,Aquaculture cage technician,40,local_peso
+fishing work,en,Aquaculture harvesting manager,50,local_peso
+fishing work,en,Aquaculture harvesting technician,60,local_peso
+fishing work,en,Aquaculture harvesting worker,70,local_peso
+fishing work,en,Aquaculture hatchery manager,80,local_peso
+fishing work,en,Aquaculture hatchery technician,90,local_peso
+fishing work,en,Aquaculture hatchery worker,100,local_peso
+fishing work,en,Aquaculture husbandry manager,110,local_peso
+fishing work,en,Aquaculture husbandry technician,120,local_peso
+fishing work,en,Aquaculture husbandry worker,130,local_peso
+fishing work,en,Aquaculture production manager,140,local_peso
+fishing work,en,Aquaculture quality supervisor,150,local_peso
+fishing work,en,Aquaculture rearing technician,160,local_peso
+fishing work,en,Aquaculture site supervisor,170,local_peso
+fishing work,en,Fishing net maker,180,local_peso
+fishing work,en,Water-based aquaculture technician,190,local_peso
+fishing work,en,Water-based aquaculture worker,200,local_peso
+IT work,en,Cloud software developer,60,local_peso
+IT work,en,Cybersecurity risk manager,70,local_peso
+IT work,en,Database administrator,80,local_peso
+IT work,en,Database designer,90,local_peso
+IT work,en,Database developer,100,local_peso
+IT work,en,Database integrator,110,local_peso
+IT work,en,Embedded systems software developer,120,local_peso
+IT work,en,Industrial mobile devices software developer,130,local_peso
+IT work,en,Numerical tool and process control programmer,140,local_peso
+IT work,en,Software analyst,150,local_peso
+IT work,en,Software architect,160,local_peso
+IT work,en,Software manager,170,local_peso
+IT work,en,Software tester,180,local_peso
+education work,en,Adult literacy teacher,60,local_peso
+education work,en,Anthropology lecturer,70,local_peso
+education work,en,Archaeology lecturer,80,local_peso
+education work,en,Architecture lecturer,90,local_peso
+education work,en,Art studies lecturer,100,local_peso
+education work,en,Art teacher secondary school,110,local_peso
+education work,en,Arts education officer,120,local_peso
+education work,en,Assistant lecturer,130,local_peso
+education work,en,Beauty vocational teacher,140,local_peso
+education work,en,Biology lecturer,150,local_peso
+education work,en,Biology teacher secondary school,160,local_peso
+education work,en,Business administration vocational teacher,170,local_peso
+education work,en,Business lecturer,180,local_peso
+education work,en,Business studies and economics teacher secondary school,190,local_peso
+education work,en,Chemistry lecturer,200,local_peso
+education work,en,Chemistry teacher secondary school,210,local_peso
+education work,en,Circus arts teacher,220,local_peso
+education work,en,Classical languages lecturer,230,local_peso
+education work,en,Classical languages teacher secondary school,240,local_peso
+education work,en,Communications lecturer,250,local_peso
+education work,en,Computer science lecturer,260,local_peso
+education work,en,Dance teacher,270,local_peso
+education work,en,Dentistry lecturer,280,local_peso
+education work,en,Design and applied arts vocational teacher,290,local_peso
+education work,en,Digital literacy teacher,300,local_peso
+logistics work,en,Finished leather warehouse manager,50,local_peso
+logistics work,en,Footwear factory warehouse operator,60,local_peso
+logistics work,en,Intermodal logistics manager,70,local_peso
+logistics work,en,Inventory coordinator,80,local_peso
+logistics work,en,Leather goods warehouse operator,90,local_peso
+logistics work,en,Logistics analyst,100,local_peso
+logistics work,en,Logistics and distribution manager,110,local_peso
+logistics work,en,Logistics engineer,120,local_peso
+logistics work,en,Rail logistics coordinator,130,local_peso
+logistics work,en,Raw materials warehouse specialist,140,local_peso
+logistics work,en,Supply chain manager,150,local_peso
+logistics work,en,Warehouse operators for clothing,160,local_peso
+beauty work,en,Hairdresser assistant,60,local_peso
+beauty work,en,Performance hairdresser,70,local_peso
+household work,en,Amusement park cleaner,50,local_peso
+household work,en,Building cleaner,60,local_peso
+household work,en,Building exterior cleaner,70,local_peso
+household work,en,Domestic butler,80,local_peso
+household work,en,Drapery and carpet cleaner,90,local_peso
+household work,en,Furniture cleaner,100,local_peso
+household work,en,Laundry workers supervisor,110,local_peso
+household work,en,Train cleaner,120,local_peso
+household work,en,Vehicle cleaner,130,local_peso
+household work,en,Window cleaner,140,local_peso
+government work,en,Government planning inspector,60,local_peso
+government work,en,Public administration manager,70,local_peso
+BPO work,en,Call Center Agent,40,local_peso
+BPO work,en,Call centre analyst,50,local_peso
+BPO work,en,Call centre manager,60,local_peso
+BPO work,en,Call centre quality auditor,70,local_peso
+BPO work,en,Call centre supervisor,80,local_peso
+BPO work,en,Contact centre manager,90,local_peso
+BPO work,en,Contact centre supervisor,100,local_peso
+BPO work,en,Customer contact centre information clerk,110,local_peso
+finance work,en,Financial auditor,40,local_peso
+finance work,en,ICT auditor manager,50,local_peso
+finance work,en,IT auditor,60,local_peso
+finance work,en,Night auditor,70,local_peso
+finance work,en,Public finance accountant,80,local_peso
+engineering work,en,Acoustical engineer,50,local_peso
+engineering work,en,Aerodynamics engineer,60,local_peso
+engineering work,en,Aerospace engineer,70,local_peso
+engineering work,en,Aerospace engineering drafter,80,local_peso
+engineering work,en,Aerospace engineering technician,90,local_peso
+engineering work,en,Aircraft maintenance engineer,100,local_peso
+engineering work,en,Airport planning engineer,110,local_peso
+engineering work,en,Alternative fuels engineer,120,local_peso
+engineering work,en,Application engineer,130,local_peso
+engineering work,en,Architectural drafter,140,local_peso
+engineering work,en,Artificial intelligence engineer,150,local_peso
+engineering work,en,Automation engineer,160,local_peso
+engineering work,en,Automation engineering technician,170,local_peso
+engineering work,en,Automotive engineer,180,local_peso
+engineering work,en,Automotive engineering drafter,190,local_peso
+engineering work,en,Automotive engineering technician,200,local_peso
+engineering work,en,Aviation ground systems engineer,210,local_peso
+engineering work,en,Battery simulation engineer,220,local_peso
+engineering work,en,Battery system engineer,230,local_peso
+engineering work,en,Biochemical engineer,240,local_peso
+engineering work,en,Bioengineer,250,local_peso
+engineering work,en,Biomedical engineer,260,local_peso
+engineering work,en,Calculation engineer,270,local_peso
+engineering work,en,Chemical engineer,280,local_peso
+engineering work,en,Chemical engineering technician,290,local_peso
+engineering work,en,Civil engineering technician,300,local_peso
+security work,en,Airport security officer,30,local_peso
+security work,en,Bodyguard,40,local_peso
+security work,en,Hospitality establishment security officer,50,local_peso
+security work,en,Police officer,60,local_peso
+human resources work,en,Recruitment consultant,40,local_peso
+human resources work,en,Talent acquisition manager,50,local_peso
+legal work,en,Corporate lawyer,20,local_peso
+legal work,en,Lawyer linguist,30,local_peso
+legal work,en,Legal assistant,40,local_peso
+legal work,en,Tax compliance officer,50,local_peso
+marketing work,en,Advertising assistant,40,local_peso
+marketing work,en,Advertising copywriter,50,local_peso
+marketing work,en,Advertising manager,60,local_peso
+marketing work,en,Advertising media buyer,70,local_peso
+marketing work,en,Advertising media planner,80,local_peso
+marketing work,en,Advertising sales agent,90,local_peso
+marketing work,en,Advertising specialist,100,local_peso
+marketing work,en,Brand manager,110,local_peso
+marketing work,en,Chief marketing officer,120,local_peso
+marketing work,en,Marketing consultant,130,local_peso
+marketing work,en,Public relations manager,140,local_peso
+marketing work,en,Public relations officer,150,local_peso
+creative work,en,3D animator,20,local_peso
+creative work,en,Animation layout artist,30,local_peso
+creative work,en,Animator,40,local_peso
+creative work,en,Artistic coach,50,local_peso
+creative work,en,Artistic director,60,local_peso
+creative work,en,Artistic painter,70,local_peso
+creative work,en,Body artist,80,local_peso
+creative work,en,Book editor,90,local_peso
+creative work,en,Broadcast news editor,100,local_peso
+creative work,en,Circus artist,110,local_peso
+creative work,en,Community artist,120,local_peso
+creative work,en,Conceptual artist,130,local_peso
+creative work,en,Copy editor,140,local_peso
+creative work,en,Digital artist,150,local_peso
+creative work,en,Drawing artist,160,local_peso
+creative work,en,Editor-in-chief,170,local_peso
+creative work,en,Editorial assistant,180,local_peso
+creative work,en,Glass artist,190,local_peso
+creative work,en,Magazine editor,200,local_peso
+creative work,en,Medical writer,210,local_peso
+creative work,en,Newspaper editor,220,local_peso
+creative work,en,Performance artist,230,local_peso
+creative work,en,Photographer,240,local_peso
+banking work,en,Insurance agency manager,40,local_peso
+banking work,en,Insurance broker,50,local_peso
+banking work,en,Insurance claims handler,60,local_peso
+banking work,en,Insurance claims manager,70,local_peso
+banking work,en,Insurance clerk,80,local_peso
+banking work,en,Insurance collector,90,local_peso
+banking work,en,Insurance fraud investigator,100,local_peso
+banking work,en,Insurance product manager,110,local_peso
+banking work,en,Insurance rating analyst,120,local_peso
+banking work,en,Insurance risk consultant,130,local_peso
+banking work,en,Insurance underwriter,140,local_peso
+banking work,en,Loan officer,150,local_peso
+banking work,en,Property insurance underwriter,160,local_peso
+real estate work,en,Real estate investor,20,local_peso
+real estate work,en,Real estate leasing manager,30,local_peso
+real estate work,en,Real estate manager,40,local_peso
+real estate work,en,Real estate surveyor,50,local_peso
+science work,en,Analytical chemist,10,local_peso
+science work,en,Aquaculture biologist,20,local_peso
+science work,en,Behavioural scientist,30,local_peso
+science work,en,Biochemist,40,local_peso
+science work,en,Biochemistry technician,50,local_peso
+science work,en,Bioinformatics scientist,60,local_peso
+science work,en,Biologist,70,local_peso
+science work,en,Biomedical scientist,80,local_peso
+science work,en,Biomedical scientist advanced,90,local_peso
+science work,en,Biophysicist,100,local_peso
+science work,en,Business economics researcher,110,local_peso
+science work,en,Chemist,120,local_peso
+science work,en,Chemistry technician,130,local_peso
+science work,en,Clinical perfusion scientist,140,local_peso
+science work,en,Communication scientist,150,local_peso
+science work,en,Computer scientist,160,local_peso
+science work,en,Conservation scientist,170,local_peso
+science work,en,Cosmetic chemist,180,local_peso
+science work,en,Data scientist,190,local_peso
+science work,en,Educational researcher,200,local_peso
+science work,en,Environmental scientist,210,local_peso
+science work,en,Fragrance chemist,220,local_peso
+science work,en,Geochemist,230,local_peso
+science work,en,Geophysicist,240,local_peso
+utilities work,en,Environmental education officer,10,local_peso
+utilities work,en,Environmental engineer,20,local_peso
+utilities work,en,Environmental expert,30,local_peso
+utilities work,en,Environmental geologist,40,local_peso
+utilities work,en,Environmental health inspector,50,local_peso
+utilities work,en,Environmental mining engineer,60,local_peso
+utilities work,en,Environmental policy officer,70,local_peso
+utilities work,en,Environmental programme coordinator,80,local_peso
+utilities work,en,Environmental protection manager,90,local_peso
+utilities work,en,Environmental technician,100,local_peso
+utilities work,en,Fossil-fuel power plant operator,110,local_peso
+utilities work,en,Geothermal power plant operator,120,local_peso
+utilities work,en,Health safety and environmental manager,130,local_peso
+utilities work,en,Offshore renewable energy engineer,140,local_peso
+utilities work,en,Offshore renewable energy plant operator,150,local_peso
+utilities work,en,Offshore renewable energy technician,160,local_peso
+utilities work,en,Power plant control room operator,170,local_peso
+utilities work,en,Power plant manager,180,local_peso
+utilities work,en,Renewable energy consultant,190,local_peso
+utilities work,en,Renewable energy engineer,200,local_peso
+utilities work,en,Solar power plant operator,210,local_peso
+utilities work,en,Waste management officer,220,local_peso
+utilities work,en,Waste management supervisor,230,local_peso
+utilities work,en,Wastewater treatment operator,240,local_peso
+utilities work,en,Wastewater treatment technician,250,local_peso
+tourism work,en,Amusement and recreation attendant,20,local_peso
+tourism work,en,Event manager,30,local_peso
+tourism work,en,Recreation policy officer,40,local_peso
+tourism work,en,Recreational facilities manager,50,local_peso
+tourism work,en,Travel consultant,60,local_peso
+social services work,en,Bereavement counsellor,20,local_peso
+social services work,en,Child care social worker,30,local_peso
+social services work,en,Child welfare worker,40,local_peso
+social services work,en,Clinical social worker,50,local_peso
+social services work,en,Community development officer,60,local_peso
+social services work,en,Community development social worker,70,local_peso
+social services work,en,Community social worker,80,local_peso
+social services work,en,Consultant social worker,90,local_peso
+social services work,en,Criminal justice social worker,100,local_peso
+social services work,en,Crisis situation social worker,110,local_peso
+social services work,en,Drug and alcohol addiction counsellor,120,local_peso
+social services work,en,Educational counsellor,130,local_peso
+social services work,en,Family planning counsellor,140,local_peso
+social services work,en,Family social worker,150,local_peso
+social services work,en,Gerontology social worker,160,local_peso
+social services work,en,Hospital social worker,170,local_peso
+social services work,en,Marriage counsellor,180,local_peso
+social services work,en,Mental health social worker,190,local_peso
+social services work,en,Migrant social worker,200,local_peso
+social services work,en,Military welfare worker,210,local_peso
+social services work,en,Palliative care social worker,220,local_peso
+social services work,en,Sexual violence counsellor,230,local_peso
+social services work,en,Social counsellor,240,local_peso
+management work,en,Business manager,10,local_peso
+management work,en,Clothing operations manager,20,local_peso
+management work,en,EBusiness manager,30,local_peso
+management work,en,ICT operations manager,40,local_peso
+management work,en,ICT project manager,50,local_peso
+management work,en,Inland water transport general manager,60,local_peso
+management work,en,Leather finishing operations manager,70,local_peso
+management work,en,Maritime water transport general manager,80,local_peso
+management work,en,Operations manager,90,local_peso
+management work,en,Project manager,100,local_peso
+management work,en,Rail operations manager,110,local_peso
+management work,en,Road operations manager,120,local_peso
+management work,en,Social entrepreneur,130,local_peso
+management work,en,Textile operations manager,140,local_peso

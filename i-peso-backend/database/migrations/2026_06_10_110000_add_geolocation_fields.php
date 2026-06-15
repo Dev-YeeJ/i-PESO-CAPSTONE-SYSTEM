@@ -15,7 +15,7 @@ return new class extends Migration
             $table->decimal('latitude', 10, 7)->nullable()->after('address_barangay_code');
             $table->decimal('longitude', 10, 7)->nullable()->after('latitude');
             $table->unsignedInteger('location_accuracy')->nullable()->after('longitude');
-            $table->string('geoapify_place_id')->nullable()->after('location_accuracy');
+            $table->string('google_place_id')->nullable()->after('location_accuracy');
             $table->index(['latitude', 'longitude'], 'job_seekers_coordinates_index');
         });
 
@@ -25,7 +25,7 @@ return new class extends Migration
             $table->string('barangay_code', 10)->nullable()->after('barangay');
             $table->decimal('latitude', 10, 7)->nullable()->after('house_unit_street');
             $table->decimal('longitude', 10, 7)->nullable()->after('latitude');
-            $table->string('geoapify_place_id')->nullable()->after('longitude');
+            $table->string('google_place_id')->nullable()->after('longitude');
             $table->index(['latitude', 'longitude'], 'employers_coordinates_index');
         });
 
@@ -35,7 +35,7 @@ return new class extends Migration
             $table->string('barangay_code', 10)->nullable()->after('barangay');
             $table->decimal('latitude', 10, 7)->nullable()->after('specific_address');
             $table->decimal('longitude', 10, 7)->nullable()->after('latitude');
-            $table->string('geoapify_place_id')->nullable()->after('longitude');
+            $table->string('google_place_id')->nullable()->after('longitude');
             $table->index(['latitude', 'longitude'], 'job_vacancies_coordinates_index');
         });
     }
@@ -51,7 +51,7 @@ return new class extends Migration
                 'latitude',
                 'longitude',
                 'location_accuracy',
-                'geoapify_place_id',
+                'google_place_id',
             ]);
         });
 
@@ -63,7 +63,7 @@ return new class extends Migration
                 'barangay_code',
                 'latitude',
                 'longitude',
-                'geoapify_place_id',
+                'google_place_id',
             ]);
         });
 
@@ -75,7 +75,7 @@ return new class extends Migration
                 'barangay_code',
                 'latitude',
                 'longitude',
-                'geoapify_place_id',
+                'google_place_id',
             ]);
         });
     }

@@ -53,7 +53,7 @@ class JobSeeker extends Authenticatable
         'latitude',
         'longitude',
         'location_accuracy',
-        'geoapify_place_id',
+        'google_place_id',
         // === STEP 2: EDUCATION & DEMOGRAPHICS ===
         'is_4ps_beneficiary',
         'household_id_4ps',
@@ -73,6 +73,8 @@ class JobSeeker extends Authenticatable
         'former_ofw_return_date',
         // === STEP 4: JOB PREFERENCES ===
         'work_type_preference',
+        'preferred_work_setups',
+        'preferred_employment_types',
         'preferred_work_location',
         'preferred_locations_details',
         // === STEP 5: EDUCATION & OTHER SKILLS ===
@@ -104,6 +106,8 @@ class JobSeeker extends Authenticatable
         'profile_completed' => 'boolean',
         'unemployment_months' => 'integer',
         'preferred_locations_details' => 'array',
+        'preferred_work_setups' => 'array',
+        'preferred_employment_types' => 'array',
         'form_validation_state' => 'array',
         'currently_in_school' => 'boolean',
         'other_skills' => 'array',

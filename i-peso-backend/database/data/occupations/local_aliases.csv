@@ -1,0 +1,454 @@
+canonical_title,alias,language,source,confidence
+Domestic cleaner,kasambahay,fil,local_peso,1
+Domestic housekeeper,house helper,en,local_peso,0.95
+Data entry clerk,encoder,en,local_peso,1
+Data entry clerk,barangay encoder,en,local_peso,0.95
+Administrative assistant,virtual assistant,en,local_peso,0.85
+Administrative assistant,VA,en,local_peso,0.8
+Online sales channel manager,online seller,en,local_peso,0.95
+Online sales channel manager,TikTok live seller,en,local_peso,0.8
+Baker,panadero,fil,local_peso,1
+Baker,bread maker,en,local_peso,0.9
+Customer contact centre information clerk,CSR,en,local_peso,0.85
+Customer contact centre information clerk,call center agent,en,local_peso,0.9
+Domestic housekeeper,katulong,fil,local_peso,1
+Domestic housekeeper,housemaid,en,local_peso,0.95
+Domestic housekeeper,household helper,en,local_peso,0.95
+Domestic housekeeper,stay-in helper,en,local_peso,0.9
+Cook,kusinero,fil,local_peso,1
+Cook,kusinera,fil,local_peso,1
+Cook,tagaluto,fil,local_peso,0.95
+Cook,kitchen cook,en,local_peso,0.9
+Baker,panadera,fil,local_peso,1
+Retail Salesperson,tindero,fil,local_peso,1
+Retail Salesperson,tindera,fil,local_peso,1
+Retail Salesperson,saleslady,en,local_peso,0.95
+Retail Salesperson,salesman,en,local_peso,0.95
+Retail Salesperson,store salesperson,en,local_peso,0.9
+Street food vendor,street vendor,en,local_peso,0.95
+Street food vendor,ambulant vendor,en,local_peso,0.9
+Street food vendor,maglalako,fil,local_peso,0.95
+Carpenter,karpintero,fil,local_peso,1
+Carpenter,carpentry worker,en,local_peso,0.9
+Mason,kantero,fil,local_peso,0.9
+Mason,masonry worker,en,local_peso,0.95
+Welder,manghihinang,fil,local_peso,1
+Welder,welding worker,en,local_peso,0.95
+Plumber,tubero,fil,local_peso,1
+Plumber,plumbing worker,en,local_peso,0.95
+Electrician,elektrisyan,fil,local_peso,1
+Electrician,electrical worker,en,local_peso,0.9
+Security guard,sekyu,fil,local_peso,1
+Security guard,guwardiya,fil,local_peso,1
+Security guard,security personnel,en,local_peso,0.9
+Taxi driver,tsuper,fil,local_peso,0.9
+Taxi driver,taxi operator,en,local_peso,0.85
+Delivery Driver,delivery van driver,en,local_peso,0.95
+Delivery Driver,parcel delivery driver,en,local_peso,0.95
+Cargo vehicle driver,truck driver,en,local_peso,0.95
+Cargo vehicle driver,lorry driver,en,local_peso,0.9
+Heavy Truck Driver,heavy equipment truck driver,en,local_peso,0.9
+Bus driver,bus operator,en,local_peso,0.9
+Motorcycle delivery person,delivery rider,en,local_peso,1
+Motorcycle delivery person,motorcycle courier,en,local_peso,0.95
+Motorcycle delivery person,motor rider,en,local_peso,0.9
+Motorcycle delivery person,food delivery rider,en,local_peso,0.95
+Construction Laborer,construction helper,en,local_peso,1
+Construction Laborer,construction worker,en,local_peso,0.95
+Construction Laborer,common laborer,en,local_peso,0.9
+Building cleaner,janitor,en,local_peso,1
+Building cleaner,janitress,en,local_peso,1
+Building cleaner,utility cleaner,en,local_peso,0.9
+Building cleaner,cleaning staff,en,local_peso,0.9
+Room attendant,housekeeping attendant,en,local_peso,1
+Room attendant,hotel housekeeper,en,local_peso,0.95
+Room attendant,chambermaid,en,local_peso,0.9
+Waiter/waitress,food server,en,local_peso,0.95
+Waiter/waitress,restaurant server,en,local_peso,0.95
+Waiter/waitress,waitstaff,en,local_peso,0.9
+Quick service restaurant crew member,service crew,en,local_peso,1
+Quick service restaurant crew member,fast food crew,en,local_peso,1
+Quick service restaurant crew member,crew member,en,local_peso,0.9
+Restaurant Service Crew,restaurant crew,en,local_peso,1
+Food Service Counter Attendant,food counter attendant,en,local_peso,0.95
+Food Service Counter Attendant,counter crew,en,local_peso,0.95
+Cashier,cashier clerk,en,local_peso,0.9
+Cashier,checkout clerk,en,local_peso,0.9
+Shop assistant,store assistant,en,local_peso,0.95
+Shop assistant,store helper,en,local_peso,0.9
+Sales assistant,retail sales assistant,en,local_peso,0.9
+Data entry clerk,data encoder,en,local_peso,1
+Data entry clerk,encoding clerk,en,local_peso,0.95
+Data entry clerk,computer encoder,en,local_peso,0.95
+Administrative assistant,admin assistant,en,local_peso,1
+Administrative assistant,administrative aide,en,local_peso,0.95
+Administrative assistant,secretarial assistant,en,local_peso,0.9
+Office clerk,office staff,en,local_peso,0.95
+Office clerk,clerical staff,en,local_peso,0.95
+Office clerk,office aide,en,local_peso,0.9
+Call centre agent,BPO agent,en,local_peso,1
+Call centre agent,contact center agent,en,local_peso,0.95
+Customer service representative,call center representative,en,local_peso,0.95
+Customer service representative,customer support representative,en,local_peso,0.95
+Customer service representative,customer care representative,en,local_peso,0.95
+Customer service representative,customer support agent,en,local_peso,0.9
+Crop production worker,farm worker,en,local_peso,0.95
+Crop production worker,farmhand,en,local_peso,0.9
+Crop production worker,magsasaka,fil,local_peso,0.95
+Agricultural technician,agri technician,en,local_peso,0.95
+Agricultural technician,farm technician,en,local_peso,0.9
+Deep-sea fishery worker,mangingisda,fil,local_peso,1
+Deep-sea fishery worker,fisherman,en,local_peso,0.95
+Deep-sea fishery worker,fisherwoman,en,local_peso,0.95
+Deep-sea fishery worker,fishing crew,en,local_peso,0.9
+Child day care worker,daycare worker,en,local_peso,1
+Child day care worker,day care aide,en,local_peso,0.95
+Babysitter,yaya,fil,local_peso,1
+Nanny,nanny,en,local_peso,1
+Babysitter,child minder,en,local_peso,0.9
+Care home worker,caregiver,en,local_peso,1
+Care home worker,home care worker,en,local_peso,0.95
+Care home worker,elderly caregiver,en,local_peso,0.95
+Nursing Assistant,nurse aide,en,local_peso,1
+Nursing Assistant,healthcare assistant,en,local_peso,0.95
+Nursing Assistant,nursing aide,en,local_peso,1
+Registered Nurse,nurse,en,local_peso,0.95
+Registered Nurse,RN,en,local_peso,0.95
+Teacher Aide,teacher assistant,en,local_peso,1
+Teacher Aide,classroom aide,en,local_peso,0.95
+Teacher Aide,teaching aide,en,local_peso,0.95
+Elementary School Teacher,grade school teacher,en,local_peso,1
+Elementary School Teacher,primary school teacher,en,local_peso,0.95
+Senior High School Teacher,SHS teacher,en,local_peso,1
+Senior High School Teacher,senior high teacher,en,local_peso,0.95
+Automotive Mechanic,auto mechanic,en,local_peso,1
+Automotive Mechanic,mekaniko,fil,local_peso,1
+Automotive Mechanic,car mechanic,en,local_peso,0.95
+Diesel engine mechanic,diesel mechanic,en,local_peso,1
+Diesel engine mechanic,truck mechanic,en,local_peso,0.95
+Diesel engine mechanic,diesel technician,en,local_peso,0.9
+Bicycle mechanic,bike mechanic,en,local_peso,1
+Hairdresser,parlorista,fil,local_peso,1
+Hairdresser,hair stylist,en,local_peso,0.95
+Barber,barbero,fil,local_peso,1
+Dressmaker,modista,fil,local_peso,1
+Tailor,sastre,fil,local_peso,1
+Laundry worker,labandero,fil,local_peso,1
+Laundry worker,labandera,fil,local_peso,1
+Laundry worker,laundry attendant,en,local_peso,0.95
+Laundry ironer,plantsadora,fil,local_peso,1
+Laundry ironer,pressing attendant,en,local_peso,0.9
+Refuse collector,garbage collector,en,local_peso,1
+Refuse collector,basurero,fil,local_peso,1
+Refuse collector,waste collector,en,local_peso,0.95
+Warehouse worker,bodega worker,en,local_peso,0.95
+Warehouse worker,warehouse staff,en,local_peso,0.95
+Warehouse worker,stockroom worker,en,local_peso,0.9
+Warehouse order picker,warehouse picker,en,local_peso,0.95
+Warehouse order picker,order picker,en,local_peso,1
+Machine Operator,production machine operator,en,local_peso,0.95
+Machine Operator,factory machine operator,en,local_peso,0.95
+Production supervisor,line supervisor,en,local_peso,0.95
+Production supervisor,factory supervisor,en,local_peso,0.9
+Tour Guide,local tour guide,en,local_peso,0.95
+Tour Guide,tourist guide,en,local_peso,0.95
+Hotel Receptionist,hotel front desk clerk,en,local_peso,1
+Hotel Receptionist,hotel front desk agent,en,local_peso,0.95
+Receptionist,front desk receptionist,en,local_peso,0.95
+Receptionist,front office clerk,en,local_peso,0.9
+Bookkeeper,accounting bookkeeper,en,local_peso,0.95
+Accountant,CPA,en,local_peso,0.95
+Computer Programmer,programmer,en,local_peso,1
+Computer Programmer,coder,en,local_peso,0.95
+Web developer,front-end developer,en,local_peso,0.95
+Web developer,back-end developer,en,local_peso,0.95
+Software developer,software engineer,en,local_peso,0.95
+Software developer,application developer,en,local_peso,0.9
+Graphic designer,layout artist,en,local_peso,0.95
+Graphic designer,graphics artist,en,local_peso,0.95
+Information Technology Support Technician,IT technician,en,local_peso,1
+Information Technology Support Technician,computer technician,en,local_peso,0.95
+Information Technology Support Technician,help desk technician,en,local_peso,0.95
+Civil engineer,civil engineering professional,en,local_peso,0.9
+Electrical engineer,electrical engineering professional,en,local_peso,0.9
+Mechanical engineer,mechanical engineering professional,en,local_peso,0.9
+Medical Technologist,med tech,en,local_peso,1
+Medical Technologist,medical laboratory technologist,en,local_peso,0.95
+Pharmacist,drugstore pharmacist,en,local_peso,0.9
+Barista,coffee shop barista,en,local_peso,0.95
+Barista,coffee shop crew,en,local_peso,0.85
+Bartender,barman,en,local_peso,0.95
+Bartender,bar attendant,en,local_peso,0.9
+Human Resource Officer,HR officer,en,local_peso,1
+Human Resource Officer,HR staff,en,local_peso,0.95
+Human Resource Officer,personnel officer,en,local_peso,0.95
+Recruitment consultant,recruiter,en,local_peso,1
+Recruitment consultant,recruitment officer,en,local_peso,0.9
+Payroll clerk,payroll staff,en,local_peso,0.95
+Billing clerk,billing staff,en,local_peso,0.95
+Secretary,office secretary,en,local_peso,0.95
+Supermarket manager,grocery store manager,en,local_peso,0.9
+Shelf filler,store stocker,en,local_peso,0.95
+Shelf filler,grocery stocker,en,local_peso,0.95
+Real estate agent,property agent,en,local_peso,0.95
+Real estate agent,property sales agent,en,local_peso,0.9
+Photographer,photo studio photographer,en,local_peso,0.9
+Camera operator,videographer,en,local_peso,0.95
+Camera operator,video camera operator,en,local_peso,0.95
+Digital marketing manager,online marketing manager,en,local_peso,0.9
+Digital marketing manager,digital marketing specialist,en,local_peso,0.85
+Sales account manager,client account manager,en,local_peso,0.9
+Bank teller,bank cashier,en,local_peso,0.9
+Loan officer,loan account officer,en,local_peso,0.9
+Credit analyst,credit officer,en,local_peso,0.9
+Car driving instructor,driving school instructor,en,local_peso,0.95
+School bus attendant,school service attendant,en,local_peso,0.9
+Animal care attendant,pet care attendant,en,local_peso,0.95
+Veterinary technician,vet technician,en,local_peso,0.95
+Dental chairside assistant,dental assistant,en,local_peso,1
+Pharmacy assistant,pharmacy aide,en,local_peso,0.95
+Firefighter,bumbero,fil,local_peso,1
+Firefighter,fireman,en,local_peso,0.95
+Police officer,pulis,fil,local_peso,1
+Police officer,police personnel,en,local_peso,0.9
+Civil enforcement officer,traffic enforcer,en,local_peso,0.95
+Civil enforcement officer,city enforcer,en,local_peso,0.85
+Crossing guard,school crossing guard,en,local_peso,0.95
+Crossing guard,traffic aide,en,local_peso,0.9
+Community health worker,barangay health worker,en,local_peso,1
+Community health worker,BHW,en,local_peso,1
+Community health worker,community health aide,en,local_peso,0.95
+Social worker,municipal social worker,en,local_peso,0.9
+Social worker,case worker,en,local_peso,0.9
+Youth worker,youth development worker,en,local_peso,0.95
+Youth worker,SK youth worker,en,local_peso,0.85
+Survey enumerator,enumerator,en,local_peso,1
+Survey enumerator,census enumerator,en,local_peso,0.95
+Survey enumerator,field surveyor,en,local_peso,0.85
+Meter reader,electric meter reader,en,local_peso,0.95
+Meter reader,water meter reader,en,local_peso,0.95
+Electric meter technician,meter technician,en,local_peso,0.95
+Water network operative,waterworks personnel,en,local_peso,0.9
+Water network operative,water line worker,en,local_peso,0.95
+Groundsman/groundswoman,groundskeeper,en,local_peso,1
+Groundsman/groundswoman,school groundskeeper,en,local_peso,0.9
+Poultry breeder,poultry raiser,en,local_peso,0.95
+Poultry breeder,chicken raiser,en,local_peso,0.95
+Poultry breeder,magmamanok,fil,local_peso,0.95
+Livestock worker,livestock farm worker,en,local_peso,0.95
+Livestock worker,animal farm worker,en,local_peso,0.9
+Cattle breeder,cattle raiser,en,local_peso,0.95
+Cattle breeder,cow raiser,en,local_peso,0.9
+Pig breeder,pig raiser,en,local_peso,0.95
+Pig breeder,hog raiser,en,local_peso,0.95
+Pig breeder,magbababoy,fil,local_peso,0.95
+Fish preparation operator,fish processor,en,local_peso,0.95
+Fish preparation operator,fish processing worker,en,local_peso,0.95
+Slaughterer,katador,fil,local_peso,0.85
+Slaughterer,slaughterhouse worker,en,local_peso,0.95
+Butcher,magkakatay,fil,local_peso,0.9
+Butcher,meat butcher,en,local_peso,0.95
+Meat cutter,meat shop cutter,en,local_peso,0.9
+Food production operator,food factory worker,en,local_peso,0.95
+Food production operator,food production worker,en,local_peso,0.95
+Food safety inspector,food sanitation inspector,en,local_peso,0.9
+Baking operator,bakery production worker,en,local_peso,0.95
+Dairy processing operator,dairy plant worker,en,local_peso,0.9
+Canning and bottling line operator,canning line worker,en,local_peso,0.95
+Canning and bottling line operator,bottling line worker,en,local_peso,0.95
+Fish canning operator,fish cannery worker,en,local_peso,0.95
+Hand packer,packer,en,local_peso,1
+Hand packer,packing staff,en,local_peso,0.95
+Hand packer,packaging worker,en,local_peso,0.9
+Packaging production manager,packaging supervisor,en,local_peso,0.9
+Forklift operator,forklift driver,en,local_peso,1
+Forklift operator,forklift personnel,en,local_peso,0.9
+Bulldozer operator,bulldozer driver,en,local_peso,0.95
+Excavator operator,backhoe operator,en,local_peso,1
+Excavator operator,excavator driver,en,local_peso,0.95
+Rigger,construction rigger,en,local_peso,0.95
+Rigger,signalman,en,local_peso,0.85
+Bricklayer,latero,fil,local_peso,0.8
+Bricklayer,brick mason,en,local_peso,0.95
+Concrete finisher,cement finisher,en,local_peso,0.95
+Construction painter,house painter,en,local_peso,0.95
+Construction painter,pintor,fil,local_peso,1
+Tile fitter,tile setter,en,local_peso,0.95
+Tile fitter,tile installer,en,local_peso,0.95
+Roofer,roof installer,en,local_peso,0.95
+Roofer,roofing worker,en,local_peso,0.95
+Mobile phone repair technician,cellphone technician,en,local_peso,1
+Mobile phone repair technician,phone repair technician,en,local_peso,0.95
+Mobile phone repair technician,cellphone repairman,en,local_peso,0.95
+Security alarm technician,CCTV technician,en,local_peso,0.9
+Security alarm technician,alarm installer,en,local_peso,0.9
+Telecommunications technician,telco technician,en,local_peso,0.95
+Telecommunications technician,fiber technician,en,local_peso,0.9
+Solar energy technician,solar installer,en,local_peso,0.95
+Solar energy technician,solar panel technician,en,local_peso,0.95
+Window installer,glass and window installer,en,local_peso,0.9
+Vehicle cleaner,car washer,en,local_peso,1
+Vehicle cleaner,car wash attendant,en,local_peso,0.95
+Vehicle cleaner,auto detailer,en,local_peso,0.9
+Chef,head cook,en,local_peso,0.95
+Chef,executive chef,en,local_peso,0.9
+Kitchen assistant,kitchen helper,en,local_peso,1
+Kitchen assistant,kitchen staff,en,local_peso,0.95
+Kitchen assistant,food prep assistant,en,local_peso,0.9
+Restaurant manager,restaurant supervisor,en,local_peso,0.9
+Accommodation manager,hotel manager,en,local_peso,0.9
+Wedding planner,wedding coordinator,en,local_peso,0.95
+Wedding planner,event coordinator,en,local_peso,0.85
+Travel agent,travel booking agent,en,local_peso,0.95
+Travel agent,ticketing agent,en,local_peso,0.9
+Tourist information officer,tourism officer,en,local_peso,0.9
+Tourist information officer,tourism staff,en,local_peso,0.9
+Massage therapist,masahista,fil,local_peso,1
+Massage therapist,massage attendant,en,local_peso,0.9
+Beauty salon attendant,salon attendant,en,local_peso,0.95
+Beauty salon attendant,salon staff,en,local_peso,0.9
+Beauty salon manager,salon owner,en,local_peso,0.85
+Manicurist,manikurista,fil,local_peso,1
+Manicurist,nail technician,en,local_peso,0.95
+Make-up artist,makeup artist,en,local_peso,1
+Make-up artist,beautician,en,local_peso,0.85
+Fitness instructor,gym instructor,en,local_peso,0.95
+Fitness instructor,fitness coach,en,local_peso,0.95
+Personal trainer,gym trainer,en,local_peso,0.95
+Sports coach,athletic coach,en,local_peso,0.9
+Swimming teacher,swimming instructor,en,local_peso,0.95
+Blogger,blog content creator,en,local_peso,0.9
+Vlogger,video content creator,en,local_peso,0.95
+Vlogger,YouTube content creator,en,local_peso,0.9
+Online sales channel manager,e-commerce seller,en,local_peso,0.95
+Online sales channel manager,Shopee seller,en,local_peso,0.95
+Online sales channel manager,Lazada seller,en,local_peso,0.95
+Marketing manager,marketing officer,en,local_peso,0.9
+Sales manager,sales supervisor,en,local_peso,0.9
+Merchandiser,store merchandiser,en,local_peso,0.95
+Visual merchandiser,display merchandiser,en,local_peso,0.95
+Supply chain assistant,logistics assistant,en,local_peso,0.9
+Warehouse manager,warehouse supervisor,en,local_peso,0.9
+General practitioner,medical doctor,en,local_peso,0.95
+General practitioner,barangay doctor,en,local_peso,0.85
+Midwife,komadrona,fil,local_peso,0.9
+Midwife,barangay midwife,en,local_peso,0.95
+Home care aide,home caregiver,en,local_peso,0.95
+Home care aide,personal care aide,en,local_peso,0.9
+Physiotherapist,physical therapist,en,local_peso,0.95
+Physiotherapist,PT,en,local_peso,0.85
+Occupational therapist,OT,en,local_peso,0.85
+Radiographer,radiologic technologist,en,local_peso,0.95
+Radiographer,x-ray technician,en,local_peso,0.95
+Medical laboratory assistant,laboratory aide,en,local_peso,0.95
+Medical laboratory assistant,lab assistant,en,local_peso,0.95
+Dental practitioner,dentist,en,local_peso,1
+Dental hygienist,dental hygiene technician,en,local_peso,0.9
+Pharmacy technician,pharmacy technician assistant,en,local_peso,0.85
+Dietitian,nutrition and diet specialist,en,local_peso,0.9
+Psychologist,mental health psychologist,en,local_peso,0.9
+Secondary school teacher,high school teacher,en,local_peso,0.95
+Vocational teacher,technical vocational instructor,en,local_peso,0.95
+Vocational teacher,TVET trainer,en,local_peso,0.95
+Tutor,academic tutor,en,local_peso,0.95
+Tutor,private tutor,en,local_peso,0.95
+Librarian,school librarian,en,local_peso,0.95
+Library assistant,library aide,en,local_peso,0.95
+Accounting assistant,accounting staff,en,local_peso,0.95
+Accounting assistant,accounts assistant,en,local_peso,0.95
+Auditing clerk,audit staff,en,local_peso,0.95
+Tax clerk,tax staff,en,local_peso,0.9
+Financial analyst,finance analyst,en,local_peso,0.95
+Insurance broker,insurance agent,en,local_peso,0.9
+Debt collector,collection officer,en,local_peso,0.95
+Debt collector,collections agent,en,local_peso,0.95
+Branch manager,branch supervisor,en,local_peso,0.9
+Corporate trainer,company trainer,en,local_peso,0.9
+Executive assistant,executive secretary,en,local_peso,0.95
+Legal assistant,legal staff,en,local_peso,0.9
+Court clerk,court staff,en,local_peso,0.9
+Civil registrar,local civil registrar,en,local_peso,0.95
+Telephone switchboard operator,telephone operator,en,local_peso,0.95
+Business analyst,business systems analyst,en,local_peso,0.9
+Sewing machine operator,garment sewer,en,local_peso,0.95
+Sewing machine operator,sewing operator,en,local_peso,0.95
+Sewing machine operator,mananahi,fil,local_peso,0.9
+Textile machine operator,textile factory worker,en,local_peso,0.9
+Clothing cutter,garment cutter,en,local_peso,0.95
+Clothing alteration machinist,alteration tailor,en,local_peso,0.9
+Shoemaker,sapatero,fil,local_peso,1
+Shoe repairer,shoe repairman,en,local_peso,0.95
+Goldsmith,platero,fil,local_peso,0.9
+Cabinet maker,furniture carpenter,en,local_peso,0.95
+Woodcarver,wood carving artisan,en,local_peso,0.9
+Upholsterer,furniture upholsterer,en,local_peso,0.95
+Screen printer,silk screen printer,en,local_peso,0.95
+Digital printer,digital printing operator,en,local_peso,0.95
+Sign maker,signage maker,en,local_peso,0.95
+Taxi driver,tricycle driver,en,local_peso,0.85
+Taxi driver,tricycle operator,en,local_peso,0.85
+Taxi driver,ride-hailing driver,en,local_peso,0.9
+Taxi driver,TNVS driver,en,local_peso,0.95
+Bus driver,jeepney driver,en,local_peso,0.85
+Bus driver,public utility bus driver,en,local_peso,0.95
+Car and van delivery driver,van delivery driver,en,local_peso,0.95
+Car and van delivery driver,light vehicle delivery driver,en,local_peso,0.9
+Moving truck driver,lipat-bahay truck driver,en,local_peso,0.95
+Tow truck driver,towing driver,en,local_peso,0.95
+Refuse vehicle driver,garbage truck driver,en,local_peso,0.95
+Emergency ambulance driver,ambulance driver,en,local_peso,1
+Patient transport services driver,patient transport driver,en,local_peso,0.9
+Train driver,locomotive driver,en,local_peso,0.95
+Academic advisor,student adviser,en,local_peso,0.95
+Academic advisor,academic counsellor,en,local_peso,0.9
+Admissions coordinator,admissions officer,en,local_peso,0.95
+Career guidance advisor,career counsellor,en,local_peso,0.95
+Career guidance advisor,career coach,en,local_peso,0.9
+Early years teacher,preschool teacher,en,local_peso,1
+Early years teacher,nursery teacher,en,local_peso,0.95
+Early years teacher,daycare teacher,en,local_peso,0.95
+Special educational needs teacher,SPED teacher,en,local_peso,1
+Special educational needs teacher,special education teacher,en,local_peso,1
+Secondary school head teacher,high school principal,en,local_peso,0.95
+Secondary school head teacher,secondary school principal,en,local_peso,0.95
+University teaching assistant,college teaching assistant,en,local_peso,0.9
+Scientific laboratory technician,lab technician,en,local_peso,0.95
+Scientific laboratory technician,laboratory technician,en,local_peso,0.95
+Biology technician,biology laboratory technician,en,local_peso,0.9
+Chemistry technician,chemistry laboratory technician,en,local_peso,0.9
+Diagnostic radiographer,medical radiographer,en,local_peso,0.95
+Clinical coder,medical coder,en,local_peso,0.95
+Optician,optical shop technician,en,local_peso,0.9
+Optometrist,eye doctor,en,local_peso,0.9
+Agronomist,crop specialist,en,local_peso,0.9
+Agronomist,agricultural crop specialist,en,local_peso,0.9
+Farm manager,farm supervisor,en,local_peso,0.95
+Farm manager,farm administrator,en,local_peso,0.9
+Crop production manager,crop farm manager,en,local_peso,0.95
+Fruit production team leader,fruit farm supervisor,en,local_peso,0.9
+Agricultural machinery technician,farm equipment technician,en,local_peso,0.95
+Agricultural machinery technician,tractor mechanic,en,local_peso,0.9
+Milling machine operator,rice mill operator,en,local_peso,0.9
+Milling machine operator,mill operator,en,local_peso,0.85
+Tree surgeon,tree trimmer,en,local_peso,0.95
+Tree surgeon,arborist,en,local_peso,0.9
+Flower and garden specialised seller,garden shop attendant,en,local_peso,0.9
+Bee breeder,beekeeper,en,local_peso,1
+Bee breeder,honey bee farmer,en,local_peso,0.9
+Dog trainer,canine trainer,en,local_peso,0.95
+Zookeeper,zoo animal keeper,en,local_peso,0.95
+Bank teller,bank counter staff,en,local_peso,0.9
+Budget analyst,budget officer,en,local_peso,0.9
+Business analyst,business process analyst,en,local_peso,0.9
+Executive assistant,executive aide,en,local_peso,0.9
+Legal assistant,legal aide,en,local_peso,0.9
+Secretary,barangay secretary,en,local_peso,0.85
+Civil registrar,civil registry officer,en,local_peso,0.95
+Telephone switchboard operator,switchboard attendant,en,local_peso,0.9
+Clothing cutter,pattern cutter,en,local_peso,0.9
+Clothing alteration machinist,alteration sewer,en,local_peso,0.9
+Shoe repairer,sapatos repairman,fil,local_peso,0.9
+Silversmith,silver jewelry maker,en,local_peso,0.9
+Upholsterer,sofa repairer,en,local_peso,0.9
+Digital printer,printing machine operator,en,local_peso,0.9
+Sign maker,signboard maker,en,local_peso,0.95

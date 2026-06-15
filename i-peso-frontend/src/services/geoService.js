@@ -7,6 +7,11 @@ import {
 
 function getCurrentPosition() {
   return new Promise((resolve, reject) => {
+    if (!window.isSecureContext) {
+      reject(new Error('Current location requires HTTPS or localhost.'))
+      return
+    }
+
     if (!navigator.geolocation) {
       reject(new Error('Your browser does not support location detection.'))
       return
@@ -35,16 +40,25 @@ function getCurrentPosition() {
   })
 }
 
-export async function autocompleteAddress(text, coordinates = {}) {
+export async function autocompleteAddress(text, coordinates = {}, sessionToken = null) {
   const response = await apiClient.get('/geo/autocomplete', {
     params: {
       text,
       latitude: coordinates.latitude,
       longitude: coordinates.longitude,
+      session_token: sessionToken,
     },
   })
 
   return response.data.suggestions ?? []
+}
+
+export async function getPlaceAddress(placeId, sessionToken = null) {
+  const response = await apiClient.get(`/geo/place/${encodeURIComponent(placeId)}`, {
+    params: { session_token: sessionToken },
+  })
+
+  return response.data.location
 }
 
 export async function geocodeAddress(address) {
@@ -65,48 +79,127 @@ export async function reverseGeocode(latitude, longitude) {
 
 async function matchPsgcLocation(location, accuracy = null) {
   const warnings = []
+  const components = location?.address_components ?? location?.addressComponents ?? []
+  const componentNames = (...types) => components
+    .filter((component) => types.some((type) => component.types?.includes(type)))
+    .map((component) => component.long_name ?? component.longText)
+    .filter(Boolean)
+  const uniqueNames = (...groups) => [
+    ...new Set(
+      groups
+        .flat()
+        .map((name) => String(name ?? '').trim())
+        .filter(Boolean)
+    ),
+  ]
+  const formattedParts = String(location?.formatted ?? '')
+    .split(',')
+    .map((part) => part.trim())
+    .filter(Boolean)
+  const firstPsgcMatch = async (candidates, matcher) => {
+    for (const candidate of candidates) {
+      const match = await matcher(candidate)
+      if (match) return { match, sourceName: candidate }
+    }
 
-  const province = location?.province_name
-    ? await findProvinceByName(location.province_name)
-    : null
-  if (location?.province_name && !province) {
-    warnings.push(`Province "${location.province_name}" was not matched. Please select it manually.`)
+    return { match: null, sourceName: candidates[0] ?? null }
   }
 
-  const city = province && location?.city_name
-    ? await findCityByName(province.code, location.city_name)
-    : null
-  if (province && location?.city_name && !city) {
-    warnings.push(`City "${location.city_name}" was not found in ${province.name}. Please select it manually.`)
+  const provinceCandidates = uniqueNames(
+    location?.province_name,
+    componentNames('administrative_area_level_1', 'administrative_area_level_2'),
+    formattedParts
+  )
+  const provinceResult = await firstPsgcMatch(provinceCandidates, findProvinceByName)
+  const province = provinceResult.match
+  const provinceName = provinceResult.sourceName
+  if (provinceName && !province) {
+    warnings.push(`Province "${provinceName}" was not matched. Please select it manually.`)
   }
 
-  const barangay = city && location?.barangay_name
-    ? await findBarangayByName(city.code, location.barangay_name)
-    : null
-  if (city && location?.barangay_name && !barangay) {
-    warnings.push(`Barangay "${location.barangay_name}" was not matched. Please select it manually.`)
+  const cityCandidates = uniqueNames(
+    location?.city_name,
+    componentNames(
+      'locality',
+      'postal_town',
+      'administrative_area_level_3',
+      'administrative_area_level_2'
+    ),
+    formattedParts
+  )
+  const cityResult = province
+    ? await firstPsgcMatch(
+        cityCandidates,
+        (candidate) => findCityByName(province.code, candidate)
+      )
+    : { match: null, sourceName: cityCandidates[0] ?? null }
+  const city = cityResult.match
+  const cityName = cityResult.sourceName
+  if (province && cityName && !city) {
+    warnings.push(`City "${cityName}" was not found in ${province.name}. Please select it manually.`)
+  }
+
+  const barangayCandidates = uniqueNames(
+    location?.barangay_name,
+    componentNames(
+      'neighborhood',
+      'sublocality_level_1',
+      'sublocality',
+      'administrative_area_level_4'
+    )
+  )
+  const barangayResult = city
+    ? await firstPsgcMatch(
+        barangayCandidates,
+        (candidate) => findBarangayByName(city.code, candidate)
+      )
+    : { match: null, sourceName: barangayCandidates[0] ?? null }
+  const barangay = barangayResult.match
+  const barangayName = barangayResult.sourceName
+  if (city && barangayName && !barangay) {
+    warnings.push(`Barangay "${barangayName}" was not matched. Please select it manually.`)
   }
 
   if (accuracy !== null && accuracy > 500) {
     warnings.push(`GPS accuracy is low (+/-${accuracy}m). Please verify the detected address.`)
   }
 
+  const houseStreet = [
+    location?.house_number,
+    location?.street,
+  ].filter(Boolean).join(' ') || location?.address_line1 || null
+  const missingFields = [
+    !province && 'province',
+    !city && 'city',
+    !barangay && 'barangay',
+    !houseStreet && 'houseStreet',
+  ].filter(Boolean)
+
   return {
     lat: location?.latitude ?? null,
     lng: location?.longitude ?? null,
     accuracy,
     placeId: location?.place_id ?? null,
+    provinceName,
+    cityName,
+    barangayName,
     province,
     city,
     barangay,
-    houseStreet: [location?.house_number, location?.street].filter(Boolean).join(' ') || location?.address_line1 || null,
+    houseStreet,
     displayName: location?.formatted ?? '',
+    missingFields,
+    isComplete: missingFields.length === 0,
     warnings,
   }
 }
 
-export async function resolveAddressSuggestion(suggestion) {
-  return matchPsgcLocation(suggestion)
+export async function resolveAddressSuggestion(suggestion, sessionToken = null) {
+  const location = suggestion?.latitude != null && suggestion?.longitude != null
+    ? suggestion
+    : await getPlaceAddress(suggestion.place_id, sessionToken)
+
+  return matchPsgcLocation(location)
 }
 
 export async function detectAddress() {

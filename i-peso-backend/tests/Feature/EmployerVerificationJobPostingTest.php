@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Administrator;
 use App\Models\Employer;
 use App\Models\EmployerDocument;
+use App\Models\JobSeeker;
 use App\Models\JobVacancy;
 use App\Models\Occupation;
 use App\Notifications\EmployerVerificationProgressUpdated;
@@ -167,6 +168,124 @@ class EmployerVerificationJobPostingTest extends TestCase
             'employer_id' => $employer->employer_id,
             'status' => 'closed',
         ]);
+    }
+
+    public function test_within_radius_scope_returns_nearby_vacancies_with_distance(): void
+    {
+        $employer = $this->createEmployer();
+        $payload = [
+            'employer_id' => $employer->employer_id,
+            'location' => 'Urdaneta City, Pangasinan',
+            ...$this->vacancyPayload(),
+        ];
+
+        $nearest = JobVacancy::create([
+            ...$payload,
+            'job_title' => 'Nearby Developer',
+            'latitude' => 15.9761,
+            'longitude' => 120.5711,
+        ]);
+        JobVacancy::create([
+            ...$payload,
+            'job_title' => 'Nearby Support Specialist',
+            'latitude' => 15.9810,
+            'longitude' => 120.5790,
+        ]);
+        JobVacancy::create([
+            ...$payload,
+            'job_title' => 'Far-away Developer',
+            'latitude' => 16.4023,
+            'longitude' => 120.5960,
+        ]);
+        JobVacancy::create([
+            ...$payload,
+            'job_title' => 'Unmapped Developer',
+            'latitude' => null,
+            'longitude' => null,
+        ]);
+
+        $nearby = JobVacancy::query()
+            ->withinRadius(15.9761, 120.5711, 5)
+            ->get();
+
+        $this->assertCount(2, $nearby);
+        $this->assertSame($nearest->post_id, $nearby->first()->post_id);
+        $this->assertEqualsWithDelta(0, (float) $nearby->first()->distance_km, 0.01);
+        $this->assertLessThan(2, (float) $nearby->last()->distance_km);
+        $this->assertNotContains('Far-away Developer', $nearby->pluck('job_title'));
+        $this->assertNotContains('Unmapped Developer', $nearby->pluck('job_title'));
+    }
+
+    public function test_seeker_can_get_active_nearby_jobs_ordered_by_distance(): void
+    {
+        $employer = $this->createEmployer();
+        $seeker = $this->createSeeker([
+            'latitude' => 15.9761,
+            'longitude' => 120.5711,
+        ]);
+        $payload = [
+            'employer_id' => $employer->employer_id,
+            'location' => 'Urdaneta City, Pangasinan',
+            ...$this->vacancyPayload(),
+        ];
+
+        JobVacancy::create([
+            ...$payload,
+            'job_title' => 'Closest Job',
+            'latitude' => 15.9761,
+            'longitude' => 120.5711,
+        ]);
+        JobVacancy::create([
+            ...$payload,
+            'job_title' => 'Second Job',
+            'latitude' => 15.9810,
+            'longitude' => 120.5790,
+        ]);
+        JobVacancy::create([
+            ...$payload,
+            'job_title' => 'Expired Job',
+            'latitude' => 15.9770,
+            'longitude' => 120.5720,
+            'application_deadline' => now()->subDay()->toDateString(),
+        ]);
+        JobVacancy::create([
+            ...$payload,
+            'job_title' => 'Closed Job',
+            'latitude' => 15.9770,
+            'longitude' => 120.5720,
+            'status' => 'closed',
+        ]);
+
+        Sanctum::actingAs($seeker);
+
+        $this->getJson('/api/seeker/nearby-jobs?radius_km=5')
+            ->assertOk()
+            ->assertJsonPath('radius_km', 5)
+            ->assertJsonPath('count', 2)
+            ->assertJsonPath('jobs.0.job_title', 'Closest Job')
+            ->assertJsonPath('jobs.0.employer.company_name', 'Test Employer')
+            ->assertJsonPath('jobs.0.distance_km', 0)
+            ->assertJsonPath('jobs.1.job_title', 'Second Job')
+            ->assertJsonMissing(['job_title' => 'Expired Job'])
+            ->assertJsonMissing(['job_title' => 'Closed Job']);
+    }
+
+    public function test_nearby_jobs_requires_a_saved_seeker_location(): void
+    {
+        $seeker = $this->createSeeker();
+        Sanctum::actingAs($seeker);
+
+        $this->getJson('/api/seeker/nearby-jobs')
+            ->assertUnprocessable()
+            ->assertJsonPath('code', 'location_required');
+    }
+
+    public function test_employer_cannot_access_seeker_nearby_jobs(): void
+    {
+        Sanctum::actingAs($this->createEmployer());
+
+        $this->getJson('/api/seeker/nearby-jobs')
+            ->assertForbidden();
     }
 
     public function test_rejection_email_contains_the_admin_reason(): void
@@ -415,6 +534,18 @@ class EmployerVerificationJobPostingTest extends TestCase
         ]);
     }
 
+    private function createSeeker(array $attributes = []): JobSeeker
+    {
+        return JobSeeker::create([
+            'first_name' => 'Juan',
+            'last_name' => fake()->unique()->lastName(),
+            'mobile_number' => '09123456789',
+            'email' => fake()->unique()->safeEmail(),
+            'password' => 'password123',
+            ...$attributes,
+        ]);
+    }
+
     private function uploadRequiredDocuments(Employer $employer, string $status = 'approved'): void
     {
         foreach ($employer->getRequiredDocuments() as $documentType) {
@@ -504,6 +635,20 @@ class EmployerVerificationJobPostingTest extends TestCase
             });
         }
 
+        if (! Schema::hasTable('job_seekers')) {
+            Schema::create('job_seekers', function (Blueprint $table) {
+                $table->id('seeker_id');
+                $table->string('first_name');
+                $table->string('last_name');
+                $table->string('mobile_number');
+                $table->string('email')->unique();
+                $table->string('password');
+                $table->decimal('latitude', 10, 7)->nullable();
+                $table->decimal('longitude', 10, 7)->nullable();
+                $table->timestamps();
+            });
+        }
+
         if (! Schema::hasTable('employers')) {
             Schema::create('employers', function (Blueprint $table) {
                 $table->id('employer_id');
@@ -559,6 +704,8 @@ class EmployerVerificationJobPostingTest extends TestCase
                 $table->string('city_municipality')->nullable();
                 $table->string('barangay')->nullable();
                 $table->string('specific_address')->nullable();
+                $table->decimal('latitude', 10, 7)->nullable();
+                $table->decimal('longitude', 10, 7)->nullable();
                 $table->text('job_description');
                 $table->unsignedInteger('vacancies_count')->default(1);
                 $table->string('minimum_education')->nullable();
@@ -578,6 +725,49 @@ class EmployerVerificationJobPostingTest extends TestCase
                 $table->boolean('spes_tupad_eligible')->default(false);
                 $table->string('status')->default('active');
                 $table->timestamps();
+            });
+        }
+
+        if (! Schema::hasTable('skill_catalog_entries')) {
+            Schema::create('skill_catalog_entries', function (Blueprint $table) {
+                $table->id();
+                $table->string('name');
+                $table->string('normalized_name');
+                $table->text('search_terms')->nullable();
+                $table->string('category', 20);
+                $table->string('source', 30);
+                $table->string('element_id')->nullable();
+                $table->unsignedInteger('occupation_count')->default(0);
+                $table->boolean('is_hot')->default(false);
+                $table->boolean('is_in_demand')->default(false);
+                $table->string('version', 20)->nullable();
+                $table->timestamps();
+                $table->unique(['category', 'normalized_name']);
+            });
+        }
+
+        if (! Schema::hasTable('skill_aliases')) {
+            Schema::create('skill_aliases', function (Blueprint $table) {
+                $table->id();
+                $table->unsignedBigInteger('skill_id');
+                $table->string('alias');
+                $table->string('normalized_alias');
+                $table->string('source')->default('local_reviewed');
+                $table->decimal('confidence', 4, 3)->default(1);
+                $table->timestamps();
+            });
+        }
+
+        if (! Schema::hasTable('job_vacancy_skills')) {
+            Schema::create('job_vacancy_skills', function (Blueprint $table) {
+                $table->id();
+                $table->unsignedBigInteger('post_id');
+                $table->unsignedBigInteger('skill_id');
+                $table->string('skill_type');
+                $table->string('original_name');
+                $table->decimal('weight', 5, 2)->default(1);
+                $table->timestamps();
+                $table->unique(['post_id', 'skill_id', 'skill_type']);
             });
         }
 

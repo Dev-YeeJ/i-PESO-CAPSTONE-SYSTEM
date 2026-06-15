@@ -7,16 +7,21 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class SeekerWorkExperience extends Model
 {
-    protected $table      = 'seeker_work_experiences';
+    protected $table = 'seeker_work_experiences';
+
     protected $primaryKey = 'id';
-    protected $keyType    = 'int';
-    public $timestamps    = true;
+
+    protected $keyType = 'int';
+
+    public $timestamps = true;
 
     protected $fillable = [
         'seeker_id',
+        'occupation_id',
         'company_name',
         'company_address',
         'position',
+        'normalized_position',
         'number_of_months',
         'employment_status',
     ];
@@ -28,5 +33,10 @@ class SeekerWorkExperience extends Model
     public function seeker(): BelongsTo
     {
         return $this->belongsTo(JobSeeker::class, 'seeker_id', 'seeker_id');
+    }
+
+    public function occupation(): BelongsTo
+    {
+        return $this->belongsTo(Occupation::class);
     }
 }

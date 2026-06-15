@@ -6,7 +6,9 @@ use App\Http\Controllers\Controller;
 use App\Models\Employer;
 use App\Models\JobVacancy;
 use App\Models\Occupation;
-use App\Services\GeoapifyService;
+use App\Services\GoogleMapsService;
+use App\Services\MatchingProfileService;
+use App\Services\SkillTaxonomyService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
@@ -29,10 +31,16 @@ class EmployerJobVacancyController extends Controller
         return response()->json($vacancies);
     }
 
-    public function store(Request $request, GeoapifyService $geoapify): JsonResponse
-    {
+    public function store(
+        Request $request,
+        GoogleMapsService $maps,
+        SkillTaxonomyService $taxonomy,
+        MatchingProfileService $matchingProfiles
+    ): JsonResponse {
         $employer = $this->employer($request);
-        $vacancy = $employer->vacancies()->create($this->validatedData($request, $geoapify));
+        $vacancy = $employer->vacancies()->create($this->validatedData($request, $maps));
+        $taxonomy->syncVacancy($vacancy);
+        $matchingProfiles->syncVacancyCertifications($vacancy);
 
         return response()->json([
             'message' => 'Job vacancy created successfully.',
@@ -47,10 +55,17 @@ class EmployerJobVacancyController extends Controller
         return response()->json($vacancy);
     }
 
-    public function update(Request $request, JobVacancy $vacancy, GeoapifyService $geoapify): JsonResponse
-    {
+    public function update(
+        Request $request,
+        JobVacancy $vacancy,
+        GoogleMapsService $maps,
+        SkillTaxonomyService $taxonomy,
+        MatchingProfileService $matchingProfiles
+    ): JsonResponse {
         $this->ensureOwnership($request, $vacancy);
-        $vacancy->update($this->validatedData($request, $geoapify));
+        $vacancy->update($this->validatedData($request, $maps));
+        $taxonomy->syncVacancy($vacancy);
+        $matchingProfiles->syncVacancyCertifications($vacancy);
 
         return response()->json([
             'message' => 'Job vacancy updated successfully.',
@@ -66,7 +81,7 @@ class EmployerJobVacancyController extends Controller
         return response()->json(['message' => 'Job vacancy deleted successfully.']);
     }
 
-    private function validatedData(Request $request, GeoapifyService $geoapify): array
+    private function validatedData(Request $request, GoogleMapsService $maps): array
     {
         $data = $request->validate([
             'occupation_id' => ['required', 'integer', 'exists:occupations,id'],
@@ -89,7 +104,7 @@ class EmployerJobVacancyController extends Controller
             'barangay_code' => ['nullable', 'string', 'max:10'],
             'latitude' => ['nullable', 'numeric', 'between:-90,90'],
             'longitude' => ['nullable', 'numeric', 'between:-180,180'],
-            'geoapify_place_id' => ['nullable', 'string', 'max:255'],
+            'google_place_id' => ['nullable', 'string', 'max:255'],
             'job_description' => ['required', 'string', 'max:10000'],
             'vacancies_count' => ['required', 'integer', 'min:1', 'max:10000'],
             'minimum_education' => ['required', Rule::in([
@@ -107,12 +122,14 @@ class EmployerJobVacancyController extends Controller
                 '3-5 Years',
                 '5+ Years',
             ])],
+            'minimum_experience_months' => ['nullable', 'integer', 'min:0', 'max:600'],
             'required_skills' => ['required', 'array', 'min:1', 'max:30'],
             'required_skills.*' => ['string', 'max:100'],
             'soft_skills' => ['nullable', 'array', 'max:20'],
             'soft_skills.*' => ['string', 'max:100'],
             'required_certifications' => ['nullable', 'array', 'max:20'],
             'required_certifications.*' => ['string', 'max:150'],
+            'certifications_mandatory' => ['nullable', 'boolean'],
             'salary_type' => ['required', Rule::in(['Monthly', 'Daily', 'Hourly'])],
             'salary_min' => ['required_unless:hide_salary,true', 'nullable', 'numeric', 'min:0'],
             'salary_max' => ['required_unless:hide_salary,true', 'nullable', 'numeric', 'gte:salary_min'],
@@ -127,6 +144,21 @@ class EmployerJobVacancyController extends Controller
         ]);
 
         $data['job_title'] = Occupation::findOrFail($data['occupation_id'])->title;
+        $data['minimum_experience_months'] = $data['minimum_experience_months']
+            ?? match ($data['experience_level']) {
+                '1-3 Years' => 12,
+                '3-5 Years' => 36,
+                '5+ Years' => 60,
+                default => 0,
+            };
+        $data['certifications_mandatory'] = (bool) ($data['certifications_mandatory'] ?? false);
+
+        if (! Schema::hasColumn('job_vacancies', 'minimum_experience_months')) {
+            unset($data['minimum_experience_months']);
+        }
+        if (! Schema::hasColumn('job_vacancies', 'certifications_mandatory')) {
+            unset($data['certifications_mandatory']);
+        }
 
         $data['location'] = collect([
             $data['specific_address'] ?? null,
@@ -136,15 +168,15 @@ class EmployerJobVacancyController extends Controller
         ])->filter()->join(', ');
 
         if (
-            Schema::hasColumns('job_vacancies', ['latitude', 'longitude', 'geoapify_place_id'])
+            Schema::hasColumns('job_vacancies', ['latitude', 'longitude', 'google_place_id'])
             && ! isset($data['latitude'], $data['longitude'])
         ) {
             try {
-                $location = $geoapify->geocode($data['location'].', Philippines');
+                $location = $maps->geocode($data['location'].', Philippines');
                 if ($location) {
                     $data['latitude'] = $location['latitude'];
                     $data['longitude'] = $location['longitude'];
-                    $data['geoapify_place_id'] = $location['place_id'];
+                    $data['google_place_id'] = $location['place_id'];
                 }
             } catch (\Throwable) {
                 // Preserve vacancy posting when optional coordinate lookup is unavailable.

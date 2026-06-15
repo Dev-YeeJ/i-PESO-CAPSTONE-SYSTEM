@@ -6,7 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Employer;
 use App\Models\EmployerDocument;
 use App\Notifications\EmployerVerificationProgressUpdated;
-use App\Services\GeoapifyService;
+use App\Services\GoogleMapsService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -68,7 +68,7 @@ class EmployerRegistrationController extends Controller
      * Step 2: Add company profile information
      * POST /api/employer/register/step-2
      */
-    public function registerStep2(Request $request, GeoapifyService $geoapify): JsonResponse
+    public function registerStep2(Request $request, GoogleMapsService $maps): JsonResponse
     {
         $validator = Validator::make($request->all(), [
             'company_name' => 'required|string|max:255',
@@ -85,7 +85,7 @@ class EmployerRegistrationController extends Controller
             'barangay_code' => 'nullable|string|max:10',
             'latitude' => 'nullable|numeric|between:-90,90',
             'longitude' => 'nullable|numeric|between:-180,180',
-            'geoapify_place_id' => 'nullable|string|max:255',
+            'google_place_id' => 'nullable|string|max:255',
             'company_description' => 'required|string|max:5000',
             'company_logo' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:5120',
         ]);
@@ -110,15 +110,15 @@ class EmployerRegistrationController extends Controller
             $data['complete_address'] = "{$request->house_unit_street}, {$request->barangay}, {$request->city_municipality}, {$request->province}";
 
             if (
-                Schema::hasColumns('employers', ['latitude', 'longitude', 'geoapify_place_id'])
+                Schema::hasColumns('employers', ['latitude', 'longitude', 'google_place_id'])
                 && ! isset($data['latitude'], $data['longitude'])
             ) {
                 try {
-                    $location = $geoapify->geocode($data['complete_address'].', Philippines');
+                    $location = $maps->geocode($data['complete_address'].', Philippines');
                     if ($location) {
                         $data['latitude'] = $location['latitude'];
                         $data['longitude'] = $location['longitude'];
-                        $data['geoapify_place_id'] = $location['place_id'];
+                        $data['google_place_id'] = $location['place_id'];
                     }
                 } catch (\Throwable) {
                     // A valid PSGC address can still be saved during a temporary map-service outage.

@@ -3,12 +3,20 @@ import { getBarangaysByCity, getCitiesByProvince, getProvinces } from '@/service
 
 const selectClass = 'w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:cursor-not-allowed disabled:bg-slate-100'
 
-export default function PsgcCascade({ province, city, barangay, onChange }) {
+export default function PsgcCascade({
+  province,
+  provinceCode: initialProvinceCode,
+  city,
+  cityCode: initialCityCode,
+  barangay,
+  barangayCode,
+  onChange,
+}) {
   const [provinces, setProvinces] = useState([])
   const [cities, setCities] = useState([])
   const [barangays, setBarangays] = useState([])
-  const [provinceCode, setProvinceCode] = useState('')
-  const [cityCode, setCityCode] = useState('')
+  const [provinceCode, setProvinceCode] = useState(initialProvinceCode ?? '')
+  const [cityCode, setCityCode] = useState(initialCityCode ?? '')
   const [loading, setLoading] = useState({ province: true, city: false, barangay: false })
   const [error, setError] = useState('')
 
@@ -72,7 +80,14 @@ export default function PsgcCascade({ province, city, barangay, onChange }) {
     setBarangays([])
     setLoading((current) => ({ ...current, city: true, barangay: false }))
     setError('')
-    onChange({ province: selected?.name ?? '', city: '', barangay: '' })
+    onChange({
+      province: selected?.name ?? '',
+      province_code: selected?.code ?? '',
+      city: '',
+      city_code: '',
+      barangay: '',
+      barangay_code: '',
+    })
   }
 
   const handleCityChange = (event) => {
@@ -82,11 +97,26 @@ export default function PsgcCascade({ province, city, barangay, onChange }) {
     setBarangays([])
     setLoading((current) => ({ ...current, barangay: true }))
     setError('')
-    onChange({ province, city: selected?.name ?? '', barangay: '' })
+    onChange({
+      province,
+      province_code: provinceCode,
+      city: selected?.name ?? '',
+      city_code: selected?.code ?? '',
+      barangay: '',
+      barangay_code: '',
+    })
   }
 
   const handleBarangayChange = (event) => {
-    onChange({ province, city, barangay: event.target.value })
+    const selected = barangays.find((item) => item.name === event.target.value)
+    onChange({
+      province,
+      province_code: provinceCode,
+      city,
+      city_code: cityCode,
+      barangay: selected?.name ?? '',
+      barangay_code: selected?.code ?? '',
+    })
   }
 
   return (
@@ -110,9 +140,12 @@ export default function PsgcCascade({ province, city, barangay, onChange }) {
 
         <div>
           <label className="mb-1.5 block text-sm font-medium text-slate-700">Barangay</label>
-          <select value={barangay} onChange={handleBarangayChange} disabled={!cityCode || loading.barangay} className={selectClass}>
+          <select value={barangayCode || barangay} onChange={(event) => {
+            const selected = barangays.find((item) => item.code === event.target.value)
+            handleBarangayChange({ target: { value: selected?.name ?? '' } })
+          }} disabled={!cityCode || loading.barangay} className={selectClass}>
             <option value="">{loading.barangay ? 'Loading barangays...' : 'Select Barangay'}</option>
-            {barangays.map((item) => <option key={item.code} value={item.name}>{item.name}</option>)}
+            {barangays.map((item) => <option key={item.code} value={item.code}>{item.name}</option>)}
           </select>
         </div>
       </div>
