@@ -11,6 +11,7 @@ class SeekerSkill extends Model
 
     protected $fillable = [
         'seeker_id',
+        'skill_id',
         'skill_name',
         'skill_type',
     ];
@@ -30,5 +31,10 @@ class SeekerSkill extends Model
     public function seeker(): BelongsTo
     {
         return $this->belongsTo(JobSeeker::class, 'seeker_id', 'seeker_id');
+    }
+
+    public function skill(): BelongsTo
+    {
+        return $this->belongsTo(Skill::class);
     }
 }

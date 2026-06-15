@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\Administrator;
 use App\Models\JobSeeker;
 use App\Models\Occupation;
 use App\Models\SeekerCertificate;
@@ -11,6 +12,7 @@ use App\Models\SeekerWorkExperience;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Laravel\Sanctum\Sanctum;
@@ -25,6 +27,110 @@ class SeekerProfileFeaturesTest extends TestCase
         parent::setUp();
 
         $this->createTables();
+        $this->createSkillCatalogTable();
+    }
+
+    public function test_step_one_saves_an_other_disability_specification(): void
+    {
+        $seeker = $this->createSeeker();
+        Sanctum::actingAs($seeker);
+
+        $this->postJson('/api/seeker/step-1', [
+            'first_name' => 'Juan',
+            'middle_name' => null,
+            'last_name' => 'Dela Cruz',
+            'suffix' => null,
+            'date_of_birth' => '2000-01-01',
+            'sex' => 'male',
+            'civil_status' => 'single',
+            'religion' => 'roman_catholic',
+            'height_ft' => 5.5,
+            'tin' => null,
+            'educ_attainment' => 'College Graduate',
+            'address_province' => 'Pangasinan',
+            'address_municipality_city' => 'Urdaneta City',
+            'address_barangay' => 'Poblacion',
+            'address_house_street' => '123 Rizal Street',
+            'disabilities' => ['others'],
+            'disability_specification' => 'Autism spectrum disorder',
+        ])->assertOk();
+
+        $this->assertDatabaseHas('seeker_disabilities', [
+            'seeker_id' => $seeker->getKey(),
+            'disability_type' => 'others',
+            'disability_specification' => 'Autism spectrum disorder',
+        ]);
+    }
+
+    public function test_step_one_requires_a_specification_for_other_disability(): void
+    {
+        $seeker = $this->createSeeker();
+        Sanctum::actingAs($seeker);
+
+        $this->postJson('/api/seeker/step-1', [
+            'first_name' => 'Juan',
+            'last_name' => 'Dela Cruz',
+            'date_of_birth' => '2000-01-01',
+            'sex' => 'male',
+            'civil_status' => 'single',
+            'religion' => 'roman_catholic',
+            'height_ft' => 5.5,
+            'educ_attainment' => 'College Graduate',
+            'address_province' => 'Pangasinan',
+            'address_municipality_city' => 'Urdaneta City',
+            'address_barangay' => 'Poblacion',
+            'address_house_street' => '123 Rizal Street',
+            'disabilities' => ['others'],
+        ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('disability_specification');
+    }
+
+    public function test_optional_education_and_work_history_steps_accept_empty_arrays(): void
+    {
+        $seeker = $this->createSeeker();
+        Sanctum::actingAs($seeker);
+
+        $this->postJson('/api/seeker/step-5', [
+            'currently_in_school' => false,
+            'educations' => [],
+            'dole_skills' => [],
+            'technical_skills' => [],
+            'soft_skills' => [],
+        ])->assertOk();
+
+        $this->postJson('/api/seeker/step-7', [
+            'work_experiences' => [],
+        ])->assertOk();
+    }
+
+    public function test_admin_can_download_the_official_two_page_nsrp_form(): void
+    {
+        $seeker = $this->createSeeker();
+        $admin = Administrator::create([
+            'first_name' => 'PESO',
+            'last_name' => 'Administrator',
+            'email' => fake()->unique()->safeEmail(),
+            'mobile_number' => '09170000001',
+            'password' => 'password123',
+            'role' => 'admin',
+            'status' => 'active',
+            'email_verified_at' => now(),
+        ]);
+
+        Sanctum::actingAs($admin);
+
+        $response = $this->get("/api/admin/job-seekers/{$seeker->getKey()}/export-nsrp-pdf")
+            ->assertOk()
+            ->assertHeader('content-type', 'application/pdf');
+
+        $response->assertHeader(
+            'content-disposition',
+            'attachment; filename=NSRP_Form_'.$seeker->getKey().'_'.$seeker->last_name.'.pdf'
+        );
+
+        $pdfContent = $response->getContent();
+        $this->assertSame(2, preg_match_all('/\/Type\s*\/Page\b/', $pdfContent));
     }
 
     public function test_step_three_rejects_unknown_occupation_ids(): void
@@ -66,6 +172,253 @@ class SeekerProfileFeaturesTest extends TestCase
             'seeker_id' => $seeker->getKey(),
             'preferred_work_location' => 'local',
         ]);
+    }
+
+    public function test_step_three_rejects_a_custom_unreviewed_occupation(): void
+    {
+        $seeker = $this->createSeeker();
+        Sanctum::actingAs($seeker);
+
+        $this->postJson('/api/seeker/step-3', [
+            'work_type_preference' => 'full_time',
+            'preferred_work_location' => 'local',
+            'preferred_locations_details' => ['Urdaneta City, Pangasinan'],
+            'occupation_preferences' => [[
+                'occupation_id' => null,
+                'raw_job_title' => 'Milk tea crew',
+            ]],
+        ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('occupation_preferences.0.raw_job_title');
+
+        $this->assertDatabaseMissing('seeker_occupations', [
+            'seeker_id' => $seeker->getKey(),
+            'raw_job_title' => 'Milk tea crew',
+        ]);
+    }
+
+    public function test_step_three_saves_a_generalized_job_family(): void
+    {
+        $seeker = $this->createSeeker();
+        Sanctum::actingAs($seeker);
+
+        $this->postJson('/api/seeker/step-3', [
+            'work_type_preference' => 'full_time',
+            'preferred_work_location' => 'local',
+            'preferred_locations_details' => ['Urdaneta City, Pangasinan'],
+            'occupation_preferences' => [[
+                'general_term' => 'healthcare work',
+            ]],
+        ])->assertOk();
+
+        $this->assertDatabaseHas('seeker_occupations', [
+            'seeker_id' => $seeker->getKey(),
+            'occupation_id' => null,
+            'general_term' => 'healthcare work',
+            'occupation_title' => 'Healthcare',
+            'raw_job_title' => null,
+            'status' => 'generalized',
+            'preference_order' => 1,
+        ]);
+    }
+
+    public function test_step_three_rejects_a_preference_with_id_and_custom_title(): void
+    {
+        $seeker = $this->createSeeker();
+        $occupation = $this->createOccupation('5249', 'Sales Assistant');
+        Sanctum::actingAs($seeker);
+
+        $this->postJson('/api/seeker/step-3', [
+            'work_type_preference' => 'full_time',
+            'preferred_work_location' => 'local',
+            'preferred_locations_details' => ['Urdaneta City, Pangasinan'],
+            'occupation_preferences' => [[
+                'occupation_id' => $occupation->id,
+                'raw_job_title' => 'Online seller',
+            ]],
+        ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('occupation_preferences.0.raw_job_title');
+    }
+
+    public function test_step_three_deduplicates_preferred_countries_case_insensitively(): void
+    {
+        $seeker = $this->createSeeker();
+        Sanctum::actingAs($seeker);
+
+        $this->postJson('/api/seeker/step-3', [
+            'work_type_preference' => 'full_time',
+            'preferred_work_location' => 'overseas',
+            'preferred_locations_details' => ['Japan', ' japan ', 'Canada'],
+            'occupation_preferences' => [[
+                'general_term' => 'healthcare work',
+            ]],
+        ])->assertOk();
+
+        $seeker->refresh();
+        $this->assertSame(['Japan', 'Canada'], $seeker->preferred_locations_details);
+    }
+
+    public function test_step_four_accepts_philippine_languages_and_normalizes_their_codes(): void
+    {
+        $seeker = $this->createSeeker();
+        Sanctum::actingAs($seeker);
+
+        $this->postJson('/api/seeker/step-4', [
+            'languages' => [
+                [
+                    'language' => 'Cebuano',
+                    'can_read' => true,
+                    'can_write' => true,
+                    'can_speak' => true,
+                    'can_understand' => true,
+                ],
+                [
+                    'language' => 'others',
+                    'language_other' => '  Sambal  ',
+                    'can_read' => false,
+                    'can_write' => false,
+                    'can_speak' => true,
+                    'can_understand' => true,
+                ],
+            ],
+        ])->assertOk();
+
+        $this->assertDatabaseHas('seeker_languages', [
+            'seeker_id' => $seeker->getKey(),
+            'language' => 'cebuano',
+            'language_other' => null,
+            'can_speak' => true,
+        ]);
+        $this->assertDatabaseHas('seeker_languages', [
+            'seeker_id' => $seeker->getKey(),
+            'language' => 'others',
+            'language_other' => 'Sambal',
+            'can_speak' => true,
+        ]);
+    }
+
+    public function test_step_four_requires_a_name_for_other_language(): void
+    {
+        $seeker = $this->createSeeker();
+        Sanctum::actingAs($seeker);
+
+        $this->postJson('/api/seeker/step-4', [
+            'languages' => [[
+                'language' => 'others',
+                'language_other' => '   ',
+                'can_speak' => true,
+            ]],
+        ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('languages');
+    }
+
+    public function test_step_five_deduplicates_hard_and_soft_skills_case_insensitively(): void
+    {
+        $seeker = $this->createSeeker();
+        Sanctum::actingAs($seeker);
+
+        $this->postJson('/api/seeker/step-5', [
+            'currently_in_school' => false,
+            'educations' => [[
+                'level' => 'tertiary',
+                'year_graduated' => 2025,
+            ]],
+            'technical_skills' => ['Microsoft Excel', ' microsoft excel ', 'Bookkeeping'],
+            'soft_skills' => ['Teamwork', ' teamwork ', 'Communication'],
+        ])->assertOk();
+
+        $this->assertDatabaseCount('seeker_skills', 4);
+        $this->assertDatabaseHas('seeker_skills', [
+            'seeker_id' => $seeker->getKey(),
+            'skill_name' => 'Microsoft Excel',
+            'skill_type' => 'technical',
+        ]);
+        $this->assertDatabaseHas('seeker_skills', [
+            'seeker_id' => $seeker->getKey(),
+            'skill_name' => 'Teamwork',
+            'skill_type' => 'soft',
+        ]);
+    }
+
+    public function test_step_five_moves_known_skills_to_their_catalog_category(): void
+    {
+        DB::table('skill_catalog_entries')->upsert([
+            [
+                'name' => 'Programming',
+                'normalized_name' => 'programming',
+                'category' => 'technical',
+                'source' => 'local_general',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+            [
+                'name' => 'Critical Thinking',
+                'normalized_name' => 'critical thinking',
+                'category' => 'soft',
+                'source' => 'local_general',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+        ], ['category', 'normalized_name'], ['name', 'source', 'updated_at']);
+
+        $seeker = $this->createSeeker();
+        Sanctum::actingAs($seeker);
+
+        $this->postJson('/api/seeker/step-5', [
+            'currently_in_school' => false,
+            'educations' => [[
+                'level' => 'tertiary',
+                'year_graduated' => 2025,
+            ]],
+            'technical_skills' => ['Critical Thinking'],
+            'soft_skills' => ['Programming'],
+        ])->assertOk();
+
+        $this->assertDatabaseHas('seeker_skills', [
+            'seeker_id' => $seeker->getKey(),
+            'skill_name' => 'Programming',
+            'skill_type' => 'technical',
+        ]);
+        $this->assertDatabaseHas('seeker_skills', [
+            'seeker_id' => $seeker->getKey(),
+            'skill_name' => 'Critical Thinking',
+            'skill_type' => 'soft',
+        ]);
+    }
+
+    private function createSkillCatalogTable(): void
+    {
+        if (! Schema::hasTable('skill_catalog_entries')) {
+            Schema::create('skill_catalog_entries', function (Blueprint $table) {
+                $table->id();
+                $table->string('name');
+                $table->string('normalized_name');
+                $table->text('search_terms')->nullable();
+                $table->string('category', 20);
+                $table->string('source', 30);
+                $table->string('element_id')->nullable();
+                $table->unsignedInteger('occupation_count')->default(0);
+                $table->boolean('is_hot')->default(false);
+                $table->boolean('is_in_demand')->default(false);
+                $table->string('version', 20)->nullable();
+                $table->timestamps();
+                $table->unique(['category', 'normalized_name']);
+            });
+        }
+
+        if (! Schema::hasTable('skill_aliases')) {
+            Schema::create('skill_aliases', function (Blueprint $table) {
+                $table->id();
+                $table->unsignedBigInteger('skill_id');
+                $table->string('alias');
+                $table->string('normalized_alias');
+                $table->string('source')->default('local_reviewed');
+                $table->decimal('confidence', 4, 3)->default(1);
+                $table->timestamps();
+            });
+        }
     }
 
     public function test_seeker_can_upload_and_view_a_private_certificate(): void
@@ -276,6 +629,22 @@ class SeekerProfileFeaturesTest extends TestCase
 
     private function createTables(): void
     {
+        if (! Schema::hasTable('administrators')) {
+            Schema::create('administrators', function (Blueprint $table) {
+                $table->id('admin_id');
+                $table->string('first_name');
+                $table->string('last_name');
+                $table->string('email')->unique();
+                $table->string('mobile_number')->nullable();
+                $table->string('password');
+                $table->string('role')->default('admin');
+                $table->string('status')->default('active');
+                $table->timestamp('email_verified_at')->nullable();
+                $table->rememberToken();
+                $table->timestamps();
+            });
+        }
+
         if (! Schema::hasTable('occupations')) {
             Schema::create('occupations', function (Blueprint $table) {
                 $table->id();
@@ -301,16 +670,44 @@ class SeekerProfileFeaturesTest extends TestCase
                 $table->string('email')->unique();
                 $table->string('password');
                 $table->date('date_of_birth')->nullable();
+                $table->string('sex')->nullable();
+                $table->string('civil_status')->nullable();
+                $table->string('religion')->nullable();
+                $table->decimal('height_ft', 4, 2)->nullable();
+                $table->string('tin', 20)->nullable();
                 $table->string('educ_attainment')->nullable();
                 $table->string('address_house_street')->nullable();
                 $table->string('address_barangay')->nullable();
                 $table->string('address_municipality_city')->nullable();
                 $table->string('address_province')->nullable();
+                $table->string('address_province_code', 10)->nullable();
+                $table->string('address_city_code', 10)->nullable();
+                $table->string('address_barangay_code', 10)->nullable();
+                $table->decimal('latitude', 10, 7)->nullable();
+                $table->decimal('longitude', 10, 7)->nullable();
+                $table->unsignedInteger('location_accuracy')->nullable();
+                $table->string('google_place_id')->nullable();
+                $table->string('employment_status')->nullable();
+                $table->string('employment_type')->nullable();
+                $table->string('self_employed_type')->nullable();
+                $table->string('self_employed_type_others')->nullable();
+                $table->unsignedInteger('unemployment_months')->nullable();
+                $table->string('unemployment_reason')->nullable();
+                $table->string('unemployment_reason_others')->nullable();
+                $table->string('unemployment_terminated_country')->nullable();
+                $table->boolean('is_ofw')->default(false);
+                $table->string('ofw_country')->nullable();
+                $table->boolean('is_former_ofw')->default(false);
+                $table->string('former_ofw_country')->nullable();
+                $table->date('former_ofw_return_date')->nullable();
+                $table->boolean('is_4ps_beneficiary')->default(false);
+                $table->string('household_id_4ps')->nullable();
                 $table->string('work_type_preference')->nullable();
                 $table->string('preferred_work_location')->nullable();
                 $table->json('preferred_locations_details')->nullable();
                 $table->boolean('currently_in_school')->default(false);
                 $table->boolean('profile_completed')->default(false);
+                $table->timestamp('profile_completed_at')->nullable();
                 $table->json('form_validation_state')->nullable();
                 $table->string('verification_status')->default('pending');
                 $table->boolean('is_verified')->default(false);
@@ -327,8 +724,17 @@ class SeekerProfileFeaturesTest extends TestCase
         });
         $this->createSimpleRelationTable('seeker_occupations', function (Blueprint $table) {
             $table->unsignedBigInteger('occupation_id')->nullable();
+            $table->string('general_term')->nullable();
             $table->string('occupation_title');
+            $table->string('raw_job_title')->nullable();
+            $table->string('status')->default('standardized');
+            $table->timestamp('mapped_at')->nullable();
             $table->unsignedTinyInteger('preference_order')->default(1);
+        });
+        $this->createSimpleRelationTable('seeker_work_locations', function (Blueprint $table) {
+            $table->string('location_type');
+            $table->string('location_name');
+            $table->string('location_code')->nullable();
         });
         $this->createSimpleRelationTable('seeker_languages', function (Blueprint $table) {
             $table->string('language');
@@ -366,9 +772,15 @@ class SeekerProfileFeaturesTest extends TestCase
             $table->string('employment_status')->nullable();
         });
         $this->createSimpleRelationTable('seeker_skills', function (Blueprint $table) {
+            $table->unsignedBigInteger('skill_id')->nullable();
             $table->string('skill_name');
             $table->string('skill_type');
         });
+        if (! Schema::hasColumn('seeker_skills', 'skill_id')) {
+            Schema::table('seeker_skills', function (Blueprint $table) {
+                $table->unsignedBigInteger('skill_id')->nullable();
+            });
+        }
 
         if (! Schema::hasTable('seeker_certificates')) {
             Schema::create('seeker_certificates', function (Blueprint $table) {

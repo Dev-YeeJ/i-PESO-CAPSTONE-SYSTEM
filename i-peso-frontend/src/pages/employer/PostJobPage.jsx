@@ -64,10 +64,10 @@ const educationLevels = [
 ]
 
 const experienceLevels = [
-  'No Experience Required',
-  '1-3 Years',
-  '3-5 Years',
-  '5+ Years',
+  { label: 'No Experience Required', months: 0 },
+  { label: '1-3 Years', months: 12 },
+  { label: '3-5 Years', months: 36 },
+  { label: '5+ Years', months: 60 },
 ]
 
 const initialForm = {
@@ -80,15 +80,20 @@ const initialForm = {
   work_setup: 'On-Site',
   region: 'Region I - Ilocos Region',
   province: '',
+  province_code: '',
   city_municipality: '',
+  city_code: '',
   barangay: '',
+  barangay_code: '',
   specific_address: '',
   minimum_education: 'High School Graduate',
   target_courses: [],
   experience_level: 'No Experience Required',
+  minimum_experience_months: 0,
   required_skills: [],
   soft_skills: [],
   required_certifications: [],
+  certifications_mandatory: false,
   salary_type: 'Monthly',
   salary_min: '',
   salary_max: '',
@@ -139,6 +144,9 @@ export default function PostJobPage() {
 
     if (targetStep === 2) {
       if (!form.required_skills.length) nextErrors.required_skills = 'Add at least one hard skill.'
+      if (form.certifications_mandatory && !form.required_certifications.length) {
+        nextErrors.required_certifications = 'Add at least one mandatory certification.'
+      }
       if (!form.hide_salary && (form.salary_min === '' || form.salary_max === '')) {
         nextErrors.salary = 'Enter the minimum and maximum salary, or choose to hide it.'
       }
@@ -305,14 +313,27 @@ export default function PostJobPage() {
 
                 <PsgcCascade
                   province={form.province}
+                  provinceCode={form.province_code}
                   city={form.city_municipality}
+                  cityCode={form.city_code}
                   barangay={form.barangay}
-                  onChange={({ province, city, barangay }) => {
+                  barangayCode={form.barangay_code}
+                  onChange={({
+                    province,
+                    province_code,
+                    city,
+                    city_code,
+                    barangay,
+                    barangay_code,
+                  }) => {
                     setForm((current) => ({
                       ...current,
                       province,
+                      province_code,
                       city_municipality: city,
+                      city_code,
                       barangay,
+                      barangay_code,
                     }))
                     setErrors((current) => ({
                       ...current,
@@ -367,8 +388,23 @@ export default function PostJobPage() {
                     </select>
                   </Field>
                   <Field label="Required experience" required>
-                    <select name="experience_level" value={form.experience_level} onChange={change} className="portal-input">
-                      {experienceLevels.map((option) => <option key={option}>{option}</option>)}
+                    <select
+                      name="minimum_experience_months"
+                      value={form.minimum_experience_months}
+                      onChange={(event) => {
+                        const months = Number(event.target.value)
+                        const selected = experienceLevels.find((option) => option.months === months)
+                        setForm((current) => ({
+                          ...current,
+                          minimum_experience_months: months,
+                          experience_level: selected?.label ?? 'No Experience Required',
+                        }))
+                      }}
+                      className="portal-input"
+                    >
+                      {experienceLevels.map((option) => (
+                        <option key={option.months} value={option.months}>{option.label}</option>
+                      ))}
                     </select>
                   </Field>
                 </div>
@@ -401,7 +437,23 @@ export default function PostJobPage() {
                   placeholder="e.g. TESDA NC II, PRC License"
                   values={form.required_certifications}
                   onChange={(values) => update('required_certifications', values)}
+                  error={errors.required_certifications}
                 />
+                {form.required_certifications.length > 0 && (
+                  <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4">
+                    <input
+                      name="certifications_mandatory"
+                      type="checkbox"
+                      checked={form.certifications_mandatory}
+                      onChange={change}
+                      className="mt-1 h-4 w-4 rounded border-amber-300 text-brand-navy"
+                    />
+                    <span>
+                      <strong className="block text-sm text-slate-900">Mandatory before application</strong>
+                      <span className="text-xs text-slate-600">Applicants without these licenses or certificates will be marked ineligible.</span>
+                    </span>
+                  </label>
+                )}
               </div>
             </Card>
 
@@ -498,6 +550,12 @@ export default function PostJobPage() {
                   <ReviewItem label="Experience" value={form.experience_level} />
                   <ReviewTags label="Hard skills" values={form.required_skills} />
                   <ReviewTags label="Certifications" values={form.required_certifications} />
+                  {form.required_certifications.length > 0 && (
+                    <ReviewItem
+                      label="Certification rule"
+                      value={form.certifications_mandatory ? 'Mandatory eligibility requirement' : 'Preferred qualification'}
+                    />
+                  )}
                 </ReviewGroup>
 
                 <ReviewGroup title="Compensation" icon={Banknote}>

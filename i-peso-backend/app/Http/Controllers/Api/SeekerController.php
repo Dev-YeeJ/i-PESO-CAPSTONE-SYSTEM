@@ -12,14 +12,43 @@ use App\Models\SeekerLanguage;
 use App\Models\SeekerOccupation;
 use App\Models\SeekerTraining;
 use App\Models\SeekerWorkExperience;
+use App\Services\MatchingProfileService;
+use App\Services\OccupationTitleMatcher;
+use App\Services\SkillCategorizer;
+use App\Services\SkillTaxonomyService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 
 class SeekerController extends Controller
 {
+    private const SUPPORTED_LANGUAGES = [
+        'english',
+        'filipino',
+        'cebuano',
+        'ilocano',
+        'hiligaynon',
+        'bikol',
+        'waray',
+        'pangasinan',
+        'kapampangan',
+        'maranao',
+        'maguindanao',
+        'tausug',
+        'mandarin',
+        'spanish',
+        'japanese',
+        'korean',
+        'arabic',
+        'french',
+        'german',
+        'others',
+    ];
+
     // ── PRIVATE HELPERS ──────────────────────────────────────────────────────
 
     /**
@@ -91,7 +120,7 @@ class SeekerController extends Controller
             'educations',
             'trainings',
             'eligibilities',
-            'workExperiences',
+            'workExperiences.occupation',
             'seekerSkills',
             'certificates',
         ]);
@@ -126,6 +155,13 @@ class SeekerController extends Controller
                 'address_barangay' => $seeker->address_barangay,
                 'address_municipality_city' => $seeker->address_municipality_city,
                 'address_province' => $seeker->address_province,
+                'address_province_code' => $seeker->address_province_code,
+                'address_city_code' => $seeker->address_city_code,
+                'address_barangay_code' => $seeker->address_barangay_code,
+                'latitude' => $seeker->latitude,
+                'longitude' => $seeker->longitude,
+                'location_accuracy' => $seeker->location_accuracy,
+                'google_place_id' => $seeker->google_place_id,
                 'disabilities' => $seeker->disabilities,
                 'is_4ps_beneficiary' => $seeker->is_4ps_beneficiary,
                 'household_id_4ps' => $seeker->household_id_4ps,
@@ -140,6 +176,8 @@ class SeekerController extends Controller
                 'former_ofw_country' => $seeker->former_ofw_country,
                 'former_ofw_return_date' => $seeker->former_ofw_return_date?->format('Y-m-d'),
                 'work_type_preference' => $seeker->work_type_preference,
+                'preferred_work_setups' => $seeker->preferred_work_setups,
+                'preferred_employment_types' => $seeker->preferred_employment_types,
                 'preferred_work_location' => $seeker->preferred_work_location,
                 'preferred_locations_details' => $seeker->preferred_locations_details,
                 'occupations' => $seeker->occupations,
@@ -233,11 +271,32 @@ class SeekerController extends Controller
             'address_municipality_city' => ['required', 'string', 'max:100'],
             'address_barangay' => ['required', 'string', 'max:100'],
             'address_house_street' => ['required', 'string', 'max:255'],
+            'address_province_code' => ['nullable', 'string', 'max:10'],
+            'address_city_code' => ['nullable', 'string', 'max:10'],
+            'address_barangay_code' => ['nullable', 'string', 'max:10'],
+            'latitude' => ['nullable', 'numeric', 'between:-90,90'],
+            'longitude' => ['nullable', 'numeric', 'between:-180,180'],
+            'location_accuracy' => ['nullable', 'integer', 'min:0', 'max:100000'],
+            'google_place_id' => ['nullable', 'string', 'max:255'],
             // Disability: array of types, at least one must be selected
-            'disabilities' => ['nullable', 'array'],
+            'disabilities' => ['required', 'array', 'min:1'],
             'disabilities.*' => ['string', 'in:visual,hearing,speech,mental,physical,others,none'],
-            'disability_specification' => ['nullable', 'string', 'max:255'],
+            'disability_specification' => [
+                'nullable',
+                Rule::requiredIf(fn () => in_array('others', $request->input('disabilities', []), true)),
+                'string',
+                'max:255',
+            ],
         ]);
+
+        if (in_array('none', $validated['disabilities'], true) && count($validated['disabilities']) > 1) {
+            return response()->json([
+                'message' => 'No Disability cannot be combined with another disability.',
+                'errors' => [
+                    'disabilities' => ['Select No Disability by itself.'],
+                ],
+            ], 422);
+        }
 
         // ── Save main seeker fields ──
         $seeker->forceFill([
@@ -258,6 +317,13 @@ class SeekerController extends Controller
             'address_municipality_city' => $validated['address_municipality_city'],
             'address_barangay' => $validated['address_barangay'],
             'address_house_street' => $validated['address_house_street'],
+            'address_province_code' => $validated['address_province_code'] ?? null,
+            'address_city_code' => $validated['address_city_code'] ?? null,
+            'address_barangay_code' => $validated['address_barangay_code'] ?? null,
+            'latitude' => $validated['latitude'] ?? null,
+            'longitude' => $validated['longitude'] ?? null,
+            'location_accuracy' => $validated['location_accuracy'] ?? null,
+            'google_place_id' => $validated['google_place_id'] ?? null,
         ])->save();
 
         // ── Save disability records ──
@@ -301,20 +367,20 @@ class SeekerController extends Controller
         $validated = $request->validate([
             'employment_status' => ['required', 'in:employed,unemployed'],
             // Employed sub-fields
-            'employment_type' => ['nullable', 'in:wage_employed,self_employed'],
-            'self_employed_type' => ['nullable', 'string', 'max:100'],
-            'self_employed_type_others' => ['nullable', 'string', 'max:255'],
+            'employment_type' => ['nullable', 'required_if:employment_status,employed', 'in:wage_employed,self_employed'],
+            'self_employed_type' => ['nullable', 'required_if:employment_type,self_employed', 'string', 'max:100'],
+            'self_employed_type_others' => ['nullable', 'required_if:self_employed_type,others', 'string', 'max:255'],
             // Unemployed sub-fields
-            'unemployment_months' => ['nullable', 'integer', 'min:0', 'max:999'],
-            'unemployment_reason' => ['nullable', 'string', 'max:100'],
-            'unemployment_reason_others' => ['nullable', 'string', 'max:255'],
-            'unemployment_terminated_country' => ['nullable', 'string', 'max:100'],
+            'unemployment_months' => ['nullable', 'required_if:employment_status,unemployed', 'integer', 'min:0', 'max:999'],
+            'unemployment_reason' => ['nullable', 'required_if:employment_status,unemployed', 'string', 'max:100'],
+            'unemployment_reason_others' => ['nullable', 'required_if:unemployment_reason,others', 'string', 'max:255'],
+            'unemployment_terminated_country' => ['nullable', 'required_if:unemployment_reason,terminated_abroad', 'string', 'max:100'],
             // OFW
             'is_ofw' => ['required', 'boolean'],
-            'ofw_country' => ['nullable', 'string', 'max:100'],
+            'ofw_country' => ['nullable', 'required_if:is_ofw,true', 'string', 'max:100'],
             'is_former_ofw' => ['required', 'boolean'],
-            'former_ofw_country' => ['nullable', 'string', 'max:100'],
-            'former_ofw_return_date' => ['nullable', 'date'],
+            'former_ofw_country' => ['nullable', 'required_if:is_former_ofw,true', 'string', 'max:100'],
+            'former_ofw_return_date' => ['nullable', 'required_if:is_former_ofw,true', 'date', 'before_or_equal:today'],
             // 4Ps
             'is_4ps_beneficiary' => ['required', 'boolean'],
             'household_id_4ps' => [
@@ -330,13 +396,27 @@ class SeekerController extends Controller
 
         $seeker->forceFill([
             'employment_status' => $validated['employment_status'],
-            'employment_type' => $validated['employment_type'] ?? null,
-            'self_employed_type' => $validated['self_employed_type'] ?? null,
-            'self_employed_type_others' => $validated['self_employed_type_others'] ?? null,
-            'unemployment_months' => $validated['unemployment_months'] ?? null,
-            'unemployment_reason' => $validated['unemployment_reason'] ?? null,
-            'unemployment_reason_others' => $validated['unemployment_reason_others'] ?? null,
-            'unemployment_terminated_country' => $validated['unemployment_terminated_country'] ?? null,
+            'employment_type' => $validated['employment_status'] === 'employed'
+                ? ($validated['employment_type'] ?? null)
+                : null,
+            'self_employed_type' => ($validated['employment_type'] ?? null) === 'self_employed'
+                ? ($validated['self_employed_type'] ?? null)
+                : null,
+            'self_employed_type_others' => ($validated['self_employed_type'] ?? null) === 'others'
+                ? ($validated['self_employed_type_others'] ?? null)
+                : null,
+            'unemployment_months' => $validated['employment_status'] === 'unemployed'
+                ? ($validated['unemployment_months'] ?? null)
+                : null,
+            'unemployment_reason' => $validated['employment_status'] === 'unemployed'
+                ? ($validated['unemployment_reason'] ?? null)
+                : null,
+            'unemployment_reason_others' => ($validated['unemployment_reason'] ?? null) === 'others'
+                ? ($validated['unemployment_reason_others'] ?? null)
+                : null,
+            'unemployment_terminated_country' => ($validated['unemployment_reason'] ?? null) === 'terminated_abroad'
+                ? ($validated['unemployment_terminated_country'] ?? null)
+                : null,
             'is_ofw' => $validated['is_ofw'],
             'ofw_country' => $validated['is_ofw'] ? ($validated['ofw_country'] ?? null) : null,
             'is_former_ofw' => $validated['is_former_ofw'],
@@ -369,37 +449,130 @@ class SeekerController extends Controller
 
         $validated = $request->validate([
             'work_type_preference' => ['required', 'in:part_time,full_time'],
+            'preferred_work_setups' => ['nullable', 'array', 'max:3'],
+            'preferred_work_setups.*' => [
+                'string',
+                'distinct',
+                Rule::in(['On-Site', 'Remote', 'Hybrid']),
+            ],
+            'preferred_employment_types' => ['nullable', 'array', 'max:6'],
+            'preferred_employment_types.*' => [
+                'string',
+                'distinct',
+                Rule::in([
+                    'Permanent/Regular',
+                    'Contractual',
+                    'Project-Based',
+                    'Seasonal',
+                    'Part-Time',
+                    'Freelance',
+                ]),
+            ],
             'preferred_work_location' => ['required', 'in:local,overseas'],
             'preferred_locations_details' => ['required', 'array', 'min:1', 'max:3'],
             'preferred_locations_details.*' => ['required', 'string', 'max:255', 'distinct'],
-            'occupation_ids' => ['required', 'array', 'min:1', 'max:3'],
+            'occupation_ids' => ['required_without:occupation_preferences', 'array', 'min:1', 'max:3'],
             'occupation_ids.*' => [
                 'required',
                 'integer',
                 'distinct',
                 'exists:occupations,id',
             ],
+            'occupation_preferences' => ['required_without:occupation_ids', 'array', 'min:1', 'max:3'],
+            'occupation_preferences.*.occupation_id' => ['nullable', 'integer', 'distinct', 'exists:occupations,id'],
+            'occupation_preferences.*.general_term' => ['nullable', 'string', 'max:100', 'distinct'],
+            'occupation_preferences.*.raw_job_title' => ['prohibited'],
         ]);
 
-        $seeker->forceFill([
+        $preferences = collect($validated['occupation_preferences'] ?? [])
+            ->map(fn (array $preference) => [
+                'occupation_id' => $preference['occupation_id'] ?? null,
+                'general_term' => isset($preference['general_term'])
+                    ? $this->normalizeOccupationTerm($preference['general_term'])
+                    : null,
+            ]);
+
+        if ($preferences->isEmpty()) {
+            $preferences = collect($validated['occupation_ids'] ?? [])
+                ->map(fn ($occupationId) => [
+                    'occupation_id' => $occupationId,
+                    'general_term' => null,
+                ]);
+        }
+
+        $invalidPreference = $preferences->first(function (array $preference) {
+            $hasOccupation = $preference['occupation_id'] !== null;
+            $hasGeneralTerm = $preference['general_term'] !== null && $preference['general_term'] !== '';
+
+            return collect([$hasOccupation, $hasGeneralTerm])->filter()->count() !== 1;
+        });
+
+        if ($invalidPreference !== null) {
+            return response()->json([
+                'message' => 'Each occupation preference must contain a job family or catalog occupation.',
+                'errors' => [
+                    'occupation_preferences' => [
+                        'Choose one available job family or catalog occupation for each preference.',
+                    ],
+                ],
+            ], 422);
+        }
+
+        $generalGroups = collect(config('job_preferences.generalized_groups', []))
+            ->keyBy(fn (array $group) => $this->normalizeOccupationTerm($group['term']));
+        $unknownGeneralTerm = $preferences
+            ->pluck('general_term')
+            ->filter()
+            ->first(fn (string $term) => ! $generalGroups->has($term));
+
+        if ($unknownGeneralTerm !== null) {
+            return response()->json([
+                'message' => 'The selected job family is not available.',
+                'errors' => [
+                    'occupation_preferences' => ['Choose an available generalized job family.'],
+                ],
+            ], 422);
+        }
+
+        $preferenceData = [
             'work_type_preference' => $validated['work_type_preference'],
             'preferred_work_location' => $validated['preferred_work_location'],
-            'preferred_locations_details' => $validated['preferred_locations_details'] ?? [],
-        ])->save();
+            'preferred_locations_details' => $this->uniqueStringList(
+                $validated['preferred_locations_details'] ?? []
+            ),
+        ];
+        if (Schema::hasColumn('job_seekers', 'preferred_work_setups')) {
+            $preferenceData['preferred_work_setups'] = $validated['preferred_work_setups'] ?? [];
+        }
+        if (Schema::hasColumn('job_seekers', 'preferred_employment_types')) {
+            $preferenceData['preferred_employment_types'] = $validated['preferred_employment_types'] ?? [];
+        }
+        $seeker->forceFill($preferenceData)->save();
 
         // ── Sync occupations (delete + re-insert) ──
         $seeker->occupations()->delete();
         $occupations = Occupation::query()
-            ->whereIn('id', $validated['occupation_ids'])
+            ->whereIn('id', $preferences->pluck('occupation_id')->filter())
             ->get()
             ->keyBy('id');
 
-        foreach ($validated['occupation_ids'] as $index => $occupationId) {
-            $occupation = $occupations->get($occupationId);
+        foreach ($preferences as $index => $preference) {
+            $occupation = $preference['occupation_id']
+                ? $occupations->get($preference['occupation_id'])
+                : null;
+            $generalGroup = $preference['general_term']
+                ? $generalGroups->get($preference['general_term'])
+                : null;
+            $title = $occupation?->title
+                ?? $generalGroup['label'];
+
             SeekerOccupation::create([
                 'seeker_id' => $seeker->getKey(),
-                'occupation_id' => $occupation->id,
-                'occupation_title' => $occupation->title,
+                'occupation_id' => $occupation?->id,
+                'general_term' => $preference['general_term'],
+                'occupation_title' => $title,
+                'raw_job_title' => null,
+                'status' => $occupation ? 'standardized' : 'generalized',
                 'preference_order' => $index + 1,
             ]);
         }
@@ -410,6 +583,26 @@ class SeekerController extends Controller
             'message' => 'Job preferences saved.',
             'user' => $this->buildPayload($seeker),
         ]);
+    }
+
+    private function normalizeOccupationTerm(string $term): string
+    {
+        return Str::of($term)
+            ->lower()
+            ->replace('&', ' and ')
+            ->replaceMatches('/[^a-z0-9+#.]+/', ' ')
+            ->squish()
+            ->toString();
+    }
+
+    private function uniqueStringList(array $values): array
+    {
+        return collect($values)
+            ->map(fn ($value) => Str::of((string) $value)->squish()->toString())
+            ->filter()
+            ->unique(fn (string $value) => Str::lower($value))
+            ->values()
+            ->all();
     }
 
     /**
@@ -427,9 +620,28 @@ class SeekerController extends Controller
             return $seeker;
         }
 
+        $request->merge([
+            'languages' => collect($request->input('languages', []))
+                ->map(function ($language) {
+                    if (! is_array($language)) {
+                        return $language;
+                    }
+
+                    $language['language'] = Str::lower(trim((string) ($language['language'] ?? '')));
+
+                    return $language;
+                })
+                ->all(),
+        ]);
+
         $validated = $request->validate([
             'languages' => ['required', 'array', 'min:1'],
-            'languages.*.language' => ['required', 'string', 'max:100'],
+            'languages.*.language' => [
+                'required',
+                'string',
+                Rule::in(self::SUPPORTED_LANGUAGES),
+                'distinct:ignore_case',
+            ],
             'languages.*.language_other' => ['nullable', 'string', 'max:100'],
             'languages.*.can_read' => ['boolean'],
             'languages.*.can_write' => ['boolean'],
@@ -437,9 +649,31 @@ class SeekerController extends Controller
             'languages.*.can_understand' => ['boolean'],
         ]);
 
+        $languages = collect($validated['languages'])
+            ->map(function (array $language) {
+                $language['language'] = Str::lower(trim($language['language']));
+                $language['language_other'] = $language['language'] === 'others'
+                    ? Str::of((string) ($language['language_other'] ?? ''))->squish()->toString()
+                    : null;
+
+                return $language;
+            });
+
+        if ($languages->contains(
+            fn (array $language) => $language['language'] === 'others'
+                && $language['language_other'] === ''
+        )) {
+            return response()->json([
+                'message' => 'Please specify the other language or dialect.',
+                'errors' => [
+                    'languages' => ['Specify the language or dialect selected under Others.'],
+                ],
+            ], 422);
+        }
+
         // ── Sync languages (delete + re-insert) ──
         $seeker->languages()->delete();
-        foreach ($validated['languages'] as $lang) {
+        foreach ($languages as $lang) {
             // Only save if at least one proficiency is marked
             $hasAny = ($lang['can_read'] ?? false)
                    || ($lang['can_write'] ?? false)
@@ -450,7 +684,7 @@ class SeekerController extends Controller
                 SeekerLanguage::create([
                     'seeker_id' => $seeker->getKey(),
                     'language' => $lang['language'],
-                    'language_other' => $lang['language_other'] ?? null,
+                    'language_other' => $lang['language_other'],
                     'can_read' => $lang['can_read'] ?? false,
                     'can_write' => $lang['can_write'] ?? false,
                     'can_speak' => $lang['can_speak'] ?? false,
@@ -473,8 +707,12 @@ class SeekerController extends Controller
      * Saves: Educational Background (writes to seeker_educations table) and
      *        Other Skills (JSON array in job_seekers table).
      */
-    public function saveStep5(Request $request): JsonResponse
-    {
+    public function saveStep5(
+        Request $request,
+        SkillCategorizer $categorizer,
+        SkillTaxonomyService $taxonomy,
+        MatchingProfileService $matchingProfiles
+    ): JsonResponse {
         $seeker = $this->getSeeker($request);
         if ($seeker instanceof JsonResponse) {
             return $seeker;
@@ -483,7 +721,7 @@ class SeekerController extends Controller
         $validated = $request->validate([
             'currently_in_school' => ['required', 'boolean'],
             // Education array: one record per level (required, min 1)
-            'educations' => ['required', 'array', 'min:1'],
+            'educations' => ['nullable', 'array'],
             'educations.*.level' => ['required', 'string', 'in:elementary,secondary_non_k12,secondary_k12,senior_high_strand,tertiary,graduate_studies'],
             'educations.*.course_strand' => ['nullable', 'string', 'max:255'],
             'educations.*.year_graduated' => ['nullable', 'integer', 'min:1900', 'max:2100'],
@@ -511,15 +749,21 @@ class SeekerController extends Controller
 
         // ── Sync educations (delete + re-insert) ──
         $seeker->educations()->delete();
-        foreach ($validated['educations'] as $edu) {
-            SeekerEducation::create([
+        foreach ($validated['educations'] ?? [] as $edu) {
+            $educationData = [
                 'seeker_id' => $seeker->getKey(),
                 'level' => $edu['level'],
                 'course_strand' => $edu['course_strand'] ?? null,
                 'year_graduated' => $edu['year_graduated'] ?? null,
                 'undergrad_level_reached' => $edu['undergrad_level_reached'] ?? null,
                 'undergrad_year_last_attended' => $edu['undergrad_year_last_attended'] ?? null,
-            ]);
+            ];
+            if (Schema::hasColumn('seeker_educations', 'normalized_course_strand')) {
+                $educationData['normalized_course_strand'] = filled($edu['course_strand'] ?? null)
+                    ? $matchingProfiles->normalize($edu['course_strand'])
+                    : null;
+            }
+            SeekerEducation::create($educationData);
         }
 
         // ── Sync all skills (delete + re-insert) ──
@@ -528,7 +772,7 @@ class SeekerController extends Controller
 
         // Insert DOLE standard skills
         if (! empty($validated['dole_skills'])) {
-            foreach ($validated['dole_skills'] as $skillName) {
+            foreach ($this->uniqueStringList($validated['dole_skills']) as $skillName) {
                 $seeker->skills()->create([
                     'skill_name' => trim($skillName),
                     'skill_type' => 'dole_standard',
@@ -536,9 +780,14 @@ class SeekerController extends Controller
             }
         }
 
+        $categorizedSkills = $categorizer->canonicalizeSubmitted(
+            $this->uniqueStringList($validated['technical_skills'] ?? []),
+            $this->uniqueStringList($validated['soft_skills'] ?? [])
+        );
+
         // Insert technical/professional skills
-        if (! empty($validated['technical_skills'])) {
-            foreach ($validated['technical_skills'] as $skillName) {
+        if ($categorizedSkills['technical'] !== []) {
+            foreach ($categorizedSkills['technical'] as $skillName) {
                 $seeker->skills()->create([
                     'skill_name' => trim($skillName),
                     'skill_type' => 'technical',
@@ -547,14 +796,16 @@ class SeekerController extends Controller
         }
 
         // Insert soft/interpersonal skills
-        if (! empty($validated['soft_skills'])) {
-            foreach ($validated['soft_skills'] as $skillName) {
+        if ($categorizedSkills['soft'] !== []) {
+            foreach ($categorizedSkills['soft'] as $skillName) {
                 $seeker->skills()->create([
                     'skill_name' => trim($skillName),
                     'skill_type' => 'soft',
                 ]);
             }
         }
+
+        $taxonomy->syncSeeker($seeker);
 
         $this->markStepComplete($seeker, 'step5');
 
@@ -571,8 +822,10 @@ class SeekerController extends Controller
      *        Professional Eligibilities/Licenses (writes to seeker_eligibilities table).
      *        Both support dynamic Add/Remove rows.
      */
-    public function saveStep6(Request $request): JsonResponse
-    {
+    public function saveStep6(
+        Request $request,
+        MatchingProfileService $matchingProfiles
+    ): JsonResponse {
         $seeker = $this->getSeeker($request);
         if ($seeker instanceof JsonResponse) {
             return $seeker;
@@ -590,22 +843,31 @@ class SeekerController extends Controller
             'eligibilities' => ['nullable', 'array'],
             'eligibilities.*.type' => ['required_with:eligibilities', 'string', 'in:civil_service,professional_license'],
             'eligibilities.*.name' => ['required_with:eligibilities', 'string', 'max:255'],
-            'eligibilities.*.date_taken' => ['nullable', 'date'],
-            'eligibilities.*.valid_until' => ['nullable', 'date'],
+            'eligibilities.*.date_taken' => ['nullable', 'required_with:eligibilities.*.valid_until', 'date', 'before_or_equal:today'],
+            'eligibilities.*.valid_until' => ['nullable', 'date', 'after_or_equal:eligibilities.*.date_taken'],
         ]);
 
         // ── Sync trainings (delete + re-insert) ──
         $seeker->trainings()->delete();
         if (! empty($validated['trainings'])) {
             foreach ($validated['trainings'] as $training) {
-                SeekerTraining::create([
+                $trainingData = [
                     'seeker_id' => $seeker->getKey(),
                     'course' => $training['course'],
                     'hours_of_training' => $training['hours_of_training'] ?? null,
                     'training_institution' => $training['training_institution'] ?? null,
                     'skills_acquired' => $training['skills_acquired'] ?? null,
                     'certificates_received' => $training['certificates_received'] ?? null,
-                ]);
+                ];
+                if (Schema::hasColumn('seeker_trainings', 'normalized_course')) {
+                    $trainingData['normalized_course'] = $matchingProfiles->normalize($training['course']);
+                }
+                if (Schema::hasColumn('seeker_trainings', 'normalized_certificates')) {
+                    $trainingData['normalized_certificates'] = filled($training['certificates_received'] ?? null)
+                        ? $matchingProfiles->normalize($training['certificates_received'])
+                        : null;
+                }
+                SeekerTraining::create($trainingData);
             }
         }
 
@@ -613,13 +875,17 @@ class SeekerController extends Controller
         $seeker->eligibilities()->delete();
         if (! empty($validated['eligibilities'])) {
             foreach ($validated['eligibilities'] as $elig) {
-                SeekerEligibility::create([
+                $eligibilityData = [
                     'seeker_id' => $seeker->getKey(),
                     'type' => $elig['type'],
                     'name' => $elig['name'],
                     'date_taken' => $elig['date_taken'] ?? null,
                     'valid_until' => $elig['valid_until'] ?? null,
-                ]);
+                ];
+                if (Schema::hasColumn('seeker_eligibilities', 'normalized_name')) {
+                    $eligibilityData['normalized_name'] = $matchingProfiles->normalize($elig['name']);
+                }
+                SeekerEligibility::create($eligibilityData);
             }
         }
 
@@ -638,15 +904,19 @@ class SeekerController extends Controller
      *        Supports dynamic Add/Remove rows.
      *        Final step — marks profile_completed = true upon success.
      */
-    public function saveStep7(Request $request): JsonResponse
-    {
+    public function saveStep7(
+        Request $request,
+        OccupationTitleMatcher $occupationMatcher,
+        MatchingProfileService $matchingProfiles
+    ): JsonResponse {
         $seeker = $this->getSeeker($request);
         if ($seeker instanceof JsonResponse) {
             return $seeker;
         }
 
         $validated = $request->validate([
-            'work_experiences' => ['required', 'array', 'min:1'],
+            'work_experiences' => ['nullable', 'array'],
+            'work_experiences.*.occupation_id' => ['nullable', 'integer', 'exists:occupations,id'],
             'work_experiences.*.company_name' => ['required', 'string', 'max:255'],
             'work_experiences.*.company_address' => ['nullable', 'string', 'max:500'],
             'work_experiences.*.position' => ['required', 'string', 'max:255'],
@@ -656,15 +926,29 @@ class SeekerController extends Controller
 
         // ── Sync work experiences (delete + re-insert) ──
         $seeker->workExperiences()->delete();
-        foreach ($validated['work_experiences'] as $exp) {
-            SeekerWorkExperience::create([
+        foreach ($validated['work_experiences'] ?? [] as $exp) {
+            $match = isset($exp['occupation_id'])
+                ? null
+                : $occupationMatcher->match($exp['position']);
+            $matchedOccupation = isset($exp['occupation_id'])
+                ? Occupation::query()->find($exp['occupation_id'])
+                : data_get($match, 'occupation');
+
+            $experienceData = [
                 'seeker_id' => $seeker->getKey(),
                 'company_name' => $exp['company_name'],
                 'company_address' => $exp['company_address'] ?? null,
                 'position' => $exp['position'],
                 'number_of_months' => $exp['number_of_months'] ?? null,
                 'employment_status' => $exp['employment_status'] ?? null,
-            ]);
+            ];
+            if (Schema::hasColumn('seeker_work_experiences', 'occupation_id')) {
+                $experienceData['occupation_id'] = $matchedOccupation?->id;
+            }
+            if (Schema::hasColumn('seeker_work_experiences', 'normalized_position')) {
+                $experienceData['normalized_position'] = $matchingProfiles->normalize($exp['position']);
+            }
+            SeekerWorkExperience::create($experienceData);
         }
 
         $this->markStepComplete($seeker, 'step7');

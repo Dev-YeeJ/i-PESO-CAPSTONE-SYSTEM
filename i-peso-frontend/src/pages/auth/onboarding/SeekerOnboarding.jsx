@@ -8,11 +8,21 @@ import { useAuthStore } from '@/stores/authStore'
 import OnboardingShell from '@/components/auth/OnboardingShell'
 import { seekerRegistrationSteps } from '@/components/auth/registrationJourneys'
 import OccupationCombobox from '@/components/form/OccupationCombobox'
-import { ISO_COUNTRIES } from '@/data/jobPreferenceVocabularies'
+import SingleAddressInput from '@/components/form/SingleAddressInput'
+import {
+  ISO_COUNTRIES,
+  SOFT_SKILL_SUGGESTIONS,
+  TECHNICAL_SKILL_SUGGESTIONS,
+} from '@/data/jobPreferenceVocabularies'
+import { searchSkills } from '@/services/skillService'
 // ── Add these imports at the top of SeekerOnboarding.jsx ──
 
 import { getProvinces, getCitiesByProvince, getBarangaysByCity } from '@/services/psgcServices'
-import { detectAddress } from '@/services/geoService'
+import {
+  detectAddress,
+  geocodeAddress,
+  resolveAddressSuggestion,
+} from '@/services/geoService'
 
 // ── Constants ─────────────────────────────────────────────────────────────
 
@@ -66,7 +76,14 @@ const calculateAge = (birthDate) => {
 // Helper to capitalize proper names
 const capitalizeName = (str) => {
   if (!str) return ''
-  return str.trim().split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()).join(' ')
+  return str
+    .split(/(\s+)/)
+    .map((part) => (
+      /^\s+$/.test(part)
+        ? part
+        : part.charAt(0).toUpperCase() + part.slice(1).toLowerCase()
+    ))
+    .join('')
 }
 
 const format4PsHouseholdId = (value) => {
@@ -119,7 +136,26 @@ const UNEMPLOYMENT_REASONS = [
   { value: 'others',              label: 'Others (specify)' },
 ]
 
-const LANGUAGES = ['English', 'Filipino', 'Mandarin', 'Spanish', 'Japanese', 'Korean', 'Arabic', 'Others']
+const LANGUAGES = [
+  'English',
+  'Filipino',
+  'Cebuano',
+  'Ilocano',
+  'Hiligaynon',
+  'Bikol',
+  'Waray',
+  'Pangasinan',
+  'Kapampangan',
+  'Maranao',
+  'Maguindanao',
+  'Tausug',
+  'Mandarin',
+  'Spanish',
+  'Japanese',
+  'Korean',
+  'Arabic',
+  'Others',
+]
 
 const EDUCATION_LEVELS = [
   { value: 'elementary', label: 'Elementary' },
@@ -148,7 +184,6 @@ const OTHER_SKILLS = [
   { value: 'sewing_dresses', label: 'Sewing Dresses' },
   { value: 'stenography', label: 'Stenography' },
   { value: 'tailoring', label: 'Tailoring' },
-  { value: 'others', label: 'Others (specify)' },
 ]
 
 const ELIGIBILITY_TYPES = [
@@ -163,6 +198,16 @@ const EMPLOYMENT_STATUS_OPTIONS = [
   { value: 'probationary', label: 'Probationary' },
   { value: 'temporary', label: 'Temporary' },
   { value: 'seasonal', label: 'Seasonal' },
+]
+
+const MATCHING_WORK_SETUPS = ['On-Site', 'Remote', 'Hybrid']
+const MATCHING_EMPLOYMENT_TYPES = [
+  'Permanent/Regular',
+  'Contractual',
+  'Project-Based',
+  'Seasonal',
+  'Part-Time',
+  'Freelance',
 ]
 
 const STEPS = [
@@ -217,6 +262,65 @@ const selectStyle = (hasError) => ({
   cursor: 'pointer',
 })
 
+const HeightInput = ({ value, error, onChange }) => {
+  const totalInches = value === '' || value == null
+    ? null
+    : Math.round(Number(value) * 12)
+  const feet = totalInches == null ? '' : Math.floor(totalInches / 12)
+  const inches = totalInches == null ? '' : totalInches % 12
+  const inchOptions = Array.from({ length: 12 }, (_, option) => option)
+    .filter((option) => feet !== 2 || option >= 6)
+    .filter((option) => feet !== 8 || option <= 6)
+
+  const updateHeight = (nextFeet, nextInches) => {
+    if (nextFeet === '' || nextInches === '') {
+      onChange({ target: { name: 'height_ft', value: '' } })
+      return
+    }
+
+    onChange({
+      target: {
+        name: 'height_ft',
+        value: ((Number(nextFeet) * 12 + Number(nextInches)) / 12).toFixed(2),
+      },
+    })
+  }
+
+  return (
+    <div className="grid grid-cols-2 gap-2">
+      <select
+        aria-label="Height feet"
+        value={feet}
+        onChange={(event) => {
+          const nextFeet = Number(event.target.value)
+          const nextInches = inches === ''
+            ? (nextFeet === 2 ? 6 : 0)
+            : Math.min(Math.max(inches, nextFeet === 2 ? 6 : 0), nextFeet === 8 ? 6 : 11)
+          updateHeight(event.target.value, nextInches)
+        }}
+        style={selectStyle(!!error)}
+      >
+        <option value="">Feet</option>
+        {[2, 3, 4, 5, 6, 7, 8].map((option) => (
+          <option key={option} value={option}>{option} ft</option>
+        ))}
+      </select>
+      <select
+        aria-label="Height inches"
+        value={inches}
+        onChange={(event) => updateHeight(feet, event.target.value)}
+        style={selectStyle(!!error)}
+        disabled={feet === ''}
+      >
+        <option value="">Inches</option>
+        {inchOptions.map((option) => (
+          <option key={option} value={option}>{option} in</option>
+        ))}
+      </select>
+    </div>
+  )
+}
+
 // ── Step Progress Indicator ───────────────────────────────────────────────
 
 const StepIndicator = ({ current, completed }) => (
@@ -266,7 +370,7 @@ const StepIndicator = ({ current, completed }) => (
 // ── STEP 1: Personal Information ──────────────────────────────────────────
 
 // ── Step1 component — replaces the existing one ──────────────────────────
-const Step1 = ({ form, errors, onChange, user, onGpsDetect, gpsState }) => {
+const Step1 = ({ form, errors, onChange, user, onGpsDetect, onAddressSelect, gpsState }) => {
   return (
     <div>
       <SectionHeader
@@ -354,10 +458,8 @@ const Step1 = ({ form, errors, onChange, user, onGpsDetect, gpsState }) => {
               value={form.religion_other ?? ''} onChange={onChange} placeholder="Specify your religion" />
           </FormField>
         )}
-        <FormField label="Height (in feet)" error={errors.height_ft} help="Range: 2.5 – 8.5 ft">
-          <input type="number" style={inputStyle(!!errors.height_ft)} name="height_ft"
-            value={form.height_ft ?? ''} onChange={onChange}
-            placeholder="e.g., 5.6" step="0.1" min="2.5" max="8.5" />
+        <FormField label="Height" error={errors.height_ft} help="Select feet and inches">
+          <HeightInput value={form.height_ft} error={errors.height_ft} onChange={onChange} />
         </FormField>
         <FormField label="TIN (Tax Identification No.)" required={false} error={errors.tin}>
           <input style={inputStyle(!!errors.tin)} name="tin"
@@ -382,6 +484,7 @@ const Step1 = ({ form, errors, onChange, user, onGpsDetect, gpsState }) => {
           onChange={onChange}
           gpsState={gpsState}
           onGpsDetect={onGpsDetect}
+          onAddressSelect={onAddressSelect}
         />
       </div>
 
@@ -425,6 +528,9 @@ const Step1 = ({ form, errors, onChange, user, onGpsDetect, gpsState }) => {
                         : current.filter((v) => v !== opt.value)
                     }
                     onChange({ target: { name: 'disabilities', value: next } })
+                    if (opt.value === 'others' && !e.target.checked) {
+                      onChange({ target: { name: 'disability_specification', value: '' } })
+                    }
                   }}
                   style={{ accentColor: '#1d4ed8' }}
                 />
@@ -545,8 +651,14 @@ const Step2 = ({ form, errors, onChange }) => (
         )}
         {form.unemployment_reason === 'terminated_abroad' && (
           <FormField label="Country" error={errors.unemployment_terminated_country}>
-            <input style={inputStyle(!!errors.unemployment_terminated_country)} name="unemployment_terminated_country"
-              value={form.unemployment_terminated_country ?? ''} onChange={onChange} placeholder="Country of employment" />
+            <SearchableSingleSelect
+              name="unemployment_terminated_country"
+              value={form.unemployment_terminated_country}
+              onChange={onChange}
+              options={ISO_COUNTRIES.map((country) => country.name)}
+              placeholder="Type or select a country"
+              error={errors.unemployment_terminated_country}
+            />
           </FormField>
         )}
       </div>
@@ -595,16 +707,28 @@ const Step2 = ({ form, errors, onChange }) => (
 
     {(form.is_ofw === true || form.is_ofw === 'true') && (
       <FormField label="Country of Employment" error={errors.ofw_country}>
-        <input style={inputStyle(!!errors.ofw_country)} name="ofw_country"
-          value={form.ofw_country ?? ''} onChange={onChange} placeholder="e.g., Saudi Arabia" />
+        <SearchableSingleSelect
+          name="ofw_country"
+          value={form.ofw_country}
+          onChange={onChange}
+          options={ISO_COUNTRIES.map((country) => country.name)}
+          placeholder="Type or select a country"
+          error={errors.ofw_country}
+        />
       </FormField>
     )}
 
     {(form.is_former_ofw === true || form.is_former_ofw === 'true') && (
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
         <FormField label="Last Country of Employment" error={errors.former_ofw_country}>
-          <input style={inputStyle(!!errors.former_ofw_country)} name="former_ofw_country"
-            value={form.former_ofw_country ?? ''} onChange={onChange} placeholder="e.g., Japan" />
+          <SearchableSingleSelect
+            name="former_ofw_country"
+            value={form.former_ofw_country}
+            onChange={onChange}
+            options={ISO_COUNTRIES.map((country) => country.name)}
+            placeholder="Type or select a country"
+            error={errors.former_ofw_country}
+          />
         </FormField>
         <FormField label="Date Returned to Philippines" error={errors.former_ofw_return_date}>
           <input type="date" style={inputStyle(!!errors.former_ofw_return_date)} name="former_ofw_return_date"
@@ -668,22 +792,70 @@ const PreferenceTags = ({ items, onRemove }) => (
   </div>
 )
 
+const normalizeChoice = (value) => String(value ?? '').trim().replace(/\s+/g, ' ').toLocaleLowerCase()
+
+const SearchableSingleSelect = ({ name, value, onChange, options, placeholder, error }) => {
+  const [open, setOpen] = useState(false)
+  const normalizedValue = normalizeChoice(value)
+  const matches = options
+    .filter((option) => normalizeChoice(option).includes(normalizedValue))
+    .slice(0, 8)
+
+  const select = (option) => {
+    onChange({ target: { name, value: option } })
+    setOpen(false)
+  }
+
+  return (
+    <div style={{ position: 'relative' }}>
+      <input
+        style={inputStyle(!!error)}
+        name={name}
+        value={value ?? ''}
+        onChange={(event) => {
+          onChange(event)
+          setOpen(true)
+        }}
+        onFocus={() => setOpen(true)}
+        onBlur={() => setTimeout(() => setOpen(false), 120)}
+        placeholder={placeholder}
+        autoComplete="off"
+        role="combobox"
+        aria-expanded={open}
+      />
+      {open && matches.length > 0 && (
+        <div style={{ position: 'absolute', zIndex: 30, top: 'calc(100% + 4px)', left: 0, right: 0, maxHeight: '220px', overflowY: 'auto', border: '1px solid #cbd5e1', borderRadius: '10px', backgroundColor: '#fff', boxShadow: '0 12px 28px rgba(15, 23, 42, 0.14)' }}>
+          {matches.map((option) => (
+            <button key={option} type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => select(option)} style={{ width: '100%', padding: '10px 12px', border: 0, borderBottom: '1px solid #f1f5f9', background: '#fff', color: '#334155', cursor: 'pointer', textAlign: 'left', fontSize: '12px' }}>
+              {option}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 const SearchableMultiSelect = ({ options, selected, onChange, placeholder, limit = 3, error }) => {
   const [query, setQuery] = useState('')
+  const pendingSelections = useRef(new Set())
   const search = query.trim().toLowerCase()
+  const selectedKeys = new Set(selected.map(normalizeChoice))
   const matches = search
-    ? options.filter((option) => option.toLowerCase().includes(search) && !selected.includes(option)).slice(0, 8)
+    ? options.filter((option) => option.toLowerCase().includes(search) && !selectedKeys.has(normalizeChoice(option))).slice(0, 8)
     : []
 
   const add = (option) => {
-    if (selected.length >= limit || selected.includes(option)) return
+    const key = normalizeChoice(option)
+    if (selected.length >= limit || selectedKeys.has(key) || pendingSelections.current.has(key)) return
+    pendingSelections.current.add(key)
     onChange([...selected, option])
     setQuery('')
+    setTimeout(() => pendingSelections.current.delete(key), 300)
   }
 
   return (
     <div>
-      <PreferenceTags items={selected} onRemove={(item) => onChange(selected.filter((value) => value !== item))} />
       <div style={{ position: 'relative' }}>
         <input
           style={inputStyle(!!error)}
@@ -730,6 +902,15 @@ const Step3 = ({ form, errors, onChange }) => {
   const locations = form.preferred_locations_details ?? []
   const setField = (name, value) => onChange({ target: { name, value } })
   const selectedProvince = provinceOptions.find((province) => province.code === provinceCode)
+  const togglePreference = (field, value) => {
+    const current = form[field] ?? []
+    setField(
+      field,
+      current.includes(value)
+        ? current.filter((item) => item !== value)
+        : [...current, value],
+    )
+  }
 
   const addLocalLocation = (cityCode) => {
     const city = cityOptions.find((option) => option.code === cityCode)
@@ -740,7 +921,7 @@ const Step3 = ({ form, errors, onChange }) => {
 
   return (
     <div>
-      <SectionHeader icon="🎯" title="III. JOB PREFERENCE" subtitle="Select standardized occupations and work locations" />
+      <SectionHeader icon="🎯" title="III. JOB PREFERENCE" subtitle="Select specific standardized occupations and your preferred work locations" />
 
       <div style={{ marginBottom: '20px' }}>
         <p style={{ fontSize: '13px', fontWeight: '700', color: '#374151', marginBottom: '10px' }}>
@@ -752,9 +933,14 @@ const Step3 = ({ form, errors, onChange }) => {
           onChange={(value) => setField('preferred_occupations', value)}
           multiple
           limit={3}
-          placeholder="Search occupation, e.g. Registered Nurse"
+          searchLimit={50}
+          minimumQueryLength={2}
+          placeholder="Search a specific job title or classification code"
           error={errors.preferred_occupations}
         />
+        <p style={{ fontSize: '11px', color: '#64748b', marginTop: '7px', lineHeight: '1.5' }}>
+          Search official and international job titles from PSOC, O*NET, and ESCO. Select the exact occupation you want; local aliases such as &quot;sekyu&quot; and &quot;kasambahay&quot; are also supported.
+        </p>
         {errors.preferred_occupations && <p style={{ fontSize: '11px', color: '#ef4444', marginTop: '6px' }}>{errors.preferred_occupations}</p>}
       </div>
 
@@ -771,6 +957,49 @@ const Step3 = ({ form, errors, onChange }) => {
           })}
         </div>
       </FormField>
+
+      <div style={{ marginBottom: '18px', padding: '14px', border: '1px solid #dbeafe', borderRadius: '12px', backgroundColor: '#f8fbff' }}>
+        <p style={{ margin: '0 0 4px', fontSize: '13px', fontWeight: '700', color: '#1e3a8a' }}>
+          Matching preferences <span style={{ fontSize: '11px', fontWeight: '500', color: '#64748b' }}>(optional)</span>
+        </p>
+        <p style={{ margin: '0 0 12px', fontSize: '11px', color: '#64748b' }}>
+          These choices improve recommendations but do not replace the official NSRP work-type answer above.
+        </p>
+
+        <p style={{ margin: '0 0 7px', fontSize: '11px', fontWeight: '700', color: '#475569' }}>Preferred work setup</p>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '7px', marginBottom: '12px' }}>
+          {MATCHING_WORK_SETUPS.map((option) => {
+            const selected = (form.preferred_work_setups ?? []).includes(option)
+            return (
+              <button
+                key={option}
+                type="button"
+                onClick={() => togglePreference('preferred_work_setups', option)}
+                style={{ padding: '7px 10px', borderRadius: '999px', border: `1px solid ${selected ? '#2563eb' : '#cbd5e1'}`, backgroundColor: selected ? '#dbeafe' : '#fff', color: selected ? '#1d4ed8' : '#475569', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}
+              >
+                {option}
+              </button>
+            )
+          })}
+        </div>
+
+        <p style={{ margin: '0 0 7px', fontSize: '11px', fontWeight: '700', color: '#475569' }}>Preferred employment arrangement</p>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '7px' }}>
+          {MATCHING_EMPLOYMENT_TYPES.map((option) => {
+            const selected = (form.preferred_employment_types ?? []).includes(option)
+            return (
+              <button
+                key={option}
+                type="button"
+                onClick={() => togglePreference('preferred_employment_types', option)}
+                style={{ padding: '7px 10px', borderRadius: '999px', border: `1px solid ${selected ? '#2563eb' : '#cbd5e1'}`, backgroundColor: selected ? '#dbeafe' : '#fff', color: selected ? '#1d4ed8' : '#475569', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}
+              >
+                {option}
+              </button>
+            )
+          })}
+        </div>
+      </div>
 
       <FormField label="Preferred Work Location" error={errors.preferred_work_location}>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
@@ -829,7 +1058,19 @@ const Step3 = ({ form, errors, onChange }) => {
 // ── STEP 4: Language Proficiency ──────────────────────────────────────────
 
 const Step4 = ({ form, onChange, errors }) => {
+  const [languageQuery, setLanguageQuery] = useState('')
   const getLangKey = (lang, skill) => `lang_${lang.toLowerCase()}_${skill}`
+  const visibleLanguages = LANGUAGES.filter((language) =>
+    language.toLowerCase().includes(languageQuery.trim().toLowerCase())
+  )
+  const selectedLanguageCount = LANGUAGES.filter((language) =>
+    ['read', 'write', 'speak', 'understand'].some((skill) => form[getLangKey(language, skill)])
+  ).length
+  const setAllProficiencies = (language, checked) => {
+    for (const skill of ['read', 'write', 'speak', 'understand']) {
+      onChange({ target: { name: getLangKey(language, skill), value: checked } })
+    }
+  }
 
   return (
     <div>
@@ -845,27 +1086,41 @@ const Step4 = ({ form, onChange, errors }) => {
         </div>
       )}
 
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', marginBottom: '12px', flexWrap: 'wrap' }}>
+        <input
+          value={languageQuery}
+          onChange={(event) => setLanguageQuery(event.target.value)}
+          placeholder="Search language or Philippine dialect"
+          style={{ ...inputStyle(false), maxWidth: '360px' }}
+        />
+        <span style={{ fontSize: '11px', fontWeight: '700', color: '#475569' }}>
+          {selectedLanguageCount} selected
+        </span>
+      </div>
+
       {/* Language table */}
-      <div style={{ border: '1px solid #e2e8f0', borderRadius: '14px', overflow: 'hidden' }}>
+      <div style={{ border: '1px solid #e2e8f0', borderRadius: '14px', overflowX: 'auto' }}>
         {/* Header */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr 1fr 1fr 1fr', backgroundColor: '#1d4ed8', padding: '10px 14px', gap: '4px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1.6fr repeat(4, minmax(58px, 1fr)) 74px', minWidth: '680px', backgroundColor: '#1d4ed8', padding: '10px 14px', gap: '4px' }}>
           <p style={{ fontSize: '11px', fontWeight: '700', color: '#fff', margin: 0 }}>LANGUAGE / DIALECT</p>
           {['READ', 'WRITE', 'SPEAK', 'UNDERSTAND'].map((h) => (
             <p key={h} style={{ fontSize: '11px', fontWeight: '700', color: '#bfdbfe', margin: 0, textAlign: 'center' }}>{h}</p>
           ))}
+          <p style={{ fontSize: '11px', fontWeight: '700', color: '#bfdbfe', margin: 0, textAlign: 'center' }}>ALL</p>
         </div>
 
         {/* Rows */}
-        {LANGUAGES.map((lang, idx) => {
+        {visibleLanguages.map((lang, idx) => {
           const isOthers  = lang === 'Others'
           const otherKey  = 'lang_other_name'
           const isEven    = idx % 2 === 0
           const othersSelected = form[`lang_others_read`] || form[`lang_others_write`] || form[`lang_others_speak`] || form[`lang_others_understand`]
           const hasError   = isOthers && othersSelected && !form[otherKey]?.trim()
+          const allChecked = ['read', 'write', 'speak', 'understand'].every((skill) => !!form[getLangKey(lang, skill)])
 
           return (
             <div key={lang}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr 1fr 1fr 1fr', padding: '10px 14px', gap: '4px', alignItems: 'center', backgroundColor: isEven ? '#f8fafc' : '#fff', borderTop: '1px solid #f1f5f9' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1.6fr repeat(4, minmax(58px, 1fr)) 74px', minWidth: '680px', padding: '10px 14px', gap: '4px', alignItems: 'center', backgroundColor: isEven ? '#f8fafc' : '#fff', borderTop: '1px solid #f1f5f9' }}>
                 <div>
                   {isOthers ? (
                     <input
@@ -893,6 +1148,23 @@ const Step4 = ({ form, onChange, errors }) => {
                     </div>
                   )
                 })}
+                <button
+                  type="button"
+                  onClick={() => setAllProficiencies(lang, !allChecked)}
+                  style={{
+                    justifySelf: 'center',
+                    border: `1px solid ${allChecked ? '#93c5fd' : '#cbd5e1'}`,
+                    borderRadius: '7px',
+                    padding: '5px 8px',
+                    backgroundColor: allChecked ? '#dbeafe' : '#fff',
+                    color: allChecked ? '#1d4ed8' : '#64748b',
+                    fontSize: '10px',
+                    fontWeight: '700',
+                    cursor: 'pointer',
+                  }}
+                >
+                  {allChecked ? 'Clear' : 'All'}
+                </button>
               </div>
               {hasError && (
                 <p style={{ fontSize: '11px', color: '#ef4444', padding: '4px 14px 0', display: 'flex', alignItems: 'center', gap: '4px' }}>
@@ -902,10 +1174,15 @@ const Step4 = ({ form, onChange, errors }) => {
             </div>
           )
         })}
+        {visibleLanguages.length === 0 && (
+          <p style={{ margin: 0, padding: '18px', textAlign: 'center', color: '#64748b', fontSize: '12px' }}>
+            No language found. Use “Others” to enter another language or dialect.
+          </p>
+        )}
       </div>
 
       <p style={{ fontSize: '11px', color: '#94a3b8', marginTop: '8px', lineHeight: '1.5' }}>
-        Check all applicable skills. At least one language with one proficiency must be selected.
+        Select only the abilities you can use. “All” marks read, write, speak, and understand for that language.
       </p>
     </div>
   )
@@ -913,9 +1190,9 @@ const Step4 = ({ form, onChange, errors }) => {
 
 // ── Handles all address dropdown state including API loading ──────────────
 
-const SelectDropdown = ({ label, name, codeName, codeValue, options, loading, disabled, error, onChange, placeholder }) => (
+const SelectDropdown = ({ label, name, codeName, codeValue, options, loading, disabled, dimmed, error, onChange, placeholder }) => (
   <FormField label={label} error={error}>
-    <div style={{ position: 'relative' }}>
+    <div style={{ position: 'relative', opacity: dimmed ? 0.55 : 1, transition: 'opacity 0.2s' }}>
       <select
         style={{
           ...selectStyle(!!error),
@@ -945,20 +1222,72 @@ const SelectDropdown = ({ label, name, codeName, codeValue, options, loading, di
   </FormField>
 )
 
-const AddressSection = ({ form, errors, onChange, gpsState, onGpsDetect }) => {
+const AddressSection = ({ form, errors, onChange, gpsState, onGpsDetect, onAddressSelect }) => {
   const [provinces,  setProvinces]  = useState([])
   const [cities,     setCities]     = useState([])
   const [barangays,  setBarangays]  = useState([])
   const [loadingProv, setLoadingProv] = useState(false)
   const [loadingCity, setLoadingCity] = useState(false)
   const [loadingBrgy, setLoadingBrgy] = useState(false)
+  const [isLocating, setIsLocating] = useState(false)
+  const [showOfficialFields, setShowOfficialFields] = useState(false)
+  const [addressDisplayValue, setAddressDisplayValue] = useState('')
   const [apiError,   setApiError]   = useState(null)
+  const [focusRequest, setFocusRequest] = useState(0)
+  const houseStreetRef = useRef(null)
+
+  const guideAddressCompletion = (matched) => {
+    const needsCompletion = !matched?.isComplete
+    setShowOfficialFields(needsCompletion)
+    if (needsCompletion) setFocusRequest((request) => request + 1)
+  }
+
+  const handleAddressParsed = (address) => {
+    if (address.street) {
+      onChange({ target: { name: 'address_house_street', value: address.street } })
+    }
+  }
+
+  const handlePlaceResolved = async (place) => {
+    setIsLocating(true)
+
+    try {
+      const matched = await onAddressSelect(place)
+      if (matched) {
+        guideAddressCompletion(matched)
+      }
+    } finally {
+      setIsLocating(false)
+    }
+  }
+
+  const handleCurrentLocation = async () => {
+    const matched = await onGpsDetect()
+    if (!matched) return
+
+    setAddressDisplayValue(
+      matched.displayName
+      || [
+        matched.houseStreet,
+        matched.barangay?.name,
+        matched.city?.name,
+        matched.province?.name,
+      ].filter(Boolean).join(', ')
+    )
+    guideAddressCompletion(matched)
+  }
+
+  useEffect(() => {
+    if (!focusRequest || !showOfficialFields) return undefined
+
+    const frame = window.requestAnimationFrame(() => houseStreetRef.current?.focus())
+    return () => window.cancelAnimationFrame(frame)
+  }, [focusRequest, showOfficialFields])
 
   // ── Load provinces on mount ───────────────────────────────────────────
   useEffect(() => {
     let isMounted = true
     // Loading state starts with the request initiated by this mount effect.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoadingProv(true)
     setApiError(null)
     getProvinces()
@@ -973,7 +1302,6 @@ const AddressSection = ({ form, errors, onChange, gpsState, onGpsDetect }) => {
     let isMounted = true
     if (!form.address_province_code) {
       // Reset dependent options when the parent selection is cleared.
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setCities([])
       setBarangays([])
       return
@@ -993,7 +1321,6 @@ const AddressSection = ({ form, errors, onChange, gpsState, onGpsDetect }) => {
     let isMounted = true
     if (!form.address_city_code) {
       // Reset dependent options when the parent selection is cleared.
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setBarangays([])
       return
     }
@@ -1006,160 +1333,342 @@ const AddressSection = ({ form, errors, onChange, gpsState, onGpsDetect }) => {
     return () => { isMounted = false }
   }, [form.address_city_code])
 
+  const hasCompleteOfficialLocation = Boolean(
+    form.address_province_code && form.address_city_code && form.address_barangay_code
+  )
+  const hasPartialOfficialLocation = Boolean(
+    !hasCompleteOfficialLocation
+    && (form.address_province || form.address_municipality_city || form.address_barangay)
+  )
+  const gpsMissingFields = gpsState.success
+    ? [
+        !form.address_province_code && 'province',
+        !form.address_city_code && 'city',
+        !form.address_barangay_code && 'barangay',
+        !form.address_house_street?.trim() && 'houseStreet',
+      ].filter(Boolean)
+    : []
+  const gpsNeedsCompletion = gpsState.success && gpsMissingFields.length > 0
+  const gpsCityName = form.address_city_code
+    ? (form.address_municipality_city || gpsState.cityName)
+    : null
+  const needsProvince = gpsMissingFields.includes('province')
+  const needsCity = gpsMissingFields.includes('city')
+  const needsBarangay = gpsMissingFields.includes('barangay')
+  const needsHouseStreet = gpsMissingFields.includes('houseStreet')
+  const completionInstruction = [
+    needsProvince && 'select your Province',
+    needsCity && 'select your Municipality / City',
+    needsBarangay && 'select your specific Barangay',
+    needsHouseStreet && 'enter your exact Street/House No.',
+  ].filter(Boolean).join(' and ')
+  const manualFieldsVisible = showOfficialFields || Boolean(
+    errors.address_house_street
+    || errors.address_province
+    || errors.address_municipality_city
+    || errors.address_barangay
+  )
+
   return (
     <div>
-      {/* Header + GPS button */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px', marginBottom: '12px' }}>
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
-          <span style={{ fontSize: '18px' }}>📍</span>
-          <div>
-            <p style={{ fontSize: '13px', fontWeight: '700', color: '#1e40af', margin: 0 }}>PRESENT ADDRESS</p>
-            <p style={{ fontSize: '11px', color: '#3b82f6', margin: '2px 0 0' }}>Complete barangay-level address — required for PESO records</p>
-          </div>
+      <div style={{ marginBottom: '12px' }}>
+        <p style={{ fontSize: '14px', fontWeight: '700', color: '#0f172a', margin: 0 }}>Present address</p>
+        <p style={{ fontSize: '11px', color: '#64748b', margin: '3px 0 0' }}>
+          Search and select your complete Philippine address.
+        </p>
+      </div>
+
+      <div>
+        <SingleAddressInput
+          label=""
+          value={addressDisplayValue}
+          onAddressParsed={handleAddressParsed}
+          onPlaceResolved={handlePlaceResolved}
+          placeholder="Search house, street, barangay, or city"
+        />
+
+        <div className="mt-2">
+          <button
+            type="button"
+            onClick={handleCurrentLocation}
+            disabled={gpsState.loading}
+            className="border-0 bg-transparent p-0 text-[11px] font-semibold text-blue-700 hover:underline disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {gpsState.loading ? 'Finding location...' : 'Use current location'}
+          </button>
         </div>
 
-        {/* GPS Button */}
-        <button
-          type="button"
-          onClick={onGpsDetect}
-          disabled={gpsState.loading || loadingProv}
-          style={{
-            display        : 'flex',
-            alignItems     : 'center',
-            gap            : '7px',
-            padding        : '9px 16px',
-            fontSize       : '12px',
-            fontWeight     : '600',
-            color          : gpsState.success ? '#15803d' : '#1d4ed8',
-            backgroundColor: gpsState.success ? '#dcfce7' : gpsState.error ? '#fff7ed' : '#eff6ff',
-            border         : `1px solid ${gpsState.success ? '#86efac' : gpsState.error ? '#fed7aa' : '#bfdbfe'}`,
-            borderRadius   : '10px',
-            cursor         : (gpsState.loading || loadingProv) ? 'not-allowed' : 'pointer',
-            opacity        : (gpsState.loading || loadingProv) ? 0.7 : 1,
-            transition     : 'all 0.2s',
-            whiteSpace     : 'nowrap',
-            flexShrink     : 0,
-          }}
-        >
-          {gpsState.loading ? (
-            <>
-              <span style={{ display: 'inline-block', width: '12px', height: '12px', border: '2px solid #93c5fd', borderTopColor: '#1d4ed8', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
-              Detecting location…
-            </>
-          ) : gpsState.success ? (
-            <>✓ Location detected — re-detect</>
+        <p className="mt-2 text-[11px] text-slate-500">
+          {manualFieldsVisible ? (
+            <button
+              type="button"
+              onClick={() => setShowOfficialFields(false)}
+              className="border-0 bg-transparent p-0 font-semibold text-slate-600 hover:text-blue-700 hover:underline"
+            >
+              Hide manual entry
+            </button>
           ) : (
-            <>📡 Auto-fill via GPS</>
+            <>
+              Can&apos;t find your address?{' '}
+              <button
+                type="button"
+                onClick={() => setShowOfficialFields(true)}
+                className="border-0 bg-transparent p-0 font-semibold text-slate-600 hover:text-blue-700 hover:underline"
+              >
+                Enter manually
+              </button>
+            </>
           )}
-        </button>
+        </p>
       </div>
 
-      {/* API load error */}
       {apiError && (
-        <div style={{ display: 'flex', gap: '8px', backgroundColor: '#fef2f2', border: '1px solid #fecaca', borderRadius: '10px', padding: '10px 12px', marginBottom: '12px' }}>
-          <span>⚠️</span>
-          <p style={{ fontSize: '12px', color: '#b91c1c', margin: 0 }}>{apiError}</p>
+        <p className="mt-2 text-[11px] text-red-700">{apiError}</p>
+      )}
+
+      {gpsState.error && (
+        <p className="mt-2 text-[11px] text-red-700">
+          {gpsState.error}
+        </p>
+      )}
+
+      {gpsState.success && !gpsNeedsCompletion && (
+        <p className="mt-2 text-[11px] font-semibold text-emerald-700">
+          {gpsState.isComplete ? 'Location fully detected.' : 'Address details completed.'}
+        </p>
+      )}
+
+      {gpsNeedsCompletion && (
+        <p className="mt-2 text-[11px] font-semibold text-amber-700">
+          {gpsCityName
+            ? `We located your town (${gpsCityName}), but please ${completionInstruction || 'complete the missing address details'}.`
+            : 'We found part of your location. Please complete the missing address details below.'}
+        </p>
+      )}
+
+      {hasCompleteOfficialLocation && !manualFieldsVisible && (
+        <div className="mt-3 flex items-center justify-between gap-3 rounded-lg bg-emerald-50 px-3 py-2">
+          <div className="min-w-0">
+            <p className="m-0 truncate text-xs text-emerald-800">
+              {[form.address_barangay, form.address_municipality_city, form.address_province]
+                .filter(Boolean)
+                .join(', ')}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowOfficialFields(true)}
+            className="shrink-0 border-0 bg-transparent p-1 text-xs font-semibold text-blue-700 hover:underline"
+          >
+            Edit
+          </button>
         </div>
       )}
 
-      {/* GPS error */}
-      {gpsState.error && (
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', backgroundColor: '#fef2f2', border: '1px solid #fecaca', borderRadius: '10px', padding: '10px 12px', marginBottom: '12px' }}>
-          <span style={{ flexShrink: 0 }}>⚠️</span>
-          <div>
-            <p style={{ fontSize: '12px', color: '#b91c1c', fontWeight: '600', margin: '0 0 2px' }}>Location Detection Failed</p>
-            <p style={{ fontSize: '11px', color: '#dc2626', margin: 0, lineHeight: '1.5' }}>{gpsState.error}</p>
-            <p style={{ fontSize: '11px', color: '#94a3b8', margin: '4px 0 0' }}>Please fill in your address using the dropdowns below.</p>
+      {hasPartialOfficialLocation && !manualFieldsVisible && (
+        <div className="mt-3 flex items-center justify-between gap-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
+          <span>Some location details need confirmation.</span>
+          <button
+            type="button"
+            onClick={() => setShowOfficialFields(true)}
+            className="shrink-0 border-0 bg-transparent p-0 font-semibold text-amber-900 hover:underline"
+          >
+            Complete
+          </button>
+        </div>
+      )}
+
+      {hasCompleteOfficialLocation && !form.address_house_street && !manualFieldsVisible && (
+        <div className="mt-3">
+          <FormField label="House No. / Street" error={errors.address_house_street}>
+            <input
+              ref={houseStreetRef}
+              style={inputStyle(!!errors.address_house_street)}
+              name="address_house_street"
+              value={form.address_house_street ?? ''}
+              onChange={onChange}
+              placeholder="e.g. 123 Rizal Street, Phase 2"
+              autoComplete="street-address"
+            />
+          </FormField>
+        </div>
+      )}
+
+      {manualFieldsVisible && (
+        <div className="mt-3 border-t border-slate-200 pt-3">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <p className="m-0 text-[11px] font-bold text-slate-600">Manual address</p>
+            {form.address_province_code && form.address_city_code && form.address_barangay_code && (
+              <button
+                type="button"
+                onClick={() => setShowOfficialFields(false)}
+                className="border-0 bg-transparent p-1 text-xs font-semibold text-blue-700 hover:underline"
+              >
+                Done
+              </button>
+            )}
+          </div>
+          <FormField label="House No. / Street / Village" error={errors.address_house_street}>
+            <input
+              ref={houseStreetRef}
+              style={inputStyle(!!errors.address_house_street)}
+              name="address_house_street"
+              value={form.address_house_street ?? ''}
+              onChange={onChange}
+              placeholder="e.g. 123 Rizal Street, Phase 2"
+              autoComplete="street-address"
+            />
+          </FormField>
+          <div className="grid gap-3 md:grid-cols-3">
+            <SelectDropdown
+              label="Province"
+              name="address_province"
+              codeName="address_province_code"
+              value={form.address_province ?? ''}
+              codeValue={form.address_province_code ?? ''}
+              options={provinces}
+              loading={loadingProv}
+              disabled={isLocating}
+              dimmed={isLocating}
+              error={errors.address_province}
+              onChange={onChange}
+              placeholder="Select province"
+            />
+
+            <SelectDropdown
+              label="Municipality / City"
+              name="address_municipality_city"
+              codeName="address_city_code"
+              value={form.address_municipality_city ?? ''}
+              codeValue={form.address_city_code ?? ''}
+              options={cities}
+              loading={loadingCity}
+              disabled={isLocating || !form.address_province_code}
+              dimmed={isLocating}
+              error={errors.address_municipality_city}
+              onChange={onChange}
+              placeholder="Select province first"
+            />
+
+            <SelectDropdown
+              label="Barangay"
+              name="address_barangay"
+              codeName="address_barangay_code"
+              value={form.address_barangay ?? ''}
+              codeValue={form.address_barangay_code ?? ''}
+              options={barangays}
+              loading={loadingBrgy}
+              disabled={isLocating || !form.address_city_code}
+              dimmed={isLocating}
+              error={errors.address_barangay}
+              onChange={onChange}
+              placeholder="Select city first"
+            />
           </div>
         </div>
       )}
-
-      {/* GPS success + warnings */}
-      {gpsState.success && (
-        <div style={{ backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '10px', padding: '10px 12px', marginBottom: '12px' }}>
-          <p style={{ fontSize: '12px', color: '#15803d', fontWeight: '600', margin: '0 0 4px' }}>
-            ✅ Location detected
-            <span style={{ fontSize: '11px', fontWeight: '400', color: '#64748b', marginLeft: '6px' }}>±{gpsState.accuracy}m accuracy</span>
-          </p>
-          <p style={{ fontSize: '11px', color: '#64748b', margin: 0 }}>
-            Dropdowns have been auto-selected. Please verify each field.
-          </p>
-          {gpsState.warnings?.length > 0 && (
-            <ul style={{ margin: '8px 0 0', paddingLeft: '16px' }}>
-              {gpsState.warnings.map((w, i) => (
-                <li key={i} style={{ fontSize: '11px', color: '#92400e', lineHeight: '1.5' }}>{w}</li>
-              ))}
-            </ul>
-          )}
-        </div>
-      )}
-
-      {/* Dropdowns */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-
-        <SelectDropdown
-          label="Province"
-          name="address_province"
-          codeName="address_province_code"
-          value={form.address_province ?? ''}
-          codeValue={form.address_province_code ?? ''}
-          options={provinces}
-          loading={loadingProv}
-          disabled={false}
-          error={errors.address_province}
-          onChange={onChange}
-          placeholder="Select province first"
-        />
-
-        <SelectDropdown
-          label="Municipality / City"
-          name="address_municipality_city"
-          codeName="address_city_code"
-          value={form.address_municipality_city ?? ''}
-          codeValue={form.address_city_code ?? ''}
-          options={cities}
-          loading={loadingCity}
-          disabled={!form.address_province_code}
-          error={errors.address_municipality_city}
-          onChange={onChange}
-          placeholder="Select province first"
-        />
-
-        <SelectDropdown
-          label="Barangay"
-          name="address_barangay"
-          codeName="address_barangay_code"
-          value={form.address_barangay ?? ''}
-          codeValue={form.address_barangay_code ?? ''}
-          options={barangays}
-          loading={loadingBrgy}
-          disabled={!form.address_city_code}
-          error={errors.address_barangay}
-          onChange={onChange}
-          placeholder="Select city first"
-        />
-
-        <FormField label="House No. / Street / Village" error={errors.address_house_street}>
-          <input
-            style={inputStyle(!!errors.address_house_street)}
-            name="address_house_street"
-            value={form.address_house_street ?? ''}
-            onChange={onChange}
-            placeholder="123 Main Street"
-          />
-        </FormField>
-
-      </div>
     </div>
   )
 }
 
 // ── STEP 5: EDUCATION & OTHER SKILLS ──────────────────────────────────────
 
+const SkillTagInput = ({ name, value = [], suggestions, category, onChange, placeholder, color = 'blue' }) => {
+  const [query, setQuery] = useState('')
+  const [catalogSuggestions, setCatalogSuggestions] = useState([])
+  const [loadingSuggestions, setLoadingSuggestions] = useState(false)
+  const normalizedValues = new Set(value.map(normalizeChoice))
+  const palette = color === 'purple'
+    ? { background: '#f3e8ff', text: '#6b21a8', border: '#d8b4fe' }
+    : { background: '#dbeafe', text: '#1e40af', border: '#93c5fd' }
+  useEffect(() => {
+    let cancelled = false
+    const timer = setTimeout(async () => {
+      setLoadingSuggestions(true)
+      try {
+        const results = await searchSkills(query.trim(), category, 20)
+        if (!cancelled) setCatalogSuggestions(results.map((result) => result.name))
+      } catch {
+        if (!cancelled) setCatalogSuggestions([])
+      } finally {
+        if (!cancelled) setLoadingSuggestions(false)
+      }
+    }, 180)
+
+    return () => {
+      cancelled = true
+      clearTimeout(timer)
+    }
+  }, [query, category])
+
+  const matches = [...new Set([...catalogSuggestions, ...suggestions])]
+    .filter((suggestion) =>
+      normalizeChoice(suggestion).includes(normalizeChoice(query))
+      && !normalizedValues.has(normalizeChoice(suggestion))
+    )
+    .slice(0, query.trim() ? 12 : 10)
+
+  const update = (nextValue) => onChange({ target: { name, value: nextValue } })
+  const add = (rawSkill) => {
+    const skill = String(rawSkill ?? '').trim().replace(/\s+/g, ' ')
+    if (!skill || normalizedValues.has(normalizeChoice(skill))) return
+    update([...value, skill])
+    setQuery('')
+  }
+  const remove = (skill) => update(value.filter((item) => normalizeChoice(item) !== normalizeChoice(skill)))
+
+  return (
+    <div>
+      <div style={{ display: 'flex', gap: '8px' }}>
+        <input
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter' || event.key === ',') {
+              event.preventDefault()
+              add(query)
+            }
+          }}
+          placeholder={placeholder}
+          style={{ ...inputStyle(false), flex: 1 }}
+        />
+        <button type="button" onClick={() => add(query)} disabled={!query.trim()} style={{ padding: '8px 14px', border: '1px solid #bfdbfe', borderRadius: '8px', backgroundColor: query.trim() ? '#eff6ff' : '#f8fafc', color: query.trim() ? '#1d4ed8' : '#94a3b8', fontSize: '12px', fontWeight: '700', cursor: query.trim() ? 'pointer' : 'not-allowed' }}>
+          Add
+        </button>
+      </div>
+
+      {matches.length > 0 && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '9px' }}>
+          {matches.map((suggestion) => (
+            <button key={suggestion} type="button" onClick={() => add(suggestion)} style={{ border: '1px solid #cbd5e1', borderRadius: '999px', padding: '5px 9px', backgroundColor: '#fff', color: '#475569', fontSize: '11px', cursor: 'pointer' }}>
+              + {suggestion}
+            </button>
+          ))}
+        </div>
+      )}
+      {loadingSuggestions && (
+        <p style={{ margin: '7px 0 0', color: '#64748b', fontSize: '10px' }}>Loading O*NET suggestions...</p>
+      )}
+
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: value.length ? '12px' : 0 }}>
+        {value.map((skill) => (
+          <span key={normalizeChoice(skill)} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', backgroundColor: palette.background, color: palette.text, border: `1px solid ${palette.border}`, padding: '6px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: '600' }}>
+            {skill}
+            <button type="button" onClick={() => remove(skill)} aria-label={`Remove ${skill}`} style={{ background: 'none', border: 0, color: palette.text, cursor: 'pointer', fontSize: '15px', lineHeight: 1, padding: 0 }}>
+              x
+            </button>
+          </span>
+        ))}
+      </div>
+      <p style={{ margin: '8px 0 0', color: '#94a3b8', fontSize: '10px' }}>
+        Choose a suggestion or type your own skill. Press Enter, comma, or Add.
+      </p>
+    </div>
+  )
+}
+
 function Step5({ form, errors, onChange, onAddEducation, onRemoveEducation, onUpdateEducation }) {
   const educationTemplate = { level: '', course_strand: '', year_graduated: '', undergrad_level_reached: '', undergrad_year_last_attended: '' }
-  const techSkillsInputRef = useRef(null)
-  const softSkillsInputRef = useRef(null)
 
   // ── Helper: Handle DOLE skill checkbox changes ─────────────────────────
   const handleDoleSkillChange = (skillLabel, checked) => {
@@ -1175,54 +1684,6 @@ function Step5({ form, errors, onChange, onAddEducation, onRemoveEducation, onUp
       }
     }
     onChange({ target: { name: 'dole_skills', value: currentDoleSkills } })
-  }
-
-  // ── Helper: Handle tag/pill input for technical skills ─────────────────
-  const handleTechKeyDown = (e) => {
-    if (e.key === 'Enter') {
-      e.preventDefault()
-      const val = e.target.value.trim()
-      if (val) {
-        const current = (form.technical_skills ?? []).slice()
-        // Avoid duplicates
-        if (!current.some((s) => s.toLowerCase() === val.toLowerCase())) {
-          current.push(val)
-          onChange({ target: { name: 'technical_skills', value: current } })
-        }
-        e.target.value = ''
-      }
-    }
-  }
-
-  // ── Helper: Handle tag/pill input for soft skills ──────────────────────
-  const handleSoftKeyDown = (e) => {
-    if (e.key === 'Enter') {
-      e.preventDefault()
-      const val = e.target.value.trim()
-      if (val) {
-        const current = (form.soft_skills ?? []).slice()
-        // Avoid duplicates
-        if (!current.some((s) => s.toLowerCase() === val.toLowerCase())) {
-          current.push(val)
-          onChange({ target: { name: 'soft_skills', value: current } })
-        }
-        e.target.value = ''
-      }
-    }
-  }
-
-  // ── Helper: Remove technical skill pill ──────────────────────────────────
-  const removeTechSkill = (idx) => {
-    const current = (form.technical_skills ?? []).slice()
-    current.splice(idx, 1)
-    onChange({ target: { name: 'technical_skills', value: current } })
-  }
-
-  // ── Helper: Remove soft skill pill ───────────────────────────────────────
-  const removeSoftSkill = (idx) => {
-    const current = (form.soft_skills ?? []).slice()
-    current.splice(idx, 1)
-    onChange({ target: { name: 'soft_skills', value: current } })
   }
 
   return (
@@ -1364,127 +1825,43 @@ function Step5({ form, errors, onChange, onAddEducation, onRemoveEducation, onUp
           {/* Specialized & Professional Skills */}
           <div style={{ backgroundColor: '#f9fafb', padding: '16px', borderRadius: '12px', border: '1px solid #e5e7eb' }}>
             <h5 style={{ fontSize: '13px', fontWeight: '600', color: '#1f2937', marginBottom: '4px' }}>
-              🔧 Specialized & Professional Skills
+              🔧 Hard Skills (Technical & Professional)
             </h5>
             <p style={{ fontSize: '11px', color: '#6b7280', marginBottom: '12px' }}>
-              e.g., React, Data Analysis, Accounting. Press Enter to add.
+              Hard skills are teachable job abilities such as software, equipment, trades, methods, and professional knowledge.
             </p>
-            <input
-              ref={techSkillsInputRef}
-              type="text"
-              placeholder="Add skill and press Enter…"
-              onKeyDown={handleTechKeyDown}
-              style={{
-                width: '100%',
-                padding: '8px 12px',
-                fontSize: '13px',
-                border: '1px solid #d1d5db',
-                borderRadius: '8px',
-                fontFamily: 'inherit',
-                marginBottom: '12px',
-              }}
+            <SkillTagInput
+              name="technical_skills"
+              value={form.technical_skills ?? []}
+              suggestions={TECHNICAL_SKILL_SUGGESTIONS}
+              category="technical"
+              onChange={onChange}
+              placeholder="Search or type a hard skill"
             />
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-              {(form.technical_skills ?? []).map((skill, idx) => (
-                <div
-                  key={idx}
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    backgroundColor: '#dbeafe',
-                    color: '#1e40af',
-                    padding: '6px 12px',
-                    borderRadius: '20px',
-                    fontSize: '12px',
-                    fontWeight: '500',
-                    gap: '6px',
-                  }}
-                >
-                  {skill}
-                  <button
-                    type="button"
-                    onClick={() => removeTechSkill(idx)}
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      color: '#1e40af',
-                      cursor: 'pointer',
-                      fontSize: '16px',
-                      lineHeight: '1',
-                      padding: '0',
-                      display: 'flex',
-                      alignItems: 'center',
-                    }}
-                  >
-                    ✕
-                  </button>
-                </div>
-              ))}
-            </div>
           </div>
 
           {/* Interpersonal / Soft Skills */}
           <div style={{ backgroundColor: '#f9fafb', padding: '16px', borderRadius: '12px', border: '1px solid #e5e7eb' }}>
             <h5 style={{ fontSize: '13px', fontWeight: '600', color: '#1f2937', marginBottom: '4px' }}>
-              🤝 Interpersonal / Soft Skills
+              🤝 Soft Skills (Behavior & Interpersonal)
             </h5>
             <p style={{ fontSize: '11px', color: '#6b7280', marginBottom: '12px' }}>
-              e.g., Leadership, Communication, Teamwork. Press Enter to add.
+              Soft skills describe how you communicate, think, adapt, organize work, lead, and collaborate.
             </p>
-            <input
-              ref={softSkillsInputRef}
-              type="text"
-              placeholder="Add skill and press Enter…"
-              onKeyDown={handleSoftKeyDown}
-              style={{
-                width: '100%',
-                padding: '8px 12px',
-                fontSize: '13px',
-                border: '1px solid #d1d5db',
-                borderRadius: '8px',
-                fontFamily: 'inherit',
-                marginBottom: '12px',
-              }}
+            <SkillTagInput
+              name="soft_skills"
+              value={form.soft_skills ?? []}
+              suggestions={SOFT_SKILL_SUGGESTIONS}
+              category="soft"
+              onChange={onChange}
+              placeholder="Search or type a soft skill"
+              color="purple"
             />
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-              {(form.soft_skills ?? []).map((skill, idx) => (
-                <div
-                  key={idx}
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    backgroundColor: '#f3e8ff',
-                    color: '#6b21a8',
-                    padding: '6px 12px',
-                    borderRadius: '20px',
-                    fontSize: '12px',
-                    fontWeight: '500',
-                    gap: '6px',
-                  }}
-                >
-                  {skill}
-                  <button
-                    type="button"
-                    onClick={() => removeSoftSkill(idx)}
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      color: '#6b21a8',
-                      cursor: 'pointer',
-                      fontSize: '16px',
-                      lineHeight: '1',
-                      padding: '0',
-                      display: 'flex',
-                      alignItems: 'center',
-                    }}
-                  >
-                    ✕
-                  </button>
-                </div>
-              ))}
-            </div>
           </div>
         </div>
+        <p style={{ margin: '10px 0 0', color: '#64748b', fontSize: '10px', textAlign: 'center' }}>
+          Recognized skills are automatically saved under the correct hard or soft skill category.
+        </p>
       </div>
     </div>
   )
@@ -1516,13 +1893,36 @@ function Step6({ form, errors, onAddTraining, onRemoveTraining, onUpdateTraining
               {form.trainings?.map((train, i) => (
                 <tr key={i} style={{ borderBottom: '1px solid #e2e8f0' }}>
                   <td style={{ padding: '10px' }}>
-                    <input
-                      type="text"
-                      placeholder="Course name"
-                      value={train.course || ''}
-                      onChange={(e) => onUpdateTraining('trainings', i, { course: e.target.value })}
-                      style={{ width: '100%', padding: '6px', fontSize: '13px', border: '1px solid #d1d5db', borderRadius: '6px' }}
-                    />
+                    <div style={{ display: 'grid', gap: '6px' }}>
+                      <input
+                        type="text"
+                        placeholder="Course name"
+                        value={train.course || ''}
+                        onChange={(e) => onUpdateTraining('trainings', i, { course: e.target.value })}
+                        style={{ width: '100%', padding: '6px', fontSize: '13px', border: '1px solid #d1d5db', borderRadius: '6px' }}
+                      />
+                      <input
+                        type="text"
+                        placeholder="Training institution (optional)"
+                        value={train.training_institution || ''}
+                        onChange={(e) => onUpdateTraining('trainings', i, { training_institution: e.target.value })}
+                        style={{ width: '100%', padding: '6px', fontSize: '12px', border: '1px solid #d1d5db', borderRadius: '6px' }}
+                      />
+                      <input
+                        type="text"
+                        placeholder="Skills acquired (optional)"
+                        value={train.skills_acquired || ''}
+                        onChange={(e) => onUpdateTraining('trainings', i, { skills_acquired: e.target.value })}
+                        style={{ width: '100%', padding: '6px', fontSize: '12px', border: '1px solid #d1d5db', borderRadius: '6px' }}
+                      />
+                      <input
+                        type="text"
+                        placeholder="Certificate received (optional)"
+                        value={train.certificates_received || ''}
+                        onChange={(e) => onUpdateTraining('trainings', i, { certificates_received: e.target.value })}
+                        style={{ width: '100%', padding: '6px', fontSize: '12px', border: '1px solid #d1d5db', borderRadius: '6px' }}
+                      />
+                    </div>
                   </td>
                   <td style={{ padding: '10px' }}>
                     <input
@@ -1584,13 +1984,34 @@ function Step6({ form, errors, onAddTraining, onRemoveTraining, onUpdateTraining
                     </select>
                   </td>
                   <td style={{ padding: '10px' }}>
-                    <input
-                      type="text"
-                      placeholder="License/Eligibility name"
-                      value={elig.name || ''}
-                      onChange={(e) => onUpdateEligibility('eligibilities', i, { name: e.target.value })}
-                      style={{ width: '100%', padding: '6px', fontSize: '13px', border: '1px solid #d1d5db', borderRadius: '6px' }}
-                    />
+                    <div style={{ display: 'grid', gap: '6px' }}>
+                      <input
+                        type="text"
+                        placeholder="License/Eligibility name"
+                        value={elig.name || ''}
+                        onChange={(e) => onUpdateEligibility('eligibilities', i, { name: e.target.value })}
+                        style={{ width: '100%', padding: '6px', fontSize: '13px', border: '1px solid #d1d5db', borderRadius: '6px' }}
+                      />
+                      <label style={{ color: '#64748b', fontSize: '10px' }}>
+                        Date taken
+                        <input
+                          type="date"
+                          value={elig.date_taken || ''}
+                          onChange={(e) => onUpdateEligibility('eligibilities', i, { date_taken: e.target.value || null })}
+                          style={{ width: '100%', marginTop: '3px', padding: '6px', fontSize: '12px', border: '1px solid #d1d5db', borderRadius: '6px' }}
+                        />
+                      </label>
+                      <label style={{ color: '#64748b', fontSize: '10px' }}>
+                        Valid until (optional)
+                        <input
+                          type="date"
+                          value={elig.valid_until || ''}
+                          min={elig.date_taken || undefined}
+                          onChange={(e) => onUpdateEligibility('eligibilities', i, { valid_until: e.target.value || null })}
+                          style={{ width: '100%', marginTop: '3px', padding: '6px', fontSize: '12px', border: '1px solid #d1d5db', borderRadius: '6px' }}
+                        />
+                      </label>
+                    </div>
                   </td>
                   <td style={{ padding: '10px', textAlign: 'center' }}>
                     <button
@@ -1614,6 +2035,7 @@ function Step6({ form, errors, onAddTraining, onRemoveTraining, onUpdateTraining
           + Add License/Eligibility
         </button>
         {errors.trainings && <p style={{ color: '#dc2626', fontSize: '12px', marginTop: '8px' }}>✕ {errors.trainings}</p>}
+        {errors.eligibilities && <p style={{ color: '#dc2626', fontSize: '12px', marginTop: '8px' }}>✕ {errors.eligibilities}</p>}
       </div>
     </div>
   )
@@ -1622,7 +2044,15 @@ function Step6({ form, errors, onAddTraining, onRemoveTraining, onUpdateTraining
 // ── STEP 7: WORK EXPERIENCE ────────────────────────────────────────────────
 
 function Step7({ form, errors, onAddExperience, onRemoveExperience, onUpdateExperience }) {
-  const experienceTemplate = { company_name: '', company_address: '', position: '', number_of_months: '', employment_status: '' }
+  const experienceTemplate = {
+    occupation: null,
+    occupation_id: null,
+    company_name: '',
+    company_address: '',
+    position: '',
+    number_of_months: '',
+    employment_status: '',
+  }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
@@ -1630,7 +2060,8 @@ function Step7({ form, errors, onAddExperience, onRemoveExperience, onUpdateExpe
 
       {/* Work experiences table */}
       <div>
-        <h4 style={{ fontSize: '13px', fontWeight: '600', color: '#1f2937', marginBottom: '12px' }}>Work Experiences (required)</h4>
+        <h4 style={{ fontSize: '13px', fontWeight: '600', color: '#1f2937', marginBottom: '4px' }}>Work Experiences</h4>
+        <p style={{ fontSize: '11px', color: '#64748b', margin: '0 0 12px' }}>Optional for first-time jobseekers.</p>
         <div style={{ border: '1px solid #e2e8f0', borderRadius: '10px', overflow: 'hidden', backgroundColor: '#fff' }}>
           <table style={{ width: '100%', fontSize: '13px', borderCollapse: 'collapse' }}>
             <thead>
@@ -1645,22 +2076,46 @@ function Step7({ form, errors, onAddExperience, onRemoveExperience, onUpdateExpe
               {form.work_experiences?.map((exp, i) => (
                 <tr key={i} style={{ borderBottom: '1px solid #e2e8f0' }}>
                   <td style={{ padding: '10px' }}>
-                    <input
-                      type="text"
-                      placeholder="Company name"
-                      value={exp.company_name || ''}
-                      onChange={(e) => onUpdateExperience('work_experiences', i, { company_name: e.target.value })}
-                      style={{ width: '100%', padding: '6px', fontSize: '13px', border: '1px solid #d1d5db', borderRadius: '6px' }}
-                    />
+                    <div style={{ display: 'grid', gap: '6px' }}>
+                      <input
+                        type="text"
+                        placeholder="Company name"
+                        value={exp.company_name || ''}
+                        onChange={(e) => onUpdateExperience('work_experiences', i, { company_name: e.target.value })}
+                        style={{ width: '100%', padding: '6px', fontSize: '13px', border: '1px solid #d1d5db', borderRadius: '6px' }}
+                      />
+                      <input
+                        type="text"
+                        placeholder="Company address (optional)"
+                        value={exp.company_address || ''}
+                        onChange={(e) => onUpdateExperience('work_experiences', i, { company_address: e.target.value })}
+                        style={{ width: '100%', padding: '6px', fontSize: '12px', border: '1px solid #d1d5db', borderRadius: '6px' }}
+                      />
+                    </div>
                   </td>
                   <td style={{ padding: '10px' }}>
-                    <input
-                      type="text"
-                      placeholder="Position"
-                      value={exp.position || ''}
-                      onChange={(e) => onUpdateExperience('work_experiences', i, { position: e.target.value })}
-                      style={{ width: '100%', padding: '6px', fontSize: '13px', border: '1px solid #d1d5db', borderRadius: '6px' }}
-                    />
+                    <div style={{ display: 'grid', gap: '6px' }}>
+                      <OccupationCombobox
+                        selected={exp.occupation}
+                        onChange={(occupation) => onUpdateExperience('work_experiences', i, {
+                          occupation,
+                          occupation_id: occupation?.id ?? null,
+                          position: occupation?.title ?? '',
+                        })}
+                        limit={1}
+                        placeholder="Search standardized position"
+                      />
+                      <select
+                        value={exp.employment_status || ''}
+                        onChange={(e) => onUpdateExperience('work_experiences', i, { employment_status: e.target.value || null })}
+                        style={{ width: '100%', padding: '6px', fontSize: '12px', border: '1px solid #d1d5db', borderRadius: '6px', backgroundColor: '#fff' }}
+                      >
+                        <option value="">Employment status (optional)</option>
+                        {EMPLOYMENT_STATUS_OPTIONS.map((status) => (
+                          <option key={status.value} value={status.value}>{status.label}</option>
+                        ))}
+                      </select>
+                    </div>
                   </td>
                   <td style={{ padding: '10px' }}>
                     <input
@@ -1716,6 +2171,9 @@ export default function SeekerOnboarding() {
     success  : false,
     error    : null,
     accuracy : null,
+    missingFields: [],
+    cityName: null,
+    isComplete: false,
   })
   const cardRef = useRef(null)
 
@@ -1734,9 +2192,16 @@ export default function SeekerOnboarding() {
     tin          : '',
     educ_attainment: '',
     address_province: '',
+    address_province_code: '',
     address_municipality_city: '',
+    address_city_code: '',
     address_barangay: '',
+    address_barangay_code: '',
     address_house_street: '',
+    latitude: null,
+    longitude: null,
+    location_accuracy: null,
+    google_place_id: null,
     disabilities : [],
     disability_specification: '',
     // Step 2
@@ -1758,6 +2223,8 @@ export default function SeekerOnboarding() {
     // Step 3
     preferred_occupations: [],
     work_type_preference: '',
+    preferred_work_setups: [],
+    preferred_employment_types: [],
     preferred_work_location: '',
     preferred_locations_details: [],
     // Step 4 (Languages - handled dynamically via lang_${key}_${skill} fields)
@@ -1771,7 +2238,7 @@ export default function SeekerOnboarding() {
     trainings: [], // Array of { course, hours_of_training, training_institution, skills_acquired, certificates_received }
     eligibilities: [], // Array of { type, name, date_taken, valid_until }
     // Step 7: Work Experience
-    work_experiences: [], // Array of { company_name, company_address, position, number_of_months, employment_status }
+    work_experiences: [], // Includes standardized occupation_id for relevant-experience matching
   })
 
   const handleChange = useCallback((e) => {
@@ -1786,21 +2253,134 @@ export default function SeekerOnboarding() {
       value = capitalizeName(value)
     }
     
-    // Trim text fields
-    if (typeof value === 'string' && (name.includes('_name') || name === 'religion' || name === 'religion_other' || name === 'tin' || name === 'ofw_country' || name === 'former_ofw_country' || name === 'unemployment_terminated_country' || name === 'address_house_street' || name === 'disability_specification' || name === 'self_employed_type_others' || name === 'unemployment_reason_others' || name === 'household_id_4ps' || name === 'lang_other_name')) {
-      value = value.trim()
-    }
-    
-    setForm((f) => ({ ...f, [name]: value }))
+    const manualAddressFields = [
+      'address_province_code',
+      'address_city_code',
+      'address_barangay_code',
+      'address_house_street',
+    ]
+
+    setForm((f) => {
+      const dependentUpdates = {}
+
+      if (name === 'employment_status') {
+        if (value === 'employed') {
+          Object.assign(dependentUpdates, {
+            unemployment_months: '',
+            unemployment_reason: '',
+            unemployment_reason_others: '',
+            unemployment_terminated_country: '',
+          })
+        } else {
+          Object.assign(dependentUpdates, {
+            employment_type: '',
+            self_employed_type: '',
+            self_employed_type_others: '',
+          })
+        }
+      }
+      if (name === 'employment_type' && value !== 'self_employed') {
+        Object.assign(dependentUpdates, {
+          self_employed_type: '',
+          self_employed_type_others: '',
+        })
+      }
+      if (name === 'self_employed_type' && value !== 'others') {
+        dependentUpdates.self_employed_type_others = ''
+      }
+      if (name === 'unemployment_reason') {
+        if (value !== 'others') dependentUpdates.unemployment_reason_others = ''
+        if (value !== 'terminated_abroad') dependentUpdates.unemployment_terminated_country = ''
+      }
+      if (name === 'is_ofw' && !value) dependentUpdates.ofw_country = ''
+      if (name === 'is_former_ofw' && !value) {
+        Object.assign(dependentUpdates, {
+          former_ofw_country: '',
+          former_ofw_return_date: '',
+        })
+      }
+      if (name === 'is_4ps_beneficiary' && !value) dependentUpdates.household_id_4ps = ''
+
+      return {
+        ...f,
+        [name]: value,
+        ...dependentUpdates,
+        ...(manualAddressFields.includes(name) ? {
+        latitude: null,
+        longitude: null,
+        location_accuracy: null,
+        google_place_id: null,
+      } : {}),
+      }
+    })
     setErrors((err) => ({ ...err, [name]: undefined }))
     setApiError('')
   }, [])
 
+  const applyResolvedLocation = useCallback((result, replaceAddress = false) => {
+    setForm((current) => {
+      const updates = {
+        latitude: result.lat,
+        longitude: result.lng,
+        location_accuracy: result.accuracy,
+        google_place_id: result.placeId,
+      }
+
+      if (replaceAddress) {
+        Object.assign(updates, {
+          address_province_code: '',
+          address_province: '',
+          address_city_code: '',
+          address_municipality_city: '',
+          address_barangay_code: '',
+          address_barangay: '',
+          address_house_street: '',
+        })
+      }
+
+      if (result.province) {
+        updates.address_province_code = result.province.code
+        updates.address_province = result.province.name
+      }
+      if (result.city) {
+        updates.address_city_code = result.city.code
+        updates.address_municipality_city = result.city.name
+      }
+      if (result.barangay) {
+        updates.address_barangay_code = result.barangay.code
+        updates.address_barangay = result.barangay.name
+      }
+      if (result.houseStreet && (replaceAddress || !current.address_house_street)) {
+        updates.address_house_street = result.houseStreet
+      }
+
+      return { ...current, ...updates }
+    })
+
+    setErrors((current) => ({
+      ...current,
+      address_province: undefined,
+      address_municipality_city: undefined,
+      address_barangay: undefined,
+      address_house_street: undefined,
+    }))
+  }, [])
+
   const handleGpsDetect = async () => {
-    setGpsState({ loading: true, success: false, error: null, accuracy: null })
+    setGpsState({
+      loading: true,
+      success: false,
+      error: null,
+      accuracy: null,
+      warnings: [],
+      missingFields: [],
+      cityName: null,
+      isComplete: false,
+    })
 
     try {
       const result = await detectAddress()
+      applyResolvedLocation(result, true)
 
       // Build changes to apply to the form
       const updates = {}
@@ -1848,16 +2428,53 @@ export default function SeekerOnboarding() {
         success : true,
         error   : null,
         accuracy: result.accuracy,
-        warnings: result.warnings // Pass warnings to UI so user knows if something didn't match
+        warnings: result.warnings,
+        missingFields: result.missingFields,
+        cityName: result.city?.name ?? result.cityName,
+        isComplete: result.isComplete,
       })
+      return result
 
     } catch (errorMessage) {
       setGpsState({
         loading : false,
         success : false,
-        error   : typeof errorMessage === 'string' ? errorMessage : 'Location detection failed.',
+        error   : errorMessage instanceof Error ? errorMessage.message : 'Location detection failed.',
+        accuracy: null,
+        warnings: [],
+        missingFields: [],
+        cityName: null,
+        isComplete: false,
+      })
+      return null
+    }
+  }
+
+  const handleAddressSelect = async (suggestion) => {
+    setGpsState({ loading: true, success: false, error: null, accuracy: null })
+
+    try {
+      const result = await resolveAddressSuggestion(suggestion, suggestion.session_token)
+      applyResolvedLocation(result, true)
+      if (!result.province || !result.city || result.warnings.length > 0) {
+        console.warn('Google address only partially matched PSGC.', result.warnings)
+      }
+      setGpsState({
+        loading: false,
+        success: false,
+        error: null,
+        accuracy: null,
+        warnings: result.warnings,
+      })
+      return result
+    } catch {
+      setGpsState({
+        loading: false,
+        success: false,
+        error: 'The selected address could not be matched to PSGC. Please use the dropdowns.',
         accuracy: null,
       })
+      return null
     }
   }
 
@@ -1881,7 +2498,8 @@ export default function SeekerOnboarding() {
       if (form.religion === 'other' && !form.religion_other?.trim())
         e.religion_other = 'Please specify your religion.'
       if (!form.height_ft)                     e.height_ft       = 'Required.'
-      else if (form.height_ft < 2.5 || form.height_ft > 8.5) e.height_ft = '2.5–8.5 ft only.'
+      else if (Number(form.height_ft) < 2.5 || Number(form.height_ft) > 8.5)
+        e.height_ft = 'Select a height from 2 ft 6 in to 8 ft 6 in.'
       if (!form.educ_attainment)               e.educ_attainment = 'Required.'
       if (!form.address_province)              e.address_province = 'Required.'
       if (!form.address_municipality_city)     e.address_municipality_city = 'Required.'
@@ -1904,7 +2522,11 @@ export default function SeekerOnboarding() {
       if (form.employment_status === 'unemployed') {
         if (form.unemployment_months === '' || form.unemployment_months === undefined)
           e.unemployment_months = 'Required.'
+        else if (Number(form.unemployment_months) < 0 || Number(form.unemployment_months) > 999)
+          e.unemployment_months = 'Enter a value from 0 to 999.'
         if (!form.unemployment_reason) e.unemployment_reason = 'Required.'
+        if (form.unemployment_reason === 'others' && !form.unemployment_reason_others?.trim())
+          e.unemployment_reason_others = 'Required.'
         if (form.unemployment_reason === 'terminated_abroad' && !form.unemployment_terminated_country?.trim())
           e.unemployment_terminated_country = 'Required.'
       }
@@ -1951,20 +2573,49 @@ export default function SeekerOnboarding() {
     }
 
     if (s === 5) {
-      if (!form.educations?.length)
-        e.educations = 'Please add at least one education level.'
+      const invalidEducation = form.educations?.some((education) => (
+        !education.level
+        || (education.year_graduated && (
+          Number(education.year_graduated) < 1900
+          || Number(education.year_graduated) > new Date().getFullYear()
+        ))
+      ))
+      if (invalidEducation) e.educations = 'Complete each added education row or remove it.'
     }
 
     if (s === 6) {
-      // Both trainings and eligibilities are optional at this step
-      // No mandatory validation unless both are empty
-      if (!form.trainings?.length && !form.eligibilities?.length)
-        e.trainings = 'Please add at least one training or eligibility.'
+      const invalidTraining = form.trainings?.some((training) => (
+        !training.course?.trim()
+        || (training.hours_of_training && Number(training.hours_of_training) < 1)
+      ))
+      const invalidEligibility = form.eligibilities?.some((eligibility) => (
+        !eligibility.type
+        || !eligibility.name?.trim()
+        || (eligibility.valid_until && !eligibility.date_taken)
+        || (eligibility.date_taken && eligibility.date_taken > new Date().toISOString().slice(0, 10))
+        || (
+          eligibility.date_taken
+          && eligibility.valid_until
+          && eligibility.valid_until < eligibility.date_taken
+        )
+      ))
+      if (invalidTraining) e.trainings = 'Complete each added training row or remove it.'
+      if (invalidEligibility) e.eligibilities = 'Complete each added eligibility row or remove it.'
     }
 
     if (s === 7) {
-      if (!form.work_experiences?.length)
-        e.work_experiences = 'Please add at least one work experience.'
+      const invalidExperience = form.work_experiences?.some((experience) => (
+        !experience.company_name?.trim()
+        || !experience.occupation_id
+        || (
+          experience.number_of_months
+          && (
+            Number(experience.number_of_months) < 0
+            || Number(experience.number_of_months) > 600
+          )
+        )
+      ))
+      if (invalidExperience) e.work_experiences = 'Complete each added work experience or remove it.'
     }
 
     return e
@@ -2011,6 +2662,13 @@ export default function SeekerOnboarding() {
     address_municipality_city: form.address_municipality_city,
     address_barangay         : form.address_barangay,
     address_house_street     : form.address_house_street,
+    address_province_code    : form.address_province_code || null,
+    address_city_code        : form.address_city_code || null,
+    address_barangay_code    : form.address_barangay_code || null,
+    latitude                 : form.latitude,
+    longitude                : form.longitude,
+    location_accuracy        : form.location_accuracy,
+    google_place_id          : form.google_place_id,
     disabilities             : form.disabilities,
     disability_specification : form.disability_specification || null,
   })
@@ -2035,9 +2693,14 @@ export default function SeekerOnboarding() {
 
   const buildStep3Payload = () => ({
     work_type_preference       : form.work_type_preference,
+    preferred_work_setups      : form.preferred_work_setups ?? [],
+    preferred_employment_types : form.preferred_employment_types ?? [],
     preferred_work_location    : form.preferred_work_location,
     preferred_locations_details: form.preferred_locations_details ?? [],
-    occupation_ids             : (form.preferred_occupations ?? []).map((occupation) => occupation.id),
+    occupation_preferences     : (form.preferred_occupations ?? []).map((occupation) => ({
+      occupation_id: occupation.is_general ? null : occupation.id,
+      general_term: occupation.is_general ? occupation.general_term : null,
+    })),
   })
 
   const buildStep4Payload = () => {
@@ -2047,7 +2710,7 @@ export default function SeekerOnboarding() {
       const hasAny = ['read','write','speak','understand'].some((s) => form[`lang_${key}_${s}`])
       if (hasAny) {
         languages.push({
-          language        : lang,
+          language        : lang.toLowerCase(),
           language_other  : lang === 'Others' ? (form.lang_other_name || null) : null,
           can_read        : !!form[`lang_${key}_read`],
           can_write       : !!form[`lang_${key}_write`],
@@ -2073,7 +2736,14 @@ export default function SeekerOnboarding() {
   })
 
   const buildStep7Payload = () => ({
-    work_experiences : form.work_experiences || [],
+    work_experiences : (form.work_experiences || []).map((experience) => ({
+      occupation_id: experience.occupation_id,
+      company_name: experience.company_name,
+      company_address: experience.company_address || null,
+      position: experience.position,
+      number_of_months: experience.number_of_months || null,
+      employment_status: experience.employment_status || null,
+    })),
   })
 
   // ── Navigation ───────────────────────────────────────────────────────────
@@ -2086,7 +2756,40 @@ export default function SeekerOnboarding() {
 
     try {
       let data
-      if (step === 1) data = await authService.saveStep1(buildStep1Payload())
+      if (step === 1) {
+        let payload = buildStep1Payload()
+
+        if (payload.latitude == null || payload.longitude == null) {
+          try {
+            const location = await geocodeAddress([
+              payload.address_house_street,
+              payload.address_barangay,
+              payload.address_municipality_city,
+              payload.address_province,
+              'Philippines',
+            ].filter(Boolean).join(', '))
+
+            if (location?.latitude != null && location?.longitude != null) {
+              payload = {
+                ...payload,
+                latitude: location.latitude,
+                longitude: location.longitude,
+                google_place_id: location.place_id,
+              }
+              setForm((current) => ({
+                ...current,
+                latitude: location.latitude,
+                longitude: location.longitude,
+                google_place_id: location.place_id,
+              }))
+            }
+          } catch {
+            // Coordinate lookup is optional; the verified PSGC address can still be saved.
+          }
+        }
+
+        data = await authService.saveStep1(payload)
+      }
       if (step === 2) data = await authService.saveStep2(buildStep2Payload())
       if (step === 3) data = await authService.saveStep3(buildStep3Payload())
       if (step === 4) data = await authService.saveStep4(buildStep4Payload())
@@ -2109,8 +2812,17 @@ export default function SeekerOnboarding() {
     } catch (err) {
       if (err.response?.status === 422) {
         const serverErrors = err.response.data.errors ?? {}
-        if (serverErrors.occupation_ids || serverErrors['occupation_ids.0']) {
-          serverErrors.preferred_occupations = serverErrors.occupation_ids?.[0]
+        if (
+          serverErrors.occupation_ids
+          || serverErrors['occupation_ids.0']
+          || serverErrors.occupation_preferences
+          || serverErrors['occupation_preferences.0.occupation_id']
+          || serverErrors['occupation_preferences.0.general_term']
+        ) {
+          serverErrors.preferred_occupations = serverErrors.occupation_preferences?.[0]
+            ?? serverErrors['occupation_preferences.0.occupation_id']?.[0]
+            ?? serverErrors['occupation_preferences.0.general_term']?.[0]
+            ?? serverErrors.occupation_ids?.[0]
             ?? serverErrors['occupation_ids.0']?.[0]
         }
         setErrors(serverErrors)
@@ -2170,6 +2882,7 @@ export default function SeekerOnboarding() {
                 onChange={handleChange}
                 user={user}
                 onGpsDetect={handleGpsDetect}
+                onAddressSelect={handleAddressSelect}
                 gpsState={gpsState}
               />
             )}

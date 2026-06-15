@@ -24,6 +24,22 @@ return [
 
     'psoc' => [
         'token' => env('PSOC_API_TOKEN'),
+        'base_url' => env('PSOC_API_BASE_URL', 'https://classification.psa.gov.ph/psoc'),
+    ],
+
+    'google_maps' => [
+        'server_key' => env('GOOGLE_MAPS_SERVER_API_KEY'),
+        'places_base_url' => env('GOOGLE_MAPS_PLACES_BASE_URL', 'https://places.googleapis.com/v1'),
+        'geocoding_base_url' => env('GOOGLE_MAPS_GEOCODING_BASE_URL', 'https://maps.googleapis.com/maps/api/geocode'),
+        'routes_base_url' => env('GOOGLE_MAPS_ROUTES_BASE_URL', 'https://routes.googleapis.com'),
+        'country_code' => env('GOOGLE_MAPS_COUNTRY_CODE', 'PH'),
+        'language' => env('GOOGLE_MAPS_LANGUAGE', 'en'),
+        'routes_enabled' => env('GOOGLE_MAPS_ROUTES_ENABLED', false),
+    ],
+
+    'jobdatalake' => [
+        'key' => env('JOB_DATA_LAKE_API_KEY'),
+        'base_url' => env('JOB_DATA_LAKE_BASE_URL', 'https://api.jobdatalake.com'),
     ],
 
     'ses' => [

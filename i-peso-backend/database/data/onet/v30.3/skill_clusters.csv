@@ -1,0 +1,9 @@
+parent_skill,onet_soc_code,element_ids,relationship_type,match_weight,reverse_match_weight
+Graphic Design,27-1024.00,2.E.4.b|2.E.4.k|2.E.7.d,operational_tool,0.850,0.650
+Web Development,15-1254.00,2.E.7.h|2.E.4.g|2.E.7.d|2.E.7.e,operational_tool,0.850,0.650
+Data Analysis,15-2051.00,2.E.6.m|2.E.6.g|2.E.9.d|2.E.4.i,operational_tool,0.800,0.600
+Accounting,13-2011.00,2.E.2.a|2.E.2.d|2.E.4.i,operational_tool,0.800,0.600
+Project Management,13-1082.00,2.E.1.e|2.E.5.a,operational_tool,0.800,0.600
+Digital Marketing,13-1161.01,2.E.1.l|2.E.6.c|2.E.6.g,operational_tool,0.800,0.600
+Inventory Management,13-1081.00,2.E.1.f|2.E.1.d,operational_tool,0.800,0.600
+Office Administration,43-6014.00,2.E.1.k|2.E.4.d|2.E.4.i|2.E.16.a,operational_tool,0.750,0.550

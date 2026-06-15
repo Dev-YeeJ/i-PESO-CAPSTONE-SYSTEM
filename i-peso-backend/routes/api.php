@@ -7,20 +7,25 @@ use App\Http\Controllers\Api\Admin\EmployerVerificationController;
 use App\Http\Controllers\Api\Admin\GovernmentDole\JobFairController as AdminJobFairController;
 use App\Http\Controllers\Api\Admin\GovernmentDole\ProgramController as AdminProgramController;
 use App\Http\Controllers\Api\Admin\NSRPPdfExportController;
+use App\Http\Controllers\Api\Admin\OccupationMappingController;
 use App\Http\Controllers\Api\Admin\SystemReports\ActivityController as AdminActivityController;
 use App\Http\Controllers\Api\Admin\SystemReports\ReportController as AdminReportController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\EmployerJobVacancyController;
 use App\Http\Controllers\Api\EmployerNotificationController;
 use App\Http\Controllers\Api\EmployerRegistrationController;
+use App\Http\Controllers\Api\GoogleMapsController;
 use App\Http\Controllers\Api\OccupationController;
 use App\Http\Controllers\Api\SeekerCertificateController;
 use App\Http\Controllers\Api\SeekerController;
+use App\Http\Controllers\Api\SeekerNearbyJobController;
 use App\Http\Controllers\Api\SeekerProfileImageController;
 use App\Http\Controllers\Api\SeekerResumeController;
+use App\Http\Controllers\Api\SkillCatalogController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/occupations', [OccupationController::class, 'index'])->middleware('throttle:60,1');
+Route::get('/skills', [SkillCatalogController::class, 'index'])->middleware('throttle:60,1');
 
 Route::prefix('auth')->group(function () {
     Route::post('/register', [AuthController::class, 'register'])->middleware('throttle:5,1');
@@ -34,6 +39,15 @@ Route::prefix('auth')->group(function () {
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/auth/me', [AuthController::class, 'me']);
     Route::post('/auth/logout', [AuthController::class, 'logout']);
+
+    Route::prefix('geo')->group(function () {
+        Route::get('/autocomplete', [GoogleMapsController::class, 'autocomplete'])->middleware('throttle:30,1');
+        Route::get('/place/{placeId}', [GoogleMapsController::class, 'place'])->middleware('throttle:20,1');
+        Route::get('/geocode', [GoogleMapsController::class, 'geocode'])->middleware('throttle:20,1');
+        Route::get('/reverse', [GoogleMapsController::class, 'reverse'])->middleware('throttle:20,1');
+        Route::post('/route', [GoogleMapsController::class, 'route'])->middleware('throttle:15,1');
+        Route::post('/matrix', [GoogleMapsController::class, 'matrix'])->middleware('throttle:5,1');
+    });
 
     // Employer authenticated endpoints
     Route::prefix('employer')->group(function () {
@@ -54,6 +68,8 @@ Route::middleware('auth:sanctum')->group(function () {
     // Seeker profile endpoints (step-by-step completion)
     Route::prefix('seeker')->group(function () {
         Route::get('/profile', [SeekerController::class, 'getProfile']);
+        Route::get('/nearby-jobs', [SeekerNearbyJobController::class, 'getNearbyJobs'])
+            ->middleware('throttle:60,1');
         Route::post('/step-1', [SeekerController::class, 'saveStep1']);
         Route::post('/step-2', [SeekerController::class, 'saveStep2']);
         Route::post('/step-3', [SeekerController::class, 'saveStep3']);
@@ -81,6 +97,11 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/seekers', [AdminSeekerController::class, 'index']);
         Route::get('/seekers/{id}', [AdminSeekerController::class, 'show']);
         Route::get('/job-seekers/{id}/export-nsrp-pdf', [NSRPPdfExportController::class, 'exportNSRPPdf']);
+        Route::get('/occupation-mappings/pending', [OccupationMappingController::class, 'pending']);
+        Route::post('/occupation-mappings/{preference}/map', [OccupationMappingController::class, 'map']);
+        Route::get('/occupation-title-candidates', [OccupationMappingController::class, 'candidates']);
+        Route::post('/occupation-title-candidates/{candidate}/map', [OccupationMappingController::class, 'mapCandidate']);
+        Route::post('/occupation-title-candidates/{candidate}/reject', [OccupationMappingController::class, 'rejectCandidate']);
 
         // Employers (Verification)
         Route::get('/employers/pending', [EmployerVerificationController::class, 'getPendingEmployers']);
