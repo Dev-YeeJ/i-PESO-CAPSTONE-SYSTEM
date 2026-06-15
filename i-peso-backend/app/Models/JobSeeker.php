@@ -25,6 +25,7 @@ class JobSeeker extends Authenticatable
         'mobile_number',
         'email',
         'password',
+        'complete_address',
         'educ_attainment',
         'skills',
         'resume_path',

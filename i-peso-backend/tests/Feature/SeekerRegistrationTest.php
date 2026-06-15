@@ -25,6 +25,7 @@ class SeekerRegistrationTest extends TestCase
                 $table->string('mobile_number');
                 $table->string('email')->unique();
                 $table->string('password');
+                $table->string('complete_address')->nullable();
                 $table->string('educ_attainment')->nullable();
                 $table->timestamps();
             });
@@ -72,6 +73,35 @@ class SeekerRegistrationTest extends TestCase
         $this->assertDatabaseHas('job_seekers', [
             'email' => 'juan@example.com',
             'educ_attainment' => null,
+        ]);
+
+        Mail::assertSent(OtpMail::class);
+    }
+
+    public function test_seeker_mobile_registration_saves_optional_profile_fields(): void
+    {
+        Mail::fake();
+
+        $response = $this->postJson('/api/auth/register', [
+            'role' => 'seeker',
+            'first_name' => 'Bryan',
+            'last_name' => 'Bugayong',
+            'educ_attainment' => 'College Graduate',
+            'email' => 'bryan@example.com',
+            'mobile_number' => '09241629692',
+            'complete_address' => 'Calbueg, Malasiqui, Pangasinan',
+            'password' => 'Bry@n_testing#123',
+            'password_confirmation' => 'Bry@n_testing#123',
+        ]);
+
+        $response
+            ->assertCreated()
+            ->assertJsonPath('email', 'bryan@example.com');
+
+        $this->assertDatabaseHas('job_seekers', [
+            'email' => 'bryan@example.com',
+            'educ_attainment' => 'College Graduate',
+            'complete_address' => 'Calbueg, Malasiqui, Pangasinan',
         ]);
 
         Mail::assertSent(OtpMail::class);
