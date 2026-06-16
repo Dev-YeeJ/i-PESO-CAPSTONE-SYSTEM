@@ -125,11 +125,9 @@ class AuthController extends Controller
         ];
 
         if ($role === 'seeker') {
-            $rules['first_name']      = ['required', 'string', 'max:100'];
-            $rules['last_name']       = ['required', 'string', 'max:100'];
-            $rules['mobile_number']   = ['required', 'regex:/^09\d{9}$/'];
-            $rules['educ_attainment']  = ['nullable', 'string', 'max:100'];
-            $rules['complete_address'] = ['nullable', 'string', 'max:500'];
+            $rules['first_name']    = ['required', 'string', 'max:100'];
+            $rules['last_name']     = ['required', 'string', 'max:100'];
+            $rules['mobile_number'] = ['required', 'regex:/^09\d{9}$/'];
         } else {
             $rules['company_type'] = ['required', Rule::in([
                 'sole_proprietorship',
@@ -151,13 +149,11 @@ class AuthController extends Controller
         DB::transaction(function () use ($role, $validated) {
             if ($role === 'seeker') {
                 JobSeeker::create([
-                    'first_name'      => $validated['first_name'],
-                    'last_name'       => $validated['last_name'],
-                    'email'           => $validated['email'],
-                    'password'        => Hash::make($validated['password']),
-                    'mobile_number'   => $validated['mobile_number'],
-                    'educ_attainment'  => $validated['educ_attainment'] ?? null,
-                    'complete_address' => $validated['complete_address'] ?? null,
+                    'first_name'    => $validated['first_name'],
+                    'last_name'     => $validated['last_name'],
+                    'email'         => $validated['email'],
+                    'password'      => Hash::make($validated['password']),
+                    'mobile_number' => $validated['mobile_number'],
                 ]);
             } else {
                 Employer::create([
