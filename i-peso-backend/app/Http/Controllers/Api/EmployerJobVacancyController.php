@@ -122,14 +122,12 @@ class EmployerJobVacancyController extends Controller
                 '3-5 Years',
                 '5+ Years',
             ])],
-            'minimum_experience_months' => ['nullable', 'integer', 'min:0', 'max:600'],
             'required_skills' => ['required', 'array', 'min:1', 'max:30'],
             'required_skills.*' => ['string', 'max:100'],
             'soft_skills' => ['nullable', 'array', 'max:20'],
             'soft_skills.*' => ['string', 'max:100'],
             'required_certifications' => ['nullable', 'array', 'max:20'],
             'required_certifications.*' => ['string', 'max:150'],
-            'certifications_mandatory' => ['nullable', 'boolean'],
             'salary_type' => ['required', Rule::in(['Monthly', 'Daily', 'Hourly'])],
             'salary_min' => ['required_unless:hide_salary,true', 'nullable', 'numeric', 'min:0'],
             'salary_max' => ['required_unless:hide_salary,true', 'nullable', 'numeric', 'gte:salary_min'],
@@ -144,14 +142,13 @@ class EmployerJobVacancyController extends Controller
         ]);
 
         $data['job_title'] = Occupation::findOrFail($data['occupation_id'])->title;
-        $data['minimum_experience_months'] = $data['minimum_experience_months']
-            ?? match ($data['experience_level']) {
-                '1-3 Years' => 12,
-                '3-5 Years' => 36,
-                '5+ Years' => 60,
-                default => 0,
-            };
-        $data['certifications_mandatory'] = (bool) ($data['certifications_mandatory'] ?? false);
+        $data['minimum_experience_months'] = match ($data['experience_level']) {
+            '1-3 Years' => 12,
+            '3-5 Years' => 36,
+            '5+ Years' => 60,
+            default => 0,
+        };
+        $data['certifications_mandatory'] = false;
 
         if (! Schema::hasColumn('job_vacancies', 'minimum_experience_months')) {
             unset($data['minimum_experience_months']);

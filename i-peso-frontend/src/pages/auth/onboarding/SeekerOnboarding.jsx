@@ -33,6 +33,17 @@ const EDUC_OPTIONS = [
   "Master's Degree", 'Doctorate',
 ]
 
+const EDUC_ATTAINMENT_RANK = {
+  'Elementary Graduate'         : 1,
+  'High School Graduate'        : 2,
+  'Senior High School Graduate' : 3,
+  'Vocational / Technical'      : 4,
+  'College Undergraduate'       : 5,
+  'College Graduate'            : 6,
+  "Master's Degree"             : 7,
+  'Doctorate'                   : 8,
+}
+
 const SUFFIX_OPTIONS = [
   { value: '', label: 'None' },
   { value: 'Jr.', label: 'Jr.' },
@@ -84,6 +95,43 @@ const capitalizeName = (str) => {
         : part.charAt(0).toUpperCase() + part.slice(1).toLowerCase()
     ))
     .join('')
+}
+
+const inferEducationalAttainment = (educations = []) => {
+  const inferred = educations
+    .map((education) => {
+      if (!education?.level) return null
+
+      const completionStatus = education.completion_status || (education.year_graduated ? 'graduated' : 'undergraduate')
+      const isGraduated = completionStatus === 'graduated'
+      const normalizedCourse = String(education.course_strand ?? '').toLowerCase()
+
+      switch (education.level) {
+        case 'elementary':
+          return isGraduated ? 'Elementary Graduate' : null
+        case 'secondary_non_k12':
+          return isGraduated ? 'High School Graduate' : null
+        case 'secondary_k12':
+        case 'senior_high_strand':
+          return isGraduated ? 'Senior High School Graduate' : null
+        case 'tertiary':
+          return isGraduated ? 'College Graduate' : 'College Undergraduate'
+        case 'graduate_studies':
+          if (!isGraduated) return null
+          return /\b(phd|ph\.d|doctor|doctorate|juris doctor)\b/i.test(normalizedCourse)
+            ? 'Doctorate'
+            : "Master's Degree"
+        default:
+          return null
+      }
+    })
+    .filter(Boolean)
+
+  if (!inferred.length) return ''
+
+  return inferred.sort((left, right) => (
+    (EDUC_ATTAINMENT_RANK[right] || 0) - (EDUC_ATTAINMENT_RANK[left] || 0)
+  ))[0]
 }
 
 const format4PsHouseholdId = (value) => {
@@ -198,16 +246,6 @@ const EMPLOYMENT_STATUS_OPTIONS = [
   { value: 'probationary', label: 'Probationary' },
   { value: 'temporary', label: 'Temporary' },
   { value: 'seasonal', label: 'Seasonal' },
-]
-
-const MATCHING_WORK_SETUPS = ['On-Site', 'Remote', 'Hybrid']
-const MATCHING_EMPLOYMENT_TYPES = [
-  'Permanent/Regular',
-  'Contractual',
-  'Project-Based',
-  'Seasonal',
-  'Part-Time',
-  'Freelance',
 ]
 
 const STEPS = [
@@ -467,14 +505,7 @@ const Step1 = ({ form, errors, onChange, user, onGpsDetect, onAddressSelect, gps
         </FormField>
       </div>
 
-      {/* Educational Attainment */}
-      <FormField label="Highest Educational Attainment" error={errors.educ_attainment}>
-        <select style={selectStyle(!!errors.educ_attainment)} name="educ_attainment"
-          value={form.educ_attainment ?? ''} onChange={onChange}>
-          <option value="">Select attainment</option>
-          {EDUC_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
-        </select>
-      </FormField>
+
 
       {/* ── ADDRESS SECTION ── */}
       <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '20px', marginBottom: '4px' }}>
@@ -902,15 +933,6 @@ const Step3 = ({ form, errors, onChange }) => {
   const locations = form.preferred_locations_details ?? []
   const setField = (name, value) => onChange({ target: { name, value } })
   const selectedProvince = provinceOptions.find((province) => province.code === provinceCode)
-  const togglePreference = (field, value) => {
-    const current = form[field] ?? []
-    setField(
-      field,
-      current.includes(value)
-        ? current.filter((item) => item !== value)
-        : [...current, value],
-    )
-  }
 
   const addLocalLocation = (cityCode) => {
     const city = cityOptions.find((option) => option.code === cityCode)
@@ -957,49 +979,6 @@ const Step3 = ({ form, errors, onChange }) => {
           })}
         </div>
       </FormField>
-
-      <div style={{ marginBottom: '18px', padding: '14px', border: '1px solid #dbeafe', borderRadius: '12px', backgroundColor: '#f8fbff' }}>
-        <p style={{ margin: '0 0 4px', fontSize: '13px', fontWeight: '700', color: '#1e3a8a' }}>
-          Matching preferences <span style={{ fontSize: '11px', fontWeight: '500', color: '#64748b' }}>(optional)</span>
-        </p>
-        <p style={{ margin: '0 0 12px', fontSize: '11px', color: '#64748b' }}>
-          These choices improve recommendations but do not replace the official NSRP work-type answer above.
-        </p>
-
-        <p style={{ margin: '0 0 7px', fontSize: '11px', fontWeight: '700', color: '#475569' }}>Preferred work setup</p>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '7px', marginBottom: '12px' }}>
-          {MATCHING_WORK_SETUPS.map((option) => {
-            const selected = (form.preferred_work_setups ?? []).includes(option)
-            return (
-              <button
-                key={option}
-                type="button"
-                onClick={() => togglePreference('preferred_work_setups', option)}
-                style={{ padding: '7px 10px', borderRadius: '999px', border: `1px solid ${selected ? '#2563eb' : '#cbd5e1'}`, backgroundColor: selected ? '#dbeafe' : '#fff', color: selected ? '#1d4ed8' : '#475569', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}
-              >
-                {option}
-              </button>
-            )
-          })}
-        </div>
-
-        <p style={{ margin: '0 0 7px', fontSize: '11px', fontWeight: '700', color: '#475569' }}>Preferred employment arrangement</p>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '7px' }}>
-          {MATCHING_EMPLOYMENT_TYPES.map((option) => {
-            const selected = (form.preferred_employment_types ?? []).includes(option)
-            return (
-              <button
-                key={option}
-                type="button"
-                onClick={() => togglePreference('preferred_employment_types', option)}
-                style={{ padding: '7px 10px', borderRadius: '999px', border: `1px solid ${selected ? '#2563eb' : '#cbd5e1'}`, backgroundColor: selected ? '#dbeafe' : '#fff', color: selected ? '#1d4ed8' : '#475569', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}
-              >
-                {option}
-              </button>
-            )
-          })}
-        </div>
-      </div>
 
       <FormField label="Preferred Work Location" error={errors.preferred_work_location}>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
@@ -1668,7 +1647,61 @@ const SkillTagInput = ({ name, value = [], suggestions, category, onChange, plac
 }
 
 function Step5({ form, errors, onChange, onAddEducation, onRemoveEducation, onUpdateEducation }) {
-  const educationTemplate = { level: '', course_strand: '', year_graduated: '', undergrad_level_reached: '', undergrad_year_last_attended: '' }
+  const educationTemplate = {
+    level: '',
+    course_strand: '',
+    year_graduated: '',
+    undergrad_level_reached: '',
+    undergrad_year_last_attended: '',
+    completion_status: 'graduated',
+  }
+  const currentYear = new Date().getFullYear()
+  const selectedLevels = (form.educations ?? []).map((education) => education.level).filter(Boolean)
+  const availableLevels = EDUCATION_LEVELS.filter((level) => !selectedLevels.includes(level.value))
+  const suggestedEducAttainment = inferEducationalAttainment(form.educations)
+  const lastSuggestedAttainmentRef = useRef('')
+
+  const getCoursePlaceholder = (level) => {
+    if (level === 'senior_high_strand' || level === 'secondary_k12') return 'Track / strand'
+    if (level === 'tertiary' || level === 'graduate_studies') return 'Course / degree'
+    return 'Course / strand if applicable'
+  }
+
+  const getEducationMode = (education) => education.completion_status || (education.year_graduated ? 'graduated' : 'undergraduate')
+  const nextEducationTemplate = {
+    ...educationTemplate,
+    level: availableLevels[0]?.value || '',
+  }
+
+  const setEducationMode = (index, mode) => {
+    onUpdateEducation(
+      'educations',
+      index,
+      mode === 'graduated'
+        ? {
+            completion_status: 'graduated',
+            undergrad_level_reached: '',
+            undergrad_year_last_attended: '',
+          }
+        : {
+            completion_status: 'undergraduate',
+            year_graduated: null,
+          }
+    )
+  }
+
+  useEffect(() => {
+    if (!suggestedEducAttainment) return
+
+    const currentAttainment = form.educ_attainment ?? ''
+    const previousSuggestion = lastSuggestedAttainmentRef.current
+
+    if (!currentAttainment || currentAttainment === previousSuggestion) {
+      onChange({ target: { name: 'educ_attainment', value: suggestedEducAttainment } })
+    }
+
+    lastSuggestedAttainmentRef.current = suggestedEducAttainment
+  }, [form.educ_attainment, onChange, suggestedEducAttainment])
 
   // ── Helper: Handle DOLE skill checkbox changes ─────────────────────────
   const handleDoleSkillChange = (skillLabel, checked) => {
@@ -1692,36 +1725,118 @@ function Step5({ form, errors, onChange, onAddEducation, onRemoveEducation, onUp
       <SectionHeader
         icon="🎓"
         title="V. DETAILED EDUCATIONAL BACKGROUND"
-        subtitle="Optional: Add your school history here. Your highest attainment is already saved in Step 1"
+        subtitle="Set your highest attainment here, then add detailed school history to strengthen matching."
       />
 
+      <div style={{ display: 'grid', gap: '12px', padding: '16px', border: '1px solid #dbeafe', borderRadius: '14px', backgroundColor: '#f8fbff' }}>
+        <FormField
+          label="Highest Educational Attainment"
+          error={errors.educ_attainment}
+          help="This education summary is used in your NSRP profile and job matching."
+        >
+          <select
+            style={selectStyle(!!errors.educ_attainment)}
+            name="educ_attainment"
+            value={form.educ_attainment ?? ''}
+            onChange={onChange}
+          >
+            <option value="">Select attainment</option>
+            {EDUC_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
+          </select>
+        </FormField>
+
+        {suggestedEducAttainment && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center', fontSize: '12px' }}>
+            <span style={{ color: '#475569' }}>
+              Suggested from your education entries: <strong style={{ color: '#0f172a' }}>{suggestedEducAttainment}</strong>
+            </span>
+            {form.educ_attainment !== suggestedEducAttainment && (
+              <button
+                type="button"
+                onClick={() => onChange({ target: { name: 'educ_attainment', value: suggestedEducAttainment } })}
+                style={{
+                  padding: '6px 10px',
+                  borderRadius: '999px',
+                  border: '1px solid #93c5fd',
+                  backgroundColor: '#fff',
+                  color: '#1d4ed8',
+                  fontSize: '11px',
+                  fontWeight: '700',
+                  cursor: 'pointer',
+                }}
+              >
+                Use suggestion
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+
       {/* Currently in school */}
-      <div>
-        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
-          <input
-            type="checkbox"
-            checked={form.currently_in_school ?? false}
-            onChange={(e) => onChange({ target: { name: 'currently_in_school', value: e.target.checked } })}
-            style={{ width: '18px', height: '18px', cursor: 'pointer' }}
-          />
-          <span style={{ fontSize: '14px', fontWeight: '500', color: '#374151' }}>Currently enrolled in school</span>
-        </label>
+      <div style={{ display: 'grid', gap: '10px', padding: '16px', border: '1px solid #dbeafe', borderRadius: '14px', backgroundColor: '#f8fbff' }}>
+        <div>
+          <p style={{ margin: 0, fontSize: '14px', fontWeight: '700', color: '#0f172a' }}>Are you currently in school?</p>
+          <p style={{ margin: '4px 0 0', fontSize: '12px', color: '#64748b' }}>
+            This helps us interpret unfinished education entries more accurately.
+          </p>
+        </div>
+        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+          {[
+            { value: true, label: 'Yes, currently enrolled' },
+            { value: false, label: 'No, not currently enrolled' },
+          ].map((option) => {
+            const active = Boolean(form.currently_in_school) === option.value
+            return (
+              <button
+                key={String(option.value)}
+                type="button"
+                onClick={() => onChange({ target: { name: 'currently_in_school', value: option.value } })}
+                style={{
+                  padding: '10px 14px',
+                  borderRadius: '999px',
+                  border: `1px solid ${active ? '#2563eb' : '#cbd5e1'}`,
+                  backgroundColor: active ? '#dbeafe' : '#fff',
+                  color: active ? '#1d4ed8' : '#475569',
+                  fontSize: '13px',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                }}
+              >
+                {option.label}
+              </button>
+            )
+          })}
+        </div>
       </div>
 
       {/* Education table */}
       <div>
-        <h4 style={{ fontSize: '13px', fontWeight: '600', color: '#1f2937', marginBottom: '12px' }}>Education Levels</h4>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', marginBottom: '12px' }}>
+          <div>
+            <h4 style={{ fontSize: '13px', fontWeight: '700', color: '#1f2937', margin: 0 }}>Education Levels</h4>
+            <p style={{ margin: '4px 0 0', fontSize: '11px', color: '#64748b' }}>
+              Add one row per level, then complete either the graduated or undergraduate details.
+            </p>
+          </div>
+          <span style={{ padding: '6px 10px', borderRadius: '999px', backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', fontSize: '11px', fontWeight: '700', color: '#475569' }}>
+            {selectedLevels.length} / {EDUCATION_LEVELS.length} levels added
+          </span>
+        </div>
         <div style={{ border: '1px solid #e2e8f0', borderRadius: '10px', overflow: 'hidden', backgroundColor: '#fff' }}>
           <table style={{ width: '100%', fontSize: '13px', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ backgroundColor: '#f1f5f9', borderBottom: '1px solid #e2e8f0' }}>
                 <th style={{ padding: '10px', textAlign: 'left', fontWeight: '600', color: '#475569' }}>Level</th>
-                <th style={{ padding: '10px', textAlign: 'left', fontWeight: '600', color: '#475569' }}>Year Graduated</th>
+                <th style={{ padding: '10px', textAlign: 'left', fontWeight: '600', color: '#475569' }}>Course / Strand</th>
+                <th style={{ padding: '10px', textAlign: 'left', fontWeight: '600', color: '#475569' }}>Completion Details</th>
                 <th style={{ padding: '10px', textAlign: 'center', fontWeight: '600', color: '#475569', width: '50px' }}>Action</th>
               </tr>
             </thead>
             <tbody>
-              {form.educations?.map((edu, i) => (
+              {form.educations?.map((edu, i) => {
+                const mode = getEducationMode(edu)
+
+                return (
                 <tr key={i} style={{ borderBottom: '1px solid #e2e8f0' }}>
                   <td style={{ padding: '10px' }}>
                     <select
@@ -1731,20 +1846,116 @@ function Step5({ form, errors, onChange, onAddEducation, onRemoveEducation, onUp
                     >
                       <option value="">Select level</option>
                       {EDUCATION_LEVELS.map((l) => (
-                        <option key={l.value} value={l.value}>{l.label}</option>
+                        <option
+                          key={l.value}
+                          value={l.value}
+                          disabled={selectedLevels.includes(l.value) && edu.level !== l.value}
+                        >
+                          {l.label}
+                        </option>
                       ))}
                     </select>
                   </td>
                   <td style={{ padding: '10px' }}>
                     <input
-                      type="number"
-                      min="1900"
-                      max={new Date().getFullYear()}
-                      placeholder="YYYY"
-                      value={edu.year_graduated || ''}
-                      onChange={(e) => onUpdateEducation('educations', i, { year_graduated: e.target.value || null })}
+                      type="text"
+                      placeholder={getCoursePlaceholder(edu.level)}
+                      value={edu.course_strand || ''}
+                      onChange={(e) => onUpdateEducation('educations', i, { course_strand: e.target.value })}
                       style={{ width: '100%', padding: '6px', fontSize: '13px', border: '1px solid #d1d5db', borderRadius: '6px' }}
                     />
+                  </td>
+                  <td style={{ padding: '10px' }}>
+                    <div style={{ display: 'grid', gap: '8px' }}>
+                      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                        {[
+                          { value: 'graduated', label: 'Graduated', accent: '#dbeafe', border: '#93c5fd', text: '#1d4ed8' },
+                          { value: 'undergraduate', label: 'Undergraduate', accent: '#ffedd5', border: '#fdba74', text: '#c2410c' },
+                        ].map((option) => {
+                          const active = mode === option.value
+                          return (
+                            <button
+                              key={option.value}
+                              type="button"
+                              onClick={() => setEducationMode(i, option.value)}
+                              style={{
+                                padding: '6px 10px',
+                                borderRadius: '999px',
+                                border: `1px solid ${active ? option.border : '#cbd5e1'}`,
+                                backgroundColor: active ? option.accent : '#fff',
+                                color: active ? option.text : '#475569',
+                                fontSize: '11px',
+                                fontWeight: '700',
+                                cursor: 'pointer',
+                              }}
+                            >
+                              {option.label}
+                            </button>
+                          )
+                        })}
+                      </div>
+
+                      {mode === 'graduated' ? (
+                        <div style={{ padding: '10px', border: '1px solid #dbeafe', borderRadius: '8px', backgroundColor: '#f8fbff' }}>
+                          <label style={{ display: 'block', fontSize: '11px', fontWeight: '600', color: '#475569', marginBottom: '4px' }}>
+                            Year graduated
+                          </label>
+                          <input
+                            type="number"
+                            min="1900"
+                            max={currentYear}
+                            placeholder="YYYY"
+                            value={edu.year_graduated || ''}
+                            onChange={(e) => onUpdateEducation('educations', i, { year_graduated: e.target.value || null })}
+                            style={{ width: '100%', padding: '6px', fontSize: '13px', border: '1px solid #93c5fd', borderRadius: '6px', backgroundColor: '#fff' }}
+                          />
+                          <p style={{ margin: '8px 0 0', fontSize: '10px', color: '#64748b' }}>
+                            Enter the year you completed this level.
+                          </p>
+                        </div>
+                      ) : (
+                        <div style={{ padding: '10px', border: '1px solid #fed7aa', borderRadius: '8px', backgroundColor: '#fff7ed' }}>
+                          <p style={{ margin: '0 0 8px', fontSize: '11px', fontWeight: '600', color: '#9a3412' }}>
+                            Undergraduate details
+                          </p>
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 120px', gap: '8px' }}>
+                            <input
+                              type="text"
+                              placeholder="Level reached"
+                              value={edu.undergrad_level_reached || ''}
+                              onChange={(e) => onUpdateEducation('educations', i, { undergrad_level_reached: e.target.value })}
+                              style={{
+                                width: '100%',
+                                padding: '6px',
+                                fontSize: '13px',
+                                border: '1px solid #fdba74',
+                                borderRadius: '6px',
+                                backgroundColor: '#fff',
+                              }}
+                            />
+                            <input
+                              type="number"
+                              min="1900"
+                              max={currentYear}
+                              placeholder="Last attended"
+                              value={edu.undergrad_year_last_attended || ''}
+                              onChange={(e) => onUpdateEducation('educations', i, { undergrad_year_last_attended: e.target.value || null })}
+                              style={{
+                                width: '100%',
+                                padding: '6px',
+                                fontSize: '13px',
+                                border: '1px solid #fdba74',
+                                borderRadius: '6px',
+                                backgroundColor: '#fff',
+                              }}
+                            />
+                          </div>
+                          <p style={{ margin: '8px 0 0', fontSize: '10px', color: '#9a3412' }}>
+                            Use this if the schooling is unfinished or still ongoing.
+                          </p>
+                        </div>
+                      )}
+                    </div>
                   </td>
                   <td style={{ padding: '10px', textAlign: 'center' }}>
                     <button
@@ -1756,16 +1967,28 @@ function Step5({ form, errors, onChange, onAddEducation, onRemoveEducation, onUp
                     </button>
                   </td>
                 </tr>
-              ))}
+                )
+              })}
             </tbody>
           </table>
         </div>
         <button
           type="button"
-          onClick={() => onAddEducation('educations', educationTemplate)}
-          style={{ marginTop: '12px', padding: '8px 12px', fontSize: '13px', color: '#1d4ed8', backgroundColor: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '8px', cursor: 'pointer', fontWeight: '500' }}
+          onClick={() => onAddEducation('educations', nextEducationTemplate)}
+          disabled={selectedLevels.length >= EDUCATION_LEVELS.length}
+          style={{
+            marginTop: '12px',
+            padding: '10px 14px',
+            fontSize: '13px',
+            color: selectedLevels.length >= EDUCATION_LEVELS.length ? '#94a3b8' : '#1d4ed8',
+            backgroundColor: selectedLevels.length >= EDUCATION_LEVELS.length ? '#f8fafc' : '#eff6ff',
+            border: '1px solid #bfdbfe',
+            borderRadius: '10px',
+            cursor: selectedLevels.length >= EDUCATION_LEVELS.length ? 'not-allowed' : 'pointer',
+            fontWeight: '700',
+          }}
         >
-          + Add Education
+          {availableLevels[0] ? `+ Add ${availableLevels[0].label}` : '+ All levels added'}
         </button>
         {errors.educations && <p style={{ color: '#dc2626', fontSize: '12px', marginTop: '8px' }}>✕ {errors.educations}</p>}
       </div>
@@ -2045,8 +2268,6 @@ function Step6({ form, errors, onAddTraining, onRemoveTraining, onUpdateTraining
 
 function Step7({ form, errors, onAddExperience, onRemoveExperience, onUpdateExperience }) {
   const experienceTemplate = {
-    occupation: null,
-    occupation_id: null,
     company_name: '',
     company_address: '',
     position: '',
@@ -2095,15 +2316,12 @@ function Step7({ form, errors, onAddExperience, onRemoveExperience, onUpdateExpe
                   </td>
                   <td style={{ padding: '10px' }}>
                     <div style={{ display: 'grid', gap: '6px' }}>
-                      <OccupationCombobox
-                        selected={exp.occupation}
-                        onChange={(occupation) => onUpdateExperience('work_experiences', i, {
-                          occupation,
-                          occupation_id: occupation?.id ?? null,
-                          position: occupation?.title ?? '',
-                        })}
-                        limit={1}
-                        placeholder="Search standardized position"
+                      <input
+                        type="text"
+                        placeholder="Position"
+                        value={exp.position || ''}
+                        onChange={(e) => onUpdateExperience('work_experiences', i, { position: e.target.value })}
+                        style={{ width: '100%', padding: '6px', fontSize: '13px', border: '1px solid #d1d5db', borderRadius: '6px' }}
                       />
                       <select
                         value={exp.employment_status || ''}
@@ -2190,7 +2408,7 @@ export default function SeekerOnboarding() {
     religion_other: '',
     height_ft    : '',
     tin          : '',
-    educ_attainment: '',
+    educ_attainment: user?.educ_attainment ?? '',
     address_province: '',
     address_province_code: '',
     address_municipality_city: '',
@@ -2223,8 +2441,6 @@ export default function SeekerOnboarding() {
     // Step 3
     preferred_occupations: [],
     work_type_preference: '',
-    preferred_work_setups: [],
-    preferred_employment_types: [],
     preferred_work_location: '',
     preferred_locations_details: [],
     // Step 4 (Languages - handled dynamically via lang_${key}_${skill} fields)
@@ -2238,7 +2454,7 @@ export default function SeekerOnboarding() {
     trainings: [], // Array of { course, hours_of_training, training_institution, skills_acquired, certificates_received }
     eligibilities: [], // Array of { type, name, date_taken, valid_until }
     // Step 7: Work Experience
-    work_experiences: [], // Includes standardized occupation_id for relevant-experience matching
+    work_experiences: [], // Array of { company_name, company_address, position, number_of_months, employment_status }
   })
 
   const handleChange = useCallback((e) => {
@@ -2500,7 +2716,6 @@ export default function SeekerOnboarding() {
       if (!form.height_ft)                     e.height_ft       = 'Required.'
       else if (Number(form.height_ft) < 2.5 || Number(form.height_ft) > 8.5)
         e.height_ft = 'Select a height from 2 ft 6 in to 8 ft 6 in.'
-      if (!form.educ_attainment)               e.educ_attainment = 'Required.'
       if (!form.address_province)              e.address_province = 'Required.'
       if (!form.address_municipality_city)     e.address_municipality_city = 'Required.'
       if (!form.address_barangay)              e.address_barangay = 'Required.'
@@ -2573,14 +2788,39 @@ export default function SeekerOnboarding() {
     }
 
     if (s === 5) {
-      const invalidEducation = form.educations?.some((education) => (
-        !education.level
-        || (education.year_graduated && (
-          Number(education.year_graduated) < 1900
-          || Number(education.year_graduated) > new Date().getFullYear()
-        ))
-      ))
-      if (invalidEducation) e.educations = 'Complete each added education row or remove it.'
+      const currentYear = new Date().getFullYear()
+      const resolvedEducAttainment = form.educ_attainment?.trim() || inferEducationalAttainment(form.educations)
+      const selectedLevels = (form.educations ?? []).map((education) => education.level).filter(Boolean)
+      const hasDuplicateEducationLevel = new Set(selectedLevels).size !== selectedLevels.length
+      const invalidEducation = form.educations?.some((education) => {
+        const completionStatus = education.completion_status || (education.year_graduated ? 'graduated' : 'undergraduate')
+        const yearGraduated = education.year_graduated ? Number(education.year_graduated) : null
+        const yearLastAttended = education.undergrad_year_last_attended ? Number(education.undergrad_year_last_attended) : null
+        const isUndergraduate = completionStatus === 'undergraduate'
+
+        return (
+          !education.level
+          || (
+            completionStatus === 'graduated'
+            && (
+              !yearGraduated
+              || yearGraduated < 1900
+              || yearGraduated > currentYear
+            )
+          )
+          || (
+            isUndergraduate && (
+              !education.undergrad_level_reached?.trim()
+              || !yearLastAttended
+              || yearLastAttended < 1900
+              || yearLastAttended > currentYear
+            )
+          )
+        )
+      })
+      if (!resolvedEducAttainment) e.educ_attainment = 'Select your highest educational attainment.'
+      if (hasDuplicateEducationLevel) e.educations = 'Each education level can only be added once.'
+      else if (invalidEducation) e.educations = 'Complete each added education row or remove it.'
     }
 
     if (s === 6) {
@@ -2606,7 +2846,7 @@ export default function SeekerOnboarding() {
     if (s === 7) {
       const invalidExperience = form.work_experiences?.some((experience) => (
         !experience.company_name?.trim()
-        || !experience.occupation_id
+        || !experience.position?.trim()
         || (
           experience.number_of_months
           && (
@@ -2657,7 +2897,6 @@ export default function SeekerOnboarding() {
     religion_other           : form.religion === 'other' ? form.religion_other : null,
     height_ft                : parseFloat(form.height_ft),
     tin                      : form.tin || null,
-    educ_attainment          : form.educ_attainment,
     address_province         : form.address_province,
     address_municipality_city: form.address_municipality_city,
     address_barangay         : form.address_barangay,
@@ -2693,8 +2932,6 @@ export default function SeekerOnboarding() {
 
   const buildStep3Payload = () => ({
     work_type_preference       : form.work_type_preference,
-    preferred_work_setups      : form.preferred_work_setups ?? [],
-    preferred_employment_types : form.preferred_employment_types ?? [],
     preferred_work_location    : form.preferred_work_location,
     preferred_locations_details: form.preferred_locations_details ?? [],
     occupation_preferences     : (form.preferred_occupations ?? []).map((occupation) => ({
@@ -2723,11 +2960,18 @@ export default function SeekerOnboarding() {
   }
 
   const buildStep5Payload = () => ({
-    currently_in_school : form.currently_in_school,
-    educations          : form.educations || [],
-    dole_skills         : form.dole_skills || [],
-    technical_skills    : form.technical_skills || [],
-    soft_skills         : form.soft_skills || [],
+    educ_attainment    : form.educ_attainment?.trim() || inferEducationalAttainment(form.educations) || null,
+    currently_in_school: form.currently_in_school,
+    educations         : (form.educations || []).map((education) => ({
+      level: education.level || null,
+      course_strand: education.course_strand?.trim() || null,
+      year_graduated: education.year_graduated || null,
+      undergrad_level_reached: education.year_graduated ? null : (education.undergrad_level_reached?.trim() || null),
+      undergrad_year_last_attended: education.year_graduated ? null : (education.undergrad_year_last_attended || null),
+    })),
+    dole_skills        : form.dole_skills || [],
+    technical_skills   : form.technical_skills || [],
+    soft_skills        : form.soft_skills || [],
   })
 
   const buildStep6Payload = () => ({
@@ -2737,7 +2981,6 @@ export default function SeekerOnboarding() {
 
   const buildStep7Payload = () => ({
     work_experiences : (form.work_experiences || []).map((experience) => ({
-      occupation_id: experience.occupation_id,
       company_name: experience.company_name,
       company_address: experience.company_address || null,
       position: experience.position,
@@ -2958,3 +3201,4 @@ export default function SeekerOnboarding() {
     </OnboardingShell>
   )
 }
+

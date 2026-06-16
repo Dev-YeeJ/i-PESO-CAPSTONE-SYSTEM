@@ -21,11 +21,23 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
 class SeekerController extends Controller
 {
+    private const EDUCATIONAL_ATTAINMENT_OPTIONS = [
+        'Elementary Graduate',
+        'High School Graduate',
+        'Senior High School Graduate',
+        'Vocational / Technical',
+        'College Undergraduate',
+        'College Graduate',
+        "Master's Degree",
+        'Doctorate',
+    ];
+
     private const SUPPORTED_LANGUAGES = [
         'english',
         'filipino',
@@ -77,6 +89,81 @@ class SeekerController extends Controller
         $seeker->forceFill(['form_validation_state' => $state])->save();
     }
 
+    private function inferEducationalAttainment(array $educations): ?string
+    {
+        $bestAttainment = null;
+        $bestRank = 0;
+
+        foreach ($educations as $education) {
+            $attainment = $this->mapEducationToAttainment($education);
+            if (! filled($attainment)) {
+                continue;
+            }
+
+            $rank = $this->educationalAttainmentRank($attainment);
+            if ($rank > $bestRank) {
+                $bestAttainment = $attainment;
+                $bestRank = $rank;
+            }
+        }
+
+        return $bestAttainment;
+    }
+
+    private function mapEducationToAttainment(array $education): ?string
+    {
+        $level = $education['level'] ?? null;
+        if (! filled($level)) {
+            return null;
+        }
+
+        $isGraduated = filled($education['year_graduated'] ?? null);
+
+        return match ($level) {
+            'elementary' => $isGraduated ? 'Elementary Graduate' : null,
+            'secondary_non_k12' => $isGraduated ? 'High School Graduate' : null,
+            'secondary_k12', 'senior_high_strand' => $isGraduated ? 'Senior High School Graduate' : null,
+            'tertiary' => $isGraduated ? 'College Graduate' : 'College Undergraduate',
+            'graduate_studies' => $isGraduated ? $this->graduateStudiesAttainment($education['course_strand'] ?? null) : null,
+            default => null,
+        };
+    }
+
+    private function graduateStudiesAttainment(?string $courseStrand): string
+    {
+        $normalized = Str::lower((string) $courseStrand);
+
+        return preg_match('/\b(phd|ph\.d|doctor|doctorate|juris doctor)\b/i', $normalized)
+            ? 'Doctorate'
+            : "Master's Degree";
+    }
+
+    private function educationalAttainmentRank(string $attainment): int
+    {
+        return match ($attainment) {
+            'Elementary Graduate' => 1,
+            'High School Graduate' => 2,
+            'Senior High School Graduate' => 3,
+            'Vocational / Technical' => 4,
+            'College Undergraduate' => 5,
+            'College Graduate' => 6,
+            "Master's Degree" => 7,
+            'Doctorate' => 8,
+            default => 0,
+        };
+    }
+
+    private function resolveEducationalAttainment(array $validated): ?string
+    {
+        $explicit = Str::squish((string) ($validated['educ_attainment'] ?? ''));
+
+        if ($explicit !== '') {
+            return $explicit;
+        }
+
+        return $this->inferEducationalAttainment($validated['educations'] ?? []);
+    }
+
     /**
      * Builds the minimal user payload returned to the frontend after each step.
      * Matches the shape that authStore and VerifyEmailPage expect.
@@ -93,6 +180,7 @@ class SeekerController extends Controller
             'first_name' => $seeker->first_name,
             'last_name' => $seeker->last_name,
             'mobile_number' => $seeker->mobile_number,
+            'educ_attainment' => $seeker->educ_attainment,
             'form_validation_state' => $seeker->form_validation_state,
         ];
     }
@@ -176,8 +264,6 @@ class SeekerController extends Controller
                 'former_ofw_country' => $seeker->former_ofw_country,
                 'former_ofw_return_date' => $seeker->former_ofw_return_date?->format('Y-m-d'),
                 'work_type_preference' => $seeker->work_type_preference,
-                'preferred_work_setups' => $seeker->preferred_work_setups,
-                'preferred_employment_types' => $seeker->preferred_employment_types,
                 'preferred_work_location' => $seeker->preferred_work_location,
                 'preferred_locations_details' => $seeker->preferred_locations_details,
                 'occupations' => $seeker->occupations,
@@ -220,31 +306,60 @@ class SeekerController extends Controller
         ]);
     }
 
+    /**
+     * Calculate profile strength based on critical profile components.
+     * Focuses on core employment profile data rather than optional features.
+     *
+     * Scoring:
+     * - Core items (required): Photo, Personal Info, Address, Skills, Occupations = 50%
+     * - Work Profile items (important): Education, Work Experience = 30%
+     * - Enhancement items (optional): Training/Certificates, Languages = 20%
+     */
     private function profileStrength(JobSeeker $seeker): array
     {
-        $items = [
-            ['key' => 'photo', 'label' => 'Professional 2x2 photo', 'complete' => filled($seeker->profile_image)],
-            ['key' => 'personal_information', 'label' => 'Personal information', 'complete' => filled($seeker->date_of_birth) && filled($seeker->mobile_number)],
-            ['key' => 'address', 'label' => 'Complete address', 'complete' => filled($seeker->address_barangay) && filled($seeker->address_municipality_city)],
-            ['key' => 'education', 'label' => 'Education', 'complete' => $seeker->educations->isNotEmpty()],
-            ['key' => 'skills', 'label' => 'Skills', 'complete' => $seeker->seekerSkills->isNotEmpty()],
-            ['key' => 'work_experience', 'label' => 'Work experience', 'complete' => $seeker->workExperiences->isNotEmpty()],
-            ['key' => 'training', 'label' => 'Training or certificate', 'complete' => $seeker->trainings->isNotEmpty() || $seeker->certificates->isNotEmpty()],
-            ['key' => 'resume', 'label' => 'Generated resume', 'complete' => filled($seeker->resume_path)],
+        // Core profile items (foundation - 50% weight)
+        $coreItems = [
+            ['key' => 'photo', 'label' => 'Professional 2x2 photo', 'weight' => 10, 'complete' => filled($seeker->profile_image)],
+            ['key' => 'personal_information', 'label' => 'Personal information', 'weight' => 10, 'complete' => filled($seeker->date_of_birth) && filled($seeker->mobile_number) && filled($seeker->first_name)],
+            ['key' => 'address', 'label' => 'Complete address', 'weight' => 10, 'complete' => filled($seeker->address_barangay) && filled($seeker->address_municipality_city)],
+            ['key' => 'occupations', 'label' => 'Job preferences', 'weight' => 10, 'complete' => $seeker->occupations->isNotEmpty()],
+            ['key' => 'skills', 'label' => 'Skills profile', 'weight' => 10, 'complete' => $seeker->seekerSkills->count() >= 3],
         ];
 
-        $completed = collect($items)->where('complete', true)->count();
+        // Work profile items (important - 30% weight)
+        $workItems = [
+            ['key' => 'education', 'label' => 'Education background', 'weight' => 15, 'complete' => filled($seeker->educ_attainment) || $seeker->educations->isNotEmpty()],
+            ['key' => 'work_experience', 'label' => 'Work experience', 'weight' => 15, 'complete' => $seeker->workExperiences->isNotEmpty()],
+        ];
+
+        // Enhancement items (optional - 20% weight)
+        $enhancementItems = [
+            ['key' => 'training', 'label' => 'Training & certificates', 'weight' => 10, 'complete' => $seeker->trainings->isNotEmpty() || $seeker->certificates->isNotEmpty()],
+            ['key' => 'languages', 'label' => 'Language proficiency', 'weight' => 10, 'complete' => $seeker->languages->isNotEmpty()],
+        ];
+
+        $allItems = array_merge($coreItems, $workItems, $enhancementItems);
+
+        // Calculate weighted percentage
+        $totalWeight = collect($allItems)->sum('weight');
+        $completedWeight = collect($allItems)
+            ->filter(fn ($item) => $item['complete'])
+            ->sum('weight');
+
+        $percentage = (int) round(($completedWeight / $totalWeight) * 100);
 
         return [
-            'percentage' => (int) round(($completed / count($items)) * 100),
-            'items' => $items,
+            'percentage' => $percentage,
+            'items' => $allItems,
+            'coreComplete' => collect($coreItems)->where('complete', true)->count(),
+            'coreTotal' => count($coreItems),
         ];
     }
 
     /**
      * POST /api/seeker/step-1   [auth:sanctum]
      *
-     * Saves: Personal Information, Present Address, Educational Attainment,
+     * Saves: Personal Information, Present Address,
      *        and Disability Status (writes to seeker_disabilities table).
      */
     public function saveStep1(Request $request): JsonResponse
@@ -266,7 +381,6 @@ class SeekerController extends Controller
             'religion_other' => ['nullable', 'string', 'max:100', 'required_if:religion,other'],
             'height_ft' => ['required', 'numeric', 'between:2.5,8.5'],
             'tin' => ['nullable', 'string', 'max:20'],
-            'educ_attainment' => ['required', 'string', 'max:100'],
             'address_province' => ['required', 'string', 'max:100'],
             'address_municipality_city' => ['required', 'string', 'max:100'],
             'address_barangay' => ['required', 'string', 'max:100'],
@@ -312,7 +426,6 @@ class SeekerController extends Controller
                 : $validated['religion'],
             'height_ft' => $validated['height_ft'],
             'tin' => $validated['tin'] ?? null,
-            'educ_attainment' => $validated['educ_attainment'],
             'address_province' => $validated['address_province'],
             'address_municipality_city' => $validated['address_municipality_city'],
             'address_barangay' => $validated['address_barangay'],
@@ -449,25 +562,6 @@ class SeekerController extends Controller
 
         $validated = $request->validate([
             'work_type_preference' => ['required', 'in:part_time,full_time'],
-            'preferred_work_setups' => ['nullable', 'array', 'max:3'],
-            'preferred_work_setups.*' => [
-                'string',
-                'distinct',
-                Rule::in(['On-Site', 'Remote', 'Hybrid']),
-            ],
-            'preferred_employment_types' => ['nullable', 'array', 'max:6'],
-            'preferred_employment_types.*' => [
-                'string',
-                'distinct',
-                Rule::in([
-                    'Permanent/Regular',
-                    'Contractual',
-                    'Project-Based',
-                    'Seasonal',
-                    'Part-Time',
-                    'Freelance',
-                ]),
-            ],
             'preferred_work_location' => ['required', 'in:local,overseas'],
             'preferred_locations_details' => ['required', 'array', 'min:1', 'max:3'],
             'preferred_locations_details.*' => ['required', 'string', 'max:255', 'distinct'],
@@ -541,12 +635,6 @@ class SeekerController extends Controller
                 $validated['preferred_locations_details'] ?? []
             ),
         ];
-        if (Schema::hasColumn('job_seekers', 'preferred_work_setups')) {
-            $preferenceData['preferred_work_setups'] = $validated['preferred_work_setups'] ?? [];
-        }
-        if (Schema::hasColumn('job_seekers', 'preferred_employment_types')) {
-            $preferenceData['preferred_employment_types'] = $validated['preferred_employment_types'] ?? [];
-        }
         $seeker->forceFill($preferenceData)->save();
 
         // ── Sync occupations (delete + re-insert) ──
@@ -718,15 +806,18 @@ class SeekerController extends Controller
             return $seeker;
         }
 
-        $validated = $request->validate([
+        $currentYear = (int) now()->year;
+
+        $validator = Validator::make($request->all(), [
+            'educ_attainment' => ['nullable', 'string', Rule::in(self::EDUCATIONAL_ATTAINMENT_OPTIONS)],
             'currently_in_school' => ['required', 'boolean'],
             // Education array: one record per level (required, min 1)
             'educations' => ['nullable', 'array'],
             'educations.*.level' => ['required', 'string', 'in:elementary,secondary_non_k12,secondary_k12,senior_high_strand,tertiary,graduate_studies'],
             'educations.*.course_strand' => ['nullable', 'string', 'max:255'],
-            'educations.*.year_graduated' => ['nullable', 'integer', 'min:1900', 'max:2100'],
+            'educations.*.year_graduated' => ['nullable', 'integer', 'min:1900', 'max:'.$currentYear],
             'educations.*.undergrad_level_reached' => ['nullable', 'string', 'max:255'],
-            'educations.*.undergrad_year_last_attended' => ['nullable', 'integer', 'min:1900', 'max:2100'],
+            'educations.*.undergrad_year_last_attended' => ['nullable', 'integer', 'min:1900', 'max:'.$currentYear],
 
             // ── SKILLS: Three separate arrays (all optional) ──────────────────────
             // DOLE standard skills (Section VIII of NSRP Form)
@@ -742,21 +833,64 @@ class SeekerController extends Controller
             'soft_skills.*' => ['required_with:soft_skills', 'string', 'max:255'],
         ]);
 
-        // ── Save main seeker fields ──
+        $validator->after(function ($validator) use ($request): void {
+            $seenLevels = [];
+
+            foreach ($request->input('educations', []) as $index => $education) {
+                $level = $education['level'] ?? null;
+                if (filled($level)) {
+                    if (in_array($level, $seenLevels, true)) {
+                        $validator->errors()->add("educations.{$index}.level", 'Each education level can only be added once.');
+                    }
+
+                    $seenLevels[] = $level;
+                }
+
+                if (filled($education['year_graduated'] ?? null)) {
+                    continue;
+                }
+
+                if (! filled($education['undergrad_level_reached'] ?? null)) {
+                    $validator->errors()->add("educations.{$index}.undergrad_level_reached", 'Level reached is required for undergraduate entries.');
+                }
+
+                if (! filled($education['undergrad_year_last_attended'] ?? null)) {
+                    $validator->errors()->add("educations.{$index}.undergrad_year_last_attended", 'Year last attended is required for undergraduate entries.');
+                }
+            }
+
+            $explicitAttainment = Str::squish((string) $request->input('educ_attainment', ''));
+            $inferredAttainment = $this->inferEducationalAttainment($request->input('educations', []));
+
+            if ($explicitAttainment === '' && ! filled($inferredAttainment)) {
+                $validator->errors()->add('educ_attainment', 'Select your highest educational attainment.');
+            }
+        });
+
+        $validated = $validator->validate();
+        $resolvedEducAttainment = $this->resolveEducationalAttainment($validated);
+
+        // Save main seeker fields
         $seeker->forceFill([
+            'educ_attainment' => $resolvedEducAttainment,
             'currently_in_school' => $validated['currently_in_school'],
         ])->save();
 
         // ── Sync educations (delete + re-insert) ──
         $seeker->educations()->delete();
         foreach ($validated['educations'] ?? [] as $edu) {
+            $yearGraduated = $edu['year_graduated'] ?? null;
             $educationData = [
                 'seeker_id' => $seeker->getKey(),
                 'level' => $edu['level'],
-                'course_strand' => $edu['course_strand'] ?? null,
-                'year_graduated' => $edu['year_graduated'] ?? null,
-                'undergrad_level_reached' => $edu['undergrad_level_reached'] ?? null,
-                'undergrad_year_last_attended' => $edu['undergrad_year_last_attended'] ?? null,
+                'course_strand' => filled($edu['course_strand'] ?? null) ? Str::squish($edu['course_strand']) : null,
+                'year_graduated' => $yearGraduated,
+                'undergrad_level_reached' => filled($yearGraduated)
+                    ? null
+                    : (filled($edu['undergrad_level_reached'] ?? null) ? Str::squish($edu['undergrad_level_reached']) : null),
+                'undergrad_year_last_attended' => filled($yearGraduated)
+                    ? null
+                    : ($edu['undergrad_year_last_attended'] ?? null),
             ];
             if (Schema::hasColumn('seeker_educations', 'normalized_course_strand')) {
                 $educationData['normalized_course_strand'] = filled($edu['course_strand'] ?? null)
@@ -916,7 +1050,6 @@ class SeekerController extends Controller
 
         $validated = $request->validate([
             'work_experiences' => ['nullable', 'array'],
-            'work_experiences.*.occupation_id' => ['nullable', 'integer', 'exists:occupations,id'],
             'work_experiences.*.company_name' => ['required', 'string', 'max:255'],
             'work_experiences.*.company_address' => ['nullable', 'string', 'max:500'],
             'work_experiences.*.position' => ['required', 'string', 'max:255'],
@@ -927,12 +1060,8 @@ class SeekerController extends Controller
         // ── Sync work experiences (delete + re-insert) ──
         $seeker->workExperiences()->delete();
         foreach ($validated['work_experiences'] ?? [] as $exp) {
-            $match = isset($exp['occupation_id'])
-                ? null
-                : $occupationMatcher->match($exp['position']);
-            $matchedOccupation = isset($exp['occupation_id'])
-                ? Occupation::query()->find($exp['occupation_id'])
-                : data_get($match, 'occupation');
+            $match = $occupationMatcher->match($exp['position']);
+            $matchedOccupation = data_get($match, 'occupation');
 
             $experienceData = [
                 'seeker_id' => $seeker->getKey(),
@@ -980,3 +1109,6 @@ class SeekerController extends Controller
         return array_filter($skills);
     }
 }
+
+
+

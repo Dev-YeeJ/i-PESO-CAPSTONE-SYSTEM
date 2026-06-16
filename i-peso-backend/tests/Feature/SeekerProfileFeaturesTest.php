@@ -46,7 +46,6 @@ class SeekerProfileFeaturesTest extends TestCase
             'religion' => 'roman_catholic',
             'height_ft' => 5.5,
             'tin' => null,
-            'educ_attainment' => 'College Graduate',
             'address_province' => 'Pangasinan',
             'address_municipality_city' => 'Urdaneta City',
             'address_barangay' => 'Poblacion',
@@ -75,7 +74,6 @@ class SeekerProfileFeaturesTest extends TestCase
             'civil_status' => 'single',
             'religion' => 'roman_catholic',
             'height_ft' => 5.5,
-            'educ_attainment' => 'College Graduate',
             'address_province' => 'Pangasinan',
             'address_municipality_city' => 'Urdaneta City',
             'address_barangay' => 'Poblacion',
@@ -92,6 +90,7 @@ class SeekerProfileFeaturesTest extends TestCase
         Sanctum::actingAs($seeker);
 
         $this->postJson('/api/seeker/step-5', [
+            'educ_attainment' => 'College Graduate',
             'currently_in_school' => false,
             'educations' => [],
             'dole_skills' => [],
@@ -312,6 +311,105 @@ class SeekerProfileFeaturesTest extends TestCase
         ])
             ->assertUnprocessable()
             ->assertJsonValidationErrors('languages');
+    }
+
+    public function test_step_five_requires_undergraduate_details_when_year_graduated_is_missing(): void
+    {
+        $seeker = $this->createSeeker();
+        Sanctum::actingAs($seeker);
+
+        $this->postJson('/api/seeker/step-5', [
+            'currently_in_school' => true,
+            'educations' => [[
+                'level' => 'tertiary',
+                'course_strand' => 'Bachelor of Science in Information Technology',
+                'year_graduated' => null,
+            ]],
+        ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors([
+                'educations.0.undergrad_level_reached',
+                'educations.0.undergrad_year_last_attended',
+            ]);
+    }
+
+    public function test_step_five_requires_a_highest_education_summary_when_nothing_can_be_inferred(): void
+    {
+        $seeker = $this->createSeeker();
+        Sanctum::actingAs($seeker);
+
+        $this->postJson('/api/seeker/step-5', [
+            'currently_in_school' => false,
+            'educations' => [],
+            'dole_skills' => [],
+            'technical_skills' => [],
+            'soft_skills' => [],
+        ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('educ_attainment');
+    }
+
+    public function test_step_five_saves_highest_education_summary_without_detailed_rows(): void
+    {
+        $seeker = $this->createSeeker();
+        Sanctum::actingAs($seeker);
+
+        $this->postJson('/api/seeker/step-5', [
+            'educ_attainment' => 'Vocational / Technical',
+            'currently_in_school' => false,
+            'educations' => [],
+        ])->assertOk();
+
+        $this->assertSame('Vocational / Technical', $seeker->fresh()->educ_attainment);
+    }
+
+    public function test_step_five_saves_undergraduate_education_details(): void
+    {
+        $seeker = $this->createSeeker();
+        Sanctum::actingAs($seeker);
+
+        $this->postJson('/api/seeker/step-5', [
+            'currently_in_school' => true,
+            'educations' => [[
+                'level' => 'tertiary',
+                'course_strand' => 'Bachelor of Science in Information Technology',
+                'undergrad_level_reached' => '3rd Year',
+                'undergrad_year_last_attended' => 2026,
+            ]],
+        ])->assertOk();
+
+        $this->assertDatabaseHas('seeker_educations', [
+            'seeker_id' => $seeker->getKey(),
+            'level' => 'tertiary',
+            'course_strand' => 'Bachelor of Science in Information Technology',
+            'year_graduated' => null,
+            'undergrad_level_reached' => '3rd Year',
+            'undergrad_year_last_attended' => 2026,
+        ]);
+    }
+
+    public function test_step_five_rejects_duplicate_education_levels(): void
+    {
+        $seeker = $this->createSeeker();
+        Sanctum::actingAs($seeker);
+
+        $this->postJson('/api/seeker/step-5', [
+            'currently_in_school' => false,
+            'educations' => [
+                [
+                    'level' => 'tertiary',
+                    'course_strand' => 'BSIT',
+                    'year_graduated' => 2025,
+                ],
+                [
+                    'level' => 'tertiary',
+                    'course_strand' => 'BSCS',
+                    'year_graduated' => 2024,
+                ],
+            ],
+        ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('educations.1.level');
     }
 
     public function test_step_five_deduplicates_hard_and_soft_skills_case_insensitively(): void

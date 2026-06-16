@@ -13,14 +13,25 @@ class SeekerSkill extends Model
         'seeker_id',
         'skill_id',
         'skill_name',
+        'normalized_skill_name',
         'skill_type',
+        'proficiency',
+        'years_of_experience',
+        'endorsement_count',
+        'relevance_score',
+        'is_verified',
     ];
 
     /**
      * Cast attributes to native types
      */
     protected $casts = [
-        'skill_type' => 'string', // enum values are strings
+        'skill_type' => 'string', // enum values are strings (dole_standard, technical, soft)
+        'proficiency' => 'string', // enum values (beginner, intermediate, advanced, expert)
+        'years_of_experience' => 'integer',
+        'endorsement_count' => 'integer',
+        'relevance_score' => 'integer',
+        'is_verified' => 'boolean',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
     ];

@@ -23,11 +23,19 @@ class SeekerEducation extends Model
         'year_graduated',
         'undergrad_level_reached',
         'undergrad_year_last_attended',
+        'gpa',
+        'academic_honors',
+        'completed_courses',
+        'is_verified',
+        'institution_name',
     ];
 
     protected $casts = [
         'year_graduated' => 'integer',
         'undergrad_year_last_attended' => 'integer',
+        'gpa' => 'float',
+        'completed_courses' => 'array',
+        'is_verified' => 'boolean',
     ];
 
     public function seeker(): BelongsTo

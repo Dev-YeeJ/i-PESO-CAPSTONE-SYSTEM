@@ -108,8 +108,7 @@ export default function SeekerProfile() {
       link.download = `i-PESO_Resume_${profile.last_name}.pdf`
       link.click()
       URL.revokeObjectURL(url)
-      setProfile((current) => updateStrength({ ...current, has_resume: true }, { resume: true }))
-      toast.success('Smart resume generated.', { id: toastId })
+      toast.success('Smart resume generated and downloaded.', { id: toastId })
     } catch (error) {
       toast.error(error.response?.data?.message ?? 'Unable to generate your resume.', { id: toastId })
     } finally {
@@ -295,23 +294,116 @@ export default function SeekerProfile() {
           </main>
 
           <aside className="space-y-6">
-            <Card title="Profile Strength" subtitle="Based on your NSRP employment profile">
+            <Card title="Profile Strength" subtitle="Complete your employment profile to improve opportunities">
               <div className="flex items-end justify-between">
-                <span className="text-4xl font-black text-blue-800">{strength.percentage}%</span>
-                <span className="text-xs font-semibold text-slate-500">{strength.items.filter((item) => item.complete).length}/{strength.items.length} complete</span>
-              </div>
-              <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-slate-100">
-                <div className="h-full rounded-full bg-gradient-to-r from-blue-700 to-cyan-500 transition-all" style={{ width: `${strength.percentage}%` }} />
-              </div>
-              <div className="mt-5 space-y-3">
-                {strength.items.map((item) => (
-                  <div key={item.key} className="flex items-center gap-2 text-sm">
-                    <span className={`flex h-5 w-5 items-center justify-center rounded-full ${item.complete ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-400'}`}>
-                      {item.complete ? <Check className="h-3.5 w-3.5" /> : <span className="h-1.5 w-1.5 rounded-full bg-current" />}
+                <div>
+                  <span className="text-4xl font-black text-blue-800">{strength.percentage}%</span>
+                  <p className="mt-1 text-xs text-slate-500">Profile complete</p>
+                </div>
+                <div className="text-right">
+                  {strength.percentage === 100 ? (
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-green-100 px-2.5 py-1 text-xs font-semibold text-green-700">
+                      <Check className="h-3.5 w-3.5" /> Perfect
                     </span>
-                    <span className={item.complete ? 'text-slate-700' : 'text-slate-500'}>{item.label}</span>
+                  ) : strength.percentage >= 80 ? (
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-100 px-2.5 py-1 text-xs font-semibold text-blue-700">
+                      <ShieldCheck className="h-3.5 w-3.5" /> Great
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-700">
+                      <Award className="h-3.5 w-3.5" /> Good start
+                    </span>
+                  )}
+                </div>
+              </div>
+              <div className="mt-4 h-3 overflow-hidden rounded-full bg-slate-100">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-blue-600 via-cyan-500 to-blue-600 transition-all duration-500"
+                  style={{ width: `${strength.percentage}%` }}
+                />
+              </div>
+
+              <div className="mt-6 space-y-4">
+                {/* Core Profile Section */}
+                {strength.items.some((item) => item.weight === 10) && (
+                  <div>
+                    <h3 className="mb-2.5 text-xs font-bold uppercase tracking-wide text-slate-600">Core Profile (Foundation)</h3>
+                    <div className="space-y-2.5">
+                      {strength.items
+                        .filter((item) => item.weight === 10)
+                        .map((item) => (
+                          <div key={item.key} className="flex items-center gap-2.5 text-sm">
+                            <span
+                              className={`flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full transition-colors ${
+                                item.complete ? 'bg-green-100 text-green-600' : 'bg-slate-100 text-slate-400'
+                              }`}
+                            >
+                              {item.complete ? (
+                                <Check className="h-3 w-3" />
+                              ) : (
+                                <span className="h-1.5 w-1.5 rounded-full bg-current" />
+                              )}
+                            </span>
+                            <span className={item.complete ? 'text-slate-700' : 'text-slate-500'}>{item.label}</span>
+                          </div>
+                        ))}
+                    </div>
                   </div>
-                ))}
+                )}
+
+                {/* Work Profile Section */}
+                {strength.items.some((item) => item.weight === 15) && (
+                  <div>
+                    <h3 className="mb-2.5 text-xs font-bold uppercase tracking-wide text-slate-600">Work Profile (Important)</h3>
+                    <div className="space-y-2.5">
+                      {strength.items
+                        .filter((item) => item.weight === 15)
+                        .map((item) => (
+                          <div key={item.key} className="flex items-center gap-2.5 text-sm">
+                            <span
+                              className={`flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full transition-colors ${
+                                item.complete ? 'bg-blue-100 text-blue-600' : 'bg-slate-100 text-slate-400'
+                              }`}
+                            >
+                              {item.complete ? (
+                                <Check className="h-3 w-3" />
+                              ) : (
+                                <span className="h-1.5 w-1.5 rounded-full bg-current" />
+                              )}
+                            </span>
+                            <span className={item.complete ? 'text-slate-700' : 'text-slate-500'}>{item.label}</span>
+                          </div>
+                        ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Enhancement Section */}
+                {strength.items.some((item) => item.weight < 10 || item.weight === 10) && (
+                  <div>
+                    <h3 className="mb-2.5 text-xs font-bold uppercase tracking-wide text-slate-600">Enhancements (Optional)</h3>
+                    <div className="space-y-2.5">
+                      {strength.items
+                        .filter((item) => item.weight === 10 && item.key !== 'photo' && item.key !== 'personal_information' && item.key !== 'address' && item.key !== 'occupations' && item.key !== 'skills')
+                        .map((item) => (
+                          <div key={item.key} className="flex items-center gap-2.5 text-sm">
+                            <span
+                              className={`flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full transition-colors ${
+                                item.complete ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-100 text-slate-400'
+                              }`}
+                            >
+                              {item.complete ? (
+                                <Check className="h-3 w-3" />
+                              ) : (
+                                <span className="h-1.5 w-1.5 rounded-full bg-current" />
+                              )}
+                            </span>
+                            <span className={item.complete ? 'text-slate-700' : 'text-slate-500'}>{item.label}</span>
+                          </div>
+                        ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </Card>
 
@@ -416,12 +508,19 @@ function updateStrength(profile, states) {
     Object.hasOwn(states, item.key) ? { ...item, complete: states[item.key] } : item
   ))
 
+  // Calculate weighted percentage
+  const totalWeight = items.reduce((sum, item) => sum + (item.weight ?? 1), 0)
+  const completedWeight = items
+    .filter((item) => item.complete)
+    .reduce((sum, item) => sum + (item.weight ?? 1), 0)
+  const percentage = Math.round((completedWeight / totalWeight) * 100)
+
   return {
     ...profile,
     profile_strength: {
       ...profile.profile_strength,
       items,
-      percentage: Math.round((items.filter((item) => item.complete).length / items.length) * 100),
+      percentage,
     },
   }
 }
