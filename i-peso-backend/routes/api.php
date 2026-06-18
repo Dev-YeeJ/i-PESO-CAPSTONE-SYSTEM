@@ -16,12 +16,14 @@ use App\Http\Controllers\Api\EmployerNotificationController;
 use App\Http\Controllers\Api\EmployerRegistrationController;
 use App\Http\Controllers\Api\GoogleMapsController;
 use App\Http\Controllers\Api\OccupationController;
+use App\Http\Controllers\Api\SeekerAiSuggestionController;
 use App\Http\Controllers\Api\SeekerCertificateController;
 use App\Http\Controllers\Api\SeekerController;
 use App\Http\Controllers\Api\SeekerNearbyJobController;
 use App\Http\Controllers\Api\SeekerProfileImageController;
 use App\Http\Controllers\Api\SeekerResumeController;
 use App\Http\Controllers\Api\SkillCatalogController;
+use App\Http\Controllers\Api\SkillRecommendationController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/occupations', [OccupationController::class, 'index'])->middleware('throttle:60,1');
@@ -84,6 +86,14 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/certificates', [SeekerCertificateController::class, 'store']);
         Route::get('/certificates/{certificate}/view', [SeekerCertificateController::class, 'view']);
         Route::delete('/certificates/{certificate}', [SeekerCertificateController::class, 'destroy']);
+        Route::post('/ai-profile-suggestions', [SeekerAiSuggestionController::class, 'suggest'])
+            ->middleware('throttle:10,1');
+        Route::get('/skill-recommendations', [SkillRecommendationController::class, 'getRecommendations'])
+            ->middleware('throttle:20,1');
+        Route::post('/skill-gap-analysis', [SkillRecommendationController::class, 'analyzeGaps'])
+            ->middleware('throttle:20,1');
+        Route::get('/learning-resources/{skill}', [SkillRecommendationController::class, 'getLearningResources'])
+            ->middleware('throttle:30,1');
         Route::post('/resume/generate', [SeekerResumeController::class, 'generate'])
             ->middleware('throttle:5,1');
     });

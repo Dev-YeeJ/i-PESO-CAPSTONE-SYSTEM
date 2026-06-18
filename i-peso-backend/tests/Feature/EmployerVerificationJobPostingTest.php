@@ -143,6 +143,9 @@ class EmployerVerificationJobPostingTest extends TestCase
             'city_municipality' => 'Urdaneta City',
             'minimum_education' => 'College Graduate',
             'salary_type' => 'Monthly',
+            'preferred_gender' => 'Any',
+            'minimum_age' => 21,
+            'maximum_age' => 55,
             'status' => 'active',
         ]);
     }
@@ -598,6 +601,9 @@ class EmployerVerificationJobPostingTest extends TestCase
             'soft_skills' => ['Communication'],
             'required_certifications' => [],
             'application_deadline' => now()->addMonth()->toDateString(),
+            'preferred_gender' => 'Any',
+            'minimum_age' => 21,
+            'maximum_age' => 55,
             'open_to_pwds' => true,
             'open_to_senior_citizens' => false,
             'spes_tupad_eligible' => false,
@@ -720,6 +726,9 @@ class EmployerVerificationJobPostingTest extends TestCase
                 $table->json('soft_skills')->nullable();
                 $table->json('required_certifications')->nullable();
                 $table->date('application_deadline')->nullable();
+                $table->string('preferred_gender')->nullable();
+                $table->unsignedTinyInteger('minimum_age')->nullable();
+                $table->unsignedTinyInteger('maximum_age')->nullable();
                 $table->boolean('open_to_pwds')->default(false);
                 $table->boolean('open_to_senior_citizens')->default(false);
                 $table->boolean('spes_tupad_eligible')->default(false);

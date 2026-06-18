@@ -68,7 +68,7 @@ class SeekerController extends Controller
             'languages:id,seeker_id,language,language_other,can_read,can_write,can_speak,can_understand',
             'occupations:id,seeker_id,occupation_title,preference_order',
             'workLocations:id,seeker_id,location_type,location_name,location_code',
-            'educations:id,seeker_id,level,course_strand,year_graduated,undergrad_level_reached,undergrad_year_last_attended',
+            'educations:id,seeker_id,level,institution_name,course_strand,completion_status,year_started,year_graduated,undergrad_level_reached,undergrad_year_last_attended,current_level',
             'trainings:id,seeker_id,course,hours_of_training,training_institution,skills_acquired,certificates_received',
             'eligibilities:id,seeker_id,type,name,date_taken,valid_until',
             'workExperiences:id,seeker_id,company_name,company_address,position,number_of_months,employment_status',

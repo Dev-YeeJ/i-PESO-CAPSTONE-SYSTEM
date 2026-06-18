@@ -37,6 +37,16 @@ return [
         'routes_enabled' => env('GOOGLE_MAPS_ROUTES_ENABLED', false),
     ],
 
+    'vertex_ai' => [
+        'enabled' => env('GOOGLE_VERTEX_AI_ENABLED', false),
+        'project_id' => env('GOOGLE_CLOUD_PROJECT_ID'),
+        'location' => env('GOOGLE_CLOUD_LOCATION', 'us-central1'),
+        'model' => env('GOOGLE_VERTEX_AI_MODEL', 'gemini-2.5-flash'),
+        'access_token' => env('GOOGLE_VERTEX_AI_ACCESS_TOKEN'),
+        'credentials_path' => env('GOOGLE_APPLICATION_CREDENTIALS'),
+        'timeout' => env('GOOGLE_VERTEX_AI_TIMEOUT', 20),
+    ],
+
     'jobdatalake' => [
         'key' => env('JOB_DATA_LAKE_API_KEY'),
         'base_url' => env('JOB_DATA_LAKE_BASE_URL', 'https://api.jobdatalake.com'),

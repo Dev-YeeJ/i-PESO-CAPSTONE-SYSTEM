@@ -23,11 +23,17 @@ class SeekerWorkExperience extends Model
         'position',
         'normalized_position',
         'number_of_months',
+        'start_date',
+        'end_date',
+        'currently_employed',
         'employment_status',
     ];
 
     protected $casts = [
         'number_of_months' => 'integer',
+        'start_date' => 'date',
+        'end_date' => 'date',
+        'currently_employed' => 'boolean',
     ];
 
     public function seeker(): BelongsTo

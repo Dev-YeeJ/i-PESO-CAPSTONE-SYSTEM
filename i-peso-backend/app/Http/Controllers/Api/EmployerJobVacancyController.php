@@ -5,13 +5,13 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Employer;
 use App\Models\JobVacancy;
-use App\Models\Occupation;
 use App\Services\GoogleMapsService;
 use App\Services\MatchingProfileService;
 use App\Services\SkillTaxonomyService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
 class EmployerJobVacancyController extends Controller
@@ -85,6 +85,7 @@ class EmployerJobVacancyController extends Controller
     {
         $data = $request->validate([
             'occupation_id' => ['required', 'integer', 'exists:occupations,id'],
+            'job_title' => ['required', 'string', 'max:255'],
             'employment_type' => ['required', Rule::in([
                 'Permanent/Regular',
                 'Contractual',
@@ -108,6 +109,7 @@ class EmployerJobVacancyController extends Controller
             'job_description' => ['required', 'string', 'max:10000'],
             'vacancies_count' => ['required', 'integer', 'min:1', 'max:10000'],
             'minimum_education' => ['required', Rule::in([
+                'High School Undergraduate',
                 'High School Graduate',
                 'College Undergraduate',
                 'College Graduate',
@@ -135,13 +137,16 @@ class EmployerJobVacancyController extends Controller
             'benefits' => ['nullable', 'array', 'max:30'],
             'benefits.*' => ['string', 'max:100'],
             'application_deadline' => ['required', 'date', 'after_or_equal:today'],
+            'preferred_gender' => ['nullable', Rule::in(['Any', 'Male', 'Female'])],
+            'minimum_age' => ['nullable', 'integer', 'min:15', 'max:100'],
+            'maximum_age' => ['nullable', 'integer', 'min:15', 'max:100', 'gte:minimum_age'],
             'open_to_pwds' => ['required', 'boolean'],
             'open_to_senior_citizens' => ['required', 'boolean'],
             'spes_tupad_eligible' => ['required', 'boolean'],
             'status' => ['required', Rule::in(['active', 'closed', 'draft'])],
         ]);
 
-        $data['job_title'] = Occupation::findOrFail($data['occupation_id'])->title;
+        $data['job_title'] = Str::squish($data['job_title']);
         $data['minimum_experience_months'] = match ($data['experience_level']) {
             '1-3 Years' => 12,
             '3-5 Years' => 36,
@@ -155,6 +160,11 @@ class EmployerJobVacancyController extends Controller
         }
         if (! Schema::hasColumn('job_vacancies', 'certifications_mandatory')) {
             unset($data['certifications_mandatory']);
+        }
+        foreach (['preferred_gender', 'minimum_age', 'maximum_age'] as $column) {
+            if (! Schema::hasColumn('job_vacancies', $column)) {
+                unset($data[$column]);
+            }
         }
 
         $data['location'] = collect([

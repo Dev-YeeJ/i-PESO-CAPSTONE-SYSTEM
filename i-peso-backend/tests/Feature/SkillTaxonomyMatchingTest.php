@@ -13,6 +13,7 @@ use App\Models\SeekerSkill;
 use App\Models\SeekerWorkExperience;
 use App\Models\Skill;
 use App\Models\SkillRelationship;
+use App\Services\EnhancedJobMatchingService;
 use App\Services\JobMatchingService;
 use App\Services\JobSkillMatchingService;
 use App\Services\SkillTaxonomyService;
@@ -202,13 +203,97 @@ class SkillTaxonomyMatchingTest extends TestCase
 
         $match = app(JobMatchingService::class)->score($vacancy, $seeker);
 
-        $this->assertSame(94.0, $match['percentage']);
+        $this->assertSame(94.75, $match['percentage']);
         $this->assertTrue($match['eligible']);
         $this->assertSame('high', $match['confidence']);
         $this->assertSame(100.0, $match['factors']['occupation']['score']);
         $this->assertSame(85.0, $match['factors']['skills']['score']);
         $this->assertSame(100.0, $match['factors']['experience']['score']);
         $this->assertSame(100.0, $match['factors']['education']['score']);
+        $this->assertSame(100.0, $match['factors']['location']['score']);
+        $this->assertSame(
+            'no_location_preference',
+            $match['factors']['location']['details']['match_type']
+        );
+    }
+
+    public function test_preferred_location_contributes_to_the_composite_match(): void
+    {
+        $seeker = $this->seeker([
+            'preferred_locations_details' => ['Urdaneta City, Pangasinan'],
+        ]);
+
+        $vacancy = $this->vacancy(
+            requiredSkills: [],
+            softSkills: [],
+            attributes: [
+                'work_setup' => 'Onsite',
+                'province' => 'Pangasinan',
+                'city_municipality' => 'Urdaneta City',
+                'barangay' => 'Poblacion',
+            ]
+        );
+
+        $match = app(JobMatchingService::class)->score($vacancy, $seeker);
+
+        $this->assertSame(100.0, $match['factors']['location']['score']);
+        $this->assertSame(
+            'preferred_location_exact',
+            $match['factors']['location']['details']['match_type']
+        );
+        $this->assertTrue($match['factors']['location']['available']);
+    }
+
+    public function test_ai_generated_occupation_title_contributes_to_occupation_match(): void
+    {
+        $occupation = Occupation::query()->create([
+            'psoc_code' => '5244',
+            'classification_code' => '5244',
+            'isco_group' => '5244',
+            'title' => 'Online Seller',
+            'source' => 'psa',
+            'is_active' => true,
+        ]);
+        $seeker = $this->seeker();
+        SeekerOccupation::query()->create([
+            'seeker_id' => $seeker->getKey(),
+            'occupation_id' => null,
+            'occupation_title' => 'Online Seller',
+            'raw_job_title' => 'Online Seller',
+            'status' => 'ai_generated',
+            'preference_order' => 1,
+        ]);
+        $vacancy = $this->vacancy(
+            requiredSkills: [],
+            attributes: [
+                'occupation_id' => $occupation->id,
+                'job_title' => 'Online Seller',
+            ]
+        );
+
+        $match = app(JobMatchingService::class)->score($vacancy, $seeker);
+
+        $this->assertSame(85.0, $match['factors']['occupation']['score']);
+        $this->assertSame('ai_generated_title', $match['factors']['occupation']['details']['match_type']);
+    }
+
+    public function test_text_skill_fallback_matches_even_without_taxonomy_sync(): void
+    {
+        $seeker = $this->seeker();
+        SeekerSkill::query()->create([
+            'seeker_id' => $seeker->getKey(),
+            'skill_name' => 'Computer Literate',
+            'skill_type' => 'technical',
+        ]);
+
+        $vacancy = $this->vacancy(requiredSkills: ['Computer Literate']);
+
+        $score = app(JobSkillMatchingService::class)->score($vacancy, $seeker);
+
+        $this->assertSame(100.0, $score['percentage']);
+        $this->assertSame(1, $score['matched_requirements']);
+        $this->assertSame('text_exact', $score['details'][0]['match_type']);
+        $this->assertSame('Computer Literate', $score['details'][0]['matched_skill']);
     }
 
     public function test_missing_mandatory_certification_marks_match_ineligible(): void
@@ -245,6 +330,170 @@ class SkillTaxonomyMatchingTest extends TestCase
         );
     }
 
+    public function test_enhanced_match_uses_dynamic_professional_weights_without_location_factor(): void
+    {
+        $occupation = Occupation::query()->create([
+            'psoc_code' => '2512',
+            'classification_code' => '2512',
+            'isco_group' => '2512',
+            'title' => 'Software Developer',
+            'source' => 'psa',
+            'is_active' => true,
+        ]);
+        $laravel = $this->skill('Laravel', 'technical');
+        $seeker = $this->seeker();
+
+        SeekerOccupation::query()->create([
+            'seeker_id' => $seeker->getKey(),
+            'occupation_id' => $occupation->id,
+            'occupation_title' => $occupation->title,
+            'status' => 'standardized',
+            'preference_order' => 1,
+        ]);
+        SeekerSkill::query()->create([
+            'seeker_id' => $seeker->getKey(),
+            'skill_id' => $laravel->id,
+            'skill_name' => 'Laravel',
+            'skill_type' => 'technical',
+            'proficiency' => 'expert',
+        ]);
+        SeekerWorkExperience::query()->create([
+            'seeker_id' => $seeker->getKey(),
+            'occupation_id' => $occupation->id,
+            'company_name' => 'Example Company',
+            'position' => 'Software Developer',
+            'normalized_position' => 'software developer',
+            'number_of_months' => 24,
+        ]);
+        SeekerEducation::query()->create([
+            'seeker_id' => $seeker->getKey(),
+            'level' => 'tertiary',
+            'course_strand' => 'BS Information Technology',
+            'year_graduated' => 2025,
+        ]);
+
+        $vacancy = $this->vacancy(
+            requiredSkills: ['Laravel'],
+            attributes: [
+                'occupation_id' => $occupation->id,
+                'minimum_experience_months' => 12,
+                'minimum_education' => 'College Graduate',
+            ]
+        );
+        app(SkillTaxonomyService::class)->syncVacancy($vacancy);
+
+        $match = app(EnhancedJobMatchingService::class)->calculateMatch($vacancy, $seeker);
+
+        $this->assertSame([
+            'occupation' => 30,
+            'skills' => 40,
+            'experience' => 10,
+            'education' => 20,
+        ], $match['weights']);
+        $this->assertSame(100, array_sum($match['weights']));
+        $this->assertTrue($match['location_excluded']);
+        $this->assertArrayNotHasKey('location', $match['factors']);
+        $this->assertSame('professionals_managers', $match['weighting_rule']['rule']);
+        $this->assertSame(100.0, $match['factors']['skills']['score']);
+        $this->assertSame([], $match['missing_critical_skills']);
+    }
+
+    public function test_enhanced_match_applies_manual_labor_weights_and_recency_decay(): void
+    {
+        $occupation = Occupation::query()->create([
+            'psoc_code' => '9211',
+            'classification_code' => '9211',
+            'isco_group' => '9211',
+            'title' => 'Farm Worker',
+            'source' => 'psa',
+            'is_active' => true,
+        ]);
+        $seeker = $this->seeker();
+
+        SeekerOccupation::query()->create([
+            'seeker_id' => $seeker->getKey(),
+            'occupation_id' => $occupation->id,
+            'occupation_title' => $occupation->title,
+            'status' => 'standardized',
+            'preference_order' => 1,
+        ]);
+        $experience = SeekerWorkExperience::query()->create([
+            'seeker_id' => $seeker->getKey(),
+            'occupation_id' => $occupation->id,
+            'company_name' => 'Farm Co.',
+            'position' => 'Farm Worker',
+            'normalized_position' => 'farm worker',
+            'number_of_months' => 24,
+        ]);
+        DB::table('seeker_work_experiences')
+            ->where('id', $experience->getKey())
+            ->update(['end_date' => now()->subYears(6)->toDateString()]);
+
+        $vacancy = $this->vacancy(
+            requiredSkills: [],
+            attributes: [
+                'occupation_id' => $occupation->id,
+                'minimum_experience_months' => 24,
+                'minimum_education' => 'College Graduate',
+            ]
+        );
+
+        $match = app(EnhancedJobMatchingService::class)->calculateMatch($vacancy, $seeker);
+
+        $this->assertSame([
+            'occupation' => 30,
+            'skills' => 40,
+            'experience' => 30,
+            'education' => 0,
+        ], $match['weights']);
+        $this->assertSame('elementary_manual_labor', $match['weighting_rule']['rule']);
+        $this->assertSame(50.0, $match['factors']['experience']['score']);
+        $this->assertSame(0.5, $match['factors']['experience']['details']['details'][0]['recency_multiplier']);
+        $this->assertSame('ended_more_than_5_years_ago', $match['factors']['experience']['details']['details'][0]['recency_bucket']);
+    }
+
+    public function test_enhanced_match_flags_beginner_required_skill_as_critical_gap(): void
+    {
+        $occupation = Occupation::query()->create([
+            'psoc_code' => '4110',
+            'classification_code' => '4110',
+            'isco_group' => '4110',
+            'title' => 'Office Clerk',
+            'source' => 'psa',
+            'is_active' => true,
+        ]);
+        $excel = $this->skill('Microsoft Excel', 'technical');
+        $seeker = $this->seeker();
+
+        SeekerOccupation::query()->create([
+            'seeker_id' => $seeker->getKey(),
+            'occupation_id' => $occupation->id,
+            'occupation_title' => $occupation->title,
+            'status' => 'standardized',
+            'preference_order' => 1,
+        ]);
+        SeekerSkill::query()->create([
+            'seeker_id' => $seeker->getKey(),
+            'skill_id' => $excel->id,
+            'skill_name' => 'Microsoft Excel',
+            'skill_type' => 'technical',
+            'proficiency' => 'beginner',
+        ]);
+
+        $vacancy = $this->vacancy(
+            requiredSkills: ['Microsoft Excel'],
+            attributes: ['occupation_id' => $occupation->id]
+        );
+        app(SkillTaxonomyService::class)->syncVacancy($vacancy);
+
+        $match = app(EnhancedJobMatchingService::class)->calculateMatch($vacancy, $seeker);
+
+        $this->assertSame(60.0, $match['factors']['skills']['score']);
+        $this->assertSame('Microsoft Excel', $match['missing_critical_skills'][0]['skill']);
+        $this->assertSame('proficiency_below_requirement', $match['missing_critical_skills'][0]['reason']);
+        $this->assertSame('beginner', $match['missing_critical_skills'][0]['matched_proficiency']);
+    }
+
     private function skill(string $name, string $category): Skill
     {
         return Skill::query()->create([
@@ -255,26 +504,46 @@ class SkillTaxonomyMatchingTest extends TestCase
         ]);
     }
 
-    private function seeker(): JobSeeker
+    private function seeker(array $attributes = []): JobSeeker
     {
         $id = (int) DB::table('job_seekers')->insertGetId([
             'email' => fake()->unique()->safeEmail(),
             'password' => 'password',
+            'preferred_locations_details' => null,
+            'address_province' => null,
+            'address_municipality_city' => null,
+            'address_province_code' => null,
+            'address_city_code' => null,
+            'address_barangay_code' => null,
+            'latitude' => null,
+            'longitude' => null,
             'created_at' => now(),
             'updated_at' => now(),
         ], 'seeker_id');
 
-        return JobSeeker::query()->findOrFail($id);
+        $seeker = JobSeeker::query()->findOrFail($id);
+
+        if ($attributes !== []) {
+            $seeker->fill($attributes);
+            $seeker->save();
+            $seeker->refresh();
+        }
+
+        return $seeker;
     }
 
-    private function vacancy(array $requiredSkills, array $softSkills = []): JobVacancy
+    private function vacancy(
+        array $requiredSkills,
+        array $softSkills = [],
+        array $attributes = []
+    ): JobVacancy
     {
-        return JobVacancy::query()->create([
+        return JobVacancy::query()->create(array_merge([
             'job_title' => 'Test Vacancy',
             'required_skills' => $requiredSkills,
             'soft_skills' => $softSkills,
             'status' => 'active',
-        ]);
+        ], $attributes));
     }
 
     private function createTables(): void
@@ -330,6 +599,13 @@ class SkillTaxonomyMatchingTest extends TestCase
                 $table->string('email');
                 $table->string('password');
                 $table->string('work_type_preference')->nullable();
+                $table->string('address_province')->nullable();
+                $table->string('address_municipality_city')->nullable();
+                $table->string('address_province_code', 10)->nullable();
+                $table->string('address_city_code', 10)->nullable();
+                $table->string('address_barangay_code', 10)->nullable();
+                $table->decimal('latitude', 10, 7)->nullable();
+                $table->decimal('longitude', 10, 7)->nullable();
                 $table->json('preferred_work_setups')->nullable();
                 $table->json('preferred_employment_types')->nullable();
                 $table->json('preferred_locations_details')->nullable();
@@ -357,9 +633,15 @@ class SkillTaxonomyMatchingTest extends TestCase
                 $table->unsignedBigInteger('occupation_id')->nullable();
                 $table->string('general_term')->nullable();
                 $table->string('occupation_title');
+                $table->string('raw_job_title')->nullable();
                 $table->string('status')->default('standardized');
                 $table->unsignedTinyInteger('preference_order')->default(1);
                 $table->timestamps();
+            });
+        }
+        if (! Schema::hasColumn('seeker_occupations', 'raw_job_title')) {
+            Schema::table('seeker_occupations', function (Blueprint $table) {
+                $table->string('raw_job_title')->nullable()->after('occupation_title');
             });
         }
 
@@ -389,6 +671,11 @@ class SkillTaxonomyMatchingTest extends TestCase
                 $table->unsignedInteger('number_of_months')->nullable();
                 $table->string('employment_status')->nullable();
                 $table->timestamps();
+            });
+        }
+        if (! Schema::hasColumn('seeker_work_experiences', 'end_date')) {
+            Schema::table('seeker_work_experiences', function (Blueprint $table) {
+                $table->date('end_date')->nullable()->after('number_of_months');
             });
         }
 
@@ -427,6 +714,11 @@ class SkillTaxonomyMatchingTest extends TestCase
                 $table->timestamps();
             });
         }
+        if (! Schema::hasColumn('seeker_skills', 'proficiency')) {
+            Schema::table('seeker_skills', function (Blueprint $table) {
+                $table->string('proficiency')->nullable()->after('skill_type');
+            });
+        }
 
         if (! Schema::hasTable('job_vacancies')) {
             Schema::create('job_vacancies', function (Blueprint $table) {
@@ -444,9 +736,17 @@ class SkillTaxonomyMatchingTest extends TestCase
                 $table->date('application_deadline')->nullable();
                 $table->string('employment_type')->nullable();
                 $table->string('work_setup')->nullable();
+                $table->string('location')->nullable();
+                $table->string('region')->nullable();
                 $table->string('province')->nullable();
+                $table->string('province_code', 10)->nullable();
                 $table->string('city_municipality')->nullable();
+                $table->string('city_code', 10)->nullable();
                 $table->string('barangay')->nullable();
+                $table->string('barangay_code', 15)->nullable();
+                $table->string('specific_address')->nullable();
+                $table->decimal('latitude', 10, 7)->nullable();
+                $table->decimal('longitude', 10, 7)->nullable();
                 $table->string('status')->default('active');
                 $table->timestamps();
             });

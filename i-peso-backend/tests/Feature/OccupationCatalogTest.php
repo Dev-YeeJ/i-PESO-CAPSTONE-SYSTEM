@@ -173,7 +173,8 @@ class OccupationCatalogTest extends TestCase
             ->assertJsonPath('data.0.sources.0', 'O*NET')
             ->assertJsonPath('data.0.sources.1', 'ESCO')
             ->assertJsonPath('data.0.source_codes.esco', '2512.1')
-            ->assertJsonPath('data.0.source_codes.onet.0', '15-1252.00');
+            ->assertJsonPath('data.0.source_codes.onet.0', '15-1252.00')
+            ->assertJsonPath('data.0.broad_category', 'Professional Occupations');
 
         $this->getJson('/api/occupations?search=15-1252.00')
             ->assertOk()

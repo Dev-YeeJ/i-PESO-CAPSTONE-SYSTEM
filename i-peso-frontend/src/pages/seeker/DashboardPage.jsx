@@ -1,28 +1,50 @@
 import { useEffect, useState } from 'react'
 import JobSeekerHome from './JobSeekerHome'
-import { getSeekerProfile } from '@/services/seekerService'
+import { getNearbyJobs, getSeekerProfile } from '@/services/seekerService'
 import { useAuthStore } from '@/stores/authStore'
 
 export default function SeekerDashboard() {
   const user = useAuthStore((state) => state.user)
   const [profile, setProfile] = useState(null)
+  const [nearbyJobs, setNearbyJobs] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [jobsError, setJobsError] = useState('')
 
   useEffect(() => {
-    getSeekerProfile()
-      .then(setProfile)
-      .catch((requestError) => {
-        setError(requestError.response?.data?.message ?? 'Unable to load your employment dashboard.')
-      })
-      .finally(() => setLoading(false))
+    let active = true
+
+    Promise.allSettled([
+      getSeekerProfile(),
+      getNearbyJobs({ radiusKm: 20, limit: 24 }),
+    ]).then(([profileResult, jobsResult]) => {
+      if (!active) return
+
+      if (profileResult.status === 'fulfilled') {
+        setProfile(profileResult.value)
+      } else {
+        setError(profileResult.reason?.response?.data?.message ?? 'Unable to load your employment dashboard.')
+      }
+
+      if (jobsResult.status === 'fulfilled') {
+        setNearbyJobs(jobsResult.value)
+      } else {
+        setJobsError(jobsResult.reason?.response?.data?.message ?? 'Nearby job feed is not available right now.')
+      }
+    }).finally(() => {
+      if (active) setLoading(false)
+    })
+
+    return () => {
+      active = false
+    }
   }, [])
 
   if (loading) {
     return <DashboardSkeleton />
   }
 
-  return <JobSeekerHome profile={profile} user={user} error={error} />
+  return <JobSeekerHome profile={profile} user={user} jobsData={nearbyJobs} error={error} jobsError={jobsError} />
 }
 
 function DashboardSkeleton() {

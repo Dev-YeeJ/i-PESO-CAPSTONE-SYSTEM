@@ -76,4 +76,26 @@ class SeekerRegistrationTest extends TestCase
 
         Mail::assertSent(OtpMail::class);
     }
+
+    public function test_seeker_registration_normalizes_contact_inputs(): void
+    {
+        Mail::fake();
+
+        $this->postJson('/api/auth/register', [
+            'role' => 'seeker',
+            'first_name' => '  Maria   Clara ',
+            'last_name' => '  Dela   Cruz ',
+            'email' => '  MARIA.CLARA@example.COM ',
+            'mobile_number' => '+63 912 345 6789',
+            'password' => 'password123',
+            'password_confirmation' => 'password123',
+        ])->assertCreated();
+
+        $this->assertDatabaseHas('job_seekers', [
+            'first_name' => 'Maria Clara',
+            'last_name' => 'Dela Cruz',
+            'email' => 'maria.clara@example.com',
+            'mobile_number' => '09123456789',
+        ]);
+    }
 }

@@ -20,9 +20,12 @@ class SeekerEducation extends Model
         'level',
         'course_strand',
         'normalized_course_strand',
+        'completion_status',
+        'year_started',
         'year_graduated',
         'undergrad_level_reached',
         'undergrad_year_last_attended',
+        'current_level',
         'gpa',
         'academic_honors',
         'completed_courses',
@@ -32,6 +35,7 @@ class SeekerEducation extends Model
 
     protected $casts = [
         'year_graduated' => 'integer',
+        'year_started' => 'integer',
         'undergrad_year_last_attended' => 'integer',
         'gpa' => 'float',
         'completed_courses' => 'array',

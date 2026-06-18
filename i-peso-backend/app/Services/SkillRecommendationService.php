@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\JobSeeker;
 use App\Models\SkillCatalogEntry;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 /**
@@ -85,10 +86,69 @@ class SkillRecommendationService
             return [];
         }
 
-        // For each preferred occupation, find common skills
         $occupationIds = $seeker->occupations->pluck('occupation_id')->toArray();
+        $occupationIds = array_values(array_filter($occupationIds));
 
-        $skills = SkillCatalogEntry::query()
+        if ($occupationIds && Schema::hasTable('skill_occupation_evidence')) {
+            $skills = SkillCatalogEntry::query()
+                ->join('skill_occupation_evidence as evidence', 'skill_catalog_entries.id', '=', 'evidence.skill_id')
+                ->whereIn('evidence.occupation_id', $occupationIds)
+                ->groupBy(
+                    'skill_catalog_entries.id',
+                    'skill_catalog_entries.name',
+                    'skill_catalog_entries.category',
+                    'skill_catalog_entries.is_in_demand',
+                    'skill_catalog_entries.is_hot',
+                    'skill_catalog_entries.occupation_count'
+                )
+                ->orderByDesc(DB::raw('MAX(COALESCE(evidence.importance, 0))'))
+                ->orderByDesc('skill_catalog_entries.occupation_count')
+                ->limit($limit)
+                ->get([
+                    'skill_catalog_entries.id',
+                    'skill_catalog_entries.name',
+                    'skill_catalog_entries.category',
+                    'skill_catalog_entries.is_in_demand',
+                    'skill_catalog_entries.is_hot',
+                ])
+                ->map(fn ($skill) => [
+                    'id' => $skill->id,
+                    'name' => $skill->name,
+                    'category' => $skill->category,
+                    'is_hot' => $skill->is_hot,
+                    'demand_level' => $skill->is_in_demand ? 'high' : 'medium',
+                    'reason' => 'Commonly linked to your preferred occupation',
+                ])
+                ->toArray();
+
+            if ($skills) {
+                return $skills;
+            }
+        }
+
+        if ($occupationIds && Schema::hasTable('occupation_skills')) {
+            $skills = DB::table('occupation_skills')
+                ->whereIn('occupation_id', $occupationIds)
+                ->select('skill_name', 'skill_type')
+                ->distinct()
+                ->limit($limit)
+                ->get()
+                ->map(fn ($skill) => [
+                    'id' => null,
+                    'name' => $skill->skill_name,
+                    'category' => $skill->skill_type === 'soft' ? 'soft' : 'technical',
+                    'is_hot' => false,
+                    'demand_level' => 'medium',
+                    'reason' => 'Listed for your preferred occupation',
+                ])
+                ->toArray();
+
+            if ($skills) {
+                return $skills;
+            }
+        }
+
+        return SkillCatalogEntry::query()
             ->where('is_in_demand', true)
             ->orderByDesc('occupation_count')
             ->limit($limit)
@@ -102,8 +162,6 @@ class SkillRecommendationService
                 'reason' => 'Required in your field',
             ])
             ->toArray();
-
-        return $skills;
     }
 
     /**

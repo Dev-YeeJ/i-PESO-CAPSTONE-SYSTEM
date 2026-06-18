@@ -17,6 +17,31 @@ const BASE_URL = 'https://psgc.cloud/api'
 // Keyed by: 'provinces' | 'cities:{provinceCode}' | 'barangays:{cityCode}'
 const cache = new Map()
 
+function formatCityMunicipalityName(name) {
+  const cleanName = String(name ?? '').trim()
+  if (cleanName === '') return ''
+
+  const cityMatch = cleanName.match(/^city of\s+(.+)$/i)
+  if (cityMatch) {
+    return `${cityMatch[1].trim()} City`
+  }
+
+  const municipalityMatch = cleanName.match(/^municipality of\s+(.+)$/i)
+  if (municipalityMatch) {
+    return municipalityMatch[1].trim()
+  }
+
+  return cleanName
+}
+
+function normalizePlaceName(name) {
+  return String(name ?? '')
+    .toLowerCase()
+    .replace(/^(city|municipality)\s+of\s+/i, '')
+    .replace(/\s+city$/i, '')
+    .replace(/[^a-z0-9]+/g, '')
+}
+
 // ── Fetch with cache ─────────────────────────────────────────────────────
 async function fetchWithCache(url, cacheKey) {
   if (cache.has(cacheKey)) {
@@ -69,7 +94,8 @@ export async function getCitiesByProvince(provinceCode) {
   return [...data]
     .map((item) => ({
       code   : item.code,
-      name   : item.name,
+      rawName: item.name,
+      name   : formatCityMunicipalityName(item.name),
       isCity : item.name.toLowerCase().includes('city'),
     }))
     .sort((a, b) => a.name.localeCompare(b.name))
@@ -132,19 +158,22 @@ export async function findCityByName(provinceCode, searchName) {
   if (!provinceCode || !searchName) return null
 
   const cities     = await getCitiesByProvince(provinceCode)
-  const normalized = searchName.toLowerCase().trim()
+  const normalized = normalizePlaceName(searchName)
 
   // 1. Exact match
   const exact = cities.find(
-    (c) => c.name.toLowerCase() === normalized
+    (c) => normalizePlaceName(c.name) === normalized
+      || normalizePlaceName(c.rawName) === normalized
   )
   if (exact) return exact
 
   // 2. Contains match (handles "City of Urdaneta" vs "Urdaneta City")
   const contains = cities.find(
     (c) =>
-      c.name.toLowerCase().includes(normalized) ||
-      normalized.includes(c.name.toLowerCase())
+      normalizePlaceName(c.name).includes(normalized) ||
+      normalized.includes(normalizePlaceName(c.name)) ||
+      normalizePlaceName(c.rawName).includes(normalized) ||
+      normalized.includes(normalizePlaceName(c.rawName))
   )
   return contains ?? null
 }

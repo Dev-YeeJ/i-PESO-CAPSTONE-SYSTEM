@@ -5,7 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\JobSeeker;
 use App\Models\JobVacancy;
-use App\Services\JobMatchingService;
+use App\Services\EnhancedJobMatchingService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
@@ -14,7 +14,7 @@ class SeekerNearbyJobController extends Controller
 {
     public function getNearbyJobs(
         Request $request,
-        JobMatchingService $matching
+        EnhancedJobMatchingService $matching
     ): JsonResponse {
         abort_unless(
             $request->user() instanceof JobSeeker,
@@ -65,7 +65,7 @@ class SeekerNearbyJobController extends Controller
             ->limit($candidateLimit)
             ->get()
             ->map(function (JobVacancy $job) use ($matching, $seeker) {
-                $match = $matching->score($job, $seeker);
+                $match = $matching->calculateMatch($job, $seeker);
 
                 return [
                     'post_id' => $job->post_id,

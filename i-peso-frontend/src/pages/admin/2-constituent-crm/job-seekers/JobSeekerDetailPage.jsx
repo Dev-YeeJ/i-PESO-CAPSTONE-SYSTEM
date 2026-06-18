@@ -242,9 +242,9 @@ export default function JobSeekerDetailPage() {
             render={(education) => (
               <TimelineRecord
                 key={education.id}
-                title={formatValue(education.level)}
-                subtitle={formatValue(education.course_strand, 'Course or strand not specified')}
-                meta={education.year_graduated ? `Graduated ${education.year_graduated}` : 'Year not specified'}
+                title={formatValue(education.institution_name, 'School not specified')}
+                subtitle={[formatValue(education.level), education.course_strand].filter(Boolean).join(' | ')}
+                meta={educationMeta(education)}
               />
             )}
           />
@@ -474,6 +474,23 @@ function TimelineRecord({ title, subtitle, meta }) {
       </p>
     </div>
   )
+}
+
+function educationMeta(education) {
+  const status = education.completion_status === 'currently_studying'
+    ? 'Currently studying'
+    : education.completion_status === 'undergraduate'
+      ? 'Undergraduate'
+      : education.year_graduated
+        ? 'Graduated'
+        : 'Status not specified'
+  const endYear = education.year_graduated
+    || education.undergrad_year_last_attended
+    || (education.completion_status === 'currently_studying' ? 'Present' : null)
+  const yearRange = [education.year_started, endYear].filter(Boolean).join(' - ')
+  const level = education.current_level || education.undergrad_level_reached
+
+  return [status, yearRange, level].filter(Boolean).join(' | ')
 }
 
 function StatusRow({ icon, label, value, complete }) {

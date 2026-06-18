@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\JobSeeker;
 use App\Services\SkillRecommendationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -25,7 +26,7 @@ class SkillRecommendationController extends Controller
     {
         $user = $request->user();
 
-        if (!$user instanceof \App\Models\JobSeeker) {
+        if (!$user instanceof JobSeeker) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
@@ -47,7 +48,7 @@ class SkillRecommendationController extends Controller
     {
         $user = $request->user();
 
-        if (!$user instanceof \App\Models\JobSeeker) {
+        if (!$user instanceof JobSeeker) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
@@ -77,6 +78,10 @@ class SkillRecommendationController extends Controller
      */
     public function getLearningResources(Request $request, string $skill): JsonResponse
     {
+        if (!$request->user() instanceof JobSeeker) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
         $resources = $this->recommendations->getLearningResources($skill);
 
         return response()->json([

@@ -46,7 +46,7 @@ export default function PsgcCascade({
       .then((items) => {
         if (!active) return
         setCities(items)
-        const selected = items.find((item) => item.name === city)
+        const selected = items.find((item) => item.name === city || item.rawName === city)
         if (selected) setCityCode(selected.code)
       })
       .catch(() => active && setError('Unable to load PSGC cities and municipalities.'))

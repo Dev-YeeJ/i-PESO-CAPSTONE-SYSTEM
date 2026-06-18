@@ -207,6 +207,34 @@ export default function SeekerProfile() {
 
         <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1.7fr)_minmax(280px,0.8fr)]">
           <main className="space-y-6">
+            <Card title="Educational Background" subtitle="School records saved from your NSRP profile">
+              {profile.educations?.length ? (
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {profile.educations.map((education) => (
+                    <div key={education.id} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                      <p className="font-bold text-slate-900">{education.institution_name || 'School not specified'}</p>
+                      <p className="mt-1 text-sm font-semibold text-blue-700">{educationLabel(education.level)}</p>
+                      {education.course_strand && <p className="mt-1 text-sm text-slate-600">{education.course_strand}</p>}
+                      <div className="mt-3 flex flex-wrap gap-2 text-xs">
+                        <span className="rounded-full bg-white px-2.5 py-1 font-semibold text-slate-600">{educationStatusLabel(education)}</span>
+                        {educationYearRange(education) && (
+                          <span className="rounded-full bg-blue-50 px-2.5 py-1 font-semibold text-blue-700">{educationYearRange(education)}</span>
+                        )}
+                        {education.undergrad_level_reached && (
+                          <span className="rounded-full bg-amber-50 px-2.5 py-1 font-semibold text-amber-700">{education.undergrad_level_reached}</span>
+                        )}
+                        {education.current_level && (
+                          <span className="rounded-full bg-emerald-50 px-2.5 py-1 font-semibold text-emerald-700">{education.current_level}</span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <EmptyState icon={GraduationCap} text="No education records saved yet." action="Add Education" onClick={() => navigate('/seeker/onboarding')} />
+              )}
+            </Card>
+
             <Card title="Skills" subtitle="Skills recorded in your DOLE NSRP profile">
               {allSkills.length ? (
                 <div className="space-y-4">
@@ -501,6 +529,34 @@ function fullName(profile) {
 
 function initials(profile) {
   return [profile.first_name, profile.last_name].filter(Boolean).map((name) => name[0]).join('').toUpperCase()
+}
+
+function educationLabel(level) {
+  return ({
+    elementary: 'Elementary',
+    secondary_non_k12: 'Secondary / Junior High School Non-K-12',
+    secondary_k12: 'Secondary / Junior High School K-12',
+    senior_high: 'Senior High School',
+    senior_high_strand: 'Senior High School',
+    tertiary: 'Tertiary / College',
+    graduate: 'Graduate Studies / Post-graduate',
+    graduate_studies: 'Graduate Studies / Post-graduate',
+  })[level] || 'Education level not specified'
+}
+
+function educationStatusLabel(education) {
+  if (education.completion_status === 'currently_studying') return 'Currently Studying'
+  if (education.completion_status === 'undergraduate') return 'Undergraduate / Did Not Finish'
+  if (education.completion_status === 'graduated' || education.year_graduated) return 'Graduated'
+  return 'Status not specified'
+}
+
+function educationYearRange(education) {
+  const endYear = education.year_graduated
+    || education.undergrad_year_last_attended
+    || (education.completion_status === 'currently_studying' ? 'Present' : null)
+
+  return [education.year_started, endYear].filter(Boolean).join(' - ')
 }
 
 function updateStrength(profile, states) {

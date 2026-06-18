@@ -75,13 +75,10 @@ class OccupationController extends Controller
                         ->orderByDesc('confidence')]);
                 }
 
-                $query->with(['generalTerms' => fn ($terms) => $terms
-                    ->where(
-                        'normalized_term',
-                        $isExactGeneralTerm ? '=' : 'like',
-                        $isExactGeneralTerm ? $normalizedSearch : $normalizedLike
-                    )
-                    ->orderBy('priority')]);
+                    $query->with(['generalTerms' => fn ($terms) => $terms->orderBy('priority')]);
+            })
+            ->when($search === '', function ($query) {
+                $query->with(['generalTerms' => fn ($terms) => $terms->orderBy('priority')]);
             })
             ->with(['sourceMappings' => fn ($mappings) => $mappings
                 ->whereIn('source', ['onet'])
@@ -131,14 +128,16 @@ class OccupationController extends Controller
                 'title',
                 'source',
             ])
-            ->map(function (Occupation $occupation) {
+            ->map(function (Occupation $occupation) use ($normalizedSearch) {
                 $matchedAliasRecord = $occupation->relationLoaded('aliases')
                     ? $occupation->aliases->first()
                     : null;
                 $matchedAlias = $matchedAliasRecord?->alias;
-                $matchedGeneralTerm = $occupation->relationLoaded('generalTerms')
-                    ? $occupation->generalTerms->first()?->term
-                    : null;
+                $generalTerms = $occupation->relationLoaded('generalTerms')
+                    ? $occupation->generalTerms
+                    : collect();
+                $primaryGeneralTerm = $generalTerms->first()?->term;
+                $matchedGeneralTerm = $this->matchedGeneralTerm($generalTerms, $normalizedSearch);
                 if ($matchedGeneralTerm) {
                     $matchedAlias = null;
                 }
@@ -150,6 +149,8 @@ class OccupationController extends Controller
                     'isco_group' => $occupation->isco_group,
                     'title' => $occupation->title,
                     'source' => $occupation->source,
+                    'broad_category' => $this->broadCategoryLabel($primaryGeneralTerm, $occupation->isco_group),
+                    'general_term' => $primaryGeneralTerm,
                     'sources' => $this->occupationSources($occupation, $matchedAliasRecord?->source),
                     'source_codes' => [
                         'psoc' => $occupation->source === 'psa' ? $occupation->psoc_code : null,
@@ -185,6 +186,52 @@ class OccupationController extends Controller
             $occupation->source === 'esco' ? 'ESCO' : null,
             $occupation->source === 'fallback' ? 'Local PESO' : null,
         ])->filter()->values()->all();
+    }
+
+    private function matchedGeneralTerm($generalTerms, string $normalizedSearch): ?string
+    {
+        if ($normalizedSearch === '' || $generalTerms->isEmpty()) {
+            return null;
+        }
+
+        return $generalTerms->first(function (OccupationGeneralTerm $term) use ($normalizedSearch) {
+            return $term->normalized_term === $normalizedSearch
+                || Str::contains($term->normalized_term, $normalizedSearch)
+                || Str::contains($normalizedSearch, $term->normalized_term);
+        })?->term;
+    }
+
+    private function broadCategoryLabel(?string $generalTerm, ?string $iscoGroup): string
+    {
+        $normalizedTerm = $generalTerm ? $this->normalize($generalTerm) : null;
+
+        if ($normalizedTerm) {
+            $group = collect(config('job_preferences.generalized_groups', []))
+                ->first(fn (array $group) => $this->normalize($group['term']) === $normalizedTerm);
+
+            if ($group) {
+                return $group['label'];
+            }
+        }
+
+        return $this->iscoBroadCategory($iscoGroup);
+    }
+
+    private function iscoBroadCategory(?string $iscoGroup): string
+    {
+        return match (substr((string) $iscoGroup, 0, 1)) {
+            '0' => 'Armed Forces Occupations',
+            '1' => 'Management and Business Operations',
+            '2' => 'Professional Occupations',
+            '3' => 'Technical and Associate Professional Work',
+            '4' => 'Office and Administration',
+            '5' => 'Service and Sales Work',
+            '6' => 'Agriculture, Forestry and Fishery Work',
+            '7' => 'Skilled Trades and Craft Work',
+            '8' => 'Plant, Machine and Assembly Work',
+            '9' => 'Elementary Occupations',
+            default => 'General Occupation',
+        };
     }
 
     private function normalize(string $value): string
@@ -374,6 +421,7 @@ class OccupationController extends Controller
             'id' => 'general:'.$group['normalized_term'],
             'title' => $group['label'],
             'general_term' => $group['normalized_term'],
+            'broad_category' => $group['label'],
             'source' => 'generalized',
             'is_general' => true,
             'matched_job_title' => $matchedJobTitle,

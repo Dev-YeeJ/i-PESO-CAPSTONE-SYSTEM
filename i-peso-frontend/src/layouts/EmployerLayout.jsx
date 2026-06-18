@@ -8,6 +8,7 @@ import {
   LogOut,
   Menu,
   PlusCircle,
+  UsersRound,
   X,
 } from 'lucide-react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
@@ -18,12 +19,14 @@ const navItems = [
   { to: '/employer/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/employer/post-job', label: 'Create Job Post', icon: PlusCircle, protected: true },
   { to: '/employer/vacancies', label: 'My Vacancies', icon: BriefcaseBusiness, protected: true },
+  { to: '/employer/ats', label: 'Applicants', icon: UsersRound, protected: true },
 ]
 
 const pageNames = {
   '/employer/dashboard': 'Dashboard',
   '/employer/post-job': 'Create Job Post',
   '/employer/vacancies': 'My Vacancies',
+  '/employer/ats': 'Applicants',
 }
 
 export default function EmployerLayout() {

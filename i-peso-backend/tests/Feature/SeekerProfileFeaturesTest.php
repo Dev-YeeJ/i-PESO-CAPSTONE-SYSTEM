@@ -84,23 +84,42 @@ class SeekerProfileFeaturesTest extends TestCase
             ->assertJsonValidationErrors('disability_specification');
     }
 
-    public function test_optional_education_and_work_history_steps_accept_empty_arrays(): void
+    public function test_optional_work_history_step_accepts_empty_arrays(): void
     {
         $seeker = $this->createSeeker();
         Sanctum::actingAs($seeker);
 
-        $this->postJson('/api/seeker/step-5', [
-            'educ_attainment' => 'College Graduate',
-            'currently_in_school' => false,
-            'educations' => [],
-            'dole_skills' => [],
-            'technical_skills' => [],
-            'soft_skills' => [],
-        ])->assertOk();
-
         $this->postJson('/api/seeker/step-7', [
             'work_experiences' => [],
         ])->assertOk();
+    }
+
+    public function test_step_seven_saves_selected_work_experience_occupation(): void
+    {
+        $seeker = $this->createSeeker();
+        $occupation = $this->createOccupation('3512', 'Computer Technician');
+        Sanctum::actingAs($seeker);
+
+        $this->postJson('/api/seeker/step-7', [
+            'work_experiences' => [[
+                'company_name' => '  Jaime Computer Shop  ',
+                'company_address' => '  Urdaneta City  ',
+                'occupation_id' => $occupation->id,
+                'position' => 'comp tech',
+                'number_of_months' => 24,
+                'employment_status' => 'contractual',
+            ]],
+        ])->assertOk();
+
+        $this->assertDatabaseHas('seeker_work_experiences', [
+            'seeker_id' => $seeker->getKey(),
+            'occupation_id' => $occupation->id,
+            'company_name' => 'Jaime Computer Shop',
+            'company_address' => 'Urdaneta City',
+            'position' => 'Computer Technician',
+            'number_of_months' => 24,
+            'employment_status' => 'contractual',
+        ]);
     }
 
     public function test_admin_can_download_the_official_two_page_nsrp_form(): void
@@ -173,7 +192,7 @@ class SeekerProfileFeaturesTest extends TestCase
         ]);
     }
 
-    public function test_step_three_rejects_a_custom_unreviewed_occupation(): void
+    public function test_step_three_saves_a_custom_unreviewed_occupation_for_admin_review(): void
     {
         $seeker = $this->createSeeker();
         Sanctum::actingAs($seeker);
@@ -186,13 +205,43 @@ class SeekerProfileFeaturesTest extends TestCase
                 'occupation_id' => null,
                 'raw_job_title' => 'Milk tea crew',
             ]],
-        ])
-            ->assertUnprocessable()
-            ->assertJsonValidationErrors('occupation_preferences.0.raw_job_title');
+        ])->assertOk();
 
-        $this->assertDatabaseMissing('seeker_occupations', [
+        $this->assertDatabaseHas('seeker_occupations', [
             'seeker_id' => $seeker->getKey(),
+            'occupation_id' => null,
+            'general_term' => null,
+            'occupation_title' => 'Milk tea crew',
             'raw_job_title' => 'Milk tea crew',
+            'status' => 'custom_pending',
+            'preference_order' => 1,
+        ]);
+    }
+
+    public function test_step_three_saves_an_ai_generated_occupation_without_admin_review(): void
+    {
+        $seeker = $this->createSeeker();
+        Sanctum::actingAs($seeker);
+
+        $this->postJson('/api/seeker/step-3', [
+            'work_type_preference' => 'full_time',
+            'preferred_work_location' => 'local',
+            'preferred_locations_details' => ['Urdaneta City, Pangasinan'],
+            'occupation_preferences' => [[
+                'occupation_id' => null,
+                'raw_job_title' => 'Online Seller',
+                'source' => 'ai_generated',
+            ]],
+        ])->assertOk();
+
+        $this->assertDatabaseHas('seeker_occupations', [
+            'seeker_id' => $seeker->getKey(),
+            'occupation_id' => null,
+            'general_term' => null,
+            'occupation_title' => 'Online Seller',
+            'raw_job_title' => 'Online Seller',
+            'status' => 'ai_generated',
+            'preference_order' => 1,
         ]);
     }
 
@@ -237,7 +286,7 @@ class SeekerProfileFeaturesTest extends TestCase
             ]],
         ])
             ->assertUnprocessable()
-            ->assertJsonValidationErrors('occupation_preferences.0.raw_job_title');
+            ->assertJsonValidationErrors('occupation_preferences');
     }
 
     public function test_step_three_deduplicates_preferred_countries_case_insensitively(): void
@@ -322,7 +371,10 @@ class SeekerProfileFeaturesTest extends TestCase
             'currently_in_school' => true,
             'educations' => [[
                 'level' => 'tertiary',
+                'institution_name' => 'Polytechnic University of the Philippines',
                 'course_strand' => 'Bachelor of Science in Information Technology',
+                'completion_status' => 'undergraduate',
+                'year_started' => 2022,
                 'year_graduated' => null,
             ]],
         ])
@@ -333,7 +385,7 @@ class SeekerProfileFeaturesTest extends TestCase
             ]);
     }
 
-    public function test_step_five_requires_a_highest_education_summary_when_nothing_can_be_inferred(): void
+    public function test_step_five_requires_at_least_one_education_record(): void
     {
         $seeker = $this->createSeeker();
         Sanctum::actingAs($seeker);
@@ -346,21 +398,7 @@ class SeekerProfileFeaturesTest extends TestCase
             'soft_skills' => [],
         ])
             ->assertUnprocessable()
-            ->assertJsonValidationErrors('educ_attainment');
-    }
-
-    public function test_step_five_saves_highest_education_summary_without_detailed_rows(): void
-    {
-        $seeker = $this->createSeeker();
-        Sanctum::actingAs($seeker);
-
-        $this->postJson('/api/seeker/step-5', [
-            'educ_attainment' => 'Vocational / Technical',
-            'currently_in_school' => false,
-            'educations' => [],
-        ])->assertOk();
-
-        $this->assertSame('Vocational / Technical', $seeker->fresh()->educ_attainment);
+            ->assertJsonValidationErrors('educations');
     }
 
     public function test_step_five_saves_undergraduate_education_details(): void
@@ -372,7 +410,10 @@ class SeekerProfileFeaturesTest extends TestCase
             'currently_in_school' => true,
             'educations' => [[
                 'level' => 'tertiary',
+                'institution_name' => 'Polytechnic University of the Philippines',
                 'course_strand' => 'Bachelor of Science in Information Technology',
+                'completion_status' => 'undergraduate',
+                'year_started' => 2022,
                 'undergrad_level_reached' => '3rd Year',
                 'undergrad_year_last_attended' => 2026,
             ]],
@@ -381,14 +422,73 @@ class SeekerProfileFeaturesTest extends TestCase
         $this->assertDatabaseHas('seeker_educations', [
             'seeker_id' => $seeker->getKey(),
             'level' => 'tertiary',
+            'institution_name' => 'Polytechnic University of the Philippines',
             'course_strand' => 'Bachelor of Science in Information Technology',
+            'completion_status' => 'undergraduate',
+            'year_started' => 2022,
             'year_graduated' => null,
             'undergrad_level_reached' => '3rd Year',
             'undergrad_year_last_attended' => 2026,
         ]);
     }
 
-    public function test_step_five_rejects_duplicate_education_levels(): void
+    public function test_step_five_saves_currently_studying_education_details(): void
+    {
+        $seeker = $this->createSeeker();
+        Sanctum::actingAs($seeker);
+
+        $this->postJson('/api/seeker/step-5', [
+            'currently_in_school' => true,
+            'educations' => [[
+                'level' => 'senior_high_strand',
+                'institution_name' => 'Baguio City National High School',
+                'course_strand' => 'STEM',
+                'completion_status' => 'currently_studying',
+                'year_started' => 2025,
+                'current_level' => 'Grade 12',
+                'year_graduated' => 2026,
+                'undergrad_level_reached' => 'Grade 11',
+                'undergrad_year_last_attended' => 2025,
+            ]],
+        ])->assertOk();
+
+        $this->assertDatabaseHas('seeker_educations', [
+            'seeker_id' => $seeker->getKey(),
+            'level' => 'senior_high_strand',
+            'institution_name' => 'Baguio City National High School',
+            'course_strand' => 'STEM',
+            'completion_status' => 'currently_studying',
+            'year_started' => 2025,
+            'current_level' => 'Grade 12',
+            'year_graduated' => null,
+            'undergrad_level_reached' => null,
+            'undergrad_year_last_attended' => null,
+        ]);
+    }
+
+    public function test_step_five_requires_conditional_program_and_valid_year_range(): void
+    {
+        $seeker = $this->createSeeker();
+        Sanctum::actingAs($seeker);
+
+        $this->postJson('/api/seeker/step-5', [
+            'currently_in_school' => false,
+            'educations' => [[
+                'level' => 'tertiary',
+                'institution_name' => 'Polytechnic University of the Philippines',
+                'completion_status' => 'graduated',
+                'year_started' => 2024,
+                'year_graduated' => 2023,
+            ]],
+        ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors([
+                'educations.0.course_strand',
+                'educations.0.year_graduated',
+            ]);
+    }
+
+    public function test_step_five_rejects_duplicate_education_records(): void
     {
         $seeker = $this->createSeeker();
         Sanctum::actingAs($seeker);
@@ -398,18 +498,24 @@ class SeekerProfileFeaturesTest extends TestCase
             'educations' => [
                 [
                     'level' => 'tertiary',
+                    'institution_name' => 'Polytechnic University of the Philippines',
                     'course_strand' => 'BSIT',
+                    'completion_status' => 'graduated',
+                    'year_started' => 2021,
                     'year_graduated' => 2025,
                 ],
                 [
                     'level' => 'tertiary',
-                    'course_strand' => 'BSCS',
-                    'year_graduated' => 2024,
+                    'institution_name' => 'Polytechnic University of the Philippines',
+                    'course_strand' => 'BSIT',
+                    'completion_status' => 'graduated',
+                    'year_started' => 2021,
+                    'year_graduated' => 2025,
                 ],
             ],
         ])
             ->assertUnprocessable()
-            ->assertJsonValidationErrors('educations.1.level');
+            ->assertJsonValidationErrors('educations.1');
     }
 
     public function test_step_five_deduplicates_hard_and_soft_skills_case_insensitively(): void
@@ -421,6 +527,10 @@ class SeekerProfileFeaturesTest extends TestCase
             'currently_in_school' => false,
             'educations' => [[
                 'level' => 'tertiary',
+                'institution_name' => 'Polytechnic University of the Philippines',
+                'course_strand' => 'Bachelor of Science in Information Technology',
+                'completion_status' => 'graduated',
+                'year_started' => 2021,
                 'year_graduated' => 2025,
             ]],
             'technical_skills' => ['Microsoft Excel', ' microsoft excel ', 'Bookkeeping'],
@@ -468,6 +578,10 @@ class SeekerProfileFeaturesTest extends TestCase
             'currently_in_school' => false,
             'educations' => [[
                 'level' => 'tertiary',
+                'institution_name' => 'Polytechnic University of the Philippines',
+                'course_strand' => 'Bachelor of Science in Information Technology',
+                'completion_status' => 'graduated',
+                'year_started' => 2021,
                 'year_graduated' => 2025,
             ]],
             'technical_skills' => ['Critical Thinking'],
@@ -632,7 +746,10 @@ class SeekerProfileFeaturesTest extends TestCase
         SeekerEducation::create([
             'seeker_id' => $seeker->getKey(),
             'level' => 'tertiary',
+            'institution_name' => 'Polytechnic University of the Philippines',
             'course_strand' => 'Bachelor of Science in Information Technology',
+            'completion_status' => 'graduated',
+            'year_started' => 2021,
             'year_graduated' => 2025,
         ]);
         SeekerSkill::create([
@@ -844,10 +961,14 @@ class SeekerProfileFeaturesTest extends TestCase
         });
         $this->createSimpleRelationTable('seeker_educations', function (Blueprint $table) {
             $table->string('level');
+            $table->string('institution_name')->nullable();
             $table->string('course_strand')->nullable();
+            $table->string('completion_status')->nullable();
+            $table->unsignedSmallInteger('year_started')->nullable();
             $table->unsignedSmallInteger('year_graduated')->nullable();
             $table->string('undergrad_level_reached')->nullable();
             $table->unsignedSmallInteger('undergrad_year_last_attended')->nullable();
+            $table->string('current_level')->nullable();
         });
         $this->createSimpleRelationTable('seeker_trainings', function (Blueprint $table) {
             $table->string('course');
@@ -863,9 +984,11 @@ class SeekerProfileFeaturesTest extends TestCase
             $table->date('valid_until')->nullable();
         });
         $this->createSimpleRelationTable('seeker_work_experiences', function (Blueprint $table) {
+            $table->unsignedBigInteger('occupation_id')->nullable();
             $table->string('company_name');
             $table->string('company_address')->nullable();
             $table->string('position');
+            $table->string('normalized_position')->nullable();
             $table->unsignedInteger('number_of_months')->nullable();
             $table->string('employment_status')->nullable();
         });

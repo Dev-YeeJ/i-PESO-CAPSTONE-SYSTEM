@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
 
@@ -55,6 +56,19 @@ class AuthController extends Controller
         $otp = str_pad(random_int(0, 999999), 6, '0', STR_PAD_LEFT);
         Cache::put("ipeso_otp_{$email}", Hash::make($otp), now()->addMinutes(10));
         Mail::to($email)->send(new OtpMail($otp));
+    }
+
+    private function normalizeMobileNumber(mixed $value): string
+    {
+        $digits = preg_replace('/\D+/', '', (string) $value);
+
+        if (str_starts_with($digits, '639')) {
+            $digits = '0'.substr($digits, 2);
+        } elseif (str_starts_with($digits, '9')) {
+            $digits = '0'.$digits;
+        }
+
+        return substr($digits, 0, 11);
     }
 
     /**
@@ -109,6 +123,9 @@ class AuthController extends Controller
         $role = $request->input('role');
         $request->merge([
             'email' => mb_strtolower(trim((string) $request->input('email'))),
+            'first_name' => Str::of((string) $request->input('first_name'))->squish()->toString(),
+            'last_name' => Str::of((string) $request->input('last_name'))->squish()->toString(),
+            'mobile_number' => $this->normalizeMobileNumber($request->input('mobile_number')),
         ]);
 
         $rules = [
@@ -125,8 +142,8 @@ class AuthController extends Controller
         ];
 
         if ($role === 'seeker') {
-            $rules['first_name']    = ['required', 'string', 'max:100'];
-            $rules['last_name']     = ['required', 'string', 'max:100'];
+            $rules['first_name']    = ['required', 'string', 'min:2', 'max:100', "regex:/^[\pL\s.'-]+$/u"];
+            $rules['last_name']     = ['required', 'string', 'min:2', 'max:100', "regex:/^[\pL\s.'-]+$/u"];
             $rules['mobile_number'] = ['required', 'regex:/^09\d{9}$/'];
         } else {
             $rules['company_type'] = ['required', Rule::in([

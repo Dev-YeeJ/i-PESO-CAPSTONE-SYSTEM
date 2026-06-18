@@ -15,10 +15,11 @@ use Illuminate\Support\Str;
 class JobMatchingService
 {
     private const WEIGHTS = [
-        'occupation' => 35,
-        'skills' => 40,
+        'occupation' => 30,
+        'skills' => 35,
         'experience' => 15,
         'education' => 10,
+        'location' => 10,
     ];
 
     public function __construct(
@@ -34,6 +35,7 @@ class JobMatchingService
         $skillMatch = $this->skills->score($vacancy, $seeker);
         $experience = $this->experienceScore($vacancy, $seeker);
         $education = $this->educationScore($vacancy, $seeker);
+        $location = $this->locationScore($vacancy, $seeker);
         $eligibility = $this->eligibility($vacancy, $seeker);
         $preferenceFit = $this->preferenceFit($vacancy, $seeker);
 
@@ -61,6 +63,12 @@ class JobMatchingService
                 'weight' => self::WEIGHTS['education'],
                 'available' => $education['available'],
                 'details' => $education['details'],
+            ],
+            'location' => [
+                'score' => (float) $location['score'],
+                'weight' => self::WEIGHTS['location'],
+                'available' => $location['available'],
+                'details' => $location['details'],
             ],
         ];
 
@@ -93,13 +101,21 @@ class JobMatchingService
             Schema::hasTable('occupations')
             && Schema::hasTable('seeker_occupations')
         ) {
-            $vacancy->loadMissing('occupation');
-            $seeker->loadMissing('occupations.occupation');
+            $vacancyRelations = ['occupation'];
+            $seekerRelations = ['occupations.occupation'];
 
             if (Schema::hasTable('occupation_general_terms')) {
-                $vacancy->loadMissing('occupation.generalTerms');
-                $seeker->loadMissing('occupations.occupation.generalTerms');
+                $vacancyRelations[] = 'occupation.generalTerms';
+                $seekerRelations[] = 'occupations.occupation.generalTerms';
             }
+
+            if (Schema::hasTable('occupation_aliases')) {
+                $vacancyRelations[] = 'occupation.aliases';
+                $seekerRelations[] = 'occupations.occupation.aliases';
+            }
+
+            $vacancy->loadMissing($vacancyRelations);
+            $seeker->loadMissing($seekerRelations);
         }
 
         if (Schema::hasTable('seeker_work_experiences')) {
@@ -198,6 +214,20 @@ class JobMatchingService
             }
         }
 
+        $rawTitle = $preference->raw_job_title
+            ?: ($preference->occupation_id ? null : $preference->occupation_title);
+
+        if ($score === 0 && filled($rawTitle)) {
+            $textScore = $this->textOccupationScore($rawTitle, $vacancyOccupation);
+
+            if ($textScore > 0) {
+                $score = $textScore;
+                $matchType = $preference->status === 'ai_generated'
+                    ? 'ai_generated_title'
+                    : 'raw_title_text';
+            }
+        }
+
         return [
             'score' => round($score * $preferenceFactor, 2),
             'base_score' => $score,
@@ -206,6 +236,224 @@ class JobMatchingService
             'preferred_occupation' => $preference->occupation_title,
             'vacancy_occupation' => $vacancyOccupation->title,
         ];
+    }
+
+    private function textOccupationScore(?string $preferredTitle, Occupation $vacancyOccupation): int
+    {
+        $preferred = $this->normalizeMatchText((string) $preferredTitle);
+        if ($preferred === '') {
+            return 0;
+        }
+
+        $vacancyTitle = $this->normalizeMatchText((string) $vacancyOccupation->title);
+        if ($preferred === $vacancyTitle) {
+            return 85;
+        }
+
+        $vacancyText = $this->normalizeMatchText(collect([
+            $vacancyOccupation->title,
+            $vacancyOccupation->search_terms,
+            $vacancyOccupation->relationLoaded('aliases')
+                ? $vacancyOccupation->aliases->pluck('alias')->join(' ')
+                : null,
+            $vacancyOccupation->relationLoaded('generalTerms')
+                ? $vacancyOccupation->generalTerms->pluck('term')->join(' ')
+                : null,
+        ])->filter()->join(' '));
+
+        if (
+            strlen($preferred) >= 4
+            && (Str::contains($vacancyTitle, $preferred) || Str::contains($preferred, $vacancyTitle))
+        ) {
+            return 70;
+        }
+
+        $preferredTokens = $this->significantTokens($preferred);
+        if ($preferredTokens->isEmpty()) {
+            return 0;
+        }
+
+        $vacancyTokens = $this->significantTokens($vacancyText)->flip();
+        $matched = $preferredTokens
+            ->filter(fn (string $token) => $vacancyTokens->has($token))
+            ->count();
+        $ratio = $matched / $preferredTokens->count();
+
+        if ($ratio >= 0.75) {
+            return 65;
+        }
+
+        if ($matched >= 2 && $ratio >= 0.5) {
+            return 50;
+        }
+
+        if ($matched === 1 && $preferredTokens->count() === 1) {
+            return 45;
+        }
+
+        return 0;
+    }
+
+    private function normalizeMatchText(string $value): string
+    {
+        return Str::of($value)
+            ->lower()
+            ->replace('&', ' and ')
+            ->replaceMatches('/[^a-z0-9+#.]+/', ' ')
+            ->squish()
+            ->toString();
+    }
+
+    private function significantTokens(string $value): Collection
+    {
+        return collect(explode(' ', $value))
+            ->map(fn (string $token) => trim($token))
+            ->filter(fn (string $token) => strlen($token) >= 3)
+            ->unique()
+            ->values();
+    }
+
+    private function locationScore(JobVacancy $vacancy, JobSeeker $seeker): array
+    {
+        if (Str::lower((string) $vacancy->work_setup) === 'remote') {
+            return [
+                'score' => 100,
+                'available' => true,
+                'details' => [
+                    'match_type' => 'remote_work',
+                    'message' => 'Remote vacancies match any preferred location.',
+                ],
+            ];
+        }
+
+        $preferredLocations = collect($seeker->preferred_locations_details ?? [])
+            ->map(fn ($location) => $this->profiles->normalize((string) $location))
+            ->filter()
+            ->values();
+        $vacancyParts = $this->vacancyLocationParts($vacancy);
+        $vacancyText = $this->profiles->normalize($vacancyParts->join(' '));
+
+        if ($preferredLocations->isNotEmpty()) {
+            $best = $preferredLocations
+                ->map(fn (string $location) => $this->comparePreferredLocation($location, $vacancyText, $vacancy))
+                ->sortByDesc('score')
+                ->first();
+
+            return [
+                'score' => (float) ($best['score'] ?? 0),
+                'available' => true,
+                'details' => $best ?? ['match_type' => 'preferred_location_miss'],
+            ];
+        }
+
+        $currentAddressScore = $this->currentAddressLocationScore($seeker, $vacancy);
+        if ($currentAddressScore['score'] > 0) {
+            return [
+                'score' => $currentAddressScore['score'],
+                'available' => true,
+                'details' => $currentAddressScore,
+            ];
+        }
+
+        $distanceKm = $this->distanceKm($seeker, $vacancy);
+        if ($distanceKm !== null) {
+            return [
+                'score' => $this->distanceScore($distanceKm),
+                'available' => true,
+                'details' => [
+                    'match_type' => 'distance_to_address',
+                    'distance_km' => round($distanceKm, 1),
+                ],
+            ];
+        }
+
+        return [
+            'score' => 100,
+            'available' => false,
+            'details' => [
+                'match_type' => 'no_location_preference',
+                'message' => 'No preferred location or usable coordinates were provided.',
+            ],
+        ];
+    }
+
+    private function comparePreferredLocation(string $preferredLocation, string $vacancyText, JobVacancy $vacancy): array
+    {
+        $city = $this->profiles->normalize((string) $vacancy->city_municipality);
+        $province = $this->profiles->normalize((string) $vacancy->province);
+        $barangay = $this->profiles->normalize((string) $vacancy->barangay);
+
+        if ($preferredLocation !== '' && Str::contains($vacancyText, $preferredLocation)) {
+            return [
+                'score' => 100,
+                'match_type' => 'preferred_location_exact',
+                'preferred_location' => $preferredLocation,
+            ];
+        }
+
+        if ($barangay !== '' && Str::contains($preferredLocation, $barangay)) {
+            return [
+                'score' => 95,
+                'match_type' => 'preferred_barangay_match',
+                'preferred_location' => $preferredLocation,
+            ];
+        }
+
+        if ($city !== '' && Str::contains($preferredLocation, $city)) {
+            return [
+                'score' => 85,
+                'match_type' => 'preferred_city_match',
+                'preferred_location' => $preferredLocation,
+            ];
+        }
+
+        if ($province !== '' && Str::contains($preferredLocation, $province)) {
+            return [
+                'score' => 65,
+                'match_type' => 'preferred_province_match',
+                'preferred_location' => $preferredLocation,
+            ];
+        }
+
+        return [
+            'score' => 0,
+            'match_type' => 'preferred_location_miss',
+            'preferred_location' => $preferredLocation,
+        ];
+    }
+
+    private function currentAddressLocationScore(JobSeeker $seeker, JobVacancy $vacancy): array
+    {
+        $seekerBarangayCode = (string) ($seeker->address_barangay_code ?? '');
+        $seekerCityCode = (string) ($seeker->address_city_code ?? '');
+        $seekerProvinceCode = (string) ($seeker->address_province_code ?? '');
+
+        if ($seekerBarangayCode !== '' && $seekerBarangayCode === (string) ($vacancy->barangay_code ?? '')) {
+            return ['score' => 100, 'match_type' => 'current_barangay_code_match'];
+        }
+
+        if ($seekerCityCode !== '' && $seekerCityCode === (string) ($vacancy->city_code ?? '')) {
+            return ['score' => 85, 'match_type' => 'current_city_code_match'];
+        }
+
+        if ($seekerProvinceCode !== '' && $seekerProvinceCode === (string) ($vacancy->province_code ?? '')) {
+            return ['score' => 65, 'match_type' => 'current_province_code_match'];
+        }
+
+        $seekerCity = $this->profiles->normalize((string) ($seeker->address_municipality_city ?? ''));
+        $seekerProvince = $this->profiles->normalize((string) ($seeker->address_province ?? ''));
+        $vacancyCity = $this->profiles->normalize((string) ($vacancy->city_municipality ?? ''));
+        $vacancyProvince = $this->profiles->normalize((string) ($vacancy->province ?? ''));
+
+        if ($seekerCity !== '' && $seekerCity === $vacancyCity) {
+            return ['score' => 80, 'match_type' => 'current_city_name_match'];
+        }
+
+        if ($seekerProvince !== '' && $seekerProvince === $vacancyProvince) {
+            return ['score' => 60, 'match_type' => 'current_province_name_match'];
+        }
+
+        return ['score' => 0, 'match_type' => 'current_location_miss'];
     }
 
     private function experienceScore(JobVacancy $vacancy, JobSeeker $seeker): array
@@ -454,6 +702,7 @@ class JobMatchingService
     private function vacancyEducationRank(?string $level): int
     {
         return match ($level) {
+            'High School Undergraduate' => 1,
             'High School Graduate' => 2,
             'College Undergraduate', 'TVET/Vocational Graduate' => 3,
             'College Graduate' => 4,
@@ -536,5 +785,54 @@ class JobMatchingService
                 'message' => $message,
             ],
         ];
+    }
+
+    private function vacancyLocationParts(JobVacancy $vacancy): Collection
+    {
+        return collect([
+            $vacancy->barangay,
+            $vacancy->city_municipality,
+            $vacancy->province,
+            $vacancy->region,
+            $vacancy->specific_address,
+            $vacancy->location,
+        ])->filter();
+    }
+
+    private function distanceKm(JobSeeker $seeker, JobVacancy $vacancy): ?float
+    {
+        if (is_numeric($vacancy->distance_km ?? null)) {
+            return (float) $vacancy->distance_km;
+        }
+
+        if (
+            ! is_numeric($seeker->latitude)
+            || ! is_numeric($seeker->longitude)
+            || ! is_numeric($vacancy->latitude)
+            || ! is_numeric($vacancy->longitude)
+        ) {
+            return null;
+        }
+
+        $earthRadiusKm = 6371.0088;
+        $lat1 = deg2rad((float) $seeker->latitude);
+        $lat2 = deg2rad((float) $vacancy->latitude);
+        $deltaLat = deg2rad((float) $vacancy->latitude - (float) $seeker->latitude);
+        $deltaLng = deg2rad((float) $vacancy->longitude - (float) $seeker->longitude);
+        $haversine = sin($deltaLat / 2) ** 2
+            + cos($lat1) * cos($lat2) * sin($deltaLng / 2) ** 2;
+
+        return $earthRadiusKm * 2 * atan2(sqrt($haversine), sqrt(1 - $haversine));
+    }
+
+    private function distanceScore(float $distanceKm): float
+    {
+        return match (true) {
+            $distanceKm <= 5 => 100,
+            $distanceKm <= 15 => 85,
+            $distanceKm <= 30 => 65,
+            $distanceKm <= 50 => 45,
+            default => 20,
+        };
     }
 }
