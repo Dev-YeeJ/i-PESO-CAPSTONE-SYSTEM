@@ -1,7 +1,33 @@
 import axios from 'axios'
 import AsyncStorage from '@react-native-async-storage/async-storage'
+import Constants from 'expo-constants'
 
-const BASE_URL = 'http://192.168.0.190:8000/api'
+const DEFAULT_API_PORT = 8001
+const DEFAULT_FALLBACK_HOST = '127.0.0.1'
+
+function computeBaseUrl() {
+  if (process.env.EXPO_PUBLIC_API_URL) {
+    return process.env.EXPO_PUBLIC_API_URL
+  }
+
+  try {
+    const hostUri = Constants.expoConfig?.hostUri
+    const debuggerHost = Constants.manifest?.debuggerHost || Constants.manifest?.packagerOpts?.host
+    const candidate = hostUri || debuggerHost
+    if (candidate) {
+      const host = String(candidate).split(':')[0]
+      if (host && host !== 'localhost' && host !== '127.0.0.1') {
+        return `http://${host}:${DEFAULT_API_PORT}/api`
+      }
+    }
+  } catch (e) {
+    // ignore and fall through to fallback host
+  }
+
+  return `http://${DEFAULT_FALLBACK_HOST}:${DEFAULT_API_PORT}/api`
+}
+
+const BASE_URL = computeBaseUrl()
 
 const apiClient = axios.create({
   baseURL: BASE_URL,
@@ -18,6 +44,7 @@ apiClient.interceptors.request.use(
     if (token) {
       config.headers['Authorization'] = `Bearer ${token}`
     }
+  
     return config
   },
   (error) => Promise.reject(error)

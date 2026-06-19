@@ -142,6 +142,19 @@ export default function RegisterScreen() {
         params: { email: data.email },
       })
     } catch (err: any) {
+      // --- ADDED LOGGING HERE ---
+      console.log("-----------------------------------------");
+      console.log("🚨 REGISTRATION ERROR DETAILS:");
+      console.log("FULL ERROR OBJECT:", err);
+      if (err.response) {
+        console.log("SERVER RESPONSE DATA:", err.response.data);
+        console.log("STATUS CODE:", err.response.status);
+      } else {
+        console.log("NETWORK ERROR MESSAGE:", err.message);
+      }
+      console.log("-----------------------------------------");
+      // ---------------------------
+
       if (err.response?.status === 422) {
         const serverErrors: Record<string, string[]> = err.response.data.errors ?? {}
         const mapped: Record<string, string> = {}
