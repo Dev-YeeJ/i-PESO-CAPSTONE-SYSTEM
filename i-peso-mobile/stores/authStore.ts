@@ -7,8 +7,13 @@ interface User {
   id: number
   name: string
   email: string
-  role: 'seeker' | 'employer' | 'admin'
+  role: 'seeker' | 'employer' | 'administrator' | 'admin'
   email_verified_at: string | null
+  profile_completed?: boolean
+  first_name?: string
+  last_name?: string
+  mobile_number?: string
+  educ_attainment?: string | null
 }
 
 interface AuthState {
@@ -17,6 +22,7 @@ interface AuthState {
   isAuthenticated: boolean
   isInitialized: boolean
   setAuth: (user: User, token: string) => Promise<void>
+  updateUser: (user: Partial<User>) => void
   initializeAuth: () => Promise<void>
   logout: () => Promise<void>
   clearAuth: () => Promise<void>
@@ -31,6 +37,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   setAuth: async (user, token) => {
     await AsyncStorage.setItem(TOKEN_KEY, token)
     set({ user, token, isAuthenticated: true, isInitialized: true })
+  },
+
+  updateUser: (user) => {
+    set((state) => ({
+      user: state.user ? { ...state.user, ...user } : null,
+    }))
   },
 
   initializeAuth: async () => {

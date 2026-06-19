@@ -5,13 +5,19 @@ import { useAuthStore } from '@/stores/authStore'
 
 export default function SeekerLayout() {
   const isAuthenticated = useAuthStore((s: AuthState) => s.isAuthenticated)
-  const isInitialized   = useAuthStore((s: AuthState) => s.isInitialized)
+  const isInitialized = useAuthStore((s: AuthState) => s.isInitialized)
+  const user = useAuthStore((s: AuthState) => s.user)
 
   useEffect(() => {
     if (isInitialized && !isAuthenticated) {
       router.replace('/(auth)/login')
+      return
     }
-  }, [isInitialized, isAuthenticated])
+
+    if (isInitialized && isAuthenticated && user?.role === 'seeker' && !user?.profile_completed) {
+      router.replace('/onboarding')
+    }
+  }, [isInitialized, isAuthenticated, user])
 
   return (
     <Tabs
@@ -38,43 +44,40 @@ export default function SeekerLayout() {
         name="index"
         options={{
           title: 'Home',
-          tabBarIcon: ({ color }: { color: string }) => (
-            <Text style={{ fontSize: 20, color }}>🏠</Text>
-          ),
+          tabBarIcon: ({ color }: { color: string }) => <TabCode color={color} label="HM" />,
         }}
       />
       <Tabs.Screen
         name="jobs"
         options={{
           title: 'Find Jobs',
-          tabBarIcon: ({ color }: { color: string }) => (
-            <Text style={{ fontSize: 20, color }}>🔍</Text>
-          ),
+          tabBarIcon: ({ color }: { color: string }) => <TabCode color={color} label="JOB" />,
         }}
       />
       <Tabs.Screen
         name="applications"
         options={{
           title: 'Applied',
-          tabBarIcon: ({ color }: { color: string }) => (
-            <Text style={{ fontSize: 20, color }}>📋</Text>
-          ),
+          tabBarIcon: ({ color }: { color: string }) => <TabCode color={color} label="APP" />,
         }}
       />
       <Tabs.Screen
         name="profile"
         options={{
           title: 'Profile',
-          tabBarIcon: ({ color }: { color: string }) => (
-            <Text style={{ fontSize: 20, color }}>👤</Text>
-          ),
+          tabBarIcon: ({ color }: { color: string }) => <TabCode color={color} label="ME" />,
         }}
       />
     </Tabs>
   )
 }
 
+function TabCode({ color, label }: { color: string; label: string }) {
+  return <Text style={{ fontSize: 12, color, fontWeight: '800' }}>{label}</Text>
+}
+
 interface AuthState {
   isAuthenticated: boolean
   isInitialized: boolean
+  user: { role?: string; profile_completed?: boolean } | null
 }

@@ -50,13 +50,13 @@ export default function LoginScreen() {
 
     try {
       const data = await authService.login(email, password)
-      await setAuth(data.user, data.token)
-
-      if (data.user.role === 'seeker') {
-        router.replace('/(seeker)/')
-      } else {
+      if (data.user.role !== 'seeker') {
         setApiError('This app is for Job Seekers only. Use the web portal.')
+        return
       }
+
+      await setAuth(data.user, data.token)
+      router.replace(data.user.profile_completed ? '/(seeker)' : '/onboarding')
     } catch (err: any) {
       const status = err.response?.status
       if (status === 403 && err.response?.data?.email_unverified) {
@@ -133,9 +133,7 @@ export default function LoginScreen() {
           <View style={s.field}>
             <View style={s.labelRow}>
               <Text style={s.label}>Password</Text>
-              <TouchableOpacity onPress={() => router.push('/(auth)/forgot-password')}>
-                <Text style={s.forgotLink}>Forgot password?</Text>
-              </TouchableOpacity>
+              <Text style={s.forgotLink}>Forgot password is available on the web portal.</Text>
             </View>
             <View style={[s.pwWrap, getError('password') ? s.inputError : null]}>
               <TextInput
@@ -182,7 +180,7 @@ export default function LoginScreen() {
 
         {/* Footer */}
         <View style={s.footer}>
-          <Text style={s.footerText}>Don't have an account? </Text>
+          <Text style={s.footerText}>Do not have an account? </Text>
           <TouchableOpacity onPress={() => router.push('/(auth)/register')}>
             <Text style={s.footerLink}>Register here</Text>
           </TouchableOpacity>

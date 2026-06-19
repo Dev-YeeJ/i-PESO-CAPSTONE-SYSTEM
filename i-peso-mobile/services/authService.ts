@@ -1,30 +1,27 @@
 import apiClient from './api'
 
+export interface LoginPayload {
+  email: string
+  password: string
+}
+
+export interface SeekerRegisterPayload extends LoginPayload {
+  role: 'seeker'
+  first_name: string
+  last_name: string
+  mobile_number: string
+  password_confirmation: string
+}
+
 export const authService = {
   async login(email: string, password: string) {
     const res = await apiClient.post('/auth/login', { email, password })
     return res.data
   },
 
-  async register(data: Record<string, string>) {
-    try {
-      const res = await apiClient.post('/auth/register', data)
-      return res.data
-    } catch (error: any) {
-      console.log('=== REGISTER ERROR DEBUG ===')
-      console.log('Message:', error?.message)
-      console.log('Code:', error?.code)
-      console.log('Response status:', error?.response?.status)
-      try {
-        console.log('Response data:', JSON.stringify(error?.response?.data))
-      } catch (e) {
-        console.log('Response data: <unserializable>')
-      }
-      console.log('Request URL:', error?.config?.url)
-      console.log('Base URL:', error?.config?.baseURL)
-      console.log('=============================')
-      throw error
-    }
+  async register(data: SeekerRegisterPayload) {
+    const res = await apiClient.post('/auth/register', data)
+    return res.data
   },
 
   async verifyOtp(email: string, otp: string) {

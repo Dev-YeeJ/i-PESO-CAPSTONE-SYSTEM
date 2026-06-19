@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\Admin\AdminDashboardController;
+use App\Http\Controllers\Api\Admin\ApplicationController as AdminApplicationController;
 use App\Http\Controllers\Api\Admin\ConstituentCRM\EmployerController as AdminEmployerController;
 use App\Http\Controllers\Api\Admin\ConstituentCRM\SeekerController as AdminSeekerController;
 use App\Http\Controllers\Api\Admin\EmployerVerificationController;
@@ -11,12 +12,14 @@ use App\Http\Controllers\Api\Admin\OccupationMappingController;
 use App\Http\Controllers\Api\Admin\SystemReports\ActivityController as AdminActivityController;
 use App\Http\Controllers\Api\Admin\SystemReports\ReportController as AdminReportController;
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\EmployerApplicationController;
 use App\Http\Controllers\Api\EmployerJobVacancyController;
 use App\Http\Controllers\Api\EmployerNotificationController;
 use App\Http\Controllers\Api\EmployerRegistrationController;
 use App\Http\Controllers\Api\GoogleMapsController;
 use App\Http\Controllers\Api\OccupationController;
 use App\Http\Controllers\Api\SeekerAiSuggestionController;
+use App\Http\Controllers\Api\SeekerApplicationController;
 use App\Http\Controllers\Api\SeekerCertificateController;
 use App\Http\Controllers\Api\SeekerController;
 use App\Http\Controllers\Api\SeekerNearbyJobController;
@@ -64,6 +67,9 @@ Route::middleware('auth:sanctum')->group(function () {
 
         Route::middleware('verified.employer')->group(function () {
             Route::apiResource('vacancies', EmployerJobVacancyController::class);
+            Route::get('/applications', [EmployerApplicationController::class, 'index']);
+            Route::get('/applications/{application}', [EmployerApplicationController::class, 'show']);
+            Route::patch('/applications/{application}/status', [EmployerApplicationController::class, 'updateStatus']);
         });
     });
 
@@ -72,6 +78,9 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/profile', [SeekerController::class, 'getProfile']);
         Route::get('/nearby-jobs', [SeekerNearbyJobController::class, 'getNearbyJobs'])
             ->middleware('throttle:60,1');
+        Route::get('/applications', [SeekerApplicationController::class, 'index']);
+        Route::post('/jobs/{vacancy}/apply', [SeekerApplicationController::class, 'apply'])
+            ->middleware('throttle:20,1');
         Route::post('/step-1', [SeekerController::class, 'saveStep1']);
         Route::post('/step-2', [SeekerController::class, 'saveStep2']);
         Route::post('/step-3', [SeekerController::class, 'saveStep3']);
@@ -102,6 +111,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::prefix('admin')->middleware('admin')->group(function () {
         // Dashboard
         Route::get('/dashboard/stats', [AdminDashboardController::class, 'stats']);
+        Route::get('/applications', [AdminApplicationController::class, 'index']);
 
         // Seekers
         Route::get('/seekers', [AdminSeekerController::class, 'index']);

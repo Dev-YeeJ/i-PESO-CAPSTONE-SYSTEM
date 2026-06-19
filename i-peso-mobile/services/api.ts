@@ -2,7 +2,7 @@ import axios from 'axios'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import Constants from 'expo-constants'
 
-const DEFAULT_API_PORT = 8001
+const DEFAULT_API_PORT = 8000
 const DEFAULT_FALLBACK_HOST = '127.0.0.1'
 
 function computeBaseUrl() {
@@ -28,6 +28,7 @@ function computeBaseUrl() {
 }
 
 const BASE_URL = computeBaseUrl()
+export { BASE_URL as API_BASE_URL }
 
 const apiClient = axios.create({
   baseURL: BASE_URL,

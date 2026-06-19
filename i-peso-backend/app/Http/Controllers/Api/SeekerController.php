@@ -518,11 +518,29 @@ class SeekerController extends Controller
             'employment_status' => ['required', 'in:employed,unemployed'],
             // Employed sub-fields
             'employment_type' => ['nullable', 'required_if:employment_status,employed', 'in:wage_employed,self_employed'],
-            'self_employed_type' => ['nullable', 'required_if:employment_type,self_employed', 'string', 'max:100'],
+            'self_employed_type' => ['nullable', 'required_if:employment_type,self_employed', Rule::in([
+                'fisherman_fisherfolk',
+                'vendor_retailer',
+                'home_based_worker',
+                'transport',
+                'domestic_worker',
+                'freelancer',
+                'artisan_craft_worker',
+                'others',
+            ])],
             'self_employed_type_others' => ['nullable', 'required_if:self_employed_type,others', 'string', 'max:255'],
             // Unemployed sub-fields
             'unemployment_months' => ['nullable', 'required_if:employment_status,unemployed', 'integer', 'min:0', 'max:999'],
-            'unemployment_reason' => ['nullable', 'required_if:employment_status,unemployed', 'string', 'max:100'],
+            'unemployment_reason' => ['nullable', 'required_if:employment_status,unemployed', Rule::in([
+                'fresh_graduate',
+                'finished_contract',
+                'resigned',
+                'retired',
+                'terminated_local',
+                'terminated_abroad',
+                'terminated_calamity',
+                'others',
+            ])],
             'unemployment_reason_others' => ['nullable', 'required_if:unemployment_reason,others', 'string', 'max:255'],
             'unemployment_terminated_country' => ['nullable', 'required_if:unemployment_reason,terminated_abroad', 'string', 'max:100'],
             // OFW

@@ -16,6 +16,16 @@ export const getNearbyJobs = async ({ radiusKm = 15, limit = 20 } = {}) => {
   return response.data
 }
 
+export const getSeekerApplications = async () => {
+  const response = await apiClient.get('/seeker/applications')
+  return response.data
+}
+
+export const applyToJob = async (postId) => {
+  const response = await apiClient.post(`/seeker/jobs/${postId}/apply`)
+  return response.data
+}
+
 export const uploadCertificate = async (formData) => {
   const response = await apiClient.post('/seeker/certificates', formData)
   return response.data

@@ -21,6 +21,7 @@ import {
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { Badge, Button, Card, CardHeader } from '@/components/ui'
+import { applyToJob } from '@/services/seekerService'
 
 const savedJobsStorageKey = 'ipeso_seeker_saved_jobs'
 
@@ -215,15 +216,39 @@ export default function JobSeekerHome({
   const [activeTab, setActiveTab] = useState('for_you')
   const [selectedJob, setSelectedJob] = useState(null)
   const [savedJobIds, setSavedJobIds] = useState(() => readSavedJobs())
+  const [appliedJobs, setAppliedJobs] = useState({})
+  const [applyingJobIds, setApplyingJobIds] = useState([])
 
   const seeker = useMemo(() => buildSeekerView(profile, user), [profile, user])
   const apiJobs = useMemo(() => normalizeApiJobs(jobsData?.jobs ?? []), [jobsData])
-  const jobs = apiJobs.length ? apiJobs : fallbackJobs
+  const jobs = useMemo(() => {
+    const source = apiJobs.length ? apiJobs : fallbackJobs
+
+    return source.map((job) => ({
+      ...job,
+      hasApplied: Boolean(appliedJobs[job.id]) || job.hasApplied,
+      applicationStatus: appliedJobs[job.id]?.status ?? job.applicationStatus,
+      applicationId: appliedJobs[job.id]?.apply_id ?? job.applicationId,
+    }))
+  }, [apiJobs, appliedJobs])
   const usingFallbackJobs = apiJobs.length === 0
 
   useEffect(() => {
     window.localStorage.setItem(savedJobsStorageKey, JSON.stringify(savedJobIds))
   }, [savedJobIds])
+
+  useEffect(() => {
+    const next = {}
+    for (const job of apiJobs) {
+      if (job.hasApplied) {
+        next[job.id] = {
+          apply_id: job.applicationId,
+          status: job.applicationStatus ?? 'pending',
+        }
+      }
+    }
+    setAppliedJobs(next)
+  }, [apiJobs])
 
   const normalizedQuery = searchQuery.trim().toLowerCase()
   const searchedJobs = useMemo(() => {
@@ -286,9 +311,37 @@ export default function JobSeekerHome({
     toast.success(isSaved ? `${job.title} removed from saved jobs.` : `${job.title} saved.`)
   }
 
-  const handleQuickApply = (job) => {
-    toast.success(`Application workflow opened for ${job.title}.`)
-    setSelectedJob(job)
+  const handleQuickApply = async (job) => {
+    if (String(job.id).startsWith('local-')) {
+      toast.error('This is only a sample job. Apply from a live employer vacancy.')
+      return
+    }
+
+    if (job.hasApplied) {
+      toast.success(`You already applied to ${job.title}.`)
+      return
+    }
+
+    setApplyingJobIds((current) => [...current, job.id])
+
+    try {
+      const data = await applyToJob(job.id)
+      setAppliedJobs((current) => ({
+        ...current,
+        [job.id]: {
+          apply_id: data.application?.apply_id,
+          status: data.application?.status ?? 'pending',
+        },
+      }))
+      toast.success(`Application submitted for ${job.title}.`)
+      setSelectedJob(null)
+    } catch (caught) {
+      const body = caught.response?.data
+      const firstError = body?.errors ? Object.values(body.errors)[0]?.[0] : ''
+      toast.error(firstError || body?.message || 'Unable to submit application.')
+    } finally {
+      setApplyingJobIds((current) => current.filter((id) => id !== job.id))
+    }
   }
 
   return (
@@ -423,6 +476,7 @@ export default function JobSeekerHome({
                     onSave={() => toggleSavedJob(job)}
                     onDetails={() => setSelectedJob(job)}
                     onQuickApply={() => handleQuickApply(job)}
+                    applying={applyingJobIds.includes(job.id)}
                   />
                 ))
               ) : (
@@ -451,13 +505,15 @@ export default function JobSeekerHome({
           saved={savedJobIds.includes(selectedJob.id)}
           onClose={() => setSelectedJob(null)}
           onSave={() => toggleSavedJob(selectedJob)}
+          onQuickApply={() => handleQuickApply(selectedJob)}
+          applying={applyingJobIds.includes(selectedJob.id)}
         />
       )}
     </div>
   )
 }
 
-function JobFeedCard({ job, featured = false, saved = false, onSave, onDetails, onQuickApply }) {
+function JobFeedCard({ job, featured = false, saved = false, applying = false, onSave, onDetails, onQuickApply }) {
   const matchMeta = matchMetaFor(job.matchScore)
 
   return (
@@ -537,8 +593,8 @@ function JobFeedCard({ job, featured = false, saved = false, onSave, onDetails, 
             <Button variant="outline" onClick={onDetails}>
               Details
             </Button>
-            <Button variant="navy" icon={ChevronRight} onClick={onQuickApply}>
-              Quick Apply
+            <Button variant={job.hasApplied ? 'outline' : 'navy'} icon={ChevronRight} onClick={onQuickApply} disabled={job.hasApplied || applying}>
+              {job.hasApplied ? `Applied: ${titleCase(job.applicationStatus || 'pending')}` : applying ? 'Submitting...' : 'Quick Apply'}
             </Button>
           </div>
         </div>
@@ -547,7 +603,7 @@ function JobFeedCard({ job, featured = false, saved = false, onSave, onDetails, 
   )
 }
 
-function JobDetailModal({ job, saved, onClose, onSave }) {
+function JobDetailModal({ job, saved, applying = false, onClose, onSave, onQuickApply }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 px-4 py-6">
       <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-xl bg-white shadow-2xl">
@@ -616,8 +672,8 @@ function JobDetailModal({ job, saved, onClose, onSave }) {
           <Button variant="outline" onClick={onSave} icon={saved ? BookmarkCheck : Bookmark}>
             {saved ? 'Saved' : 'Save Job'}
           </Button>
-          <Button variant="navy" icon={ChevronRight} onClick={() => toast.success(`Application workflow opened for ${job.title}.`)}>
-            Quick Apply
+          <Button variant={job.hasApplied ? 'outline' : 'navy'} icon={ChevronRight} onClick={onQuickApply} disabled={job.hasApplied || applying}>
+            {job.hasApplied ? `Applied: ${titleCase(job.applicationStatus || 'pending')}` : applying ? 'Submitting...' : 'Quick Apply'}
           </Button>
         </div>
       </div>
@@ -882,6 +938,9 @@ function normalizeApiJobs(rows) {
       postedAt: row.posted_at,
       deadline: row.application_deadline,
       description: row.job_description,
+      hasApplied: Boolean(row.has_applied),
+      applicationId: row.application_id,
+      applicationStatus: row.application_status,
       matchSummary: {
         occupation: factorScore(factors.occupation),
         skills: factorScore(factors.skills),

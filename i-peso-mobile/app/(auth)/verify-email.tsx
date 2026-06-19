@@ -74,13 +74,14 @@ export default function VerifyEmailScreen() {
 
     try {
       const data = await authService.verifyOtp(email!, otp)
-      await setAuth(data.user, data.token)
-
-      if (data.user.role === 'seeker') {
-        router.replace('/(seeker)/')
-      } else {
+      if (data.user.role !== 'seeker') {
+        setApiError('This app is for Job Seekers only. Use the web portal.')
         router.replace('/(auth)/login')
+        return
       }
+
+      await setAuth(data.user, data.token)
+      router.replace(data.user.profile_completed ? '/(seeker)' : '/onboarding')
     } catch (err: any) {
       setApiError(err.response?.data?.message ?? 'Invalid code. Please try again.')
       setDigits(Array(6).fill(''))

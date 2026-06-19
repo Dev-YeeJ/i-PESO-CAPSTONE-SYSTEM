@@ -43,6 +43,13 @@ class SeekerNearbyJobController extends Controller
             $seeker->loadMissing('seekerSkills:id,seeker_id,skill_id');
         }
 
+        $applicationsByPost = Schema::hasTable('applications')
+            ? $seeker->applications()
+                ->select(['apply_id', 'post_id', 'status'])
+                ->get()
+                ->keyBy('post_id')
+            : collect();
+
         $with = ['employer:employer_id,company_name'];
         if (Schema::hasTable('job_vacancy_skills')) {
             $with[] = 'skillRequirements.skill.outgoingRelationships';
@@ -64,8 +71,9 @@ class SeekerNearbyJobController extends Controller
             )
             ->limit($candidateLimit)
             ->get()
-            ->map(function (JobVacancy $job) use ($matching, $seeker) {
+            ->map(function (JobVacancy $job) use ($matching, $seeker, $applicationsByPost) {
                 $match = $matching->calculateMatch($job, $seeker);
+                $application = $applicationsByPost->get($job->post_id);
 
                 return [
                     'post_id' => $job->post_id,
@@ -104,6 +112,9 @@ class SeekerNearbyJobController extends Controller
                     'spes_tupad_eligible' => $job->spes_tupad_eligible,
                     'distance_km' => round((float) $job->distance_km, 1),
                     'posted_at' => $job->created_at?->toISOString(),
+                    'has_applied' => (bool) $application,
+                    'application_id' => $application?->apply_id,
+                    'application_status' => $application?->status,
                 ];
             })
             ->sort(function (array $left, array $right) {

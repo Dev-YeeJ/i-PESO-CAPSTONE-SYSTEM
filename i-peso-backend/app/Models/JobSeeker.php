@@ -168,6 +168,11 @@ class JobSeeker extends Authenticatable
             ->latest();
     }
 
+    public function applications(): HasMany
+    {
+        return $this->hasMany(Application::class, 'seeker_id', 'seeker_id');
+    }
+
     // ===== HELPER METHODS =====
 
     /**

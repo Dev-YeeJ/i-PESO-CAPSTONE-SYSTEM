@@ -7,7 +7,7 @@ import { useAuthStore } from '@/stores/authStore'
 interface AuthState {
   isInitialized: boolean
   isAuthenticated: boolean
-  user: { role: string } | null
+  user: { role: string; profile_completed?: boolean } | null
 }
 
 export default function IndexScreen() {
@@ -19,7 +19,7 @@ export default function IndexScreen() {
     if (!isInitialized) return
 
     if (isAuthenticated && user?.role === 'seeker') {
-      router.replace('/(seeker)/')
+      router.replace(user.profile_completed ? '/(seeker)' : '/onboarding')
     } else {
       router.replace('/(auth)/login')
     }

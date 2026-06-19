@@ -215,4 +215,9 @@ class JobVacancy extends Model
     {
         return $this->hasMany(JobVacancyCertification::class, 'post_id', 'post_id');
     }
+
+    public function applications(): HasMany
+    {
+        return $this->hasMany(Application::class, 'post_id', 'post_id');
+    }
 }
