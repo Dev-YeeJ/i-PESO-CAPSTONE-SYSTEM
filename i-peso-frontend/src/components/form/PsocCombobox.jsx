@@ -39,7 +39,7 @@ export default function PsocCombobox({
       setLoading(true)
       try {
         const rows = await searchOccupations(query.trim(), Math.max(limit, 20), 'catalog')
-        setOptions(rows.filter((row) => getPsocCode(row)))
+        setOptions(rows.filter((row) => getCatalogCode(row)))
       } catch {
         setOptions([])
       } finally {
@@ -62,22 +62,22 @@ export default function PsocCombobox({
     return () => document.removeEventListener('mousedown', closeOnOutsideClick)
   }, [])
 
-  const selectedCode = getPsocCode(selectedOption) || normalizePsocCode(value)
+  const selectedCode = getCatalogCode(selectedOption) || normalizeCatalogCode(value)
   const displayValue = open ? query : formatOccupation(selectedOption, selectedCode)
   const filteredOptions = useMemo(
-    () => uniqueByPsoc(options).filter((option) => getPsocCode(option)),
+    () => uniqueByCatalogCode(options).filter((option) => getCatalogCode(option)),
     [options],
   )
 
   const selectOption = (occupation) => {
-    const psocCode = getPsocCode(occupation)
-    if (!psocCode) return
+    const catalogCode = getCatalogCode(occupation)
+    if (!catalogCode) return
 
-    const normalized = { ...occupation, psoc_code: psocCode }
+    const normalized = { ...occupation, catalog_code: catalogCode }
     setSelectedOption(normalized)
     setQuery('')
     setOpen(false)
-    onChange?.(psocCode, normalized)
+    onChange?.(catalogCode, normalized)
   }
 
   const clearSelection = () => {
@@ -147,7 +147,7 @@ export default function PsocCombobox({
         {open && !disabled && (
           <div className="absolute z-50 mt-2 max-h-80 w-full overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl">
             {query.trim().length < 2 && !selectedOption && (
-              <div className="px-4 py-3 text-sm text-slate-500">Type at least 2 characters to search official occupation codes.</div>
+              <div className="px-4 py-3 text-sm text-slate-500">Type at least 2 characters to search standardized occupations.</div>
             )}
 
             {loading && (
@@ -158,13 +158,13 @@ export default function PsocCombobox({
             )}
 
             {!loading && query.trim().length >= 2 && filteredOptions.length === 0 && (
-              <div className="px-4 py-3 text-sm text-slate-500">No matching PSOC occupation found.</div>
+              <div className="px-4 py-3 text-sm text-slate-500">No matching occupation found.</div>
             )}
 
             {!loading && filteredOptions.length > 0 && (
               <div className="max-h-80 overflow-y-auto py-1" role="listbox">
                 {filteredOptions.map((occupation) => {
-                  const code = getPsocCode(occupation)
+                  const code = getCatalogCode(occupation)
                   const active = selectedCode === code
 
                   return (
@@ -195,7 +195,7 @@ export default function PsocCombobox({
         )}
       </div>
 
-      <p className="mt-1.5 text-xs text-slate-500">Select an official occupation result. Typed text is never saved as the PSOC anchor.</p>
+      <p className="mt-1.5 text-xs text-slate-500">Select a standardized occupation result. Typed text alone is not saved.</p>
       {error && <p className="mt-1.5 text-xs font-semibold text-red-600">{error}</p>}
     </div>
   )
@@ -209,29 +209,36 @@ function MetaBadge({ children }) {
   )
 }
 
-function uniqueByPsoc(rows) {
+function uniqueByCatalogCode(rows) {
   const seen = new Set()
   return rows.filter((row) => {
-    const code = getPsocCode(row)
+    const code = getCatalogCode(row)
     if (!code || seen.has(code)) return false
     seen.add(code)
     return true
   })
 }
 
-function getPsocCode(occupation) {
+function getCatalogCode(occupation) {
   if (!occupation) return ''
-  return normalizePsocCode(occupation.psoc_code || occupation.code || occupation.classification_code)
+  return normalizeCatalogCode(
+    occupation.catalog_code
+      || occupation.code
+      || occupation.classification_code
+      || occupation.psoc_code,
+  )
 }
 
-function normalizePsocCode(value) {
-  const match = String(value ?? '').match(/\d{4}/)
-  return match?.[0] ?? ''
+function normalizeCatalogCode(value) {
+  return String(value ?? '')
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9._-]/g, '')
 }
 
 function formatOccupation(occupation, fallbackCode = '') {
   if (!occupation) return fallbackCode
-  const code = getPsocCode(occupation) || fallbackCode
+  const code = getCatalogCode(occupation) || fallbackCode
   const title = occupation.title ?? occupation.name
   if (code && title) return `${code} - ${title}`
   return title || code

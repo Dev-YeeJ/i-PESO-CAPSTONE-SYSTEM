@@ -54,9 +54,12 @@ apiClient.interceptors.response.use(
       // Clear invalid token from localStorage
       localStorage.removeItem('ipeso_token')
       localStorage.removeItem('ipeso-auth')
-      
-      // Let the error propagate so components can handle it gracefully
-      // Router guards will naturally redirect to login if needed
+
+      // Keep the in-memory auth store in sync so protected routes redirect
+      // immediately instead of leaving a stale onboarding screen visible.
+      void import('@/stores/authStore').then(({ useAuthStore }) => {
+        useAuthStore.getState().clearAuth()
+      })
     }
     return Promise.reject(error)
   }

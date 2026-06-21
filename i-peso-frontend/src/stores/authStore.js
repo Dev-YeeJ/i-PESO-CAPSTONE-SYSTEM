@@ -55,6 +55,7 @@ export const useAuthStore = create((set, get) => ({
 
   clearAuth: () => {
     localStorage.removeItem('ipeso_token')
+    localStorage.removeItem('ipeso-auth')
     set({ user: null, token: null, isAuthenticated: false })
   },
 

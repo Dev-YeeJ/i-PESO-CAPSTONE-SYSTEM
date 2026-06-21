@@ -1152,7 +1152,7 @@ const Step3 = ({ form, errors, onChange }) => {
         <p style={{ fontSize: '13px', fontWeight: '700', color: '#374151', marginBottom: '10px' }}>
           Preferred Occupation <span style={{ color: '#ef4444' }}>*</span>
           <span style={{ marginLeft: '6px', border: '1px solid #bfdbfe', borderRadius: '999px', padding: '2px 7px', color: '#1d4ed8', backgroundColor: '#eff6ff', fontSize: '10px', fontWeight: '800' }}>
-            PSOC coded
+            Standardized
           </span>
           <span style={{ fontSize: '11px', fontWeight: '400', color: '#94a3b8', marginLeft: '6px' }}>(at least 1, up to 3)</span>
         </p>
@@ -1180,7 +1180,7 @@ const Step3 = ({ form, errors, onChange }) => {
             ])
           }}
           limit={50}
-          placeholder={occupations.length >= 3 ? 'Maximum of 3 occupations selected' : 'Search official occupation title or PSOC code'}
+          placeholder={occupations.length >= 3 ? 'Maximum of 3 occupations selected' : 'Search occupation title or catalog code'}
           error={errors.preferred_occupations}
           disabled={occupations.length >= 3}
         />
@@ -1202,7 +1202,7 @@ const Step3 = ({ form, errors, onChange }) => {
           </div>
         )}
         <p style={{ fontSize: '11px', color: '#64748b', marginTop: '7px', lineHeight: '1.5' }}>
-          Select official occupation results only. Typed text is used for search, not saved as a matching anchor.
+          Select a standardized occupation result. Typed text is used for search and is not saved by itself.
         </p>
         {errors.preferred_occupations && <p style={{ fontSize: '11px', color: '#ef4444', marginTop: '6px' }}>{errors.preferred_occupations}</p>}
       </div>
