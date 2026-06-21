@@ -1,6 +1,6 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import toast from 'react-hot-toast'
-import { Check, Loader2, Plus, Search, Sparkles, X } from 'lucide-react'
+import { Check, Loader2, Plus, Search, X } from 'lucide-react'
 import {
   SOFT_SKILL_SUGGESTIONS,
   TECHNICAL_SKILL_SUGGESTIONS,
@@ -53,7 +53,7 @@ const LOCAL_SOFT_SKILLS = [
   'Service Orientation',
 ]
 
-const AI_STANDARDIZATION_RULES = [
+const SKILL_CLASSIFICATION_RULES = [
   { patterns: ['excell', 'spreadsheet'], skill: 'Microsoft Excel', type: 'hard' },
   { patterns: ['drive', 'driver', 'driving'], skill: 'Driver', type: 'hard', is_dole: true },
   { patterns: ['computer', 'encoding', 'encode'], skill: 'Computer Literate', type: 'hard', is_dole: true },
@@ -80,7 +80,6 @@ export default function SeekerSkillsForm({
   const [query, setQuery] = useState('')
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
-  const [aiLoading, setAiLoading] = useState(false)
   const [results, setResults] = useState([])
   const [activeIndex, setActiveIndex] = useState(0)
   const [warning, setWarning] = useState('')
@@ -109,8 +108,8 @@ export default function SeekerSkillsForm({
     : filteredRecommendationPool.slice(0, 10)
   const normalizedQuery = normalizeText(query)
   const hasExactResult = results.some((skill) => normalizeText(skill.name) === normalizedQuery)
-  const showAiOption = normalizedQuery.length >= 2 && !hasExactResult && results.length === 0
-  const optionCount = results.length + (showAiOption ? 1 : 0)
+  const showCustomOption = normalizedQuery.length >= 2 && !hasExactResult && results.length === 0
+  const optionCount = results.length + (showCustomOption ? 1 : 0)
 
   useEffect(() => {
     if (normalizedQuery.length < 2 || searchDisabled) {
@@ -123,7 +122,7 @@ export default function SeekerSkillsForm({
     const timer = window.setTimeout(async () => {
       setLoading(true)
       try {
-        const rows = await searchUnifiedSkillTaxonomy(query)
+        const rows = await searchUnifiedSkillCatalog(query)
         if (!ignore) {
           setResults(rows.filter((skill) => !selectedKeys.has(skillKey(skill))).slice(0, SEARCH_LIMIT))
           setActiveIndex(0)
@@ -189,15 +188,9 @@ export default function SeekerSkillsForm({
     emit(selectedSkills.filter((item) => skillKey(item) !== skillKey(skill)))
   }
 
-  const standardizeWithAI = async () => {
-    if (normalizedQuery.length < 2 || aiLoading) return
-    setAiLoading(true)
-    try {
-      const skill = await mockStandardizeSkillWithAI(query)
-      addSkill(skill)
-    } finally {
-      setAiLoading(false)
-    }
+  const addCustomSkill = () => {
+    if (normalizedQuery.length < 2) return
+    addSkill(classifyCustomSkill(query))
   }
 
   const handleKeyDown = (event) => {
@@ -226,8 +219,8 @@ export default function SeekerSkillsForm({
       if (!open) return
       if (activeIndex < results.length) {
         addSkill(results[activeIndex])
-      } else if (showAiOption) {
-        standardizeWithAI()
+      } else if (showCustomOption) {
+        addCustomSkill()
       }
     }
   }
@@ -286,8 +279,10 @@ export default function SeekerSkillsForm({
               <button
                 key={skillKey(skill)}
                 type="button"
-                onClick={() => addSkill(skill)}
-                disabled={selected || limitReached || disabled}
+                onClick={() => selected ? removeSkill(skill) : addSkill(skill)}
+                disabled={limitReached || disabled}
+                aria-pressed={selected}
+                aria-label={`${selected ? 'Remove' : 'Add'} ${skill.name}`}
                 className={`inline-flex max-w-full items-center gap-2 rounded-full border px-3 py-2 text-sm font-extrabold transition focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                   selected
                     ? 'border-blue-600 bg-blue-600 text-white'
@@ -397,35 +392,31 @@ export default function SeekerSkillsForm({
                 )
               })}
 
-              {!loading && showAiOption && (
+              {!loading && showCustomOption && (
                 <button
                   id={`${listboxId}-option-${results.length}`}
                   type="button"
                   role="option"
                   aria-selected={activeIndex === results.length}
                   onMouseDown={(event) => event.preventDefault()}
-                  onClick={standardizeWithAI}
+                  onClick={addCustomSkill}
                   className={`flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition ${
-                    activeIndex === results.length ? 'bg-indigo-50' : 'bg-white hover:bg-indigo-50'
+                    activeIndex === results.length ? 'bg-blue-50' : 'bg-white hover:bg-blue-50'
                   }`}
                 >
                   <span className="min-w-0">
-                    <span className="block truncate text-sm font-black text-indigo-950">
-                      Use AI to standardize "{query.trim()}"
+                    <span className="block truncate text-sm font-black text-slate-950">
+                      Add "{query.trim()}"
                     </span>
-                    <span className="mt-1 block text-xs font-semibold text-indigo-700">
-                      We will clean up the wording and classify it as a hard or soft skill.
+                    <span className="mt-1 block text-xs font-semibold text-slate-600">
+                      Add as a {inferSoftSkill(normalizedQuery) ? 'Soft Skill' : 'Hard Skill'} because no close catalog match was found.
                     </span>
                   </span>
-                  {aiLoading ? (
-                    <Loader2 className="h-4 w-4 shrink-0 animate-spin text-indigo-700" />
-                  ) : (
-                    <Sparkles className="h-4 w-4 shrink-0 text-indigo-700" />
-                  )}
+                  <Plus className="h-4 w-4 shrink-0 text-blue-700" />
                 </button>
               )}
 
-              {!loading && results.length === 0 && !showAiOption && (
+              {!loading && results.length === 0 && !showCustomOption && (
                 <p className="px-4 py-3 text-sm font-semibold text-slate-500">
                   No skill matches yet. Try another keyword.
                 </p>
@@ -445,12 +436,74 @@ export default function SeekerSkillsForm({
           <span aria-hidden="true">.</span>
           <span>{softCount} / {SOFT_LIMIT} soft skills</span>
         </div>
+        {selectedSkills.length === 0 && (
+          <p id="skills-save-requirement" className="mt-2 text-xs font-semibold text-amber-700" role="status">
+            Select at least 1 skill to continue.
+          </p>
+        )}
+      </div>
+
+      <div className="mt-5 grid gap-4 md:grid-cols-2" aria-label="Selected skill categories">
+        <SkillCategoryPanel
+          title="Hard Skills"
+          description="Technical, software, trade, vocational, and professional abilities."
+          skills={selectedSkills.filter((skill) => skill.type === 'hard')}
+          count={hardCount}
+          limit={HARD_LIMIT}
+          onRemove={removeSkill}
+        />
+        <SkillCategoryPanel
+          title="Soft Skills"
+          description="Communication, teamwork, adaptability, and workplace behavior."
+          skills={selectedSkills.filter((skill) => skill.type === 'soft')}
+          count={softCount}
+          limit={SOFT_LIMIT}
+          onRemove={removeSkill}
+        />
       </div>
 
       <SelectedSkills
         selectedSkills={selectedSkills}
         onRemove={removeSkill}
       />
+    </section>
+  )
+}
+
+function SkillCategoryPanel({ title, description, skills, count, limit, onRemove }) {
+  return (
+    <section className="rounded-xl border border-slate-200 bg-white p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h4 className="text-sm font-black text-slate-950">{title}</h4>
+          <p className="mt-1 text-xs leading-5 text-slate-500">{description}</p>
+        </div>
+        <span className="shrink-0 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-black text-slate-700" aria-label={`${count} of ${limit} selected`}>
+          {count}/{limit}
+        </span>
+      </div>
+
+      {skills.length === 0 ? (
+        <p className="mt-4 rounded-lg border border-dashed border-slate-300 px-3 py-3 text-xs font-semibold text-slate-500">
+          No {title.toLowerCase()} selected yet.
+        </p>
+      ) : (
+        <div className="mt-4 flex flex-wrap gap-2">
+          {skills.map((skillItem) => (
+            <button
+              key={skillKey(skillItem)}
+              type="button"
+              onClick={() => onRemove(skillItem)}
+              className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-bold text-slate-700 transition hover:border-red-200 hover:bg-red-50 hover:text-red-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              aria-label={`Remove ${skillItem.name}`}
+              title={`Remove ${skillItem.name}`}
+            >
+              <span className="truncate">{skillItem.name}</span>
+              <X className="h-3.5 w-3.5 shrink-0" />
+            </button>
+          ))}
+        </div>
+      )}
     </section>
   )
 }
@@ -527,7 +580,7 @@ function SkillGroup({ title, skills, onRemove }) {
   )
 }
 
-async function searchUnifiedSkillTaxonomy(query) {
+async function searchUnifiedSkillCatalog(query) {
   const [technicalRows, softRows] = await Promise.all([
     searchSkills(query, 'technical', SEARCH_LIMIT),
     searchSkills(query, 'soft', SEARCH_LIMIT),
@@ -537,7 +590,6 @@ async function searchUnifiedSkillTaxonomy(query) {
     ...technicalRows.map((skill) => normalizeSkill({
       ...skill,
       type: 'hard',
-      is_dole: false,
     })),
     ...softRows.map((skill) => normalizeSkill({
       ...skill,
@@ -559,6 +611,8 @@ function searchLocalSkills(query) {
       name,
       type: 'hard',
       is_dole: OFFICIAL_DOLE_SKILLS.some((skill) => normalizeText(skill) === normalizeText(name)),
+      source: OFFICIAL_DOLE_SKILLS.some((skill) => normalizeText(skill) === normalizeText(name)) ? 'dole' : 'system',
+      is_official: true,
       proficiency: 'Intermediate',
     })),
     ...LOCAL_SOFT_SKILLS.map((name, index) => ({
@@ -566,6 +620,8 @@ function searchLocalSkills(query) {
       name,
       type: 'soft',
       is_dole: false,
+      source: 'system',
+      is_official: true,
       proficiency: 'Intermediate',
     })),
   ].filter((skill) => normalizeText(skill.name).includes(normalized))
@@ -582,6 +638,8 @@ function searchLocalDoleSkills(query) {
       name,
       type: 'hard',
       is_dole: true,
+      source: 'dole',
+      is_official: true,
     }))
 }
 
@@ -645,25 +703,29 @@ function buildRecommendations(preferredOccupations) {
     skill('Data Entry', 'hard'),
     skill('Microsoft Office', 'hard'),
     skill('Critical Thinking', 'soft'),
-  ])
+  ]).map((skillItem) => ({
+    ...skillItem,
+    source: skillItem.is_dole ? 'dole' : 'occupation_recommended',
+    is_recommended: true,
+  }))
 }
 
-function mockStandardizeSkillWithAI(input) {
-  return new Promise((resolve) => {
-    window.setTimeout(() => {
-      const normalized = normalizeText(input)
-      const rule = AI_STANDARDIZATION_RULES.find((item) => (
-        item.patterns.some((pattern) => normalized.includes(normalizeText(pattern)))
-      ))
+function classifyCustomSkill(input) {
+  const normalized = normalizeText(input)
+  const rule = SKILL_CLASSIFICATION_RULES.find((item) => (
+    item.patterns.some((pattern) => normalized.includes(normalizeText(pattern)))
+  ))
 
-      if (rule) {
-        resolve(skill(rule.skill, rule.type, Boolean(rule.is_dole)))
-        return
-      }
+  if (rule) {
+    return skill(rule.skill, rule.type, Boolean(rule.is_dole), {
+      source: rule.is_dole ? 'dole' : 'system',
+      is_official: true,
+    })
+  }
 
-      const type = inferSoftSkill(normalized) ? 'soft' : 'hard'
-      resolve(skill(titleCase(input), type, false))
-    }, 450)
+  return skill(titleCase(input), inferSoftSkill(normalized) ? 'soft' : 'hard', false, {
+    source: 'user_added',
+    is_official: false,
   })
 }
 
@@ -680,21 +742,29 @@ function normalizeSkill(item) {
   const isDole = Boolean(item.is_dole ?? item.is_official_dole_skill ?? item.isOfficialDoleSkill)
     || normalizeText(item.category).includes('dole')
     || OFFICIAL_DOLE_SKILLS.some((skillName) => normalizeText(skillName) === normalizeText(name))
+  const source = isDole ? 'dole' : normalizeMetadataSource(item.source)
+  const officialSource = ['dole', 'esco', 'system', 'occupation_recommended'].includes(source)
 
   return {
     skill_id: item.skill_id ?? item.id ?? stableMockId(name, type, isDole),
     name,
     type,
     is_dole: isDole,
+    source,
+    is_official: isDole || officialSource || Boolean(item.is_official ?? item.isOfficial),
+    is_recommended: Boolean(item.is_recommended ?? item.isRecommended),
     proficiency: normalizeProficiency(item.proficiency),
   }
 }
 
-function skill(name, type = 'hard', isDole = false) {
+function skill(name, type = 'hard', isDole = false, metadata = {}) {
   return normalizeSkill({
     name,
     type,
     is_dole: isDole,
+    source: isDole ? 'dole' : (metadata.source ?? 'system'),
+    is_official: isDole || (metadata.is_official ?? true),
+    is_recommended: metadata.is_recommended ?? false,
   })
 }
 
@@ -721,6 +791,13 @@ function skillKey(skillItem) {
 function normalizeSkillType(type) {
   const normalized = normalizeText(type)
   return normalized.includes('soft') ? 'soft' : 'hard'
+}
+
+function normalizeMetadataSource(source) {
+  const normalized = String(source ?? 'system').toLowerCase()
+  if (normalized === 'local_submitted' || normalized === 'user_added') return 'user_added'
+  if (['dole', 'esco', 'occupation_recommended', 'system'].includes(normalized)) return normalized
+  return 'system'
 }
 
 function normalizeProficiency(value) {

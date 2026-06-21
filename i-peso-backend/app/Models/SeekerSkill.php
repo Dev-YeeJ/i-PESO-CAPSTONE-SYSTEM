@@ -15,6 +15,10 @@ class SeekerSkill extends Model
         'skill_name',
         'normalized_skill_name',
         'skill_type',
+        'source',
+        'is_official',
+        'is_recommended',
+        'priority_score',
         'proficiency',
         'years_of_experience',
         'endorsement_count',
@@ -27,6 +31,9 @@ class SeekerSkill extends Model
      */
     protected $casts = [
         'skill_type' => 'string', // enum values are strings (dole_standard, technical, soft)
+        'is_official' => 'boolean',
+        'is_recommended' => 'boolean',
+        'priority_score' => 'decimal:2',
         'proficiency' => 'string', // enum values (beginner, intermediate, advanced, expert)
         'years_of_experience' => 'integer',
         'endorsement_count' => 'integer',

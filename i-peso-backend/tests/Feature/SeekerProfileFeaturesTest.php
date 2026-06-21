@@ -600,6 +600,59 @@ class SeekerProfileFeaturesTest extends TestCase
         ]);
     }
 
+    public function test_step_five_preserves_hidden_skill_source_metadata(): void
+    {
+        $seeker = $this->createSeeker();
+        Sanctum::actingAs($seeker);
+
+        $this->postJson('/api/seeker/step-5', [
+            'currently_in_school' => false,
+            'educations' => [[
+                'level' => 'tertiary',
+                'institution_name' => 'Urdaneta City University',
+                'course_strand' => 'Bachelor of Science in Information Technology',
+                'completion_status' => 'graduated',
+                'year_started' => 2021,
+                'year_graduated' => 2025,
+            ]],
+            'dole_skills' => [[
+                'name' => 'Computer Literate',
+                'source' => 'dole',
+                'is_official' => true,
+                'is_recommended' => true,
+            ]],
+            'technical_skills' => [[
+                'name' => 'Microsoft Excel',
+                'source' => 'occupation_recommended',
+                'is_official' => true,
+                'is_recommended' => true,
+            ]],
+            'soft_skills' => [[
+                'name' => 'Communication',
+                'source' => 'user_added',
+                'is_official' => false,
+                'is_recommended' => false,
+            ]],
+        ])->assertOk();
+
+        $this->assertDatabaseHas('seeker_skills', [
+            'seeker_id' => $seeker->getKey(),
+            'skill_name' => 'Computer Literate',
+            'skill_type' => 'dole_standard',
+            'source' => 'dole',
+            'is_official' => true,
+            'is_recommended' => true,
+        ]);
+        $this->assertDatabaseHas('seeker_skills', [
+            'seeker_id' => $seeker->getKey(),
+            'skill_name' => 'Communication',
+            'skill_type' => 'soft',
+            'source' => 'user_added',
+            'is_official' => false,
+            'is_recommended' => false,
+        ]);
+    }
+
     private function createSkillCatalogTable(): void
     {
         if (! Schema::hasTable('skill_catalog_entries')) {
@@ -996,6 +1049,10 @@ class SeekerProfileFeaturesTest extends TestCase
             $table->unsignedBigInteger('skill_id')->nullable();
             $table->string('skill_name');
             $table->string('skill_type');
+            $table->string('source')->default('system');
+            $table->boolean('is_official')->default(false);
+            $table->boolean('is_recommended')->default(false);
+            $table->decimal('priority_score', 5, 2)->nullable();
         });
         if (! Schema::hasColumn('seeker_skills', 'skill_id')) {
             Schema::table('seeker_skills', function (Blueprint $table) {

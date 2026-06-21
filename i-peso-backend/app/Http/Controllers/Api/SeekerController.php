@@ -775,14 +775,23 @@ class SeekerController extends Controller
                 if (is_array($value)) {
                     $name = Str::of((string) ($value['name'] ?? $value['skill_name'] ?? ''))->squish()->toString();
                     $proficiency = (string) ($value['proficiency'] ?? 'intermediate');
+                    $source = $this->normalizeSkillSource((string) ($value['source'] ?? 'system'));
+                    $isOfficial = (bool) ($value['is_official'] ?? false);
+                    $isRecommended = (bool) ($value['is_recommended'] ?? false);
                 } else {
                     $name = Str::of((string) $value)->squish()->toString();
                     $proficiency = 'intermediate';
+                    $source = 'system';
+                    $isOfficial = false;
+                    $isRecommended = false;
                 }
 
                 return [
                     'name' => $name,
                     'proficiency' => $this->normalizeSkillProficiency($proficiency),
+                    'source' => $source,
+                    'is_official' => $source === 'dole' || $isOfficial,
+                    'is_recommended' => $isRecommended,
                 ];
             })
             ->filter(fn (array $skill): bool => filled($skill['name']))
@@ -804,6 +813,34 @@ class SeekerController extends Controller
         );
 
         return $match['proficiency'] ?? 'intermediate';
+    }
+
+    private function skillSourceMetadata(array $items, string $skillName): array
+    {
+        $normalized = Str::lower(Str::squish($skillName));
+        $match = collect($items)->first(
+            fn (array $item): bool => Str::lower(Str::squish($item['name'])) === $normalized
+        );
+
+        return $this->filterSkillSourceMetadata([
+            'source' => $match['source'] ?? 'system',
+            'is_official' => (bool) ($match['is_official'] ?? false),
+            'is_recommended' => (bool) ($match['is_recommended'] ?? false),
+        ]);
+    }
+
+    private function filterSkillSourceMetadata(array $metadata): array
+    {
+        return collect($metadata)
+            ->filter(fn ($value, string $column): bool => Schema::hasColumn('seeker_skills', $column))
+            ->all();
+    }
+
+    private function normalizeSkillSource(string $source): string
+    {
+        return in_array($source, ['dole', 'esco', 'user_added', 'occupation_recommended', 'system'], true)
+            ? $source
+            : 'system';
     }
 
     private function normalizeSkillProficiency(string $value): string
@@ -997,6 +1034,9 @@ class SeekerController extends Controller
             'dole_skills.*.name' => ['sometimes', 'string', 'max:255'],
             'dole_skills.*.skill_name' => ['sometimes', 'string', 'max:255'],
             'dole_skills.*.proficiency' => ['sometimes', Rule::in(['beginner', 'intermediate', 'expert'])],
+            'dole_skills.*.source' => ['sometimes', 'string', Rule::in(['dole', 'esco', 'user_added', 'occupation_recommended', 'system'])],
+            'dole_skills.*.is_official' => ['sometimes', 'boolean'],
+            'dole_skills.*.is_recommended' => ['sometimes', 'boolean'],
 
             // Technical/Professional skills (custom, not on official NSRP form)
             'technical_skills' => ['nullable', 'array', 'max:20'],
@@ -1005,6 +1045,9 @@ class SeekerController extends Controller
             'technical_skills.*.name' => ['sometimes', 'string', 'max:255'],
             'technical_skills.*.skill_name' => ['sometimes', 'string', 'max:255'],
             'technical_skills.*.proficiency' => ['sometimes', Rule::in(['beginner', 'intermediate', 'expert'])],
+            'technical_skills.*.source' => ['sometimes', 'string', Rule::in(['dole', 'esco', 'user_added', 'occupation_recommended', 'system'])],
+            'technical_skills.*.is_official' => ['sometimes', 'boolean'],
+            'technical_skills.*.is_recommended' => ['sometimes', 'boolean'],
 
             // Soft/Interpersonal skills (custom, not on official NSRP form)
             'soft_skills' => ['nullable', 'array', 'max:10'],
@@ -1013,6 +1056,9 @@ class SeekerController extends Controller
             'soft_skills.*.name' => ['sometimes', 'string', 'max:255'],
             'soft_skills.*.skill_name' => ['sometimes', 'string', 'max:255'],
             'soft_skills.*.proficiency' => ['sometimes', Rule::in(['beginner', 'intermediate', 'expert'])],
+            'soft_skills.*.source' => ['sometimes', 'string', Rule::in(['dole', 'esco', 'user_added', 'occupation_recommended', 'system'])],
+            'soft_skills.*.is_official' => ['sometimes', 'boolean'],
+            'soft_skills.*.is_recommended' => ['sometimes', 'boolean'],
         ]);
 
         $validator->after(function ($validator) use ($request, $currentYear): void {
@@ -1160,6 +1206,11 @@ class SeekerController extends Controller
                     'skill_name' => trim($skill['name']),
                     'skill_type' => 'dole_standard',
                 ];
+                $skillData = array_merge($skillData, $this->filterSkillSourceMetadata([
+                    'source' => 'dole',
+                    'is_official' => true,
+                    'is_recommended' => $skill['is_recommended'],
+                ]));
                 if (Schema::hasColumn('seeker_skills', 'proficiency')) {
                     $skillData['proficiency'] = $skill['proficiency'];
                 }
@@ -1183,6 +1234,7 @@ class SeekerController extends Controller
                     'skill_name' => trim($skillName),
                     'skill_type' => 'technical',
                 ];
+                $skillData = array_merge($skillData, $this->skillSourceMetadata($submittedSkillItems, $skillName));
                 if (Schema::hasColumn('seeker_skills', 'proficiency')) {
                     $skillData['proficiency'] = $this->proficiencyForSkill($submittedSkillItems, $skillName);
                 }
@@ -1197,6 +1249,7 @@ class SeekerController extends Controller
                     'skill_name' => trim($skillName),
                     'skill_type' => 'soft',
                 ];
+                $skillData = array_merge($skillData, $this->skillSourceMetadata($submittedSkillItems, $skillName));
                 if (Schema::hasColumn('seeker_skills', 'proficiency')) {
                     $skillData['proficiency'] = $this->proficiencyForSkill($submittedSkillItems, $skillName);
                 }

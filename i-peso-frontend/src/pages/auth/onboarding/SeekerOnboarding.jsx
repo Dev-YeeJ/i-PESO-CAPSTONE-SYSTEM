@@ -1188,37 +1188,6 @@ const Step3 = ({ form, errors, onChange }) => {
         <p style={{ fontSize: '13px', fontWeight: '700', color: '#374151', marginBottom: '10px' }}>
           Preferred Occupation <span style={{ color: '#ef4444' }}>*</span>
           <span style={{ marginLeft: '6px', border: '1px solid #bfdbfe', borderRadius: '999px', padding: '2px 7px', color: '#1d4ed8', backgroundColor: '#eff6ff', fontSize: '10px', fontWeight: '800' }}>
-<<<<<<< HEAD
-            Standardized
-          </span>
-          <span style={{ fontSize: '11px', fontWeight: '400', color: '#94a3b8', marginLeft: '6px' }}>(at least 1, up to 3)</span>
-        </p>
-        <PsocCombobox
-          key={`preferred-occupation-${occupations.map((occupation) => occupation.id ?? occupation.psoc_code).join('-')}`}
-          selected={null}
-          value=""
-          onChange={(psocCode, occupation) => {
-            if (!occupation || occupations.length >= 3) return
-            const alreadySelected = occupations.some((item) => (
-              catalogOccupationId(item.id) === catalogOccupationId(occupation.id)
-              || (item.psoc_code && item.psoc_code === psocCode)
-            ))
-            if (alreadySelected) return
-
-            setField('preferred_occupations', [
-              ...occupations,
-              {
-                ...occupation,
-                id: catalogOccupationId(occupation.id),
-                psoc_code: psocCode,
-                is_general: false,
-                is_ai_generated: false,
-              },
-            ])
-          }}
-          limit={50}
-          placeholder={occupations.length >= 3 ? 'Maximum of 3 occupations selected' : 'Search occupation title or catalog code'}
-=======
             Broad Field
           </span>
           <span style={{ fontSize: '11px', fontWeight: '400', color: '#94a3b8', marginLeft: '6px' }}>(at least 1, up to 3)</span>
@@ -1231,15 +1200,10 @@ const Step3 = ({ form, errors, onChange }) => {
           broadFieldOnly
           onChange={(nextOccupations) => setField('preferred_occupations', nextOccupations)}
           placeholder={occupations.length >= 3 ? 'Maximum of 3 occupations selected' : 'Type your specific job title, e.g. Teacher, Cashier, React Developer'}
->>>>>>> 74b8ba0c70cb12faa22abd7dae723e71814deb1d
           error={errors.preferred_occupations}
         />
         <p style={{ fontSize: '11px', color: '#64748b', marginTop: '7px', lineHeight: '1.5' }}>
-<<<<<<< HEAD
-          Select a standardized occupation result. Typed text is used for search and is not saved by itself.
-=======
           Type the specific job title you know. The system will show only broad job fields in the dropdown for matching.
->>>>>>> 74b8ba0c70cb12faa22abd7dae723e71814deb1d
         </p>
         {errors.preferred_occupations && <p style={{ fontSize: '11px', color: '#ef4444', marginTop: '6px' }}>{errors.preferred_occupations}</p>}
       </div>
@@ -1862,6 +1826,9 @@ const normalizeUnifiedSeekerSkill = (skill) => {
     name,
     type,
     is_dole: Boolean(skill?.is_dole ?? skill?.is_official_dole_skill ?? skill?.isOfficialDoleSkill),
+    source: skill?.source ?? (skill?.is_dole ? 'dole' : 'system'),
+    is_official: Boolean(skill?.is_official ?? skill?.isOfficial),
+    is_recommended: Boolean(skill?.is_recommended ?? skill?.isRecommended),
     proficiency: normalizeSkillProficiencyForUi(skill?.proficiency),
   }
 }
@@ -1899,6 +1866,9 @@ const backendSkillItem = (skill, category) => ({
   name: skill.name,
   skill_name: skill.name,
   category,
+  source: skill.source ?? (skill.is_dole ? 'dole' : 'system'),
+  is_official: Boolean(skill.is_official || skill.is_dole),
+  is_recommended: Boolean(skill.is_recommended),
   proficiency: normalizeSkillProficiencyForBackend(skill.proficiency),
 })
 
@@ -3009,6 +2979,10 @@ export default function SeekerOnboarding() {
   }
 
   const progressPct = ((step - 1) / 6) * 100
+  const selectedSkillCount = (form.dole_skills ?? []).length
+    + (form.technical_skills ?? []).length
+    + (form.soft_skills ?? []).length
+  const saveDisabled = isLoading || (step === 5 && selectedSkillCount === 0)
 
   return (
     <OnboardingShell
@@ -3104,8 +3078,9 @@ export default function SeekerOnboarding() {
               </button>
               <button
                 onClick={handleNext}
-                disabled={isLoading}
-                style={{ flex: 2, padding: '13px', fontSize: '14px', fontWeight: '800', color: '#0f172a', backgroundColor: isLoading ? '#fde68a' : '#f59e0b', border: '1px solid #f59e0b', borderRadius: '8px', cursor: isLoading ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', transition: 'all 0.15s' }}
+                disabled={saveDisabled}
+                aria-describedby={step === 5 && selectedSkillCount === 0 ? 'skills-save-requirement' : undefined}
+                style={{ flex: 2, padding: '13px', fontSize: '14px', fontWeight: '800', color: saveDisabled ? '#64748b' : '#0f172a', backgroundColor: saveDisabled ? '#e2e8f0' : '#f59e0b', border: `1px solid ${saveDisabled ? '#cbd5e1' : '#f59e0b'}`, borderRadius: '8px', cursor: saveDisabled ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', transition: 'all 0.15s' }}
               >
                 {isLoading ? (
                   <>
