@@ -83,8 +83,12 @@ class EmployerJobVacancyController extends Controller
 
     private function validatedData(Request $request, GoogleMapsService $maps): array
     {
+        $broadOccupationInput = $this->broadOccupationInput($request);
         $data = $request->validate([
-            'occupation_id' => ['required', 'integer', 'exists:occupations,id'],
+            'occupation_id' => [$broadOccupationInput ? 'nullable' : 'required', 'integer', 'exists:occupations,id'],
+            'general_term' => ['nullable', 'string', 'max:120'],
+            'broad_field_key' => ['nullable', 'string', 'max:120'],
+            'anchor_code' => ['nullable', 'string', 'max:120'],
             'job_title' => ['required', 'string', 'max:255'],
             'employment_type' => ['required', Rule::in([
                 'Permanent/Regular',
@@ -147,6 +151,13 @@ class EmployerJobVacancyController extends Controller
         ]);
 
         $data['job_title'] = Str::squish($data['job_title']);
+        $data['general_term'] = $this->normalizeOccupationGeneralTerm($broadOccupationInput);
+        unset($data['broad_field_key'], $data['anchor_code']);
+
+        if (! Schema::hasColumn('job_vacancies', 'general_term')) {
+            unset($data['general_term']);
+        }
+
         $data['minimum_experience_months'] = match ($data['experience_level']) {
             '1-3 Years' => 12,
             '3-5 Years' => 36,
@@ -196,6 +207,35 @@ class EmployerJobVacancyController extends Controller
         }
 
         return $data;
+    }
+
+    private function broadOccupationInput(Request $request): ?string
+    {
+        foreach (['general_term', 'broad_field_key', 'anchor_code'] as $field) {
+            $value = $request->input($field);
+
+            if (is_string($value) && trim($value) !== '') {
+                return $value;
+            }
+        }
+
+        return null;
+    }
+
+    private function normalizeOccupationGeneralTerm(?string $value): ?string
+    {
+        if (! is_string($value) || trim($value) === '') {
+            return null;
+        }
+
+        return Str::of($value)
+            ->lower()
+            ->replaceMatches('/^general:/', '')
+            ->replace(['-', '_'], ' ')
+            ->replace('&', ' and ')
+            ->replaceMatches('/[^a-z0-9+#.]+/', ' ')
+            ->squish()
+            ->toString();
     }
 
     private function employer(Request $request): Employer

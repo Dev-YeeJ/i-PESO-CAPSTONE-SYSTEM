@@ -141,17 +141,22 @@ class JobMatchingService
 
     private function occupationScore(JobVacancy $vacancy, JobSeeker $seeker): array
     {
+        $vacancyBroadAnchor = $this->vacancyBroadAnchor($vacancy);
+
         if (
             ! Schema::hasTable('seeker_occupations')
-            || ! $vacancy->occupation
             || ! $seeker->relationLoaded('occupations')
         ) {
             return $this->unavailableFactor('No standardized occupation data available.');
         }
 
+        if (! $vacancy->occupation && ! $vacancyBroadAnchor) {
+            return $this->unavailableFactor('No standardized occupation data available.');
+        }
+
         $matches = $seeker->occupations
             ->map(fn (SeekerOccupation $preference) => $this->compareOccupation(
-                $vacancy->occupation,
+                $vacancy,
                 $preference
             ))
             ->sortByDesc('score');
@@ -168,7 +173,7 @@ class JobMatchingService
     }
 
     private function compareOccupation(
-        Occupation $vacancyOccupation,
+        JobVacancy $vacancy,
         SeekerOccupation $preference
     ): array {
         $preferenceOrder = max(1, (int) $preference->preference_order);
@@ -177,9 +182,41 @@ class JobMatchingService
             2 => 0.95,
             default => 0.9,
         };
+        $vacancyOccupation = $vacancy->occupation;
         $preferredOccupation = $preference->occupation;
+        $vacancyBroadAnchor = $this->vacancyBroadAnchor($vacancy);
+        $preferenceBroadAnchor = $this->preferenceBroadAnchor($preference);
         $score = 0;
         $matchType = 'none';
+
+        if ($vacancyBroadAnchor && $preferenceBroadAnchor) {
+            $score = $vacancyBroadAnchor === $preferenceBroadAnchor ? 100 : 0;
+            $matchType = $score === 100 ? 'same_broad_field' : 'different_broad_field';
+
+            return [
+                'score' => (float) $score,
+                'base_score' => $score,
+                'match_type' => $matchType,
+                'preference_order' => $preferenceOrder,
+                'preferred_occupation' => $preference->occupation_title,
+                'vacancy_occupation' => $vacancyOccupation?->title ?: $vacancy->job_title,
+                'preferred_broad_field' => $preferenceBroadAnchor,
+                'vacancy_broad_field' => $vacancyBroadAnchor,
+            ];
+        }
+
+        if (! $vacancyOccupation) {
+            return [
+                'score' => 0.0,
+                'base_score' => 0,
+                'match_type' => 'missing_vacancy_occupation',
+                'preference_order' => $preferenceOrder,
+                'preferred_occupation' => $preference->occupation_title,
+                'vacancy_occupation' => $vacancy->job_title,
+                'preferred_broad_field' => $preferenceBroadAnchor,
+                'vacancy_broad_field' => $vacancyBroadAnchor,
+            ];
+        }
 
         if ($preferredOccupation?->id === $vacancyOccupation->id) {
             $score = 100;
@@ -203,12 +240,15 @@ class JobMatchingService
             }
         }
 
-        if ($score === 0 && filled($preference->general_term)) {
+        if ($score === 0 && filled($preferenceBroadAnchor)) {
             $vacancyTerms = $vacancyOccupation->relationLoaded('generalTerms')
-                ? $vacancyOccupation->generalTerms->pluck('normalized_term')
+                ? $vacancyOccupation->generalTerms
+                    ->pluck('normalized_term')
+                    ->map(fn (?string $term) => $this->normalizeBroadAnchor($term))
+                    ->filter()
                 : collect();
 
-            if ($vacancyTerms->contains($preference->general_term)) {
+            if ($vacancyTerms->contains($preferenceBroadAnchor)) {
                 $score = 70;
                 $matchType = 'preferred_job_family';
             }
@@ -235,7 +275,69 @@ class JobMatchingService
             'preference_order' => $preferenceOrder,
             'preferred_occupation' => $preference->occupation_title,
             'vacancy_occupation' => $vacancyOccupation->title,
+            'preferred_broad_field' => $preferenceBroadAnchor,
+            'vacancy_broad_field' => $vacancyBroadAnchor,
         ];
+    }
+
+    private function vacancyBroadAnchor(JobVacancy $vacancy): ?string
+    {
+        if (Schema::hasColumn('job_vacancies', 'general_term')) {
+            $anchor = $this->normalizeBroadAnchor($vacancy->general_term);
+
+            if ($anchor) {
+                return $anchor;
+            }
+        }
+
+        $occupation = $vacancy->occupation;
+        if ($occupation?->relationLoaded('generalTerms')) {
+            return $occupation->generalTerms
+                ->pluck('normalized_term')
+                ->map(fn (?string $term) => $this->normalizeBroadAnchor($term))
+                ->filter()
+                ->first();
+        }
+
+        return null;
+    }
+
+    private function preferenceBroadAnchor(SeekerOccupation $preference): ?string
+    {
+        $anchor = $this->normalizeBroadAnchor($preference->general_term);
+
+        if ($anchor) {
+            return $anchor;
+        }
+
+        $occupation = $preference->occupation;
+        if ($occupation?->relationLoaded('generalTerms')) {
+            return $occupation->generalTerms
+                ->pluck('normalized_term')
+                ->map(fn (?string $term) => $this->normalizeBroadAnchor($term))
+                ->filter()
+                ->first();
+        }
+
+        return null;
+    }
+
+    private function normalizeBroadAnchor(?string $value): ?string
+    {
+        if (! is_string($value) || trim($value) === '') {
+            return null;
+        }
+
+        $anchor = Str::of($value)
+            ->lower()
+            ->replaceMatches('/^general:/', '')
+            ->replace(['-', '_'], ' ')
+            ->replace('&', ' and ')
+            ->replaceMatches('/[^a-z0-9+#.]+/', ' ')
+            ->squish()
+            ->toString();
+
+        return $anchor === '' ? null : $anchor;
     }
 
     private function textOccupationScore(?string $preferredTitle, Occupation $vacancyOccupation): int

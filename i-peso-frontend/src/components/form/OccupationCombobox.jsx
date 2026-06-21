@@ -15,6 +15,44 @@ const ISCO_BROAD_FIELDS = {
   9: 'Elementary Occupations',
 }
 
+const BROAD_OCCUPATION_FIELDS = [
+  { key: 'office-work', title: 'Office and Administration', generalTerm: 'office work', patterns: ['office', 'admin', 'administrative', 'encoder', 'data entry', 'secretary', 'receptionist', 'clerk', 'records'] },
+  { key: 'factory-worker', title: 'Manufacturing and Factory Work', generalTerm: 'factory worker', patterns: ['factory', 'production', 'machine operator', 'assembler', 'packer', 'manufacturing'] },
+  { key: 'driver', title: 'Driving and Transportation', generalTerm: 'driver', patterns: ['driver', 'chauffeur', 'taxi', 'bus operator', 'truck driver', 'jeepney', 'transport'] },
+  { key: 'delivery-work', title: 'Delivery and Courier Work', generalTerm: 'delivery work', patterns: ['delivery', 'courier', 'messenger', 'parcel', 'rider'] },
+  { key: 'healthcare-work', title: 'Healthcare', generalTerm: 'healthcare work', patterns: ['nurse', 'medical', 'clinic', 'hospital', 'pharmacist', 'midwife', 'doctor', 'health worker'] },
+  { key: 'caregiver-work', title: 'Caregiving and Personal Care', generalTerm: 'caregiver work', patterns: ['caregiver', 'care worker', 'care aide', 'nursing assistant', 'home care', 'personal care'] },
+  { key: 'construction-work', title: 'Construction', generalTerm: 'construction work', patterns: ['construction', 'mason', 'carpenter', 'building', 'scaffold', 'roofer', 'painter'] },
+  { key: 'skilled-trades', title: 'Skilled Trades and Repair', generalTerm: 'skilled trades', patterns: ['mechanic', 'auto', 'automotive', 'electrician', 'plumber', 'welder', 'repair', 'aircon', 'refrigeration'] },
+  { key: 'hospitality-work', title: 'Hospitality and Hotels', generalTerm: 'hospitality work', patterns: ['hotel', 'housekeeping', 'front desk', 'room attendant', 'hospitality'] },
+  { key: 'restaurant-work', title: 'Food Service and Restaurants', generalTerm: 'restaurant work', patterns: ['cook', 'chef', 'waiter', 'waitress', 'service crew', 'kitchen', 'restaurant', 'food service', 'barista'] },
+  { key: 'retail-work', title: 'Retail and Store Work', generalTerm: 'retail work', patterns: ['cashier', 'retail', 'sales', 'store', 'merchandiser', 'counter'] },
+  { key: 'agriculture-work', title: 'Agriculture and Farming', generalTerm: 'agriculture work', patterns: ['farm', 'farmer', 'agriculture', 'crop', 'livestock', 'poultry'] },
+  { key: 'fishing-work', title: 'Fishing and Fish Processing', generalTerm: 'fishing work', patterns: ['fishery', 'fisherman', 'fishing', 'fish processing', 'aquaculture'] },
+  { key: 'it-work', title: 'IT and Computer Work', generalTerm: 'it work', patterns: ['react', 'frontend', 'front end', 'software', 'developer', 'programmer', 'web', 'javascript', 'it support', 'computer', 'network', 'data analyst'] },
+  { key: 'education-work', title: 'Education and Teaching', generalTerm: 'education work', patterns: ['teacher', 'teaching', 'tutor', 'instructor', 'lecturer', 'professor', 'school', 'trainer'] },
+  { key: 'logistics-work', title: 'Warehouse and Logistics', generalTerm: 'logistics work', patterns: ['warehouse', 'logistics', 'inventory', 'stock clerk', 'forklift', 'supply chain'] },
+  { key: 'beauty-work', title: 'Beauty and Wellness', generalTerm: 'beauty work', patterns: ['hairdresser', 'barber', 'beautician', 'makeup', 'massage', 'nail technician'] },
+  { key: 'household-work', title: 'Household and Domestic Services', generalTerm: 'household work', patterns: ['domestic', 'housekeeper', 'cleaner', 'babysitter', 'laundry', 'kasambahay'] },
+  { key: 'government-work', title: 'Government and Community Services', generalTerm: 'government work', patterns: ['government', 'public service', 'barangay', 'community', 'civil service', 'public administration'] },
+  { key: 'bpo-work', title: 'BPO and Customer Service', generalTerm: 'bpo work', patterns: ['bpo', 'call center', 'contact center', 'customer service representative', 'technical support representative'] },
+  { key: 'online-work', title: 'Online and Digital Work', generalTerm: 'online work', patterns: ['virtual assistant', 'online seller', 'ecommerce', 'e-commerce', 'content creator', 'social media', 'remote work'] },
+  { key: 'finance-work', title: 'Accounting and Finance', generalTerm: 'finance work', patterns: ['accountant', 'bookkeeper', 'accounting', 'auditor', 'payroll', 'tax', 'finance'] },
+  { key: 'engineering-work', title: 'Engineering and Architecture', generalTerm: 'engineering work', patterns: ['engineer', 'engineering', 'architect', 'architecture', 'drafting', 'drafter'] },
+  { key: 'human-resources-work', title: 'Human Resources and Recruitment', generalTerm: 'human resources work', patterns: ['human resources', 'hr', 'recruiter', 'recruitment', 'personnel', 'talent acquisition'] },
+  { key: 'legal-work', title: 'Legal and Compliance', generalTerm: 'legal work', patterns: ['lawyer', 'attorney', 'paralegal', 'legal assistant', 'legal secretary', 'compliance officer'] },
+  { key: 'security-work', title: 'Security and Protective Services', generalTerm: 'security work', patterns: ['security guard', 'security officer', 'protective service', 'police', 'bodyguard'] },
+  { key: 'marketing-work', title: 'Marketing and Communications', generalTerm: 'marketing work', patterns: ['marketing', 'advertising', 'brand', 'public relations', 'communications officer'] },
+  { key: 'creative-work', title: 'Media Arts and Design', generalTerm: 'creative work', patterns: ['graphic designer', 'artist', 'photographer', 'videographer', 'writer', 'editor', 'multimedia', 'animator'] },
+  { key: 'banking-work', title: 'Banking and Insurance', generalTerm: 'banking work', patterns: ['bank', 'banking', 'insurance', 'teller', 'loan', 'credit', 'claims'] },
+  { key: 'real-estate-work', title: 'Real Estate and Property Services', generalTerm: 'real estate work', patterns: ['real estate', 'property', 'broker', 'leasing', 'realtor'] },
+  { key: 'science-work', title: 'Science, Research and Laboratory Work', generalTerm: 'science work', patterns: ['science', 'scientist', 'researcher', 'laboratory', 'lab', 'biologist', 'chemist', 'physicist'] },
+  { key: 'utilities-work', title: 'Utilities, Energy and Environment', generalTerm: 'utilities work', patterns: ['utilities', 'energy', 'power plant', 'water treatment', 'waste management', 'environmental', 'renewable energy'] },
+  { key: 'tourism-work', title: 'Tourism, Events and Recreation', generalTerm: 'tourism work', patterns: ['tourism', 'tour guide', 'travel', 'event coordinator', 'event manager', 'recreation'] },
+  { key: 'social-services-work', title: 'Social Services and Counseling', generalTerm: 'social services work', patterns: ['social worker', 'counselor', 'counsellor', 'welfare worker', 'community development'] },
+  { key: 'management-work', title: 'Management and Business Operations', generalTerm: 'management work', patterns: ['manager', 'supervisor', 'operations manager', 'project manager', 'business manager', 'entrepreneur'] },
+]
+
 export default function OccupationCombobox({
   selected = [],
   onChange,
@@ -24,7 +62,9 @@ export default function OccupationCombobox({
   minimumQueryLength = 2,
   generalizedOnly = false,
   enableAiSuggestions = false,
+  allowCustomFallback = false,
   aiSuggestionProvider = null,
+  broadFieldOnly = false,
   placeholder = 'Search by occupation title or occupation code',
   error,
 }) {
@@ -44,22 +84,45 @@ export default function OccupationCombobox({
   const inputRef = useRef(null)
   const normalizedQuery = query.trim()
   const canSelectMore = values.length < limit
+  const displayedOptions = options
+  const customFallbackOption = useMemo(() => {
+    if (!allowCustomFallback || generalizedOnly || broadFieldOnly || normalizedQuery.length < minimumQueryLength) return null
+
+    const title = normalizedQuery.replace(/\s+/g, ' ')
+    const duplicate = [...values, ...options, ...aiOptions].some((occupation) => (
+      normalizeTitle(occupation.title || occupation.raw_job_title) === normalizeTitle(title)
+    ))
+
+    if (!title || duplicate) return null
+
+    return {
+      id: `custom:${normalizeTitle(title)}`,
+      title,
+      raw_job_title: title,
+      reason: 'Save as a pending title for PESO review and later catalog mapping.',
+      broad_category: 'Pending PESO mapping',
+      is_custom: true,
+      is_custom_pending: true,
+      source: 'manual',
+    }
+  }, [allowCustomFallback, aiOptions, broadFieldOnly, generalizedOnly, minimumQueryLength, normalizedQuery, options, values])
 
   useEffect(() => {
     aiSuggestionProviderRef.current = aiSuggestionProvider
   }, [aiSuggestionProvider])
 
   useEffect(() => {
-    if (!open || !canSelectMore) return
+    if (broadFieldOnly) return undefined
+    if (!open || !canSelectMore) return undefined
 
     const updateMenuRect = () => {
       const rect = inputRef.current?.getBoundingClientRect()
       if (!rect) return
 
       setMenuRect({
-        left: rect.left,
+        left: Math.max(12, rect.left),
         top: rect.bottom + 6,
-        width: rect.width,
+        width: Math.min(rect.width, window.innerWidth - Math.max(12, rect.left) - 12),
       })
     }
 
@@ -71,11 +134,41 @@ export default function OccupationCombobox({
       window.removeEventListener('resize', updateMenuRect)
       window.removeEventListener('scroll', updateMenuRect, true)
     }
-  }, [open, canSelectMore])
+  }, [broadFieldOnly, open, canSelectMore])
 
   useEffect(() => {
     if (!open || !canSelectMore || normalizedQuery.length < minimumQueryLength) {
       return
+    }
+
+    if (broadFieldOnly) {
+      let cancelled = false
+
+      const timer = setTimeout(async () => {
+        setLoading(true)
+        setSearchError(false)
+        setAiError(false)
+
+        try {
+          const rows = await searchOccupations(normalizedQuery, searchLimit, 'general')
+          if (cancelled) return
+
+          const apiOptions = toBroadFieldOptions(rows, normalizedQuery, values)
+          setOptions(apiOptions.length ? apiOptions : broadOccupationOptions(normalizedQuery, values, searchLimit))
+        } catch {
+          if (!cancelled) {
+            setOptions(broadOccupationOptions(normalizedQuery, values, searchLimit))
+            setSearchError(true)
+          }
+        } finally {
+          if (!cancelled) setLoading(false)
+        }
+      }, 220)
+
+      return () => {
+        cancelled = true
+        clearTimeout(timer)
+      }
     }
 
     let cancelled = false
@@ -114,7 +207,7 @@ export default function OccupationCombobox({
       cancelled = true
       clearTimeout(timer)
     }
-  }, [normalizedQuery, open, limit, searchLimit, minimumQueryLength, values, generalizedOnly, enableAiSuggestions, canSelectMore])
+  }, [normalizedQuery, open, limit, searchLimit, minimumQueryLength, values, generalizedOnly, enableAiSuggestions, broadFieldOnly, canSelectMore])
 
   const select = (occupation) => {
     if (multiple && values.some((value) => value.id === occupation.id)) return
@@ -180,21 +273,27 @@ export default function OccupationCombobox({
           }`}
         />
 
-        {open && canSelectMore && menuRect && (
+        {open && canSelectMore && (broadFieldOnly || menuRect) && (
           <div
             role="listbox"
-            className="fixed z-[9999] max-h-80 overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-2xl"
-            style={{ left: menuRect.left, top: menuRect.top, width: menuRect.width }}
+            className={`${broadFieldOnly ? 'absolute left-0 right-0 top-full mt-2' : 'fixed'} z-[9999] max-h-80 overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-2xl`}
+            style={broadFieldOnly ? undefined : { left: menuRect.left, top: menuRect.top, width: menuRect.width }}
           >
             {!loading && normalizedQuery.length < minimumQueryLength && (
               <p className="px-4 py-3 text-xs text-slate-500">
-                Type at least {minimumQueryLength} characters to search occupations.
+                Type at least {minimumQueryLength} characters so the system can suggest the broad field.
               </p>
             )}
 
-            {loading && <p className="px-4 py-3 text-xs text-slate-500">Searching occupations...</p>}
+            {loading && <p className="px-4 py-3 text-xs text-slate-500">Recognizing broad field...</p>}
 
-            {!loading && normalizedQuery.length >= minimumQueryLength && options.map((occupation) => (
+            {!loading && broadFieldOnly && normalizedQuery.length >= minimumQueryLength && displayedOptions.length > 0 && (
+              <div className="border-b border-slate-100 bg-slate-50 px-4 py-2 text-[10px] font-extrabold uppercase tracking-wide text-slate-500">
+                Broad job fields
+              </div>
+            )}
+
+            {!loading && normalizedQuery.length >= minimumQueryLength && displayedOptions.map((occupation) => (
               <OccupationOption
                 key={occupation.id}
                 occupation={occupation}
@@ -204,11 +303,13 @@ export default function OccupationCombobox({
 
             {!loading && normalizedQuery.length >= minimumQueryLength && searchError && (
               <p className="px-4 py-3 text-xs text-red-600">
-                Unable to search saved occupations. Showing suggestions when available.
+                {broadFieldOnly
+                  ? 'Unable to reach database broad fields. Showing local broad-field fallback.'
+                  : 'Unable to search saved occupations. Showing suggestions when available.'}
               </p>
             )}
 
-            {!loading && normalizedQuery.length >= minimumQueryLength && aiOptions.length > 0 && (
+            {!broadFieldOnly && !loading && normalizedQuery.length >= minimumQueryLength && aiOptions.length > 0 && (
               <>
                 <div className="border-b border-slate-100 bg-slate-50 px-4 py-2 text-[10px] font-extrabold uppercase tracking-wide text-slate-500">
                   Suggested occupations
@@ -223,13 +324,27 @@ export default function OccupationCombobox({
               </>
             )}
 
-            {!loading && normalizedQuery.length >= minimumQueryLength && !options.length && aiError && (
+            {!broadFieldOnly && !loading && customFallbackOption && (
+              <>
+                <div className="border-b border-slate-100 bg-amber-50 px-4 py-2 text-[10px] font-extrabold uppercase tracking-wide text-amber-700">
+                  Pending PESO mapping
+                </div>
+                <OccupationOption
+                  occupation={customFallbackOption}
+                  onSelect={select}
+                />
+              </>
+            )}
+
+            {!broadFieldOnly && !loading && normalizedQuery.length >= minimumQueryLength && !options.length && !customFallbackOption && aiError && (
               <p className="px-4 py-3 text-xs text-slate-500">Suggested occupations are unavailable right now.</p>
             )}
 
-            {!loading && normalizedQuery.length >= minimumQueryLength && !searchError && !options.length && !aiOptions.length && !aiError && (
+            {!loading && normalizedQuery.length >= minimumQueryLength && !searchError && !displayedOptions.length && !aiOptions.length && !aiError && !customFallbackOption && (
               <p className="px-4 py-3 text-xs text-slate-500">
-                {generalizedOnly
+                {broadFieldOnly
+                  ? 'No broad field recognized yet. Try a simpler title like Teacher, Cashier, Driver, Nurse, or React Developer.'
+                  : generalizedOnly
                   ? 'No matching field found. Clear the search and choose the closest broad field.'
                   : 'No matching occupation found. Try another job title, alias, or occupation code.'}
               </p>
@@ -260,7 +375,7 @@ function OccupationOption({ occupation, onSelect }) {
           <span className="text-sm font-semibold text-slate-800">{occupation.title}</span>
           <span className={`max-w-48 truncate rounded-full px-2 py-0.5 text-[10px] font-extrabold ${
             isGeneral
-              ? 'bg-violet-100 text-violet-700'
+              ? 'bg-blue-100 text-blue-700'
               : 'bg-slate-100 text-slate-600'
           }`}>
             {category}
@@ -284,8 +399,8 @@ function OccupationOption({ occupation, onSelect }) {
           </span>
         )}
         {occupation.matched_job_title && (
-          <span className="max-w-44 truncate text-[10px] font-semibold text-emerald-700">
-            "{occupation.matched_job_title}" belongs here
+          <span className="max-w-44 truncate rounded bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700">
+            from "{occupation.matched_job_title}"
           </span>
         )}
       </span>
@@ -323,6 +438,101 @@ function titleCase(value) {
 }
 
 const normalizeTitle = (value) => String(value ?? '').trim().replace(/\s+/g, ' ').toLowerCase()
+
+function broadOccupationOptions(query, selected = [], limit = 20) {
+  const normalized = normalizeTitle(query)
+  const selectedTerms = new Set(selected.map((occupation) => normalizeTitle(occupation.general_term || occupation.matched_general_term || occupation.title)))
+  const scored = BROAD_OCCUPATION_FIELDS
+    .map((field) => {
+      const directPattern = field.patterns.find((pattern) => normalized.includes(normalizeTitle(pattern)))
+      const titleMatch = normalizeTitle(field.title).includes(normalized) || normalized.includes(normalizeTitle(field.title))
+      const termMatch = normalizeTitle(field.generalTerm).includes(normalized) || normalized.includes(normalizeTitle(field.generalTerm))
+      const score = directPattern ? 100 : titleMatch ? 88 : termMatch ? 80 : tokenScore(normalized, field)
+
+      return { field, score, directPattern }
+    })
+    .filter(({ field, score }) => score > 0 && !selectedTerms.has(normalizeTitle(field.generalTerm)))
+    .sort((left, right) => right.score - left.score || left.field.title.localeCompare(right.field.title))
+
+  const primary = scored.slice(0, 8)
+  const fallback = BROAD_OCCUPATION_FIELDS
+    .filter((field) => !selectedTerms.has(normalizeTitle(field.generalTerm)))
+    .slice(0, 8)
+    .map((field) => ({ field, score: 45, directPattern: null }))
+
+  return uniqueBroadFields([...primary, ...fallback])
+    .slice(0, limit)
+    .map(({ field, score, directPattern }) => ({
+      id: `broad:${field.key}`,
+      title: field.title,
+      raw_job_title: query.trim().replace(/\s+/g, ' '),
+      reason: directPattern
+        ? `Recognized from "${query.trim()}" using "${directPattern}".`
+        : `Broad field option for "${query.trim()}".`,
+      broad_category: 'Broad field',
+      general_term: field.generalTerm,
+      matched_general_term: field.generalTerm,
+      matched_job_title: query.trim().replace(/\s+/g, ' '),
+      confidence: score,
+      is_general: true,
+      is_ai_generated: true,
+      source: 'ai_generated',
+    }))
+}
+
+function tokenScore(normalized, field) {
+  const tokens = normalized.split(' ').filter((token) => token.length >= 3)
+  if (!tokens.length) return 0
+
+  const haystack = normalizeTitle([field.title, field.generalTerm, ...field.patterns].join(' '))
+  const matches = tokens.filter((token) => haystack.includes(token)).length
+
+  return matches ? Math.min(70, 40 + matches * 10) : 0
+}
+
+function uniqueBroadFields(rows) {
+  const seen = new Set()
+
+  return rows.filter(({ field }) => {
+    if (seen.has(field.key)) return false
+    seen.add(field.key)
+    return true
+  })
+}
+
+function toBroadFieldOptions(rows = [], query = '', selected = []) {
+  const typedTitle = query.trim().replace(/\s+/g, ' ')
+  const selectedTerms = new Set(selected.map((occupation) => normalizeTitle(occupation.general_term || occupation.matched_general_term || occupation.title)))
+  const seen = new Set()
+
+  return rows
+    .map((row) => {
+      const generalTerm = cleanCategory(row.general_term || row.matched_general_term || row.term || row.title)
+      const title = cleanCategory(row.title || row.broad_category || titleCase(generalTerm))
+      const key = normalizeTitle(generalTerm || title)
+
+      if (!key || selectedTerms.has(key) || seen.has(key)) return null
+      seen.add(key)
+
+      return {
+        ...row,
+        id: row.id || `general:${key}`,
+        title,
+        raw_job_title: typedTitle,
+        reason: row.matched_job_title
+          ? `"${typedTitle}" matched ${row.matched_job_title}.`
+          : `Broad field recognized for "${typedTitle}".`,
+        broad_category: 'Broad field',
+        general_term: generalTerm || key,
+        matched_general_term: generalTerm || key,
+        matched_job_title: typedTitle,
+        is_general: true,
+        is_ai_generated: true,
+        source: row.source || 'generalized',
+      }
+    })
+    .filter(Boolean)
+}
 
 const toAiOccupationOptions = (suggestions = [], selected = []) => {
   const selectedTitles = new Set(selected.map((occupation) => normalizeTitle(occupation.title)))

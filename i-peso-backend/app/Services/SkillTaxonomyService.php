@@ -81,8 +81,21 @@ class SkillTaxonomyService
             ->each(function ($seekerSkill) use (&$updated) {
                 $category = $seekerSkill->skill_type === 'soft' ? 'soft' : 'technical';
                 $skill = $this->resolve($seekerSkill->skill_name, $category);
+                $updates = [];
+
                 if ($skill && $seekerSkill->skill_id !== $skill->id) {
-                    $seekerSkill->update(['skill_id' => $skill->id]);
+                    $updates['skill_id'] = $skill->id;
+                }
+
+                if (
+                    Schema::hasColumn('seeker_skills', 'normalized_skill_name')
+                    && $seekerSkill->normalized_skill_name !== $this->normalize($seekerSkill->skill_name)
+                ) {
+                    $updates['normalized_skill_name'] = $this->normalize($seekerSkill->skill_name);
+                }
+
+                if ($updates !== []) {
+                    $seekerSkill->update($updates);
                     $updated++;
                 }
             });
