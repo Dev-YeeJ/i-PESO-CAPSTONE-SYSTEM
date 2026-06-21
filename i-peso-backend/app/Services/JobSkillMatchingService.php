@@ -292,6 +292,16 @@ class JobSkillMatchingService
                 continue;
             }
 
+            $semanticFactor = $this->semanticSkillFactor($requiredNormalized, $candidateNormalized);
+            if ($semanticFactor > ($best['factor'] ?? 0)) {
+                $best = [
+                    'factor' => $semanticFactor,
+                    'match_type' => 'semantic_skill_family',
+                    'matched_skill_id' => $skill->skill_id,
+                    'matched_skill_name' => $skill->skill_name,
+                ];
+            }
+
             $overlap = $this->tokenOverlapFactor($requiredNormalized, $candidateNormalized);
             if ($overlap > ($best['factor'] ?? 0)) {
                 $best = [
@@ -304,6 +314,129 @@ class JobSkillMatchingService
         }
 
         return $best;
+    }
+
+    private function semanticSkillFactor(string $required, string $candidate): float
+    {
+        $requiredGroups = $this->semanticSkillGroups($required);
+        $candidateGroups = $this->semanticSkillGroups($candidate);
+
+        if ($requiredGroups->isEmpty() || $candidateGroups->isEmpty()) {
+            return 0.0;
+        }
+
+        $sharedGroups = $requiredGroups->intersect($candidateGroups);
+
+        return $sharedGroups->isEmpty() ? 0.0 : 0.85;
+    }
+
+    private function semanticSkillGroups(string $normalizedSkill): Collection
+    {
+        $groups = [
+            'computer_operations' => [
+                'basic computer operations',
+                'computer operation',
+                'computer literacy',
+                'computer skills',
+                'computer literate',
+                'digital literacy',
+                'typing',
+                'encoding',
+                'data entry',
+            ],
+            'spreadsheet' => [
+                'microsoft excel',
+                'excel',
+                'spreadsheet',
+                'spreadsheet management',
+                'google sheets',
+                'worksheet',
+            ],
+            'customer_service' => [
+                'customer service',
+                'client support',
+                'client assistance',
+                'customer care',
+                'customer assistance',
+                'guest relations',
+                'front desk service',
+            ],
+            'sales' => [
+                'sales',
+                'selling',
+                'retail sales',
+                'merchandising',
+                'product promotion',
+                'upselling',
+            ],
+            'inventory' => [
+                'inventory management',
+                'inventory control',
+                'stock control',
+                'stock management',
+                'warehouse inventory',
+                'stock taking',
+            ],
+            'food_service' => [
+                'food preparation',
+                'food prep',
+                'meal preparation',
+                'kitchen work',
+                'cooking',
+                'cookery',
+            ],
+            'driving' => [
+                'driving',
+                'vehicle operation',
+                'vehicle driving',
+                'defensive driving',
+                'delivery driving',
+                'truck driving',
+            ],
+            'office_admin' => [
+                'office administration',
+                'administrative support',
+                'administrative work',
+                'clerical work',
+                'records management',
+                'filing',
+            ],
+            'teamwork' => [
+                'teamwork',
+                'collaboration',
+                'cooperation',
+                'team collaboration',
+            ],
+            'leadership' => [
+                'leadership',
+                'team leading',
+                'people management',
+                'supervision',
+                'staff supervision',
+            ],
+            'problem_solving' => [
+                'problem solving',
+                'troubleshooting',
+                'analytical thinking',
+                'critical thinking',
+            ],
+            'communication' => [
+                'communication',
+                'verbal communication',
+                'written communication',
+                'interpersonal communication',
+                'active listening',
+            ],
+        ];
+
+        return collect($groups)
+            ->filter(fn (array $phrases) => collect($phrases)->contains(
+                fn (string $phrase) => $normalizedSkill === $phrase
+                    || Str::contains($normalizedSkill, $phrase)
+                    || Str::contains($phrase, $normalizedSkill)
+            ))
+            ->keys()
+            ->values();
     }
 
     private function filteredSeekerSkills(Collection $seekerSkills, string $requirementType): Collection

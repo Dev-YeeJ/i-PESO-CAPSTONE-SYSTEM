@@ -121,6 +121,7 @@ class SeekerController extends Controller
         $isGraduated = $status === 'graduated';
 
         return match ($level) {
+            'vocational' => $isGraduated || $status === 'currently_studying' ? 'Vocational / Technical' : null,
             'elementary' => $isGraduated ? 'Elementary Graduate' : null,
             'secondary_non_k12' => $isGraduated ? 'High School Graduate' : null,
             'secondary_k12', 'senior_high_strand' => $isGraduated ? 'Senior High School Graduate' : null,
@@ -142,6 +143,7 @@ class SeekerController extends Controller
     private function educationRequiresProgram(?string $level): bool
     {
         return in_array($this->normalizeEducationLevel($level), [
+            'vocational',
             'senior_high_strand',
             'tertiary',
             'graduate_studies',
@@ -661,7 +663,11 @@ class SeekerController extends Controller
             $hasGeneralTerm = $preference['general_term'] !== null && $preference['general_term'] !== '';
             $hasRawTitle = $preference['raw_job_title'] !== null && $preference['raw_job_title'] !== '';
 
-            return collect([$hasOccupation, $hasGeneralTerm, $hasRawTitle])->filter()->count() !== 1;
+            if ($hasOccupation && ($hasGeneralTerm || $hasRawTitle)) {
+                return true;
+            }
+
+            return ! $hasOccupation && ! $hasGeneralTerm && ! $hasRawTitle;
         });
 
         if ($invalidPreference !== null) {
@@ -715,8 +721,8 @@ class SeekerController extends Controller
                 ? $generalGroups->get($preference['general_term'])
                 : null;
             $title = $occupation?->title
-                ?? $generalGroup['label']
-                ?? $preference['raw_job_title'];
+                ?? $preference['raw_job_title']
+                ?? $generalGroup['label'];
 
             SeekerOccupation::create([
                 'seeker_id' => $seeker->getKey(),
@@ -921,6 +927,7 @@ class SeekerController extends Controller
         }
 
         $currentYear = (int) now()->year;
+        $maxExpectedGraduationYear = $currentYear + 15;
 
         $request->merge([
             'educations' => collect($request->input('educations', []))
@@ -941,11 +948,13 @@ class SeekerController extends Controller
                     }
 
                     if ($status === 'graduated') {
+                        $education['expected_year_graduated'] = null;
                         $education['undergrad_level_reached'] = null;
                         $education['undergrad_year_last_attended'] = null;
                         $education['current_level'] = null;
                     } elseif ($status === 'undergraduate') {
                         $education['year_graduated'] = null;
+                        $education['expected_year_graduated'] = null;
                         $education['current_level'] = null;
                     } elseif ($status === 'currently_studying') {
                         $education['year_graduated'] = null;
@@ -958,16 +967,24 @@ class SeekerController extends Controller
                 ->all(),
         ]);
 
+        if (! $request->has('currently_in_school')) {
+            $request->merge([
+                'currently_in_school' => collect($request->input('educations', []))
+                    ->contains(fn ($education) => ($education['completion_status'] ?? null) === 'currently_studying'),
+            ]);
+        }
+
         $validator = Validator::make($request->all(), [
             'educ_attainment' => ['nullable', 'string', Rule::in(self::EDUCATIONAL_ATTAINMENT_OPTIONS)],
             'currently_in_school' => ['required', 'boolean'],
             'educations' => ['required', 'array', 'min:1'],
-            'educations.*.level' => ['required', 'string', 'in:elementary,secondary_non_k12,secondary_k12,senior_high_strand,tertiary,graduate_studies'],
+            'educations.*.level' => ['required', 'string', 'in:elementary,secondary_non_k12,secondary_k12,senior_high_strand,vocational,tertiary,graduate_studies'],
             'educations.*.institution_name' => ['required', 'string', 'max:255'],
             'educations.*.course_strand' => ['nullable', 'string', 'max:255'],
             'educations.*.completion_status' => ['required', 'string', 'in:graduated,undergraduate,currently_studying'],
             'educations.*.year_started' => ['required', 'integer', 'min:1950', 'max:'.$currentYear],
             'educations.*.year_graduated' => ['nullable', 'integer', 'min:1900', 'max:'.$currentYear],
+            'educations.*.expected_year_graduated' => ['nullable', 'integer', 'min:'.$currentYear, 'max:'.$maxExpectedGraduationYear],
             'educations.*.undergrad_level_reached' => ['nullable', 'string', 'max:255'],
             'educations.*.undergrad_year_last_attended' => ['nullable', 'integer', 'min:1900', 'max:'.$currentYear],
             'educations.*.current_level' => ['nullable', 'string', 'max:100'],
@@ -975,18 +992,24 @@ class SeekerController extends Controller
             // ── SKILLS: Three separate arrays (all optional) ──────────────────────
             // DOLE standard skills (Section VIII of NSRP Form)
             'dole_skills' => ['nullable', 'array'],
-            'dole_skills.*' => ['required_with:dole_skills', 'string', 'max:255'],
+            'dole_skills.*' => ['required_with:dole_skills'],
+            'dole_skills.*.skill_id' => ['sometimes', 'nullable', 'integer'],
+            'dole_skills.*.name' => ['sometimes', 'string', 'max:255'],
+            'dole_skills.*.skill_name' => ['sometimes', 'string', 'max:255'],
+            'dole_skills.*.proficiency' => ['sometimes', Rule::in(['beginner', 'intermediate', 'expert'])],
 
             // Technical/Professional skills (custom, not on official NSRP form)
-            'technical_skills' => ['nullable', 'array'],
+            'technical_skills' => ['nullable', 'array', 'max:20'],
             'technical_skills.*' => ['required_with:technical_skills'],
+            'technical_skills.*.skill_id' => ['sometimes', 'nullable', 'integer'],
             'technical_skills.*.name' => ['sometimes', 'string', 'max:255'],
             'technical_skills.*.skill_name' => ['sometimes', 'string', 'max:255'],
             'technical_skills.*.proficiency' => ['sometimes', Rule::in(['beginner', 'intermediate', 'expert'])],
 
             // Soft/Interpersonal skills (custom, not on official NSRP form)
-            'soft_skills' => ['nullable', 'array'],
+            'soft_skills' => ['nullable', 'array', 'max:10'],
             'soft_skills.*' => ['required_with:soft_skills'],
+            'soft_skills.*.skill_id' => ['sometimes', 'nullable', 'integer'],
             'soft_skills.*.name' => ['sometimes', 'string', 'max:255'],
             'soft_skills.*.skill_name' => ['sometimes', 'string', 'max:255'],
             'soft_skills.*.proficiency' => ['sometimes', Rule::in(['beginner', 'intermediate', 'expert'])],
@@ -1035,8 +1058,19 @@ class SeekerController extends Controller
                     }
                 }
 
-                if ($status === 'currently_studying' && ! filled($education['current_level'] ?? null)) {
-                    $validator->errors()->add("educations.{$index}.current_level", 'Current level is required for currently studying entries.');
+                if ($status === 'currently_studying') {
+                    $expectedYearGraduated = isset($education['expected_year_graduated'])
+                        ? (int) $education['expected_year_graduated']
+                        : null;
+
+                    if (
+                        ! filled($education['expected_year_graduated'] ?? null)
+                        && ! filled($education['current_level'] ?? null)
+                    ) {
+                        $validator->errors()->add("educations.{$index}.expected_year_graduated", 'Expected graduation year is required for currently studying entries.');
+                    } elseif (filled($education['expected_year_graduated'] ?? null) && $yearStarted && $expectedYearGraduated < $yearStarted) {
+                        $validator->errors()->add("educations.{$index}.expected_year_graduated", 'Expected graduation year must not be earlier than year started.');
+                    }
                 }
 
                 $duplicateKey = $this->educationDuplicateKey($education);
@@ -1045,6 +1079,18 @@ class SeekerController extends Controller
                 }
 
                 $seenEducationRecords[] = $duplicateKey;
+            }
+
+            $doleSkillCount = count($this->normalizeSubmittedSkillItems($request->input('dole_skills', [])));
+            $technicalSkillCount = count($this->normalizeSubmittedSkillItems($request->input('technical_skills', [])));
+            $softSkillCount = count($this->normalizeSubmittedSkillItems($request->input('soft_skills', [])));
+
+            if (($doleSkillCount + $technicalSkillCount) > 20) {
+                $validator->errors()->add('technical_skills', 'Select up to 20 hard skills including DOLE/NSRP skills.');
+            }
+
+            if ($softSkillCount > 10) {
+                $validator->errors()->add('soft_skills', 'Select up to 10 soft skills.');
             }
         });
 
@@ -1069,7 +1115,7 @@ class SeekerController extends Controller
                 'course_strand' => filled($edu['course_strand'] ?? null) ? Str::squish($edu['course_strand']) : null,
                 'year_graduated' => $status === 'graduated' ? $yearGraduated : null,
                 'undergrad_level_reached' => $status === 'undergraduate'
-                    ? Str::squish((string) ($edu['undergrad_level_reached'] ?? ''))
+                    ? (filled($edu['undergrad_level_reached'] ?? null) ? Str::squish((string) $edu['undergrad_level_reached']) : null)
                     : null,
                 'undergrad_year_last_attended' => $status === 'undergraduate' ? $yearLastAttended : null,
             ];
@@ -1081,6 +1127,11 @@ class SeekerController extends Controller
             }
             if (Schema::hasColumn('seeker_educations', 'year_started')) {
                 $educationData['year_started'] = $edu['year_started'];
+            }
+            if (Schema::hasColumn('seeker_educations', 'expected_year_graduated')) {
+                $educationData['expected_year_graduated'] = $status === 'currently_studying'
+                    ? ($edu['expected_year_graduated'] ?? null)
+                    : null;
             }
             if (Schema::hasColumn('seeker_educations', 'current_level')) {
                 $educationData['current_level'] = $status === 'currently_studying'
@@ -1102,18 +1153,23 @@ class SeekerController extends Controller
         $seeker->skills()->delete();
 
         // Insert DOLE standard skills
-        if (! empty($validated['dole_skills'])) {
-            foreach ($this->uniqueStringList($validated['dole_skills']) as $skillName) {
-                $seeker->skills()->create([
-                    'skill_name' => trim($skillName),
+        $doleSkillItems = $this->normalizeSubmittedSkillItems($validated['dole_skills'] ?? []);
+        if ($doleSkillItems !== []) {
+            foreach ($doleSkillItems as $skill) {
+                $skillData = [
+                    'skill_name' => trim($skill['name']),
                     'skill_type' => 'dole_standard',
-                ]);
+                ];
+                if (Schema::hasColumn('seeker_skills', 'proficiency')) {
+                    $skillData['proficiency'] = $skill['proficiency'];
+                }
+                $seeker->skills()->create($skillData);
             }
         }
 
         $technicalSkillItems = $this->normalizeSubmittedSkillItems($validated['technical_skills'] ?? []);
         $softSkillItems = $this->normalizeSubmittedSkillItems($validated['soft_skills'] ?? []);
-        $submittedSkillItems = array_merge($technicalSkillItems, $softSkillItems);
+        $submittedSkillItems = array_merge($doleSkillItems, $technicalSkillItems, $softSkillItems);
 
         $categorizedSkills = $categorizer->canonicalizeSubmitted(
             $this->skillItemNames($technicalSkillItems),
@@ -1123,22 +1179,28 @@ class SeekerController extends Controller
         // Insert technical/professional skills
         if ($categorizedSkills['technical'] !== []) {
             foreach ($categorizedSkills['technical'] as $skillName) {
-                $seeker->skills()->create([
+                $skillData = [
                     'skill_name' => trim($skillName),
                     'skill_type' => 'technical',
-                    'proficiency' => $this->proficiencyForSkill($submittedSkillItems, $skillName),
-                ]);
+                ];
+                if (Schema::hasColumn('seeker_skills', 'proficiency')) {
+                    $skillData['proficiency'] = $this->proficiencyForSkill($submittedSkillItems, $skillName);
+                }
+                $seeker->skills()->create($skillData);
             }
         }
 
         // Insert soft/interpersonal skills
         if ($categorizedSkills['soft'] !== []) {
             foreach ($categorizedSkills['soft'] as $skillName) {
-                $seeker->skills()->create([
+                $skillData = [
                     'skill_name' => trim($skillName),
                     'skill_type' => 'soft',
-                    'proficiency' => $this->proficiencyForSkill($submittedSkillItems, $skillName),
-                ]);
+                ];
+                if (Schema::hasColumn('seeker_skills', 'proficiency')) {
+                    $skillData['proficiency'] = $this->proficiencyForSkill($submittedSkillItems, $skillName);
+                }
+                $seeker->skills()->create($skillData);
             }
         }
 

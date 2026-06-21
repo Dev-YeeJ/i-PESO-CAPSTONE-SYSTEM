@@ -1,159 +1,147 @@
-import { useMemo, useState } from 'react'
-import { Check, Pencil, Plus, Search, Trash2, X } from 'lucide-react'
+import { useId, useMemo, useState } from 'react'
+import { BookOpen, Check, GraduationCap, Pencil, Plus, Search, Trash2, X } from 'lucide-react'
 
 const educationLevels = [
-  { value: 'elementary', label: 'Elementary' },
-  { value: 'secondary_non_k12', label: 'Secondary / Junior High School Non-K-12' },
-  { value: 'secondary_k12', label: 'Secondary / Junior High School K-12' },
-  { value: 'senior_high_strand', label: 'Senior High School' },
-  { value: 'tertiary', label: 'Tertiary / College' },
-  { value: 'graduate_studies', label: 'Graduate Studies / Post-graduate' },
+  { value: 'high_school_undergraduate', label: 'High School Undergraduate', backendLevel: 'secondary_non_k12' },
+  { value: 'high_school_graduate', label: 'High School Graduate', backendLevel: 'secondary_non_k12' },
+  { value: 'vocational', label: 'Vocational', backendLevel: 'vocational', requiresCourse: true },
+  { value: 'college_undergraduate', label: 'College Undergraduate', backendLevel: 'tertiary', requiresCourse: true },
+  { value: 'college_graduate', label: 'College Graduate', backendLevel: 'tertiary', requiresCourse: true },
+  { value: 'post_graduate', label: 'Post-Graduate', backendLevel: 'graduate_studies', requiresCourse: true },
 ]
 
 const educationStatuses = [
-  { value: 'graduated', label: 'Graduated' },
-  { value: 'undergraduate', label: 'Undergraduate / Did Not Finish' },
-  { value: 'currently_studying', label: 'Currently Studying' },
-]
-
-const strands = [
-  'STEM',
-  'ABM',
-  'HUMSS',
-  'GAS',
-  'ICT',
-  'Home Economics',
-  'Industrial Arts',
-  'Agri-Fishery Arts',
-  'Sports',
-  'Arts and Design',
+  { value: 'graduated', label: 'Graduated', help: 'Completed the school level, course, or program.' },
+  { value: 'undergraduate', label: 'Undergraduate / Did Not Finish', help: 'Attended but did not complete this level or program.' },
+  { value: 'currently_studying', label: 'Currently Studying', help: 'Currently enrolled and expected to complete later.' },
 ]
 
 const schoolSuggestions = [
-  'Abra State Institute of Sciences and Technology',
-  'Adamson University',
-  'Ateneo de Manila University',
-  'Baguio City National High School',
+  'University of Pangasinan',
+  'Pangasinan State University',
+  'Urdaneta City University',
+  'Lyceum-Northwestern University',
+  'Colegio de Dagupan',
+  'TESDA Provincial Training Center',
+  'Polytechnic University of the Philippines',
+  'University of the Philippines',
+  'Technological University of the Philippines',
+  'Rizal Technological University',
+  'Taguig City University',
+  'University of Makati',
+  'Pamantasan ng Lungsod ng Maynila',
+  'Philippine Normal University',
   'Bulacan State University',
   'Cavite State University',
-  'Central Luzon State University',
-  'De La Salle University',
-  'Don Bosco Technical Institute',
-  'Far Eastern University',
   'Laguna State Polytechnic University',
-  'Mapua University',
-  'Mindanao State University',
-  'National University',
-  'Pangasinan State University',
-  'Philippine Normal University',
-  'Polytechnic University of the Philippines',
-  'Rizal Technological University',
-  'STI College',
-  'Taguig City University',
-  'Technological Institute of the Philippines',
-  'Technological University of the Philippines',
   'TESDA Training Center',
-  'University of Caloocan City',
-  'University of Makati',
-  'University of Manila',
-  'University of Perpetual Help System',
-  'University of Rizal System',
-  'University of Santo Tomas',
-  'University of the East',
-  'University of the Philippines',
 ]
 
-const collegePrograms = [
+const programSuggestions = [
+  'Automotive Servicing NC II',
+  'Bookkeeping NC III',
+  'Bread and Pastry Production NC II',
+  'Caregiving NC II',
+  'Computer Systems Servicing NC II',
+  'Contact Center Services NC II',
+  'Cookery NC II',
+  'Electrical Installation and Maintenance NC II',
+  'Food and Beverage Services NC II',
+  'Shielded Metal Arc Welding NC II',
   'Bachelor of Elementary Education',
   'Bachelor of Secondary Education',
   'Bachelor of Science in Accountancy',
-  'Bachelor of Science in Agriculture',
-  'Bachelor of Science in Architecture',
   'Bachelor of Science in Business Administration',
-  'Bachelor of Science in Civil Engineering',
-  'Bachelor of Science in Computer Engineering',
   'Bachelor of Science in Computer Science',
   'Bachelor of Science in Criminology',
-  'Bachelor of Science in Electrical Engineering',
-  'Bachelor of Science in Electronics Engineering',
-  'Bachelor of Science in Entrepreneurship',
   'Bachelor of Science in Hospitality Management',
-  'Bachelor of Science in Information Systems',
   'Bachelor of Science in Information Technology',
-  'Bachelor of Science in Mechanical Engineering',
   'Bachelor of Science in Nursing',
-  'Bachelor of Science in Office Administration',
-  'Bachelor of Science in Psychology',
-  'Bachelor of Science in Tourism Management',
-]
-
-const graduatePrograms = [
-  'Doctor of Education',
-  'Doctor of Philosophy',
-  'Juris Doctor',
   'Master in Business Administration',
   'Master in Public Administration',
   'Master of Arts in Education',
-  'Master of Engineering',
-  'Master of Information Technology',
-  'Master of Public Health',
-  'Master of Science in Computer Science',
-  'Master of Science in Information Technology',
-  'Master of Science in Nursing',
+  'Doctor of Education',
+  'Doctor of Philosophy',
+  'Juris Doctor',
 ]
 
-const levelOptions = {
-  elementary: ['Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 'Grade 5', 'Grade 6'],
-  secondary_non_k12: ['1st Year High School', '2nd Year High School', '3rd Year High School', '4th Year High School'],
-  secondary_k12: ['Grade 7', 'Grade 8', 'Grade 9', 'Grade 10'],
-  senior_high_strand: ['Grade 11', 'Grade 12'],
-  tertiary: ['1st Year College', '2nd Year College', '3rd Year College', '4th Year College', '5th Year College', '6th Year College'],
-  graduate_studies: ['1st Year Graduate Studies', '2nd Year Graduate Studies', 'Completed Coursework', 'Thesis / Dissertation Stage'],
-}
-
 const blankEducation = {
+  attainment_level: '',
   level: '',
   institution_name: '',
   course_strand: '',
   completion_status: '',
   year_started: '',
   year_graduated: '',
-  undergrad_level_reached: '',
+  expected_year_graduated: '',
   undergrad_year_last_attended: '',
-  current_level: '',
+  undergrad_level_reached: '',
 }
 
-const normalize = (value) => String(value ?? '').trim().replace(/\s+/g, ' ').toLowerCase()
 const currentYear = new Date().getFullYear()
-const years = Array.from({ length: currentYear - 1949 }, (_, index) => currentYear - index)
+const pastYears = Array.from({ length: currentYear - 1949 }, (_, index) => currentYear - index)
+const expectedYears = Array.from({ length: 16 }, (_, index) => currentYear + index)
+const normalize = (value) => String(value ?? '').trim().replace(/\s+/g, ' ').toLowerCase()
 
-export default function EducationBackgroundEditor({ form, errors, onChange }) {
+export default function EducationBackgroundEditor({ form: controlledForm, errors = {}, onChange }) {
+  const [localForm, setLocalForm] = useState({ educations: [] })
   const [draft, setDraft] = useState(blankEducation)
   const [editingIndex, setEditingIndex] = useState(null)
   const [draftErrors, setDraftErrors] = useState({})
+  const [attemptedSubmit, setAttemptedSubmit] = useState(false)
 
+  const form = controlledForm ?? localForm
   const educations = form.educations ?? []
   const suggestedAttainment = inferEducationalAttainment(educations)
+  const levelConfig = educationLevels.find((level) => level.value === draft.attainment_level)
+  const showCourse = Boolean(levelConfig?.requiresCourse)
+  const statusIsGraduated = draft.completion_status === 'graduated'
+  const statusIsUndergraduate = draft.completion_status === 'undergraduate'
+  const statusIsStudying = draft.completion_status === 'currently_studying'
+  const cleanDraft = cleanEducation(draft)
+  const readinessErrors = validateEducation(cleanDraft)
+  const duplicateIndex = educations.findIndex((education, index) => (
+    index !== editingIndex && educationKey(cleanDraft) === educationKey(cleanEducation(education))
+  ))
+  const duplicateMessage = duplicateIndex !== -1 && isMeaningfulEducation(cleanDraft)
+    ? 'This school, level, course, and year range is already recorded.'
+    : ''
+  const canSaveDraft = Object.keys(readinessErrors).length === 0 && !duplicateMessage
+
+  const emitChange = (event) => {
+    if (onChange) {
+      onChange(event)
+      return
+    }
+
+    const { name, value } = event.target
+    setLocalForm((current) => ({ ...current, [name]: value }))
+  }
 
   const updateEducations = (nextEducations) => {
-    onChange({ target: { name: 'educations', value: nextEducations } })
+    emitChange({ target: { name: 'educations', value: nextEducations } })
   }
 
   const setDraftField = (name, value) => {
     setDraft((current) => {
       const next = { ...current, [name]: value }
 
-      if (name === 'level') {
+      if (name === 'attainment_level') {
+        const level = educationLevels.find((option) => option.value === value)
+        next.level = level?.backendLevel ?? ''
         next.course_strand = ''
+        next.completion_status = ''
+        next.year_graduated = ''
+        next.expected_year_graduated = ''
+        next.undergrad_year_last_attended = ''
         next.undergrad_level_reached = ''
-        next.current_level = ''
       }
 
       if (name === 'completion_status') {
         next.year_graduated = ''
-        next.undergrad_level_reached = ''
+        next.expected_year_graduated = ''
         next.undergrad_year_last_attended = ''
-        next.current_level = ''
+        next.undergrad_level_reached = ''
       }
 
       return next
@@ -165,32 +153,29 @@ export default function EducationBackgroundEditor({ form, errors, onChange }) {
     setDraft(blankEducation)
     setEditingIndex(null)
     setDraftErrors({})
+    setAttemptedSubmit(false)
   }
 
   const startEdit = (education, index) => {
     setDraft(normalizeEducationForDraft(education))
     setEditingIndex(index)
     setDraftErrors({})
+    setAttemptedSubmit(false)
   }
 
   const removeRecord = (index) => {
     const education = educations[index]
-    const label = education.institution_name || labelForLevel(education.level) || 'this education record'
+    const label = education.institution_name || labelForLevel(education) || 'this education record'
     if (!window.confirm(`Remove ${label} from your education records?`)) return
     updateEducations(educations.filter((_, itemIndex) => itemIndex !== index))
     if (editingIndex === index) resetDraft()
   }
 
   const saveDraft = () => {
-    const clean = cleanEducation(draft)
-    const validationErrors = validateEducation(clean)
-    const duplicateIndex = educations.findIndex((education, index) => (
-      index !== editingIndex && educationKey(clean) === educationKey(cleanEducation(education))
-    ))
+    setAttemptedSubmit(true)
 
-    if (duplicateIndex !== -1) {
-      validationErrors.duplicate = 'This school, level, program, and year range is already recorded.'
-    }
+    const validationErrors = { ...readinessErrors }
+    if (duplicateMessage) validationErrors.duplicate = duplicateMessage
 
     if (Object.keys(validationErrors).length) {
       setDraftErrors(validationErrors)
@@ -198,187 +183,47 @@ export default function EducationBackgroundEditor({ form, errors, onChange }) {
     }
 
     if (editingIndex === null) {
-      updateEducations([...educations, clean])
+      updateEducations([...educations, cleanDraft])
     } else {
-      updateEducations(educations.map((education, index) => (index === editingIndex ? clean : education)))
+      updateEducations(educations.map((education, index) => (index === editingIndex ? cleanDraft : education)))
     }
 
     resetDraft()
   }
 
-  const programMode = programModeForLevel(draft.level)
-  const statusIsGraduated = draft.completion_status === 'graduated'
-  const statusIsUndergraduate = draft.completion_status === 'undergraduate'
-  const statusIsStudying = draft.completion_status === 'currently_studying'
+  const baseVisibleErrors = attemptedSubmit ? { ...draftErrors, ...readinessErrors } : { ...draftErrors }
+  const visibleErrors = duplicateMessage && (attemptedSubmit || !canSaveDraft)
+    ? { ...baseVisibleErrors, duplicate: duplicateMessage }
+    : baseVisibleErrors
 
-  return (
-    <div className="space-y-5">
-      <div className="rounded-xl border border-blue-100 bg-blue-50 p-4">
-        <p className="text-sm font-bold text-slate-900">Currently in school?</p>
-        <div className="mt-3 grid gap-2 sm:grid-cols-2">
-          {[
-            { value: true, label: 'Yes' },
-            { value: false, label: 'No' },
-          ].map((option) => {
-            const active = Boolean(form.currently_in_school) === option.value
-            return (
-              <button
-                key={String(option.value)}
-                type="button"
-                onClick={() => onChange({ target: { name: 'currently_in_school', value: option.value } })}
-                className={`rounded-lg border px-4 py-3 text-left text-sm font-semibold transition ${
-                  active
-                    ? 'border-blue-700 bg-white text-blue-800 shadow-sm'
-                    : 'border-blue-100 bg-blue-50 text-slate-600 hover:bg-white'
-                }`}
-              >
-                {option.label}
-              </button>
-            )
-          })}
+  const savedRecordsSection = (
+    <section className="rounded-xl border border-slate-200 bg-white shadow-sm">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-4 py-3 sm:px-5">
+        <div>
+          <h4 className="text-sm font-black text-slate-950">Saved Education Records</h4>
+          <p className="mt-0.5 text-xs font-medium text-slate-500">
+            {educations.length} record{educations.length === 1 ? '' : 's'} added
+          </p>
         </div>
+        {suggestedAttainment && (
+          <span className="rounded-full border border-blue-100 bg-blue-50 px-3 py-1.5 text-xs font-bold text-blue-800">
+            Highest attainment: {suggestedAttainment}
+          </span>
+        )}
       </div>
 
-      <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h4 className="text-sm font-bold text-slate-950">{editingIndex === null ? 'Add Education Record' : 'Edit Education Record'}</h4>
-            {suggestedAttainment && (
-              <p className="mt-1 text-xs text-slate-500">Highest attainment will be saved as {suggestedAttainment}.</p>
-            )}
-          </div>
-          {editingIndex !== null && (
-            <button type="button" onClick={resetDraft} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50">
-              <X className="h-3.5 w-3.5" /> Cancel
-            </button>
-          )}
-        </div>
-
-        <div className="mt-4 grid gap-4">
-          <div className="grid gap-4 md:grid-cols-2">
-            <Field label="Education Level" error={draftErrors.level || errors['educations.*.level']}>
-              <select value={draft.level} onChange={(event) => setDraftField('level', event.target.value)} className="portal-input">
-                <option value="">Select level</option>
-                {educationLevels.map((level) => <option key={level.value} value={level.value}>{level.label}</option>)}
-              </select>
-            </Field>
-
-            <Field label="Education Status" error={draftErrors.completion_status}>
-              <div className="grid gap-2 sm:grid-cols-3">
-                {educationStatuses.map((status) => {
-                  const active = draft.completion_status === status.value
-                  return (
-                    <button
-                      key={status.value}
-                      type="button"
-                      onClick={() => setDraftField('completion_status', status.value)}
-                      className={`min-h-11 rounded-lg border px-3 py-2 text-left text-xs font-bold transition ${
-                        active
-                          ? 'border-blue-700 bg-blue-50 text-blue-800'
-                          : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
-                      }`}
-                    >
-                      {status.label}
-                    </button>
-                  )
-                })}
-              </div>
-            </Field>
-          </div>
-
-          <SearchablePicker
-            label="School Name"
-            value={draft.institution_name}
-            options={schoolSuggestions}
-            placeholder="Search school"
-            error={draftErrors.institution_name}
-            onChange={(value) => setDraftField('institution_name', value)}
-          />
-
-          {programMode === 'strand' && (
-            <Field label="Strand" error={draftErrors.course_strand}>
-              <select value={draft.course_strand} onChange={(event) => setDraftField('course_strand', event.target.value)} className="portal-input">
-                <option value="">Select strand</option>
-                {strands.map((strand) => <option key={strand} value={strand}>{strand}</option>)}
-              </select>
-            </Field>
-          )}
-
-          {programMode === 'college' && (
-            <SearchablePicker
-              label="Course / Program"
-              value={draft.course_strand}
-              options={collegePrograms}
-              placeholder="Search course or program"
-              error={draftErrors.course_strand}
-              onChange={(value) => setDraftField('course_strand', value)}
-            />
-          )}
-
-          {programMode === 'graduate' && (
-            <SearchablePicker
-              label="Graduate Program"
-              value={draft.course_strand}
-              options={graduatePrograms}
-              placeholder="Search graduate program"
-              error={draftErrors.course_strand}
-              onChange={(value) => setDraftField('course_strand', value)}
-            />
-          )}
-
-          <div className="grid gap-4 md:grid-cols-3">
-            <Field label="Year Started" error={draftErrors.year_started}>
-              <YearSelect value={draft.year_started} onChange={(value) => setDraftField('year_started', value)} />
-            </Field>
-
-            {statusIsGraduated && (
-              <Field label="Year Graduated" error={draftErrors.year_graduated}>
-                <YearSelect value={draft.year_graduated} onChange={(value) => setDraftField('year_graduated', value)} />
-              </Field>
-            )}
-
-            {statusIsUndergraduate && (
-              <>
-                <Field label="Level Reached" error={draftErrors.undergrad_level_reached}>
-                  <LevelSelect level={draft.level} value={draft.undergrad_level_reached} onChange={(value) => setDraftField('undergrad_level_reached', value)} />
-                </Field>
-                <Field label="Year Last Attended" error={draftErrors.undergrad_year_last_attended}>
-                  <YearSelect value={draft.undergrad_year_last_attended} onChange={(value) => setDraftField('undergrad_year_last_attended', value)} />
-                </Field>
-              </>
-            )}
-
-            {statusIsStudying && (
-              <Field label="Current Level" error={draftErrors.current_level}>
-                <LevelSelect level={draft.level} value={draft.current_level} onChange={(value) => setDraftField('current_level', value)} />
-              </Field>
-            )}
-          </div>
-
-          {draftErrors.duplicate && <p className="text-xs font-semibold text-red-600">{draftErrors.duplicate}</p>}
-
-          <button
-            type="button"
-            onClick={saveDraft}
-            className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-blue-800 px-4 py-3 text-sm font-bold text-white shadow-sm hover:bg-blue-900 sm:w-auto"
-          >
-            {editingIndex === null ? <Plus className="h-4 w-4" /> : <Check className="h-4 w-4" />}
-            {editingIndex === null ? 'Add Education Record' : 'Save Education Record'}
-          </button>
-        </div>
-      </section>
-
-      <section>
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h4 className="text-sm font-bold text-slate-950">Saved Education Records</h4>
-            <p className="mt-1 text-xs text-slate-500">{educations.length} record{educations.length === 1 ? '' : 's'} added</p>
-          </div>
-        </div>
-
+      <div className="p-4 sm:p-5">
         {educations.length === 0 ? (
-          <div className="rounded-xl border-2 border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
-            No education records yet.
+          <div className="flex items-start gap-3 rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-3">
+            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-white text-slate-400 shadow-sm">
+              <GraduationCap className="h-5 w-5" />
+            </span>
+            <div>
+              <p className="text-sm font-bold text-slate-800">No education records yet</p>
+              <p className="mt-1 text-xs leading-5 text-slate-500">
+                Add one school record below. This area will become your saved education list.
+              </p>
+            </div>
           </div>
         ) : (
           <div className="grid gap-3">
@@ -392,59 +237,258 @@ export default function EducationBackgroundEditor({ form, errors, onChange }) {
             ))}
           </div>
         )}
-        {errors.educations && <p className="mt-2 text-xs font-semibold text-red-600">{errors.educations}</p>}
-      </section>
+        {errors.educations && <p className="mt-3 text-xs font-semibold text-red-600">{errors.educations}</p>}
+      </div>
+    </section>
+  )
+
+  const formSection = (
+    <section className="rounded-xl border border-blue-100 bg-slate-50 p-4 shadow-sm sm:p-5">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="text-xs font-black uppercase tracking-wide text-blue-800">Education record builder</p>
+          <h4 className="mt-1 text-base font-black text-slate-950">
+            {editingIndex === null ? 'Add Education Record' : 'Edit Education Record'}
+          </h4>
+          <p className="mt-1 text-sm leading-6 text-slate-600">
+            Complete the required fields in order. Date fields change based on the education status you choose.
+          </p>
+        </div>
+        {editingIndex !== null && (
+          <button
+            type="button"
+            onClick={resetDraft}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-600 transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40"
+          >
+            <X className="h-3.5 w-3.5" /> Cancel edit
+          </button>
+        )}
+      </div>
+
+      <div className="mt-5 grid gap-4">
+        <div className="grid gap-4 lg:grid-cols-2">
+          <Field label="Education Level" id="education-level" required error={visibleErrors.attainment_level || visibleErrors.level || errors['educations.*.level']}>
+            <select
+              id="education-level"
+              value={draft.attainment_level}
+              onChange={(event) => setDraftField('attainment_level', event.target.value)}
+              className={controlClass(Boolean(visibleErrors.attainment_level || visibleErrors.level))}
+              aria-invalid={Boolean(visibleErrors.attainment_level || visibleErrors.level)}
+            >
+              <option value="">Select education level</option>
+              {educationLevels.map((level) => <option key={level.value} value={level.value}>{level.label}</option>)}
+            </select>
+          </Field>
+
+          <SearchablePicker
+            label="School Name"
+            required
+            value={draft.institution_name}
+            options={schoolSuggestions}
+            placeholder="Search school or training center"
+            error={visibleErrors.institution_name}
+            onChange={(value) => setDraftField('institution_name', value)}
+          />
+        </div>
+
+        {showCourse && (
+          <SearchablePicker
+            label="Course / Degree"
+            required
+            value={draft.course_strand}
+            options={programSuggestions}
+            placeholder="Search course, degree, or TESDA qualification"
+            error={visibleErrors.course_strand}
+            onChange={(value) => setDraftField('course_strand', value)}
+          />
+        )}
+
+        <Field label="Education Status" required error={visibleErrors.completion_status}>
+          <div role="radiogroup" aria-label="Education Status" className="grid gap-3 sm:grid-cols-3">
+            {educationStatuses.map((status) => {
+              const active = draft.completion_status === status.value
+              return (
+                <button
+                  key={status.value}
+                  type="button"
+                  role="radio"
+                  aria-checked={active}
+                  aria-pressed={active}
+                  onClick={() => setDraftField('completion_status', status.value)}
+                  className={`min-h-24 rounded-xl border p-3 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 ${
+                    active
+                      ? 'border-blue-700 bg-blue-50 text-blue-950 shadow-sm'
+                      : 'border-slate-200 bg-white text-slate-700 hover:border-blue-200 hover:bg-blue-50/60'
+                  }`}
+                >
+                  <span className="flex items-center gap-2 text-sm font-black">
+                    <span className={`grid h-5 w-5 place-items-center rounded-full border ${active ? 'border-blue-700 bg-blue-700 text-white' : 'border-slate-300 bg-white text-transparent'}`}>
+                      <Check className="h-3 w-3" />
+                    </span>
+                    {status.label}
+                  </span>
+                  <span className="mt-2 block text-xs leading-5 text-slate-500">{status.help}</span>
+                  {active && <span className="mt-2 inline-flex text-[11px] font-black text-blue-800">Selected</span>}
+                </button>
+              )
+            })}
+          </div>
+        </Field>
+
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          <Field label="Year Started" id="year-started" required error={visibleErrors.year_started}>
+            <YearSelect
+              id="year-started"
+              value={draft.year_started}
+              years={pastYears}
+              error={visibleErrors.year_started}
+              onChange={(value) => setDraftField('year_started', value)}
+            />
+          </Field>
+
+          {statusIsGraduated && (
+            <Field label="Year Graduated" id="year-graduated" required error={visibleErrors.year_graduated}>
+              <YearSelect
+                id="year-graduated"
+                value={draft.year_graduated}
+                years={pastYears}
+                error={visibleErrors.year_graduated}
+                onChange={(value) => setDraftField('year_graduated', value)}
+              />
+            </Field>
+          )}
+
+          {statusIsStudying && (
+            <Field label="Expected Year Graduated" id="expected-year-graduated" required error={visibleErrors.expected_year_graduated}>
+              <YearSelect
+                id="expected-year-graduated"
+                value={draft.expected_year_graduated}
+                years={expectedYears}
+                error={visibleErrors.expected_year_graduated}
+                onChange={(value) => setDraftField('expected_year_graduated', value)}
+              />
+            </Field>
+          )}
+
+          {statusIsUndergraduate && (
+            <Field label="Year Last Attended" id="year-last-attended" required error={visibleErrors.undergrad_year_last_attended}>
+              <YearSelect
+                id="year-last-attended"
+                value={draft.undergrad_year_last_attended}
+                years={pastYears}
+                error={visibleErrors.undergrad_year_last_attended}
+                onChange={(value) => setDraftField('undergrad_year_last_attended', value)}
+              />
+            </Field>
+          )}
+        </div>
+
+        {visibleErrors.duplicate && (
+          <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700">
+            {visibleErrors.duplicate}
+          </p>
+        )}
+
+        <div className="flex flex-col gap-2 border-t border-slate-200 pt-4 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-xs leading-5 text-slate-500">
+            {canSaveDraft
+              ? 'Ready to add this education record.'
+              : 'Complete all required fields to enable the add button.'}
+          </p>
+          <button
+            type="button"
+            onClick={saveDraft}
+            disabled={!canSaveDraft}
+            className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-blue-900 px-4 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-blue-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-600 sm:w-auto"
+          >
+            {editingIndex === null ? <Plus className="h-4 w-4" /> : <Check className="h-4 w-4" />}
+            {editingIndex === null ? 'Add Education Record' : 'Save Education Record'}
+          </button>
+        </div>
+      </div>
+    </section>
+  )
+
+  return (
+    <div className="space-y-5">
+      {educations.length === 0 ? (
+        <>
+          {formSection}
+          {savedRecordsSection}
+        </>
+      ) : (
+        <>
+          {savedRecordsSection}
+          {formSection}
+        </>
+      )}
     </div>
   )
 }
 
-function SearchablePicker({ label, value, options, placeholder, error, onChange }) {
-  const [query, setQuery] = useState(value || '')
-  const exactMatch = options.some((option) => normalize(option) === normalize(query))
+function SearchablePicker({ label, required = false, value, options, placeholder, error, onChange }) {
+  const inputId = useId()
+  const listboxId = useId()
+  const [focused, setFocused] = useState(false)
+  const query = value || ''
+  const normalizedQuery = normalize(query)
   const matches = useMemo(() => (
     options
-      .filter((option) => normalize(option).includes(normalize(query)))
-      .slice(0, query ? 8 : 6)
-  ), [options, query])
+      .filter((option) => !normalizedQuery || normalize(option).includes(normalizedQuery))
+      .slice(0, normalizedQuery ? 8 : 6)
+  ), [options, normalizedQuery])
 
   const choose = (nextValue) => {
-    setQuery(nextValue)
     onChange(nextValue)
+    setFocused(false)
   }
 
   return (
-    <Field label={label} error={error}>
+    <Field label={label} id={inputId} required={required} error={error}>
       <div className="relative">
-        <Search className="pointer-events-none absolute left-3 top-3.5 h-4 w-4 text-slate-400" />
+        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
         <input
+          id={inputId}
           value={query}
-          onChange={(event) => {
-            setQuery(event.target.value)
-            if (exactMatch) onChange(event.target.value)
-          }}
-          className="portal-input pl-9"
+          onFocus={() => setFocused(true)}
+          onBlur={() => window.setTimeout(() => setFocused(false), 120)}
+          onChange={(event) => onChange(event.target.value)}
+          className={`${controlClass(Boolean(error))} pl-9`}
           placeholder={placeholder}
+          autoComplete="off"
+          role="combobox"
+          aria-expanded={focused}
+          aria-controls={listboxId}
+          aria-autocomplete="list"
+          aria-invalid={Boolean(error)}
         />
-      </div>
-      <div className="mt-2 flex flex-wrap gap-2">
-        {matches.map((option) => (
-          <button
-            key={option}
-            type="button"
-            onClick={() => choose(option)}
-            className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${
-              normalize(value) === normalize(option)
-                ? 'border-blue-700 bg-blue-50 text-blue-800'
-                : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
-            }`}
+        {focused && (
+          <div
+            id={listboxId}
+            role="listbox"
+            className="absolute z-30 mt-2 max-h-56 w-full overflow-y-auto rounded-xl border border-slate-200 bg-white py-1 shadow-xl"
           >
-            {option}
-          </button>
-        ))}
-        {query.trim() && !exactMatch && (
-          <button type="button" onClick={() => choose(query.trim())} className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-800">
-            Use "{query.trim()}"
-          </button>
+            {matches.length > 0 ? (
+              matches.map((option) => (
+                <button
+                  key={option}
+                  type="button"
+                  role="option"
+                  aria-selected={normalize(value) === normalize(option)}
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={() => choose(option)}
+                  className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm font-semibold text-slate-700 transition hover:bg-blue-50 focus-visible:bg-blue-50 focus-visible:outline-none"
+                >
+                  <BookOpen className="h-3.5 w-3.5 text-slate-400" />
+                  <span className="min-w-0 truncate">{option}</span>
+                </button>
+              ))
+            ) : (
+              <div className="px-3 py-3 text-xs leading-5 text-slate-500">
+                No saved suggestion found. You may continue with the typed name.
+              </div>
+            )}
+          </div>
         )}
       </div>
     </Field>
@@ -455,30 +499,42 @@ function EducationCard({ education, onEdit, onRemove }) {
   const statusLabel = educationStatuses.find((status) => status.value === education.completion_status)?.label
     || (education.year_graduated ? 'Graduated' : 'Undergraduate / Did Not Finish')
   const program = education.course_strand || null
-  const yearRange = [
-    education.year_started,
-    education.year_graduated || education.undergrad_year_last_attended || (education.completion_status === 'currently_studying' ? 'Present' : null),
-  ].filter(Boolean).join(' - ')
+  const endYear = education.year_graduated
+    || education.undergrad_year_last_attended
+    || education.expected_year_graduated
+    || (education.completion_status === 'currently_studying' ? 'Present' : null)
+  const yearRange = [education.year_started, endYear].filter(Boolean).join(' - ')
 
   return (
     <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
-          <p className="text-sm font-bold text-slate-950">{education.institution_name || 'School not specified'}</p>
-          <p className="mt-1 text-xs font-semibold text-blue-700">{labelForLevel(education.level)}</p>
-          {program && <p className="mt-1 text-sm text-slate-600">{program}</p>}
+          <p className="text-sm font-black text-slate-950">{education.institution_name || 'School not specified'}</p>
+          <p className="mt-1 text-xs font-bold text-blue-700">{labelForLevel(education)}</p>
+          {program && <p className="mt-1 text-sm leading-5 text-slate-600">{program}</p>}
           <div className="mt-3 flex flex-wrap gap-2 text-xs">
             <span className="rounded-full bg-slate-100 px-2.5 py-1 font-semibold text-slate-600">{statusLabel}</span>
             {yearRange && <span className="rounded-full bg-blue-50 px-2.5 py-1 font-semibold text-blue-700">{yearRange}</span>}
-            {education.undergrad_level_reached && <span className="rounded-full bg-amber-50 px-2.5 py-1 font-semibold text-amber-700">{education.undergrad_level_reached}</span>}
-            {education.current_level && <span className="rounded-full bg-emerald-50 px-2.5 py-1 font-semibold text-emerald-700">{education.current_level}</span>}
+            {education.expected_year_graduated && education.completion_status === 'currently_studying' && (
+              <span className="rounded-full bg-emerald-50 px-2.5 py-1 font-semibold text-emerald-700">Expected {education.expected_year_graduated}</span>
+            )}
           </div>
         </div>
         <div className="flex shrink-0 gap-2">
-          <button type="button" onClick={onEdit} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50">
+          <button
+            type="button"
+            onClick={onEdit}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-xs font-bold text-slate-700 transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40"
+            aria-label="Edit education record"
+          >
             <Pencil className="h-3.5 w-3.5" /> Edit
           </button>
-          <button type="button" onClick={onRemove} className="inline-flex items-center gap-1.5 rounded-lg border border-red-100 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700 hover:bg-red-100">
+          <button
+            type="button"
+            onClick={onRemove}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-red-100 bg-red-50 px-3 py-2 text-xs font-bold text-red-700 transition hover:bg-red-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/30"
+            aria-label="Remove education record"
+          >
             <Trash2 className="h-3.5 w-3.5" /> Remove
           </button>
         </div>
@@ -487,86 +543,110 @@ function EducationCard({ education, onEdit, onRemove }) {
   )
 }
 
-function Field({ label, error, children }) {
+function Field({ label, id, required = false, error, children }) {
+  const labelContent = (
+    <>
+      {label}
+      {required && <span className="ml-1 text-red-600">*</span>}
+    </>
+  )
+
   return (
-    <label className="block">
-      <span className="mb-1.5 block text-xs font-bold uppercase tracking-wide text-slate-600">{label}</span>
+    <div className="block">
+      {id ? (
+        <label htmlFor={id} className="mb-1.5 block text-xs font-black uppercase tracking-wide text-slate-600">
+          {labelContent}
+        </label>
+      ) : (
+        <p className="mb-1.5 text-xs font-black uppercase tracking-wide text-slate-600">{labelContent}</p>
+      )}
       {children}
       {error && <span className="mt-1.5 block text-xs font-semibold text-red-600">{Array.isArray(error) ? error[0] : error}</span>}
-    </label>
+    </div>
   )
 }
 
-function YearSelect({ value, onChange }) {
+function YearSelect({ id, value, years, error, onChange }) {
   return (
-    <select value={value || ''} onChange={(event) => onChange(event.target.value)} className="portal-input">
+    <select
+      id={id}
+      value={value || ''}
+      onChange={(event) => onChange(event.target.value)}
+      className={controlClass(Boolean(error))}
+      aria-invalid={Boolean(error)}
+    >
       <option value="">Select year</option>
       {years.map((year) => <option key={year} value={year}>{year}</option>)}
     </select>
   )
 }
 
-function LevelSelect({ level, value, onChange }) {
-  const options = levelOptions[level] ?? []
-  return (
-    <select value={value || ''} onChange={(event) => onChange(event.target.value)} className="portal-input" disabled={!level}>
-      <option value="">{level ? 'Select level' : 'Select education level first'}</option>
-      {options.map((option) => <option key={option} value={option}>{option}</option>)}
-    </select>
-  )
+function controlClass(hasError = false) {
+  return [
+    'h-11 w-full rounded-lg border bg-white px-3 text-sm font-semibold text-slate-900 shadow-sm outline-none transition placeholder:text-slate-400',
+    'focus:border-blue-700 focus:ring-2 focus:ring-blue-700/15',
+    hasError ? 'border-red-400 focus:border-red-500 focus:ring-red-100' : 'border-slate-300',
+  ].join(' ')
 }
 
 function validateEducation(education) {
   const errors = {}
   const startYear = Number(education.year_started)
   const graduatedYear = Number(education.year_graduated)
+  const expectedYear = Number(education.expected_year_graduated)
   const lastAttendedYear = Number(education.undergrad_year_last_attended)
 
+  if (!education.attainment_level) errors.attainment_level = 'Education level is required.'
   if (!education.level) errors.level = 'Education level is required.'
   if (!education.institution_name) errors.institution_name = 'School name is required.'
-  if (!education.completion_status) errors.completion_status = 'Education status is required.'
+  if (!education.completion_status) errors.completion_status = 'Choose an education status.'
   if (!education.year_started) errors.year_started = 'Year started is required.'
   if (education.year_started && (startYear < 1950 || startYear > currentYear)) errors.year_started = 'Select a valid year.'
 
-  if (programModeForLevel(education.level) && !education.course_strand) {
-    errors.course_strand = education.level === 'senior_high_strand'
-      ? 'Strand is required.'
-      : 'Program is required.'
+  if (requiresCourse(education) && !education.course_strand) {
+    errors.course_strand = 'Course or degree is required for this education level.'
   }
 
   if (education.completion_status === 'graduated') {
     if (!education.year_graduated) errors.year_graduated = 'Year graduated is required.'
     if (education.year_graduated && graduatedYear < startYear) errors.year_graduated = 'Year graduated cannot be earlier than year started.'
+    if (education.year_graduated && graduatedYear > currentYear) errors.year_graduated = 'Year graduated cannot be in the future.'
   }
 
   if (education.completion_status === 'undergraduate') {
-    if (!education.undergrad_level_reached) errors.undergrad_level_reached = 'Level reached is required.'
     if (!education.undergrad_year_last_attended) errors.undergrad_year_last_attended = 'Year last attended is required.'
     if (education.undergrad_year_last_attended && lastAttendedYear < startYear) errors.undergrad_year_last_attended = 'Year last attended cannot be earlier than year started.'
     if (education.undergrad_year_last_attended && lastAttendedYear > currentYear) errors.undergrad_year_last_attended = 'Year last attended cannot be in the future.'
   }
 
-  if (education.completion_status === 'currently_studying' && !education.current_level) {
-    errors.current_level = 'Current level is required.'
+  if (education.completion_status === 'currently_studying') {
+    if (!education.expected_year_graduated) errors.expected_year_graduated = 'Expected year graduated is required.'
+    if (education.expected_year_graduated && expectedYear < startYear) errors.expected_year_graduated = 'Expected year cannot be earlier than year started.'
+    if (education.expected_year_graduated && expectedYear < currentYear) errors.expected_year_graduated = 'Expected year should not be in the past.'
   }
 
   return errors
 }
 
 function cleanEducation(education) {
-  const status = education.completion_status || (education.year_graduated ? 'graduated' : 'undergraduate')
-  const level = education.level === 'senior_high' ? 'senior_high_strand' : education.level === 'graduate' ? 'graduate_studies' : (education.level || '')
+  const attainmentLevel = education.attainment_level || inferAttainmentLevel(education)
+  const levelConfig = educationLevels.find((level) => level.value === attainmentLevel)
+  const level = levelConfig?.backendLevel || normalizeBackendLevel(education.level)
+  const status = education.completion_status || (education.year_graduated ? 'graduated' : '')
 
   return {
+    attainment_level: attainmentLevel,
     level,
     institution_name: String(education.institution_name ?? '').trim().replace(/\s+/g, ' '),
-    course_strand: programModeForLevel(level) ? String(education.course_strand ?? '').trim().replace(/\s+/g, ' ') : '',
+    course_strand: requiresCourse({ attainment_level: attainmentLevel, level }) ? String(education.course_strand ?? '').trim().replace(/\s+/g, ' ') : '',
     completion_status: status,
     year_started: education.year_started || '',
     year_graduated: status === 'graduated' ? (education.year_graduated || '') : '',
-    undergrad_level_reached: status === 'undergraduate' ? (education.undergrad_level_reached || '') : '',
+    expected_year_graduated: status === 'currently_studying' ? (education.expected_year_graduated || '') : '',
     undergrad_year_last_attended: status === 'undergraduate' ? (education.undergrad_year_last_attended || '') : '',
-    current_level: status === 'currently_studying' ? (education.current_level || education.undergrad_level_reached || '') : '',
+    undergrad_level_reached: status === 'undergraduate'
+      ? (education.undergrad_level_reached || levelConfig?.label || labelForLevel({ attainment_level: attainmentLevel, level }))
+      : '',
   }
 }
 
@@ -577,58 +657,87 @@ function normalizeEducationForDraft(education) {
 function educationKey(education) {
   const endYear = education.year_graduated
     || education.undergrad_year_last_attended
+    || education.expected_year_graduated
     || (education.completion_status === 'currently_studying' ? 'present' : '')
   return [
     normalize(education.institution_name),
-    normalize(education.level),
+    normalize(education.attainment_level || education.level),
     normalize(education.course_strand),
     education.year_started || '',
     endYear,
   ].join('|')
 }
 
-function programModeForLevel(level) {
-  if (level === 'senior_high_strand' || level === 'senior_high') return 'strand'
-  if (level === 'tertiary') return 'college'
-  if (level === 'graduate_studies' || level === 'graduate') return 'graduate'
-  return null
+function isMeaningfulEducation(education) {
+  return Boolean(
+    education.attainment_level
+    && education.institution_name
+    && education.completion_status
+    && education.year_started
+  )
 }
 
-function labelForLevel(value) {
-  const normalized = value === 'senior_high' ? 'senior_high_strand' : value === 'graduate' ? 'graduate_studies' : value
-  return educationLevels.find((level) => level.value === normalized)?.label || 'Education level not specified'
+function requiresCourse(education) {
+  const value = education.attainment_level || inferAttainmentLevel(education)
+  const config = educationLevels.find((level) => level.value === value)
+  return Boolean(config?.requiresCourse)
+}
+
+function normalizeBackendLevel(value) {
+  if (value === 'senior_high') return 'senior_high_strand'
+  if (value === 'graduate') return 'graduate_studies'
+  if (value === 'post_graduate') return 'graduate_studies'
+  return value || ''
+}
+
+function inferAttainmentLevel(education) {
+  if (education.attainment_level) return education.attainment_level
+  const level = normalizeBackendLevel(education.level)
+  const status = education.completion_status || (education.year_graduated ? 'graduated' : '')
+
+  if (level === 'vocational') return 'vocational'
+  if (level === 'graduate_studies') return 'post_graduate'
+  if (level === 'tertiary') return status === 'graduated' ? 'college_graduate' : 'college_undergraduate'
+  if (level === 'secondary_non_k12' || level === 'secondary_k12' || level === 'senior_high_strand') {
+    return status === 'graduated' ? 'high_school_graduate' : 'high_school_undergraduate'
+  }
+
+  return ''
+}
+
+function labelForLevel(education) {
+  const value = education.attainment_level || inferAttainmentLevel(education)
+  return educationLevels.find((level) => level.value === value)?.label || 'Education level not specified'
 }
 
 function inferEducationalAttainment(educations = []) {
   const ranks = {
-    'Elementary Graduate': 1,
+    'High School Undergraduate': 1,
     'High School Graduate': 2,
-    'Senior High School Graduate': 3,
-    'College Undergraduate': 5,
-    'College Graduate': 6,
-    "Master's Degree": 7,
-    'Doctorate': 8,
+    'Vocational / Technical': 3,
+    'College Undergraduate': 4,
+    'College Graduate': 5,
+    'Post-Graduate': 6,
   }
 
   const inferred = educations
     .map((education) => {
       const clean = cleanEducation(education)
       const isGraduated = clean.completion_status === 'graduated'
-      const program = clean.course_strand.toLowerCase()
 
-      switch (clean.level) {
-        case 'elementary':
-          return isGraduated ? 'Elementary Graduate' : null
-        case 'secondary_non_k12':
-          return isGraduated ? 'High School Graduate' : null
-        case 'secondary_k12':
-        case 'senior_high_strand':
-          return isGraduated ? 'Senior High School Graduate' : null
-        case 'tertiary':
+      switch (clean.attainment_level) {
+        case 'high_school_undergraduate':
+          return 'High School Undergraduate'
+        case 'high_school_graduate':
+          return isGraduated ? 'High School Graduate' : 'High School Undergraduate'
+        case 'vocational':
+          return 'Vocational / Technical'
+        case 'college_undergraduate':
+          return 'College Undergraduate'
+        case 'college_graduate':
           return isGraduated ? 'College Graduate' : 'College Undergraduate'
-        case 'graduate_studies':
-          if (!isGraduated) return null
-          return /\b(phd|ph\.d|doctor|doctorate|juris doctor)\b/i.test(program) ? 'Doctorate' : "Master's Degree"
+        case 'post_graduate':
+          return 'Post-Graduate'
         default:
           return null
       }

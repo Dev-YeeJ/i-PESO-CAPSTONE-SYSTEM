@@ -16,9 +16,9 @@ import {
   X,
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
+import AIOccupationMapper from '@/components/form/AIOccupationMapper'
 import EducationLevelSelect, { educationRankToBackendValue } from '@/components/form/EducationLevelSelect'
 import ExperienceTimeFrame from '@/components/form/ExperienceTimeFrame'
-import PsocCombobox from '@/components/form/PsocCombobox'
 import SkillTaxonomyTags from '@/components/form/SkillTaxonomyTags'
 import PsgcCascade from '@/pages/employer/components/PsgcCascade'
 import * as employerService from '@/services/employerService'
@@ -74,6 +74,10 @@ const initialForm = {
   work_setup: 'On-Site',
   occupation: null,
   occupation_id: null,
+  occupation_mapping: null,
+  general_term: '',
+  broad_field_key: '',
+  anchor_code: '',
   psoc_code: '',
   region: '',
   province: '',
@@ -90,6 +94,7 @@ const initialForm = {
   minimum_education: 'High School Graduate',
   required_years_experience: 0,
   required_skills: [],
+  soft_skills: [],
   preferred_gender: 'Any',
   minimum_age: '',
   maximum_age: '',
@@ -170,7 +175,7 @@ export default function JobPostingWizard() {
     }
 
     if (targetStep === 2) {
-      if (!form.occupation_id || !form.psoc_code) nextErrors.occupation_id = 'Select a preferred occupation / PSOC anchor.'
+      if (!form.general_term) nextErrors.general_term = 'Select the broad occupation field for matching.'
       if (!form.province) nextErrors.province = 'Select province.'
       if (!form.city_municipality) nextErrors.city_municipality = 'Select city or municipality.'
       if (!form.barangay) nextErrors.barangay = 'Select barangay.'
@@ -182,6 +187,8 @@ export default function JobPostingWizard() {
         nextErrors.required_years_experience = 'Enter 0 or higher.'
       }
       if (!form.required_skills.length) nextErrors.required_skills = 'Add at least one required hard skill.'
+      if (form.required_skills.length > 15) nextErrors.required_skills = 'Select up to 15 required hard skills.'
+      if (form.soft_skills.length > 10) nextErrors.soft_skills = 'Select up to 10 preferred soft skills.'
     }
 
     if (targetStep === 4) {
@@ -425,6 +432,16 @@ function BasicInformationStep({ form, errors, change }) {
 }
 
 function AlgorithmAnchorsStep({ form, errors, update, setLocation, locationSummary }) {
+  const setOccupationMapping = (mapping) => {
+    update('occupation_mapping', mapping)
+    update('occupation_id', null)
+    update('occupation', null)
+    update('psoc_code', mapping?.psocCode ?? '')
+    update('general_term', mapping?.anchorCode || mapping?.broadFieldKey || '')
+    update('broad_field_key', mapping?.broadFieldKey ?? '')
+    update('anchor_code', mapping?.anchorCode ?? '')
+  }
+
   return (
     <StepShell
       icon={Target}
@@ -432,20 +449,16 @@ function AlgorithmAnchorsStep({ form, errors, update, setLocation, locationSumma
       description="Standard occupation and PSGC location data become the strongest anchors for matching, referrals, and analytics."
     >
       <div className="space-y-6">
-        <Field label="Preferred Occupation / PSOC" required error={errors.occupation_id}>
-          <PsocCombobox
-            value={form.psoc_code}
-            selected={form.occupation}
-            onChange={(psocCode, occupation) => {
-              update('psoc_code', psocCode)
-              update('occupation', occupation)
-              update('occupation_id', occupation?.id ?? null)
-            }}
-            limit={50}
-            placeholder="Search occupation title or PSOC code"
-            error={errors.occupation_id}
+        <div>
+          <AIOccupationMapper
+            mode="employer"
+            value={form.occupation_mapping}
+            defaultInputText={form.job_title}
+            onChange={setOccupationMapping}
+            placeholder="e.g. Accounting Staff, Cashier, React Developer, Auto Mechanic"
           />
-        </Field>
+          {errors.general_term && <p className="mt-1.5 text-xs font-semibold text-red-600">{errors.general_term}</p>}
+        </div>
 
         <div>
           <p className="text-sm font-bold text-slate-700">Job Location / PSGC <span className="text-red-500">*</span></p>
@@ -531,7 +544,7 @@ function QualificationsStep({ form, errors, update }) {
         />
       </div>
 
-      <div className="mt-6">
+      <div className="mt-6 grid gap-5 lg:grid-cols-2">
         <SkillTaxonomyTags
           label="Required Hard Skills"
           required
@@ -540,8 +553,21 @@ function QualificationsStep({ form, errors, update }) {
           output="names"
           value={form.required_skills}
           onChange={(values) => update('required_skills', values)}
-          placeholder="Search a required hard skill"
+          placeholder="Type a required hard skill"
           error={errors.required_skills}
+          limit={15}
+        />
+
+        <SkillTaxonomyTags
+          label="Preferred Soft Skills"
+          mode="employer"
+          category="soft"
+          output="names"
+          value={form.soft_skills}
+          onChange={(values) => update('soft_skills', values)}
+          placeholder="Type a preferred soft skill"
+          error={errors.soft_skills}
+          limit={10}
         />
       </div>
     </StepShell>
@@ -734,7 +760,10 @@ function yearsToExperienceLevel(yearsValue) {
 
 function buildPayload(form) {
   return {
-    occupation_id: form.occupation_id,
+    occupation_id: form.occupation_id || null,
+    general_term: form.general_term || form.anchor_code || form.broad_field_key || null,
+    broad_field_key: form.broad_field_key || null,
+    anchor_code: form.anchor_code || form.general_term || null,
     job_title: form.job_title.trim().replace(/\s+/g, ' '),
     employment_type: form.employment_type,
     work_setup: form.work_setup,
@@ -755,7 +784,7 @@ function buildPayload(form) {
     target_courses: [],
     experience_level: yearsToExperienceLevel(form.required_years_experience),
     required_skills: form.required_skills,
-    soft_skills: [],
+    soft_skills: form.soft_skills,
     required_certifications: [],
     salary_type: 'Monthly',
     salary_min: form.hide_salary || form.salary_min === '' ? null : Number(form.salary_min),

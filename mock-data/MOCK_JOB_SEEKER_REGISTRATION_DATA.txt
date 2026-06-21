@@ -1,0 +1,118 @@
+I-PESO JOB SEEKER REGISTRATION MOCK DATA
+========================================
+
+Notes:
+- This record is fictional and intended only for local testing.
+- Use a unique email if the account already exists.
+- Password and Confirm Password must match.
+- Contact number must use the Philippine format 09XXXXXXXXX.
+- Suggested occupation uses the broad-field matching flow: user types a job title, then selects the broad field shown below.
+- Skills may be selected from ready-to-click recommendations or typed manually.
+
+
+MOCK JOB SEEKER 1
+-----------------
+
+Account Login
+Email Address: jaime.seeker01@example.com
+Password: TestSeeker#2026
+Confirm Password: TestSeeker#2026
+
+Personal Information
+First Name: Jaime
+Middle Name (Optional): Reyes
+Last Name: Dela Cruz
+Suffix: None
+Mobile Number: 09171234567
+Date of Birth: 1999-02-15
+Sex: Male
+Civil Status: Single
+Religion: Roman Catholic
+Height: 5.70
+TIN (Optional): 
+
+Present Address
+Province: Pangasinan
+City/Municipality: Urdaneta City
+Barangay: Poblacion
+House No. / Street / Village: 123 Rizal Street
+
+Employment Status
+Current Employment Status: Unemployed
+Unemployment Duration: 3 months
+Reason for Unemployment: New Entrant / Fresh Graduate
+OFW: No
+Former OFW: No
+4Ps Beneficiary: No
+
+Preferred Occupation
+Typed Job Title: React Developer
+Broad Field Selected: IT Work
+Occupation Score Behavior: Same broad field = 100, Different broad field = 0
+
+Work Preference
+Preferred Work Type: Full-time
+Preferred Work Setup: On-site, Hybrid, Remote
+Preferred Employment Type: Permanent/Regular, Contractual
+Preferred Work Location: Local
+Preferred Locations: Urdaneta City, Dagupan City, Baguio City
+
+Educational Background
+Education Level: College Graduate
+School Name: University of Pangasinan
+Course / Degree: BS Information Technology
+Education Status: Graduated
+Year Started: 2018
+Year Graduated: 2022
+
+Hard Skills
+React
+JavaScript
+Laravel
+HTML
+CSS
+Git
+Microsoft Excel
+Computer Literacy
+
+Soft Skills
+Communication
+Teamwork
+Customer Service
+Problem Solving
+Adaptability
+Attention to Detail
+
+Official DOLE Vocational Skills
+Computer Literate
+
+Languages
+English: Read, Write, Speak, Understand
+Filipino: Read, Write, Speak, Understand
+
+Training
+Course: Web Development Bootcamp
+Hours of Training: 160
+Training Institution: TESDA Accredited Training Center
+Skills Acquired: HTML, CSS, JavaScript, React, Laravel, Git
+Certificate Received: Certificate of Completion
+
+Eligibility / License
+Type: Civil Service Exam/Eligibility
+Name: Career Service Professional Eligibility
+Date Taken: 2023-03-26
+Valid Until: Not applicable
+
+Work Experience
+Company Name: Northstar Digital Solutions
+Company Address: Urdaneta City, Pangasinan
+Position: Junior React Developer
+Employment Status: Contractual
+Duration: 18 months
+Start Date: 2023-01-01
+End Date: 2024-06-30
+
+Certificates / Uploads
+Resume: jaime-dela-cruz-resume.pdf
+Training Certificate: jaime-web-development-certificate.pdf
+Government ID: jaime-dela-cruz-government-id.jpg

@@ -17,6 +17,7 @@ class JobVacancy extends Model
     protected $fillable = [
         'employer_id',
         'occupation_id',
+        'general_term',
         'job_title',
         'employment_type',
         'work_setup',

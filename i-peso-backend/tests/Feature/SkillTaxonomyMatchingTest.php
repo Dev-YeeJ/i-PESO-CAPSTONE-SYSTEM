@@ -277,6 +277,64 @@ class SkillTaxonomyMatchingTest extends TestCase
         $this->assertSame('ai_generated_title', $match['factors']['occupation']['details']['match_type']);
     }
 
+    public function test_same_broad_field_scores_full_occupation_match(): void
+    {
+        $seeker = $this->seeker();
+        SeekerOccupation::query()->create([
+            'seeker_id' => $seeker->getKey(),
+            'occupation_id' => null,
+            'general_term' => 'it-work',
+            'occupation_title' => 'React Developer',
+            'raw_job_title' => 'React Developer',
+            'status' => 'ai_generated',
+            'preference_order' => 1,
+        ]);
+        $vacancy = $this->vacancy(
+            requiredSkills: [],
+            attributes: [
+                'occupation_id' => null,
+                'general_term' => 'general:it-work',
+                'job_title' => 'Frontend Developer',
+            ]
+        );
+
+        $match = app(JobMatchingService::class)->score($vacancy, $seeker);
+
+        $this->assertSame(100.0, $match['factors']['occupation']['score']);
+        $this->assertSame('same_broad_field', $match['factors']['occupation']['details']['match_type']);
+        $this->assertSame('it work', $match['factors']['occupation']['details']['preferred_broad_field']);
+        $this->assertSame('it work', $match['factors']['occupation']['details']['vacancy_broad_field']);
+    }
+
+    public function test_different_broad_field_scores_zero_occupation_match(): void
+    {
+        $seeker = $this->seeker();
+        SeekerOccupation::query()->create([
+            'seeker_id' => $seeker->getKey(),
+            'occupation_id' => null,
+            'general_term' => 'it-work',
+            'occupation_title' => 'React Developer',
+            'raw_job_title' => 'React Developer',
+            'status' => 'ai_generated',
+            'preference_order' => 1,
+        ]);
+        $vacancy = $this->vacancy(
+            requiredSkills: [],
+            attributes: [
+                'occupation_id' => null,
+                'general_term' => 'healthcare-work',
+                'job_title' => 'Clinic Assistant',
+            ]
+        );
+
+        $match = app(JobMatchingService::class)->score($vacancy, $seeker);
+
+        $this->assertSame(0.0, $match['factors']['occupation']['score']);
+        $this->assertSame('different_broad_field', $match['factors']['occupation']['details']['match_type']);
+        $this->assertSame('it work', $match['factors']['occupation']['details']['preferred_broad_field']);
+        $this->assertSame('healthcare work', $match['factors']['occupation']['details']['vacancy_broad_field']);
+    }
+
     public function test_text_skill_fallback_matches_even_without_taxonomy_sync(): void
     {
         $seeker = $this->seeker();
@@ -294,6 +352,81 @@ class SkillTaxonomyMatchingTest extends TestCase
         $this->assertSame(1, $score['matched_requirements']);
         $this->assertSame('text_exact', $score['details'][0]['match_type']);
         $this->assertSame('Computer Literate', $score['details'][0]['matched_skill']);
+    }
+
+    public function test_skill_match_understands_same_meaning_different_words(): void
+    {
+        $seeker = $this->seeker();
+        SeekerSkill::query()->create([
+            'seeker_id' => $seeker->getKey(),
+            'skill_name' => 'Front Desk Service',
+            'skill_type' => 'technical',
+        ]);
+
+        $vacancy = $this->vacancy(requiredSkills: ['Customer Service']);
+        app(SkillTaxonomyService::class)->syncVacancy($vacancy);
+
+        $score = app(JobSkillMatchingService::class)->score($vacancy, $seeker);
+
+        $this->assertSame(85.0, $score['percentage']);
+        $this->assertSame('semantic_skill_family', $score['details'][0]['match_type']);
+        $this->assertSame('Front Desk Service', $score['details'][0]['matched_skill']);
+    }
+
+    public function test_skill_normalization_maps_common_skill_phrases(): void
+    {
+        $seeker = $this->seeker();
+        SeekerSkill::query()->create([
+            'seeker_id' => $seeker->getKey(),
+            'skill_name' => 'Spreadsheet Management',
+            'skill_type' => 'technical',
+        ]);
+
+        $vacancy = $this->vacancy(requiredSkills: ['Microsoft Excel']);
+
+        $score = app(JobSkillMatchingService::class)->score($vacancy, $seeker);
+
+        $this->assertSame(100.0, $score['percentage']);
+        $this->assertSame('text_exact', $score['details'][0]['match_type']);
+    }
+
+    public function test_user_entered_custom_skill_is_added_to_local_taxonomy(): void
+    {
+        $seeker = $this->seeker();
+        $seekerSkill = SeekerSkill::query()->create([
+            'seeker_id' => $seeker->getKey(),
+            'skill_name' => 'Cash Register Operation',
+            'skill_type' => 'technical',
+        ]);
+
+        app(SkillTaxonomyService::class)->syncSeeker($seeker);
+        $seekerSkill->refresh();
+
+        $this->assertNotNull($seekerSkill->skill_id);
+        $this->assertDatabaseHas('skill_catalog_entries', [
+            'id' => $seekerSkill->skill_id,
+            'normalized_name' => 'cash register operation',
+            'source' => 'local_submitted',
+        ]);
+    }
+
+    public function test_user_entered_custom_skill_can_match_by_semantic_family(): void
+    {
+        $seeker = $this->seeker();
+        SeekerSkill::query()->create([
+            'seeker_id' => $seeker->getKey(),
+            'skill_name' => 'Guest Relations',
+            'skill_type' => 'technical',
+        ]);
+
+        $vacancy = $this->vacancy(requiredSkills: ['Customer Service']);
+        app(SkillTaxonomyService::class)->syncSeeker($seeker);
+        app(SkillTaxonomyService::class)->syncVacancy($vacancy);
+
+        $score = app(JobSkillMatchingService::class)->score($vacancy, $seeker);
+
+        $this->assertGreaterThanOrEqual(85.0, $score['percentage']);
+        $this->assertContains($score['details'][0]['match_type'], ['text_exact', 'semantic_skill_family']);
     }
 
     public function test_missing_mandatory_certification_marks_match_ineligible(): void
@@ -725,6 +858,7 @@ class SkillTaxonomyMatchingTest extends TestCase
                 $table->id('post_id');
                 $table->string('job_title');
                 $table->unsignedBigInteger('occupation_id')->nullable();
+                $table->string('general_term')->nullable();
                 $table->json('required_skills')->nullable();
                 $table->json('soft_skills')->nullable();
                 $table->string('minimum_education')->nullable();
@@ -749,6 +883,11 @@ class SkillTaxonomyMatchingTest extends TestCase
                 $table->decimal('longitude', 10, 7)->nullable();
                 $table->string('status')->default('active');
                 $table->timestamps();
+            });
+        }
+        if (! Schema::hasColumn('job_vacancies', 'general_term')) {
+            Schema::table('job_vacancies', function (Blueprint $table) {
+                $table->string('general_term')->nullable()->after('occupation_id');
             });
         }
 

@@ -24,6 +24,9 @@ class SkillNormalizationService
         // Expand common abbreviations
         $abbreviations = [
             '/\bjs\b/' => 'javascript',
+            '/\bms\s+excel\b/' => 'microsoft excel',
+            '/\bms\s+word\b/' => 'microsoft word',
+            '/\bms\s+office\b/' => 'microsoft office',
             '/\bc\+\+\b/' => 'c plus plus',
             '/\bc#\b/' => 'c sharp',
             '/\bui\/ux\b/' => 'user interface user experience',
@@ -41,6 +44,38 @@ class SkillNormalizationService
         ];
 
         foreach ($abbreviations as $pattern => $replacement) {
+            $normalized = preg_replace($pattern, $replacement, $normalized);
+        }
+
+        $semanticPhrases = [
+            '/\bcomputer literate\b/' => 'basic computer operations',
+            '/\bcomputer literacy\b/' => 'basic computer operations',
+            '/\bcomputer skills\b/' => 'basic computer operations',
+            '/\bspreadsheet management\b/' => 'microsoft excel',
+            '/\bspreadsheet skills\b/' => 'microsoft excel',
+            '/\bexcel spreadsheet\b/' => 'microsoft excel',
+            '/\bclient assistance\b/' => 'customer service',
+            '/\bclient support\b/' => 'customer service',
+            '/\bcustomer assistance\b/' => 'customer service',
+            '/\bcustomer care\b/' => 'customer service',
+            '/\bguest relations\b/' => 'customer service',
+            '/\bstock control\b/' => 'inventory management',
+            '/\bstock management\b/' => 'inventory management',
+            '/\binventory control\b/' => 'inventory management',
+            '/\bfood prep\b/' => 'food preparation',
+            '/\bmeal preparation\b/' => 'food preparation',
+            '/\bvehicle operation\b/' => 'driving',
+            '/\bvehicle driving\b/' => 'driving',
+            '/\bclerical work\b/' => 'office administration',
+            '/\badministrative work\b/' => 'office administration',
+            '/\boffice work\b/' => 'office administration',
+            '/\bpeople management\b/' => 'leadership',
+            '/\bteam leading\b/' => 'leadership',
+            '/\bcollaboration\b/' => 'teamwork',
+            '/\bcooperation\b/' => 'teamwork',
+        ];
+
+        foreach ($semanticPhrases as $pattern => $replacement) {
             $normalized = preg_replace($pattern, $replacement, $normalized);
         }
 

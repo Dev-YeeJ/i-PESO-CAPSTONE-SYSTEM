@@ -1,6 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Check, Loader2, Search, X } from 'lucide-react'
+import { Check, Loader2, Plus, Search, X } from 'lucide-react'
 import { searchSkills } from '@/services/skillService'
+import {
+  SOFT_SKILL_SUGGESTIONS,
+  TECHNICAL_SKILL_SUGGESTIONS,
+} from '@/data/jobPreferenceVocabularies'
 
 const proficiencyOptions = [
   { value: 'beginner', label: 'Beginner' },
@@ -20,35 +24,79 @@ export default function SkillTaxonomyTags({
   error,
   disabled = false,
   limit = 20,
+  allowCustom = true,
   className = '',
 }) {
-  const rootRef = useRef(null)
   const inputRef = useRef(null)
   const [query, setQuery] = useState('')
-  const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [results, setResults] = useState([])
+  const [starterSkills, setStarterSkills] = useState([])
+  const [starterLoading, setStarterLoading] = useState(false)
 
   const selected = useMemo(() => normalizeSelected(value), [value])
   const selectedKeys = useMemo(() => new Set(selected.map((skill) => skillKey(skill))), [selected])
+  const selectionFull = selected.length >= limit
+  const starterFallbacks = useMemo(
+    () => localStarterSkills(category, Math.min(limit, 14)),
+    [category, limit],
+  )
+  const customSkill = useMemo(() => {
+    const name = query.trim().replace(/\s+/g, ' ')
+    if (!allowCustom || selectionFull || name.length < 2) return null
+
+    const skill = {
+      id: null,
+      skill_id: null,
+      name,
+      skill_name: name,
+      category,
+      source: 'custom_user_input',
+      is_custom: true,
+      proficiency: mode === 'seeker' ? 'intermediate' : undefined,
+    }
+
+    return selectedKeys.has(skillKey(skill)) ? null : skill
+  }, [allowCustom, category, mode, query, selectedKeys, selectionFull])
+  const recommendedSkills = useMemo(
+    () => uniqueSkills([
+      ...starterSkills,
+      ...starterFallbacks,
+    ])
+      .filter((skill) => !selectedKeys.has(skillKey(skill)))
+      .slice(0, 16),
+    [selectedKeys, starterFallbacks, starterSkills],
+  )
   const visibleResults = useMemo(
-    () => uniqueSkills(results).filter((skill) => !selectedKeys.has(skillKey(skill))),
+    () => uniqueSkills(results).filter((skill) => !selectedKeys.has(skillKey(skill))).slice(0, 16),
     [results, selectedKeys],
   )
+  const hasSearchQuery = query.trim().length >= 2
 
   useEffect(() => {
-    const closeOnOutsideClick = (event) => {
-      if (!rootRef.current?.contains(event.target)) {
-        setOpen(false)
+    let ignore = false
+
+    async function loadStarterSkills() {
+      setStarterLoading(true)
+      try {
+        const skills = await fetchSkills('', category, 16)
+        if (!ignore) setStarterSkills(skills)
+      } catch {
+        if (!ignore) setStarterSkills([])
+      } finally {
+        if (!ignore) setStarterLoading(false)
       }
     }
 
-    document.addEventListener('mousedown', closeOnOutsideClick)
-    return () => document.removeEventListener('mousedown', closeOnOutsideClick)
-  }, [])
+    loadStarterSkills()
+
+    return () => {
+      ignore = true
+    }
+  }, [category])
 
   useEffect(() => {
-    if (!open || query.trim().length < 2) {
+    if (!hasSearchQuery) {
       setResults([])
       setLoading(false)
       return undefined
@@ -66,7 +114,7 @@ export default function SkillTaxonomyTags({
     }, 220)
 
     return () => window.clearTimeout(timer)
-  }, [category, limit, open, query])
+  }, [category, hasSearchQuery, limit, query])
 
   const emit = (nextSelected) => {
     if (output === 'names') {
@@ -81,17 +129,18 @@ export default function SkillTaxonomyTags({
       skill_name: skill.name,
       category: skill.category ?? category,
       proficiency: skill.proficiency ?? 'intermediate',
+      source: skill.source ?? null,
+      is_custom: Boolean(skill.is_custom),
     })))
   }
 
   const addSkill = (skill) => {
     const normalized = normalizeSkill(skill, mode)
-    if (!normalized || selectedKeys.has(skillKey(normalized))) return
+    if (!normalized || selectionFull || selectedKeys.has(skillKey(normalized))) return
 
     emit([...selected, normalized])
     setQuery('')
     setResults([])
-    setOpen(true)
     window.setTimeout(() => inputRef.current?.focus(), 0)
   }
 
@@ -106,7 +155,7 @@ export default function SkillTaxonomyTags({
   }
 
   return (
-    <div className={className} ref={rootRef}>
+    <div className={className}>
       {label && (
         <p className="text-sm font-bold text-slate-700">
           {label}
@@ -154,78 +203,88 @@ export default function SkillTaxonomyTags({
             <input
               ref={inputRef}
               value={query}
-              disabled={disabled}
-              onFocus={() => setOpen(true)}
+              disabled={disabled || selectionFull}
               onChange={(event) => {
                 setQuery(event.target.value)
-                setOpen(true)
               }}
               onKeyDown={(event) => {
                 if (event.key === 'Enter') {
                   event.preventDefault()
-                  if (visibleResults.length) addSkill(visibleResults[0])
+                  if (customSkill) addSkill(customSkill)
+                  else if (visibleResults.length) addSkill(visibleResults[0])
                 }
                 if (event.key === 'Backspace' && !query && selected.length) {
                   removeSkill(selected[selected.length - 1])
                 }
-                if (event.key === 'Escape') setOpen(false)
+                if (event.key === 'Escape') setQuery('')
               }}
               className="w-full border-0 py-1.5 pl-8 pr-2 text-sm font-semibold text-slate-900 outline-none placeholder:text-slate-400 disabled:cursor-not-allowed disabled:bg-white"
-              placeholder={selected.length ? 'Search another skill' : placeholder}
-              role="combobox"
-              aria-expanded={open}
-              aria-autocomplete="list"
+              placeholder={selectionFull ? `Maximum of ${limit} selected` : (selected.length ? 'Search another skill' : placeholder)}
               aria-invalid={Boolean(error)}
             />
           </div>
         </div>
       </div>
 
-      <div className="relative">
-        {open && !disabled && (
-          <div className="absolute z-50 mt-2 max-h-72 w-full overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl">
-            {query.trim().length < 2 && (
-              <div className="px-4 py-3 text-sm text-slate-500">Type at least 2 characters to search the approved skills taxonomy.</div>
-            )}
-            {loading && (
-              <div className="flex items-center gap-2 px-4 py-3 text-sm font-semibold text-slate-600">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Searching skills...
-              </div>
-            )}
-            {!loading && query.trim().length >= 2 && visibleResults.length === 0 && (
-              <div className="px-4 py-3 text-sm text-slate-500">No approved skill found for this search.</div>
-            )}
-            {!loading && visibleResults.length > 0 && (
-              <div className="max-h-72 overflow-y-auto py-1" role="listbox">
-                {visibleResults.map((skill) => (
-                  <button
-                    key={skillKey(skill)}
-                    type="button"
-                    onMouseDown={(event) => event.preventDefault()}
-                    onClick={() => addSkill(skill)}
-                    className="flex w-full items-center justify-between gap-3 border-b border-slate-100 px-4 py-3 text-left transition last:border-b-0 hover:bg-blue-50"
-                    role="option"
-                    aria-selected="false"
-                  >
-                    <span className="min-w-0">
-                      <span className="block truncate text-sm font-black text-slate-950">{skillName(skill)}</span>
-                      <span className="mt-1 flex flex-wrap gap-1.5">
-                        {skill.category && <MetaBadge>{titleCase(skill.category)}</MetaBadge>}
-                        {skill.source && <MetaBadge>{skill.source}</MetaBadge>}
-                        {skill.is_hot && <MetaBadge>In demand</MetaBadge>}
-                      </span>
-                    </span>
-                    <Check className="h-4 w-4 shrink-0 text-blue-900" />
-                  </button>
-                ))}
-              </div>
+      {!disabled && !selectionFull && (
+        <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
+          <div className="mb-2 flex items-center justify-between gap-3">
+            <p className="text-[11px] font-black uppercase tracking-wide text-slate-500">
+              {hasSearchQuery ? 'Matching skills' : 'Recommended skills'}
+            </p>
+            {(starterLoading || loading) && (
+              <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-slate-500">
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                Loading
+              </span>
             )}
           </div>
-        )}
-      </div>
 
-      <p className="mt-1.5 text-xs text-slate-500">Only approved taxonomy skills can be selected. Free-text tags are disabled for matching accuracy.</p>
+          {hasSearchQuery && customSkill && (
+            <button
+              type="button"
+              onClick={() => addSkill(customSkill)}
+              className="mb-2 flex w-full items-center justify-between gap-3 rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-2.5 text-left transition hover:border-indigo-300 hover:bg-indigo-100"
+            >
+              <span className="min-w-0">
+                <span className="block truncate text-sm font-black text-indigo-950">Use typed skill: "{customSkill.name}"</span>
+                <span className="mt-0.5 block text-xs font-semibold text-indigo-700">
+                  Add exactly what the user typed. The system will normalize it for matching.
+                </span>
+              </span>
+              <Check className="h-4 w-4 shrink-0 text-indigo-800" />
+            </button>
+          )}
+
+          {!loading && hasSearchQuery && visibleResults.length === 0 && (
+            <p className="rounded-lg bg-white px-3 py-2 text-xs font-semibold text-slate-500">
+              No database recommendation yet. The typed skill above can still be added.
+            </p>
+          )}
+
+          {(!hasSearchQuery || visibleResults.length > 0) && (
+            <div className="flex flex-wrap gap-2">
+              {(hasSearchQuery ? visibleResults : recommendedSkills).map((skill) => (
+                <SuggestionPill
+                  key={skillKey(skill)}
+                  skill={skill}
+                  onClick={() => addSkill(skill)}
+                />
+              ))}
+            </div>
+          )}
+
+          {!hasSearchQuery && !starterLoading && recommendedSkills.length === 0 && (
+            <p className="rounded-lg bg-white px-3 py-2 text-xs font-semibold text-slate-500">
+              Start typing any skill to add it or find database recommendations.
+            </p>
+          )}
+        </div>
+      )}
+
+      <p className="mt-1.5 text-xs text-slate-500">
+        Tap a recommended skill below, or type any skill and press Enter. {selected.length} of {limit} selected.
+      </p>
       {error && <p className="mt-1.5 text-xs font-semibold text-red-600">{error}</p>}
     </div>
   )
@@ -295,16 +354,40 @@ function skillName(skill) {
   return String(skill.name ?? skill.skill_name ?? skill.label ?? '').trim()
 }
 
-function MetaBadge({ children }) {
+function SuggestionPill({ skill, onClick }) {
   return (
-    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-slate-600">
-      {children}
-    </span>
+    <button
+      type="button"
+      onClick={onClick}
+      className="group inline-flex max-w-full items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-2 text-left text-xs font-extrabold text-slate-700 shadow-sm transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-900"
+      title={skillName(skill)}
+    >
+      <Plus className="h-3.5 w-3.5 shrink-0 text-slate-400 transition group-hover:text-blue-800" />
+      <span className="truncate">{skillName(skill)}</span>
+      {skill.is_hot && (
+        <span className="rounded-full bg-blue-50 px-1.5 py-0.5 text-[10px] font-black text-blue-700">
+          In Demand
+        </span>
+      )}
+    </button>
   )
 }
 
-function titleCase(value) {
-  return String(value)
-    .replace(/[_-]+/g, ' ')
-    .replace(/\w\S*/g, (word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+function localStarterSkills(category, limit) {
+  const source = category === 'soft'
+    ? SOFT_SKILL_SUGGESTIONS
+    : category === 'all'
+      ? [...TECHNICAL_SKILL_SUGGESTIONS, ...SOFT_SKILL_SUGGESTIONS]
+      : TECHNICAL_SKILL_SUGGESTIONS
+
+  return source.slice(0, limit).map((name) => ({
+    id: null,
+    skill_id: null,
+    name,
+    skill_name: name,
+    category: category === 'all'
+      ? (SOFT_SKILL_SUGGESTIONS.includes(name) ? 'soft' : 'technical')
+      : category,
+    source: 'starter',
+  }))
 }

@@ -23,6 +23,7 @@ class SeekerEducation extends Model
         'completion_status',
         'year_started',
         'year_graduated',
+        'expected_year_graduated',
         'undergrad_level_reached',
         'undergrad_year_last_attended',
         'current_level',
@@ -36,6 +37,7 @@ class SeekerEducation extends Model
     protected $casts = [
         'year_graduated' => 'integer',
         'year_started' => 'integer',
+        'expected_year_graduated' => 'integer',
         'undergrad_year_last_attended' => 'integer',
         'gpa' => 'float',
         'completed_courses' => 'array',

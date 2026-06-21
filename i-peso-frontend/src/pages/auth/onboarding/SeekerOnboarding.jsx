@@ -9,15 +9,15 @@ import OnboardingShell from '@/components/auth/OnboardingShell'
 import { seekerRegistrationSteps } from '@/components/auth/registrationJourneys'
 import EducationBackgroundEditor from '@/components/form/EducationBackgroundEditor'
 import ExperienceTimeFrame from '@/components/form/ExperienceTimeFrame'
+import OccupationCombobox from '@/components/form/OccupationCombobox'
 import PsocCombobox from '@/components/form/PsocCombobox'
-import SkillTaxonomyTags from '@/components/form/SkillTaxonomyTags'
+import SeekerSkillsForm from '@/components/form/SeekerSkillsForm'
 import SingleAddressInput from '@/components/form/SingleAddressInput'
 import {
   ISO_COUNTRIES,
   SOFT_SKILL_SUGGESTIONS,
   TECHNICAL_SKILL_SUGGESTIONS,
 } from '@/data/jobPreferenceVocabularies'
-import { getAiProfileSuggestions, getSkillRecommendations } from '@/services/skillService'
 // ── Add these imports at the top of SeekerOnboarding.jsx ──
 
 import { getProvinces, getCitiesByProvince, getBarangaysByCity } from '@/services/psgcServices'
@@ -104,6 +104,8 @@ const inferEducationalAttainment = (educations = []) => {
       const normalizedLevel = normalizeEducationLevel(education.level)
 
       switch (normalizedLevel) {
+        case 'vocational':
+          return 'Vocational / Technical'
         case 'elementary':
           return isGraduated ? 'Elementary Graduate' : null
         case 'secondary_non_k12':
@@ -138,7 +140,7 @@ const normalizeEducationLevel = (level) => {
 }
 
 const educationProgramRequired = (level) => (
-  ['senior_high_strand', 'tertiary', 'graduate_studies'].includes(normalizeEducationLevel(level))
+  ['vocational', 'senior_high_strand', 'tertiary', 'graduate_studies'].includes(normalizeEducationLevel(level))
 )
 
 const cleanEducationForSubmit = (education) => {
@@ -155,8 +157,11 @@ const cleanEducationForSubmit = (education) => {
     completion_status: status || null,
     year_started: education.year_started || null,
     year_graduated: status === 'graduated' ? (education.year_graduated || null) : null,
+    expected_year_graduated: status === 'currently_studying'
+      ? (education.expected_year_graduated || null)
+      : null,
     undergrad_level_reached: status === 'undergraduate'
-      ? (String(education.undergrad_level_reached ?? '').trim() || null)
+      ? (String(education.undergrad_level_reached ?? education.attainment_level ?? education.level ?? '').trim() || null)
       : null,
     undergrad_year_last_attended: status === 'undergraduate'
       ? (education.undergrad_year_last_attended || null)
@@ -275,26 +280,57 @@ const OTHER_SKILLS = [
   { value: 'tailoring', label: 'Tailoring' },
 ]
 
-const buildAiSuggestionContext = (form, targetJobDescription = '') => ({
-  employment_status: form.employment_status || null,
-  target_job_description: targetJobDescription.trim() || null,
-  work_type_preference: form.work_type_preference || null,
-  educ_attainment: inferEducationalAttainment(form.educations) || form.educ_attainment || null,
-  preferred_occupations: (form.preferred_occupations ?? []).map((occupation) => ({
-    title: occupation.title,
-    general_term: occupation.general_term,
-  })),
-  technical_skills: skillNameList(form.technical_skills ?? []),
-  soft_skills: skillNameList(form.soft_skills ?? []),
-  trainings: (form.trainings ?? []).map((training) => ({
-    course: training.course,
-    skills_acquired: training.skills_acquired,
-  })),
-  work_experiences: (form.work_experiences ?? []).map((experience) => ({
-    position: experience.position,
-    employment_status: experience.employment_status,
-  })),
-})
+const BROAD_OCCUPATION_RULES = [
+  { term: 'it work', patterns: ['react', 'frontend', 'front end', 'software', 'developer', 'programmer', 'web', 'javascript', 'it support', 'computer', 'network', 'data analyst'] },
+  { term: 'retail work', patterns: ['cashier', 'retail', 'sales', 'store', 'merchandiser', 'counter'] },
+  { term: 'office work', patterns: ['office', 'admin', 'administrative', 'encoder', 'data entry', 'secretary', 'receptionist', 'records clerk'] },
+  { term: 'bpo work', patterns: ['bpo', 'call center', 'contact center', 'customer service', 'technical support representative'] },
+  { term: 'skilled trades', patterns: ['mechanic', 'auto', 'automotive', 'electrician', 'plumber', 'welder', 'repair', 'aircon', 'refrigeration'] },
+  { term: 'healthcare work', patterns: ['nurse', 'medical', 'clinic', 'hospital', 'pharmacist', 'midwife', 'doctor', 'health worker'] },
+  { term: 'caregiver work', patterns: ['caregiver', 'care worker', 'care aide', 'nursing assistant', 'home care', 'personal care'] },
+  { term: 'construction work', patterns: ['construction', 'mason', 'carpenter', 'building', 'scaffold', 'roofer'] },
+  { term: 'restaurant work', patterns: ['cook', 'chef', 'waiter', 'waitress', 'service crew', 'kitchen', 'restaurant', 'food service'] },
+  { term: 'hospitality work', patterns: ['hotel', 'housekeeping', 'front desk', 'room attendant', 'hospitality'] },
+  { term: 'driver', patterns: ['driver', 'chauffeur', 'taxi', 'bus operator', 'truck driver', 'jeepney'] },
+  { term: 'delivery work', patterns: ['delivery', 'courier', 'messenger', 'parcel', 'rider'] },
+  { term: 'logistics work', patterns: ['warehouse', 'logistics', 'inventory', 'stock clerk', 'forklift', 'supply chain'] },
+  { term: 'factory worker', patterns: ['factory', 'production', 'machine operator', 'assembler', 'packer', 'manufacturing'] },
+  { term: 'education work', patterns: ['teacher', 'teaching', 'tutor', 'instructor', 'lecturer', 'school'] },
+  { term: 'finance work', patterns: ['accountant', 'bookkeeper', 'accounting', 'auditor', 'payroll', 'tax'] },
+  { term: 'human resources work', patterns: ['human resources', 'hr', 'recruiter', 'recruitment', 'personnel', 'talent acquisition'] },
+  { term: 'security work', patterns: ['security guard', 'security officer', 'protective service', 'police', 'bodyguard'] },
+  { term: 'agriculture work', patterns: ['farm', 'farmer', 'agriculture', 'crop', 'livestock', 'poultry'] },
+  { term: 'fishing work', patterns: ['fishery', 'fisherman', 'fishing', 'fish processing', 'aquaculture'] },
+  { term: 'marketing work', patterns: ['marketing', 'advertising', 'brand', 'public relations', 'communications officer'] },
+  { term: 'creative work', patterns: ['graphic designer', 'artist', 'photographer', 'videographer', 'writer', 'editor', 'multimedia', 'animator'] },
+  { term: 'beauty work', patterns: ['hairdresser', 'barber', 'beautician', 'makeup', 'massage', 'nail technician'] },
+  { term: 'household work', patterns: ['domestic', 'housekeeper', 'cleaner', 'babysitter', 'laundry', 'kasambahay'] },
+  { term: 'management work', patterns: ['manager', 'supervisor', 'operations manager', 'project manager', 'business manager', 'entrepreneur'] },
+]
+
+const normalizeOccupationText = (value) => String(value ?? '')
+  .toLowerCase()
+  .replace(/&/g, ' and ')
+  .replace(/[^a-z0-9+#.]+/g, ' ')
+  .trim()
+  .replace(/\s+/g, ' ')
+
+const inferBroadOccupationTerm = (occupation) => {
+  const existing = normalizeOccupationText(occupation?.general_term || occupation?.matched_general_term)
+  if (existing) return existing
+
+  const haystack = normalizeOccupationText([
+    occupation?.raw_job_title,
+    occupation?.title,
+    occupation?.broad_category,
+    occupation?.category,
+    occupation?.reason,
+  ].filter(Boolean).join(' '))
+
+  return BROAD_OCCUPATION_RULES.find((rule) => (
+    rule.patterns.some((pattern) => haystack.includes(normalizeOccupationText(pattern)))
+  ))?.term ?? null
+}
 
 const ELIGIBILITY_TYPES = [
   { value: 'civil_service', label: 'Civil Service Exam/Eligibility' },
@@ -1152,6 +1188,7 @@ const Step3 = ({ form, errors, onChange }) => {
         <p style={{ fontSize: '13px', fontWeight: '700', color: '#374151', marginBottom: '10px' }}>
           Preferred Occupation <span style={{ color: '#ef4444' }}>*</span>
           <span style={{ marginLeft: '6px', border: '1px solid #bfdbfe', borderRadius: '999px', padding: '2px 7px', color: '#1d4ed8', backgroundColor: '#eff6ff', fontSize: '10px', fontWeight: '800' }}>
+<<<<<<< HEAD
             Standardized
           </span>
           <span style={{ fontSize: '11px', fontWeight: '400', color: '#94a3b8', marginLeft: '6px' }}>(at least 1, up to 3)</span>
@@ -1181,28 +1218,28 @@ const Step3 = ({ form, errors, onChange }) => {
           }}
           limit={50}
           placeholder={occupations.length >= 3 ? 'Maximum of 3 occupations selected' : 'Search occupation title or catalog code'}
+=======
+            Broad Field
+          </span>
+          <span style={{ fontSize: '11px', fontWeight: '400', color: '#94a3b8', marginLeft: '6px' }}>(at least 1, up to 3)</span>
+        </p>
+        <OccupationCombobox
+          selected={occupations}
+          multiple
+          limit={3}
+          searchLimit={50}
+          broadFieldOnly
+          onChange={(nextOccupations) => setField('preferred_occupations', nextOccupations)}
+          placeholder={occupations.length >= 3 ? 'Maximum of 3 occupations selected' : 'Type your specific job title, e.g. Teacher, Cashier, React Developer'}
+>>>>>>> 74b8ba0c70cb12faa22abd7dae723e71814deb1d
           error={errors.preferred_occupations}
-          disabled={occupations.length >= 3}
         />
-        {occupations.length > 0 && (
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '10px' }}>
-            {occupations.map((occupation, index) => (
-              <span key={`${occupation.id ?? occupation.psoc_code}-${index}`} style={{ display: 'inline-flex', alignItems: 'center', gap: '7px', border: '1px solid #bfdbfe', borderRadius: '999px', backgroundColor: '#eff6ff', color: '#1d4ed8', padding: '7px 10px', fontSize: '12px', fontWeight: '700' }}>
-                {occupation.psoc_code ? `${occupation.psoc_code} - ` : ''}{occupation.title}
-                <button
-                  type="button"
-                  onClick={() => setField('preferred_occupations', occupations.filter((_, itemIndex) => itemIndex !== index))}
-                  aria-label={`Remove ${occupation.title}`}
-                  style={{ background: 'none', border: 0, color: '#1d4ed8', cursor: 'pointer', fontSize: '15px', lineHeight: 1, padding: 0 }}
-                >
-                  x
-                </button>
-              </span>
-            ))}
-          </div>
-        )}
         <p style={{ fontSize: '11px', color: '#64748b', marginTop: '7px', lineHeight: '1.5' }}>
+<<<<<<< HEAD
           Select a standardized occupation result. Typed text is used for search and is not saved by itself.
+=======
+          Type the specific job title you know. The system will show only broad job fields in the dropdown for matching.
+>>>>>>> 74b8ba0c70cb12faa22abd7dae723e71814deb1d
         </p>
         {errors.preferred_occupations && <p style={{ fontSize: '11px', color: '#ef4444', marginTop: '6px' }}>{errors.preferred_occupations}</p>}
       </div>
@@ -1793,295 +1830,125 @@ const AddressSection = ({ form, errors, onChange, gpsState, onGpsDetect, onAddre
 
 // ── STEP 5: EDUCATION & OTHER SKILLS ──────────────────────────────────────
 
-const skillFieldForCategory = (category) => (
-  String(category ?? '').toLowerCase() === 'soft' ? 'soft_skills' : 'technical_skills'
-)
-
-const flattenSkillRecommendations = (groups = {}) => (
-  Object.values(groups).flatMap((group) => (
-    (group.skills ?? []).map((skill) => ({
-      name: skill.name,
-      category: skill.category,
-      reason: skill.reason,
-      title: group.title,
-    }))
-  ))
-)
-
-const SkillRecommendationPanel = ({ form, onChange }) => {
-  const [recommendations, setRecommendations] = useState({})
-  const [aiSuggestions, setAiSuggestions] = useState({ technical_skills: [], soft_skills: [] })
-  const [loading, setLoading] = useState(false)
-  const [aiLoading, setAiLoading] = useState(false)
-  const [error, setError] = useState('')
-  const [aiError, setAiError] = useState('')
-  const selectedKeys = new Set([
-    ...(form.dole_skills ?? []),
-    ...skillNameList(form.technical_skills ?? []),
-    ...skillNameList(form.soft_skills ?? []),
-  ].map(normalizeChoice))
-  const aiSkillSuggestions = [
-    ...(aiSuggestions.technical_skills ?? []).map((skill) => ({ ...skill, category: 'technical' })),
-    ...(aiSuggestions.soft_skills ?? []).map((skill) => ({ ...skill, category: 'soft' })),
-  ]
-  const suggestions = [...aiSkillSuggestions, ...flattenSkillRecommendations(recommendations)]
-    .filter((skill) => skill.name && !selectedKeys.has(normalizeChoice(skill.name)))
-    .filter((skill, index, list) => (
-      list.findIndex((item) => normalizeChoice(item.name) === normalizeChoice(skill.name)) === index
-    ))
-    .slice(0, 12)
-
-  const loadRecommendations = useCallback(async () => {
-    setLoading(true)
-    setError('')
-    try {
-      const data = await getSkillRecommendations()
-      setRecommendations(data)
-    } catch {
-      setRecommendations({})
-      setError('Unable to load skill suggestions right now.')
-    } finally {
-      setLoading(false)
-    }
-  }, [])
-
-  useEffect(() => {
-    loadRecommendations()
-  }, [loadRecommendations])
-
-  const loadAiSuggestions = async () => {
-    setAiLoading(true)
-    setAiError('')
-    try {
-      const data = await getAiProfileSuggestions(buildAiSuggestionContext(form))
-      setAiSuggestions({
-        technical_skills: data.technical_skills ?? [],
-        soft_skills: data.soft_skills ?? [],
-      })
-    } catch {
-      setAiSuggestions({ technical_skills: [], soft_skills: [] })
-      setAiError('AI skill suggestions are not available right now.')
-    } finally {
-      setAiLoading(false)
-    }
-  }
-
-  const addSkill = (skill) => {
-    const name = String(skill.name ?? '').trim().replace(/\s+/g, ' ')
-    if (!name || selectedKeys.has(normalizeChoice(name))) return
-
-    const field = skillFieldForCategory(skill.category)
-    onChange({
-      target: {
-        name: field,
-        value: [
-          ...(form[field] ?? []),
-          {
-            name,
-            skill_name: name,
-            category: field === 'soft_skills' ? 'soft' : 'technical',
-            proficiency: 'intermediate',
-          },
-        ],
-      },
-    })
-  }
-
-  return (
-    <div style={{ marginBottom: '22px', border: '1px solid #bfdbfe', borderRadius: '12px', backgroundColor: '#f8fafc', padding: '14px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', alignItems: 'flex-start', marginBottom: '10px' }}>
-        <div>
-          <p style={{ fontSize: '13px', fontWeight: '800', color: '#0f172a', margin: 0 }}>Suggested skills for your preferred occupation</p>
-          <p style={{ fontSize: '11px', color: '#64748b', margin: '3px 0 0', lineHeight: 1.4 }}>
-            Choose only the skills you actually have. Suggestions are added to hard or soft skills automatically.
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={loadRecommendations}
-          disabled={loading}
-          style={{ border: '1px solid #bfdbfe', borderRadius: '8px', backgroundColor: '#fff', color: '#1d4ed8', fontSize: '11px', fontWeight: '800', padding: '7px 10px', cursor: loading ? 'not-allowed' : 'pointer', whiteSpace: 'nowrap' }}
-        >
-          {loading ? 'Loading...' : 'Refresh'}
-        </button>
-      </div>
-
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '10px' }}>
-        <button
-          type="button"
-          onClick={loadAiSuggestions}
-          disabled={aiLoading}
-          style={{ border: '1px solid #d8b4fe', borderRadius: '8px', backgroundColor: '#fff', color: '#6b21a8', fontSize: '11px', fontWeight: '800', padding: '7px 10px', cursor: aiLoading ? 'not-allowed' : 'pointer' }}
-        >
-          {aiLoading ? 'Finding AI skills...' : 'AI skill suggestions'}
-        </button>
-        {aiError && <span style={{ color: '#b91c1c', fontSize: '11px' }}>{aiError}</span>}
-      </div>
-
-      {error && <p style={{ color: '#b91c1c', fontSize: '11px', margin: '0 0 10px' }}>{error}</p>}
-
-      {!loading && !error && suggestions.length === 0 && (
-        <p style={{ color: '#64748b', fontSize: '11px', margin: 0 }}>
-          No new suggestions yet. Save your preferred occupation first, or add a few skills manually.
-        </p>
-      )}
-
-      {suggestions.length > 0 && (
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-          {suggestions.map((skill) => {
-            const isSoft = skillFieldForCategory(skill.category) === 'soft_skills'
-            return (
-              <button
-                key={`${skill.name}-${skill.reason ?? ''}`}
-                type="button"
-                onClick={() => addSkill(skill)}
-                title={skill.reason || skill.title || 'Suggested for your profile'}
-                style={{
-                  border: `1px solid ${isSoft ? '#d8b4fe' : '#93c5fd'}`,
-                  borderRadius: '999px',
-                  padding: '7px 10px',
-                  backgroundColor: isSoft ? '#faf5ff' : '#eff6ff',
-                  color: isSoft ? '#6b21a8' : '#1e40af',
-                  fontSize: '11px',
-                  fontWeight: '700',
-                  cursor: 'pointer',
-                }}
-              >
-                + {skill.name}
-              </button>
-            )
-          })}
-        </div>
-      )}
-    </div>
-  )
+const SKILL_LIMITS = {
+  hard: 20,
+  soft: 10,
 }
 
+const normalizeSkillProficiencyForBackend = (value) => {
+  const normalized = String(value ?? 'Intermediate').toLowerCase()
+  if (normalized === 'beginner') return 'beginner'
+  if (normalized === 'expert' || normalized === 'advanced') return 'expert'
+  return 'intermediate'
+}
+
+const normalizeSkillProficiencyForUi = (value) => {
+  const normalized = String(value ?? 'intermediate').toLowerCase()
+  if (normalized === 'beginner') return 'Beginner'
+  if (normalized === 'expert' || normalized === 'advanced') return 'Expert'
+  return 'Intermediate'
+}
+
+const normalizeUnifiedSeekerSkill = (skill) => {
+  const name = skillDisplayName(skill)
+  if (!name) return null
+
+  const type = String(skill?.type ?? skill?.category ?? skill?.skill_type ?? '').toLowerCase().includes('soft')
+    ? 'soft'
+    : 'hard'
+
+  return {
+    skill_id: skill?.skill_id ?? skill?.id ?? null,
+    name,
+    type,
+    is_dole: Boolean(skill?.is_dole ?? skill?.is_official_dole_skill ?? skill?.isOfficialDoleSkill),
+    proficiency: normalizeSkillProficiencyForUi(skill?.proficiency),
+  }
+}
+
+const uniqueUnifiedSkills = (skills = []) => {
+  const seen = new Set()
+  return skills.filter((skill) => {
+    const key = `${skill.type}:${normalizeChoice(skill.name)}`
+    if (!skill.name || seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
+}
+
+const seekerSkillsFromForm = (form) => uniqueUnifiedSkills([
+  ...(form.dole_skills ?? []).map((skill) => normalizeUnifiedSeekerSkill({
+    ...(typeof skill === 'string' ? { name: skill } : skill),
+    type: 'hard',
+    is_dole: true,
+  })),
+  ...(form.technical_skills ?? []).map((skill) => normalizeUnifiedSeekerSkill({
+    ...(typeof skill === 'string' ? { name: skill } : skill),
+    type: 'hard',
+    is_dole: false,
+  })),
+  ...(form.soft_skills ?? []).map((skill) => normalizeUnifiedSeekerSkill({
+    ...(typeof skill === 'string' ? { name: skill } : skill),
+    type: 'soft',
+    is_dole: false,
+  })),
+].filter(Boolean))
+
+const backendSkillItem = (skill, category) => ({
+  skill_id: skill.skill_id,
+  name: skill.name,
+  skill_name: skill.name,
+  category,
+  proficiency: normalizeSkillProficiencyForBackend(skill.proficiency),
+})
+
+const formSkillArraysFromUnified = (skills = []) => {
+  const normalizedSkills = uniqueUnifiedSkills(
+    skills.map(normalizeUnifiedSeekerSkill).filter(Boolean),
+  )
+
+  return {
+    dole_skills: normalizedSkills
+      .filter((skill) => skill.type === 'hard' && skill.is_dole)
+      .map((skill) => backendSkillItem(skill, 'technical')),
+    technical_skills: normalizedSkills
+      .filter((skill) => skill.type === 'hard' && !skill.is_dole)
+      .map((skill) => backendSkillItem(skill, 'technical')),
+    soft_skills: normalizedSkills
+      .filter((skill) => skill.type === 'soft')
+      .map((skill) => backendSkillItem(skill, 'soft')),
+  }
+}
 function Step5({ form, errors, onChange }) {
-  const handleDoleSkillChange = (skillLabel, checked) => {
-    const currentDoleSkills = (form.dole_skills ?? []).slice()
-    if (checked) {
-      if (!currentDoleSkills.includes(skillLabel)) {
-        currentDoleSkills.push(skillLabel)
-      }
-    } else {
-      const idx = currentDoleSkills.indexOf(skillLabel)
-      if (idx > -1) {
-        currentDoleSkills.splice(idx, 1)
-      }
-    }
-    onChange({ target: { name: 'dole_skills', value: currentDoleSkills } })
+  const selectedSkills = seekerSkillsFromForm(form)
+
+  const handleSkillsChange = (skills) => {
+    const nextSkillFields = formSkillArraysFromUnified(skills)
+    onChange({ target: { name: 'dole_skills', value: nextSkillFields.dole_skills } })
+    onChange({ target: { name: 'technical_skills', value: nextSkillFields.technical_skills } })
+    onChange({ target: { name: 'soft_skills', value: nextSkillFields.soft_skills } })
   }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
       <SectionHeader
         title="V. DETAILED EDUCATIONAL BACKGROUND"
-        subtitle="Add each school record using guided choices from the NSRP education fields."
+        subtitle="Add each school record with guided education status and year fields for matching readiness."
       />
 
       <EducationBackgroundEditor form={form} errors={errors} onChange={onChange} />
 
-      {/* Skills Integration */}
-      <div style={{ borderTop: '1px solid #e5e7eb', paddingTop: '20px' }}>
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', marginBottom: '20px', padding: '14px 16px', backgroundColor: '#eff6ff', borderRadius: '12px', border: '1px solid #bfdbfe' }}>
-          <span style={{ fontSize: '20px' }}>💼</span>
-          <div>
-            <p style={{ fontSize: '13px', fontWeight: '700', color: '#1e40af', margin: 0 }}>SKILLS & COMPETENCIES</p>
-            <p style={{ fontSize: '11px', color: '#3b82f6', margin: '2px 0 0', lineHeight: '1.4' }}>Select official DOLE vocational skills and add your professional expertise</p>
-          </div>
-        </div>
-
-        <SkillRecommendationPanel form={form} onChange={onChange} />
-
-        {/* Official DOLE Vocational Skills */}
-        <div style={{ marginBottom: '24px' }}>
-          <h5 style={{ fontSize: '13px', fontWeight: '600', color: '#1f2937', marginBottom: '12px' }}>
-            🏢 Official DOLE Vocational Skills
-          </h5>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '10px' }}>
-            {OTHER_SKILLS.map((skillOption) => {
-              const doleSkillsArray = form.dole_skills ?? []
-              const isChecked = doleSkillsArray.includes(skillOption.label)
-
-              return (
-                <label
-                  key={skillOption.value}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    cursor: 'pointer',
-                    padding: '8px 10px',
-                    borderRadius: '8px',
-                    border: `1px solid ${isChecked ? '#86efac' : '#e2e8f0'}`,
-                    backgroundColor: isChecked ? '#dcfce7' : '#fafafa',
-                    transition: 'all 0.15s',
-                  }}
-                >
-                  <input
-                    type="checkbox"
-                    checked={isChecked}
-                    onChange={(e) => handleDoleSkillChange(skillOption.label, e.target.checked)}
-                    style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: '#15803d' }}
-                  />
-                  <span style={{ fontSize: '13px', color: isChecked ? '#15803d' : '#374151', fontWeight: isChecked ? '600' : '400' }}>
-                    {skillOption.label}
-                  </span>
-                </label>
-              )
-            })}
-          </div>
-        </div>
-
-        {/* Specialized & Professional Skills + Soft Skills */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-          {/* Specialized & Professional Skills */}
-          <div style={{ backgroundColor: '#f9fafb', padding: '16px', borderRadius: '12px', border: '1px solid #e5e7eb' }}>
-            <h5 style={{ fontSize: '13px', fontWeight: '600', color: '#1f2937', marginBottom: '4px' }}>
-              🔧 Hard Skills (Technical & Professional)
-            </h5>
-            <p style={{ fontSize: '11px', color: '#6b7280', marginBottom: '12px' }}>
-              Hard skills are teachable job abilities such as software, equipment, trades, methods, and professional knowledge.
-            </p>
-            <SkillTaxonomyTags
-              label={null}
-              value={form.technical_skills ?? []}
-              mode="seeker"
-              category="technical"
-              output="objects"
-              onChange={(value) => onChange({ target: { name: 'technical_skills', value } })}
-              placeholder="Search a hard skill"
-            />
-          </div>
-
-          {/* Interpersonal / Soft Skills */}
-          <div style={{ backgroundColor: '#f9fafb', padding: '16px', borderRadius: '12px', border: '1px solid #e5e7eb' }}>
-            <h5 style={{ fontSize: '13px', fontWeight: '600', color: '#1f2937', marginBottom: '4px' }}>
-              🤝 Soft Skills (Behavior & Interpersonal)
-            </h5>
-            <p style={{ fontSize: '11px', color: '#6b7280', marginBottom: '12px' }}>
-              Soft skills describe how you communicate, think, adapt, organize work, lead, and collaborate.
-            </p>
-            <SkillTaxonomyTags
-              label={null}
-              value={form.soft_skills ?? []}
-              mode="seeker"
-              category="soft"
-              output="objects"
-              onChange={(value) => onChange({ target: { name: 'soft_skills', value } })}
-              placeholder="Search a soft skill"
-            />
-          </div>
-        </div>
-        <p style={{ margin: '10px 0 0', color: '#64748b', fontSize: '10px', textAlign: 'center' }}>
-          Recognized skills are automatically saved under the correct hard or soft skill category.
-        </p>
+      <div className="border-t border-slate-200 pt-5">
+        <SeekerSkillsForm
+          value={selectedSkills}
+          onChange={handleSkillsChange}
+          preferredOccupations={form.preferred_occupations ?? []}
+          error={errors.skills || errors.technical_skills || errors.soft_skills}
+        />
       </div>
     </div>
   )
 }
-
 // ── STEP 6: TRAININGS & ELIGIBILITIES ─────────────────────────────────────
 
 function Step6({ form, errors, onAddTraining, onRemoveTraining, onUpdateTraining, onAddEligibility, onRemoveEligibility, onUpdateEligibility }) {
@@ -2452,9 +2319,9 @@ export default function SeekerOnboarding() {
     // Step 5: Education & Other Skills
     currently_in_school: false,
     educations: [], // Array of { level, course_strand, year_graduated, undergrad_level_reached, undergrad_year_last_attended }
-    dole_skills: [], // Array of DOLE skill strings (e.g., ['Auto Mechanic', 'Carpentry Work'])
-    technical_skills: [], // Array of custom technical/hard skills
-    soft_skills: [], // Array of custom soft/interpersonal skills
+    dole_skills: [], // Array of official DOLE hard skill objects
+    technical_skills: [], // Array of hard skill objects
+    soft_skills: [], // Array of soft skill objects
     // Step 6: Trainings & Eligibilities
     trainings: [], // Array of { course, hours_of_training, training_institution, skills_acquired, certificates_received }
     eligibilities: [], // Array of { type, name, date_taken, valid_until }
@@ -2534,7 +2401,11 @@ export default function SeekerOnboarding() {
       } : {}),
       }
     })
-    setErrors((err) => ({ ...err, [name]: undefined }))
+    setErrors((err) => ({
+      ...err,
+      [name]: undefined,
+      ...(['dole_skills', 'technical_skills', 'soft_skills'].includes(name) ? { skills: undefined } : {}),
+    }))
     setApiError('')
   }, [])
 
@@ -2800,6 +2671,7 @@ export default function SeekerOnboarding() {
       const invalidEducation = cleanedEducations.some((education) => {
         const yearStarted = education.year_started ? Number(education.year_started) : null
         const yearGraduated = education.year_graduated ? Number(education.year_graduated) : null
+        const expectedYearGraduated = education.expected_year_graduated ? Number(education.expected_year_graduated) : null
         const yearLastAttended = education.undergrad_year_last_attended ? Number(education.undergrad_year_last_attended) : null
 
         return (
@@ -2820,18 +2692,30 @@ export default function SeekerOnboarding() {
           )
           || (
             education.completion_status === 'undergraduate' && (
-              !education.undergrad_level_reached
-              || !yearLastAttended
+              !yearLastAttended
               || yearLastAttended < yearStarted
               || yearLastAttended > currentYear
             )
           )
-          || (education.completion_status === 'currently_studying' && !education.current_level)
+          || (
+            education.completion_status === 'currently_studying' && (
+              (!expectedYearGraduated && !education.current_level)
+              || (expectedYearGraduated && expectedYearGraduated < yearStarted)
+              || (expectedYearGraduated && expectedYearGraduated < currentYear)
+            )
+          )
         )
       })
       if (!cleanedEducations.length) e.educations = 'Add at least one education record.'
       else if (hasDuplicateEducation) e.educations = 'Duplicate education records are not allowed.'
       else if (invalidEducation) e.educations = 'Complete each added education row or remove it.'
+
+      const hardSkillsCount = (form.dole_skills ?? []).length + skillNameList(form.technical_skills ?? []).length
+      const softSkillsCount = skillNameList(form.soft_skills ?? []).length
+      const allSkillsCount = hardSkillsCount + softSkillsCount
+      if (!allSkillsCount) e.skills = 'Select at least one skill to continue.'
+      if (hardSkillsCount > SKILL_LIMITS.hard) e.technical_skills = `Select up to ${SKILL_LIMITS.hard} hard skills.`
+      if (softSkillsCount > SKILL_LIMITS.soft) e.soft_skills = `Select up to ${SKILL_LIMITS.soft} soft skills.`
     }
 
     if (s === 6) {
@@ -2956,12 +2840,22 @@ export default function SeekerOnboarding() {
     work_type_preference       : form.work_type_preference,
     preferred_work_location    : form.preferred_work_location,
     preferred_locations_details: form.preferred_locations_details ?? [],
-    occupation_preferences     : (form.preferred_occupations ?? []).map((occupation) => ({
-      occupation_id: occupation.is_general || occupation.is_ai_generated ? null : occupation.id,
-      general_term: occupation.is_general ? occupation.general_term : null,
-      raw_job_title: occupation.is_ai_generated ? (occupation.raw_job_title || occupation.title) : null,
-      source: occupation.is_ai_generated ? 'ai_generated' : null,
-    })),
+    occupation_preferences     : (form.preferred_occupations ?? []).map((occupation) => {
+      const occupationId = occupation.is_general || occupation.is_ai_generated || occupation.is_custom_pending
+        ? null
+        : catalogOccupationId(occupation.id)
+      const generalTerm = occupationId ? null : inferBroadOccupationTerm(occupation)
+      const rawJobTitle = (occupation.is_ai_generated || occupation.is_custom_pending)
+        ? (occupation.raw_job_title || occupation.title)
+        : null
+
+      return {
+        occupation_id: occupationId,
+        general_term: generalTerm,
+        raw_job_title: rawJobTitle,
+        source: occupation.is_ai_generated ? 'ai_generated' : (occupation.is_custom_pending ? 'manual' : null),
+      }
+    }),
   })
 
   const buildStep4Payload = () => {
@@ -2985,7 +2879,7 @@ export default function SeekerOnboarding() {
 
   const buildStep5Payload = () => ({
     educ_attainment    : inferEducationalAttainment(form.educations) || form.educ_attainment?.trim() || null,
-    currently_in_school: form.currently_in_school,
+    currently_in_school: (form.educations || []).some((education) => education.completion_status === 'currently_studying'),
     educations         : (form.educations || []).map(cleanEducationForSubmit),
     dole_skills        : form.dole_skills || [],
     technical_skills   : form.technical_skills || [],
