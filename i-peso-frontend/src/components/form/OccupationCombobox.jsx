@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { X } from 'lucide-react'
-import { searchOccupations } from '@/services/occupationService'
+import { classifyOccupationTitle, searchOccupations } from '@/services/occupationService'
 
 const ISCO_BROAD_FIELDS = {
   0: 'Armed Forces',
@@ -20,7 +20,8 @@ const BROAD_OCCUPATION_FIELDS = [
   { key: 'factory-worker', title: 'Manufacturing and Factory Work', generalTerm: 'factory worker', patterns: ['factory', 'production', 'machine operator', 'assembler', 'packer', 'manufacturing'] },
   { key: 'driver', title: 'Driving and Transportation', generalTerm: 'driver', patterns: ['driver', 'chauffeur', 'taxi', 'bus operator', 'truck driver', 'jeepney', 'transport'] },
   { key: 'delivery-work', title: 'Delivery and Courier Work', generalTerm: 'delivery work', patterns: ['delivery', 'courier', 'messenger', 'parcel', 'rider'] },
-  { key: 'healthcare-work', title: 'Healthcare', generalTerm: 'healthcare work', patterns: ['nurse', 'medical', 'clinic', 'hospital', 'pharmacist', 'midwife', 'doctor', 'health worker'] },
+  { key: 'maritime-work', title: 'Maritime and Seafaring', generalTerm: 'maritime work', patterns: ['seaman', 'seafarer', 'sailor', 'maritime', 'marine', 'ship crew', 'deckhand', 'able seaman', 'oiler', 'bosun', 'vessel'] },
+  { key: 'healthcare-work', title: 'Healthcare', generalTerm: 'healthcare work', patterns: ['nurse', 'medical', 'clinic', 'hospital', 'pharma', 'pharmacy', 'pharmaceutical', 'pharmacist', 'midwife', 'doctor', 'health worker'] },
   { key: 'caregiver-work', title: 'Caregiving and Personal Care', generalTerm: 'caregiver work', patterns: ['caregiver', 'care worker', 'care aide', 'nursing assistant', 'home care', 'personal care'] },
   { key: 'construction-work', title: 'Construction', generalTerm: 'construction work', patterns: ['construction', 'mason', 'carpenter', 'building', 'scaffold', 'roofer', 'painter'] },
   { key: 'skilled-trades', title: 'Skilled Trades and Repair', generalTerm: 'skilled trades', patterns: ['mechanic', 'auto', 'automotive', 'electrician', 'plumber', 'welder', 'repair', 'aircon', 'refrigeration'] },
@@ -65,6 +66,7 @@ export default function OccupationCombobox({
   allowCustomFallback = false,
   aiSuggestionProvider = null,
   broadFieldOnly = false,
+  enableAiBroadField = false,
   placeholder = 'Search by occupation title or occupation code',
   error,
 }) {
@@ -84,7 +86,13 @@ export default function OccupationCombobox({
   const inputRef = useRef(null)
   const normalizedQuery = query.trim()
   const canSelectMore = values.length < limit
-  const displayedOptions = options
+  const localBroadOptions = useMemo(() => {
+    if (!broadFieldOnly || normalizedQuery.length < minimumQueryLength) return []
+    return broadOccupationOptions(normalizedQuery, values, searchLimit)
+  }, [broadFieldOnly, minimumQueryLength, normalizedQuery, searchLimit, values])
+  const displayedOptions = broadFieldOnly
+    ? uniqueBroadOccupationOptions([...options, ...localBroadOptions]).slice(0, searchLimit)
+    : options
   const customFallbackOption = useMemo(() => {
     if (!allowCustomFallback || generalizedOnly || broadFieldOnly || normalizedQuery.length < minimumQueryLength) return null
 
@@ -143,25 +151,41 @@ export default function OccupationCombobox({
 
     if (broadFieldOnly) {
       let cancelled = false
+      const localOptions = localBroadOptions
 
       const timer = setTimeout(async () => {
-        setLoading(true)
         setSearchError(false)
         setAiError(false)
 
         try {
-          const rows = await searchOccupations(normalizedQuery, searchLimit, 'general')
+          const catalogRows = await searchOccupations(normalizedQuery, searchLimit, 'general')
           if (cancelled) return
 
-          const apiOptions = toBroadFieldOptions(rows, normalizedQuery, values)
-          setOptions(apiOptions.length ? apiOptions : broadOccupationOptions(normalizedQuery, values, searchLimit))
+          const apiOptions = toBroadFieldOptions(catalogRows, normalizedQuery, values)
+          setOptions(uniqueBroadOccupationOptions([...apiOptions, ...localOptions]).slice(0, searchLimit))
         } catch {
           if (!cancelled) {
-            setOptions(broadOccupationOptions(normalizedQuery, values, searchLimit))
             setSearchError(true)
+            setOptions(localOptions)
           }
-        } finally {
-          if (!cancelled) setLoading(false)
+        }
+
+        if (enableAiBroadField) {
+          try {
+            const aiRows = await classifyOccupationTitle(normalizedQuery, 5)
+            if (cancelled) return
+
+            const aiBroadOptions = toAiBroadFieldOptions(aiRows, normalizedQuery, values)
+            setOptions((current) => uniqueBroadOccupationOptions([
+              ...current,
+              ...aiBroadOptions,
+              ...localOptions,
+            ]).slice(0, searchLimit))
+          } catch {
+            if (!cancelled) {
+              setAiError(true)
+            }
+          }
         }
       }, 220)
 
@@ -207,7 +231,7 @@ export default function OccupationCombobox({
       cancelled = true
       clearTimeout(timer)
     }
-  }, [normalizedQuery, open, limit, searchLimit, minimumQueryLength, values, generalizedOnly, enableAiSuggestions, broadFieldOnly, canSelectMore])
+  }, [normalizedQuery, open, limit, searchLimit, minimumQueryLength, values, generalizedOnly, enableAiSuggestions, broadFieldOnly, enableAiBroadField, canSelectMore, localBroadOptions])
 
   const select = (occupation) => {
     if (multiple && values.some((value) => value.id === occupation.id)) return
@@ -256,6 +280,10 @@ export default function OccupationCombobox({
               setOptions([])
               setAiOptions([])
               setLoading(false)
+            } else if (broadFieldOnly) {
+              setOptions([])
+              setAiOptions([])
+              setLoading(false)
             }
             setOpen(true)
           }}
@@ -285,7 +313,7 @@ export default function OccupationCombobox({
               </p>
             )}
 
-            {loading && <p className="px-4 py-3 text-xs text-slate-500">Recognizing broad field...</p>}
+            {loading && !broadFieldOnly && <p className="px-4 py-3 text-xs text-slate-500">Searching saved occupations...</p>}
 
             {!loading && broadFieldOnly && normalizedQuery.length >= minimumQueryLength && displayedOptions.length > 0 && (
               <div className="border-b border-slate-100 bg-slate-50 px-4 py-2 text-[10px] font-extrabold uppercase tracking-wide text-slate-500">
@@ -306,6 +334,12 @@ export default function OccupationCombobox({
                 {broadFieldOnly
                   ? 'Unable to reach database broad fields. Showing local broad-field fallback.'
                   : 'Unable to search saved occupations. Showing suggestions when available.'}
+              </p>
+            )}
+
+            {!loading && broadFieldOnly && normalizedQuery.length >= minimumQueryLength && aiError && (
+              <p className="px-4 py-3 text-xs text-amber-700">
+                AI broad-field understanding is unavailable right now. Showing database and local fallback results.
               </p>
             )}
 
@@ -475,9 +509,41 @@ function broadOccupationOptions(query, selected = [], limit = 20) {
       matched_job_title: query.trim().replace(/\s+/g, ' '),
       confidence: score,
       is_general: true,
-      is_ai_generated: true,
-      source: 'ai_generated',
+      is_ai_generated: false,
+      source: 'local_broad_field',
     }))
+}
+
+function toAiBroadFieldOptions(rows = [], query = '', selected = []) {
+  const typedTitle = query.trim().replace(/\s+/g, ' ')
+  const selectedTerms = new Set(selected.map((occupation) => normalizeTitle(occupation.general_term || occupation.matched_general_term || occupation.title)))
+
+  return rows
+    .map((row) => {
+      const generalTerm = cleanCategory(row.general_term || row.matched_general_term || row.term || row.title)
+      const title = cleanCategory(row.title || row.broad_category || titleCase(generalTerm))
+      const key = normalizeTitle(generalTerm || title)
+
+      if (!key || selectedTerms.has(key)) return null
+
+      return {
+        ...row,
+        id: row.id || `ai-general:${key}`,
+        title,
+        raw_job_title: typedTitle,
+        reason: row.reason
+          ? `AI understood "${typedTitle}": ${row.reason}`
+          : `AI understood "${typedTitle}" as ${title}.`,
+        broad_category: 'AI broad field',
+        general_term: generalTerm || key,
+        matched_general_term: generalTerm || key,
+        matched_job_title: typedTitle,
+        is_general: true,
+        is_ai_generated: true,
+        source: 'vertex_ai',
+      }
+    })
+    .filter(Boolean)
 }
 
 function tokenScore(normalized, field) {
@@ -496,6 +562,17 @@ function uniqueBroadFields(rows) {
   return rows.filter(({ field }) => {
     if (seen.has(field.key)) return false
     seen.add(field.key)
+    return true
+  })
+}
+
+function uniqueBroadOccupationOptions(rows) {
+  const seen = new Set()
+
+  return rows.filter((occupation) => {
+    const key = normalizeTitle(occupation.general_term || occupation.matched_general_term || occupation.title)
+    if (!key || seen.has(key)) return false
+    seen.add(key)
     return true
   })
 }

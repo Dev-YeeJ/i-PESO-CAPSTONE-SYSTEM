@@ -11,6 +11,36 @@ use RuntimeException;
 
 class SeekerAiSuggestionController extends Controller
 {
+    public function classifyOccupation(Request $request, VertexAiSuggestionService $suggestions): JsonResponse
+    {
+        $user = $request->user();
+        if (! $user instanceof JobSeeker) {
+            return response()->json(['message' => 'Job seeker account required.'], 403);
+        }
+
+        $validated = $request->validate([
+            'title' => ['required', 'string', 'min:2', 'max:150'],
+            'limit' => ['nullable', 'integer', 'min:1', 'max:5'],
+        ]);
+
+        try {
+            return response()->json([
+                'data' => $suggestions->classifyOccupationTitle(
+                    $validated['title'],
+                    $validated['limit'] ?? 5,
+                ),
+                'message' => 'Occupation broad fields generated.',
+            ]);
+        } catch (RuntimeException $exception) {
+            report($exception);
+
+            return response()->json([
+                'message' => $exception->getMessage(),
+                'data' => [],
+            ], 503);
+        }
+    }
+
     public function suggest(Request $request, VertexAiSuggestionService $suggestions): JsonResponse
     {
         $user = $request->user();

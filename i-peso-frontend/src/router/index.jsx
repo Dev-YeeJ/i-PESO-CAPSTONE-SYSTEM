@@ -28,6 +28,7 @@ const EmployerVacancies = lazy(() => import('@/pages/employer/VacanciesPage'))
 const EmployerATSBoard  = lazy(() => import('@/pages/employer/EmployerATSBoard'))
 const SeekerDashboard   = lazy(() => import('@/pages/seeker/DashboardPage'))
 const SeekerProfile     = lazy(() => import('@/pages/seeker/SeekerProfile'))
+const SeekerProfileEdit = lazy(() => import('@/pages/seeker/SeekerProfileEdit'))
 const SeekerOnboarding  = lazy(() => import('@/pages/auth/onboarding/SeekerOnboarding'))
 
 // Admin Pages - CATEGORY 1: OVERVIEW
@@ -294,6 +295,7 @@ export const router = createBrowserRouter([
                           { index: true, element: <Navigate to="dashboard" replace /> },
                           { path: 'dashboard', element: S(SeekerDashboard) },
                           { path: 'profile', element: S(SeekerProfile) },
+                          { path: 'profile/edit', element: S(SeekerProfileEdit) },
                         ],
                       }
                     ],

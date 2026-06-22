@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react'
 import Field from '@/components/form/Field'
 import FormError from '@/components/form/FormError'
+import SmartSuggestionInput from '@/components/form/SmartSuggestionInput'
 import * as employerService from '@/services/employerService'
 import { validateEmployerStep2 } from '@/services/validationHelpers'
 import PsgcCascade from '../components/PsgcCascade'
@@ -42,6 +43,12 @@ const COMPANY_SIZE_OPTIONS = [
   { value: 'small', label: '51-200 employees' },
   { value: 'medium', label: '201-500 employees' },
   { value: 'large', label: '500+ employees' },
+]
+
+const COMPANY_NAME_SUGGESTIONS = [
+  { label: 'ABC Trading Corporation', value: 'ABC Trading Corporation', helper: 'Use the official SEC/DTI registered business name.' },
+  { label: 'Urdaneta City Manpower Services', value: 'Urdaneta City Manpower Services', helper: 'Avoid branch nicknames unless part of the legal name.' },
+  { label: 'North Luzon Food Services Inc.', value: 'North Luzon Food Services Inc.', helper: 'Keep suffixes like Inc., Corp., or Cooperative when applicable.' },
 ]
 
 export default function Step2CompanyProfile({ initialData = {}, onComplete }) {
@@ -173,7 +180,7 @@ export default function Step2CompanyProfile({ initialData = {}, onComplete }) {
     <form onSubmit={handleSubmit} noValidate className="space-y-4">
       <FormError message={apiError} />
 
-      <Field
+      <SmartSuggestionInput
         label="Company Name"
         name="company_name"
         placeholder="Enter your official company name"
@@ -181,6 +188,9 @@ export default function Step2CompanyProfile({ initialData = {}, onComplete }) {
         onChange={handleChange}
         onBlur={handleBlur}
         error={getError('company_name')}
+        options={COMPANY_NAME_SUGGESTIONS}
+        helper="Smart suggestions encourage the official registered name used for PESO verification."
+        required
       />
 
       <Field

@@ -97,6 +97,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('/certificates/{certificate}', [SeekerCertificateController::class, 'destroy']);
         Route::post('/ai-profile-suggestions', [SeekerAiSuggestionController::class, 'suggest'])
             ->middleware('throttle:10,1');
+        Route::post('/ai-occupation-classification', [SeekerAiSuggestionController::class, 'classifyOccupation'])
+            ->middleware('throttle:20,1');
         Route::get('/skill-recommendations', [SkillRecommendationController::class, 'getRecommendations'])
             ->middleware('throttle:20,1');
         Route::post('/skill-gap-analysis', [SkillRecommendationController::class, 'analyzeGaps'])

@@ -41,6 +41,33 @@ class VertexAiSuggestionService
         return $this->normalizeResponse($response->json());
     }
 
+    public function classifyOccupationTitle(string $title, int $limit = 5): array
+    {
+        if (! config('services.vertex_ai.enabled')) {
+            throw new RuntimeException('Vertex AI suggestions are disabled.');
+        }
+
+        $projectId = trim((string) config('services.vertex_ai.project_id'));
+        $location = trim((string) config('services.vertex_ai.location', 'us-central1'));
+        $model = trim((string) config('services.vertex_ai.model', 'gemini-2.5-flash'));
+        $accessToken = $this->tokens->token();
+
+        if ($projectId === '' || $location === '' || $model === '' || ! $accessToken) {
+            throw new RuntimeException('Vertex AI is not fully configured.');
+        }
+
+        $response = Http::acceptJson()
+            ->withToken($accessToken)
+            ->timeout((int) config('services.vertex_ai.timeout', 20))
+            ->post($this->endpoint($projectId, $location, $model), $this->occupationClassificationPayload($title, $limit));
+
+        if (! $response->successful()) {
+            throw new RuntimeException('Vertex AI did not return occupation classifications.');
+        }
+
+        return $this->normalizeOccupationClassificationResponse($response->json(), $limit);
+    }
+
     private function endpoint(string $projectId, string $location, string $model): string
     {
         return sprintf(
@@ -70,6 +97,24 @@ class VertexAiSuggestionService
         ];
     }
 
+    private function occupationClassificationPayload(string $title, int $limit): array
+    {
+        return [
+            'contents' => [[
+                'role' => 'user',
+                'parts' => [[
+                    'text' => $this->occupationClassificationPrompt($title, $limit),
+                ]],
+            ]],
+            'generationConfig' => [
+                'temperature' => 0.1,
+                'maxOutputTokens' => 700,
+                'responseMimeType' => 'application/json',
+                'responseSchema' => $this->occupationClassificationSchema(),
+            ],
+        ];
+    }
+
     private function prompt(JobSeeker $seeker, array $context): string
     {
         $profile = [
@@ -94,6 +139,29 @@ class VertexAiSuggestionService
             .'Avoid sentences, fake jobs, joke titles, and overly narrow company-specific wording. '
             .'Skill suggestions must be skills the seeker might reasonably claim based on the profile, not required skills they do not have. '
             .'Profile context: '.json_encode($profile, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+    }
+
+    private function occupationClassificationPrompt(string $title, int $limit): string
+    {
+        $groups = collect(config('job_preferences.generalized_groups', []))
+            ->map(fn (array $group) => [
+                'general_term' => Str::of((string) $group['term'])->lower()->squish()->toString(),
+                'label' => $group['label'],
+                'keywords' => $group['keywords'] ?? '',
+                'patterns' => $group['patterns'] ?? '',
+            ])
+            ->values()
+            ->all();
+
+        return 'You classify Philippine PESO job seeker preferred job titles into broad i-PESO job families. '
+            .'The user may type local, informal, new, misspelled, platform-specific, freelance, or very specific job titles. '
+            .'Choose only from the allowed broad job families. Do not create new broad families. '
+            .'Prefer the broad field that best represents the actual work performed, not the company, schedule, seniority, or platform. '
+            .'If ambiguous, return up to '.$limit.' likely broad fields ordered by confidence. '
+            .'Use confidence 90-100 only when the work type is clear, 70-89 when likely, 45-69 when uncertain. '
+            .'Return only JSON that matches the schema. '
+            .'Raw job title: '.json_encode($title, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE).'. '
+            .'Allowed broad job families: '.json_encode($groups, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
     }
 
     private function responseSchema(): array
@@ -130,6 +198,30 @@ class VertexAiSuggestionService
         ];
     }
 
+    private function occupationClassificationSchema(): array
+    {
+        return [
+            'type' => 'OBJECT',
+            'properties' => [
+                'classifications' => [
+                    'type' => 'ARRAY',
+                    'maxItems' => 5,
+                    'items' => [
+                        'type' => 'OBJECT',
+                        'properties' => [
+                            'general_term' => ['type' => 'STRING'],
+                            'label' => ['type' => 'STRING'],
+                            'confidence' => ['type' => 'INTEGER'],
+                            'reason' => ['type' => 'STRING'],
+                        ],
+                        'required' => ['general_term', 'label', 'confidence', 'reason'],
+                    ],
+                ],
+            ],
+            'required' => ['classifications'],
+        ];
+    }
+
     private function normalizeResponse(array $response): array
     {
         $text = data_get($response, 'candidates.0.content.parts.0.text');
@@ -147,6 +239,63 @@ class VertexAiSuggestionService
             'technical_skills' => $this->cleanSuggestions($decoded['technical_skills'] ?? []),
             'soft_skills' => $this->cleanSuggestions($decoded['soft_skills'] ?? []),
         ];
+    }
+
+    private function normalizeOccupationClassificationResponse(array $response, int $limit): array
+    {
+        $text = data_get($response, 'candidates.0.content.parts.0.text');
+        if (! is_string($text) || trim($text) === '') {
+            return [];
+        }
+
+        $decoded = json_decode($text, true);
+        if (! is_array($decoded)) {
+            return [];
+        }
+
+        $allowed = collect(config('job_preferences.generalized_groups', []))
+            ->mapWithKeys(function (array $group) {
+                $term = Str::of((string) $group['term'])->lower()->squish()->toString();
+
+                return [$term => [
+                    'general_term' => $term,
+                    'label' => $group['label'],
+                ]];
+            });
+
+        return collect($decoded['classifications'] ?? [])
+            ->map(function ($item) use ($allowed) {
+                $term = Str::of((string) Arr::get($item, 'general_term'))->lower()->squish()->toString();
+                $match = $allowed->get($term);
+
+                if (! $match) {
+                    $label = Str::of((string) Arr::get($item, 'label'))->lower()->squish()->toString();
+                    $match = $allowed->first(fn (array $group) => Str::of($group['label'])->lower()->squish()->toString() === $label);
+                }
+
+                if (! $match) {
+                    return null;
+                }
+
+                return [
+                    'id' => 'ai-general:'.$match['general_term'],
+                    'title' => $match['label'],
+                    'general_term' => $match['general_term'],
+                    'broad_category' => $match['label'],
+                    'source' => 'vertex_ai',
+                    'is_general' => true,
+                    'is_ai_generated' => true,
+                    'match_type' => 'ai_broad_field',
+                    'confidence' => max(0, min(100, (int) Arr::get($item, 'confidence', 70))),
+                    'reason' => Str::of((string) Arr::get($item, 'reason'))->squish()->limit(160, '')->toString(),
+                ];
+            })
+            ->filter()
+            ->unique('general_term')
+            ->sortByDesc('confidence')
+            ->take($limit)
+            ->values()
+            ->all();
     }
 
     private function cleanSuggestions(array $suggestions): array

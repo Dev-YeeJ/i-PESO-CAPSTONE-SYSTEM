@@ -92,6 +92,8 @@ function SeekerTimeFrame({ value = {}, onChange, label, required, error, disable
         </p>
       )}
 
+      <p className="mt-1 text-xs leading-5 text-slate-500">Use exact dates to calculate work duration accurately.</p>
+
       <div className="mt-2 grid gap-4 md:grid-cols-2">
         <label className="block">
           <span className="text-xs font-black uppercase tracking-wide text-slate-500">Start Date</span>
@@ -107,19 +109,25 @@ function SeekerTimeFrame({ value = {}, onChange, label, required, error, disable
 
         <label className="block">
           <span className="text-xs font-black uppercase tracking-wide text-slate-500">End Date</span>
-          <input
-            type="date"
-            value={frame.end_date}
-            onChange={(event) => emit({ end_date: event.target.value })}
-            disabled={disabled || frame.currently_employed}
-            min={frame.start_date || undefined}
-            max={todayDate()}
-            className={`${inputClass} ${error ? 'border-red-300 focus:border-red-500 focus:ring-red-100' : ''}`}
-          />
+          {frame.currently_employed ? (
+            <div className="mt-2 flex min-h-11 items-center rounded-xl border border-slate-200 bg-slate-50 px-3.5 text-sm font-black text-slate-700">
+              Present
+            </div>
+          ) : (
+            <input
+              type="date"
+              value={frame.end_date}
+              onChange={(event) => emit({ end_date: event.target.value })}
+              disabled={disabled}
+              min={frame.start_date || undefined}
+              max={todayDate()}
+              className={`${inputClass} ${error ? 'border-red-300 focus:border-red-500 focus:ring-red-100' : ''}`}
+            />
+          )}
         </label>
       </div>
 
-      <label className="mt-3 inline-flex items-center gap-2 text-sm font-bold text-slate-700">
+      <label className="mt-3 inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700">
         <input
           type="checkbox"
           checked={frame.currently_employed}

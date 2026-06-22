@@ -585,7 +585,7 @@ class SkillTaxonomyMatchingTest extends TestCase
         $this->assertSame('ended_more_than_5_years_ago', $match['factors']['experience']['details']['details'][0]['recency_bucket']);
     }
 
-    public function test_enhanced_match_flags_beginner_required_skill_as_critical_gap(): void
+    public function test_enhanced_match_ignores_skill_proficiency_levels(): void
     {
         $occupation = Occupation::query()->create([
             'psoc_code' => '4110',
@@ -621,10 +621,8 @@ class SkillTaxonomyMatchingTest extends TestCase
 
         $match = app(EnhancedJobMatchingService::class)->calculateMatch($vacancy, $seeker);
 
-        $this->assertSame(60.0, $match['factors']['skills']['score']);
-        $this->assertSame('Microsoft Excel', $match['missing_critical_skills'][0]['skill']);
-        $this->assertSame('proficiency_below_requirement', $match['missing_critical_skills'][0]['reason']);
-        $this->assertSame('beginner', $match['missing_critical_skills'][0]['matched_proficiency']);
+        $this->assertSame(100.0, $match['factors']['skills']['score']);
+        $this->assertSame([], $match['missing_critical_skills']);
     }
 
     private function skill(string $name, string $category): Skill

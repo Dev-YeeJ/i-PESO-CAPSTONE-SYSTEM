@@ -4,7 +4,6 @@ import { AlertCircle, ChevronDown, AlertTriangle, TrendingUp, Brain } from 'luci
 /**
  * Enhanced Education & Skills Form - Step 5
  * Improvements:
- * - Proficiency levels for skills
  * - Better skill search with suggestions
  * - Skill gap analysis
  * - Duplicate detection warning
@@ -14,25 +13,14 @@ import { AlertCircle, ChevronDown, AlertTriangle, TrendingUp, Brain } from 'luci
 
 export default function EnhancedStep5Form({
   form,
-  errors,
   onChange,
   onAddEducation,
   onRemoveEducation,
   onUpdateEducation,
   skillSuggestions = [],
-  onSkillsAnalysis,
 }) {
-  const [showAdvancedOptions, setShowAdvancedOptions] = useState({})
   const [skillDuplicateWarnings, setSkillDuplicateWarnings] = useState({})
   const [selectedEducationIndex, setSelectedEducationIndex] = useState(null)
-
-  // Proficiency level options
-  const PROFICIENCY_LEVELS = [
-    { value: 'beginner', label: 'Beginner', description: 'Just learning this skill' },
-    { value: 'intermediate', label: 'Intermediate', description: 'Can use competently' },
-    { value: 'advanced', label: 'Advanced', description: 'Very proficient' },
-    { value: 'expert', label: 'Expert', description: 'Master level knowledge' },
-  ]
 
   // Detect potential skill duplicates
   const detectDuplicates = useCallback((skills, newSkill) => {
@@ -46,7 +34,7 @@ export default function EnhancedStep5Form({
   }, [])
 
   // Handle skill add with duplicate check
-  const handleAddSkill = (skillType, newSkill, proficiency = 'intermediate') => {
+  const handleAddSkill = (skillType, newSkill) => {
     const currentSkills = form[skillType] ?? []
     const duplicates = detectDuplicates(
       currentSkills.map((s) => (typeof s === 'object' ? s.name : s)),
@@ -76,7 +64,6 @@ export default function EnhancedStep5Form({
       ...skillsArray,
       {
         name: newSkill,
-        proficiency,
         yearsOfExperience: 0,
       },
     ]
@@ -87,17 +74,6 @@ export default function EnhancedStep5Form({
   const handleRemoveSkill = (skillType, index) => {
     const skillsArray = form[skillType] ?? []
     const updated = skillsArray.filter((_, i) => i !== index)
-    onChange({ target: { name: skillType, value: updated } })
-  }
-
-  // Update skill proficiency
-  const handleUpdateSkillProficiency = (skillType, index, proficiency) => {
-    const skillsArray = form[skillType] ?? []
-    const updated = [...skillsArray]
-    updated[index] = {
-      ...(typeof updated[index] === 'object' ? updated[index] : { name: updated[index] }),
-      proficiency,
-    }
     onChange({ target: { name: skillType, value: updated } })
   }
 
@@ -338,10 +314,8 @@ export default function EnhancedStep5Form({
           description="Technical and professional skills you can demonstrate"
           skills={form.technical_skills ?? []}
           type="technical_skills"
-          proficiencyLevels={PROFICIENCY_LEVELS}
           onAdd={handleAddSkill}
           onRemove={handleRemoveSkill}
-          onUpdateProficiency={handleUpdateSkillProficiency}
           duplicateWarning={skillDuplicateWarnings.technical_skills}
           color="#8b5cf6"
         />
@@ -352,10 +326,8 @@ export default function EnhancedStep5Form({
           description="Interpersonal and behavioral competencies"
           skills={form.soft_skills ?? []}
           type="soft_skills"
-          proficiencyLevels={PROFICIENCY_LEVELS}
           onAdd={handleAddSkill}
           onRemove={handleRemoveSkill}
-          onUpdateProficiency={handleUpdateSkillProficiency}
           duplicateWarning={skillDuplicateWarnings.soft_skills}
           color="#10b981"
         />
@@ -372,21 +344,17 @@ function SkillCategorySection({
   description,
   skills,
   type,
-  proficiencyLevels,
   onAdd,
   onRemove,
-  onUpdateProficiency,
   duplicateWarning,
   color,
 }) {
   const [newSkill, setNewSkill] = useState('')
-  const [newProficiency, setNewProficiency] = useState('intermediate')
 
   const handleAdd = () => {
     if (newSkill.trim()) {
-      onAdd(type, newSkill, newProficiency)
+      onAdd(type, newSkill)
       setNewSkill('')
-      setNewProficiency('intermediate')
     }
   }
 
@@ -435,8 +403,6 @@ function SkillCategorySection({
       <div style={{ marginBottom: '12px', display: 'grid', gap: '8px' }}>
         {skills.map((skill, index) => {
           const skillName = typeof skill === 'object' ? skill.name : skill
-          const proficiency = typeof skill === 'object' ? skill.proficiency : 'intermediate'
-          const profLabel = proficiencyLevels.find((p) => p.value === proficiency)?.label || 'Intermediate'
 
           return (
             <div
@@ -455,24 +421,6 @@ function SkillCategorySection({
                 <p style={{ fontSize: '13px', fontWeight: '600', color: '#1f2937', margin: 0 }}>
                   {skillName}
                 </p>
-                <select
-                  value={proficiency}
-                  onChange={(e) => onUpdateProficiency(type, index, e.target.value)}
-                  style={{
-                    fontSize: '11px',
-                    padding: '4px 6px',
-                    marginTop: '4px',
-                    border: `1px solid ${color}40`,
-                    borderRadius: '4px',
-                    cursor: 'pointer',
-                  }}
-                >
-                  {proficiencyLevels.map((level) => (
-                    <option key={level.value} value={level.value}>
-                      {level.label}
-                    </option>
-                  ))}
-                </select>
               </div>
               <button
                 type="button"
@@ -511,23 +459,6 @@ function SkillCategorySection({
             outline: 'none',
           }}
         />
-        <select
-          value={newProficiency}
-          onChange={(e) => setNewProficiency(e.target.value)}
-          style={{
-            padding: '8px 10px',
-            fontSize: '12px',
-            border: `1px solid ${color}40`,
-            borderRadius: '6px',
-            cursor: 'pointer',
-          }}
-        >
-          {proficiencyLevels.map((level) => (
-            <option key={level.value} value={level.value}>
-              {level.label}
-            </option>
-          ))}
-        </select>
         <button
           type="button"
           onClick={handleAdd}

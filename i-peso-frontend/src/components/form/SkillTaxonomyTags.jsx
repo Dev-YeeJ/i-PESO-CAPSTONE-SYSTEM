@@ -6,12 +6,6 @@ import {
   TECHNICAL_SKILL_SUGGESTIONS,
 } from '@/data/jobPreferenceVocabularies'
 
-const proficiencyOptions = [
-  { value: 'beginner', label: 'Beginner' },
-  { value: 'intermediate', label: 'Intermediate' },
-  { value: 'expert', label: 'Expert' },
-]
-
 export default function SkillTaxonomyTags({
   value = [],
   onChange,
@@ -53,11 +47,10 @@ export default function SkillTaxonomyTags({
       category,
       source: 'custom_user_input',
       is_custom: true,
-      proficiency: mode === 'seeker' ? 'intermediate' : undefined,
     }
 
     return selectedKeys.has(skillKey(skill)) ? null : skill
-  }, [allowCustom, category, mode, query, selectedKeys, selectionFull])
+  }, [allowCustom, category, query, selectedKeys, selectionFull])
   const recommendedSkills = useMemo(
     () => uniqueSkills([
       ...starterSkills,
@@ -128,14 +121,13 @@ export default function SkillTaxonomyTags({
       name: skill.name,
       skill_name: skill.name,
       category: skill.category ?? category,
-      proficiency: skill.proficiency ?? 'intermediate',
       source: skill.source ?? null,
       is_custom: Boolean(skill.is_custom),
     })))
   }
 
   const addSkill = (skill) => {
-    const normalized = normalizeSkill(skill, mode)
+    const normalized = normalizeSkill(skill)
     if (!normalized || selectionFull || selectedKeys.has(skillKey(normalized))) return
 
     emit([...selected, normalized])
@@ -146,12 +138,6 @@ export default function SkillTaxonomyTags({
 
   const removeSkill = (skill) => {
     emit(selected.filter((item) => skillKey(item) !== skillKey(skill)))
-  }
-
-  const updateProficiency = (skill, proficiency) => {
-    emit(selected.map((item) => (
-      skillKey(item) === skillKey(skill) ? { ...item, proficiency } : item
-    )))
   }
 
   return (
@@ -173,19 +159,6 @@ export default function SkillTaxonomyTags({
               className="inline-flex max-w-full items-center gap-2 rounded-full border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-bold text-blue-800"
             >
               <span className="truncate">{skill.name}</span>
-              {mode === 'seeker' && (
-                <select
-                  value={skill.proficiency ?? 'intermediate'}
-                  onChange={(event) => updateProficiency(skill, event.target.value)}
-                  disabled={disabled}
-                  className="rounded-full border border-blue-200 bg-white px-2 py-0.5 text-[11px] font-bold text-blue-900 outline-none focus:border-blue-900"
-                  aria-label={`Set proficiency for ${skill.name}`}
-                >
-                  {proficiencyOptions.map((option) => (
-                    <option key={option.value} value={option.value}>{option.label}</option>
-                  ))}
-                </select>
-              )}
               <button
                 type="button"
                 onClick={() => removeSkill(skill)}
@@ -308,7 +281,7 @@ function normalizeSelected(value) {
   return value.map((item) => normalizeSkill(item)).filter(Boolean)
 }
 
-function normalizeSkill(item, mode = 'employer') {
+function normalizeSkill(item) {
   if (!item) return null
   if (typeof item === 'string') {
     return {
@@ -316,7 +289,6 @@ function normalizeSkill(item, mode = 'employer') {
       skill_id: null,
       name: item,
       category: null,
-      proficiency: mode === 'seeker' ? 'intermediate' : undefined,
     }
   }
 
@@ -329,7 +301,6 @@ function normalizeSkill(item, mode = 'employer') {
     skill_id: item.skill_id ?? item.id ?? null,
     name,
     category: item.category ?? null,
-    proficiency: item.proficiency ?? (mode === 'seeker' ? 'intermediate' : undefined),
   }
 }
 

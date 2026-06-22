@@ -11,6 +11,7 @@ import {
   Loader2,
   MapPin,
   ShieldAlert,
+  Sparkles,
   Target,
   UsersRound,
   X,
@@ -20,6 +21,7 @@ import AIOccupationMapper from '@/components/form/AIOccupationMapper'
 import EducationLevelSelect, { educationRankToBackendValue } from '@/components/form/EducationLevelSelect'
 import ExperienceTimeFrame from '@/components/form/ExperienceTimeFrame'
 import SkillTaxonomyTags from '@/components/form/SkillTaxonomyTags'
+import SmartSuggestionInput from '@/components/form/SmartSuggestionInput'
 import PsgcCascade from '@/pages/employer/components/PsgcCascade'
 import * as employerService from '@/services/employerService'
 
@@ -45,6 +47,15 @@ const workArrangementOptions = [
 ]
 
 const genderOptions = ['Any', 'Male', 'Female']
+
+const jobTitleSuggestions = [
+  { label: 'Accounting Staff', value: 'Accounting Staff', helper: 'Standard office and finance role title.' },
+  { label: 'Cashier', value: 'Cashier', helper: 'Common retail and customer transaction role.' },
+  { label: 'Data Encoder', value: 'Data Encoder', helper: 'Cleaner than mixed titles like encoder/admin/data staff.' },
+  { label: 'Delivery Rider', value: 'Delivery Rider', helper: 'Standard transport and logistics title.' },
+  { label: 'Web Developer', value: 'Web Developer', helper: 'Use this before choosing the matching occupation anchor.' },
+  { label: 'Production Operator', value: 'Production Operator', helper: 'Common manufacturing role title.' },
+]
 
 const regionByProvincePrefix = {
   '01': 'Region I - Ilocos Region',
@@ -339,7 +350,7 @@ export default function JobPostingWizard() {
             )}
             {step === 3 && <QualificationsStep form={form} errors={errors} update={update} />}
             {step === 4 && <DemographicPreferencesStep form={form} errors={errors} change={change} />}
-            {step === 5 && <CompensationDetailsStep form={form} errors={errors} change={change} />}
+            {step === 5 && <CompensationDetailsStep form={form} errors={errors} change={change} update={update} />}
           </div>
 
           <footer className="sticky bottom-0 z-10 flex items-center justify-between gap-3 border-t border-slate-200 bg-white/95 px-5 py-4 backdrop-blur sm:px-7">
@@ -388,16 +399,20 @@ function BasicInformationStep({ form, errors, change }) {
       description="Capture the employer-facing role basics first. These fields are intentionally compact so posting starts quickly."
     >
       <div className="grid gap-5 md:grid-cols-2">
-        <Field label="Job Title" required error={errors.job_title} className="md:col-span-2">
-          <input
+        <div className="md:col-span-2">
+          <SmartSuggestionInput
+            label="Job Title"
             name="job_title"
             value={form.job_title}
             onChange={change}
-            className={inputClass}
             placeholder="e.g. Accounting Staff"
             maxLength={255}
+            error={errors.job_title}
+            options={jobTitleSuggestions}
+            helper="Use standardized role titles first, then map the exact occupation in the next step."
+            required
           />
-        </Field>
+        </div>
 
         <Field label="Number of Vacancies" required error={errors.vacancies_count}>
           <input
@@ -625,7 +640,13 @@ function DemographicPreferencesStep({ form, errors, change }) {
   )
 }
 
-function CompensationDetailsStep({ form, errors, change }) {
+function CompensationDetailsStep({ form, errors, change, update }) {
+  const draftDescription = () => {
+    const hardSkills = form.required_skills.length ? form.required_skills.join(', ') : 'the required tools and workplace procedures'
+    const softSkills = form.soft_skills.length ? form.soft_skills.join(', ') : 'teamwork, communication, and reliability'
+    update('job_description', `${form.job_title || 'The selected candidate'} will perform daily duties aligned with the role, maintain accurate records, and coordinate with supervisors to meet operational targets.\n\nKey responsibilities:\n- Execute assigned tasks using ${hardSkills}.\n- Maintain quality, safety, and productivity standards throughout the shift.\n- Communicate progress, issues, and documentation clearly with the team.\n- Demonstrate ${softSkills} while serving customers, coworkers, and company requirements.`)
+  }
+
   return (
     <StepShell
       icon={CircleDollarSign}
@@ -682,6 +703,16 @@ function CompensationDetailsStep({ form, errors, change }) {
 
       <div className="mt-6">
         <Field label="Job Description & Responsibilities" required error={errors.job_description}>
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+            <p className="text-xs leading-5 text-slate-500">Draft clear duties for applicants and for better skill matching.</p>
+            <button
+              type="button"
+              onClick={draftDescription}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-50 px-3 py-2 text-xs font-black text-indigo-600 ring-1 ring-indigo-100 transition hover:bg-indigo-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            >
+              <Sparkles className="h-3.5 w-3.5" /> AI Draft Responsibilities
+            </button>
+          </div>
           <textarea
             name="job_description"
             value={form.job_description}

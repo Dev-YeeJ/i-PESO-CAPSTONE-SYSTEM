@@ -27,13 +27,6 @@ class EnhancedJobMatchingService
         'education' => 10,
     ];
 
-    private const PROFICIENCY_MODIFIERS = [
-        'beginner' => 0.6,
-        'intermediate' => 0.8,
-        'advanced' => 0.95,
-        'expert' => 1.0,
-    ];
-
     private const CRITICAL_SKILL_THRESHOLD = 0.7;
 
     public function __construct(
@@ -249,17 +242,11 @@ class EnhancedJobMatchingService
         $details = $requirements->map(function (array $requirement) use ($seekerSkills) {
             $matchedSkill = $this->matchedSeekerSkill($requirement, $seekerSkills);
             $baseFactor = (float) ($requirement['match_factor'] ?? 0);
-            $proficiency = $matchedSkill?->proficiency ?: 'intermediate';
-            $proficiencyModifier = $matchedSkill
-                ? (self::PROFICIENCY_MODIFIERS[$proficiency] ?? 0.8)
-                : 0.0;
-            $adjustedFactor = min(1.0, $baseFactor * $proficiencyModifier);
+            $adjustedFactor = $matchedSkill ? min(1.0, $baseFactor) : 0.0;
             $weight = (float) ($requirement['requirement_weight'] ?? 1.0);
             $gapReason = $this->skillGapReason($baseFactor, $adjustedFactor, $matchedSkill);
 
             return array_merge($requirement, [
-                'matched_proficiency' => $matchedSkill?->proficiency,
-                'proficiency_modifier' => round($proficiencyModifier, 2),
                 'adjusted_match_factor' => round($adjustedFactor, 3),
                 'adjusted_weighted_score' => round($adjustedFactor * $weight, 3),
                 'is_critical_gap' => $gapReason !== null,
@@ -274,7 +261,6 @@ class EnhancedJobMatchingService
                 'skill' => $detail['required_skill'],
                 'reason' => $detail['gap_reason'],
                 'matched_skill' => $detail['matched_skill'] ?? null,
-                'matched_proficiency' => $detail['matched_proficiency'] ?? null,
                 'required_match_factor' => self::CRITICAL_SKILL_THRESHOLD,
                 'actual_match_factor' => $detail['adjusted_match_factor'],
             ])
@@ -300,9 +286,7 @@ class EnhancedJobMatchingService
         }
 
         if ($adjustedFactor < self::CRITICAL_SKILL_THRESHOLD) {
-            return $baseFactor >= self::CRITICAL_SKILL_THRESHOLD
-                ? 'proficiency_below_requirement'
-                : 'partial_skill_match';
+            return 'partial_skill_match';
         }
 
         return null;

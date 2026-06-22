@@ -1,7 +1,7 @@
 // src/pages/auth/onboarding/SeekerOnboarding.jsx
 // Digitizes the NSRP Form 1 (National Skills Registration Program)
 // Department of Labor and Employment — Job Seeker Registration Form
-import { useState, useCallback, useEffect, useRef } from 'react'
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { authService } from '@/services/authService'
 import { useAuthStore } from '@/stores/authStore'
@@ -341,9 +341,15 @@ const EMPLOYMENT_STATUS_OPTIONS = [
   { value: 'permanent', label: 'Permanent' },
   { value: 'contractual', label: 'Contractual' },
   { value: 'part_time', label: 'Part-time' },
+  { value: 'project_based', label: 'Project-based' },
+  { value: 'casual', label: 'Casual' },
   { value: 'probationary', label: 'Probationary' },
   { value: 'temporary', label: 'Temporary' },
   { value: 'seasonal', label: 'Seasonal' },
+  { value: 'internship', label: 'Internship' },
+  { value: 'ojt', label: 'OJT / On-the-Job Training' },
+  { value: 'freelance', label: 'Freelance' },
+  { value: 'self_employed', label: 'Self-Employed' },
 ]
 
 const MONTH_DURATION_OPTIONS = [
@@ -1198,6 +1204,7 @@ const Step3 = ({ form, errors, onChange }) => {
           limit={3}
           searchLimit={50}
           broadFieldOnly
+          enableAiBroadField
           onChange={(nextOccupations) => setField('preferred_occupations', nextOccupations)}
           placeholder={occupations.length >= 3 ? 'Maximum of 3 occupations selected' : 'Type your specific job title, e.g. Teacher, Cashier, React Developer'}
           error={errors.preferred_occupations}
@@ -1799,20 +1806,6 @@ const SKILL_LIMITS = {
   soft: 10,
 }
 
-const normalizeSkillProficiencyForBackend = (value) => {
-  const normalized = String(value ?? 'Intermediate').toLowerCase()
-  if (normalized === 'beginner') return 'beginner'
-  if (normalized === 'expert' || normalized === 'advanced') return 'expert'
-  return 'intermediate'
-}
-
-const normalizeSkillProficiencyForUi = (value) => {
-  const normalized = String(value ?? 'intermediate').toLowerCase()
-  if (normalized === 'beginner') return 'Beginner'
-  if (normalized === 'expert' || normalized === 'advanced') return 'Expert'
-  return 'Intermediate'
-}
-
 const normalizeUnifiedSeekerSkill = (skill) => {
   const name = skillDisplayName(skill)
   if (!name) return null
@@ -1829,7 +1822,6 @@ const normalizeUnifiedSeekerSkill = (skill) => {
     source: skill?.source ?? (skill?.is_dole ? 'dole' : 'system'),
     is_official: Boolean(skill?.is_official ?? skill?.isOfficial),
     is_recommended: Boolean(skill?.is_recommended ?? skill?.isRecommended),
-    proficiency: normalizeSkillProficiencyForUi(skill?.proficiency),
   }
 }
 
@@ -1869,7 +1861,6 @@ const backendSkillItem = (skill, category) => ({
   source: skill.source ?? (skill.is_dole ? 'dole' : 'system'),
   is_official: Boolean(skill.is_official || skill.is_dole),
   is_recommended: Boolean(skill.is_recommended),
-  proficiency: normalizeSkillProficiencyForBackend(skill.proficiency),
 })
 
 const formSkillArraysFromUnified = (skills = []) => {
@@ -2097,6 +2088,419 @@ function Step6({ form, errors, onAddTraining, onRemoveTraining, onUpdateTraining
 }
 
 // ── STEP 7: WORK EXPERIENCE ────────────────────────────────────────────────
+
+const COMPANY_SUGGESTIONS = [
+  { label: 'Department of Labor and Employment', meta: 'Government agency', keywords: 'dole labor employment government' },
+  { label: 'Jollibee Foods Corporation', meta: 'Food service and restaurant', keywords: 'jollibee fast food service crew cashier' },
+  { label: 'SM Supermalls', meta: 'Retail and mall operations', keywords: 'sm mall retail sales admin' },
+  { label: 'SM Hypermarket', meta: 'Retail and grocery', keywords: 'sm grocery supermarket cashier stock clerk' },
+  { label: 'Mang Inasal', meta: 'Food service and restaurant', keywords: 'restaurant service crew cook cashier' },
+  { label: "McDonald's Philippines", meta: 'Food service and restaurant', keywords: 'mcdonalds fast food crew cashier' },
+  { label: '7-Eleven Philippines', meta: 'Convenience store', keywords: 'seven eleven cashier retail store' },
+  { label: 'Accenture', meta: 'BPO, technology, and consulting', keywords: 'accenture bpo it support software' },
+  { label: 'Concentrix', meta: 'BPO and customer service', keywords: 'call center bpo customer support' },
+  { label: 'Teleperformance', meta: 'BPO and customer service', keywords: 'call center bpo customer support' },
+  { label: 'Foundever', meta: 'BPO and customer service', keywords: 'sitel call center bpo customer support' },
+  { label: 'Urdaneta City Government', meta: 'Local government', keywords: 'city government lgu public service' },
+  { label: 'Local Government Unit', meta: 'Government office', keywords: 'lgu municipal city hall public service' },
+  { label: 'Public Employment Service Office', meta: 'PESO office', keywords: 'peso employment office government' },
+  { label: 'Department of Education', meta: 'Education agency', keywords: 'deped school teacher education' },
+  { label: 'TESDA', meta: 'Technical education and training', keywords: 'tesda training vocational technical' },
+  { label: 'Barangay Office', meta: 'Community government office', keywords: 'barangay government office community' },
+  { label: 'Municipal Hall', meta: 'Local government office', keywords: 'municipal hall lgu government' },
+  { label: 'City Hall', meta: 'Local government office', keywords: 'city hall lgu government' },
+  { label: 'Robinsons', meta: 'Retail and mall operations', keywords: 'mall retail sales supermarket' },
+  { label: 'Puregold', meta: 'Retail and grocery', keywords: 'grocery supermarket cashier stock clerk' },
+  { label: 'Watsons', meta: 'Retail pharmacy and health store', keywords: 'pharmacy retail cashier sales' },
+  { label: 'Mercury Drug', meta: 'Pharmacy and retail', keywords: 'pharmacy cashier sales assistant' },
+  { label: 'Wilcon Depot', meta: 'Hardware and construction retail', keywords: 'hardware retail warehouse sales' },
+  { label: 'Small Business / Self-Employed', meta: 'Self-employment or family business', keywords: 'small business sari sari freelance self employed' },
+]
+
+const POSITION_SUGGESTIONS = [
+  { label: 'Cashier', meta: 'Retail and store work', keywords: 'cashier pos payment store grocery' },
+  { label: 'Sales Associate', meta: 'Retail and sales', keywords: 'sales retail store assistant merchandiser' },
+  { label: 'Service Crew', meta: 'Food service', keywords: 'crew restaurant fast food kitchen cashier' },
+  { label: 'Crew Member', meta: 'Food service', keywords: 'crew restaurant fast food service' },
+  { label: 'Office Staff', meta: 'Office and administration', keywords: 'office admin clerical records' },
+  { label: 'Administrative Assistant', meta: 'Office and administration', keywords: 'admin assistant office clerical' },
+  { label: 'Clerk', meta: 'Office and administration', keywords: 'clerk office records filing' },
+  { label: 'Encoder', meta: 'Data entry and office work', keywords: 'encoder data entry typing office' },
+  { label: 'Receptionist', meta: 'Front desk and office work', keywords: 'front desk receptionist office' },
+  { label: 'Customer Service Representative', meta: 'BPO and customer support', keywords: 'csr call center customer support bpo' },
+  { label: 'Call Center Agent', meta: 'BPO and customer support', keywords: 'call center bpo customer service' },
+  { label: 'Technical Support Representative', meta: 'BPO and technical support', keywords: 'tech support call center troubleshooting' },
+  { label: 'Graphic Designer', meta: 'Creative and design', keywords: 'graphic design creative photoshop canva' },
+  { label: 'Web Designer', meta: 'Digital and creative work', keywords: 'web design website ui ux' },
+  { label: 'Web Developer', meta: 'IT and software', keywords: 'web developer frontend react javascript' },
+  { label: 'Software Developer', meta: 'IT and software', keywords: 'software programmer developer coding' },
+  { label: 'IT Support', meta: 'IT and computer support', keywords: 'it support computer troubleshooting network' },
+  { label: 'Computer Technician', meta: 'IT and technical work', keywords: 'computer technician repair hardware' },
+  { label: 'Data Entry Clerk', meta: 'Office and data work', keywords: 'data entry encoder clerk spreadsheet' },
+  { label: 'Bookkeeper', meta: 'Accounting and finance', keywords: 'bookkeeping accounting finance records' },
+  { label: 'Marketing Assistant', meta: 'Marketing and communications', keywords: 'marketing social media promotion' },
+  { label: 'Social Media Assistant', meta: 'Online and digital work', keywords: 'social media content marketing online' },
+  { label: 'Warehouse Staff', meta: 'Warehouse and logistics', keywords: 'warehouse inventory stock logistics' },
+  { label: 'Delivery Rider', meta: 'Delivery and courier work', keywords: 'delivery rider courier motorcycle' },
+  { label: 'Production Worker', meta: 'Manufacturing and factory work', keywords: 'production factory manufacturing' },
+  { label: 'Factory Worker', meta: 'Manufacturing and factory work', keywords: 'factory production assembler packer' },
+  { label: 'Utility Worker', meta: 'Maintenance and support work', keywords: 'utility cleaner maintenance' },
+  { label: 'Security Guard', meta: 'Security and protective services', keywords: 'security guard safety' },
+  { label: 'Teacher', meta: 'Education and teaching', keywords: 'teacher school education' },
+  { label: 'Tutor', meta: 'Education and teaching', keywords: 'tutor teaching education' },
+  { label: 'Intern', meta: 'Internship or entry-level work', keywords: 'intern internship trainee' },
+  { label: 'OJT Trainee', meta: 'On-the-job training', keywords: 'ojt trainee internship student' },
+  { label: 'Freelancer', meta: 'Freelance work', keywords: 'freelance self employed project' },
+  { label: 'Self-Employed', meta: 'Self-employment', keywords: 'self employed business freelance' },
+]
+
+const employmentStatusSuggestions = EMPLOYMENT_STATUS_OPTIONS.map((status) => ({
+  label: status.label,
+  code: status.value,
+  meta: 'Employment type',
+  keywords: status.label,
+}))
+
+const employmentStatusLabel = (value) => (
+  EMPLOYMENT_STATUS_OPTIONS.find((status) => status.value === value)?.label || ''
+)
+
+function WorkExperienceAutocomplete({
+  id,
+  label,
+  value,
+  suggestions,
+  placeholder,
+  helper,
+  onChange,
+  onSelect,
+  allowCustom = true,
+}) {
+  const inputRef = useRef(null)
+  const [open, setOpen] = useState(false)
+  const [activeIndex, setActiveIndex] = useState(0)
+  const [debouncedQuery, setDebouncedQuery] = useState(value || '')
+  const query = cleanText(value)
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedQuery(value || ''), 140)
+    return () => window.clearTimeout(timer)
+  }, [value])
+
+  const matches = useMemo(() => {
+    const normalized = normalizeChoice(debouncedQuery)
+    const rows = suggestions
+      .map((suggestion) => ({
+        ...suggestion,
+        score: suggestionScore(suggestion, normalized),
+      }))
+      .filter((suggestion) => !normalized || suggestion.score > 0)
+      .sort((left, right) => right.score - left.score || left.label.localeCompare(right.label))
+      .slice(0, 12)
+
+    if (allowCustom && query && !rows.some((row) => normalizeChoice(row.label) === normalizeChoice(query))) {
+      rows.unshift({
+        label: query,
+        value: query,
+        meta: 'Use custom entry',
+        keywords: query,
+        custom: true,
+        score: 999,
+      })
+    }
+
+    return rows
+  }, [allowCustom, debouncedQuery, query, suggestions])
+
+  const choose = (suggestion) => {
+    onSelect?.(suggestion)
+    onChange(suggestion.value ?? suggestion.label)
+    setOpen(false)
+    setActiveIndex(0)
+  }
+
+  const handleKeyDown = (event) => {
+    if (!open && ['ArrowDown', 'ArrowUp'].includes(event.key)) {
+      setOpen(true)
+      return
+    }
+
+    if (event.key === 'ArrowDown') {
+      event.preventDefault()
+      setActiveIndex((current) => Math.min(current + 1, Math.max(matches.length - 1, 0)))
+    }
+
+    if (event.key === 'ArrowUp') {
+      event.preventDefault()
+      setActiveIndex((current) => Math.max(current - 1, 0))
+    }
+
+    if (event.key === 'Enter' && open && matches[activeIndex]) {
+      event.preventDefault()
+      choose(matches[activeIndex])
+    }
+
+    if (event.key === 'Escape') {
+      setOpen(false)
+      setActiveIndex(0)
+    }
+  }
+
+  return (
+    <label className="block">
+      <span className="text-xs font-black uppercase tracking-wide text-slate-500">{label}</span>
+      <div className="relative mt-2">
+        <input
+          ref={inputRef}
+          id={id}
+          value={value || ''}
+          onChange={(event) => {
+            onChange(event.target.value)
+            setOpen(true)
+            setActiveIndex(0)
+          }}
+          onFocus={() => setOpen(true)}
+          onBlur={() => window.setTimeout(() => setOpen(false), 140)}
+          onKeyDown={handleKeyDown}
+          placeholder={placeholder}
+          autoComplete="off"
+          role="combobox"
+          aria-expanded={open}
+          aria-controls={`${id}-options`}
+          aria-activedescendant={open && matches[activeIndex] ? `${id}-option-${activeIndex}` : undefined}
+          className="h-11 w-full rounded-lg border border-slate-300 bg-white px-3.5 text-sm font-semibold text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-blue-600 focus:ring-2 focus:ring-blue-500/20"
+        />
+
+        {open && (
+          <div
+            id={`${id}-options`}
+            role="listbox"
+            className="absolute left-0 top-full z-50 mt-2 max-h-72 w-[min(36rem,calc(100vw-3rem))] overflow-y-auto rounded-xl border border-slate-200 bg-white py-1 shadow-2xl"
+          >
+            {matches.length ? (
+              matches.map((suggestion, index) => {
+                const active = index === activeIndex
+
+                return (
+                  <button
+                    key={`${suggestion.label}-${index}`}
+                    id={`${id}-option-${index}`}
+                    type="button"
+                    role="option"
+                    aria-selected={active}
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={() => choose(suggestion)}
+                    className={`block w-full border-b border-slate-100 px-4 py-3 text-left transition last:border-b-0 ${
+                      active ? 'bg-blue-50' : 'bg-white hover:bg-blue-50'
+                    }`}
+                  >
+                    <span className="block text-sm font-black text-slate-950">
+                      <HighlightedText text={suggestion.label} query={query} />
+                    </span>
+                    {suggestion.meta && (
+                      <span className="mt-1 block text-xs font-semibold text-slate-500">{suggestion.meta}</span>
+                    )}
+                  </button>
+                )
+              })
+            ) : (
+              <div className="px-4 py-3 text-sm font-semibold text-slate-500">
+                No results found - use custom entry.
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+      {helper && <span className="mt-1.5 block text-xs leading-5 text-slate-500">{helper}</span>}
+    </label>
+  )
+}
+
+function HighlightedText({ text, query }) {
+  const normalized = normalizeChoice(query)
+  if (!normalized) return text
+
+  const index = normalizeChoice(text).indexOf(normalized)
+  if (index === -1) return text
+
+  return (
+    <>
+      {text.slice(0, index)}
+      <mark className="rounded bg-blue-100 px-0.5 text-blue-900">{text.slice(index, index + query.length)}</mark>
+      {text.slice(index + query.length)}
+    </>
+  )
+}
+
+function suggestionScore(suggestion, normalizedQuery) {
+  if (!normalizedQuery) return 1
+
+  const label = normalizeChoice(suggestion.label)
+  const keywords = normalizeChoice(suggestion.keywords)
+  const meta = normalizeChoice(suggestion.meta)
+  if (label === normalizedQuery) return 100
+  if (label.startsWith(normalizedQuery)) return 90
+  if (label.includes(normalizedQuery)) return 80
+  if (keywords.includes(normalizedQuery)) return 70
+
+  const tokens = normalizedQuery.split(' ').filter((token) => token.length >= 2)
+  const hits = tokens.filter((token) => `${label} ${keywords} ${meta}`.includes(token)).length
+  return hits ? 40 + hits * 5 : 0
+}
+
+function WorkExperienceCards({ form, errors, onAddExperience, onRemoveExperience, onUpdateExperience }) {
+  const experienceTemplate = {
+    company_name: '',
+    company_address: '',
+    position: '',
+    occupation_id: null,
+    start_date: '',
+    end_date: '',
+    currently_employed: false,
+    number_of_months: '',
+    employment_status: '',
+    responsibilities: '',
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+      <SectionHeader title="Work Experience" num={7} />
+
+      <div>
+        <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h4 className="text-sm font-black text-slate-950">Work Experiences</h4>
+            <p className="mt-1 text-xs leading-5 text-slate-500">
+              Add your previous jobs, internships, part-time work, or relevant work experience.
+            </p>
+            <p className="mt-1 text-xs leading-5 text-slate-500">
+              No work experience yet? You may skip this section or add internships, OJT, and freelance work.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => onAddExperience('work_experiences', experienceTemplate)}
+            className="inline-flex w-fit items-center justify-center rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-bold text-blue-700 transition hover:border-blue-300 hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            + Add Work Experience
+          </button>
+        </div>
+
+        {form.work_experiences?.length ? (
+          <div className="grid gap-4">
+            {form.work_experiences.map((exp, i) => (
+              <section key={i} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="text-xs font-black uppercase tracking-wide text-slate-500">Experience {i + 1}</p>
+                    <h5 className="mt-1 text-sm font-black text-slate-950">
+                      {exp.position || exp.company_name || 'New work experience'}
+                    </h5>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => onRemoveExperience('work_experiences', i)}
+                    className="inline-flex w-fit items-center justify-center rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-bold text-red-700 transition hover:border-red-300 hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-red-500"
+                  >
+                    Remove
+                  </button>
+                </div>
+
+                <div className="grid gap-4 lg:grid-cols-2">
+                  <div className="grid gap-3">
+                    <WorkExperienceAutocomplete
+                      id={`company-name-${i}`}
+                      label="Company Name"
+                      value={exp.company_name || ''}
+                      suggestions={COMPANY_SUGGESTIONS}
+                      placeholder="Company name"
+                      helper="Search by official name, alias, acronym, or keyword. Custom names are allowed."
+                      onChange={(value) => onUpdateExperience('work_experiences', i, { company_name: value })}
+                    />
+
+                    <label className="block">
+                      <span className="text-xs font-black uppercase tracking-wide text-slate-500">Company Address / Location</span>
+                      <input
+                        type="text"
+                        placeholder="Company address (optional)"
+                        value={exp.company_address || ''}
+                        onChange={(event) => onUpdateExperience('work_experiences', i, { company_address: event.target.value })}
+                        className="mt-2 h-11 w-full rounded-lg border border-slate-300 bg-white px-3.5 text-sm font-semibold text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-blue-600 focus:ring-2 focus:ring-blue-500/20"
+                      />
+                    </label>
+
+                    <WorkExperienceAutocomplete
+                      id={`employment-status-${i}`}
+                      label="Employment Status"
+                      value={exp.employment_status_query ?? employmentStatusLabel(exp.employment_status)}
+                      suggestions={employmentStatusSuggestions}
+                      placeholder="Select employment status"
+                      helper="Internship, OJT, freelance, and self-employment can count as valid experience."
+                      allowCustom={false}
+                      onChange={(value) => onUpdateExperience('work_experiences', i, { employment_status_query: value })}
+                      onSelect={(status) => onUpdateExperience('work_experiences', i, {
+                        employment_status: status.code || null,
+                        employment_status_query: status.label,
+                      })}
+                    />
+                  </div>
+
+                  <div className="grid gap-4">
+                    <WorkExperienceAutocomplete
+                      id={`position-title-${i}`}
+                      label="Position / Job Title"
+                      value={exp.position || ''}
+                      suggestions={POSITION_SUGGESTIONS}
+                      placeholder="Position or job title"
+                      helper="Search by job title, alias, or category. Custom titles are matched after saving."
+                      onChange={(value) => onUpdateExperience('work_experiences', i, {
+                        position: value,
+                        occupation_id: null,
+                        occupation: null,
+                      })}
+                    />
+
+                    <ExperienceTimeFrame
+                      mode="seeker"
+                      value={exp}
+                      onChange={(value) => onUpdateExperience('work_experiences', i, {
+                        start_date: value.start_date || '',
+                        end_date: value.end_date || '',
+                        currently_employed: Boolean(value.currently_employed),
+                        number_of_months: value.number_of_months || null,
+                      })}
+                    />
+                  </div>
+                </div>
+
+                <label className="mt-4 block">
+                  <span className="text-xs font-black uppercase tracking-wide text-slate-500">Key Responsibilities / Description</span>
+                  <textarea
+                    value={exp.responsibilities || ''}
+                    onChange={(event) => onUpdateExperience('work_experiences', i, { responsibilities: event.target.value })}
+                    placeholder="Optional: describe tasks, tools, or achievements from this role."
+                    rows={3}
+                    className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3.5 py-3 text-sm font-semibold text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-blue-600 focus:ring-2 focus:ring-blue-500/20"
+                  />
+                </label>
+              </section>
+            ))}
+          </div>
+        ) : (
+          <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-5 text-sm font-semibold text-slate-500">
+            Add your previous jobs, internships, part-time work, or relevant work experience. First-time jobseekers can continue without adding one.
+          </div>
+        )}
+
+        {errors.work_experiences && (
+          <p className="mt-3 text-xs font-semibold text-red-600" role="alert">
+            {errors.work_experiences}
+          </p>
+        )}
+      </div>
+    </div>
+  )
+}
 
 function Step7({ form, errors, onAddExperience, onRemoveExperience, onUpdateExperience }) {
   const experienceTemplate = {
@@ -2713,15 +3117,17 @@ export default function SeekerOnboarding() {
       const invalidExperience = form.work_experiences?.some((experience) => (
         !experience.company_name?.trim()
         || !experience.position?.trim()
-        || !experience.start_date
-        || experience.start_date > today
+        || (experience.start_date && experience.start_date > today)
         || (
           !experience.currently_employed
-          && (
-            !experience.end_date
-            || experience.end_date < experience.start_date
-            || experience.end_date > today
-          )
+          && experience.end_date
+          && experience.start_date
+          && experience.end_date < experience.start_date
+        )
+        || (
+          !experience.currently_employed
+          && experience.end_date
+          && experience.end_date > today
         )
         || (
           experience.number_of_months
@@ -2731,7 +3137,7 @@ export default function SeekerOnboarding() {
           )
         )
       ))
-      if (invalidExperience) e.work_experiences = 'Complete each added work experience or remove it.'
+      if (invalidExperience) e.work_experiences = 'Each added experience needs a company and position. End date cannot be earlier than start date.'
     }
 
     return e
@@ -2883,6 +3289,7 @@ export default function SeekerOnboarding() {
       currently_employed: Boolean(experience.currently_employed),
       number_of_months: experience.number_of_months || null,
       employment_status: experience.employment_status || null,
+      responsibilities: nullableCleanText(experience.responsibilities),
     })),
   })
 
@@ -3058,7 +3465,7 @@ export default function SeekerOnboarding() {
               />
             )}
             {step === 7 && (
-              <Step7
+              <WorkExperienceCards
                 form={form}
                 errors={errors}
                 onAddExperience={addArrayItem}

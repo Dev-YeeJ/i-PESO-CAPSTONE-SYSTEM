@@ -1132,7 +1132,7 @@ class SeekerController extends Controller
             $softSkillCount = count($this->normalizeSubmittedSkillItems($request->input('soft_skills', [])));
 
             if (($doleSkillCount + $technicalSkillCount) > 20) {
-                $validator->errors()->add('technical_skills', 'Select up to 20 hard skills including DOLE/NSRP skills.');
+                $validator->errors()->add('technical_skills', 'Select up to 20 hard skills.');
             }
 
             if ($softSkillCount > 10) {
@@ -1378,12 +1378,44 @@ class SeekerController extends Controller
             'work_experiences.*.company_address' => ['nullable', 'string', 'max:500'],
             'work_experiences.*.occupation_id' => ['nullable', 'integer', 'exists:occupations,id'],
             'work_experiences.*.position' => ['required', 'string', 'max:255'],
+            'work_experiences.*.responsibilities' => ['nullable', 'string', 'max:1000'],
             'work_experiences.*.number_of_months' => ['nullable', 'integer', 'min:0', 'max:600'],
             'work_experiences.*.start_date' => ['nullable', 'date', 'before_or_equal:today'],
             'work_experiences.*.end_date' => ['nullable', 'date', 'before_or_equal:today'],
             'work_experiences.*.currently_employed' => ['nullable', 'boolean'],
-            'work_experiences.*.employment_status' => ['nullable', 'string', 'in:permanent,contractual,part_time,probationary,temporary,seasonal'],
+            'work_experiences.*.employment_status' => ['nullable', 'string', Rule::in([
+                'permanent',
+                'contractual',
+                'part_time',
+                'project_based',
+                'casual',
+                'probationary',
+                'temporary',
+                'seasonal',
+                'internship',
+                'ojt',
+                'freelance',
+                'self_employed',
+            ])],
         ]);
+
+        foreach ($validated['work_experiences'] ?? [] as $index => $exp) {
+            if (
+                ! ($exp['currently_employed'] ?? false)
+                && filled($exp['start_date'] ?? null)
+                && filled($exp['end_date'] ?? null)
+                && $exp['end_date'] < $exp['start_date']
+            ) {
+                return response()->json([
+                    'message' => 'The given data was invalid.',
+                    'errors' => [
+                        "work_experiences.$index.end_date" => [
+                            'End date cannot be earlier than start date.',
+                        ],
+                    ],
+                ], 422);
+            }
+        }
 
         // ── Sync work experiences (delete + re-insert) ──
         $seeker->workExperiences()->delete();
@@ -1417,6 +1449,11 @@ class SeekerController extends Controller
                 'number_of_months' => $exp['number_of_months'] ?? null,
                 'employment_status' => $exp['employment_status'] ?? null,
             ];
+            if (Schema::hasColumn('seeker_work_experiences', 'responsibilities')) {
+                $experienceData['responsibilities'] = filled($exp['responsibilities'] ?? null)
+                    ? Str::squish($exp['responsibilities'])
+                    : null;
+            }
             if (Schema::hasColumn('seeker_work_experiences', 'occupation_id')) {
                 $experienceData['occupation_id'] = $matchedOccupation?->id;
             }

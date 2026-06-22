@@ -21,6 +21,7 @@ class SeekerWorkExperience extends Model
         'company_name',
         'company_address',
         'position',
+        'responsibilities',
         'normalized_position',
         'number_of_months',
         'start_date',

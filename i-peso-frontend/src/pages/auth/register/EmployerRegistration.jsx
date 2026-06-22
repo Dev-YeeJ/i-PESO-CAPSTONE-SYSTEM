@@ -11,10 +11,10 @@ import { authService } from '@/services/authService'
 import { getPasswordStrength } from '@/services/validationHelpers'
 
 const companyTypes = [
-  { value: 'sole_proprietorship', label: 'Sole Proprietorship' },
-  { value: 'corporation_partnership', label: 'Corporation / Partnership' },
-  { value: 'local_recruitment_agency', label: 'Local Recruitment Agency' },
-  { value: 'overseas_recruitment_agency', label: 'Overseas Recruitment Agency' },
+  { value: 'sole_proprietorship', label: 'Sole Proprietorship', helper: 'Best for DTI-registered single-owner businesses.' },
+  { value: 'corporation_partnership', label: 'Corporation / Partnership', helper: 'Use for SEC-registered corporations or partnerships.' },
+  { value: 'local_recruitment_agency', label: 'Local Recruitment Agency', helper: 'Use when recruiting workers for local placement.' },
+  { value: 'overseas_recruitment_agency', label: 'Overseas Recruitment Agency', helper: 'Use for overseas placement agencies subject to additional review.' },
 ]
 
 const fields = ['email', 'password', 'password_confirmation', 'company_type']
@@ -101,12 +101,18 @@ export default function EmployerRegistration() {
           <Field label="Confirm password" name="password_confirmation" type={showConfirmation ? 'text' : 'password'} placeholder="Re-enter your password" value={form.password_confirmation ?? ''} onChange={change} onBlur={blur} error={fieldError('password_confirmation')} rightElement={<VisibilityButton shown={showConfirmation} onClick={() => setShowConfirmation((current) => !current)} />} />
 
           <fieldset>
-            <legend className="mb-2 text-sm font-bold text-slate-700">Legal company type</legend>
+            <legend className="mb-2 text-sm font-bold text-slate-700">Smart legal company type</legend>
+            <p className="mb-3 rounded-xl border border-indigo-100 bg-indigo-50 px-3 py-2 text-xs leading-5 text-indigo-700">
+              Select the closest legal classification so PESO can request the correct verification documents after email confirmation.
+            </p>
             <div className="grid gap-2">
               {companyTypes.map((type) => (
-                <label key={type.value} className={`flex cursor-pointer items-center gap-3 rounded-lg border p-3.5 transition ${form.company_type === type.value ? 'border-brand-navy bg-slate-50 ring-1 ring-brand-navy' : 'border-slate-200 hover:border-slate-300'}`}>
+                <label key={type.value} className={`flex cursor-pointer items-start gap-3 rounded-lg border p-3.5 transition ${form.company_type === type.value ? 'border-brand-navy bg-slate-50 ring-1 ring-brand-navy' : 'border-slate-200 hover:border-slate-300'}`}>
                   <input type="radio" name="company_type" value={type.value} checked={form.company_type === type.value} onChange={change} onBlur={blur} className="h-4 w-4 accent-slate-900" />
-                  <span className="text-sm font-semibold text-slate-700">{type.label}</span>
+                  <span>
+                    <span className="block text-sm font-bold text-slate-800">{type.label}</span>
+                    <span className="mt-0.5 block text-xs leading-5 text-slate-500">{type.helper}</span>
+                  </span>
                 </label>
               ))}
             </div>

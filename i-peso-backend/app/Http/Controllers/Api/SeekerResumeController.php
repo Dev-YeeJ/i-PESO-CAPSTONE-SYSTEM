@@ -7,6 +7,7 @@ use App\Models\JobSeeker;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -40,11 +41,26 @@ class SeekerResumeController extends Controller
             ]);
         }
 
+        $validated = $request->validate([
+            'professional_summary' => ['nullable', 'string', 'max:1200'],
+            'responsibility_overrides' => ['nullable', 'array'],
+            'responsibility_overrides.*' => ['nullable', 'string', 'max:1200'],
+        ]);
+
+        $responsibilityOverrides = collect($validated['responsibility_overrides'] ?? [])
+            ->mapWithKeys(fn ($value, $key) => [
+                (string) $key => trim(strip_tags((string) $value)),
+            ])
+            ->filter()
+            ->all();
+
         $pdf = Pdf::loadView('pdf.smart-resume', [
             'seeker' => $seeker,
             'skillsByType' => $seeker->seekerSkills->groupBy('skill_type'),
             'profilePhoto' => $profilePhoto,
             'generatedDate' => now(),
+            'professionalSummary' => Str::squish(strip_tags((string) ($validated['professional_summary'] ?? ''))),
+            'responsibilityOverrides' => $responsibilityOverrides,
         ])
             ->setOption([
                 'defaultFont' => 'Helvetica',

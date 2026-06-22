@@ -21,6 +21,11 @@ export const getSeekerApplications = async () => {
   return response.data
 }
 
+export const saveSeekerProfileStep = async (step, payload) => {
+  const response = await apiClient.post(`/seeker/step-${step}`, payload)
+  return response.data
+}
+
 export const applyToJob = async (postId) => {
   const response = await apiClient.post(`/seeker/jobs/${postId}/apply`)
   return response.data
@@ -43,9 +48,9 @@ export const deleteCertificate = async (id) => {
   return response.data
 }
 
-export const generateSmartResume = async () => {
+export const generateSmartResume = async (payload = {}) => {
   try {
-    return await apiClient.post('/seeker/resume/generate', null, {
+    return await apiClient.post('/seeker/resume/generate', payload, {
       responseType: 'blob',
     })
   } catch (error) {
