@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\Concerns\FormatsApplications;
 use App\Http\Controllers\Controller;
 use App\Models\Application;
 use App\Models\Employer;
+use App\Events\ApplicationStatusChanged;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -122,6 +123,8 @@ class EmployerApplicationController extends Controller
 
             return $application->fresh();
         });
+
+        event(new ApplicationStatusChanged($application));
 
         return response()->json([
             'message' => 'Application status updated.',

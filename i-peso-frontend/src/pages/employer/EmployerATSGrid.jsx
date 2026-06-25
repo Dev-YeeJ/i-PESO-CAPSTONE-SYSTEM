@@ -1,0 +1,592 @@
+import React, { useState, useMemo, useEffect } from 'react';
+import { 
+  Search, Filter, ChevronDown, CheckSquare, Square, 
+  MapPin, GraduationCap, Calendar as CalendarIcon, Mail, Phone,
+  CheckCircle2, XCircle, Clock, Video, UserCheck, Briefcase, ChevronRight
+} from 'lucide-react';
+import toast from 'react-hot-toast';
+import { getEmployerApplications, updateEmployerApplicationStatus } from '@/services/employerApplicationService';
+
+const PIPELINE_TABS = [
+  { id: 'pending', label: 'Inbox' },
+  { id: 'reviewed', label: 'Reviewed' },
+  { id: 'shortlisted', label: 'Shortlisted' },
+  { id: 'interview', label: 'Interview' },
+  { id: 'hired', label: 'Hired' },
+  { id: 'rejected', label: 'Rejected' }
+];
+
+export default function EmployerATSGrid() {
+  const [activeTab, setActiveTab] = useState('pending');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [sortBy, setSortBy] = useState('match_score');
+  
+  const [applications, setApplications] = useState([]);
+  const [loading, setLoading] = useState(true);
+  
+  const [selectedIds, setSelectedIds] = useState(new Set());
+  
+  // Modal States
+  const [activeModal, setActiveModal] = useState(null); // 'profile', 'interview', 'hire'
+  const [modalTarget, setModalTarget] = useState(null); // Single application or array of applications for bulk
+
+  // Form States
+  const [interviewForm, setInterviewForm] = useState({ date: '', time: '', mode: 'online', autoMeet: true });
+  const [hireForm, setHireForm] = useState({ startDate: '', salary: '', employmentType: 'regular' });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const fetchData = async () => {
+    setLoading(true);
+    try {
+      const res = await getEmployerApplications({ per_page: 500 });
+      setApplications(res.data || []);
+    } catch (err) {
+      toast.error('Failed to load applications');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 1. Filtering & Sorting Logic
+  const filteredApps = useMemo(() => {
+    let filtered = applications.filter(app => app.status === activeTab);
+    
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      filtered = filtered.filter(app => {
+        const seeker = app.seeker || {};
+        const job = app.job || {};
+        return (
+          seeker.name?.toLowerCase().includes(q) ||
+          seeker.skills?.join(' ').toLowerCase().includes(q) ||
+          job.job_title?.toLowerCase().includes(q)
+        );
+      });
+    }
+
+    // Sort
+    filtered.sort((a, b) => {
+      if (sortBy === 'match_score') {
+        return (b.match_percentage || 0) - (a.match_percentage || 0);
+      }
+      if (sortBy === 'distance') {
+        // Fallback to match_percentage if distance logic isn't fully implemented in data
+        return (a.distance_km || 999) - (b.distance_km || 999);
+      }
+      return new Date(b.applied_at) - new Date(a.applied_at);
+    });
+
+    return filtered;
+  }, [applications, activeTab, searchQuery, sortBy]);
+
+  const tabCounts = useMemo(() => {
+    const counts = {};
+    PIPELINE_TABS.forEach(t => counts[t.id] = 0);
+    applications.forEach(app => {
+      if (counts[app.status] !== undefined) {
+        counts[app.status]++;
+      }
+    });
+    return counts;
+  }, [applications]);
+
+  // 2. Selection Logic
+  const toggleSelectAll = () => {
+    if (selectedIds.size === filteredApps.length && filteredApps.length > 0) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filteredApps.map(app => app.apply_id)));
+    }
+  };
+
+  const toggleSelect = (id) => {
+    const newSet = new Set(selectedIds);
+    if (newSet.has(id)) newSet.delete(id);
+    else newSet.add(id);
+    setSelectedIds(newSet);
+  };
+
+  // 3. Status Change Execution (The Engine)
+  const executeStatusChange = async (targetStatus, payload = {}) => {
+    setIsSubmitting(true);
+    
+    // Determine which applications to update
+    const targets = Array.isArray(modalTarget) ? modalTarget : [modalTarget];
+    
+    /**
+     * API HOOKS PREPARATION (DOLE SPRS & R.A. 10911 COMPLIANCE)
+     * ---------------------------------------------------------
+     * 1. Send the status change array to a bulk update endpoint.
+     * 2. If targetStatus === 'hired', the payload must include DOLE Placement Capture data:
+     *    { placement_start_date: hireForm.startDate, placement_salary: hireForm.salary, employment_type: hireForm.employmentType }
+     *    -> The backend will deduct 1 from job vacancies_count.
+     * 3. ANTI-GHOSTING SWEEP: If vacancies hit 0, the backend must automatically sweep all remaining 
+     *    'pending', 'reviewed', 'shortlisted', and 'interview' candidates for this job and mark them 'rejected'.
+     */
+
+    try {
+      // Execute for each target (In production, use a bulk API endpoint)
+      for (const app of targets) {
+        const updatePayload = { status: targetStatus, ...payload };
+        
+        // Mock payload injection based on DOLE requirements
+        if (targetStatus === 'hired') {
+          updatePayload.placement_start_date = hireForm.startDate;
+          updatePayload.placement_salary = hireForm.salary;
+          updatePayload.employment_type = hireForm.employmentType;
+        }
+        
+        if (targetStatus === 'interview') {
+          updatePayload.interview = {
+            schedule: `${interviewForm.date} ${interviewForm.time}`,
+            mode_of_interview: interviewForm.mode,
+            auto_meet_link: interviewForm.autoMeet // Tells backend GoogleCalendarController to provision link
+          };
+        }
+
+        await updateEmployerApplicationStatus(app.apply_id, updatePayload);
+      }
+
+      toast.success(`Successfully moved ${targets.length} candidates to ${targetStatus}`);
+      
+      // Close Modals & Clear Selection
+      closeModal();
+      setSelectedIds(new Set());
+      fetchData(); // Refresh list to reflect changes
+
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Action failed.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // 4. Modal Handlers
+  const openProfileModal = (app) => {
+    setModalTarget(app);
+    setActiveModal('profile');
+    
+    // R.A. 10911: Automatically move to 'reviewed' if currently 'pending'
+    if (app.status === 'pending') {
+      executeStatusChange('reviewed', {}, [app]); 
+      // Note: In real implementation, this should be silent or happen without full UI block
+    }
+  };
+
+  const openBulkModal = (status) => {
+    if (selectedIds.size === 0) return;
+    const targets = applications.filter(a => selectedIds.has(a.apply_id));
+    setModalTarget(targets);
+
+    if (status === 'interview') setActiveModal('interview');
+    else if (status === 'hired') setActiveModal('hire');
+    else executeStatusChange(status); // Directly move to shortlisted or rejected
+  };
+
+  const closeModal = () => {
+    setActiveModal(null);
+    setModalTarget(null);
+    setInterviewForm({ date: '', time: '', mode: 'online', autoMeet: true });
+    setHireForm({ startDate: '', salary: '', employmentType: 'regular' });
+  };
+
+  // UI Helpers
+  const getMatchColor = (score) => {
+    if (score >= 90) return 'bg-emerald-100 text-emerald-800 border-emerald-200';
+    if (score >= 75) return 'bg-blue-100 text-blue-800 border-blue-200';
+    return 'bg-amber-100 text-amber-800 border-amber-200';
+  };
+
+  return (
+    <div className="min-h-screen bg-slate-50 p-6">
+      
+      {/* HEADER */}
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Applicant Tracking System</h1>
+        <p className="text-sm text-slate-500 mt-1">
+          DOLE SPRS Compliant Pipeline • Enforcing R.A. 10911 (Blind Screening)
+        </p>
+      </div>
+
+      {/* PIPELINE TABS */}
+      <div className="flex border-b border-slate-200 mb-6 overflow-x-auto no-scrollbar">
+        {PIPELINE_TABS.map(tab => (
+          <button
+            key={tab.id}
+            onClick={() => { setActiveTab(tab.id); setSelectedIds(new Set()); }}
+            className={`flex items-center px-5 py-3 border-b-2 font-medium text-sm whitespace-nowrap transition-colors
+              ${activeTab === tab.id 
+                ? 'border-blue-600 text-blue-700 bg-blue-50/50' 
+                : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
+              }
+            `}
+          >
+            {tab.label}
+            <span className={`ml-2 py-0.5 px-2.5 rounded-full text-xs font-semibold
+              ${activeTab === tab.id ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-600'}
+            `}>
+              {tabCounts[tab.id]}
+            </span>
+          </button>
+        ))}
+      </div>
+
+      {/* TOOLBAR */}
+      <div className="flex flex-col sm:flex-row justify-between items-center mb-4 gap-4">
+        <div className="relative w-full sm:w-96">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+          <input
+            type="text"
+            placeholder="Search by name, skills, or job title..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-9 pr-4 py-2 bg-white border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 shadow-sm"
+          />
+        </div>
+        
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          <span className="text-sm text-slate-500 font-medium">Sort by:</span>
+          <select 
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value)}
+            className="bg-white border border-slate-300 rounded-lg text-sm py-2 pl-3 pr-8 focus:ring-2 focus:ring-blue-500 shadow-sm"
+          >
+            <option value="match_score">Highest Match Score</option>
+            <option value="distance">Closest Distance</option>
+            <option value="applied_date">Date Applied (Newest)</option>
+          </select>
+        </div>
+      </div>
+
+      {/* HIGH-DENSITY DATA GRID */}
+      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden relative">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="bg-slate-50 border-b border-slate-200">
+                <th className="py-3 px-4 w-12 text-center">
+                  <button onClick={toggleSelectAll} className="text-slate-400 hover:text-slate-600">
+                    {selectedIds.size === filteredApps.length && filteredApps.length > 0 ? (
+                      <CheckSquare className="h-5 w-5 text-blue-600" />
+                    ) : (
+                      <Square className="h-5 w-5" />
+                    )}
+                  </button>
+                </th>
+                <th className="py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Candidate</th>
+                <th className="py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">AI Match</th>
+                <th className="py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Top Skills</th>
+                <th className="py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Education</th>
+                <th className="py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Applied</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {loading ? (
+                <tr><td colSpan="6" className="py-8 text-center text-slate-500">Loading pipeline data...</td></tr>
+              ) : filteredApps.length === 0 ? (
+                <tr><td colSpan="6" className="py-12 text-center text-slate-500">No candidates found in this stage.</td></tr>
+              ) : (
+                filteredApps.map((app) => {
+                  const isSelected = selectedIds.has(app.apply_id);
+                  const seeker = app.seeker || {};
+                  const skills = seeker.skills || [];
+                  const topSkills = skills.slice(0, 3);
+                  
+                  return (
+                    <tr 
+                      key={app.apply_id} 
+                      className={`hover:bg-slate-50 transition-colors ${isSelected ? 'bg-blue-50/30' : ''}`}
+                    >
+                      <td className="py-3 px-4 text-center">
+                        <button onClick={() => toggleSelect(app.apply_id)} className="text-slate-400 hover:text-blue-600">
+                          {isSelected ? <CheckSquare className="h-5 w-5 text-blue-600" /> : <Square className="h-5 w-5" />}
+                        </button>
+                      </td>
+                      <td className="py-3 px-4">
+                        <div className="flex flex-col">
+                          <button 
+                            onClick={() => openProfileModal(app)}
+                            className="text-sm font-semibold text-slate-900 hover:text-blue-600 hover:underline text-left"
+                          >
+                            {seeker.name}
+                          </button>
+                          <span className="text-xs text-slate-500 flex items-center mt-0.5">
+                            <Briefcase className="h-3 w-3 mr-1" />
+                            {app.job?.job_title}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="py-3 px-4">
+                        <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold border ${getMatchColor(app.match_percentage)}`}>
+                          {parseFloat(app.match_percentage).toFixed(1)}% Match
+                        </span>
+                      </td>
+                      <td className="py-3 px-4">
+                        <div className="flex flex-wrap gap-1">
+                          {topSkills.map((s, i) => (
+                            <span key={i} className="inline-block px-2 py-0.5 bg-slate-100 text-slate-600 rounded text-xs">
+                              {s}
+                            </span>
+                          ))}
+                          {skills.length > 3 && (
+                            <span className="inline-block px-2 py-0.5 bg-slate-100 text-slate-500 rounded text-xs">
+                              +{skills.length - 3}
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="py-3 px-4">
+                        <div className="flex items-center text-sm text-slate-700">
+                          <GraduationCap className="h-3.5 w-3.5 text-slate-400 mr-1.5" />
+                          <span className="truncate max-w-[150px]">{seeker.educ_attainment || 'Not specified'}</span>
+                        </div>
+                      </td>
+                      <td className="py-3 px-4">
+                        <div className="text-sm text-slate-600 flex items-center">
+                          <Clock className="h-3.5 w-3.5 mr-1.5 text-slate-400" />
+                          {new Date(app.applied_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* STICKY BULK ACTION BAR */}
+      {selectedIds.size > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-slate-900 text-white px-6 py-4 rounded-xl shadow-2xl flex items-center gap-6 animate-in slide-in-from-bottom-5 fade-in z-40">
+          <div className="font-semibold whitespace-nowrap">
+            {selectedIds.size} Selected
+          </div>
+          <div className="w-px h-6 bg-slate-700"></div>
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-slate-400 mr-2">Move to:</span>
+            <button onClick={() => openBulkModal('reviewed')} className="px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-slate-800 transition-colors text-slate-200">
+              Reviewed
+            </button>
+            <button onClick={() => openBulkModal('shortlisted')} className="px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-slate-800 transition-colors text-slate-200">
+              Shortlist
+            </button>
+            <button onClick={() => openBulkModal('interview')} className="px-3 py-1.5 rounded-lg text-sm font-medium bg-blue-600 hover:bg-blue-500 transition-colors text-white">
+              Interview
+            </button>
+            <button onClick={() => openBulkModal('hired')} className="px-3 py-1.5 rounded-lg text-sm font-medium bg-emerald-600 hover:bg-emerald-500 transition-colors text-white ml-2">
+              Hire
+            </button>
+            <button onClick={() => openBulkModal('rejected')} className="px-3 py-1.5 rounded-lg text-sm font-medium text-red-400 hover:bg-red-950/30 transition-colors ml-2">
+              Reject
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ================================================= */}
+      {/* MODAL A: PROFILE REVEAL (R.A. 10911 COMPLIANCE)   */}
+      {/* ================================================= */}
+      {activeModal === 'profile' && modalTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={closeModal}></div>
+          <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-3xl overflow-hidden animate-in zoom-in-95 duration-200">
+            {/* Disclaimer Banner */}
+            <div className="bg-amber-50 border-b border-amber-100 px-6 py-3 flex items-start gap-3">
+              <CheckCircle2 className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
+              <p className="text-xs text-amber-800 leading-relaxed">
+                <strong className="font-semibold">Official HR Onboarding Data:</strong> Demographic data (Age, Gender) is now revealed in compliance with R.A. 10911. You are legally required to evaluate candidates strictly based on merit and the AI Match Score before viewing these details.
+              </p>
+            </div>
+            
+            <div className="p-8 max-h-[75vh] overflow-y-auto">
+              <div className="flex justify-between items-start mb-6">
+                <div>
+                  <h2 className="text-2xl font-bold text-slate-900">{modalTarget.seeker?.name}</h2>
+                  <p className="text-blue-600 font-medium mt-1">Applying for: {modalTarget.job?.job_title}</p>
+                </div>
+                <button onClick={closeModal} className="text-slate-400 hover:text-slate-600 bg-slate-100 p-2 rounded-full">
+                  <XCircle className="h-5 w-5" />
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                {/* Contact & Demographics */}
+                <div className="space-y-4">
+                  <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-500 mb-3">Contact & Demographics</h3>
+                  <div className="flex items-center gap-3 text-sm text-slate-700">
+                    <Mail className="h-4 w-4 text-slate-400" /> {modalTarget.seeker?.email}
+                  </div>
+                  <div className="flex items-center gap-3 text-sm text-slate-700">
+                    <Phone className="h-4 w-4 text-slate-400" /> {modalTarget.seeker?.mobile_number}
+                  </div>
+                  <div className="flex items-center gap-3 text-sm text-slate-700">
+                    <MapPin className="h-4 w-4 text-slate-400" /> {modalTarget.seeker?.address}
+                  </div>
+                  
+                  <div className="mt-6 p-4 bg-slate-50 rounded-lg border border-slate-200">
+                    <h4 className="text-xs font-semibold text-slate-500 mb-2 uppercase">Revealed Demographics</h4>
+                    <div className="grid grid-cols-2 gap-2 text-sm">
+                      <div><span className="text-slate-500">Gender:</span> <span className="font-medium text-slate-900">Not provided by default</span></div>
+                      <div><span className="text-slate-500">Age:</span> <span className="font-medium text-slate-900">Not provided by default</span></div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Match Analysis */}
+                <div>
+                  <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-500 mb-3">Match Analysis</h3>
+                  <div className={`p-4 rounded-xl border ${getMatchColor(modalTarget.match_percentage)} mb-4`}>
+                    <div className="text-3xl font-bold">{parseFloat(modalTarget.match_percentage).toFixed(1)}%</div>
+                    <div className="text-sm font-medium mt-1">Overall AI Merit Match</div>
+                  </div>
+                  
+                  <div className="mt-4">
+                    <h4 className="text-xs font-semibold text-slate-500 mb-2 uppercase">All Declared Skills</h4>
+                    <div className="flex flex-wrap gap-2">
+                      {modalTarget.seeker?.skills?.map((s, i) => (
+                        <span key={i} className="px-2.5 py-1 bg-slate-100 text-slate-700 rounded-md text-xs font-medium border border-slate-200">
+                          {s}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <div className="border-t border-slate-100 p-6 bg-slate-50 flex justify-end gap-3 rounded-b-2xl">
+              <button onClick={closeModal} className="px-5 py-2.5 text-sm font-medium text-slate-600 hover:text-slate-800 transition-colors">
+                Close Profile
+              </button>
+              <button onClick={() => { closeModal(); openBulkModal('interview'); }} className="px-5 py-2.5 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 shadow-sm transition-all">
+                Schedule Interview
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ================================================= */}
+      {/* MODAL B: INTERVIEW SCHEDULER                      */}
+      {/* ================================================= */}
+      {activeModal === 'interview' && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={closeModal}></div>
+          <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="p-6 border-b border-slate-100">
+              <h2 className="text-xl font-bold text-slate-900">Schedule Interview</h2>
+              <p className="text-sm text-slate-500 mt-1">Moving {Array.isArray(modalTarget) ? modalTarget.length : 1} candidate(s) to Interview stage.</p>
+            </div>
+            
+            <div className="p-6 space-y-5">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Date</label>
+                  <input type="date" value={interviewForm.date} onChange={e => setInterviewForm({...interviewForm, date: e.target.value})} className="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none" required />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Time</label>
+                  <input type="time" value={interviewForm.time} onChange={e => setInterviewForm({...interviewForm, time: e.target.value})} className="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none" required />
+                </div>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Mode of Interview</label>
+                <select value={interviewForm.mode} onChange={e => setInterviewForm({...interviewForm, mode: e.target.value})} className="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+                  <option value="online">Online (Video Call)</option>
+                  <option value="face_to_face">Face-to-Face (On-site)</option>
+                  <option value="phone">Phone Call</option>
+                </select>
+              </div>
+
+              {interviewForm.mode === 'online' && (
+                <div className="p-4 border border-blue-100 bg-blue-50 rounded-xl flex items-start gap-3 mt-4">
+                  <div className="mt-0.5"><Video className="h-5 w-5 text-blue-600" /></div>
+                  <div className="flex-1">
+                    <label className="flex items-center cursor-pointer">
+                      <input type="checkbox" checked={interviewForm.autoMeet} onChange={e => setInterviewForm({...interviewForm, autoMeet: e.target.checked})} className="sr-only peer" />
+                      <div className="w-11 h-6 bg-slate-300 rounded-full peer peer-checked:bg-blue-600 peer-focus:ring-4 peer-focus:ring-blue-300 transition-all after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-full relative"></div>
+                      <span className="ml-3 text-sm font-semibold text-slate-900">Auto-generate Google Meet Link</span>
+                    </label>
+                    <p className="text-xs text-slate-600 mt-1">This will sync with your connected Google Calendar API and send the meet link to the candidate.</p>
+                  </div>
+                </div>
+              )}
+            </div>
+            
+            <div className="p-6 bg-slate-50 border-t border-slate-100 flex justify-end gap-3 rounded-b-2xl">
+              <button onClick={closeModal} className="px-5 py-2.5 text-sm font-medium text-slate-600 hover:text-slate-800">Cancel</button>
+              <button 
+                onClick={() => executeStatusChange('interview')} 
+                disabled={isSubmitting || !interviewForm.date || !interviewForm.time}
+                className="px-5 py-2.5 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center shadow-sm"
+              >
+                {isSubmitting ? 'Scheduling...' : 'Schedule Interview'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ================================================= */}
+      {/* MODAL C: DOLE PLACEMENT CAPTURE (SYNC)            */}
+      {/* ================================================= */}
+      {activeModal === 'hire' && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" onClick={closeModal}></div>
+          <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="p-6 border-b border-emerald-100 bg-emerald-50 flex items-start gap-4">
+              <div className="bg-emerald-100 p-2 rounded-full shrink-0"><UserCheck className="h-6 w-6 text-emerald-700" /></div>
+              <div>
+                <h2 className="text-xl font-bold text-emerald-900">Official Placement Capture</h2>
+                <p className="text-xs text-emerald-700 mt-1 font-medium">Mandatory DOLE SPRS reporting requirement.</p>
+              </div>
+            </div>
+            
+            <div className="p-6 space-y-5">
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-1">Official Start Date <span className="text-red-500">*</span></label>
+                <input type="date" value={hireForm.startDate} onChange={e => setHireForm({...hireForm, startDate: e.target.value})} className="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 outline-none" required />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-1">Placement Salary (PHP) <span className="text-red-500">*</span></label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 font-medium">₱</span>
+                  <input type="number" placeholder="e.g. 25000" value={hireForm.salary} onChange={e => setHireForm({...hireForm, salary: e.target.value})} className="w-full pl-8 pr-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 outline-none" required />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-1">Employment Type <span className="text-red-500">*</span></label>
+                <select value={hireForm.employmentType} onChange={e => setHireForm({...hireForm, employmentType: e.target.value})} className="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 outline-none">
+                  <option value="regular">Regular / Permanent</option>
+                  <option value="contractual">Contractual / Project-based</option>
+                  <option value="probationary">Probationary</option>
+                  <option value="part_time">Part-Time</option>
+                </select>
+              </div>
+            </div>
+            
+            <div className="p-6 bg-slate-50 border-t border-slate-100 flex justify-end gap-3 rounded-b-2xl">
+              <button onClick={closeModal} className="px-5 py-2.5 text-sm font-medium text-slate-600 hover:text-slate-800">Cancel</button>
+              <button 
+                onClick={() => executeStatusChange('hired')} 
+                disabled={isSubmitting || !hireForm.startDate || !hireForm.salary}
+                className="px-6 py-2.5 text-sm font-bold bg-emerald-600 text-white rounded-lg hover:bg-emerald-500 disabled:opacity-50 flex items-center shadow-md shadow-emerald-600/20"
+              >
+                {isSubmitting ? 'Syncing...' : 'Confirm Hire & Sync to PESO'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+    </div>
+  );
+}

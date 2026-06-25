@@ -16,9 +16,11 @@ use App\Http\Controllers\Api\EmployerApplicationController;
 use App\Http\Controllers\Api\EmployerJobVacancyController;
 use App\Http\Controllers\Api\EmployerNotificationController;
 use App\Http\Controllers\Api\EmployerRegistrationController;
+use App\Http\Controllers\Api\GoogleCalendarController;
 use App\Http\Controllers\Api\GoogleMapsController;
 use App\Http\Controllers\Api\OccupationController;
 use App\Http\Controllers\Api\SeekerAiSuggestionController;
+use App\Http\Controllers\Api\SeekerAnalyticsController;
 use App\Http\Controllers\Api\SeekerApplicationController;
 use App\Http\Controllers\Api\SeekerCertificateController;
 use App\Http\Controllers\Api\SeekerController;
@@ -40,6 +42,9 @@ Route::prefix('auth')->group(function () {
     Route::post('/forgot-password', [AuthController::class, 'forgotPassword'])->middleware('throttle:5,1');
     Route::post('/reset-password', [AuthController::class, 'resetPassword'])->middleware('throttle:5,1');
 });
+
+// Public callback for Google Calendar (Google browser redirect does not have Bearer token)
+Route::get('/employer/calendar/callback', [GoogleCalendarController::class, 'callback']);
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/auth/me', [AuthController::class, 'me']);
@@ -70,6 +75,10 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::get('/applications', [EmployerApplicationController::class, 'index']);
             Route::get('/applications/{application}', [EmployerApplicationController::class, 'show']);
             Route::patch('/applications/{application}/status', [EmployerApplicationController::class, 'updateStatus']);
+            
+            // Google Calendar
+            Route::get('/calendar/connect', [GoogleCalendarController::class, 'connect']);
+            Route::post('/calendar/generate-meet-link', [GoogleCalendarController::class, 'generateMeetLink']);
         });
     });
 
@@ -107,6 +116,7 @@ Route::middleware('auth:sanctum')->group(function () {
             ->middleware('throttle:30,1');
         Route::post('/resume/generate', [SeekerResumeController::class, 'generate'])
             ->middleware('throttle:5,1');
+        Route::get('/analytics', [SeekerAnalyticsController::class, 'index']);
     });
 
     // Admin endpoints (protected by auth:sanctum + Administrator model check)

@@ -5,6 +5,11 @@ export const getSeekerProfile = async () => {
   return response.data.user
 }
 
+export const getSeekerAnalytics = async () => {
+  const response = await apiClient.get('/seeker/analytics')
+  return response.data.analytics
+}
+
 export const getNearbyJobs = async ({ radiusKm = 15, limit = 20 } = {}) => {
   const response = await apiClient.get('/seeker/nearby-jobs', {
     params: {

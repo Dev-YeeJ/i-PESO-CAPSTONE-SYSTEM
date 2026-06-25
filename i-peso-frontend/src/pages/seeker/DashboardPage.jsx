@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react'
 import JobSeekerHome from './JobSeekerHome'
-import { getNearbyJobs, getSeekerProfile } from '@/services/seekerService'
+import { getNearbyJobs, getSeekerProfile, getSeekerAnalytics } from '@/services/seekerService'
 import { useAuthStore } from '@/stores/authStore'
 
 export default function SeekerDashboard() {
   const user = useAuthStore((state) => state.user)
   const [profile, setProfile] = useState(null)
+  const [analyticsData, setAnalyticsData] = useState(null)
   const [nearbyJobs, setNearbyJobs] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -17,7 +18,8 @@ export default function SeekerDashboard() {
     Promise.allSettled([
       getSeekerProfile(),
       getNearbyJobs({ radiusKm: 20, limit: 24 }),
-    ]).then(([profileResult, jobsResult]) => {
+      getSeekerAnalytics(),
+    ]).then(([profileResult, jobsResult, analyticsResult]) => {
       if (!active) return
 
       if (profileResult.status === 'fulfilled') {
@@ -30,6 +32,10 @@ export default function SeekerDashboard() {
         setNearbyJobs(jobsResult.value)
       } else {
         setJobsError(jobsResult.reason?.response?.data?.message ?? 'Nearby job feed is not available right now.')
+      }
+
+      if (analyticsResult.status === 'fulfilled') {
+        setAnalyticsData(analyticsResult.value)
       }
     }).finally(() => {
       if (active) setLoading(false)
@@ -44,7 +50,7 @@ export default function SeekerDashboard() {
     return <DashboardSkeleton />
   }
 
-  return <JobSeekerHome profile={profile} user={user} jobsData={nearbyJobs} error={error} jobsError={jobsError} />
+  return <JobSeekerHome profile={profile} user={user} jobsData={nearbyJobs} analyticsData={analyticsData} error={error} jobsError={jobsError} />
 }
 
 function DashboardSkeleton() {

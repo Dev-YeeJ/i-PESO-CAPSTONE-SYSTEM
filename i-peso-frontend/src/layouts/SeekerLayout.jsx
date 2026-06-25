@@ -1,12 +1,11 @@
 import { createElement, useState } from 'react'
-import { ChevronLeft, CircleCheck, LayoutDashboard, LogOut, Menu, UserCog, UserRound, X } from 'lucide-react'
+import { ChevronLeft, CircleCheck, LayoutDashboard, LogOut, Menu, UserRound, X } from 'lucide-react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '@/stores/authStore'
 
 const navLinks = [
   { to: '/seeker/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/seeker/profile', label: 'My Profile', icon: UserRound },
-  { to: '/seeker/profile/edit', label: 'Update Profile', icon: UserCog },
 ]
 
 const pageNames = {

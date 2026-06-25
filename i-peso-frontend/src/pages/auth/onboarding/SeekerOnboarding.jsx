@@ -2446,18 +2446,25 @@ function WorkExperienceCards({ form, errors, onAddExperience, onRemoveExperience
                   </div>
 
                   <div className="grid gap-4">
-                    <WorkExperienceAutocomplete
+                    <OccupationCombobox
                       id={`position-title-${i}`}
-                      label="Position / Job Title"
-                      value={exp.position || ''}
-                      suggestions={POSITION_SUGGESTIONS}
-                      placeholder="Position or job title"
-                      helper="Search by job title, alias, or category. Custom titles are matched after saving."
-                      onChange={(value) => onUpdateExperience('work_experiences', i, {
-                        position: value,
-                        occupation_id: null,
-                        occupation: null,
-                      })}
+                      selected={
+                        exp.occupation_id
+                          ? { id: exp.occupation_id, title: exp.position }
+                          : exp.position
+                            ? { id: 'custom', title: exp.position }
+                            : null
+                      }
+                      multiple={false}
+                      onChange={(nextOccupation) => {
+                        onUpdateExperience('work_experiences', i, {
+                          position: nextOccupation ? nextOccupation.title : '',
+                          occupation_id: nextOccupation && nextOccupation.id !== 'custom' ? nextOccupation.id : null,
+                          occupation: nextOccupation ? nextOccupation.title : null,
+                        })
+                      }}
+                      placeholder="Search standardized job titles"
+                      error={errors[`work_experiences.${i}.position`]}
                     />
 
                     <ExperienceTimeFrame

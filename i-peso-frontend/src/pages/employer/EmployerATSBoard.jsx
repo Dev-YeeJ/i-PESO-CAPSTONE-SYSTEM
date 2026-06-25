@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd'
 import {
   Archive,
   BriefcaseBusiness,
@@ -12,7 +13,7 @@ import {
   X,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
-import { getEmployerApplications, updateEmployerApplicationStatus } from '@/services/employerApplicationService'
+import { getEmployerApplications, updateEmployerApplicationStatus, generateGoogleMeetLink, connectGoogleCalendar } from '@/services/employerApplicationService'
 
 const columns = [
   { id: 'pending', title: 'Inbox', label: 'Pending review', icon: MailCheck },
@@ -91,6 +92,17 @@ export default function EmployerATSBoard() {
 
   const activeCount = applications.filter((application) => !['hired', 'rejected'].includes(application.status)).length
   const hiredCount = applications.filter((application) => application.status === 'hired').length
+
+  const handleDragEnd = (result) => {
+    const { source, destination, draggableId } = result
+    if (!destination) return
+    if (source.droppableId === destination.droppableId) return
+
+    const application = applications.find((app) => String(app.apply_id) === draggableId)
+    if (application) {
+      openStatusForm(application, destination.droppableId)
+    }
+  }
 
   const openStatusForm = (application, status) => {
     setActiveApplication(application)
@@ -178,16 +190,18 @@ export default function EmployerATSBoard() {
       )}
 
       <section className="overflow-x-auto rounded-xl border border-slate-200 bg-slate-50 p-4 shadow-inner">
-        <div className="flex min-h-[32rem] gap-4">
-          {columns.map((column) => (
-            <KanbanColumn
-              key={column.id}
-              column={column}
-              applications={groupedApplications[column.id] ?? []}
-              onMove={openStatusForm}
-            />
-          ))}
-        </div>
+        <DragDropContext onDragEnd={handleDragEnd}>
+          <div className="flex min-h-[32rem] gap-4">
+            {columns.map((column) => (
+              <KanbanColumn
+                key={column.id}
+                column={column}
+                applications={groupedApplications[column.id] ?? []}
+                onMove={openStatusForm}
+              />
+            ))}
+          </div>
+        </DragDropContext>
       </section>
 
       {activeApplication && (
@@ -224,16 +238,36 @@ function KanbanColumn({ column, applications, onMove }) {
         </div>
       </div>
 
-      <div className="flex flex-1 flex-col gap-3 p-3">
-        {applications.length ? applications.map((application) => (
-          <ApplicantCard key={application.apply_id} application={application} onMove={onMove} />
-        )) : (
-          <div className="flex flex-1 flex-col items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center">
-            <Icon className="h-7 w-7 text-slate-300" />
-            <p className="mt-3 text-sm font-bold text-slate-500">No applicants in this stage.</p>
+      <Droppable droppableId={column.id}>
+        {(provided, snapshot) => (
+          <div
+            ref={provided.innerRef}
+            {...provided.droppableProps}
+            className={`flex flex-1 flex-col gap-3 p-3 transition-colors ${snapshot.isDraggingOver ? 'bg-blue-50/50' : ''}`}
+          >
+            {applications.length ? applications.map((application, index) => (
+              <Draggable key={application.apply_id} draggableId={String(application.apply_id)} index={index}>
+                {(provided, snapshot) => (
+                  <div
+                    ref={provided.innerRef}
+                    {...provided.draggableProps}
+                    {...provided.dragHandleProps}
+                    style={{ ...provided.draggableProps.style, opacity: snapshot.isDragging ? 0.8 : 1 }}
+                  >
+                    <ApplicantCard application={application} onMove={onMove} />
+                  </div>
+                )}
+              </Draggable>
+            )) : (
+              <div className="flex flex-1 flex-col items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center">
+                <Icon className="h-7 w-7 text-slate-300" />
+                <p className="mt-3 text-sm font-bold text-slate-500">No applicants in this stage.</p>
+              </div>
+            )}
+            {provided.placeholder}
           </div>
         )}
-      </div>
+      </Droppable>
     </div>
   )
 }
@@ -303,6 +337,42 @@ function StatusModal({ application, form, setForm, saving, onClose, onSubmit }) 
   const selectedColumn = columns.find((column) => column.id === form.status)
   const requiresInterview = form.status === 'interview'
   const requiresPlacement = form.status === 'hired'
+  const [generatingMeet, setGeneratingMeet] = useState(false)
+
+  const handleGenerateMeet = async () => {
+    if (!form.interview.schedule) {
+      toast.error('Please set the interview schedule first.')
+      return
+    }
+
+    setGeneratingMeet(true)
+    try {
+      const data = await generateGoogleMeetLink({
+        schedule: form.interview.schedule,
+        summary: `Interview: ${seeker.name || 'Applicant'} - ${application.job?.job_title || 'Position'}`,
+        description: form.employer_remarks || 'Interview scheduled via i-PESO ATS.',
+      })
+      setForm((current) => ({
+        ...current,
+        interview: { ...current.interview, venue_or_link: data.meet_link, mode_of_interview: 'online' },
+      }))
+      toast.success('Google Meet link generated!')
+    } catch (caught) {
+      if (caught.response?.status === 403 && caught.response?.data?.message?.includes('Google Calendar not connected')) {
+        toast('Redirecting to connect Google Calendar...', { icon: '🗓️' })
+        try {
+          const { url } = await connectGoogleCalendar()
+          window.location.href = url
+        } catch (e) {
+          toast.error('Failed to initiate Google Calendar connection.')
+        }
+      } else {
+        toast.error(caught.response?.data?.message || 'Failed to generate meeting link.')
+      }
+    } finally {
+      setGeneratingMeet(false)
+    }
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 px-4 py-6">
@@ -356,7 +426,17 @@ function StatusModal({ application, form, setForm, saving, onClose, onSubmit }) 
                   />
                 </label>
                 <label className="block">
-                  <span className="text-sm font-bold text-slate-700">Venue or link</span>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-bold text-slate-700">Venue or link</span>
+                    <button
+                      type="button"
+                      onClick={handleGenerateMeet}
+                      disabled={generatingMeet}
+                      className="text-xs font-bold text-blue-700 hover:text-blue-900 hover:underline disabled:opacity-50"
+                    >
+                      {generatingMeet ? 'Generating...' : 'Generate Google Meet Link'}
+                    </button>
+                  </div>
                   <input
                     value={form.interview.venue_or_link}
                     onChange={(event) => setForm((current) => ({ ...current, interview: { ...current.interview, venue_or_link: event.target.value } }))}
