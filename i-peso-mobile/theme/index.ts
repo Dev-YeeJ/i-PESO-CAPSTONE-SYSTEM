@@ -1,0 +1,79 @@
+export const colors = {
+  primary: '#0F172A',
+  accent: '#F59E0B',
+  border: '#E2E8F0',
+  secondaryText: '#64748B',
+  muted: '#475569',
+  background: '#F8FAFC',
+  surface: '#FFFFFF',
+  white: '#FFFFFF',
+  info: '#1D4ED8',
+  infoBackground: '#EFF6FF',
+  infoBorder: '#BFDBFE',
+  success: '#166534',
+  successBackground: '#DCFCE7',
+  successBorder: '#86EFAC',
+  warning: '#92400E',
+  warningBackground: '#FFFBEB',
+  warningBorder: '#FDE68A',
+  danger: '#991B1B',
+  dangerBackground: '#FEF2F2',
+  dangerBorder: '#FECACA',
+  neutralText: '#0F172A',
+  subtle: '#94A3B8',
+  overlay: 'rgba(15, 23, 42, 0.04)',
+};
+
+export const spacing = {
+  xs: 4,
+  sm: 8,
+  md: 12,
+  lg: 16,
+  xl: 20,
+  xxl: 24,
+  xxxl: 32,
+};
+
+export const radii = {
+  sm: 8,
+  md: 14,
+  lg: 18,
+  pill: 999,
+};
+
+export const shadows = {
+  card: {
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  elevated: {
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.12,
+    shadowRadius: 12,
+    elevation: 4,
+  },
+};
+
+export const typography = {
+  display: 28,
+  heading: 22,
+  title: 18,
+  body: 14,
+  small: 12,
+  label: 11,
+  weight: {
+    regular: '400' as const,
+    medium: '600' as const,
+    semibold: '700' as const,
+    bold: '800' as const,
+  },
+};
+
+export type ThemeColor = keyof typeof colors;
+export type ThemeSpacing = keyof typeof spacing;
+export type ThemeRadius = keyof typeof radii;
+export type ThemeTypography = keyof typeof typography;

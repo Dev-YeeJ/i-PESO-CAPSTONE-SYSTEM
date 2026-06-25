@@ -15,6 +15,7 @@ import { router } from 'expo-router'
 import type { AxiosError } from 'axios'
 import { authService } from '@/services/authService'
 import type { SeekerRegisterPayload } from '@/services/authService'
+import { API_BASE_URL } from '@/services/api'
 
 interface ApiErrorBody {
   message?: string
@@ -191,6 +192,12 @@ export default function RegisterScreen() {
         })
         setErrors(mappedErrors)
         setApiError(firstServerError(serverErrors) || response.data?.message || 'Please check the highlighted fields.')
+      } else if (!response) {
+        const reason = err.code === 'ECONNABORTED' ? 'The request timed out.' : 'The backend could not be reached.'
+        const detail = err.message ? ` ${err.message}` : ''
+        setApiError(
+          `${reason} Make sure it is running at ${API_BASE_URL} and both devices use the same Wi-Fi.${detail}`
+        )
       } else {
         setApiError(response?.data?.message ?? 'Registration failed. Check your connection to the i-PESO backend.')
       }

@@ -1,7 +1,8 @@
 import { useEffect } from 'react'
-import { Text } from 'react-native'
 import { Tabs, router } from 'expo-router'
+import MaterialIcons from '@expo/vector-icons/MaterialIcons'
 import { useAuthStore } from '@/stores/authStore'
+import { colors, spacing } from '@/theme'
 
 export default function SeekerLayout() {
   const isAuthenticated = useAuthStore((s: AuthState) => s.isAuthenticated)
@@ -23,19 +24,24 @@ export default function SeekerLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: '#1d4ed8',
-        tabBarInactiveTintColor: '#94a3b8',
+        tabBarActiveTintColor: colors.info,
+        tabBarInactiveTintColor: colors.subtle,
         tabBarStyle: {
-          backgroundColor: '#ffffff',
-          borderTopColor: '#e2e8f0',
-          borderTopWidth: 0.5,
-          paddingBottom: 10,
-          paddingTop: 8,
-          height: 65,
+          backgroundColor: colors.surface,
+          borderTopColor: colors.border,
+          borderTopWidth: 1,
+          paddingBottom: spacing.sm,
+          paddingTop: spacing.sm,
+          height: 70,
+          shadowColor: colors.primary,
+          shadowOffset: { width: 0, height: -1 },
+          shadowOpacity: 0.05,
+          shadowRadius: 10,
+          elevation: 12,
         },
         tabBarLabelStyle: {
           fontSize: 11,
-          fontWeight: '600',
+          fontWeight: '700',
           marginTop: 2,
         },
       }}
@@ -44,36 +50,36 @@ export default function SeekerLayout() {
         name="index"
         options={{
           title: 'Home',
-          tabBarIcon: ({ color }: { color: string }) => <TabCode color={color} label="HM" />,
+          tabBarIcon: ({ color }) => <TabIcon name="home" color={color} />,
         }}
       />
       <Tabs.Screen
         name="jobs"
         options={{
-          title: 'Find Jobs',
-          tabBarIcon: ({ color }: { color: string }) => <TabCode color={color} label="JOB" />,
+          title: 'Jobs',
+          tabBarIcon: ({ color }) => <TabIcon name="search" color={color} />,
         }}
       />
       <Tabs.Screen
         name="applications"
         options={{
           title: 'Applied',
-          tabBarIcon: ({ color }: { color: string }) => <TabCode color={color} label="APP" />,
+          tabBarIcon: ({ color }) => <TabIcon name="task" color={color} />,
         }}
       />
       <Tabs.Screen
         name="profile"
         options={{
           title: 'Profile',
-          tabBarIcon: ({ color }: { color: string }) => <TabCode color={color} label="ME" />,
+          tabBarIcon: ({ color }) => <TabIcon name="person" color={color} />,
         }}
       />
     </Tabs>
   )
 }
 
-function TabCode({ color, label }: { color: string; label: string }) {
-  return <Text style={{ fontSize: 12, color, fontWeight: '800' }}>{label}</Text>
+function TabIcon({ name, color }: { name: React.ComponentProps<typeof MaterialIcons>['name']; color: string }) {
+  return <MaterialIcons name={name} size={22} color={color} />
 }
 
 interface AuthState {

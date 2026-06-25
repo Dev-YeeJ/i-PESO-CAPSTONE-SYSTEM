@@ -57,7 +57,7 @@ Important: `php artisan migrate` is required because the system has new matching
 ### 5. Start the Backend Server
 
 ```powershell
-php artisan serve --host=127.0.0.1 --port=8000
+php artisan serve --host=0.0.0.0 --port=8000
 ```
 
 Keep this terminal open.
@@ -134,7 +134,7 @@ php artisan skills:sync-taxonomy-links
 ### 3. Start Backend
 
 ```powershell
-php artisan serve --host=127.0.0.1 --port=8000
+php artisan serve --host=0.0.0.0 --port=8000
 ```
 
 ### 4. Refresh Frontend
@@ -273,7 +273,7 @@ composer install
 php artisan migrate
 php artisan optimize:clear
 php artisan skills:sync-taxonomy-links
-php artisan serve --host=127.0.0.1 --port=8000
+php artisan serve --host=0.0.0.0 --port=8000
 ```
 
 Frontend:

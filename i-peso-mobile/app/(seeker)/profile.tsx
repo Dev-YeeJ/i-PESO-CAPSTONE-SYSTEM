@@ -5,7 +5,6 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TouchableOpacity,
   View,
 } from 'react-native'
 import { router } from 'expo-router'
@@ -20,6 +19,10 @@ import {
   textFrom,
   titleCase,
 } from '@/utils/seekerView'
+import { AlertBox } from '@/components/ui/AlertBox'
+import { Button } from '@/components/ui/Button'
+import { Card } from '@/components/ui/Card'
+import { colors, radii, spacing, typography } from '@/theme'
 
 export default function ProfileScreen() {
   const [profile, setProfile] = useState<SeekerProfile | null>(null)
@@ -59,7 +62,7 @@ export default function ProfileScreen() {
     <View style={styles.flex}>
       <ScrollView
         contentContainerStyle={styles.content}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#1d4ed8" />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.info} />}
         showsVerticalScrollIndicator={false}
       >
         <Text style={styles.kicker}>My NSRP Profile</Text>
@@ -69,30 +72,32 @@ export default function ProfileScreen() {
         </Text>
 
         {loading ? (
-          <View style={styles.loadingCard}>
-            <ActivityIndicator color="#1d4ed8" />
+          <Card style={[styles.statusCard, styles.statusMessageCard]} padding="md">
+            <ActivityIndicator color={colors.info} />
             <Text style={styles.loadingText}>Loading profile...</Text>
-          </View>
+          </Card>
         ) : null}
 
         {error ? (
-          <View style={styles.errorCard}>
-            <Text style={styles.errorText}>{error}</Text>
-          </View>
+          <AlertBox variant="danger" style={styles.alertBox}>
+            {error}
+          </AlertBox>
         ) : null}
 
-        <View style={styles.profileHeader}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>{seekerName(profile).charAt(0).toUpperCase()}</Text>
+        <Card style={styles.profileHeaderCard} padding="md">
+          <View style={styles.profileHeaderInner}>
+            <View style={styles.avatar}>
+              <Text style={styles.avatarText}>{seekerName(profile).charAt(0).toUpperCase()}</Text>
+            </View>
+            <View style={styles.profileHeaderText}>
+              <Text style={styles.name}>{seekerName(profile)}</Text>
+              <Text style={styles.muted}>{textFrom(profile?.email, 'Email not listed')}</Text>
+              <Text style={styles.muted}>{addressLine(profile)}</Text>
+            </View>
           </View>
-          <View style={styles.profileHeaderText}>
-            <Text style={styles.name}>{seekerName(profile)}</Text>
-            <Text style={styles.muted}>{textFrom(profile?.email, 'Email not listed')}</Text>
-            <Text style={styles.muted}>{addressLine(profile)}</Text>
-          </View>
-        </View>
+        </Card>
 
-        <View style={styles.card}>
+        <Card style={styles.card} padding="md">
           <View style={styles.rowBetween}>
             <Text style={styles.sectionTitle}>Profile Strength</Text>
             <Text style={styles.strength}>{strength}%</Text>
@@ -106,10 +111,10 @@ export default function ProfileScreen() {
               <Text style={[styles.checkText, item.complete && styles.checkTextDone]}>{item.label}</Text>
             </View>
           ))}
-          <TouchableOpacity style={styles.primaryBtn} onPress={() => router.push('/onboarding')}>
-            <Text style={styles.primaryBtnText}>Update onboarding details</Text>
-          </TouchableOpacity>
-        </View>
+          <Button variant="secondary" fullWidth onPress={() => router.push('/onboarding')} style={styles.primaryBtn} textStyle={styles.primaryBtnText}>
+            Update onboarding details
+          </Button>
+        </Card>
 
         <Section title="Personal and Work Preferences">
           <Info label="Mobile" value={textFrom(profile?.mobile_number)} />
@@ -122,7 +127,11 @@ export default function ProfileScreen() {
         <Section title="Skills">
           {skills.length ? (
             <View style={styles.tagRow}>
-              {skills.slice(0, 24).map((skill) => <Text key={skill} style={styles.tag}>{skill}</Text>)}
+              {skills.slice(0, 24).map((skill) => (
+                <Text key={skill} style={styles.tag}>
+                  {skill}
+                </Text>
+              ))}
             </View>
           ) : (
             <EmptyLine text="No skills listed yet. Add technical and soft skills in onboarding." />
@@ -130,29 +139,33 @@ export default function ProfileScreen() {
         </Section>
 
         <Section title="Education">
-          {educations.length ? educations.map((education, index) => (
-            <MiniCard key={`${recordText(education, ['institution_name'], 'education')}-${index}`}>
-              <Text style={styles.itemTitle}>{recordText(education, ['institution_name'], 'School not listed')}</Text>
-              <Text style={styles.itemMeta}>{titleCase(recordText(education, ['level'], 'Level not listed'))}</Text>
-              <Text style={styles.itemMeta}>{recordText(education, ['course_strand'], 'Course or strand not listed')}</Text>
-              <Text style={styles.itemMeta}>
-                {textFrom(education.year_started, '')}
-                {education.year_graduated ? ` - ${textFrom(education.year_graduated, '')}` : ''}
-              </Text>
-            </MiniCard>
-          )) : (
+          {educations.length ? (
+            educations.map((education, index) => (
+              <Card key={`${recordText(education, ['institution_name'], 'education')}-${index}`} padding="sm" style={styles.miniCard}>
+                <Text style={styles.itemTitle}>{recordText(education, ['institution_name'], 'School not listed')}</Text>
+                <Text style={styles.itemMeta}>{titleCase(recordText(education, ['level'], 'Level not listed'))}</Text>
+                <Text style={styles.itemMeta}>{recordText(education, ['course_strand'], 'Course or strand not listed')}</Text>
+                <Text style={styles.itemMeta}>
+                  {textFrom(education.year_started, '')}
+                  {education.year_graduated ? ` - ${textFrom(education.year_graduated, '')}` : ''}
+                </Text>
+              </Card>
+            ))
+          ) : (
             <EmptyLine text="No education records listed yet." />
           )}
         </Section>
 
         <Section title="Work Experience">
-          {workExperiences.length ? workExperiences.map((work, index) => (
-            <MiniCard key={`${recordText(work, ['company_name'], 'work')}-${index}`}>
-              <Text style={styles.itemTitle}>{recordText(work, ['position', 'job_title'], 'Position not listed')}</Text>
-              <Text style={styles.itemMeta}>{recordText(work, ['company_name'], 'Company not listed')}</Text>
-              <Text style={styles.itemMeta}>{recordText(work, ['number_of_months'], 'Duration not listed')} months</Text>
-            </MiniCard>
-          )) : (
+          {workExperiences.length ? (
+            workExperiences.map((work, index) => (
+              <Card key={`${recordText(work, ['company_name'], 'work')}-${index}`} padding="sm" style={styles.miniCard}>
+                <Text style={styles.itemTitle}>{recordText(work, ['position', 'job_title'], 'Position not listed')}</Text>
+                <Text style={styles.itemMeta}>{recordText(work, ['company_name'], 'Company not listed')}</Text>
+                <Text style={styles.itemMeta}>{recordText(work, ['number_of_months'], 'Duration not listed')} months</Text>
+              </Card>
+            ))
+          ) : (
             <EmptyLine text="No work experience listed yet." />
           )}
         </Section>
@@ -161,16 +174,16 @@ export default function ProfileScreen() {
           {trainings.length || certificates.length ? (
             <>
               {trainings.slice(0, 4).map((training, index) => (
-                <MiniCard key={`${recordText(training, ['course', 'name'], 'training')}-${index}`}>
+                <Card key={`${recordText(training, ['course', 'name'], 'training')}-${index}`} padding="sm" style={styles.miniCard}>
                   <Text style={styles.itemTitle}>{recordText(training, ['course', 'name'], 'Training not listed')}</Text>
                   <Text style={styles.itemMeta}>{recordText(training, ['training_institution', 'institution'], 'Institution not listed')}</Text>
-                </MiniCard>
+                </Card>
               ))}
               {certificates.slice(0, 4).map((certificate, index) => (
-                <MiniCard key={`${recordText(certificate, ['title'], 'certificate')}-${index}`}>
+                <Card key={`${recordText(certificate, ['title'], 'certificate')}-${index}`} padding="sm" style={styles.miniCard}>
                   <Text style={styles.itemTitle}>{recordText(certificate, ['title'], 'Certificate not listed')}</Text>
                   <Text style={styles.itemMeta}>{recordText(certificate, ['issuing_body'], 'Issuer not listed')}</Text>
-                </MiniCard>
+                </Card>
               ))}
             </>
           ) : (
@@ -205,50 +218,47 @@ function Info({ label, value }: { label: string; value: string }) {
   )
 }
 
-function MiniCard({ children }: { children: React.ReactNode }) {
-  return <View style={styles.miniCard}>{children}</View>
-}
-
 function EmptyLine({ text }: { text: string }) {
   return <Text style={styles.emptyText}>{text}</Text>
 }
 
 const styles = StyleSheet.create({
-  flex: { flex: 1, backgroundColor: '#f8fafc' },
-  content: { paddingHorizontal: 20, paddingTop: 56, paddingBottom: 34 },
-  kicker: { color: '#1d4ed8', fontSize: 12, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 },
-  title: { color: '#0f172a', fontSize: 27, fontWeight: '800', marginBottom: 8 },
-  subtitle: { color: '#64748b', fontSize: 13, lineHeight: 19, marginBottom: 16 },
-  loadingCard: { backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 16, padding: 18, alignItems: 'center', gap: 8, marginBottom: 14 },
-  loadingText: { color: '#64748b', fontSize: 12, fontWeight: '700' },
-  errorCard: { backgroundColor: '#fef2f2', borderWidth: 1, borderColor: '#fecaca', borderRadius: 14, padding: 14, marginBottom: 14 },
-  errorText: { color: '#991b1b', fontSize: 13, lineHeight: 18 },
-  profileHeader: { backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 18, padding: 16, flexDirection: 'row', gap: 14, marginBottom: 14 },
+  flex: { flex: 1, backgroundColor: colors.background },
+  content: { paddingHorizontal: spacing.xl, paddingTop: 56, paddingBottom: spacing.xxxl },
+  kicker: { color: colors.info, fontSize: typography.small, fontWeight: typography.bold, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: spacing.xs },
+  title: { color: colors.primary, fontSize: typography.heading, fontWeight: typography.bold, marginBottom: spacing.xs },
+  subtitle: { color: colors.secondaryText, fontSize: typography.body, lineHeight: 20, marginBottom: spacing.lg },
+  statusCard: { marginBottom: spacing.lg, alignItems: 'center', justifyContent: 'center', gap: spacing.sm },
+  statusMessageCard: { borderColor: colors.border, backgroundColor: colors.surface },
+  loadingText: { color: colors.secondaryText, fontSize: typography.small, fontWeight: typography.semibold, marginTop: spacing.xs },
+  alertBox: { marginBottom: spacing.lg },
+  profileHeaderCard: { marginBottom: spacing.lg },
+  profileHeaderInner: { flexDirection: 'row', gap: spacing.md, alignItems: 'center' },
   profileHeaderText: { flex: 1 },
-  avatar: { width: 54, height: 54, borderRadius: 27, backgroundColor: '#1d4ed8', alignItems: 'center', justifyContent: 'center' },
-  avatarText: { color: '#ffffff', fontSize: 22, fontWeight: '800' },
-  name: { color: '#0f172a', fontSize: 18, fontWeight: '800', marginBottom: 4 },
-  muted: { color: '#64748b', fontSize: 12, lineHeight: 18 },
-  card: { backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 16, padding: 16, marginBottom: 14 },
+  avatar: { width: 54, height: 54, borderRadius: 27, backgroundColor: colors.info, alignItems: 'center', justifyContent: 'center' },
+  avatarText: { color: colors.surface, fontSize: typography.title, fontWeight: typography.bold },
+  name: { color: colors.primary, fontSize: typography.title, fontWeight: typography.bold, marginBottom: spacing.xs },
+  muted: { color: colors.secondaryText, fontSize: typography.small, lineHeight: 18 },
+  card: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radii.lg, padding: spacing.lg, marginBottom: spacing.lg },
   rowBetween: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  sectionTitle: { color: '#0f172a', fontSize: 16, fontWeight: '800', marginBottom: 12 },
-  strength: { color: '#1d4ed8', fontSize: 22, fontWeight: '800' },
-  progressTrack: { height: 8, backgroundColor: '#e2e8f0', borderRadius: 4, overflow: 'hidden', marginBottom: 12 },
-  progressFill: { height: '100%', backgroundColor: '#1d4ed8' },
-  checkRow: { flexDirection: 'row', alignItems: 'center', gap: 9, marginBottom: 8 },
-  checkDot: { width: 9, height: 9, borderRadius: 5, backgroundColor: '#cbd5e1' },
-  checkDotDone: { backgroundColor: '#16a34a' },
-  checkText: { color: '#64748b', fontSize: 12, flex: 1 },
-  checkTextDone: { color: '#0f172a', fontWeight: '700' },
-  primaryBtn: { backgroundColor: '#1d4ed8', borderRadius: 12, paddingVertical: 12, alignItems: 'center', marginTop: 8 },
-  primaryBtnText: { color: '#ffffff', fontSize: 13, fontWeight: '800' },
-  infoRow: { borderBottomWidth: 1, borderBottomColor: '#f1f5f9', paddingBottom: 10, marginBottom: 10 },
-  infoLabel: { color: '#64748b', fontSize: 11, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 3 },
-  infoValue: { color: '#0f172a', fontSize: 13, lineHeight: 19, fontWeight: '600' },
-  tagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
-  tag: { backgroundColor: '#eff6ff', color: '#1d4ed8', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 6, fontSize: 11, fontWeight: '700' },
-  miniCard: { backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 12, padding: 12, marginBottom: 9 },
-  itemTitle: { color: '#0f172a', fontSize: 13, fontWeight: '800', marginBottom: 4 },
-  itemMeta: { color: '#64748b', fontSize: 12, lineHeight: 18 },
-  emptyText: { color: '#64748b', fontSize: 13, lineHeight: 19 },
+  sectionTitle: { color: colors.primary, fontSize: typography.title, fontWeight: typography.bold, marginBottom: spacing.sm },
+  strength: { color: colors.info, fontSize: typography.heading, fontWeight: typography.bold },
+  progressTrack: { height: 8, backgroundColor: colors.border, borderRadius: radii.sm, overflow: 'hidden', marginBottom: spacing.md },
+  progressFill: { height: '100%', backgroundColor: colors.info },
+  checkRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.sm },
+  checkDot: { width: 9, height: 9, borderRadius: 5, backgroundColor: colors.border },
+  checkDotDone: { backgroundColor: colors.success },
+  checkText: { color: colors.secondaryText, fontSize: typography.small, flex: 1 },
+  checkTextDone: { color: colors.primary, fontWeight: typography.bold },
+  primaryBtn: { marginTop: spacing.md },
+  primaryBtnText: { color: colors.primary },
+  infoRow: { borderBottomWidth: 1, borderBottomColor: colors.background, paddingBottom: spacing.sm, marginBottom: spacing.sm },
+  infoLabel: { color: colors.secondaryText, fontSize: typography.small, fontWeight: typography.semibold, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: spacing.xs },
+  infoValue: { color: colors.primary, fontSize: typography.body, lineHeight: 20, fontWeight: typography.medium },
+  tagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  tag: { backgroundColor: colors.infoBackground, color: colors.info, borderRadius: radii.pill, paddingHorizontal: spacing.sm, paddingVertical: spacing.xs, fontSize: typography.small, fontWeight: typography.semibold },
+  miniCard: { marginBottom: spacing.sm },
+  itemTitle: { color: colors.primary, fontSize: typography.body, fontWeight: typography.bold, marginBottom: spacing.xs },
+  itemMeta: { color: colors.secondaryText, fontSize: typography.small, lineHeight: 18 },
+  emptyText: { color: colors.secondaryText, fontSize: typography.body, lineHeight: 20 },
 })

@@ -6,15 +6,21 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TouchableOpacity,
   View,
 } from 'react-native'
 import { router } from 'expo-router'
 import type { SeekerApplication, SeekerProfile } from '@/services/seekerService'
 import { seekerService } from '@/services/seekerService'
 import { arrayFrom, formatDate, formatSalary, jobCompany, jobLocation, seekerName, textFrom, titleCase } from '@/utils/seekerView'
+import { AlertBox } from '@/components/ui/AlertBox'
+import { Badge } from '@/components/ui/Badge'
+import { Button } from '@/components/ui/Button'
+import { Card } from '@/components/ui/Card'
+import { colors, radii, spacing, typography } from '@/theme'
 
 const SAVED_JOBS_KEY = 'ipeso_mobile_saved_jobs'
+
+type StatusBadgeVariant = 'neutral' | 'info' | 'success' | 'warning' | 'danger'
 
 export default function ApplicationsScreen() {
   const [profile, setProfile] = useState<SeekerProfile | null>(null)
@@ -63,7 +69,7 @@ export default function ApplicationsScreen() {
     <View style={styles.flex}>
       <ScrollView
         contentContainerStyle={styles.content}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#1d4ed8" />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.info} />}
         showsVerticalScrollIndicator={false}
       >
         <Text style={styles.kicker}>Application Activity</Text>
@@ -73,19 +79,19 @@ export default function ApplicationsScreen() {
         </Text>
 
         {loading ? (
-          <View style={styles.loadingCard}>
-            <ActivityIndicator color="#1d4ed8" />
+          <Card style={[styles.statusCard, styles.statusMessageCard]} padding="md">
+            <ActivityIndicator color={colors.info} />
             <Text style={styles.loadingText}>Loading activity...</Text>
-          </View>
+          </Card>
         ) : null}
 
         {error ? (
-          <View style={styles.errorCard}>
-            <Text style={styles.errorText}>{error}</Text>
-          </View>
+          <AlertBox variant="danger" style={styles.alertBox}>
+            {error}
+          </AlertBox>
         ) : null}
 
-        <View style={styles.summaryCard}>
+        <Card style={styles.summaryCard} padding="md">
           <Text style={styles.summaryLabel}>{seekerName(profile)}</Text>
           <Text style={styles.summaryTitle}>
             {applications.length
@@ -95,7 +101,7 @@ export default function ApplicationsScreen() {
           <Text style={styles.summaryText}>
             Employers can now move your application from pending review to interview, hired, or rejected.
           </Text>
-        </View>
+        </Card>
 
         <View style={styles.statsRow}>
           <Stat label="Active" value={activeApplications} />
@@ -105,15 +111,15 @@ export default function ApplicationsScreen() {
         </View>
 
         {!loading && !applications.length ? (
-          <View style={styles.card}>
+          <Card style={styles.emptyStateCard} padding="md">
             <Text style={styles.sectionTitle}>Start Applying</Text>
             <Text style={styles.bodyText}>
               Open Find Jobs, choose a matching vacancy, and tap Apply now. Your application will appear here and on the employer ATS board.
             </Text>
-            <TouchableOpacity style={styles.primaryBtn} onPress={() => router.push('/(seeker)/jobs')}>
-              <Text style={styles.primaryBtnText}>Find jobs</Text>
-            </TouchableOpacity>
-          </View>
+            <Button variant="primary" fullWidth onPress={() => router.push('/(seeker)/jobs')} style={styles.emptyButton}>
+              Find jobs
+            </Button>
+          </Card>
         ) : null}
 
         {applications.map((application) => (
@@ -128,23 +134,19 @@ function ApplicationCard({ application }: { application: SeekerApplication }) {
   const job = application.job
 
   return (
-    <View style={styles.applicationCard}>
+    <Card style={styles.applicationCard} padding="md">
       <View style={styles.applicationHeader}>
         <View style={styles.applicationTitleWrap}>
           <Text style={styles.jobTitle}>{textFrom(job?.job_title, 'Untitled job')}</Text>
           <Text style={styles.company}>{job ? jobCompany(job) : 'Employer not listed'}</Text>
         </View>
-        <View style={[styles.statusPill, statusStyle(application.status)]}>
-          <Text style={[styles.statusText, statusTextStyle(application.status)]}>{application.status_label ?? titleCase(application.status)}</Text>
-        </View>
+        <Badge variant={statusVariant(application.status)} style={styles.statusBadge}>
+          {application.status_label ?? titleCase(application.status)}
+        </Badge>
       </View>
 
-      {job ? (
-        <>
-          <Text style={styles.meta}>{jobLocation(job)}</Text>
-          <Text style={styles.meta}>{formatSalary(job)}</Text>
-        </>
-      ) : null}
+      {job ? <Text style={styles.meta}>{jobLocation(job)}</Text> : null}
+      {job ? <Text style={styles.meta}>{formatSalary(job)}</Text> : null}
 
       <View style={styles.detailGrid}>
         <Detail label="Applied" value={formatDate(application.applied_at)} />
@@ -175,7 +177,7 @@ function ApplicationCard({ application }: { application: SeekerApplication }) {
           <Text style={styles.noteText}>{application.employer_remarks}</Text>
         </View>
       ) : null}
-    </View>
+    </Card>
   )
 }
 
@@ -197,70 +199,53 @@ function Detail({ label, value }: { label: string; value: string }) {
   )
 }
 
-function statusStyle(status: string) {
-  if (status === 'hired') return styles.statusSuccess
-  if (status === 'rejected') return styles.statusDanger
-  if (status === 'interview' || status === 'shortlisted') return styles.statusWarning
-  return styles.statusNeutral
-}
-
-function statusTextStyle(status: string) {
-  if (status === 'hired') return styles.statusTextSuccess
-  if (status === 'rejected') return styles.statusTextDanger
-  if (status === 'interview' || status === 'shortlisted') return styles.statusTextWarning
-  return styles.statusTextNeutral
+function statusVariant(status: string): StatusBadgeVariant {
+  if (status === 'hired') return 'success'
+  if (status === 'rejected') return 'danger'
+  if (status === 'interview' || status === 'shortlisted') return 'warning'
+  if (status === 'pending' || status === 'review' || status === 'interviewed') return 'info'
+  return 'neutral'
 }
 
 const styles = StyleSheet.create({
-  flex: { flex: 1, backgroundColor: '#f8fafc' },
-  content: { paddingHorizontal: 20, paddingTop: 56, paddingBottom: 34 },
-  kicker: { color: '#1d4ed8', fontSize: 12, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 },
-  title: { color: '#0f172a', fontSize: 27, fontWeight: '800', marginBottom: 8 },
-  subtitle: { color: '#64748b', fontSize: 13, lineHeight: 19, marginBottom: 16 },
-  loadingCard: { backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 16, padding: 18, alignItems: 'center', gap: 8, marginBottom: 14 },
-  loadingText: { color: '#64748b', fontSize: 12, fontWeight: '700' },
-  errorCard: { backgroundColor: '#fef2f2', borderWidth: 1, borderColor: '#fecaca', borderRadius: 14, padding: 14, marginBottom: 14 },
-  errorText: { color: '#991b1b', fontSize: 13, lineHeight: 18 },
-  summaryCard: { backgroundColor: '#1d4ed8', borderRadius: 18, padding: 18, marginBottom: 14 },
-  summaryLabel: { color: '#bfdbfe', fontSize: 12, fontWeight: '800', marginBottom: 8 },
-  summaryTitle: { color: '#ffffff', fontSize: 22, lineHeight: 29, fontWeight: '800', marginBottom: 8 },
-  summaryText: { color: '#dbeafe', fontSize: 13, lineHeight: 19 },
-  statsRow: { flexDirection: 'row', gap: 8, marginBottom: 14 },
-  statCard: { flex: 1, backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 14, padding: 12, alignItems: 'center' },
-  statValue: { color: '#0f172a', fontSize: 19, fontWeight: '800' },
-  statLabel: { color: '#64748b', fontSize: 10, fontWeight: '800', marginTop: 3 },
-  card: { backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 16, padding: 16, marginBottom: 14 },
-  sectionTitle: { color: '#0f172a', fontSize: 16, fontWeight: '800', marginBottom: 12 },
-  bodyText: { color: '#475569', fontSize: 13, lineHeight: 20, marginBottom: 14 },
-  primaryBtn: { backgroundColor: '#1d4ed8', borderRadius: 12, paddingVertical: 12, alignItems: 'center' },
-  primaryBtnText: { color: '#ffffff', fontSize: 13, fontWeight: '800' },
-  applicationCard: { backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 16, padding: 16, marginBottom: 12 },
-  applicationHeader: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 },
+  flex: { flex: 1, backgroundColor: colors.background },
+  content: { paddingHorizontal: spacing.xl, paddingTop: 56, paddingBottom: spacing.xxxl },
+  kicker: { color: colors.info, fontSize: typography.small, fontWeight: typography.bold, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: spacing.xs },
+  title: { color: colors.primary, fontSize: typography.heading, fontWeight: typography.bold, marginBottom: spacing.xs },
+  subtitle: { color: colors.secondaryText, fontSize: typography.body, lineHeight: 20, marginBottom: spacing.lg },
+  statusCard: { marginBottom: spacing.lg, alignItems: 'center', justifyContent: 'center', gap: spacing.sm },
+  statusMessageCard: { borderColor: colors.border, backgroundColor: colors.surface },
+  loadingText: { color: colors.secondaryText, fontSize: typography.small, fontWeight: typography.semibold, marginTop: spacing.xs },
+  alertBox: { marginBottom: spacing.lg },
+  summaryCard: { marginBottom: spacing.lg },
+  summaryLabel: { color: colors.info, fontSize: typography.small, fontWeight: typography.bold, marginBottom: spacing.xs },
+  summaryTitle: { color: colors.primary, fontSize: typography.heading, fontWeight: typography.bold, marginBottom: spacing.xs },
+  summaryText: { color: colors.secondaryText, fontSize: typography.body, lineHeight: 20 },
+  statsRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.lg },
+  statCard: { flex: 1, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radii.md, padding: spacing.md, alignItems: 'center' },
+  statValue: { color: colors.primary, fontSize: typography.title, fontWeight: typography.bold },
+  statLabel: { color: colors.secondaryText, fontSize: typography.small, fontWeight: typography.semibold, marginTop: spacing.xs },
+  emptyStateCard: { marginBottom: spacing.lg },
+  bodyText: { color: colors.muted, fontSize: typography.body, lineHeight: 20, marginBottom: spacing.lg },
+  emptyButton: { marginTop: spacing.md },
+  applicationCard: { marginBottom: spacing.sm },
+  applicationHeader: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: spacing.sm },
   applicationTitleWrap: { flex: 1 },
-  jobTitle: { color: '#0f172a', fontSize: 16, lineHeight: 22, fontWeight: '800' },
-  company: { color: '#475569', fontSize: 12, fontWeight: '700', marginTop: 4 },
-  statusPill: { borderRadius: 999, paddingHorizontal: 9, paddingVertical: 5, borderWidth: 1 },
-  statusNeutral: { backgroundColor: '#f1f5f9', borderColor: '#cbd5e1' },
-  statusWarning: { backgroundColor: '#fffbeb', borderColor: '#fde68a' },
-  statusSuccess: { backgroundColor: '#dcfce7', borderColor: '#86efac' },
-  statusDanger: { backgroundColor: '#fef2f2', borderColor: '#fecaca' },
-  statusText: { fontSize: 10, fontWeight: '800' },
-  statusTextNeutral: { color: '#475569' },
-  statusTextWarning: { color: '#92400e' },
-  statusTextSuccess: { color: '#166534' },
-  statusTextDanger: { color: '#991b1b' },
-  meta: { color: '#64748b', fontSize: 12, lineHeight: 18, marginTop: 6 },
-  detailGrid: { flexDirection: 'row', gap: 10, marginTop: 12 },
-  detailItem: { flex: 1, backgroundColor: '#f8fafc', borderRadius: 12, padding: 10 },
-  detailLabel: { color: '#64748b', fontSize: 10, fontWeight: '800', textTransform: 'uppercase', marginBottom: 3 },
-  detailValue: { color: '#0f172a', fontSize: 12, fontWeight: '800' },
-  infoBox: { backgroundColor: '#eff6ff', borderWidth: 1, borderColor: '#bfdbfe', borderRadius: 12, padding: 12, marginTop: 12 },
-  infoTitle: { color: '#1d4ed8', fontSize: 13, fontWeight: '800', marginBottom: 5 },
-  infoText: { color: '#1e3a8a', fontSize: 12, lineHeight: 18 },
-  successBox: { backgroundColor: '#ecfdf5', borderWidth: 1, borderColor: '#a7f3d0', borderRadius: 12, padding: 12, marginTop: 12 },
-  successTitle: { color: '#047857', fontSize: 13, fontWeight: '800', marginBottom: 5 },
-  successText: { color: '#065f46', fontSize: 12, lineHeight: 18 },
-  noteBox: { backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 12, padding: 12, marginTop: 12 },
-  noteTitle: { color: '#0f172a', fontSize: 13, fontWeight: '800', marginBottom: 5 },
-  noteText: { color: '#475569', fontSize: 12, lineHeight: 18 },
+  jobTitle: { color: colors.primary, fontSize: typography.title, lineHeight: 22, fontWeight: typography.bold },
+  company: { color: colors.muted, fontSize: typography.small, fontWeight: typography.semibold, marginTop: spacing.xs },
+  statusBadge: { alignSelf: 'flex-start' },
+  meta: { color: colors.secondaryText, fontSize: typography.small, lineHeight: 18, marginTop: spacing.xs },
+  detailGrid: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md },
+  detailItem: { flex: 1, backgroundColor: colors.background, borderRadius: radii.md, padding: spacing.sm },
+  detailLabel: { color: colors.secondaryText, fontSize: typography.small, fontWeight: typography.semibold, textTransform: 'uppercase', marginBottom: spacing.xs },
+  detailValue: { color: colors.primary, fontSize: typography.body, fontWeight: typography.semibold },
+  infoBox: { backgroundColor: colors.infoBackground, borderWidth: 1, borderColor: colors.infoBorder, borderRadius: radii.md, padding: spacing.md, marginTop: spacing.md },
+  infoTitle: { color: colors.info, fontSize: typography.body, fontWeight: typography.semibold, marginBottom: spacing.xs },
+  infoText: { color: colors.primary, fontSize: typography.small, lineHeight: 20 },
+  successBox: { backgroundColor: colors.successBackground, borderWidth: 1, borderColor: colors.successBorder, borderRadius: radii.md, padding: spacing.md, marginTop: spacing.md },
+  successTitle: { color: colors.success, fontSize: typography.body, fontWeight: typography.semibold, marginBottom: spacing.xs },
+  successText: { color: colors.primary, fontSize: typography.small, lineHeight: 20 },
+  noteBox: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radii.md, padding: spacing.md, marginTop: spacing.md },
+  noteTitle: { color: colors.primary, fontSize: typography.body, fontWeight: typography.semibold, marginBottom: spacing.xs },
+  noteText: { color: colors.secondaryText, fontSize: typography.small, lineHeight: 20 },
 })

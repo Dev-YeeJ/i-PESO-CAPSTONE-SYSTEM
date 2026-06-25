@@ -22,6 +22,11 @@ import {
   textFrom,
   titleCase,
 } from '@/utils/seekerView'
+import { AlertBox } from '@/components/ui/AlertBox'
+import { Badge } from '@/components/ui/Badge'
+import { Button } from '@/components/ui/Button'
+import { Card } from '@/components/ui/Card'
+import { colors, radii, spacing, typography } from '@/theme'
 
 const SAVED_JOBS_KEY = 'ipeso_mobile_saved_jobs'
 type Filter = 'all' | 'nearby' | 'saved'
@@ -126,7 +131,7 @@ export default function JobsScreen() {
     <View style={styles.flex}>
       <ScrollView
         contentContainerStyle={styles.content}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#1d4ed8" />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.info} />}
         showsVerticalScrollIndicator={false}
       >
         <Text style={styles.kicker}>Job Search</Text>
@@ -140,7 +145,7 @@ export default function JobsScreen() {
           value={query}
           onChangeText={setQuery}
           placeholder="Search job title, company, skill, or location"
-          placeholderTextColor="#94a3b8"
+          placeholderTextColor={colors.subtle}
         />
 
         <View style={styles.filters}>
@@ -150,27 +155,27 @@ export default function JobsScreen() {
         </View>
 
         {loading ? (
-          <View style={styles.loadingCard}>
-            <ActivityIndicator color="#1d4ed8" />
+          <Card style={styles.loadingCard} padding="md">
+            <ActivityIndicator color={colors.info} />
             <Text style={styles.loadingText}>Loading nearby jobs...</Text>
-          </View>
+          </Card>
         ) : null}
 
         {message ? (
-          <View style={styles.noteCard}>
-            <Text style={styles.noteText}>{message}</Text>
-          </View>
+          <AlertBox variant="warning" style={styles.alertBox}>
+            {message}
+          </AlertBox>
         ) : null}
 
         {!loading && !filteredJobs.length ? (
-          <View style={styles.emptyCard}>
+          <Card style={styles.emptyCard} padding="md">
             <Text style={styles.emptyTitle}>{filter === 'saved' ? 'No saved jobs yet' : 'No jobs found'}</Text>
             <Text style={styles.emptySub}>
               {filter === 'saved'
                 ? 'Save jobs from the All tab so you can revisit them later.'
                 : 'Try another search term, refresh, or update your address in onboarding.'}
             </Text>
-          </View>
+          </Card>
         ) : null}
 
         {filteredJobs.map((job) => {
@@ -183,89 +188,94 @@ export default function JobsScreen() {
           const softSkills = listFrom(job.soft_skills).slice(0, 4)
 
           return (
-            <TouchableOpacity
-              key={jobId}
-              style={styles.jobCard}
-              activeOpacity={0.9}
-              onPress={() => setExpandedId(expanded ? null : jobId)}
-            >
-              <View style={styles.jobHeader}>
-                <View style={styles.jobTitleWrap}>
-                  <Text style={styles.jobTitle} numberOfLines={2}>{textFrom(job.job_title, 'Untitled job')}</Text>
-                  <Text style={styles.company}>{jobCompany(job)}</Text>
-                </View>
-                <View style={styles.matchPill}>
-                  <Text style={styles.matchText}>{job.match?.percentage ?? 0}%</Text>
-                </View>
-              </View>
-
-              <Text style={styles.meta}>{jobLocation(job)}</Text>
-              <Text style={styles.meta}>{formatSalary(job)}</Text>
-              <Text style={styles.meta}>
-                {titleCase(job.employment_type, 'Employment type not listed')}
-                {job.distance_km ? ` - ${job.distance_km} km away` : ''}
-              </Text>
-
-              <View style={styles.tagRow}>
-                {requiredSkills.slice(0, 3).map((skill) => (
-                  <Text key={skill} style={styles.tag}>{skill}</Text>
-                ))}
-              </View>
-
-              {expanded ? (
-                <View style={styles.details}>
-                  <Detail label="Deadline" value={formatDate(job.application_deadline)} />
-                  <Detail label="Vacancies" value={textFrom(job.vacancies_count, 'Not listed')} />
-                  <Detail label="Education" value={titleCase(job.minimum_education, 'Not listed')} />
-                  <Detail label="Experience" value={titleCase(job.experience_level, 'Not listed')} />
-
-                  <Text style={styles.detailLabel}>Description</Text>
-                  <Text style={styles.description}>{textFrom(job.job_description, 'No description provided.')}</Text>
-
-                  {requiredSkills.length ? (
-                    <>
-                      <Text style={styles.detailLabel}>Required Skills</Text>
-                      <View style={styles.tagRow}>
-                        {requiredSkills.map((skill) => <Text key={skill} style={styles.tag}>{skill}</Text>)}
-                      </View>
-                    </>
-                  ) : null}
-
-                  {softSkills.length ? (
-                    <>
-                      <Text style={styles.detailLabel}>Soft Skills</Text>
-                      <View style={styles.tagRow}>
-                        {softSkills.map((skill) => <Text key={skill} style={styles.tagMuted}>{skill}</Text>)}
-                      </View>
-                    </>
-                  ) : null}
-
-                  <View style={styles.actions}>
-                    <TouchableOpacity style={styles.saveBtn} onPress={() => toggleSaved(jobId)}>
-                      <Text style={styles.saveBtnText}>{saved ? 'Remove saved' : 'Save job'}</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[styles.applyBtn, applied && styles.applyBtnDone]}
-                      onPress={() => applyToJob(job)}
-                      disabled={applied || applying}
-                    >
-                      <Text style={[styles.applyBtnText, applied && styles.applyBtnTextDone]}>
-                        {applied ? `Applied: ${titleCase(job.application_status, 'Pending')}` : applying ? 'Submitting...' : 'Apply now'}
-                      </Text>
-                    </TouchableOpacity>
-                    {applied ? (
-                      <View style={styles.infoBox}>
-                        <Text style={styles.infoText}>
-                          Track employer updates in My Applications.
-                        </Text>
-                      </View>
-                    ) : null}
+            <Card key={jobId} style={styles.jobCardTouch} padding="md">
+              <TouchableOpacity
+                activeOpacity={0.9}
+                onPress={() => setExpandedId(expanded ? null : jobId)}
+              >
+                <View style={styles.jobHeader}>
+                  <View style={styles.jobTitleWrap}>
+                    <Text style={styles.jobTitle} numberOfLines={2}>{textFrom(job.job_title, 'Untitled job')}</Text>
+                    <Text style={styles.company}>{jobCompany(job)}</Text>
                   </View>
+                  <Badge variant="success" style={styles.matchBadge}>
+                    {job.match?.percentage ?? 0}%
+                  </Badge>
                 </View>
-              ) : (
-                <Text style={styles.tapHint}>Tap for details</Text>
-              )}
-            </TouchableOpacity>
+
+                <Text style={styles.meta}>{jobLocation(job)}</Text>
+                <Text style={styles.meta}>{formatSalary(job)}</Text>
+                <Text style={styles.meta}>
+                  {titleCase(job.employment_type, 'Employment type not listed')}
+                  {job.distance_km ? ` - ${job.distance_km} km away` : ''}
+                </Text>
+
+                <View style={styles.tagRow}>
+                  {requiredSkills.slice(0, 3).map((skill) => (
+                    <Text key={skill} style={styles.tag}>{skill}</Text>
+                  ))}
+                </View>
+
+                {expanded ? (
+                  <View style={styles.details}>
+                    <Detail label="Deadline" value={formatDate(job.application_deadline)} />
+                    <Detail label="Vacancies" value={textFrom(job.vacancies_count, 'Not listed')} />
+                    <Detail label="Education" value={titleCase(job.minimum_education, 'Not listed')} />
+                    <Detail label="Experience" value={titleCase(job.experience_level, 'Not listed')} />
+
+                    <Text style={styles.detailLabel}>Description</Text>
+                    <Text style={styles.description}>{textFrom(job.job_description, 'No description provided.')}</Text>
+
+                    {requiredSkills.length ? (
+                      <>
+                        <Text style={styles.detailLabel}>Required Skills</Text>
+                        <View style={styles.tagRow}>
+                          {requiredSkills.map((skill) => <Text key={skill} style={styles.tag}>{skill}</Text>)}
+                        </View>
+                      </>
+                    ) : null}
+
+                    {softSkills.length ? (
+                      <>
+                        <Text style={styles.detailLabel}>Soft Skills</Text>
+                        <View style={styles.tagRow}>
+                          {softSkills.map((skill) => <Text key={skill} style={styles.tagMuted}>{skill}</Text>)}
+                        </View>
+                      </>
+                    ) : null}
+
+                    <View style={styles.actions}>
+                      <Button
+                        variant="outline"
+                        fullWidth
+                        onPress={() => toggleSaved(jobId)}
+                        style={styles.saveBtn}
+                      >
+                        {saved ? 'Remove saved' : 'Save job'}
+                      </Button>
+                      <Button
+                        variant={applied ? 'secondary' : 'success'}
+                        fullWidth
+                        onPress={() => applyToJob(job)}
+                        disabled={applied || applying}
+                        style={styles.applyBtn}
+                      >
+                        {applied ? `Applied: ${titleCase(job.application_status, 'Pending')}` : applying ? 'Submitting...' : 'Apply now'}
+                      </Button>
+                      {applied ? (
+                        <View style={styles.infoBox}>
+                          <Text style={styles.infoText}>
+                            Track employer updates in My Applications.
+                          </Text>
+                        </View>
+                      ) : null}
+                    </View>
+                  </View>
+                ) : (
+                  <Text style={styles.tapHint}>Tap for details</Text>
+                )}
+              </TouchableOpacity>
+            </Card>
           )
         })}
       </ScrollView>
@@ -291,48 +301,42 @@ function Detail({ label, value }: { label: string; value: string }) {
 }
 
 const styles = StyleSheet.create({
-  flex: { flex: 1, backgroundColor: '#f8fafc' },
-  content: { paddingHorizontal: 20, paddingTop: 56, paddingBottom: 34 },
-  kicker: { color: '#1d4ed8', fontSize: 12, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 },
-  title: { color: '#0f172a', fontSize: 27, fontWeight: '800', marginBottom: 8 },
-  subtitle: { color: '#64748b', fontSize: 13, lineHeight: 19, marginBottom: 16 },
-  search: { backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 14, paddingHorizontal: 14, paddingVertical: 12, color: '#0f172a', fontSize: 14, marginBottom: 12 },
-  filters: { flexDirection: 'row', gap: 8, marginBottom: 16 },
-  filterBtn: { flex: 1, borderWidth: 1, borderColor: '#cbd5e1', backgroundColor: '#ffffff', borderRadius: 999, paddingVertical: 10, alignItems: 'center' },
-  filterBtnActive: { backgroundColor: '#1d4ed8', borderColor: '#1d4ed8' },
-  filterText: { color: '#475569', fontSize: 12, fontWeight: '800' },
-  filterTextActive: { color: '#ffffff' },
-  loadingCard: { backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 16, padding: 18, alignItems: 'center', gap: 8, marginBottom: 14 },
-  loadingText: { color: '#64748b', fontSize: 12, fontWeight: '700' },
-  noteCard: { backgroundColor: '#fffbeb', borderWidth: 1, borderColor: '#fde68a', borderRadius: 14, padding: 14, marginBottom: 14 },
-  noteText: { color: '#92400e', fontSize: 12, lineHeight: 18 },
-  emptyCard: { backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 16, padding: 24, alignItems: 'center' },
-  emptyTitle: { color: '#0f172a', fontSize: 17, fontWeight: '800', marginBottom: 6 },
-  emptySub: { color: '#64748b', fontSize: 13, lineHeight: 19, textAlign: 'center' },
-  jobCard: { backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 16, padding: 16, marginBottom: 12 },
-  jobHeader: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 },
+  flex: { flex: 1, backgroundColor: colors.background },
+  content: { paddingHorizontal: spacing.xl, paddingTop: 56, paddingBottom: spacing.xxxl },
+  kicker: { color: colors.info, fontSize: typography.small, fontWeight: typography.bold, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: spacing.xs },
+  title: { color: colors.primary, fontSize: typography.heading, fontWeight: typography.bold, marginBottom: spacing.xs },
+  subtitle: { color: colors.secondaryText, fontSize: typography.body, lineHeight: 20, marginBottom: spacing.lg },
+  search: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.subtle, borderRadius: radii.md, paddingHorizontal: spacing.md, paddingVertical: spacing.md, color: colors.primary, fontSize: typography.body, marginBottom: spacing.md },
+  filters: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.lg },
+  filterBtn: { flex: 1, borderWidth: 1, borderColor: colors.subtle, backgroundColor: colors.surface, borderRadius: radii.pill, paddingVertical: spacing.sm, alignItems: 'center' },
+  filterBtnActive: { backgroundColor: colors.info, borderColor: colors.info },
+  filterText: { color: colors.muted, fontSize: typography.small, fontWeight: typography.bold },
+  filterTextActive: { color: colors.white },
+  loadingCard: { marginBottom: spacing.lg, alignItems: 'center', justifyContent: 'center', gap: spacing.sm },
+  loadingText: { color: colors.secondaryText, fontSize: typography.small, fontWeight: typography.semibold, marginTop: spacing.xs },
+  alertBox: { marginBottom: spacing.lg },
+  emptyCard: { alignItems: 'center' },
+  emptyTitle: { color: colors.primary, fontSize: typography.title, fontWeight: typography.bold, marginBottom: spacing.xs },
+  emptySub: { color: colors.secondaryText, fontSize: typography.body, lineHeight: 20, textAlign: 'center' },
+  jobCardTouch: { marginBottom: spacing.sm },
+  jobHeader: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: spacing.md },
   jobTitleWrap: { flex: 1 },
-  jobTitle: { color: '#0f172a', fontSize: 16, lineHeight: 22, fontWeight: '800' },
-  company: { color: '#475569', fontSize: 12, fontWeight: '700', marginTop: 4 },
-  matchPill: { backgroundColor: '#dcfce7', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 5 },
-  matchText: { color: '#166534', fontSize: 11, fontWeight: '800' },
-  meta: { color: '#64748b', fontSize: 12, lineHeight: 18, marginTop: 6 },
-  tagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 10 },
-  tag: { backgroundColor: '#eff6ff', color: '#1d4ed8', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 5, fontSize: 11, fontWeight: '700' },
-  tagMuted: { backgroundColor: '#f1f5f9', color: '#475569', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 5, fontSize: 11, fontWeight: '700' },
-  tapHint: { color: '#1d4ed8', fontSize: 12, fontWeight: '800', marginTop: 12 },
-  details: { borderTopWidth: 1, borderTopColor: '#e2e8f0', marginTop: 14, paddingTop: 14 },
-  detailRow: { marginBottom: 9 },
-  detailLabel: { color: '#0f172a', fontSize: 12, fontWeight: '800', marginBottom: 3 },
-  detailValue: { color: '#64748b', fontSize: 12, lineHeight: 18 },
-  description: { color: '#475569', fontSize: 12, lineHeight: 19 },
-  actions: { marginTop: 14, gap: 10 },
-  saveBtn: { backgroundColor: '#1d4ed8', borderRadius: 12, paddingVertical: 12, alignItems: 'center' },
-  saveBtnText: { color: '#ffffff', fontSize: 13, fontWeight: '800' },
-  applyBtn: { backgroundColor: '#16a34a', borderRadius: 12, paddingVertical: 12, alignItems: 'center' },
-  applyBtnDone: { backgroundColor: '#dcfce7', borderWidth: 1, borderColor: '#86efac' },
-  applyBtnText: { color: '#ffffff', fontSize: 13, fontWeight: '800' },
-  applyBtnTextDone: { color: '#166534' },
-  infoBox: { backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 12, padding: 12 },
-  infoText: { color: '#64748b', fontSize: 12, lineHeight: 18 },
+  jobTitle: { color: colors.primary, fontSize: typography.title, lineHeight: 22, fontWeight: typography.bold },
+  company: { color: colors.muted, fontSize: typography.small, fontWeight: typography.semibold, marginTop: spacing.xs },
+  matchBadge: { alignSelf: 'flex-start' },
+  meta: { color: colors.secondaryText, fontSize: typography.small, lineHeight: 18, marginTop: spacing.xs },
+  tagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.md },
+  tag: { backgroundColor: colors.infoBackground, color: colors.info, borderRadius: radii.pill, paddingHorizontal: spacing.sm, paddingVertical: spacing.xs, fontSize: typography.small, fontWeight: typography.semibold },
+  tagMuted: { backgroundColor: colors.background, color: colors.muted, borderRadius: radii.pill, paddingHorizontal: spacing.sm, paddingVertical: spacing.xs, fontSize: typography.small, fontWeight: typography.semibold },
+  tapHint: { color: colors.info, fontSize: typography.small, fontWeight: typography.bold, marginTop: spacing.md },
+  details: { borderTopWidth: 1, borderTopColor: colors.border, marginTop: spacing.md, paddingTop: spacing.md },
+  detailRow: { marginBottom: spacing.sm },
+  detailLabel: { color: colors.primary, fontSize: typography.small, fontWeight: typography.bold, marginBottom: spacing.xs },
+  detailValue: { color: colors.secondaryText, fontSize: typography.small, lineHeight: 18 },
+  description: { color: colors.muted, fontSize: typography.small, lineHeight: 20 },
+  actions: { marginTop: spacing.md, gap: spacing.sm },
+  saveBtn: { marginBottom: 0 },
+  applyBtn: { marginBottom: 0 },
+  infoBox: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radii.md, padding: spacing.md, marginTop: spacing.md },
+  infoText: { color: colors.secondaryText, fontSize: typography.small, lineHeight: 18 },
 })

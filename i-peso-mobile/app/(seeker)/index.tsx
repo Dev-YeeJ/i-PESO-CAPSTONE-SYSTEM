@@ -22,6 +22,11 @@ import {
   textFrom,
   titleCase,
 } from '@/utils/seekerView'
+import { Button } from '@/components/ui/Button'
+import { Card } from '@/components/ui/Card'
+import { Badge } from '@/components/ui/Badge'
+import { AlertBox } from '@/components/ui/AlertBox'
+import { colors, radii, spacing, typography } from '@/theme'
 
 export default function SeekerHomeScreen() {
   const user = useAuthStore((state) => state.user)
@@ -86,11 +91,11 @@ export default function SeekerHomeScreen() {
 
   return (
     <View style={styles.flex}>
-      <StatusBar barStyle="dark-content" backgroundColor="#f8fafc" />
+      <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.content}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#1d4ed8" />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.info} />}
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.header}>
@@ -103,34 +108,34 @@ export default function SeekerHomeScreen() {
               <Text style={styles.nameText} numberOfLines={1}>{firstName(activeProfile)}</Text>
             </View>
           </View>
-          <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
-            <Text style={styles.logoutText}>Sign out</Text>
-          </TouchableOpacity>
+          <Button variant="outline" size="sm" onPress={handleLogout} style={styles.logoutBtn} textStyle={styles.logoutText}>
+            Sign out
+          </Button>
         </View>
 
         {loading ? (
-          <View style={styles.loadingCard}>
-            <ActivityIndicator color="#1d4ed8" />
+          <Card style={styles.loadingCard} padding="md">
+            <ActivityIndicator color={colors.info} />
             <Text style={styles.loadingText}>Loading your job seeker dashboard...</Text>
-          </View>
+          </Card>
         ) : null}
 
         {error ? (
-          <View style={styles.errorCard}>
-            <Text style={styles.errorText}>{error}</Text>
-          </View>
+          <AlertBox variant="danger" style={styles.alertBox}>
+            {error}
+          </AlertBox>
         ) : null}
 
-        <View style={styles.hero}>
+        <Card style={styles.heroCard} contentStyle={styles.heroContent}>
           <Text style={styles.heroKicker}>i-PESO Job Seeker</Text>
           <Text style={styles.heroTitle}>Find work that matches your profile.</Text>
           <Text style={styles.heroSub}>
             Keep your NSRP profile updated so PESO can match you with nearby opportunities.
           </Text>
-          <TouchableOpacity style={styles.heroBtn} onPress={() => router.push('/(seeker)/jobs')}>
-            <Text style={styles.heroBtnText}>Browse jobs</Text>
-          </TouchableOpacity>
-        </View>
+          <Button variant="secondary" onPress={() => router.push('/(seeker)/jobs')} style={styles.heroButton} textStyle={styles.heroButtonText}>
+            Browse jobs
+          </Button>
+        </Card>
 
         <View style={styles.statsRow}>
           <Stat label="Applications" value={stats?.active_applications ?? 0} />
@@ -138,7 +143,7 @@ export default function SeekerHomeScreen() {
           <Stat label="Matches" value={jobs.length} />
         </View>
 
-        <View style={styles.profileCard}>
+        <Card padding="md" style={styles.profileCard}>
           <View style={styles.cardHeader}>
             <View>
               <Text style={styles.sectionTitle}>Profile Strength</Text>
@@ -154,10 +159,10 @@ export default function SeekerHomeScreen() {
               ? 'Your profile is strong. Keep it current when your skills change.'
               : 'Add skills, education, work experience, and documents to improve matches.'}
           </Text>
-          <TouchableOpacity style={styles.secondaryBtn} onPress={() => router.push('/(seeker)/profile')}>
-            <Text style={styles.secondaryBtnText}>Review profile</Text>
-          </TouchableOpacity>
-        </View>
+          <Button variant="outline" onPress={() => router.push('/(seeker)/profile')} style={styles.secondaryBtn} textStyle={styles.secondaryBtnText}>
+            Review profile
+          </Button>
+        </Card>
 
         <Text style={styles.sectionTitle}>Quick Actions</Text>
         <View style={styles.actionsGrid}>
@@ -169,40 +174,40 @@ export default function SeekerHomeScreen() {
 
         <View style={styles.cardHeader}>
           <Text style={styles.sectionTitle}>Nearby Matches</Text>
-          <TouchableOpacity onPress={() => router.push('/(seeker)/jobs')}>
-            <Text style={styles.linkText}>View all</Text>
-          </TouchableOpacity>
+          <Button variant="ghost" size="sm" onPress={() => router.push('/(seeker)/jobs')} textStyle={styles.viewAllText}>
+            View all
+          </Button>
         </View>
 
-        {jobsMessage ? <Text style={styles.inlineNote}>{jobsMessage}</Text> : null}
+        {jobsMessage ? (
+          <AlertBox variant="warning" style={styles.alertBox}>
+            {jobsMessage}
+          </AlertBox>
+        ) : null}
 
         {topJobs.length ? topJobs.map((job) => (
-          <TouchableOpacity
-            key={String(job.post_id)}
-            style={styles.jobCard}
-            activeOpacity={0.86}
-            onPress={() => router.push('/(seeker)/jobs')}
-          >
+          <Card key={String(job.post_id)} padding="md" style={styles.jobCard}>
             <View style={styles.cardHeader}>
               <View style={styles.jobTitleWrap}>
                 <Text style={styles.jobTitle} numberOfLines={2}>{textFrom(job.job_title, 'Untitled job')}</Text>
                 <Text style={styles.jobCompany}>{jobCompany(job)}</Text>
               </View>
-              <View style={styles.matchPill}>
-                <Text style={styles.matchText}>{job.match?.percentage ?? 0}%</Text>
-              </View>
+              <Badge variant="success" style={styles.matchBadge}> {job.match?.percentage ?? 0}% </Badge>
             </View>
             <Text style={styles.jobMeta}>{jobLocation(job)}</Text>
             <Text style={styles.jobMeta}>{formatSalary(job)}</Text>
             <Text style={styles.jobMeta}>{titleCase(job.employment_type, 'Employment type not listed')}</Text>
-          </TouchableOpacity>
+            <Button variant="ghost" size="sm" onPress={() => router.push('/(seeker)/jobs')} style={styles.cardActionButton} textStyle={styles.cardActionText}>
+              View details
+            </Button>
+          </Card>
         )) : (
-          <View style={styles.emptyCard}>
+          <Card padding="md" style={styles.emptyCard}>
             <Text style={styles.emptyTitle}>No nearby jobs yet</Text>
             <Text style={styles.emptySub}>
               Jobs will appear here when employers post active vacancies near your saved address.
             </Text>
-          </View>
+          </Card>
         )}
       </ScrollView>
     </View>
@@ -236,56 +241,56 @@ function QuickAction({
 }
 
 const styles = StyleSheet.create({
-  flex: { flex: 1, backgroundColor: '#f8fafc' },
+  flex: { flex: 1, backgroundColor: colors.background },
   scroll: { flex: 1 },
-  content: { paddingHorizontal: 20, paddingTop: 56, paddingBottom: 32 },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
-  headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
+  content: { paddingHorizontal: spacing.xl, paddingTop: 56, paddingBottom: spacing.xxxl },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.lg },
+  headerLeft: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, flex: 1 },
   headerText: { flex: 1 },
-  avatarCircle: { width: 42, height: 42, borderRadius: 21, backgroundColor: '#1d4ed8', justifyContent: 'center', alignItems: 'center' },
-  avatarText: { color: '#ffffff', fontSize: 16, fontWeight: '700' },
-  greetingText: { fontSize: 12, color: '#64748b', fontWeight: '600' },
-  nameText: { fontSize: 17, color: '#0f172a', fontWeight: '800' },
-  logoutBtn: { backgroundColor: '#fef2f2', borderWidth: 1, borderColor: '#fecaca', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8 },
-  logoutText: { color: '#dc2626', fontSize: 12, fontWeight: '700' },
-  loadingCard: { backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 14, padding: 16, alignItems: 'center', gap: 8, marginBottom: 14 },
-  loadingText: { color: '#64748b', fontSize: 12, fontWeight: '600' },
-  errorCard: { backgroundColor: '#fef2f2', borderWidth: 1, borderColor: '#fecaca', borderRadius: 14, padding: 14, marginBottom: 14 },
-  errorText: { color: '#991b1b', fontSize: 13, lineHeight: 18 },
-  hero: { backgroundColor: '#1d4ed8', borderRadius: 18, padding: 20, marginBottom: 18 },
-  heroKicker: { color: '#bfdbfe', fontSize: 11, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 },
-  heroTitle: { color: '#ffffff', fontSize: 24, lineHeight: 31, fontWeight: '800', marginBottom: 8 },
-  heroSub: { color: '#dbeafe', fontSize: 13, lineHeight: 19, marginBottom: 16 },
-  heroBtn: { backgroundColor: '#ffffff', borderRadius: 12, paddingVertical: 11, paddingHorizontal: 16, alignSelf: 'flex-start' },
-  heroBtnText: { color: '#1d4ed8', fontSize: 13, fontWeight: '800' },
-  statsRow: { flexDirection: 'row', gap: 10, marginBottom: 18 },
-  statCard: { flex: 1, backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 14, padding: 14, alignItems: 'center' },
-  statValue: { color: '#0f172a', fontSize: 22, fontWeight: '800' },
-  statLabel: { color: '#64748b', fontSize: 10, fontWeight: '700', marginTop: 3, textAlign: 'center' },
-  profileCard: { backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 16, padding: 16, marginBottom: 20 },
-  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 },
-  sectionTitle: { fontSize: 16, fontWeight: '800', color: '#0f172a', marginBottom: 10 },
-  muted: { color: '#64748b', fontSize: 12, lineHeight: 17 },
-  strengthText: { color: '#1d4ed8', fontSize: 22, fontWeight: '800' },
-  progressTrack: { height: 8, backgroundColor: '#e2e8f0', borderRadius: 4, overflow: 'hidden', marginTop: 10, marginBottom: 10 },
-  progressFill: { height: '100%', backgroundColor: '#1d4ed8', borderRadius: 4 },
-  profileHint: { color: '#475569', fontSize: 12, lineHeight: 18, marginBottom: 12 },
-  secondaryBtn: { backgroundColor: '#eff6ff', borderWidth: 1, borderColor: '#bfdbfe', borderRadius: 12, paddingVertical: 11, alignItems: 'center' },
-  secondaryBtnText: { color: '#1d4ed8', fontSize: 13, fontWeight: '800' },
-  actionsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 20 },
-  actionCard: { width: '48%', backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 14, padding: 14 },
-  actionLabel: { color: '#0f172a', fontSize: 13, fontWeight: '800', marginBottom: 4 },
-  actionDescription: { color: '#64748b', fontSize: 11, lineHeight: 16 },
-  linkText: { color: '#1d4ed8', fontSize: 12, fontWeight: '800', marginTop: 2 },
-  inlineNote: { color: '#92400e', backgroundColor: '#fffbeb', borderWidth: 1, borderColor: '#fde68a', borderRadius: 12, padding: 12, fontSize: 12, lineHeight: 17, marginBottom: 12 },
-  jobCard: { backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 16, padding: 16, marginBottom: 12 },
+  avatarCircle: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.info, justifyContent: 'center', alignItems: 'center' },
+  avatarText: { color: colors.surface, fontSize: typography.title, fontWeight: typography.bold },
+  greetingText: { fontSize: typography.small, color: colors.secondaryText, fontWeight: typography.semibold },
+  nameText: { fontSize: typography.title, color: colors.primary, fontWeight: typography.bold },
+  logoutBtn: { borderWidth: 0, paddingHorizontal: 12, paddingVertical: 10 },
+  logoutText: { color: colors.danger, fontSize: typography.small, fontWeight: typography.semibold },
+  loadingCard: { marginBottom: spacing.lg, alignItems: 'center', justifyContent: 'center', gap: spacing.sm },
+  loadingText: { color: colors.secondaryText, fontSize: typography.small, fontWeight: typography.medium, marginTop: spacing.xs },
+  alertBox: { marginBottom: spacing.lg },
+  heroCard: { backgroundColor: colors.info, borderRadius: radii.lg, padding: spacing.xl, marginBottom: spacing.xl },
+  heroContent: { gap: spacing.sm },
+  heroKicker: { color: colors.surface, fontSize: typography.small, fontWeight: typography.bold, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: spacing.sm },
+  heroTitle: { color: colors.surface, fontSize: typography.display, lineHeight: 34, fontWeight: typography.bold, marginBottom: spacing.sm },
+  heroSub: { color: '#Dbeafe', fontSize: typography.body, lineHeight: 20, marginBottom: spacing.lg },
+  heroButton: { backgroundColor: colors.surface, borderColor: colors.surface, width: 140 },
+  heroButtonText: { color: colors.info },
+  statsRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.lg },
+  statCard: { flex: 1, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radii.md, padding: spacing.lg, alignItems: 'center' },
+  statValue: { color: colors.primary, fontSize: typography.heading, fontWeight: typography.bold },
+  statLabel: { color: colors.secondaryText, fontSize: typography.small, fontWeight: typography.semibold, marginTop: spacing.xs, textAlign: 'center' },
+  profileCard: { marginBottom: spacing.xl },
+  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: spacing.md },
+  sectionTitle: { fontSize: typography.title, fontWeight: typography.bold, color: colors.primary, marginBottom: spacing.sm },
+  muted: { color: colors.secondaryText, fontSize: typography.small, lineHeight: 18 },
+  strengthText: { color: colors.info, fontSize: typography.heading, fontWeight: typography.bold },
+  progressTrack: { height: 8, backgroundColor: colors.border, borderRadius: radii.sm, overflow: 'hidden', marginTop: spacing.sm, marginBottom: spacing.sm },
+  progressFill: { height: '100%', backgroundColor: colors.info, borderRadius: radii.sm },
+  profileHint: { color: colors.muted, fontSize: typography.body, lineHeight: 20, marginBottom: spacing.md },
+  secondaryBtn: { width: '100%', borderColor: colors.info, backgroundColor: colors.surface },
+  secondaryBtnText: { color: colors.info },
+  actionsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.xl },
+  actionCard: { width: '48%', backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radii.md, padding: spacing.lg },
+  actionLabel: { color: colors.primary, fontSize: typography.body, fontWeight: typography.bold, marginBottom: spacing.xs },
+  actionDescription: { color: colors.secondaryText, fontSize: typography.small, lineHeight: 18 },
+  viewAllText: { color: colors.info, fontSize: typography.small, fontWeight: typography.bold },
+  jobCard: { marginBottom: spacing.sm },
   jobTitleWrap: { flex: 1 },
-  jobTitle: { color: '#0f172a', fontSize: 15, fontWeight: '800', lineHeight: 21 },
-  jobCompany: { color: '#475569', fontSize: 12, fontWeight: '700', marginTop: 3 },
-  matchPill: { backgroundColor: '#dcfce7', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 5 },
-  matchText: { color: '#166534', fontSize: 11, fontWeight: '800' },
-  jobMeta: { color: '#64748b', fontSize: 12, lineHeight: 18, marginTop: 6 },
-  emptyCard: { backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 16, padding: 20, alignItems: 'center' },
-  emptyTitle: { color: '#0f172a', fontSize: 15, fontWeight: '800', marginBottom: 6 },
-  emptySub: { color: '#64748b', fontSize: 12, lineHeight: 18, textAlign: 'center' },
+  jobTitle: { color: colors.primary, fontSize: typography.title, fontWeight: typography.bold, lineHeight: 22 },
+  jobCompany: { color: colors.muted, fontSize: typography.small, fontWeight: typography.semibold, marginTop: spacing.xs },
+  matchBadge: { alignSelf: 'flex-start', paddingVertical: 0, paddingHorizontal: spacing.sm },
+  jobMeta: { color: colors.secondaryText, fontSize: typography.small, lineHeight: 18, marginTop: spacing.xs },
+  cardActionButton: { marginTop: spacing.md, borderColor: colors.border, backgroundColor: colors.background },
+  cardActionText: { color: colors.info, fontSize: typography.small, fontWeight: typography.semibold },
+  emptyCard: { marginBottom: spacing.lg },
+  emptyTitle: { color: colors.primary, fontSize: typography.title, fontWeight: typography.bold, marginBottom: spacing.sm },
+  emptySub: { color: colors.secondaryText, fontSize: typography.body, lineHeight: 20, textAlign: 'center' },
 })

@@ -3,31 +3,67 @@ import AsyncStorage from '@react-native-async-storage/async-storage'
 import Constants from 'expo-constants'
 
 const DEFAULT_API_PORT = 8000
-const DEFAULT_FALLBACK_HOST = '127.0.0.1'
+const DEFAULT_FALLBACK_HOST = '192.168.137.1' // ← your LAN IP as fallback
+const DEFAULT_ANDROID_EMULATOR_HOST = '10.0.2.2'
+
+function apiUrlForHost(host: string) {
+  return `http://${host}:${DEFAULT_API_PORT}/api`
+}
+
+function extractHost(value: string) {
+  const candidate = value.trim()
+
+  try {
+    if (candidate.includes('://')) {
+      return new URL(candidate).hostname
+    }
+  } catch {
+    return ''
+  }
+
+  return candidate.split(':')[0]
+}
 
 function computeBaseUrl() {
-  if (process.env.EXPO_PUBLIC_API_URL) {
-    return process.env.EXPO_PUBLIC_API_URL
+  const configuredApiUrl =
+    process.env.EXPO_PUBLIC_API_URL ||
+    Constants.expoConfig?.extra?.EXPO_PUBLIC_API_URL ||
+    Constants.expoConfig?.extra?.apiBaseUrl ||
+    (Constants as any).manifest2?.extra?.EXPO_PUBLIC_API_URL ||
+    (Constants as any).manifest2?.extra?.apiBaseUrl ||
+    (Constants as any).manifest?.extra?.EXPO_PUBLIC_API_URL ||
+    (Constants as any).manifest?.extra?.apiBaseUrl
+
+  if (configuredApiUrl) {
+    return String(configuredApiUrl).replace(/\/$/, '')
   }
 
   try {
-    const hostUri = Constants.expoConfig?.hostUri
-    const debuggerHost = Constants.manifest?.debuggerHost || Constants.manifest?.packagerOpts?.host
-    const candidate = hostUri || debuggerHost
-    if (candidate) {
-      const host = String(candidate).split(':')[0]
+    // expoConfig?.hostUri is the most reliable in modern Expo SDK
+    const hostUri =
+      Constants.expoConfig?.hostUri ||
+      (Constants as any).manifest2?.launchAsset?.url ||
+      (Constants as any).manifest?.debuggerHost
+
+    if (hostUri) {
+      const host = extractHost(String(hostUri))
       if (host && host !== 'localhost' && host !== '127.0.0.1') {
-        return `http://${host}:${DEFAULT_API_PORT}/api`
+        return apiUrlForHost(host)
       }
     }
   } catch (e) {
     // ignore and fall through to fallback host
   }
 
-  return `http://${DEFAULT_FALLBACK_HOST}:${DEFAULT_API_PORT}/api`
+  if ((Constants as any).platform?.android) {
+    return apiUrlForHost(DEFAULT_ANDROID_EMULATOR_HOST)
+  }
+
+  return apiUrlForHost(DEFAULT_FALLBACK_HOST)
 }
 
 const BASE_URL = computeBaseUrl()
+console.log('🔍 API BASE_URL:', BASE_URL)
 export { BASE_URL as API_BASE_URL }
 
 const apiClient = axios.create({
@@ -45,7 +81,6 @@ apiClient.interceptors.request.use(
     if (token) {
       config.headers['Authorization'] = `Bearer ${token}`
     }
-  
     return config
   },
   (error) => Promise.reject(error)
@@ -56,7 +91,6 @@ apiClient.interceptors.response.use(
   async (error) => {
     if (error.response?.status === 401) {
       await AsyncStorage.removeItem('ipeso_token')
-      // Dynamic import avoids circular dependency
       const { useAuthStore } = await import('@/stores/authStore')
       useAuthStore.getState().clearAuth()
     }
