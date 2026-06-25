@@ -47,6 +47,12 @@ return [
         'timeout' => env('GOOGLE_VERTEX_AI_TIMEOUT', 20),
     ],
 
+    'google' => [
+        'client_id' => env('GOOGLE_CLIENT_ID'),
+        'client_secret' => env('GOOGLE_CLIENT_SECRET'),
+        'calendar_redirect' => env('GOOGLE_CALENDAR_REDIRECT_URI', 'http://localhost:8000/api/employer/calendar/callback'),
+    ],
+
     'jobdatalake' => [
         'key' => env('JOB_DATA_LAKE_API_KEY'),
         'base_url' => env('JOB_DATA_LAKE_BASE_URL', 'https://api.jobdatalake.com'),

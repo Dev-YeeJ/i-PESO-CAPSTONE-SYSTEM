@@ -25,7 +25,7 @@ const EmployerOnboarding   = lazy(() => import('@/pages/employer/EmployerRegistr
 const EmployerDashboard = lazy(() => import('@/pages/employer/DashboardPage'))
 const EmployerPostJob   = lazy(() => import('@/pages/employer/PostJobPage'))
 const EmployerVacancies = lazy(() => import('@/pages/employer/VacanciesPage'))
-const EmployerATSBoard  = lazy(() => import('@/pages/employer/EmployerATSBoard'))
+const EmployerATSGrid   = lazy(() => import('@/pages/employer/EmployerATSGrid'))
 const SeekerDashboard   = lazy(() => import('@/pages/seeker/DashboardPage'))
 const SeekerProfile     = lazy(() => import('@/pages/seeker/SeekerProfile'))
 const SeekerProfileEdit = lazy(() => import('@/pages/seeker/SeekerProfileEdit'))
@@ -223,7 +223,7 @@ export const router = createBrowserRouter([
                         children: [
                           { path: 'post-job', element: S(EmployerPostJob) },
                           { path: 'vacancies', element: S(EmployerVacancies) },
-                          { path: 'ats', element: S(EmployerATSBoard) },
+                          { path: 'ats', element: S(EmployerATSGrid) },
                         ],
                       },
                     ],

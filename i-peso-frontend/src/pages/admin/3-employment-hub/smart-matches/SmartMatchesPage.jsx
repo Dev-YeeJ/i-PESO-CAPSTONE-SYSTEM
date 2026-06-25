@@ -1,47 +1,21 @@
-import { useState } from 'react'
-import { PageHeader, StatCard, DataTable, ConfirmModal } from '@/pages/admin/_components'
+import { createElement, useState } from 'react'
+import { BrainCircuit, PlayCircle, BarChart3, Users, CheckCircle2 } from 'lucide-react'
+import { Card, Button } from '@/components/ui'
+import PageHeader from '@/pages/admin/_components/PageHeader'
+import DataTable from '@/pages/admin/_components/DataTable'
 
 export default function SmartMatchesPage() {
-  const [matches, setMatches] = useState([
-    {
-      id: 1,
-      run_date: '2024-06-01',
-      job_seekers_matched: 145,
-      positions_filled: 32,
-      success_rate: '22.07%',
-      status: 'completed',
-    },
-    {
-      id: 2,
-      run_date: '2024-05-15',
-      job_seekers_matched: 128,
-      positions_filled: 28,
-      success_rate: '21.88%',
-      status: 'completed',
-    },
-  ])
-
+  // Mock data removed. Awaiting backend integration for AI matching
+  const [matches] = useState([])
+  const [loading] = useState(false)
   const [isRunning, setIsRunning] = useState(false)
-  const [showConfirm, setShowConfirm] = useState(false)
 
   const handleRunMatching = () => {
     setIsRunning(true)
-    // Simulate AI matching process
     setTimeout(() => {
-      setMatches([
-        {
-          id: matches.length + 1,
-          run_date: new Date().toISOString().split('T')[0],
-          job_seekers_matched: Math.floor(Math.random() * 200),
-          positions_filled: Math.floor(Math.random() * 50),
-          success_rate: `${(Math.random() * 30).toFixed(2)}%`,
-          status: 'completed',
-        },
-        ...matches,
-      ])
+      alert('Backend AI matching logic not yet implemented.')
       setIsRunning(false)
-      setShowConfirm(false)
-    }, 2000)
+    }, 1000)
   }
 
   const columns = [
@@ -53,7 +27,7 @@ export default function SmartMatchesPage() {
       key: 'status',
       label: 'Status',
       render: (value) => (
-        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800">
           {value}
         </span>
       ),
@@ -61,55 +35,72 @@ export default function SmartMatchesPage() {
   ]
 
   return (
-    <div className="min-h-screen bg-gray-50 p-8">
+    <div className="portal-page">
       <PageHeader
         title="AI Smart Matches"
-        subtitle="Run intelligent job seeker-to-vacancy matching and notify candidates"
+        subtitle="Run intelligent job seeker-to-vacancy matching to accelerate local employment."
+        eyebrow="Employment Hub"
+        actions={[
+          { label: isRunning ? 'Running...' : 'Run Match Engine', onClick: handleRunMatching, variant: 'primary', disabled: isRunning }
+        ]}
       />
 
-      <div className="mt-8 grid grid-cols-1 gap-6 md:grid-cols-3">
-        <StatCard
-          title="Total Matches"
-          value={matches.length}
-          icon="📊"
-          trend="up"
-        />
-        <StatCard
-          title="Positions Filled"
-          value={matches.reduce((sum, m) => sum + m.positions_filled, 0)}
-          icon="✓"
-        />
-        <StatCard
-          title="Avg Success Rate"
-          value={`${(matches.reduce((sum, m) => sum + parseFloat(m.success_rate), 0) / matches.length).toFixed(2)}%`}
-          icon="📈"
-        />
+      <div className="grid gap-4 sm:grid-cols-3">
+        <SummaryCard icon={BarChart3} label="Total Matches" value={matches.length} detail="Historical runs" tone="navy" />
+        <SummaryCard icon={Users} label="Positions Filled" value={0} detail="Attributed to Smart Matches" tone="green" />
+        <SummaryCard icon={CheckCircle2} label="Avg Success Rate" value="0%" detail="Candidate acceptance rate" tone="blue" />
       </div>
 
-      <div className="mt-8 bg-white shadow rounded-lg p-6">
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-lg font-semibold text-gray-900">Match History</h2>
-          <button
-            onClick={() => setShowConfirm(true)}
-            disabled={isRunning}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
-          >
-            {isRunning ? 'Running...' : 'Run New Matching'}
-          </button>
+      <Card padding="none" className="mt-6">
+        <div className="p-5 sm:p-6 flex items-center justify-between border-b border-slate-100">
+          <div>
+            <h2 className="text-lg font-bold text-slate-950">Match History</h2>
+            <p className="text-sm text-slate-500">Review past AI matching executions and their outcomes.</p>
+          </div>
         </div>
 
-        <DataTable columns={columns} data={matches} />
-      </div>
-
-      {showConfirm && (
-        <ConfirmModal
-          title="Run Smart Matching"
-          message="This will analyze all job seekers and vacancies to find optimal matches. This may take a few minutes. Continue?"
-          onConfirm={handleRunMatching}
-          onCancel={() => setShowConfirm(false)}
-          isLoading={isRunning}
-        />
-      )}
+        {matches.length === 0 && !loading ? (
+          <div className="py-16 text-center">
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-brand-50 text-brand-700">
+              <BrainCircuit className="h-8 w-8" />
+            </div>
+            <h2 className="mt-4 text-lg font-bold text-slate-950">No Matching History</h2>
+            <p className="mx-auto mt-2 max-w-sm text-sm text-slate-500">
+              You haven't run the Smart Match engine yet. Run it to start connecting job seekers with open vacancies automatically.
+            </p>
+            <Button variant="outline" className="mt-6" onClick={handleRunMatching} disabled={isRunning}>
+              {isRunning ? 'Processing...' : 'Start Initial Match Run'}
+            </Button>
+          </div>
+        ) : (
+          <DataTable columns={columns} data={matches} loading={loading} />
+        )}
+      </Card>
     </div>
   )
 }
+
+function SummaryCard({ icon, label, value, detail, tone }) {
+  const tones = {
+    navy: 'bg-slate-100 text-brand-navy',
+    green: 'bg-emerald-50 text-emerald-700',
+    amber: 'bg-amber-50 text-amber-700',
+    blue: 'bg-blue-50 text-blue-700',
+  }
+
+  return (
+    <Card padding="sm">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p className="text-xs font-extrabold uppercase tracking-wide text-slate-500">{label}</p>
+          <p className="mt-2 text-3xl font-black text-slate-950">{value}</p>
+          <p className="mt-1 text-xs text-slate-500">{detail}</p>
+        </div>
+        <span className={`rounded-xl p-2.5 ${tones[tone]}`}>
+          {createElement(icon, { className: 'h-5 w-5' })}
+        </span>
+      </div>
+    </Card>
+  )
+}
+

@@ -24,12 +24,7 @@ class SeekerNearbyJobController extends Controller
 
         /** @var JobSeeker $seeker */
         $seeker = $request->user();
-        if ($seeker->latitude === null || $seeker->longitude === null) {
-            return response()->json([
-                'message' => 'Set your address location before searching for nearby jobs.',
-                'code' => 'location_required',
-            ], 422);
-        }
+        $hasLocation = $seeker->latitude !== null && $seeker->longitude !== null;
 
         $validated = $request->validate([
             'radius_km' => ['nullable', 'numeric', 'min:1', 'max:100'],
@@ -39,6 +34,7 @@ class SeekerNearbyJobController extends Controller
         $radiusKm = (float) ($validated['radius_km'] ?? 15);
         $limit = (int) ($validated['limit'] ?? 20);
         $candidateLimit = min(100, max($limit, $limit * 5));
+        
         if (Schema::hasTable('seeker_skills') && Schema::hasColumn('seeker_skills', 'skill_id')) {
             $seeker->loadMissing('seekerSkills:id,seeker_id,skill_id');
         }
@@ -56,7 +52,7 @@ class SeekerNearbyJobController extends Controller
             $with[] = 'skillRequirements.skill.incomingRelationships';
         }
 
-        $jobs = JobVacancy::query()
+        $jobsQuery = JobVacancy::query()
             ->with($with)
             ->where('status', 'active')
             ->where(function ($query) {
@@ -64,16 +60,30 @@ class SeekerNearbyJobController extends Controller
                     ->whereNull('application_deadline')
                     ->orWhereDate('application_deadline', '>=', today());
             })
-            ->withinRadius(
-                (float) $seeker->latitude,
-                (float) $seeker->longitude,
-                $radiusKm
-            )
+            ->latest();
+
+        $jobs = $jobsQuery
             ->limit($candidateLimit)
             ->get()
-            ->map(function (JobVacancy $job) use ($matching, $seeker, $applicationsByPost) {
+            ->map(function (JobVacancy $job) use ($matching, $seeker, $applicationsByPost, $hasLocation) {
                 $match = $matching->calculateMatch($job, $seeker);
                 $application = $applicationsByPost->get($job->post_id);
+
+                $distanceKm = null;
+                if ($hasLocation && $job->latitude !== null && $job->longitude !== null) {
+                    $latFrom = deg2rad((float) $seeker->latitude);
+                    $lonFrom = deg2rad((float) $seeker->longitude);
+                    $latTo = deg2rad((float) $job->latitude);
+                    $lonTo = deg2rad((float) $job->longitude);
+
+                    $latDelta = $latTo - $latFrom;
+                    $lonDelta = $lonTo - $lonFrom;
+
+                    $angle = 2 * asin(sqrt(pow(sin($latDelta / 2), 2) +
+                        cos($latFrom) * cos($latTo) * pow(sin($lonDelta / 2), 2)));
+                    
+                    $distanceKm = round($angle * 6371.0088, 1);
+                }
 
                 return [
                     'post_id' => $job->post_id,
@@ -110,7 +120,7 @@ class SeekerNearbyJobController extends Controller
                     'open_to_pwds' => $job->open_to_pwds,
                     'open_to_senior_citizens' => $job->open_to_senior_citizens,
                     'spes_tupad_eligible' => $job->spes_tupad_eligible,
-                    'distance_km' => round((float) $job->distance_km, 1),
+                    'distance_km' => $distanceKm,
                     'posted_at' => $job->created_at?->toISOString(),
                     'has_applied' => (bool) $application,
                     'application_id' => $application?->apply_id,
@@ -128,17 +138,20 @@ class SeekerNearbyJobController extends Controller
                     return $percentage;
                 }
 
-                return $left['distance_km'] <=> $right['distance_km'];
+                $leftDistance = $left['distance_km'] ?? 999999;
+                $rightDistance = $right['distance_km'] ?? 999999;
+
+                return $leftDistance <=> $rightDistance;
             })
             ->take($limit)
             ->values();
 
         return response()->json([
             'radius_km' => $radiusKm,
-            'origin' => [
+            'origin' => $hasLocation ? [
                 'latitude' => (float) $seeker->latitude,
                 'longitude' => (float) $seeker->longitude,
-            ],
+            ] : null,
             'count' => $jobs->count(),
             'jobs' => $jobs,
         ]);

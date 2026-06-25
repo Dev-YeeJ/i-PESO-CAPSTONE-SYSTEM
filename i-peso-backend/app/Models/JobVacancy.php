@@ -89,7 +89,8 @@ class JobVacancy extends Model
         Builder $query,
         float $latitude,
         float $longitude,
-        float $radiusKm
+        float $radiusKm,
+        bool $includeNullLocations = false
     ): Builder {
         $this->registerSqliteMathFunctions($query);
 
@@ -127,24 +128,31 @@ class JobVacancy extends Model
         $distanceBindings = [$earthRadiusKm, $latitude, $latitude, $longitude];
 
         return $query
-            ->whereNotNull('job_vacancies.latitude')
-            ->whereNotNull('job_vacancies.longitude')
-            ->whereBetween('job_vacancies.latitude', [
-                max(-90, $latitude - $latitudeDelta),
-                min(90, $latitude + $latitudeDelta),
-            ])
-            ->when(
-                $longitude - $longitudeDelta >= -180
-                    && $longitude + $longitudeDelta <= 180,
-                fn (Builder $builder) => $builder->whereBetween('job_vacancies.longitude', [
-                    $longitude - $longitudeDelta,
-                    $longitude + $longitudeDelta,
-                ])
-            )
             ->addSelect('job_vacancies.*')
             ->selectRaw("{$distanceSql} AS distance_km", $distanceBindings)
-            ->whereRaw("{$distanceSql} <= ?", [...$distanceBindings, $radiusKm])
-            ->orderBy('distance_km');
+            ->where(function (Builder $query) use ($latitude, $latitudeDelta, $longitude, $longitudeDelta, $distanceSql, $distanceBindings, $radiusKm, $includeNullLocations) {
+                if ($includeNullLocations) {
+                    $query->whereNull('job_vacancies.latitude');
+                }
+                
+                $query->orWhere(function (Builder $q) use ($latitude, $latitudeDelta, $longitude, $longitudeDelta, $distanceSql, $distanceBindings, $radiusKm) {
+                    $q->whereNotNull('job_vacancies.latitude')
+                      ->whereNotNull('job_vacancies.longitude')
+                      ->whereBetween('job_vacancies.latitude', [
+                          max(-90, $latitude - $latitudeDelta),
+                          min(90, $latitude + $latitudeDelta),
+                      ])
+                      ->when(
+                          $longitude - $longitudeDelta >= -180
+                              && $longitude + $longitudeDelta <= 180,
+                          fn (Builder $builder) => $builder->whereBetween('job_vacancies.longitude', [
+                              $longitude - $longitudeDelta,
+                              $longitude + $longitudeDelta,
+                          ])
+                      )
+                      ->whereRaw("{$distanceSql} <= ?", [...$distanceBindings, $radiusKm]);
+                });
+            });
     }
 
     public function scopeMatchWithSynonyms(Builder $query, JobSeeker $seeker): Builder

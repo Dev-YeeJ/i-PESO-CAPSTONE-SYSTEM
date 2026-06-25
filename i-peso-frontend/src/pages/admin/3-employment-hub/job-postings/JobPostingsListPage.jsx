@@ -1,19 +1,25 @@
-// i-peso-frontend/src/pages/admin/vacancies/VacanciesListPage.jsx
-import { useEffect, useState } from 'react'
+import { BriefcaseBusiness } from 'lucide-react'
+import { Card } from '@/components/ui'
 import PageHeader from '@/pages/admin/_components/PageHeader'
-import DataTable from '@/pages/admin/_components/DataTable'
-import StatusBadge from '@/pages/admin/_components/StatusBadge'
 
-export default function VacanciesListPage() {
+export default function JobPostingsListPage() {
   return (
-    <div className="space-y-6">
+    <div className="portal-page">
       <PageHeader
-        title="Job Vacancies"
-        subtitle="View all job openings from employers"
+        title="Job Postings"
+        subtitle="Monitor and oversee all active job vacancies posted by accredited employers."
+        eyebrow="Employment Hub"
       />
-      <div className="bg-blue-50 border border-blue-200 rounded-2xl p-6">
-        <p className="text-blue-900">This is a read-only view of job vacancies. To manage vacancies, please use the employer portal.</p>
-      </div>
+      
+      <Card className="mt-6 text-center py-16">
+        <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-brand-50 text-brand-700">
+          <BriefcaseBusiness className="h-10 w-10" />
+        </div>
+        <h2 className="mt-6 text-xl font-bold text-slate-950">Read-Only View</h2>
+        <p className="mx-auto mt-2 max-w-md text-sm text-slate-500">
+          This portal currently provides a read-only overview of job vacancies. To manage or create vacancies, please log in through the respective employer constituent portal.
+        </p>
+      </Card>
     </div>
   )
-}
+}

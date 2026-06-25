@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { createElement, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   AlertTriangle,
@@ -62,148 +62,15 @@ const emptyFilters = {
   datePosted: 'any',
 }
 
-const fallbackJobs = [
-  {
-    id: 'local-1',
-    title: 'Administrative Aide IV',
-    company: 'Urdaneta City LGU',
-    location: 'Nancayasan, Urdaneta City',
-    distanceKm: 1.8,
-    salaryMin: 18500,
-    salaryMax: 22000,
-    salaryRange: 'PHP 18,500 - PHP 22,000 / month',
-    requiredSkills: ['Records Management', 'MS Excel', 'Document Control', 'Client Service'],
-    matchScore: 95,
-    workSetup: 'On-site',
-    employmentType: 'Full-Time',
-    jobLevel: 'Entry',
-    vacancies: 4,
-    postedAt: '2026-06-16',
-    deadline: '2026-07-12',
-    description: 'Assist with records, front desk coordination, routing of documents, and citizen service support.',
-    matchSummary: { occupation: 95, skills: 92, experience: 88, education: 100 },
-    missingCriticalSkills: [],
-  },
-  {
-    id: 'local-2',
-    title: 'HR Assistant',
-    company: 'Pangasinan Allied Services',
-    location: 'San Vicente, Urdaneta City',
-    distanceKm: 3.2,
-    salaryMin: 17000,
-    salaryMax: 21000,
-    salaryRange: 'PHP 17,000 - PHP 21,000 / month',
-    requiredSkills: ['Recruitment Support', 'Data Encoding', 'Communication', 'MS Excel'],
-    matchScore: 91,
-    workSetup: 'On-site',
-    employmentType: 'Contractual',
-    jobLevel: 'Mid',
-    vacancies: 2,
-    postedAt: '2026-06-14',
-    deadline: '2026-07-05',
-    description: 'Support applicant screening, appointment scheduling, employment document preparation, and reporting.',
-    matchSummary: { occupation: 88, skills: 94, experience: 84, education: 100 },
-    missingCriticalSkills: [],
-  },
-  {
-    id: 'local-3',
-    title: 'Cashier / Front Desk Associate',
-    company: 'CB Mall Urdaneta',
-    location: 'Poblacion, Urdaneta City',
-    distanceKm: 4.4,
-    salaryMin: 15000,
-    salaryMax: 18000,
-    salaryRange: 'PHP 15,000 - PHP 18,000 / month',
-    requiredSkills: ['Cash Handling', 'POS Systems', 'Customer Service', 'Inventory'],
-    matchScore: 82,
-    workSetup: 'On-site',
-    employmentType: 'Full-Time',
-    jobLevel: 'Entry',
-    vacancies: 6,
-    postedAt: '2026-06-13',
-    deadline: '2026-06-30',
-    description: 'Handle front desk transactions, customer inquiries, payment processing, and basic inventory checks.',
-    matchSummary: { occupation: 78, skills: 80, experience: 85, education: 90 },
-    missingCriticalSkills: ['POS Systems'],
-  },
-  {
-    id: 'local-4',
-    title: 'Data Encoder',
-    company: 'North Luzon Diagnostics',
-    location: 'Mabini, Urdaneta City',
-    distanceKm: 5.1,
-    salaryMin: 16000,
-    salaryMax: 19500,
-    salaryRange: 'PHP 16,000 - PHP 19,500 / month',
-    requiredSkills: ['Typing', 'Spreadsheet Management', 'Data Validation', 'Confidentiality'],
-    matchScore: 76,
-    workSetup: 'Hybrid',
-    employmentType: 'Contractual',
-    jobLevel: 'Entry',
-    vacancies: 3,
-    postedAt: '2026-06-10',
-    deadline: '2026-07-01',
-    description: 'Encode laboratory records, validate patient forms, and maintain confidential digital files.',
-    matchSummary: { occupation: 72, skills: 76, experience: 70, education: 95 },
-    missingCriticalSkills: ['Data Validation'],
-  },
-  {
-    id: 'local-5',
-    title: 'Customer Support Associate',
-    company: 'PESO Partner BPO Hub',
-    location: 'Anonas, Urdaneta City',
-    distanceKm: 6.8,
-    salaryMin: 20000,
-    salaryMax: 25000,
-    salaryRange: 'PHP 20,000 - PHP 25,000 / month',
-    requiredSkills: ['Email Support', 'CRM', 'Problem Solving', 'English Communication'],
-    matchScore: 72,
-    workSetup: 'Hybrid',
-    employmentType: 'Full-Time',
-    jobLevel: 'Mid',
-    vacancies: 8,
-    postedAt: '2026-06-08',
-    deadline: '2026-07-15',
-    description: 'Respond to customer inquiries, maintain CRM records, and coordinate issue resolution with supervisors.',
-    matchSummary: { occupation: 70, skills: 68, experience: 78, education: 90 },
-    missingCriticalSkills: ['CRM'],
-  },
-]
+const fallbackJobs = []
 
-const bulletins = [
-  {
-    id: 'news-1',
-    type: 'Job Fair',
-    title: 'Mega Job Fair at UCU Gymnasium',
-    detail: 'PESO partner employers will conduct walk-in screening and initial interviews. Bring valid IDs and printed resumes.',
-    date: 'July 12, 2026',
-    location: 'Urdaneta City University Gymnasium',
-    priority: 'high',
-  },
-  {
-    id: 'news-2',
-    type: 'Advisory',
-    title: 'TESDA Certificate Validation Week',
-    detail: 'Job seekers may verify TESDA-related records through the PESO help desk to strengthen their matching profile.',
-    date: 'Weekdays',
-    location: 'City Hall Annex',
-    priority: 'normal',
-  },
-  {
-    id: 'news-3',
-    type: 'Coaching',
-    title: 'Resume and Interview Coaching',
-    detail: 'Free one-on-one coaching slots are available for first-time applicants, returning OFWs, and displaced workers.',
-    date: 'Friday, 9:00 AM',
-    location: 'PESO Career Center',
-    priority: 'normal',
-  },
-]
+const bulletins = []
 
 export default function JobSeekerHome({
   profile = null,
   user = null,
   jobsData = null,
+  analyticsData = null,
   error = '',
   jobsError = '',
 }) {
@@ -385,24 +252,31 @@ export default function JobSeekerHome({
           </div>
         )}
 
-        <SearchPanel
-          seeker={seeker}
-          topMatch={topMatch}
-          usingFallbackJobs={usingFallbackJobs}
-          radiusKm={Number(jobsData?.radius_km ?? 20)}
-          draftQuery={draftQuery}
-          draftLocation={draftLocation}
-          activeQuickFilters={activeQuickFilters}
-          onQueryChange={setDraftQuery}
-          onLocationChange={setDraftLocation}
-          onClear={clearSearch}
-          onSubmit={submitSearch}
-          onToggleQuickFilter={toggleQuickFilter}
-          onOpenFilters={() => setFiltersOpen(true)}
-        />
+        <div className="grid gap-6 lg:grid-cols-[minmax(280px,0.8fr)_minmax(0,2fr)] lg:items-start">
+          <aside className="space-y-5 lg:sticky lg:top-24 lg:self-start">
+            <ProfileSnapshot seeker={seeker} activeApplications={activeApplications} />
+            <NextBestAction profile={profile} seeker={seeker} />
+            {analyticsData && <ProfileViewsAnalytics analytics={analyticsData} />}
+            <MatchingEngineCard />
+          </aside>
 
-        <div className="grid gap-6 xl:grid-cols-[minmax(0,1.65fr)_minmax(320px,0.75fr)]">
           <main className="space-y-5">
+            <SearchPanel
+              seeker={seeker}
+              topMatch={topMatch}
+              usingFallbackJobs={usingFallbackJobs}
+              radiusKm={Number(jobsData?.radius_km ?? 20)}
+              draftQuery={draftQuery}
+              draftLocation={draftLocation}
+              activeQuickFilters={activeQuickFilters}
+              onQueryChange={setDraftQuery}
+              onLocationChange={setDraftLocation}
+              onClear={clearSearch}
+              onSubmit={submitSearch}
+              onToggleQuickFilter={toggleQuickFilter}
+              onOpenFilters={() => setFiltersOpen(true)}
+            />
+
             <FeedControls
               activeTab={activeTab}
               savedCount={savedJobIds.length}
@@ -447,12 +321,6 @@ export default function JobSeekerHome({
               </section>
             )}
           </main>
-
-          <aside className="space-y-5 xl:sticky xl:top-24 xl:self-start">
-            <ProfileSnapshot seeker={seeker} activeApplications={activeApplications} />
-            <NextBestAction profile={profile} seeker={seeker} />
-            <MatchingEngineCard />
-          </aside>
         </div>
 
         {selectedJob && (
@@ -496,62 +364,40 @@ function SearchPanel({
 }) {
   return (
     <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-      <div className="border-b border-slate-200 bg-gradient-to-br from-white via-white to-blue-50/60 p-5 sm:p-7">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-          <div>
-            <div className="inline-flex items-center gap-2 rounded-full border border-blue-100 bg-blue-50 px-3 py-1 text-xs font-black uppercase tracking-[0.16em] text-blue-700">
-              <Layers3 className="h-3.5 w-3.5" />
-              Dual-Layer Matching Engine
-            </div>
-            <h1 className="mt-4 text-2xl font-black tracking-tight text-slate-950 sm:text-4xl">
-              Find your best PESO job matches
-            </h1>
-            <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-              Search vacancies ranked by merit score and GPS distance. Use quick filters when you need a tighter shortlist.
-            </p>
-          </div>
-          <div className="rounded-xl border border-blue-100 bg-white px-4 py-3 shadow-sm">
-            <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">Today&apos;s focus</p>
-            <p className="mt-1 text-sm font-bold text-slate-950">
-              {topMatch ? `${topMatch.title} is your strongest match.` : `Welcome back, ${seeker.firstName}.`}
-            </p>
-          </div>
-        </div>
-
-        <form onSubmit={onSubmit} className="mt-6 grid gap-3 lg:grid-cols-[minmax(0,1.35fr)_minmax(220px,0.65fr)_auto]">
-          <div className="relative">
+      <div className="p-4 sm:p-5">
+        <form onSubmit={onSubmit} className="flex flex-col sm:flex-row gap-3">
+          <div className="relative flex-1">
             <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
             <input
               value={draftQuery}
               onChange={(event) => onQueryChange(event.target.value)}
-              className="h-14 w-full rounded-xl border border-slate-300 bg-white pl-12 pr-4 text-sm font-semibold text-slate-900 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-blue-600 focus:ring-4 focus:ring-blue-100"
-              placeholder="Search job titles, companies, or keywords"
+              className="h-12 w-full rounded-xl border border-slate-300 bg-slate-50 hover:bg-white pl-12 pr-4 text-sm font-semibold text-slate-900 shadow-sm outline-none transition placeholder:text-slate-500 focus:border-blue-600 focus:bg-white focus:ring-4 focus:ring-blue-100"
+              placeholder="Search by title, skill, or company"
             />
           </div>
 
-          <div className="relative">
+          <div className="relative flex-1">
             <MapPin className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
             <input
               value={draftLocation}
               onChange={(event) => onLocationChange(event.target.value)}
-              className="h-14 w-full rounded-xl border border-slate-300 bg-white pl-12 pr-4 text-sm font-semibold text-slate-900 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-blue-600 focus:ring-4 focus:ring-blue-100"
-              placeholder="Location or barangay"
+              className="h-12 w-full rounded-xl border border-slate-300 bg-slate-50 hover:bg-white pl-12 pr-4 text-sm font-semibold text-slate-900 shadow-sm outline-none transition placeholder:text-slate-500 focus:border-blue-600 focus:bg-white focus:ring-4 focus:ring-blue-100"
+              placeholder="City, province, or region"
             />
           </div>
 
-          <div className="flex gap-2">
+          <div className="flex gap-2 shrink-0">
             <button
               type="submit"
-              className="inline-flex h-14 flex-1 items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 text-sm font-black text-white shadow-sm transition hover:bg-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-200 lg:flex-none"
+              className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-blue-600 px-6 text-sm font-black text-white shadow-sm transition hover:bg-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-200"
             >
-              <Search className="h-4 w-4" />
               Search
             </button>
             {(draftQuery || draftLocation) && (
               <button
                 type="button"
                 onClick={onClear}
-                className="inline-flex h-14 w-14 items-center justify-center rounded-xl border border-slate-300 bg-white text-slate-500 transition hover:bg-slate-50 hover:text-slate-800"
+                className="inline-flex h-12 w-12 items-center justify-center rounded-xl border border-slate-300 bg-white text-slate-500 transition hover:bg-slate-50 hover:text-slate-800"
                 aria-label="Clear search"
               >
                 <X className="h-5 w-5" />
@@ -572,7 +418,7 @@ function SearchPanel({
           <button
             type="button"
             onClick={onOpenFilters}
-            className="inline-flex shrink-0 items-center gap-2 rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-black text-slate-700 shadow-sm transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-100"
+            className="inline-flex shrink-0 items-center gap-2 rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-black text-slate-700 shadow-sm transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-100"
           >
             <Settings2 className="h-4 w-4" />
             All Filters
@@ -580,15 +426,9 @@ function SearchPanel({
         </div>
       </div>
 
-      <div className="grid gap-3 bg-slate-50 p-4 sm:grid-cols-3">
-        <MetricCard icon={Target} label="Best Merit Match" value={topMatch ? `${topMatch.matchScore}%` : '0%'} />
-        <MetricCard icon={MapPin} label="Search Radius" value={`${radiusKm} km`} />
-        <MetricCard icon={ShieldCheck} label="Ranking Model" value="Merit + GPS" />
-      </div>
-
       {usingFallbackJobs && (
         <div className="border-t border-amber-200 bg-amber-50 px-5 py-3 text-xs font-semibold leading-5 text-amber-800">
-          Live nearby matching needs a saved map location and active published jobs. This preview feed keeps the dashboard usable while data is still being prepared.
+          Showing a preview feed. Update your location in your profile to enable GPS-based nearby matching.
         </div>
       )}
     </section>
@@ -609,7 +449,7 @@ function QuickFilterPill({ filter, active, onClick }) {
           : 'border-slate-300 bg-white text-slate-700 hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700'
       }`}
     >
-      <Icon className="h-4 w-4" />
+      {createElement(Icon, { className: 'h-4 w-4' })}
       {filter.label}
     </button>
   )
@@ -698,7 +538,7 @@ function ViewToggleButton({ active, icon: Icon, label, onClick }) {
         active ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-50 hover:text-blue-700'
       }`}
     >
-      <Icon className="h-4 w-4" />
+      {createElement(Icon, { className: 'h-4 w-4' })}
       {label}
     </button>
   )
@@ -708,98 +548,71 @@ function JobCard({ job, saved = false, applying = false, onSave, onDetails, onQu
   const matchMeta = matchMetaFor(job.matchScore)
 
   return (
-    <article className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition-all hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-md">
-      <div className="flex flex-col gap-5">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-          <div className="flex min-w-0 gap-4">
-            <CompanyMark company={job.company} />
-            <div className="min-w-0">
-              <div className="mb-2 flex flex-wrap items-center gap-2">
-                <ScoreBadge icon={Star} label={`${job.matchScore}% Match`} className={matchMeta.className} />
-                <ScoreBadge icon={MapPin} label={`${formatDistance(job.distanceKm)} away`} className="border-slate-200 bg-slate-50 text-slate-700" />
-              </div>
-              <h2 className="text-lg font-black text-slate-950">{job.title}</h2>
-              <p className="mt-1 flex flex-wrap items-center gap-2 text-sm font-semibold text-slate-600">
-                <span className="inline-flex items-center gap-1.5">
-                  <Building2 className="h-4 w-4 text-slate-400" />
-                  {job.company}
-                </span>
-                <span className="text-slate-300">/</span>
-                <span>{job.location}</span>
-              </p>
-            </div>
+    <article className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-blue-300 hover:shadow-lg cursor-pointer group" onClick={onDetails}>
+      <div className="flex flex-col gap-4">
+        <div className="flex items-start gap-4">
+          <CompanyMark company={job.company} />
+          <div className="min-w-0 flex-1">
+            <h2 className="text-lg font-black text-blue-700 group-hover:underline">{job.title}</h2>
+            <p className="mt-0.5 text-sm font-semibold text-slate-900">{job.company}</p>
+            <p className="mt-0.5 text-sm text-slate-500 flex items-center gap-1.5 flex-wrap">
+              <span>{job.location}</span>
+              {job.distanceKm != null && (
+                <>
+                  <span className="text-slate-300">&bull;</span>
+                  <span className="flex items-center gap-1"><MapPin className="h-3.5 w-3.5"/> {formatDistance(job.distanceKm)}</span>
+                </>
+              )}
+            </p>
+            <p className="mt-1 text-xs font-bold text-slate-500 flex items-center gap-2 flex-wrap">
+              <span className="flex items-center gap-1"><WalletCards className="h-3.5 w-3.5"/> {job.salaryRange}</span>
+              <span className="text-slate-300">&bull;</span>
+              <span className="flex items-center gap-1"><BriefcaseBusiness className="h-3.5 w-3.5"/> {job.workSetup || 'Not specified'}</span>
+            </p>
           </div>
-
-          <div className="grid grid-cols-2 gap-2 text-sm lg:min-w-64">
-            <MiniFact icon={WalletCards} label="Salary" value={job.salaryRange} />
-            <MiniFact icon={BriefcaseBusiness} label="Setup" value={job.workSetup || 'Not specified'} />
-          </div>
+          <button 
+            type="button" 
+            onClick={(e) => { e.stopPropagation(); onSave(); }} 
+            className="text-slate-400 hover:text-blue-600 transition p-2 hover:bg-blue-50 rounded-full"
+            aria-label={saved ? `Remove ${job.title} from saved jobs` : `Save ${job.title}`}
+          >
+            {saved ? <BookmarkCheck className="h-6 w-6 text-blue-600" /> : <Bookmark className="h-6 w-6" />}
+          </button>
         </div>
 
-        <div className="grid gap-3 md:grid-cols-4">
-          {Object.entries(job.matchSummary).map(([key, value]) => (
-            <ScorePill key={key} label={titleCase(key)} value={value} />
-          ))}
-        </div>
-
-        <div className="flex flex-wrap gap-2">
-          {job.requiredSkills.slice(0, 6).map((skill) => (
-            <span key={skill} className="rounded-full border border-blue-100 bg-blue-50 px-3 py-1.5 text-xs font-bold text-blue-700">
+        <div className="flex flex-wrap items-center gap-2 mt-2">
+          <ScoreBadge icon={Star} label={`${job.matchScore}% Match`} className={matchMeta.className} />
+          {job.requiredSkills.slice(0, 3).map((skill) => (
+            <span key={skill} className="rounded-md bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">
               {skill}
             </span>
           ))}
-        </div>
-
-        <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
-          {job.missingCriticalSkills.length ? (
-            <p className="text-sm leading-6 text-slate-600">
-              <span className="font-black text-amber-700">Missing:</span> {job.missingCriticalSkills.slice(0, 2).join(', ')}
-              <Link to="/seeker/profile/edit" className="ml-2 inline-flex items-center gap-1 font-black text-blue-700 hover:text-blue-900">
-                <Search className="h-3.5 w-3.5" />
-                Find TESDA Training
-              </Link>
-            </p>
-          ) : (
-            <p className="text-sm font-semibold leading-6 text-emerald-700">
-              You meet the critical skill signals currently visible for this vacancy.
-            </p>
+          {job.requiredSkills.length > 3 && (
+            <span className="text-xs font-semibold text-slate-400">+{job.requiredSkills.length - 3} more</span>
           )}
         </div>
-
-        <div className="flex flex-col gap-3 border-t border-slate-100 pt-4 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-xs font-bold text-slate-500">
-            Posted {formatDate(job.postedAt) || 'recently'} / Deadline {formatDate(job.deadline) || 'open'}
+        
+        <div className="flex items-center justify-between border-t border-slate-100 pt-3 mt-1">
+          <p className="text-xs font-semibold text-emerald-700 flex items-center gap-1">
+            {job.missingCriticalSkills.length ? (
+              <span className="text-amber-600 flex items-center gap-1">
+                <AlertTriangle className="h-3.5 w-3.5"/> Missing {job.missingCriticalSkills.length} skill{job.missingCriticalSkills.length > 1 ? 's' : ''}
+              </span>
+            ) : (
+              <><ShieldCheck className="h-3.5 w-3.5"/> Strong Match</>
+            )}
           </p>
-          <div className="flex flex-wrap items-center gap-2">
+          
+          <div className="flex gap-2">
+            <span className="text-xs text-slate-500 self-center mr-2">{formatDate(job.postedAt) || 'recently'}</span>
             <button
               type="button"
-              onClick={onSave}
-              aria-label={saved ? `Remove ${job.title} from saved jobs` : `Save ${job.title}`}
-              aria-pressed={saved}
-              className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-black transition ${
-                saved
-                  ? 'border-blue-200 bg-blue-50 text-blue-700'
-                  : 'border-slate-300 bg-white text-slate-700 hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700'
-              }`}
-            >
-              {saved ? <BookmarkCheck className="h-4 w-4" /> : <Bookmark className="h-4 w-4" />}
-              Save
-            </button>
-            <button
-              type="button"
-              onClick={onDetails}
-              className="inline-flex min-h-11 items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-black text-slate-700 transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700"
-            >
-              View Details
-            </button>
-            <button
-              type="button"
-              onClick={onQuickApply}
+              onClick={(e) => { e.stopPropagation(); onQuickApply(); }}
               disabled={job.hasApplied || applying}
-              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-black text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex items-center justify-center gap-1.5 rounded-full bg-blue-600 px-4 py-1.5 text-xs font-black text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              <Zap className="h-4 w-4" />
-              {job.hasApplied ? `Applied: ${titleCase(job.applicationStatus || 'pending')}` : applying ? 'Submitting...' : '1-Click Apply'}
+              <Zap className="h-3.5 w-3.5" />
+              {job.hasApplied ? 'Applied' : applying ? 'Wait...' : 'Easy Apply'}
             </button>
           </div>
         </div>
@@ -810,43 +623,77 @@ function JobCard({ job, saved = false, applying = false, onSave, onDetails, onQu
 
 function ProfileSnapshot({ seeker, activeApplications }) {
   return (
-    <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-      <div className="flex items-start gap-4">
-        <img src={seeker.profilePhoto} alt={seeker.name} className="h-16 w-16 rounded-2xl border border-slate-200 object-cover shadow-sm" />
-        <div className="min-w-0">
-          <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">Profile Snapshot</p>
-          <h2 className="mt-1 truncate text-lg font-black text-slate-950">{seeker.name}</h2>
-          <p className="mt-1 text-sm text-slate-600">{seeker.headline}</p>
+    <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+      <div className="relative h-20 bg-gradient-to-r from-blue-700 to-indigo-800">
+        <div className="absolute -bottom-8 left-1/2 -translate-x-1/2">
+          <img src={seeker.profilePhoto} alt={seeker.name} className="h-16 w-16 rounded-full border-4 border-white object-cover shadow-md" />
+        </div>
+      </div>
+      
+      <div className="pt-10 px-5 pb-4 text-center">
+        <h2 className="text-lg font-black text-slate-950 truncate hover:underline cursor-pointer">
+          <Link to="/seeker/profile">{seeker.name}</Link>
+        </h2>
+        <p className="mt-1 text-xs text-slate-600 line-clamp-2">{seeker.headline}</p>
+      </div>
+
+      <div className="border-t border-slate-100 py-3">
+        <div className="px-5 py-2 hover:bg-slate-50 cursor-pointer flex justify-between items-center transition">
+          <span className="text-xs font-semibold text-slate-500">Profile Readiness</span>
+          <span className="text-xs font-black text-blue-700">{seeker.nsrpCompletion}%</span>
+        </div>
+        <div className="px-5 pb-2">
+          <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-200">
+            <div className="h-full rounded-full bg-gradient-to-r from-blue-600 to-emerald-500" style={{ width: `${Math.min(seeker.nsrpCompletion, 100)}%` }} />
+          </div>
+        </div>
+        <div className="px-5 py-2 hover:bg-slate-50 cursor-pointer flex justify-between items-center transition">
+          <span className="text-xs font-semibold text-slate-500">Active Applications</span>
+          <span className="text-xs font-black text-blue-700">{activeApplications}</span>
         </div>
       </div>
 
-      <div className="mt-5 rounded-xl border border-slate-200 bg-slate-50 p-4">
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <p className="text-sm font-black text-slate-900">Profile Readiness</p>
-            <p className="text-xs text-slate-500">Used for matching and PESO referrals</p>
-          </div>
-          <span className="text-2xl font-black text-blue-700">{seeker.nsrpCompletion}%</span>
-        </div>
-        <div className="mt-4 h-2.5 overflow-hidden rounded-full bg-slate-200">
-          <div className="h-full rounded-full bg-gradient-to-r from-blue-600 to-emerald-500" style={{ width: `${Math.min(seeker.nsrpCompletion, 100)}%` }} />
+      <div className="border-t border-slate-100 p-4">
+        <Link to="/seeker/profile" className="flex w-full min-h-10 items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-black text-slate-700 transition hover:bg-slate-50">
+          <UserRound className="h-4 w-4" />
+          Manage Profile
+        </Link>
+      </div>
+    </section>
+  )
+}
+
+function ProfileViewsAnalytics({ analytics }) {
+  return (
+    <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="flex items-start gap-3">
+        <span className="rounded-xl bg-blue-50 p-2 text-blue-700">
+          <UserRound className="h-5 w-5" />
+        </span>
+        <div>
+          <h2 className="text-sm font-black text-slate-950">Profile Analytics</h2>
+          <p className="mt-1 text-xs leading-5 text-slate-500">Past 30 days visibility</p>
         </div>
       </div>
 
       <div className="mt-4 grid grid-cols-2 gap-3">
-        <SidebarStat label="Active Applications" value={activeApplications} />
-        <SidebarStat label="Profile Status" value={seeker.nsrpCompletion >= 85 ? 'Strong' : 'Improve'} />
+        <SidebarStat label="Profile Views" value={analytics.total_views_30_days} />
+        <SidebarStat label="Search Appearances" value={analytics.search_appearances} />
       </div>
 
-      <div className="mt-5 flex flex-wrap gap-2">
-        <Link to="/seeker/profile" className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-black text-white transition hover:bg-blue-700">
-          <UserRound className="h-4 w-4" />
-          View Profile
-        </Link>
-        <Link to="/seeker/profile/edit" className="inline-flex min-h-10 items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-black text-slate-700 transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700">
-          Update
-        </Link>
-      </div>
+      {analytics.recent_viewers?.length > 0 && (
+        <div className="mt-5 border-t border-slate-100 pt-4">
+          <p className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-400">Recent Viewers</p>
+          <ul className="mt-3 space-y-3 text-sm font-semibold text-slate-700">
+            {analytics.recent_viewers.map((viewer, i) => (
+              <li key={i} className="flex items-center gap-2">
+                <Building2 className="h-4 w-4 text-slate-400 shrink-0" />
+                <span className="truncate">{viewer.company_name}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </section>
   )
 }
@@ -1047,7 +894,7 @@ function FilterSection({ title, icon: Icon, children }) {
   return (
     <section>
       <h3 className="mb-3 flex items-center gap-2 text-sm font-black text-slate-950">
-        <Icon className="h-4 w-4 text-blue-600" />
+        {createElement(Icon, { className: 'h-4 w-4 text-blue-600' })}
         {title}
       </h3>
       {children}
@@ -1234,7 +1081,7 @@ function MetricCard({ icon: Icon, label, value }) {
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
       <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-50 text-blue-700">
-        <Icon className="h-4 w-4" />
+        {createElement(Icon, { className: 'h-4 w-4' })}
       </span>
       <p className="mt-3 text-xs font-black uppercase tracking-[0.16em] text-slate-500">{label}</p>
       <p className="mt-1 text-xl font-black text-slate-950">{value}</p>
@@ -1246,7 +1093,7 @@ function MiniFact({ icon: Icon, label, value }) {
   return (
     <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
       <p className="flex items-center gap-1.5 text-[11px] font-black uppercase tracking-[0.14em] text-slate-500">
-        <Icon className="h-3.5 w-3.5" />
+        {createElement(Icon, { className: 'h-3.5 w-3.5' })}
         {label}
       </p>
       <p className="mt-1 truncate text-sm font-bold text-slate-900">{value}</p>
@@ -1258,7 +1105,7 @@ function Fact({ icon: Icon, label, value }) {
   return (
     <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
       <p className="flex items-center gap-1.5 text-[11px] font-black uppercase tracking-[0.14em] text-slate-500">
-        <Icon className="h-3.5 w-3.5" />
+        {createElement(Icon, { className: 'h-3.5 w-3.5' })}
         {label}
       </p>
       <p className="mt-1 truncate text-sm font-bold text-slate-900">{value}</p>
@@ -1269,7 +1116,7 @@ function Fact({ icon: Icon, label, value }) {
 function ScoreBadge({ icon: Icon, label, className }) {
   return (
     <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-black ${className}`}>
-      <Icon className="h-3.5 w-3.5" />
+      {createElement(Icon, { className: 'h-3.5 w-3.5' })}
       {label}
     </span>
   )
@@ -1305,7 +1152,7 @@ function ScoreRow({ label, value }) {
 
 function CompanyMark({ company }) {
   return (
-    <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-blue-100 bg-blue-50 text-sm font-black text-blue-700">
+    <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-sm border border-slate-200 bg-slate-50 shadow-sm text-sm font-black text-slate-500">
       {companyMonogram(company)}
     </div>
   )
@@ -1323,7 +1170,7 @@ function SidebarStat({ label, value }) {
 function EngineRow({ icon: Icon, title, text }) {
   return (
     <div className="flex gap-3 rounded-xl bg-slate-50 p-3">
-      <Icon className="mt-0.5 h-4 w-4 shrink-0 text-blue-700" />
+      {createElement(Icon, { className: 'mt-0.5 h-4 w-4 shrink-0 text-blue-700' })}
       <div>
         <p className="text-sm font-black text-slate-900">{title}</p>
         <p className="mt-0.5 text-xs leading-5 text-slate-500">{text}</p>
@@ -1457,8 +1304,8 @@ function nextBestAction(profile, seeker) {
     return {
       title: 'Add your Professional Summary',
       description: 'You are missing a short About Me section. Add one with AI to make your profile easier for employers to understand.',
-      cta: 'Add with AI',
-      href: '/seeker/profile/edit',
+      cta: 'Open Profile to Add with AI',
+      href: '/seeker/profile',
     }
   }
 
@@ -1466,8 +1313,8 @@ function nextBestAction(profile, seeker) {
     return {
       title: missing.label || 'Complete your profile',
       description: 'This missing item can improve match quality and make your resume studio output stronger.',
-      cta: 'Update Profile',
-      href: '/seeker/profile/edit',
+      cta: 'Open Profile',
+      href: '/seeker/profile',
     }
   }
 
@@ -1476,7 +1323,7 @@ function nextBestAction(profile, seeker) {
       title: 'Polish your employment profile',
       description: 'Your profile is usable, but a few final details can improve referrals and resume quality.',
       cta: 'Review Profile',
-      href: '/seeker/profile/edit',
+      href: '/seeker/profile',
     }
   }
 
