@@ -1,5 +1,5 @@
 import { ReactNode } from 'react'
-import { StyleSheet, View, Text, type ViewStyle, type TextStyle } from 'react-native'
+import { StyleSheet, View, Text, type ViewStyle, type TextStyle, type StyleProp } from 'react-native'
 import { colors, radii, shadows, spacing, typography } from '@/theme'
 
 type CardPadding = 'sm' | 'md' | 'lg'
@@ -7,11 +7,11 @@ type CardPadding = 'sm' | 'md' | 'lg'
 interface CardProps {
   children: ReactNode
   padding?: CardPadding
-  style?: ViewStyle
-  contentStyle?: ViewStyle
+  style?: StyleProp<ViewStyle>
+  contentStyle?: StyleProp<ViewStyle>
 }
 
-export function Card({ children, padding = 'md', style, contentStyle }: CardProps) {
+export function Card({ children, padding = 'lg', style, contentStyle }: CardProps) {
   return (
     <View style={[styles.card, styles[padding], style]}>
       <View style={[styles.content, contentStyle]}>{children}</View>
@@ -23,9 +23,9 @@ interface CardHeaderProps {
   title: string
   subtitle?: string
   action?: ReactNode
-  style?: ViewStyle
-  titleStyle?: TextStyle
-  subtitleStyle?: TextStyle
+  style?: StyleProp<ViewStyle>
+  titleStyle?: StyleProp<TextStyle>
+  subtitleStyle?: StyleProp<TextStyle>
 }
 
 export function CardHeader({ title, subtitle, action, style, titleStyle, subtitleStyle }: CardHeaderProps) {
@@ -54,13 +54,13 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   sm: {
-    padding: spacing.md,
-  },
-  md: {
     padding: spacing.lg,
   },
-  lg: {
+  md: {
     padding: spacing.xl,
+  },
+  lg: {
+    padding: spacing.xxl,
   },
   header: {
     width: '100%',
@@ -75,11 +75,12 @@ const styles = StyleSheet.create({
   headTitle: {
     color: colors.primary,
     fontSize: typography.title,
-    fontWeight: typography.bold,
+    fontFamily: typography.family.bold,
   },
   headSubtitle: {
     marginTop: spacing.xs,
     color: colors.secondaryText,
     fontSize: typography.body,
+    fontFamily: typography.family.regular,
   },
 })
