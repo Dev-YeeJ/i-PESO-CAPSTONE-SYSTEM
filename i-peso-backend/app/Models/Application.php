@@ -15,6 +15,12 @@ class Application extends Model
     protected $fillable = [
         'post_id',
         'seeker_id',
+        'job_fair_id',
+        'is_hots',
+        'dole_mismatch_code',
+        'employer_mismatch_reason_code',
+        'seeker_mismatch_reason_code',
+        'mismatch_reason_details',
         'match_percentage',
         'status',
         'status_changed_at',
@@ -28,6 +34,7 @@ class Application extends Model
 
     protected $casts = [
         'match_percentage' => 'decimal:2',
+        'is_hots' => 'boolean',
         'status_changed_at' => 'datetime',
         'placement_start_date' => 'date',
         'placement_salary' => 'decimal:2',
@@ -43,6 +50,11 @@ class Application extends Model
     public function jobSeeker(): BelongsTo
     {
         return $this->belongsTo(JobSeeker::class, 'seeker_id', 'seeker_id');
+    }
+
+    public function jobFair(): BelongsTo
+    {
+        return $this->belongsTo(JobFair::class, 'job_fair_id', 'job_fair_id');
     }
 
     public function interviewSchedule(): HasOne

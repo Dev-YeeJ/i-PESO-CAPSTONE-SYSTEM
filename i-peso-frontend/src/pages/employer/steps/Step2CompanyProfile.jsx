@@ -4,7 +4,7 @@ import FormError from '@/components/form/FormError'
 import SmartSuggestionInput from '@/components/form/SmartSuggestionInput'
 import * as employerService from '@/services/employerService'
 import { validateEmployerStep2 } from '@/services/validationHelpers'
-import PsgcCascade from '../components/PsgcCascade'
+import AddressPicker from '@/components/maps/AddressPicker'
 
 const SERVER_FIELD_MAP = {
   city_municipality: 'city',
@@ -39,16 +39,10 @@ const INDUSTRY_OPTIONS = [
 ]
 
 const COMPANY_SIZE_OPTIONS = [
-  { value: 'micro', label: '1-50 employees' },
-  { value: 'small', label: '51-200 employees' },
-  { value: 'medium', label: '201-500 employees' },
-  { value: 'large', label: '500+ employees' },
-]
-
-const COMPANY_NAME_SUGGESTIONS = [
-  { label: 'ABC Trading Corporation', value: 'ABC Trading Corporation', helper: 'Use the official SEC/DTI registered business name.' },
-  { label: 'Urdaneta City Manpower Services', value: 'Urdaneta City Manpower Services', helper: 'Avoid branch nicknames unless part of the legal name.' },
-  { label: 'North Luzon Food Services Inc.', value: 'North Luzon Food Services Inc.', helper: 'Keep suffixes like Inc., Corp., or Cooperative when applicable.' },
+  { value: 'micro', label: 'Micro (1-9 employees)' },
+  { value: 'small', label: 'Small (10-99 employees)' },
+  { value: 'medium', label: 'Medium (100-199 employees)' },
+  { value: 'large', label: 'Large (200+ employees)' },
 ]
 
 export default function Step2CompanyProfile({ initialData = {}, onComplete }) {
@@ -75,18 +69,6 @@ export default function Step2CompanyProfile({ initialData = {}, onComplete }) {
   }, [])
 
   const getError = (name) => (touched[name] ? errors[name] : undefined)
-
-  const handleLocationChange = useCallback(({ province, city, barangay }) => {
-    setForm((f) => ({ ...f, province, city, barangay }))
-    setTouched((t) => ({ ...t, province: true, city: true, barangay: true }))
-    setErrors((current) => ({
-      ...current,
-      province: province ? undefined : current.province,
-      city: city ? undefined : current.city,
-      barangay: barangay ? undefined : current.barangay,
-    }))
-    setApiError('')
-  }, [])
 
   const handleLogoChange = (e) => {
     const file = e.target.files[0]
@@ -140,9 +122,19 @@ export default function Step2CompanyProfile({ initialData = {}, onComplete }) {
       formDataToSend.append('industry', form.industry)
       formDataToSend.append('company_size', form.company_size)
       formDataToSend.append('province', form.province)
+      formDataToSend.append('province_code', form.province_code || '')
       formDataToSend.append('city_municipality', form.city)
+      formDataToSend.append('city_code', form.city_code || '')
       formDataToSend.append('barangay', form.barangay)
+      formDataToSend.append('barangay_code', form.barangay_code || '')
       formDataToSend.append('house_unit_street', form.street_address)
+      if (form.latitude && form.longitude) {
+        formDataToSend.append('latitude', form.latitude)
+        formDataToSend.append('longitude', form.longitude)
+      }
+      if (form.location_accuracy) {
+        formDataToSend.append('location_accuracy', form.location_accuracy)
+      }
       formDataToSend.append('company_description', form.description)
       if (form.logo) {
         formDataToSend.append('company_logo', form.logo)
@@ -180,7 +172,7 @@ export default function Step2CompanyProfile({ initialData = {}, onComplete }) {
     <form onSubmit={handleSubmit} noValidate className="space-y-4">
       <FormError message={apiError} />
 
-      <SmartSuggestionInput
+      <Field
         label="Company Name"
         name="company_name"
         placeholder="Enter your official company name"
@@ -188,8 +180,6 @@ export default function Step2CompanyProfile({ initialData = {}, onComplete }) {
         onChange={handleChange}
         onBlur={handleBlur}
         error={getError('company_name')}
-        options={COMPANY_NAME_SUGGESTIONS}
-        helper="Smart suggestions encourage the official registered name used for PESO verification."
         required
       />
 
@@ -216,7 +206,7 @@ export default function Step2CompanyProfile({ initialData = {}, onComplete }) {
       {/* Industry */}
       <div>
         <label className="block text-sm font-medium text-slate-700 mb-1.5">
-          Industry
+          Industry (Optional)
         </label>
         <select
           name="industry"
@@ -248,29 +238,33 @@ export default function Step2CompanyProfile({ initialData = {}, onComplete }) {
 
       {/* Company Size */}
       <div>
-        <label className="block text-sm font-medium text-slate-700 mb-1.5">
+        <label className="block text-sm font-medium text-slate-700 mb-2">
           Company Size
         </label>
-        <select
-          name="company_size"
-          value={form.company_size ?? ''}
-          onChange={handleChange}
-          onBlur={handleBlur}
-          className={`w-full px-3.5 py-2.5 text-sm rounded-xl border bg-white transition-all focus:outline-none focus:ring-2 focus:ring-blue-500/20 ${
-            getError('company_size')
-              ? 'border-red-400 focus:border-red-400'
-              : 'border-slate-300 focus:border-blue-400'
-          }`}
-        >
-          <option value="">Select Size</option>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           {COMPANY_SIZE_OPTIONS.map((size) => (
-            <option key={size.value} value={size.value}>
-              {size.label}
-            </option>
+            <button
+              key={size.value}
+              type="button"
+              onClick={() => {
+                setForm((prev) => ({ ...prev, company_size: size.value }))
+                setErrors((prev) => ({ ...prev, company_size: null }))
+              }}
+              className={`flex flex-col items-center justify-center rounded-xl border p-3 text-center transition-all ${
+                form.company_size === size.value
+                  ? 'border-blue-600 bg-blue-50 text-blue-700 ring-1 ring-blue-600'
+                  : 'border-slate-200 bg-white text-slate-600 hover:border-blue-300 hover:bg-blue-50/50'
+              } ${getError('company_size') ? 'border-red-400' : ''}`}
+            >
+              <span className="text-sm font-semibold">{size.label.split(' (')[0]}</span>
+              <span className="text-xs text-slate-500">
+                {size.label.split('(')[1]?.replace(')', '')}
+              </span>
+            </button>
           ))}
-        </select>
+        </div>
         {getError('company_size') && (
-          <p className="mt-1.5 text-xs text-red-600 flex items-center gap-1">
+          <p className="mt-2 text-xs text-red-600 flex items-center gap-1">
             <svg className="w-3 h-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
               <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
             </svg>
@@ -280,29 +274,45 @@ export default function Step2CompanyProfile({ initialData = {}, onComplete }) {
       </div>
 
       {/* Location */}
-      <PsgcCascade
-        province={form.province ?? ''}
-        city={form.city ?? ''}
-        barangay={form.barangay ?? ''}
-        onChange={handleLocationChange}
-      />
-      {(getError('province') || getError('city') || getError('barangay')) && (
+      <div className="space-y-4">
+        <AddressPicker
+          title="Company Office Address"
+          province={form.province ?? ''}
+          provinceCode={form.province_code ?? ''}
+          city={form.city ?? ''}
+          cityCode={form.city_code ?? ''}
+          barangay={form.barangay ?? ''}
+          barangayCode={form.barangay_code ?? ''}
+          street={form.street_address ?? ''}
+          latitude={form.latitude}
+          longitude={form.longitude}
+          onChange={(locationData) => {
+            setForm((prev) => ({
+              ...prev,
+              province: locationData.province ?? prev.province,
+              province_code: locationData.province_code ?? prev.province_code,
+              city: locationData.city ?? prev.city,
+              city_code: locationData.city_code ?? prev.city_code,
+              barangay: locationData.barangay ?? prev.barangay,
+              barangay_code: locationData.barangay_code ?? prev.barangay_code,
+              street_address: locationData.street ?? prev.street_address,
+              latitude: locationData.latitude ?? prev.latitude,
+              longitude: locationData.longitude ?? prev.longitude,
+              location_accuracy: locationData.location_accuracy ?? prev.location_accuracy,
+            }))
+            setTouched((prev) => ({ ...prev, province: true, city: true, barangay: true, street_address: true }))
+          }}
+        />
+      </div>
+
+      {(getError('province') || getError('city') || getError('barangay') || getError('street_address')) && (
         <div className="space-y-1">
           {getError('province') && <p className="text-xs text-red-600">Province: {getError('province')}</p>}
           {getError('city') && <p className="text-xs text-red-600">City/Municipality: {getError('city')}</p>}
           {getError('barangay') && <p className="text-xs text-red-600">Barangay: {getError('barangay')}</p>}
+          {getError('street_address') && <p className="text-xs text-red-600">Street Address: {getError('street_address')}</p>}
         </div>
       )}
-
-      <Field
-        label="Street Address"
-        name="street_address"
-        placeholder="123 Business Street"
-        value={form.street_address ?? ''}
-        onChange={handleChange}
-        onBlur={handleBlur}
-        error={getError('street_address')}
-      />
 
       {/* Description */}
       <div>

@@ -11,6 +11,7 @@ class SeekerCertificate extends Model
 
     protected $fillable = [
         'seeker_id',
+        'program_application_id',
         'title',
         'issuing_body',
         'file_path',
@@ -28,5 +29,10 @@ class SeekerCertificate extends Model
     public function seeker(): BelongsTo
     {
         return $this->belongsTo(JobSeeker::class, 'seeker_id', 'seeker_id');
+    }
+
+    public function programApplication(): BelongsTo
+    {
+        return $this->belongsTo(ProgramApplication::class, 'program_application_id', 'prog_apply_id');
     }
 }

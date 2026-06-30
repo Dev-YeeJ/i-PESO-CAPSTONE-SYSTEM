@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { BriefcaseBusiness, MapPin, Plus, Trash2, UsersRound } from 'lucide-react'
+import { BriefcaseBusiness, MapPin, Plus, Trash2, UsersRound, Calendar, Banknote, GraduationCap, Clock } from 'lucide-react'
 import { AlertBox, Badge, Button, Card, CardHeader } from '@/components/ui'
 import * as employerService from '@/services/employerService'
 
@@ -64,22 +64,46 @@ export default function VacanciesPage() {
         ) : (
           <div className="divide-y divide-slate-200 border-t border-slate-200">
             {vacancies.map((vacancy) => (
-              <div key={vacancy.post_id} className="flex flex-col gap-4 px-5 py-5 transition hover:bg-slate-50 sm:px-6 lg:flex-row lg:items-center lg:justify-between">
-                <div className="flex min-w-0 gap-4">
-                  <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-700"><BriefcaseBusiness className="h-5 w-5" /></span>
-                  <div className="min-w-0">
+              <div key={vacancy.post_id} className="flex flex-col gap-4 px-5 py-6 transition hover:bg-slate-50 sm:px-6 lg:flex-row lg:items-start lg:justify-between">
+                <div className="flex min-w-0 gap-4 w-full">
+                  <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-700 shadow-sm border border-blue-100"><BriefcaseBusiness className="h-6 w-6" /></span>
+                  <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
-                      <h2 className="font-extrabold text-slate-950">{vacancy.job_title}</h2>
-                      <Badge variant={vacancy.status}>{vacancy.status}</Badge>
+                      <h2 className="text-lg font-extrabold text-slate-900 truncate">{vacancy.job_title}</h2>
+                      <Badge variant={vacancy.status} className="uppercase text-[10px] tracking-wider">{vacancy.status}</Badge>
                     </div>
-                    <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
-                      <span className="flex items-center gap-1"><MapPin className="h-3.5 w-3.5" />{vacancy.location}</span>
-                      <span className="flex items-center gap-1"><UsersRound className="h-3.5 w-3.5" />{vacancy.vacancies_count} opening(s)</span>
-                      <span className="capitalize">{vacancy.employment_type?.replaceAll('_', ' ')}</span>
+                    
+                    <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-2 text-sm text-slate-600">
+                      <span className="flex items-center gap-1.5"><MapPin className="h-4 w-4 text-slate-400" /><span className="truncate">{vacancy.location}</span></span>
+                      <span className="flex items-center gap-1.5"><UsersRound className="h-4 w-4 text-slate-400" />{vacancy.vacancies_count} opening(s)</span>
+                      <span className="flex items-center gap-1.5"><BriefcaseBusiness className="h-4 w-4 text-slate-400" /><span className="capitalize truncate">{vacancy.employment_type?.replaceAll('_', ' ')}</span></span>
+                      
+                      {!vacancy.hide_salary && vacancy.salary_min && (
+                         <span className="flex items-center gap-1.5 font-medium text-emerald-700">
+                           <Banknote className="h-4 w-4 text-emerald-500" />
+                           ₱{Number(vacancy.salary_min).toLocaleString()} {vacancy.salary_max && vacancy.salary_max > vacancy.salary_min ? `- ₱${Number(vacancy.salary_max).toLocaleString()}` : ''} <span className="text-xs text-slate-400 font-normal">/ {vacancy.salary_type?.toLowerCase() || 'mo'}</span>
+                         </span>
+                      )}
+                      
+                      {vacancy.experience_level && (
+                         <span className="flex items-center gap-1.5"><Clock className="h-4 w-4 text-slate-400" /><span className="truncate">{vacancy.experience_level}</span></span>
+                      )}
+
+                      {vacancy.application_deadline && (
+                         <span className="flex items-center gap-1.5 text-amber-700"><Calendar className="h-4 w-4 text-amber-500" />Deadline: {new Date(vacancy.application_deadline).toLocaleDateString()}</span>
+                      )}
                     </div>
                   </div>
+                  <div className="flex flex-col gap-2 shrink-0 ml-4 hidden lg:flex">
+                    <Button to={`/employer/ats?vacancy_id=${vacancy.post_id}`} variant="outline" size="sm" icon={UsersRound}>View Applicants</Button>
+                    <Button onClick={() => remove(vacancy.post_id)} variant="ghost" size="sm" icon={Trash2} className="text-red-600 hover:bg-red-50 hover:text-red-700">Delete</Button>
+                  </div>
                 </div>
-                <Button onClick={() => remove(vacancy.post_id)} variant="ghost" size="sm" icon={Trash2} className="self-start text-red-600 hover:bg-red-50 hover:text-red-700 lg:self-auto">Delete</Button>
+                {/* Mobile action buttons */}
+                <div className="flex flex-row gap-2 w-full lg:hidden mt-2 pt-4 border-t border-slate-100">
+                  <Button to={`/employer/ats?vacancy_id=${vacancy.post_id}`} variant="outline" size="sm" icon={UsersRound} className="flex-1 justify-center">Applicants</Button>
+                  <Button onClick={() => remove(vacancy.post_id)} variant="ghost" size="sm" icon={Trash2} className="flex-1 justify-center text-red-600 hover:bg-red-50 hover:text-red-700">Delete</Button>
+                </div>
               </div>
             ))}
           </div>

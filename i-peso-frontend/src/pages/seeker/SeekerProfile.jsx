@@ -23,7 +23,7 @@ import {
   UserCheck,
   X,
 } from 'lucide-react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import CertificateUploadModal from './components/CertificateUploadModal'
 import ProfilePhotoUploadModal from './components/ProfilePhotoUploadModal'
@@ -43,9 +43,10 @@ const skillGroups = [
 ]
 
 export default function SeekerProfile() {
+  const location = useLocation()
   const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [uploadOpen, setUploadOpen] = useState(false)
+  const [uploadOpen, setUploadOpen] = useState(Boolean(location.state?.openCertificateUpload))
   const [photoUploadOpen, setPhotoUploadOpen] = useState(false)
   const [photoUrl, setPhotoUrl] = useState(null)
   const [photoVersion, setPhotoVersion] = useState(0)

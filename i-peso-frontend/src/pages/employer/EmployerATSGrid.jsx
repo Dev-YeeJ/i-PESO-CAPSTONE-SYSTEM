@@ -5,7 +5,8 @@ import {
   CheckCircle2, XCircle, Clock, Video, UserCheck, Briefcase, ChevronRight
 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { getEmployerApplications, updateEmployerApplicationStatus } from '@/services/employerApplicationService';
+import { getEmployerApplications, updateEmployerApplicationStatus, connectGoogleCalendar } from '@/services/employerApplicationService';
+import { useSearchParams, Link } from 'react-router-dom';
 
 const PIPELINE_TABS = [
   { id: 'pending', label: 'Inbox' },
@@ -16,7 +17,26 @@ const PIPELINE_TABS = [
   { id: 'rejected', label: 'Rejected' }
 ];
 
+const EMPLOYER_MISMATCH_REASONS = [
+  ['salary_expectation_not_met', 'Salary expectation is not met'],
+  ['lack_competencies_skills', 'Lack of competencies or skills'],
+  ['lack_license_certification', 'Lack of professional license or TESDA certification'],
+  ['documentary_requirements', 'Failed to submit documentary requirements'],
+  ['other_reason', 'Other reason'],
+];
+
+const SEEKER_MISMATCH_REASONS = [
+  ['', 'Not reported'],
+  ['skill_mismatch', 'Skill mismatch'],
+  ['transportation_location', 'Transportation or location issue'],
+  ['working_environment', 'Working environment is not acceptable'],
+  ['other_reason', 'Other reason'],
+];
+
 export default function EmployerATSGrid() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const vacancyId = searchParams.get('vacancy_id');
+
   const [activeTab, setActiveTab] = useState('pending');
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState('match_score');
@@ -27,12 +47,13 @@ export default function EmployerATSGrid() {
   const [selectedIds, setSelectedIds] = useState(new Set());
   
   // Modal States
-  const [activeModal, setActiveModal] = useState(null); // 'profile', 'interview', 'hire'
+  const [activeModal, setActiveModal] = useState(null); // 'profile', 'interview', 'hire', 'reject'
   const [modalTarget, setModalTarget] = useState(null); // Single application or array of applications for bulk
 
   // Form States
   const [interviewForm, setInterviewForm] = useState({ date: '', time: '', mode: 'online', autoMeet: true });
   const [hireForm, setHireForm] = useState({ startDate: '', salary: '', employmentType: 'regular' });
+  const [rejectionForm, setRejectionForm] = useState({ employerReason: EMPLOYER_MISMATCH_REASONS[0][0], seekerReason: '', details: '' });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
@@ -42,9 +63,9 @@ export default function EmployerATSGrid() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const res = await getEmployerApplications({ per_page: 500 });
+      const res = await getEmployerApplications({ per_page: 100 });
       setApplications(res.data || []);
-    } catch (err) {
+    } catch {
       toast.error('Failed to load applications');
     } finally {
       setLoading(false);
@@ -54,6 +75,10 @@ export default function EmployerATSGrid() {
   // 1. Filtering & Sorting Logic
   const filteredApps = useMemo(() => {
     let filtered = applications.filter(app => app.status === activeTab);
+
+    if (vacancyId) {
+      filtered = filtered.filter(app => String(app.job?.post_id) === String(vacancyId));
+    }
     
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
@@ -81,7 +106,7 @@ export default function EmployerATSGrid() {
     });
 
     return filtered;
-  }, [applications, activeTab, searchQuery, sortBy]);
+  }, [applications, activeTab, searchQuery, sortBy, vacancyId]);
 
   const tabCounts = useMemo(() => {
     const counts = {};
@@ -144,7 +169,7 @@ export default function EmployerATSGrid() {
           updatePayload.interview = {
             schedule: `${interviewForm.date} ${interviewForm.time}`,
             mode_of_interview: interviewForm.mode,
-            auto_meet_link: interviewForm.autoMeet // Tells backend GoogleCalendarController to provision link
+            auto_meet_link: interviewForm.autoMeet,
           };
         }
 
@@ -159,7 +184,17 @@ export default function EmployerATSGrid() {
       fetchData(); // Refresh list to reflect changes
 
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Action failed.');
+      if (err.response?.status === 403 && (err.response?.data?.message?.includes('Google Calendar not connected') || err.response?.data?.message?.includes('token expired'))) {
+        toast('Redirecting to connect Google Calendar...', { icon: '🗓️' });
+        try {
+          const { url } = await connectGoogleCalendar();
+          window.location.href = url;
+        } catch {
+          toast.error('Failed to initiate Google Calendar connection.');
+        }
+      } else {
+        toast.error(err.response?.data?.message || 'Action failed.');
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -184,7 +219,8 @@ export default function EmployerATSGrid() {
 
     if (status === 'interview') setActiveModal('interview');
     else if (status === 'hired') setActiveModal('hire');
-    else executeStatusChange(status); // Directly move to shortlisted or rejected
+    else if (status === 'rejected') setActiveModal('reject');
+    else executeStatusChange(status);
   };
 
   const closeModal = () => {
@@ -192,6 +228,7 @@ export default function EmployerATSGrid() {
     setModalTarget(null);
     setInterviewForm({ date: '', time: '', mode: 'online', autoMeet: true });
     setHireForm({ startDate: '', salary: '', employmentType: 'regular' });
+    setRejectionForm({ employerReason: EMPLOYER_MISMATCH_REASONS[0][0], seekerReason: '', details: '' });
   };
 
   // UI Helpers
@@ -207,9 +244,6 @@ export default function EmployerATSGrid() {
       {/* HEADER */}
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Applicant Tracking System</h1>
-        <p className="text-sm text-slate-500 mt-1">
-          DOLE SPRS Compliant Pipeline • Enforcing R.A. 10911 (Blind Screening)
-        </p>
       </div>
 
       {/* PIPELINE TABS */}
@@ -235,6 +269,26 @@ export default function EmployerATSGrid() {
         ))}
       </div>
 
+      {/* VACANCY FILTER INDICATOR */}
+      {vacancyId && (
+        <div className="bg-blue-50 border border-blue-200 px-4 py-3 rounded-lg mb-4 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Briefcase className="h-5 w-5 text-blue-600" />
+            <span className="text-sm font-medium text-blue-800">Showing applicants for a specific vacancy.</span>
+          </div>
+          <button 
+            onClick={() => {
+              const params = new URLSearchParams(searchParams);
+              params.delete('vacancy_id');
+              setSearchParams(params);
+            }} 
+            className="text-sm font-semibold text-blue-600 hover:text-blue-800 transition"
+          >
+            Clear Filter
+          </button>
+        </div>
+      )}
+
       {/* TOOLBAR */}
       <div className="flex flex-col sm:flex-row justify-between items-center mb-4 gap-4">
         <div className="relative w-full sm:w-96">
@@ -248,17 +302,34 @@ export default function EmployerATSGrid() {
           />
         </div>
         
-        <div className="flex items-center gap-2 w-full sm:w-auto">
-          <span className="text-sm text-slate-500 font-medium">Sort by:</span>
-          <select 
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value)}
-            className="bg-white border border-slate-300 rounded-lg text-sm py-2 pl-3 pr-8 focus:ring-2 focus:ring-blue-500 shadow-sm"
+        <div className="flex items-center gap-4 w-full sm:w-auto">
+          <button
+            onClick={async () => {
+              try {
+                const { url } = await connectGoogleCalendar();
+                window.location.href = url;
+              } catch {
+                toast.error('Failed to initiate Google Calendar connection.');
+              }
+            }}
+            className="flex items-center gap-2 px-3 py-2 bg-white border border-slate-300 text-slate-700 rounded-lg text-sm font-medium hover:bg-slate-50 transition-colors shadow-sm whitespace-nowrap"
           >
-            <option value="match_score">Highest Match Score</option>
-            <option value="distance">Closest Distance</option>
-            <option value="applied_date">Date Applied (Newest)</option>
-          </select>
+            <CalendarIcon className="w-4 h-4 text-blue-600" />
+            Connect Calendar
+          </button>
+          
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-slate-500 font-medium">Sort by:</span>
+            <select 
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              className="bg-white border border-slate-300 rounded-lg text-sm py-2 pl-3 pr-8 focus:ring-2 focus:ring-blue-500 shadow-sm"
+            >
+              <option value="match_score">Highest Match Score</option>
+              <option value="distance">Closest Distance</option>
+              <option value="applied_date">Date Applied (Newest)</option>
+            </select>
+          </div>
         </div>
       </div>
 
@@ -278,7 +349,7 @@ export default function EmployerATSGrid() {
                   </button>
                 </th>
                 <th className="py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Candidate</th>
-                <th className="py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">AI Match</th>
+                <th className="py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Match</th>
                 <th className="py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Top Skills</th>
                 <th className="py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Education</th>
                 <th className="py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Applied</th>
@@ -314,10 +385,10 @@ export default function EmployerATSGrid() {
                           >
                             {seeker.name}
                           </button>
-                          <span className="text-xs text-slate-500 flex items-center mt-0.5">
+                          <Link to="/employer/vacancies" className="text-xs text-slate-500 hover:text-blue-600 flex items-center mt-0.5">
                             <Briefcase className="h-3 w-3 mr-1" />
                             {app.job?.job_title}
-                          </span>
+                          </Link>
                         </div>
                       </td>
                       <td className="py-3 px-4">
@@ -346,9 +417,16 @@ export default function EmployerATSGrid() {
                         </div>
                       </td>
                       <td className="py-3 px-4">
-                        <div className="text-sm text-slate-600 flex items-center">
-                          <Clock className="h-3.5 w-3.5 mr-1.5 text-slate-400" />
-                          {new Date(app.applied_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                        <div className="text-sm text-slate-600 flex flex-col gap-1 items-start">
+                          <span className="flex items-center">
+                            <Clock className="h-3.5 w-3.5 mr-1.5 text-slate-400" />
+                            {new Date(app.applied_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                          </span>
+                          {app.status === 'interview' && (
+                            <Link to="/employer/calendar" className="flex items-center text-xs font-semibold text-blue-600 hover:text-blue-800 transition">
+                              <CalendarIcon className="h-3.5 w-3.5 mr-1" /> View in Calendar
+                            </Link>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -442,7 +520,7 @@ export default function EmployerATSGrid() {
                   <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-500 mb-3">Match Analysis</h3>
                   <div className={`p-4 rounded-xl border ${getMatchColor(modalTarget.match_percentage)} mb-4`}>
                     <div className="text-3xl font-bold">{parseFloat(modalTarget.match_percentage).toFixed(1)}%</div>
-                    <div className="text-sm font-medium mt-1">Overall AI Merit Match</div>
+                    <div className="text-sm font-medium mt-1">Overall Merit Match</div>
                   </div>
                   
                   <div className="mt-4">
@@ -457,6 +535,59 @@ export default function EmployerATSGrid() {
                   </div>
                 </div>
               </div>
+
+              {/* Digital Resume: Work Experience & Education */}
+              <div className="mt-8 border-t border-slate-200 pt-8 grid grid-cols-1 md:grid-cols-2 gap-8">
+                {/* Work Experience */}
+                <div>
+                  <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-500 mb-4 flex items-center gap-2">
+                    <Briefcase className="h-4 w-4" /> Work Experience
+                  </h3>
+                  {modalTarget.seeker?.work_experiences?.length > 0 ? (
+                    <div className="space-y-4">
+                      {modalTarget.seeker.work_experiences.map((exp, idx) => (
+                        <div key={idx} className="relative pl-4 border-l-2 border-slate-200">
+                          <h4 className="font-bold text-slate-900 text-sm">{exp.position}</h4>
+                          <p className="text-xs text-blue-600 font-semibold">{exp.company_name}</p>
+                          <p className="text-xs text-slate-500 mt-0.5">
+                            {exp.start_date ? new Date(exp.start_date).toLocaleDateString(undefined, { month: 'short', year: 'numeric' }) : 'Unknown'} - 
+                            {exp.currently_employed ? ' Present' : (exp.end_date ? ' ' + new Date(exp.end_date).toLocaleDateString(undefined, { month: 'short', year: 'numeric' }) : ' Unknown')}
+                          </p>
+                          {exp.responsibilities && (
+                            <p className="mt-2 text-xs text-slate-600 leading-relaxed whitespace-pre-wrap">{exp.responsibilities}</p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-slate-500 italic">No work experience declared.</p>
+                  )}
+                </div>
+
+                {/* Education */}
+                <div>
+                  <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-500 mb-4 flex items-center gap-2">
+                    <GraduationCap className="h-4 w-4" /> Education History
+                  </h3>
+                  {modalTarget.seeker?.educations?.length > 0 ? (
+                    <div className="space-y-4">
+                      {modalTarget.seeker.educations.map((edu, idx) => (
+                        <div key={idx} className="relative pl-4 border-l-2 border-slate-200">
+                          <h4 className="font-bold text-slate-900 text-sm">{edu.course_strand || edu.level}</h4>
+                          <p className="text-xs text-blue-600 font-semibold">{edu.institution_name}</p>
+                          <p className="text-xs text-slate-500 mt-0.5">
+                            {edu.year_started || 'Unknown'} - {edu.year_graduated || (edu.expected_year_graduated ? `Expected ${edu.expected_year_graduated}` : 'Present')}
+                          </p>
+                          <p className="mt-1 text-xs text-slate-600 uppercase font-medium">{edu.completion_status}</p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-slate-500 italic">No education history declared.</p>
+                  )}
+                </div>
+              </div>
+
             </div>
             
             <div className="border-t border-slate-100 p-6 bg-slate-50 flex justify-end gap-3 rounded-b-2xl">
@@ -513,7 +644,7 @@ export default function EmployerATSGrid() {
                       <div className="w-11 h-6 bg-slate-300 rounded-full peer peer-checked:bg-blue-600 peer-focus:ring-4 peer-focus:ring-blue-300 transition-all after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-full relative"></div>
                       <span className="ml-3 text-sm font-semibold text-slate-900">Auto-generate Google Meet Link</span>
                     </label>
-                    <p className="text-xs text-slate-600 mt-1">This will sync with your connected Google Calendar API and send the meet link to the candidate.</p>
+                    <p className="text-xs text-slate-600 mt-1">This will automatically create a meeting on your Google Calendar and send the link when you submit.</p>
                   </div>
                 </div>
               )}
@@ -581,6 +712,53 @@ export default function EmployerATSGrid() {
                 className="px-6 py-2.5 text-sm font-bold bg-emerald-600 text-white rounded-lg hover:bg-emerald-500 disabled:opacity-50 flex items-center shadow-md shadow-emerald-600/20"
               >
                 {isSubmitting ? 'Syncing...' : 'Confirm Hire & Sync to PESO'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeModal === 'reject' && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" onClick={closeModal}></div>
+          <div className="relative w-full max-w-lg overflow-hidden rounded-xl bg-white shadow-xl animate-in zoom-in-95 duration-200">
+            <div className="border-b border-rose-100 bg-rose-50 p-6">
+              <h2 className="text-xl font-bold text-rose-950">Record Rejection Outcome</h2>
+              <p className="mt-1 text-sm text-rose-800">The selected reasons will appear in the Establishment Report / RO1-JF Form 3.</p>
+            </div>
+
+            <div className="space-y-5 p-6">
+              <div>
+                <label className="mb-1 block text-sm font-semibold text-slate-700">Employer-Side Reason <span className="text-red-500">*</span></label>
+                <select value={rejectionForm.employerReason} onChange={(event) => setRejectionForm((current) => ({ ...current, employerReason: event.target.value }))} className="w-full rounded-lg border border-slate-300 p-2.5 text-sm">
+                  {EMPLOYER_MISMATCH_REASONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-semibold text-slate-700">Seeker-Side Reason</label>
+                <select value={rejectionForm.seekerReason} onChange={(event) => setRejectionForm((current) => ({ ...current, seekerReason: event.target.value }))} className="w-full rounded-lg border border-slate-300 p-2.5 text-sm">
+                  {SEEKER_MISMATCH_REASONS.map(([value, label]) => <option key={value || 'none'} value={value}>{label}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-semibold text-slate-700">Additional Details</label>
+                <textarea value={rejectionForm.details} onChange={(event) => setRejectionForm((current) => ({ ...current, details: event.target.value }))} rows={3} maxLength={5000} className="w-full resize-y rounded-lg border border-slate-300 p-2.5 text-sm" placeholder="Optional report context" />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 border-t border-slate-100 bg-slate-50 p-6">
+              <button onClick={closeModal} className="px-5 py-2.5 text-sm font-medium text-slate-600 hover:text-slate-800">Cancel</button>
+              <button
+                onClick={() => executeStatusChange('rejected', {
+                  employer_mismatch_reason_code: rejectionForm.employerReason,
+                  seeker_mismatch_reason_code: rejectionForm.seekerReason || null,
+                  mismatch_reason_details: rejectionForm.details || null,
+                  employer_remarks: rejectionForm.details || null,
+                })}
+                disabled={isSubmitting || !rejectionForm.employerReason}
+                className="rounded-lg bg-rose-700 px-5 py-2.5 text-sm font-bold text-white hover:bg-rose-800 disabled:opacity-50"
+              >
+                {isSubmitting ? 'Saving...' : 'Reject and Record Reason'}
               </button>
             </div>
           </div>

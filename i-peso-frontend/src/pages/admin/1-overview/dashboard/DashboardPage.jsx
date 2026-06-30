@@ -6,9 +6,12 @@ import {
   CalendarDays,
   CheckCircle2,
   ClipboardCheck,
+  Download,
   FileChartColumn,
+  RefreshCw,
   UsersRound,
 } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import { Badge, Button, Card, CardHeader } from '@/components/ui'
 import DataTable from '@/pages/admin/_components/DataTable'
 import PageHeader from '@/pages/admin/_components/PageHeader'
@@ -20,12 +23,34 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
-  useEffect(() => {
+  const fetchStats = () => {
+    setLoading(true)
     adminService.getDashboardStats()
       .then(setStats)
       .catch((requestError) => setError(requestError.response?.data?.message ?? 'Failed to load dashboard statistics.'))
       .finally(() => setLoading(false))
+  }
+
+  useEffect(() => {
+    fetchStats()
   }, [])
+
+  const handleExportCSV = () => {
+    if (!stats?.recent_registrations?.length) return
+    const headers = ['Constituent', 'Role', 'Email', 'Registered At']
+    const csvContent = [
+      headers.join(','),
+      ...stats.recent_registrations.map((r) =>
+        `"${r.name}","${r.role}","${r.email}","${new Date(r.registered_at).toLocaleDateString()}"`
+      ),
+    ].join('\n')
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+    const link = document.createElement('a')
+    link.href = URL.createObjectURL(blob)
+    link.download = `recent_registrations_${new Date().toISOString().split('T')[0]}.csv`
+    link.click()
+  }
 
   const composition = useMemo(() => {
     const seekers = Number(stats?.total_seekers ?? 0)
@@ -41,7 +66,11 @@ export default function DashboardPage() {
 
   return (
     <div className="portal-page">
-      <PageHeader title="Operations Dashboard" subtitle="Monitor employment services, accreditation workload, and platform activity." />
+      <PageHeader 
+        title="Operations Dashboard" 
+        subtitle="Monitor employment services, accreditation workload, and platform activity."
+        actions={[{ label: 'Refresh Data', icon: RefreshCw, variant: 'outline', onClick: fetchStats }]}
+      />
       {error && <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</div>}
 
       <section className="portal-card-hero relative overflow-hidden rounded-xl border border-blue-900 bg-brand-navy px-6 py-7 text-white shadow-elevated sm:px-8">
@@ -62,7 +91,18 @@ export default function DashboardPage() {
         <Kpi icon={UsersRound} label="Registered Seekers" value={stats?.total_seekers ?? 0} detail={`${stats?.profile_completion_rate?.toFixed(1) ?? 0}% profile completion`} tone="brand" />
         <Kpi icon={Building2} label="Registered Employers" value={stats?.total_employers ?? 0} detail="Constituent employer accounts" tone="violet" />
         <Kpi icon={BriefcaseBusiness} label="Active Vacancies" value={stats?.active_vacancies ?? 0} detail="Published opportunities" tone="emerald" />
-        <Kpi icon={CheckCircle2} label="Monthly Applications" value={stats?.applications_this_month ?? 0} detail="Submitted this month" tone="amber" />
+        <Kpi 
+          icon={CheckCircle2} 
+          label="Monthly Applications" 
+          value={stats?.applications_this_month ?? 0} 
+          detail={
+            <span className="flex gap-2">
+              <span className="text-emerald-600 font-semibold">{stats?.hired_this_month ?? 0} Hired</span> &bull; 
+              <span className="text-red-500 font-semibold">{stats?.rejected_this_month ?? 0} Rejected</span>
+            </span>
+          } 
+          tone="amber" 
+        />
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[0.8fr_1.2fr]">
@@ -94,7 +134,12 @@ export default function DashboardPage() {
             <CardHeader
               title="Recent Registrations"
               subtitle="Newest job seeker and employer accounts."
-              action={<Button to="/admin/job-seekers" variant="secondary" size="sm" icon={ArrowRight}>View Constituents</Button>}
+              action={
+                <div className="flex gap-2">
+                  <Button onClick={handleExportCSV} variant="outline" size="sm" icon={Download}>Export</Button>
+                  <Button to="/admin/job-seekers" variant="secondary" size="sm" icon={ArrowRight}>View All</Button>
+                </div>
+              }
             />
           </div>
           <DataTable
@@ -114,7 +159,11 @@ export default function DashboardPage() {
         {stats?.recent_applications?.length ? (
           <div className="grid gap-3 lg:grid-cols-2">
             {stats.recent_applications.map((application) => (
-              <div key={application.id} className="rounded-2xl border border-slate-200 p-4 transition hover:border-brand-200 hover:bg-brand-50/40">
+              <Link 
+                key={application.id} 
+                to="/admin/job-postings"
+                className="rounded-2xl border border-slate-200 p-4 transition hover:border-brand-300 hover:bg-brand-50/50 block focus:outline-none focus:ring-2 focus:ring-brand-500"
+              >
                 <div className="flex items-start justify-between gap-3">
                   <div><p className="font-bold text-slate-950">{application.seeker_name}</p><p className="mt-1 text-sm text-slate-600">{application.job_title} at {application.company_name}</p></div>
                   <StatusBadge status={application.status} />
@@ -123,7 +172,7 @@ export default function DashboardPage() {
                   <div className="h-2 flex-1 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-brand-600" style={{ width: `${Math.min(100, application.match_percentage ?? 0)}%` }} /></div>
                   <span className="text-xs font-black text-brand-800">{application.match_percentage ?? 0}% match</span>
                 </div>
-              </div>
+              </Link>
             ))}
           </div>
         ) : <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 py-10 text-center text-sm text-slate-500">No recent application activity.</div>}

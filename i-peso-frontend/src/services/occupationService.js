@@ -16,3 +16,8 @@ export async function classifyOccupationTitle(title = '', limit = 5) {
 
   return response.data.data ?? []
 }
+
+export async function classifyOccupation(title, limit = 5) {
+  const response = await apiClient.post('/seeker/classify-occupation', { title, limit })
+  return response.data
+}

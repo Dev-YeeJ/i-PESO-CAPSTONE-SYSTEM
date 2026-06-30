@@ -7,6 +7,7 @@ use App\Models\Employer;
 use App\Models\EmployerDocument;
 use App\Notifications\EmployerVerificationProgressUpdated;
 use App\Services\GoogleMapsService;
+use App\Services\AddressService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -85,6 +86,7 @@ class EmployerRegistrationController extends Controller
             'barangay_code' => 'nullable|string|max:10',
             'latitude' => 'nullable|numeric|between:-90,90',
             'longitude' => 'nullable|numeric|between:-180,180',
+            'location_accuracy' => 'nullable|integer|min:0|max:100000',
             'google_place_id' => 'nullable|string|max:255',
             'company_description' => 'required|string|max:5000',
             'company_logo' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:5120',
@@ -107,7 +109,19 @@ class EmployerRegistrationController extends Controller
             }
 
             // Build complete address from components
+            $addressService = new AddressService();
+            $data['full_address'] = $addressService->buildFullAddress(
+                $request->house_unit_street,
+                $request->barangay,
+                $request->city_municipality,
+                $request->province
+            );
             $data['complete_address'] = "{$request->house_unit_street}, {$request->barangay}, {$request->city_municipality}, {$request->province}";
+            $data['region_code'] = substr($request->province_code ?? '', 0, 2) ?: null;
+
+            if (isset($data['latitude'], $data['longitude'])) {
+                $data['location_verified_at'] = now();
+            }
 
             if (
                 Schema::hasColumns('employers', ['latitude', 'longitude', 'google_place_id'])
@@ -119,6 +133,7 @@ class EmployerRegistrationController extends Controller
                         $data['latitude'] = $location['latitude'];
                         $data['longitude'] = $location['longitude'];
                         $data['google_place_id'] = $location['place_id'];
+                        $data['location_verified_at'] = now();
                     }
                 } catch (\Throwable) {
                     // A valid PSGC address can still be saved during a temporary map-service outage.

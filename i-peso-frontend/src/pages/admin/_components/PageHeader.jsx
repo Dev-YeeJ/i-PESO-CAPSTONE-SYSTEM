@@ -16,6 +16,7 @@ export function PageHeader({ title, subtitle, actions = [], eyebrow = 'PESO Oper
               onClick={action.onClick}
               variant={action.variant === 'danger' ? 'danger' : action.variant === 'ghost' ? 'ghost' : action.variant === 'outline' ? 'outline' : 'primary'}
               size="sm"
+              icon={action.icon}
             >
               {action.label}
             </Button>

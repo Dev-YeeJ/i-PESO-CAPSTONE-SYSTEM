@@ -86,3 +86,26 @@ export const deleteProfileImage = async () => {
   const response = await apiClient.delete('/seeker/profile-image')
   return response.data
 }
+
+// Notifications
+export const getNotifications = async () => {
+  const response = await apiClient.get('/seeker/notifications')
+  return response.data
+}
+
+export const markNotificationRead = async (id) => {
+  const response = await apiClient.patch(`/seeker/notifications/${id}/read`)
+  return response.data
+}
+
+export const markAllNotificationsRead = async () => {
+  const response = await apiClient.patch('/seeker/notifications/read-all')
+  return response.data
+}
+
+// Saved Jobs
+export const toggleSavedJob = async (postId) => {
+  const response = await apiClient.post(`/seeker/saved-jobs/${postId}`)
+  return response.data
+}
+

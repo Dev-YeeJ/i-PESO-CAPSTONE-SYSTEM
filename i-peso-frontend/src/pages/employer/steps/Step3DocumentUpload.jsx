@@ -81,15 +81,17 @@ export default function Step3DocumentUpload({ companyType, onComplete }) {
       <div className="space-y-4">
         <h3 className="font-semibold text-slate-900">Upload Required Documents</h3>
 
-        {requiredDocuments.map((docType) => (
-          <DocumentUploadZone
-            key={docType}
-            documentType={docType}
-            isUploaded={uploadedDocuments.includes(docType)}
-            onUpload={(file) => handleDocumentUpload(docType, file)}
-            loading={uploading[docType] || false}
-          />
-        ))}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {requiredDocuments.map((docType) => (
+            <DocumentUploadZone
+              key={docType}
+              documentType={docType}
+              isUploaded={uploadedDocuments.includes(docType)}
+              onUpload={(file) => handleDocumentUpload(docType, file)}
+              loading={uploading[docType] || false}
+            />
+          ))}
+        </div>
       </div>
 
       {optionalDocuments.length > 0 && (
@@ -100,16 +102,18 @@ export default function Step3DocumentUpload({ companyType, onComplete }) {
               Upload these when requested by the local PESO or when already available.
             </p>
           </div>
-          {optionalDocuments.map((docType) => (
-            <DocumentUploadZone
-              key={docType}
-              documentType={docType}
-              isUploaded={uploadedDocuments.includes(docType)}
-              onUpload={(file) => handleDocumentUpload(docType, file)}
-              loading={uploading[docType] || false}
-              optional
-            />
-          ))}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {optionalDocuments.map((docType) => (
+              <DocumentUploadZone
+                key={docType}
+                documentType={docType}
+                isUploaded={uploadedDocuments.includes(docType)}
+                onUpload={(file) => handleDocumentUpload(docType, file)}
+                loading={uploading[docType] || false}
+                optional
+              />
+            ))}
+          </div>
         </div>
       )}
 

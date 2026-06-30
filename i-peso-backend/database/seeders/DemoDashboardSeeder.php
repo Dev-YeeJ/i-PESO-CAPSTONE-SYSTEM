@@ -150,58 +150,46 @@ class DemoDashboardSeeder extends Seeder
 
     private function seedEmployers(): array
     {
-        return [
-            'northstar' => $this->seedEmployer([
-                'email' => self::PRIMARY_EMPLOYER_EMAIL,
-                'company_name' => 'Northstar Business Solutions Urdaneta',
-                'trade_name' => 'Northstar Business Solutions',
-                'industry_type' => 'Business Process and Office Support',
-                'industry' => 'Administrative and Support Service Activities',
-                'company_size' => 'small',
-                'company_description' => 'A PESO partner employer providing office support, documentation, and customer operations roles in Urdaneta City.',
-                'logo_url' => 'https://api.dicebear.com/7.x/shapes/svg?seed=Northstar&backgroundColor=0a5c36,146a47&shape1Color=ffffff&shape2Color=e8f5e9',
-            ]),
-            'pangasinan_retail' => $this->seedEmployer([
-                'email' => self::SECONDARY_EMPLOYER_EMAIL,
-                'company_name' => 'Pangasinan Retail and Logistics Cooperative',
-                'trade_name' => 'PRL Cooperative',
-                'industry_type' => 'Retail and Logistics',
-                'industry' => 'Wholesale and Retail Trade',
-                'company_size' => 'medium',
-                'company_description' => 'A local cooperative operating retail, warehouse, delivery, and administrative roles.',
-                'logo_url' => 'https://api.dicebear.com/7.x/shapes/svg?seed=PangasinanRetail&backgroundColor=1e3a8a,1d4ed8&shape1Color=ffffff&shape2Color=eff6ff',
-            ]),
-            'hospital' => $this->seedEmployer([
-                'email' => self::HOSPITAL_EMPLOYER_EMAIL,
-                'company_name' => 'Urdaneta City General Hospital',
-                'trade_name' => 'UCGH',
-                'industry_type' => 'Healthcare',
-                'industry' => 'Human Health and Social Work Activities',
-                'company_size' => 'large',
-                'company_description' => 'A leading healthcare provider offering medical services and clinical care in Pangasinan.',
-                'logo_url' => 'https://api.dicebear.com/7.x/shapes/svg?seed=UrdanetaHospital&backgroundColor=991b1b,b91c1c&shape1Color=ffffff&shape2Color=fef2f2',
-            ]),
-            'tech' => $this->seedEmployer([
-                'email' => self::TECH_EMPLOYER_EMAIL,
-                'company_name' => 'Pangasinan Tech Solutions',
-                'trade_name' => 'PTS',
-                'industry_type' => 'Information Technology',
-                'industry' => 'Information and Communication',
-                'company_size' => 'small',
-                'company_description' => 'A fast-growing software development and IT support agency.',
-                'logo_url' => 'https://api.dicebear.com/7.x/shapes/svg?seed=TechSolutions&backgroundColor=4c1d95,5b21b6&shape1Color=ffffff&shape2Color=f5f3ff',
-            ]),
-            'construction' => $this->seedEmployer([
-                'email' => self::CONST_EMPLOYER_EMAIL,
-                'company_name' => 'Golden Harvest Construction',
-                'trade_name' => 'GHC',
-                'industry_type' => 'Construction',
-                'industry' => 'Construction',
-                'company_size' => 'medium',
-                'company_description' => 'A dedicated firm focusing on commercial and residential building projects.',
-                'logo_url' => 'https://api.dicebear.com/7.x/shapes/svg?seed=GoldenHarvest&backgroundColor=854d0e,a16207&shape1Color=ffffff&shape2Color=fefce8',
-            ]),
+        $employersData = [];
+        $baseLat = 15.9758;
+        $baseLng = 120.5707;
+        
+        $companies = [
+            ['Northstar Business Solutions', 'Business Process and Office Support', 'small', '0a5c36,146a47'],
+            ['Pangasinan Retail Cooperative', 'Retail and Logistics', 'medium', '1e3a8a,1d4ed8'],
+            ['Urdaneta General Hospital', 'Healthcare', 'large', '991b1b,b91c1c'],
+            ['Pangasinan Tech Solutions', 'Information Technology', 'small', '4c1d95,5b21b6'],
+            ['Golden Harvest Construction', 'Construction', 'medium', '854d0e,a16207'],
+            ['Urdaneta Supermart', 'Retail and Logistics', 'large', '166534,14532d'],
+            ['Agno Valley IT Academy', 'Education and Training', 'small', '3730a3,312e81'],
+            ['Central Pangasinan Bank', 'Finance and Insurance', 'medium', '115e59,134e4a'],
+            ['Sunrise Manufacturing', 'Manufacturing', 'large', '9a3412,7c2d12'],
+            ['Elite Delivery Services', 'Transportation', 'medium', '86198f,701a75'],
         ];
+
+        foreach ($companies as $index => $c) {
+            $key = 'emp_' . $index;
+            $email = $index === 0 ? self::PRIMARY_EMPLOYER_EMAIL : "employer{$index}@ipeso.test";
+            
+            // Scatter around Urdaneta Center
+            $lat = $baseLat + ((rand(-50, 50) / 1000) * 1.5);
+            $lng = $baseLng + ((rand(-50, 50) / 1000) * 1.5);
+
+            $employersData[$key] = $this->seedEmployer([
+                'email' => $email,
+                'company_name' => $c[0],
+                'trade_name' => $c[0],
+                'industry_type' => $c[1],
+                'industry' => $c[1],
+                'company_size' => $c[2],
+                'company_description' => 'A reputable employer based in Urdaneta City.',
+                'logo_url' => "https://api.dicebear.com/7.x/shapes/svg?seed={$c[0]}&backgroundColor={$c[3]}&shape1Color=ffffff&shape2Color=fef2f2",
+                'latitude' => $lat,
+                'longitude' => $lng,
+            ]);
+        }
+        
+        return $employersData;
     }
 
     private function seedEmployer(array $data): Employer
@@ -358,59 +346,67 @@ class DemoDashboardSeeder extends Seeder
 
     private function seedVacancies(array $employers, array $occupations): array
     {
-        $jobs = [
-            ['northstar', 'office_admin', 'office administration', 'Data Encoder', 3],
-            ['northstar', 'customer_service', 'customer service', 'Support Associate', 5],
-            ['pangasinan_retail', 'driver', 'transportation and logistics', 'Delivery Driver', 4],
-            ['pangasinan_retail', 'accounting', 'accounting and finance', 'Accounting Clerk', 2],
-            ['hospital', 'nurse', 'healthcare and medical', 'Registered Nurse', 10],
-            ['hospital', 'office_admin', 'office administration', 'Medical Records Encoder', 3],
-            ['tech', 'web_developer', 'information technology', 'Frontend Web Developer', 2],
-            ['tech', 'it_support', 'information technology', 'IT Helpdesk Support', 4],
-            ['construction', 'civil_engineer', 'engineering and construction', 'Project Civil Engineer', 2],
-            ['construction', 'hr_specialist', 'human resources', 'HR Officer', 1],
-        ];
-
         $vacancies = [];
         $i = 1;
 
-        foreach ($jobs as $jobData) {
-            $employer = $employers[$jobData[0]] ?? null;
-            $occupation = $occupations[$jobData[1]] ?? null;
+        $jobTemplates = [
+            ['office_admin', 'office administration', 'Data Encoder'],
+            ['customer_service', 'customer service', 'Support Associate'],
+            ['driver', 'transportation and logistics', 'Delivery Driver'],
+            ['accounting', 'accounting and finance', 'Accounting Clerk'],
+            ['nurse', 'healthcare and medical', 'Registered Nurse'],
+            ['web_developer', 'information technology', 'Frontend Web Developer'],
+            ['it_support', 'information technology', 'IT Helpdesk Support'],
+            ['civil_engineer', 'engineering and construction', 'Project Civil Engineer'],
+            ['hr_specialist', 'human resources', 'HR Officer'],
+            ['office_admin', 'office administration', 'Admin Assistant'],
+        ];
 
-            if (! $employer || ! $occupation) continue;
+        foreach ($employers as $empKey => $employer) {
+            // Give each employer 5 distinct jobs
+            $selectedJobs = array_slice($jobTemplates, ($i % 5), 5);
+            if (count($selectedJobs) < 5) {
+                 $selectedJobs = array_merge($selectedJobs, array_slice($jobTemplates, 0, 5 - count($selectedJobs)));
+            }
 
-            $vacancy = JobVacancy::query()
-                ->where('employer_id', $employer->getKey())
-                ->where('job_title', $jobData[3])
-                ->first() ?? new JobVacancy();
+            foreach ($selectedJobs as $index => $jobData) {
+                $occupation = $occupations[$jobData[0]] ?? null;
+                if (! $occupation) continue;
 
-            $vacancy->forceFill($this->onlyExistingColumns('job_vacancies', [
-                'employer_id' => $employer->getKey(),
-                'occupation_id' => $occupation->id,
-                'general_term' => $jobData[2],
-                'job_title' => $jobData[3],
-                'employment_type' => 'Full-Time',
-                'work_setup' => 'On-site',
-                'location' => 'Urdaneta City, Pangasinan',
-                'province_code' => '015500000',
-                'city_code' => '015546000',
-                'job_description' => 'A fulfilling role performing standard duties for ' . $jobData[3],
-                'vacancies_count' => $jobData[4],
-                'minimum_education' => 'College Graduate',
-                'salary_min' => 15000 + ($i * 1000),
-                'salary_max' => 20000 + ($i * 1000),
-                'salary_type' => 'Monthly',
-                'required_skills' => explode(' ', $occupation->search_terms),
-                'soft_skills' => ['Communication', 'Teamwork'],
-                'application_deadline' => now()->addDays(30)->toDateString(),
-                'status' => 'active',
-                'created_at' => now()->subDays($i),
-                'updated_at' => now()->subDays($i),
-            ]))->save();
+                $vacancy = JobVacancy::query()
+                    ->where('employer_id', $employer->getKey())
+                    ->where('job_title', $jobData[2])
+                    ->first() ?? new JobVacancy();
 
-            $vacancies[] = $vacancy->fresh();
-            $i++;
+                $vacancy->forceFill($this->onlyExistingColumns('job_vacancies', [
+                    'employer_id' => $employer->getKey(),
+                    'occupation_id' => $occupation->id,
+                    'general_term' => $jobData[1],
+                    'job_title' => $jobData[2],
+                    'employment_type' => 'Full-Time',
+                    'work_setup' => 'On-site',
+                    'location' => 'Urdaneta City, Pangasinan',
+                    'province_code' => '015500000',
+                    'city_code' => '015546000',
+                    'latitude' => $employer->latitude,
+                    'longitude' => $employer->longitude,
+                    'job_description' => 'A fulfilling role performing standard duties for ' . $jobData[2],
+                    'vacancies_count' => rand(1, 5),
+                    'minimum_education' => 'College Graduate',
+                    'salary_min' => 15000 + ($i * 100),
+                    'salary_max' => 20000 + ($i * 100),
+                    'salary_type' => 'Monthly',
+                    'required_skills' => explode(' ', $occupation->search_terms),
+                    'soft_skills' => ['Communication', 'Teamwork'],
+                    'application_deadline' => now()->addDays(30)->toDateString(),
+                    'status' => 'active',
+                    'created_at' => now()->subDays(rand(1, 5)),
+                    'updated_at' => now()->subDays(rand(1, 5)),
+                ]))->save();
+
+                $vacancies[] = $vacancy->fresh();
+                $i++;
+            }
         }
 
         return $vacancies;

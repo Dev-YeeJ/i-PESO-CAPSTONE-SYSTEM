@@ -1,15 +1,27 @@
 import { createElement, useState } from 'react'
-import { ChevronLeft, CircleCheck, LayoutDashboard, LogOut, Menu, UserRound, X } from 'lucide-react'
+import { BookOpenCheck, CalendarDays, ChevronLeft, CircleCheck, ClipboardList, GraduationCap, LayoutDashboard, LogOut, Menu, UserRound, X, MapPin } from 'lucide-react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '@/stores/authStore'
+import NotificationBell from '@/pages/seeker/components/NotificationBell'
 
 const navLinks = [
   { to: '/seeker/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { to: '/seeker/job-fairs', label: 'Job Fairs', icon: CalendarDays },
+  { to: '/seeker/job-map', label: 'AI Job Map', icon: MapPin },
+  { to: '/seeker/applications', label: 'My Applications', icon: ClipboardList },
+  { to: '/seeker/upskill-hub', label: 'Upskill Hub', icon: GraduationCap },
+  { to: '/seeker/program-applications', label: 'Program Applications', icon: BookOpenCheck },
   { to: '/seeker/profile', label: 'My Profile', icon: UserRound },
 ]
 
 const pageNames = {
   '/seeker/dashboard': 'Dashboard',
+  '/seeker/job-fairs': 'Job Fairs',
+  '/seeker/job-map': 'AI Job Map',
+  '/seeker/applications': 'My Applications',
+  '/seeker/upskill-hub': 'Upskill Hub',
+  '/seeker/upskill-hub/recommended': 'Recommended Programs',
+  '/seeker/program-applications': 'Program Applications',
   '/seeker/profile': 'My Profile',
   '/seeker/profile/edit': 'Update Profile',
 }
@@ -93,6 +105,8 @@ export default function SeekerLayout() {
             <span className="hidden items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-extrabold text-emerald-700 sm:inline-flex">
               <CircleCheck className="h-3.5 w-3.5" /> Profile Active
             </span>
+            <NotificationBell />
+            <span className="hidden h-9 w-px bg-slate-200 sm:block" />
             <span className="flex h-9 w-9 items-center justify-center rounded-full bg-brand-navy text-xs font-black text-white">{initials}</span>
             <div className="hidden lg:block"><p className="max-w-40 truncate text-sm font-bold text-slate-800">{user?.name}</p><p className="text-xs text-slate-500">Job Seeker</p></div>
           </div>

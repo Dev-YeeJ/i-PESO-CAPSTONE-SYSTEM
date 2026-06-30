@@ -51,6 +51,7 @@ return [
         'client_id' => env('GOOGLE_CLIENT_ID'),
         'client_secret' => env('GOOGLE_CLIENT_SECRET'),
         'calendar_redirect' => env('GOOGLE_CALENDAR_REDIRECT_URI', 'http://localhost:8000/api/employer/calendar/callback'),
+        'calendar_id' => env('GOOGLE_CALENDAR_ID', 'primary'),
     ],
 
     'jobdatalake' => [

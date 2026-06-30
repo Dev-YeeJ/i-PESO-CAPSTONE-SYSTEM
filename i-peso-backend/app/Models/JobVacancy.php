@@ -45,6 +45,10 @@ class JobVacancy extends Model
         'hide_salary',
         'benefits',
         'required_skills',
+        'hard_to_find_skills',
+        'training_needed',
+        'accepts_trainees',
+        'accepts_fresh_graduates',
         'soft_skills',
         'required_certifications',
         'certifications_mandatory',
@@ -60,6 +64,10 @@ class JobVacancy extends Model
 
     protected $casts = [
         'required_skills' => 'array',
+        'hard_to_find_skills' => 'array',
+        'training_needed' => 'array',
+        'accepts_trainees' => 'boolean',
+        'accepts_fresh_graduates' => 'boolean',
         'target_courses' => 'array',
         'soft_skills' => 'array',
         'required_certifications' => 'array',
@@ -228,5 +236,15 @@ class JobVacancy extends Model
     public function applications(): HasMany
     {
         return $this->hasMany(Application::class, 'post_id', 'post_id');
+    }
+
+    public function jobFairLinks(): HasMany
+    {
+        return $this->hasMany(JobFairVacancy::class, 'vacancy_id', 'post_id');
+    }
+
+    public function skillDemands(): HasMany
+    {
+        return $this->hasMany(EmployerSkillDemand::class, 'job_vacancy_id', 'post_id');
     }
 }

@@ -75,4 +75,14 @@ class Skill extends Model
     {
         return $this->hasMany(SkillOccupationEvidence::class, 'skill_id');
     }
+
+    public function governmentProgramSkills(): HasMany
+    {
+        return $this->hasMany(GovernmentProgramSkill::class, 'skill_id');
+    }
+
+    public function employerDemands(): HasMany
+    {
+        return $this->hasMany(EmployerSkillDemand::class, 'skill_id');
+    }
 }

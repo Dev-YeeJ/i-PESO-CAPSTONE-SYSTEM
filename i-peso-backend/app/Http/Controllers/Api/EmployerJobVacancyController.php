@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Employer;
 use App\Models\JobVacancy;
 use App\Services\GoogleMapsService;
+use App\Services\AddressService;
 use App\Services\MatchingProfileService;
 use App\Services\SkillTaxonomyService;
 use Illuminate\Http\JsonResponse;
@@ -109,6 +110,7 @@ class EmployerJobVacancyController extends Controller
             'barangay_code' => ['nullable', 'string', 'max:10'],
             'latitude' => ['nullable', 'numeric', 'between:-90,90'],
             'longitude' => ['nullable', 'numeric', 'between:-180,180'],
+            'location_accuracy' => ['nullable', 'integer', 'min:0', 'max:100000'],
             'google_place_id' => ['nullable', 'string', 'max:255'],
             'job_description' => ['required', 'string', 'max:10000'],
             'vacancies_count' => ['required', 'integer', 'min:1', 'max:10000'],
@@ -130,6 +132,12 @@ class EmployerJobVacancyController extends Controller
             ])],
             'required_skills' => ['required', 'array', 'min:1', 'max:30'],
             'required_skills.*' => ['string', 'max:100'],
+            'hard_to_find_skills' => ['nullable', 'array', 'max:20'],
+            'hard_to_find_skills.*' => ['string', 'max:100'],
+            'training_needed' => ['nullable', 'array', 'max:20'],
+            'training_needed.*' => ['string', 'max:150'],
+            'accepts_trainees' => ['sometimes', 'boolean'],
+            'accepts_fresh_graduates' => ['sometimes', 'boolean'],
             'soft_skills' => ['nullable', 'array', 'max:20'],
             'soft_skills.*' => ['string', 'max:100'],
             'required_certifications' => ['nullable', 'array', 'max:20'],
@@ -172,18 +180,35 @@ class EmployerJobVacancyController extends Controller
         if (! Schema::hasColumn('job_vacancies', 'certifications_mandatory')) {
             unset($data['certifications_mandatory']);
         }
+        foreach (['hard_to_find_skills', 'training_needed', 'accepts_trainees', 'accepts_fresh_graduates'] as $column) {
+            if (! Schema::hasColumn('job_vacancies', $column)) {
+                unset($data[$column]);
+            }
+        }
         foreach (['preferred_gender', 'minimum_age', 'maximum_age'] as $column) {
             if (! Schema::hasColumn('job_vacancies', $column)) {
                 unset($data[$column]);
             }
         }
 
+        $addressService = new AddressService();
+        $data['full_work_address'] = $addressService->buildFullAddress(
+            $data['specific_address'] ?? null,
+            $data['barangay'],
+            $data['city_municipality'],
+            $data['province']
+        );
         $data['location'] = collect([
             $data['specific_address'] ?? null,
             $data['barangay'],
             $data['city_municipality'],
             $data['province'],
         ])->filter()->join(', ');
+        
+        $data['region_code'] = substr($data['province_code'] ?? '', 0, 2) ?: null;
+        if (isset($data['latitude'], $data['longitude'])) {
+            $data['location_verified_at'] = now();
+        }
 
         if (
             Schema::hasColumns('job_vacancies', ['latitude', 'longitude', 'google_place_id'])
@@ -195,6 +220,7 @@ class EmployerJobVacancyController extends Controller
                     $data['latitude'] = $location['latitude'];
                     $data['longitude'] = $location['longitude'];
                     $data['google_place_id'] = $location['place_id'];
+                    $data['location_verified_at'] = now();
                 }
             } catch (\Throwable) {
                 // Preserve vacancy posting when optional coordinate lookup is unavailable.

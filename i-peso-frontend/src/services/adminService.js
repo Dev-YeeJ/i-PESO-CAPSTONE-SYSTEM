@@ -150,6 +150,13 @@ export const adminService = {
     return data
   },
 
+  downloadJobFairSprs: async (id) => {
+    const response = await api.get(`/admin/job-fairs/${id}/export-sprs`, {
+      responseType: 'blob',
+    })
+    return response.data
+  },
+
   // ── REPORTS ───────────────────────────────────────────────────
   getReports: async (params = {}) => {
     const { data } = await api.get('/admin/reports', { params })
@@ -158,6 +165,11 @@ export const adminService = {
 
   generateReport: async (reportData) => {
     const { data } = await api.post('/admin/reports/generate', reportData)
+    return data
+  },
+
+  generateSPRS: async (month, year) => {
+    const { data } = await api.post('/admin/reports/generate-sprs', { month, year })
     return data
   },
 

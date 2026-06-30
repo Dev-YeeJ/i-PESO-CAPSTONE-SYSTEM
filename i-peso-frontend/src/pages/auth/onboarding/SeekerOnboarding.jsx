@@ -1194,7 +1194,7 @@ const Step3 = ({ form, errors, onChange }) => {
         <p style={{ fontSize: '13px', fontWeight: '700', color: '#374151', marginBottom: '10px' }}>
           Preferred Occupation <span style={{ color: '#ef4444' }}>*</span>
           <span style={{ marginLeft: '6px', border: '1px solid #bfdbfe', borderRadius: '999px', padding: '2px 7px', color: '#1d4ed8', backgroundColor: '#eff6ff', fontSize: '10px', fontWeight: '800' }}>
-            Broad Field
+            Job Match Target
           </span>
           <span style={{ fontSize: '11px', fontWeight: '400', color: '#94a3b8', marginLeft: '6px' }}>(at least 1, up to 3)</span>
         </p>
@@ -1202,15 +1202,12 @@ const Step3 = ({ form, errors, onChange }) => {
           selected={occupations}
           multiple
           limit={3}
-          searchLimit={50}
-          broadFieldOnly
-          enableAiBroadField
           onChange={(nextOccupations) => setField('preferred_occupations', nextOccupations)}
-          placeholder={occupations.length >= 3 ? 'Maximum of 3 occupations selected' : 'Type your specific job title, e.g. Teacher, Cashier, React Developer'}
+          placeholder={occupations.length >= 3 ? 'Maximum of 3 occupations selected' : 'Type a specific job title (e.g. Teacher, Cashier, React Developer)'}
           error={errors.preferred_occupations}
         />
         <p style={{ fontSize: '11px', color: '#64748b', marginTop: '7px', lineHeight: '1.5' }}>
-          Type the specific job title you know. The system will show only broad job fields in the dropdown for matching.
+          Type the specific job title. The system will match it to the correct broad field automatically.
         </p>
         {errors.preferred_occupations && <p style={{ fontSize: '11px', color: '#ef4444', marginTop: '6px' }}>{errors.preferred_occupations}</p>}
       </div>
@@ -2456,6 +2453,7 @@ function WorkExperienceCards({ form, errors, onAddExperience, onRemoveExperience
                             : null
                       }
                       multiple={false}
+                      allowCustomFallback={true}
                       onChange={(nextOccupation) => {
                         onUpdateExperience('work_experiences', i, {
                           position: nextOccupation ? nextOccupation.title : '',
@@ -3121,30 +3119,31 @@ export default function SeekerOnboarding() {
 
     if (s === 7) {
       const today = new Date().toISOString().slice(0, 10)
-      const invalidExperience = form.work_experiences?.some((experience) => (
-        !experience.company_name?.trim()
-        || !experience.position?.trim()
-        || (experience.start_date && experience.start_date > today)
-        || (
-          !experience.currently_employed
-          && experience.end_date
-          && experience.start_date
-          && experience.end_date < experience.start_date
-        )
-        || (
-          !experience.currently_employed
-          && experience.end_date
-          && experience.end_date > today
-        )
-        || (
-          experience.number_of_months
-          && (
-            Number(experience.number_of_months) < 0
-            || Number(experience.number_of_months) > 600
-          )
-        )
-      ))
-      if (invalidExperience) e.work_experiences = 'Each added experience needs a company and position. End date cannot be earlier than start date.'
+      let invalidExperienceError = null
+      const hasInvalidExperience = form.work_experiences?.some((experience) => {
+        if (!experience.company_name?.trim() || !experience.position?.trim()) {
+          invalidExperienceError = 'Each added experience needs a company and position.'
+          return true
+        }
+        if (experience.start_date && experience.start_date > today) {
+          invalidExperienceError = 'Start date cannot be in the future.'
+          return true
+        }
+        if (!experience.currently_employed && experience.end_date && experience.start_date && experience.end_date < experience.start_date) {
+          invalidExperienceError = 'End date cannot be earlier than start date.'
+          return true
+        }
+        if (!experience.currently_employed && experience.end_date && experience.end_date > today) {
+          invalidExperienceError = 'End date cannot be in the future.'
+          return true
+        }
+        if (experience.number_of_months && (Number(experience.number_of_months) < 0 || Number(experience.number_of_months) > 600)) {
+          invalidExperienceError = 'Invalid work duration.'
+          return true
+        }
+        return false
+      })
+      if (hasInvalidExperience) e.work_experiences = invalidExperienceError
     }
 
     return e
@@ -3223,22 +3222,15 @@ export default function SeekerOnboarding() {
     work_type_preference       : form.work_type_preference,
     preferred_work_location    : form.preferred_work_location,
     preferred_locations_details: form.preferred_locations_details ?? [],
-    occupation_preferences     : (form.preferred_occupations ?? []).map((occupation) => {
-      const occupationId = occupation.is_general || occupation.is_ai_generated || occupation.is_custom_pending
-        ? null
-        : catalogOccupationId(occupation.id)
-      const generalTerm = occupationId ? null : inferBroadOccupationTerm(occupation)
-      const rawJobTitle = (occupation.is_ai_generated || occupation.is_custom_pending)
-        ? (occupation.raw_job_title || occupation.title)
-        : null
-
-      return {
-        occupation_id: occupationId,
-        general_term: generalTerm,
-        raw_job_title: rawJobTitle,
-        source: occupation.is_ai_generated ? 'ai_generated' : (occupation.is_custom_pending ? 'manual' : null),
-      }
-    }),
+    occupation_preferences     : (form.preferred_occupations ?? []).map((occupation) => ({
+      occupation_id: occupation.occupation_id || null,
+      general_term: occupation.general_term || null,
+      broad_field: occupation.broad_field || null,
+      role_function: occupation.role_function || null,
+      confidence: occupation.confidence || null,
+      raw_job_title: occupation.raw_job_title || occupation.occupation_title,
+      source: occupation.source || null,
+    })),
   })
 
   const buildStep4Payload = () => {

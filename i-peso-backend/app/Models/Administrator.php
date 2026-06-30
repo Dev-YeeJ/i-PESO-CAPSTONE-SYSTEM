@@ -3,11 +3,17 @@
 namespace App\Models;
 
 use Illuminate\Foundation\Auth\User as Authenticatable;
+use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 
 class Administrator extends Authenticatable
 {
-    use HasApiTokens;
+    use HasApiTokens, Notifiable;
+
+    public function governmentPrograms(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(GovernmentProgram::class, 'admin_id', 'admin_id');
+    }
 
     protected $table      = 'administrators';
     protected $primaryKey = 'admin_id';

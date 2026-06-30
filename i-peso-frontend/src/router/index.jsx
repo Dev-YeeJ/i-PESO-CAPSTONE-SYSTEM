@@ -29,6 +29,13 @@ const EmployerATSGrid   = lazy(() => import('@/pages/employer/EmployerATSGrid'))
 const SeekerDashboard   = lazy(() => import('@/pages/seeker/DashboardPage'))
 const SeekerProfile     = lazy(() => import('@/pages/seeker/SeekerProfile'))
 const SeekerProfileEdit = lazy(() => import('@/pages/seeker/SeekerProfileEdit'))
+const SeekerJobMap      = lazy(() => import('@/pages/seeker/JobMapPage'))
+const SeekerJobFairs    = lazy(() => import('@/pages/seeker/JobFairFeed'))
+const SeekerUpskillHub  = lazy(() => import('@/pages/seeker/UpskillHubPage'))
+const SeekerRecommendedPrograms = lazy(() => import('@/pages/seeker/RecommendedPrograms'))
+const SeekerProgramDetails = lazy(() => import('@/pages/seeker/ProgramDetailsPage'))
+const SeekerProgramApplications = lazy(() => import('@/pages/seeker/MyProgramApplications'))
+const SeekerApplications = lazy(() => import('@/pages/seeker/MyApplications'))
 const SeekerOnboarding  = lazy(() => import('@/pages/auth/onboarding/SeekerOnboarding'))
 
 // Admin Pages - CATEGORY 1: OVERVIEW
@@ -57,6 +64,7 @@ const AdminPEISExport          = lazy(() => import('@/pages/admin/4-government-d
 
 // Admin Pages - CATEGORY 5: SYSTEM & REPORTS
 const AdminLaborAnalytics = lazy(() => import('@/pages/admin/5-system-reports/labor-analytics/LaborAnalyticsPage'))
+const AdminLocationDataQuality = lazy(() => import('@/pages/admin/5-system-reports/location-analytics/LocationDataQualityPage'))
 const AdminAnalyticsDetail = lazy(() => import('@/pages/admin/5-system-reports/labor-analytics/AnalyticsDetailPage'))
 const AdminActivityLogs    = lazy(() => import('@/pages/admin/5-system-reports/activity-logs/ActivityLogsPage'))
 const AdminSMSNotifications = lazy(() => import('@/pages/admin/5-system-reports/sms-notifications/SMSNotificationsPage'))
@@ -267,6 +275,7 @@ export const router = createBrowserRouter([
                       
                       // CATEGORY 5: SYSTEM & REPORTS
                       { path: 'labor-analytics', element: S(AdminLaborAnalytics) },
+                      { path: 'location-data-quality', element: S(AdminLocationDataQuality) },
                       { path: 'labor-analytics/:id', element: S(AdminAnalyticsDetail) },
                       { path: 'activity-logs', element: S(AdminActivityLogs) },
                       { path: 'sms-notifications', element: S(AdminSMSNotifications) },
@@ -294,6 +303,13 @@ export const router = createBrowserRouter([
                         children: [
                           { index: true, element: <Navigate to="dashboard" replace /> },
                           { path: 'dashboard', element: S(SeekerDashboard) },
+                          { path: 'job-map', element: S(SeekerJobMap) },
+                          { path: 'job-fairs', element: S(SeekerJobFairs) },
+                          { path: 'upskill-hub', element: S(SeekerUpskillHub) },
+                          { path: 'upskill-hub/recommended', element: S(SeekerRecommendedPrograms) },
+                          { path: 'upskill-hub/:id', element: S(SeekerProgramDetails) },
+                          { path: 'program-applications', element: S(SeekerProgramApplications) },
+                          { path: 'applications', element: S(SeekerApplications) },
                           { path: 'profile', element: S(SeekerProfile) },
                           { path: 'profile/edit', element: S(SeekerProfileEdit) },
                         ],
@@ -311,3 +327,4 @@ export const router = createBrowserRouter([
     ],
   },
 ])
+

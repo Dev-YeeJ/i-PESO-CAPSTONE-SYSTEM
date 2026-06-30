@@ -3,44 +3,18 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use Google\Client;
+use App\Services\GoogleCalendarService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 
 class GoogleCalendarController extends Controller
 {
-    private function getGoogleClient(?\App\Models\Employer $employer = null): Client
+    protected $calendarService;
+
+    public function __construct(GoogleCalendarService $calendarService)
     {
-        $client = new Client();
-        $client->setClientId(config('services.google.client_id'));
-        $client->setClientSecret(config('services.google.client_secret'));
-        $client->setRedirectUri(config('services.google.calendar_redirect'));
-        $client->addScope(\Google\Service\Calendar::CALENDAR_EVENTS);
-        $client->setAccessType('offline');
-        $client->setPrompt('consent');
-
-        if ($employer && $employer->google_access_token) {
-            $client->setAccessToken([
-                'access_token' => $employer->google_access_token,
-                'refresh_token' => $employer->google_refresh_token,
-                'expires_in' => $employer->google_token_expires_at ? $employer->google_token_expires_at->diffInSeconds(now()) : 3600,
-            ]);
-
-            if ($client->isAccessTokenExpired() && $employer->google_refresh_token) {
-                $client->fetchAccessTokenWithRefreshToken($employer->google_refresh_token);
-                $newToken = $client->getAccessToken();
-                if (!isset($newToken['error'])) {
-                    $employer->forceFill([
-                        'google_access_token' => $newToken['access_token'],
-                        'google_refresh_token' => $newToken['refresh_token'] ?? $employer->google_refresh_token,
-                        'google_token_expires_at' => isset($newToken['expires_in']) ? now()->addSeconds($newToken['expires_in']) : null,
-                    ])->save();
-                }
-            }
-        }
-
-        return $client;
+        $this->calendarService = $calendarService;
     }
 
     /**
@@ -48,7 +22,7 @@ class GoogleCalendarController extends Controller
      */
     public function connect(Request $request): JsonResponse
     {
-        $client = $this->getGoogleClient();
+        $client = $this->calendarService->getClient();
         // Encrypt the employer ID to safely pass it through Google's state parameter
         $client->setState(encrypt($request->user()->employer_id));
         $authUrl = $client->createAuthUrl();
@@ -76,7 +50,7 @@ class GoogleCalendarController extends Controller
             return redirect(config('app.frontend_url') . '/employer/ats?calendar_error=1');
         }
 
-        $client = $this->getGoogleClient();
+        $client = $this->calendarService->getClient();
         
         try {
             $token = $client->fetchAccessTokenWithAuthCode($code);
@@ -106,10 +80,6 @@ class GoogleCalendarController extends Controller
     {
         $employer = $request->user();
 
-        if (!$employer->google_access_token) {
-            return response()->json(['message' => 'Google Calendar not connected.'], 403);
-        }
-
         $validated = $request->validate([
             'schedule' => ['required', 'date', 'after:now'],
             'summary' => ['required', 'string', 'max:255'],
@@ -117,51 +87,47 @@ class GoogleCalendarController extends Controller
         ]);
 
         try {
-            $client = $this->getGoogleClient($employer);
-            $service = new \Google\Service\Calendar($client);
-
-            $event = new \Google\Service\Calendar\Event([
-                'summary' => $validated['summary'],
-                'description' => $validated['description'] ?? 'Interview details.',
-                'start' => [
-                    'dateTime' => \Carbon\Carbon::parse($validated['schedule'])->toRfc3339String(),
-                    'timeZone' => config('app.timezone'),
-                ],
-                'end' => [
-                    'dateTime' => \Carbon\Carbon::parse($validated['schedule'])->addHour()->toRfc3339String(),
-                    'timeZone' => config('app.timezone'),
-                ],
-                'conferenceData' => [
-                    'createRequest' => [
-                        'requestId' => uniqid('interview_'),
-                        'conferenceSolutionKey' => [
-                            'type' => 'hangoutsMeet'
-                        ]
-                    ]
-                ]
-            ]);
-
-            $calendarId = 'primary';
-            $event = $service->events->insert($calendarId, $event, ['conferenceDataVersion' => 1]);
-
-            $meetLink = null;
-            if ($event->getConferenceData() && $event->getConferenceData()->getEntryPoints()) {
-                foreach ($event->getConferenceData()->getEntryPoints() as $entryPoint) {
-                    if ($entryPoint->getEntryPointType() === 'video') {
-                        $meetLink = $entryPoint->getUri();
-                        break;
-                    }
-                }
-            }
-
-            return response()->json([
-                'meet_link' => $meetLink ?? $event->getHangoutLink(),
-                'event_id' => $event->getId(),
-            ]);
-
+            $result = $this->calendarService->createMeetEvent(
+                $employer, 
+                $validated['schedule'], 
+                $validated['summary'], 
+                $validated['description'] ?? 'Interview details.'
+            );
+            return response()->json($result);
         } catch (\Exception $e) {
+            if ($e->getCode() === 403) {
+                return response()->json(['message' => $e->getMessage()], 403);
+            }
             Log::error('Failed to generate Google Meet link: ' . $e->getMessage());
             return response()->json(['message' => 'Failed to generate meeting link.', 'error' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Fetches events for the employer calendar view.
+     */
+    public function events(Request $request)
+    {
+        $employer = $request->user();
+
+        $validated = $request->validate([
+            'start' => ['required', 'date'],
+            'end' => ['required', 'date'],
+        ]);
+
+        try {
+            $events = $this->calendarService->getEvents(
+                $employer, 
+                $validated['start'], 
+                $validated['end']
+            );
+            return response()->json($events);
+        } catch (\Exception $e) {
+            if ($e->getCode() === 403) {
+                return response()->json(['message' => $e->getMessage()], 403);
+            }
+            Log::error('Failed to fetch Google Calendar events: ' . $e->getMessage());
+            return response()->json(['message' => 'Failed to fetch calendar events.', 'error' => $e->getMessage()], 500);
         }
     }
 }

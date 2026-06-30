@@ -15,7 +15,6 @@ class EmployerVerificationStatusChanged extends Notification implements ShouldQu
         public string $status,
         public ?string $remarks = null,
     ) {
-        $this->afterCommit();
     }
 
     public function via(object $notifiable): array
@@ -26,22 +25,23 @@ class EmployerVerificationStatusChanged extends Notification implements ShouldQu
     public function toMail(object $notifiable): MailMessage
     {
         $approved = $this->status === 'verified';
-        $message = (new MailMessage)
-            ->subject($approved ? 'Your i-PESO employer account is verified' : 'Update on your i-PESO employer application')
-            ->greeting('Hello '.($notifiable->company_name ?: 'Employer').',')
-            ->line(
-                $approved
-                    ? 'PESO has verified your employer account. You can now access the verified employer features and post job vacancies.'
-                    : 'PESO reviewed your employer application and it requires changes before it can be verified.'
-            );
-
-        if ($this->remarks) {
-            $message->line(($approved ? 'Admin remarks: ' : 'Reason: ').$this->remarks);
-        }
-
-        return $message
-            ->action('Open i-PESO', $this->actionUrl())
-            ->line('Sign in to your employer dashboard to view your current verification status.');
+        $title = $approved ? 'Your i-PESO employer account is verified' : 'Update on your i-PESO employer application';
+        $message = $approved
+            ? 'PESO has verified your employer account. You can now access the verified employer features and post job vacancies.'
+            : 'PESO reviewed your employer application and it requires changes before it can be verified.';
+        
+        return (new MailMessage)
+            ->subject($title)
+            ->view('emails.employer-verification', [
+                'title' => $title,
+                'message' => $message,
+                'status' => $approved ? 'progress' : 'action_required',
+                'documentType' => null,
+                'documentLabel' => null,
+                'remarks' => $this->remarks,
+                'actionLabel' => 'Open i-PESO',
+                'actionUrl' => $this->actionUrl(),
+            ]);
     }
 
     public function toArray(object $notifiable): array

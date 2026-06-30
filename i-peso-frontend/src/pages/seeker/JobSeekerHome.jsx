@@ -30,9 +30,7 @@ import {
   Zap,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
-import { applyToJob } from '@/services/seekerService'
-
-const savedJobsStorageKey = 'ipeso_seeker_saved_jobs'
+import { applyToJob, toggleSavedJob as toggleSavedJobApi } from '@/services/seekerService'
 
 const feedTabs = [
   { key: 'smart', label: 'Smart Matches', icon: Star },
@@ -82,12 +80,18 @@ export default function JobSeekerHome({
   const [sortMode, setSortMode] = useState('match')
   const [viewMode, setViewMode] = useState('list')
   const [selectedJob, setSelectedJob] = useState(null)
-  const [savedJobIds, setSavedJobIds] = useState(() => readSavedJobs())
+  const [savedJobIds, setSavedJobIds] = useState(profile?.dashboard_stats?.saved_jobs || [])
   const [activeQuickFilters, setActiveQuickFilters] = useState([])
   const [filters, setFilters] = useState(emptyFilters)
   const [filtersOpen, setFiltersOpen] = useState(false)
   const [appliedJobs, setAppliedJobs] = useState({})
   const [applyingJobIds, setApplyingJobIds] = useState([])
+
+  useEffect(() => {
+    if (profile?.dashboard_stats?.saved_jobs) {
+      setSavedJobIds(profile.dashboard_stats.saved_jobs.map(String))
+    }
+  }, [profile])
 
   const seeker = useMemo(() => buildSeekerView(profile, user), [profile, user])
   const apiJobs = useMemo(() => normalizeApiJobs(jobsData?.jobs ?? []), [jobsData])
@@ -154,10 +158,6 @@ export default function JobSeekerHome({
   const activeApplications = Number(profile?.dashboard_stats?.active_applications ?? 0)
 
   useEffect(() => {
-    window.localStorage.setItem(savedJobsStorageKey, JSON.stringify(savedJobIds))
-  }, [savedJobIds])
-
-  useEffect(() => {
     const next = {}
 
     for (const job of apiJobs) {
@@ -194,14 +194,22 @@ export default function JobSeekerHome({
     ))
   }
 
-  const toggleSavedJob = (job) => {
-    const isSaved = savedJobIds.includes(job.id)
+  const toggleSavedJob = async (job) => {
+    const isSaved = savedJobIds.includes(String(job.id))
     const nextSaved = isSaved
-      ? savedJobIds.filter((savedJobId) => savedJobId !== job.id)
-      : [...savedJobIds, job.id]
+      ? savedJobIds.filter((savedJobId) => savedJobId !== String(job.id))
+      : [...savedJobIds, String(job.id)]
 
     setSavedJobIds(nextSaved)
-    toast.success(isSaved ? `${job.title} removed from saved jobs.` : `${job.title} saved.`)
+    
+    try {
+      await toggleSavedJobApi(job.id)
+      toast.success(isSaved ? `${job.title} removed from saved jobs.` : `${job.title} saved.`)
+    } catch (caught) {
+      // Revert on error
+      setSavedJobIds(savedJobIds)
+      toast.error('Failed to update saved jobs.')
+    }
   }
 
   const handleQuickApply = async (job) => {
@@ -1385,7 +1393,8 @@ function currency(value) {
 }
 
 function formatDistance(value) {
-  const distance = Number(value ?? 0)
+  if (value == null) return 'Distance Unknown'
+  const distance = Number(value)
   return `${distance.toFixed(distance >= 10 ? 0 : 1)}km`
 }
 
@@ -1477,12 +1486,4 @@ function normalizeText(value) {
     .replace(/[^a-z0-9+#.]+/g, ' ')
     .trim()
     .replace(/\s+/g, ' ')
-}
-
-function readSavedJobs() {
-  try {
-    return JSON.parse(window.localStorage.getItem(savedJobsStorageKey) ?? '[]')
-  } catch {
-    return []
-  }
 }

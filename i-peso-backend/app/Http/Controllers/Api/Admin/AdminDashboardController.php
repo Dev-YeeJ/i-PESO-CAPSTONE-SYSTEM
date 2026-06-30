@@ -12,12 +12,13 @@ use App\Models\GovernmentProgram;
 use App\Models\JobFair;
 use App\Models\JobSeeker;
 use App\Models\JobVacancy;
+use App\Services\GovernmentProgramAnalyticsService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 
 class AdminDashboardController extends Controller
 {
-    public function stats(): JsonResponse
+    public function stats(GovernmentProgramAnalyticsService $programAnalytics): JsonResponse
     {
         $admin = auth()->user();
 
@@ -32,6 +33,18 @@ class AdminDashboardController extends Controller
             Carbon::now()->startOfMonth(),
             Carbon::now()->endOfMonth(),
         ])->count();
+
+        $hiredThisMonth = Application::where('status', 'hired')
+            ->whereBetween('updated_at', [
+                Carbon::now()->startOfMonth(),
+                Carbon::now()->endOfMonth(),
+            ])->count();
+
+        $rejectedThisMonth = Application::where('status', 'rejected')
+            ->whereBetween('updated_at', [
+                Carbon::now()->startOfMonth(),
+                Carbon::now()->endOfMonth(),
+            ])->count();
 
         $profileCompletionRate = $totalSeekers > 0
             ? (JobSeeker::where('profile_completed', true)->count() / $totalSeekers) * 100
@@ -91,6 +104,8 @@ class AdminDashboardController extends Controller
             'total_employers' => $totalEmployers,
             'active_vacancies' => $activeVacancies,
             'applications_this_month' => $applicationsThisMonth,
+            'hired_this_month' => $hiredThisMonth,
+            'rejected_this_month' => $rejectedThisMonth,
             'profile_completion_rate' => round($profileCompletionRate, 2),
             'open_programs' => $openPrograms,
             'upcoming_job_fairs' => $upcomingJobFairs,
@@ -98,6 +113,7 @@ class AdminDashboardController extends Controller
             'pending_employer_verifications' => $pendingEmployerVerifications,
             'recent_registrations' => $recentRegistrations,
             'recent_applications' => $recentApplications,
+            'government_programs' => $programAnalytics->summary(),
         ]);
     }
 }

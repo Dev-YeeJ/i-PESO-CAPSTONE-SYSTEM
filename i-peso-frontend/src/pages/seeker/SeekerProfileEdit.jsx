@@ -18,6 +18,8 @@ import {
   Trash2,
   UserCheck,
 } from 'lucide-react'
+import SeekerOccupationMapper from '@/components/form/SeekerOccupationMapper'
+import AddressPicker from '@/components/maps/AddressPicker'
 import SeekerSkillsForm from '@/components/form/SeekerSkillsForm'
 import ExperienceTimeFrame from '@/components/form/ExperienceTimeFrame'
 import PsgcCascade from '@/pages/employer/components/PsgcCascade'
@@ -354,29 +356,37 @@ export default function SeekerProfileEdit() {
                 </div>
 
                 <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                  <div className="mb-4 flex items-center gap-2">
-                    <MapPin className="h-4 w-4 text-blue-700" />
-                    <p className="text-sm font-black text-slate-900">Present Address</p>
-                  </div>
-                  <PsgcCascade
-                    province={form.identity.address_province}
-                    provinceCode={form.identity.address_province_code}
-                    city={form.identity.address_municipality_city}
-                    cityCode={form.identity.address_city_code}
-                    barangay={form.identity.address_barangay}
-                    barangayCode={form.identity.address_barangay_code}
-                    onChange={(location) => updateSection('identity', {
-                      address_province: location.province,
-                      address_province_code: location.province_code,
-                      address_municipality_city: location.city,
-                      address_city_code: location.city_code,
-                      address_barangay: location.barangay,
-                      address_barangay_code: location.barangay_code,
-                    })}
-                  />
-                  <div className="mt-4">
-                    <TextInput label="House no. / street / purok" value={form.identity.address_house_street} error={errors.address_house_street} onChange={(value) => updateSection('identity', { address_house_street: value })} />
-                  </div>
+                    <AddressPicker
+                      title="Identity & Present Address"
+                      province={form.identity.address_province}
+                      provinceCode={form.identity.address_province_code}
+                      city={form.identity.address_municipality_city}
+                      cityCode={form.identity.address_city_code}
+                      barangay={form.identity.address_barangay}
+                      barangayCode={form.identity.address_barangay_code}
+                      street={form.identity.address_house_street}
+                      latitude={form.identity.latitude}
+                      longitude={form.identity.longitude}
+                      location_accuracy={form.identity.location_accuracy}
+                      google_place_id={form.identity.google_place_id}
+                      onChange={(location) => updateSection('identity', {
+                        address_province: location.province,
+                        address_province_code: location.province_code,
+                        address_municipality_city: location.city,
+                        address_city_code: location.city_code,
+                        address_barangay: location.barangay,
+                        address_barangay_code: location.barangay_code,
+                        address_house_street: location.street,
+                        latitude: location.latitude,
+                        longitude: location.longitude,
+                        location_accuracy: location.location_accuracy,
+                        google_place_id: location.google_place_id
+                      })}
+                    />
+                  {errors.address_province && <p className="mt-2 text-xs font-semibold text-red-600">{errors.address_province}</p>}
+                  {errors.address_municipality_city && <p className="mt-1 text-xs font-semibold text-red-600">{errors.address_municipality_city}</p>}
+                  {errors.address_barangay && <p className="mt-1 text-xs font-semibold text-red-600">{errors.address_barangay}</p>}
+                  {errors.address_house_street && <p className="mt-1 text-xs font-semibold text-red-600">{errors.address_house_street}</p>}
                 </div>
 
                 <div className="mt-5 rounded-2xl border border-slate-200 bg-white p-4">
@@ -915,6 +925,8 @@ function buildStep1Payload(identity) {
     disabilities: identity.disabilities.length ? identity.disabilities : ['none'],
     disability_specification: identity.disabilities.includes('others') ? identity.disability_specification : null,
     height_ft: identity.height_ft === '' ? '' : Number(identity.height_ft),
+    location_accuracy: identity.location_accuracy,
+    google_place_id: identity.google_place_id,
   }
 }
 

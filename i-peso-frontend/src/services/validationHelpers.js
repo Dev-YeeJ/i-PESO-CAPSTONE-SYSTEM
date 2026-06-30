@@ -33,7 +33,7 @@ export const validateEmployerStep2 = (f) => {
   if (!f.company_name?.trim()) e.company_name = 'Company name is required.'
   if (!f.tin?.trim()) e.tin = 'TIN is required.'
   else if (!/^\d{3}-\d{3}-\d{3}-\d{3}$/.test(f.tin)) e.tin = 'Use the format 000-000-000-000.'
-  if (!f.industry) e.industry = 'Industry is required.'
+
   if (!f.company_size) e.company_size = 'Company size is required.'
   if (!f.province) e.province = 'Province is required.'
   if (!f.city) e.city = 'City is required.'

@@ -4,11 +4,12 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
+use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 
 class JobSeeker extends Authenticatable
 {
-    use HasApiTokens;
+    use HasApiTokens, Notifiable;
 
     // We will assign `seeker_id` manually to support gap-filling
     // and predictable sequential IDs. Disable auto-incrementing.
@@ -171,6 +172,22 @@ class JobSeeker extends Authenticatable
     public function applications(): HasMany
     {
         return $this->hasMany(Application::class, 'seeker_id', 'seeker_id');
+    }
+
+    public function programApplications(): HasMany
+    {
+        return $this->hasMany(ProgramApplication::class, 'seeker_id', 'seeker_id');
+    }
+
+    public function jobFairAttendances(): HasMany
+    {
+        return $this->hasMany(JobFairAttendee::class, 'seeker_id', 'seeker_id');
+    }
+
+    public function savedJobs(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    {
+        return $this->belongsToMany(JobVacancy::class, 'seeker_saved_jobs', 'seeker_id', 'vacancy_id')
+            ->withTimestamps();
     }
 
     // ===== HELPER METHODS =====

@@ -87,4 +87,30 @@ class SeekerAiSuggestionController extends Controller
             ], 503);
         }
     }
+
+    public function parseMapQuery(Request $request, VertexAiSuggestionService $suggestions): JsonResponse
+    {
+        $user = $request->user();
+        if (! $user instanceof JobSeeker) {
+            return response()->json(['message' => 'Job seeker account required.'], 403);
+        }
+
+        $validated = $request->validate([
+            'query' => ['required', 'string', 'max:200'],
+        ]);
+
+        try {
+            return response()->json([
+                'data' => $suggestions->parseMapQuery($validated['query']),
+                'message' => 'Map query parsed.',
+            ]);
+        } catch (RuntimeException $exception) {
+            report($exception);
+
+            return response()->json([
+                'message' => $exception->getMessage(),
+                'data' => [],
+            ], 503);
+        }
+    }
 }

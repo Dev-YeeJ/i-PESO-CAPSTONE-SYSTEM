@@ -16,7 +16,6 @@ class EmployerVerificationProgressUpdated extends Notification implements Should
         public ?string $documentType = null,
         public ?string $remarks = null,
     ) {
-        $this->afterCommit();
     }
 
     public function via(object $notifiable): array
@@ -34,18 +33,19 @@ class EmployerVerificationProgressUpdated extends Notification implements Should
     public function toMail(object $notifiable): MailMessage
     {
         $content = $this->content();
-        $message = (new MailMessage)
+        
+        return (new MailMessage)
             ->subject($content['subject'])
-            ->greeting('Hello '.($notifiable->company_name ?: 'Employer').',')
-            ->line($content['message']);
-
-        if ($this->remarks) {
-            $message->line('PESO notes: '.$this->remarks);
-        }
-
-        return $message
-            ->action($content['action_label'], $this->actionUrl())
-            ->line('You can monitor your application from the i-PESO employer dashboard.');
+            ->view('emails.employer-verification', [
+                'title' => $content['title'],
+                'message' => $content['message'],
+                'status' => $content['status'],
+                'documentType' => $this->documentType,
+                'documentLabel' => $this->documentLabel(),
+                'remarks' => $this->remarks,
+                'actionLabel' => $content['action_label'],
+                'actionUrl' => $this->actionUrl(),
+            ]);
     }
 
     public function toArray(object $notifiable): array

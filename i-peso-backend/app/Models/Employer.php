@@ -76,6 +76,7 @@ class Employer extends Authenticatable
         'representative_is_owner' => 'boolean',
         'latitude' => 'float',
         'longitude' => 'float',
+        'google_token_expires_at' => 'datetime',
     ];
 
     /**
@@ -89,6 +90,21 @@ class Employer extends Authenticatable
     public function vacancies(): HasMany
     {
         return $this->hasMany(JobVacancy::class, 'employer_id', 'employer_id');
+    }
+
+    public function jobFairJoins(): HasMany
+    {
+        return $this->hasMany(JobFairEmployer::class, 'employer_id', 'employer_id');
+    }
+
+    public function jobFairVacancies(): HasMany
+    {
+        return $this->hasMany(JobFairVacancy::class, 'employer_id', 'employer_id');
+    }
+
+    public function skillDemands(): HasMany
+    {
+        return $this->hasMany(EmployerSkillDemand::class, 'employer_id', 'employer_id');
     }
 
     /**

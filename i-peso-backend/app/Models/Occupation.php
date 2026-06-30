@@ -53,4 +53,9 @@ class Occupation extends Model
     {
         return $this->hasMany(JobVacancy::class);
     }
+
+    public function governmentPrograms(): HasMany
+    {
+        return $this->hasMany(GovernmentProgram::class, 'target_occupation_id');
+    }
 }

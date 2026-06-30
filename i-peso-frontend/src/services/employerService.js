@@ -63,3 +63,15 @@ export const markAllNotificationsRead = async () => {
   const response = await apiClient.patch('/employer/notifications/read-all')
   return response.data
 }
+
+export const connectGoogleCalendar = async () => {
+  const response = await apiClient.get('/employer/calendar/connect')
+  return response.data
+}
+
+export const getCalendarEvents = async (start, end) => {
+  const response = await apiClient.get('/employer/calendar/events', {
+    params: { start, end }
+  })
+  return response.data
+}

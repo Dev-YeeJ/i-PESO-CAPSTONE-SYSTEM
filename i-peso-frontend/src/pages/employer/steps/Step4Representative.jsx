@@ -96,7 +96,8 @@ export default function Step4Representative({ onComplete }) {
       const formDataToSend = new FormData()
       formDataToSend.append('representative_first_name', form.first_name)
       formDataToSend.append('representative_middle_name', form.middle_name || '')
-      formDataToSend.append('representative_last_name', form.last_name)
+      const lastNameToSave = form.suffix ? `${form.last_name}, ${form.suffix}` : form.last_name
+      formDataToSend.append('representative_last_name', lastNameToSave)
       formDataToSend.append('representative_designation', form.designation)
       formDataToSend.append('representative_contact_number', form.contact_number)
       formDataToSend.append('representative_is_owner', form.representative_is_owner)
@@ -140,15 +141,31 @@ export default function Step4Representative({ onComplete }) {
           onBlur={handleBlur}
           error={getError('first_name')}
         />
-        <Field
-          label="Last Name"
-          name="last_name"
-          placeholder="Santos"
-          value={form.last_name ?? ''}
-          onChange={handleChange}
-          onBlur={handleBlur}
-          error={getError('last_name')}
-        />
+        <div className="flex gap-2">
+          <div className="flex-1">
+            <Field
+              label="Last Name"
+              name="last_name"
+              placeholder="Santos"
+              value={form.last_name ?? ''}
+              onChange={handleChange}
+              onBlur={handleBlur}
+              error={getError('last_name')}
+            />
+          </div>
+          <div className="w-24">
+            <label className="block text-sm font-medium text-slate-700 mb-1.5 h-[20px] leading-5">Suffix</label>
+            <select
+              name="suffix"
+              value={form.suffix ?? ''}
+              onChange={handleChange}
+              className="w-full px-2 py-2.5 text-sm rounded-xl border border-slate-300 bg-white transition-all focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+            >
+              <option value=""></option>
+              {['Jr.', 'Sr.', 'II', 'III', 'IV', 'V'].map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </div>
+        </div>
       </div>
 
       <Field
@@ -161,15 +178,29 @@ export default function Step4Representative({ onComplete }) {
         error={getError('middle_name')}
       />
 
-      <Field
-        label="Designation / Position"
-        name="designation"
-        placeholder="HR Manager, Director, etc."
-        value={form.designation ?? ''}
-        onChange={handleChange}
-        onBlur={handleBlur}
-        error={getError('designation')}
-      />
+      <div>
+        <label className="block text-sm font-medium text-slate-700 mb-1.5">Designation / Position</label>
+        <input
+          type="text"
+          name="designation"
+          list="designation-options"
+          placeholder="HR Manager, Director, etc."
+          value={form.designation ?? ''}
+          onChange={handleChange}
+          onBlur={handleBlur}
+          className={`w-full px-3.5 py-2.5 text-sm rounded-xl border bg-white transition-all focus:outline-none focus:ring-2 focus:ring-blue-500/20 ${
+            getError('designation') ? 'border-red-400 focus:border-red-400' : 'border-slate-300 focus:border-blue-400'
+          }`}
+        />
+        <datalist id="designation-options">
+          {['HR Manager', 'HR Supervisor', 'Recruitment Officer', 'Owner', 'CEO', 'Director', 'President', 'General Manager', 'Admin Officer'].map(opt => (
+            <option key={opt} value={opt} />
+          ))}
+        </datalist>
+        {getError('designation') && (
+          <p className="mt-1.5 text-xs text-red-600">{getError('designation')}</p>
+        )}
+      </div>
 
       <Field
         label="Direct Contact Number"

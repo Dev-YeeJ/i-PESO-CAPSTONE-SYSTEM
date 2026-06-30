@@ -1,13 +1,18 @@
-import { createElement, useState } from 'react'
+import { createElement, useState, useEffect } from 'react'
 import {
   BriefcaseBusiness,
   Building2,
+  Calendar as CalendarIcon,
+  GraduationCap,
+  FileBarChart,
   ChevronLeft,
   CircleCheck,
   LayoutDashboard,
   LogOut,
   Menu,
   PlusCircle,
+  QrCode,
+  Wrench,
   UsersRound,
   X,
 } from 'lucide-react'
@@ -20,6 +25,11 @@ const navItems = [
   { to: '/employer/post-job', label: 'Create Job Post', icon: PlusCircle, protected: true },
   { to: '/employer/vacancies', label: 'My Vacancies', icon: BriefcaseBusiness, protected: true },
   { to: '/employer/ats', label: 'Applicants', icon: UsersRound, protected: true },
+  { to: '/employer/job-fairs', label: 'Job Fairs', icon: QrCode, protected: true },
+  { to: '/employer/reports/establishment-report', label: 'Establishment Report', icon: FileBarChart, protected: true },
+  { to: '/employer/upskill-hub', label: 'Training Programs', icon: GraduationCap, protected: true },
+  { to: '/employer/upskill-needs', label: 'Upskill Needs', icon: Wrench, protected: true },
+  { to: '/employer/calendar', label: 'Calendar', icon: CalendarIcon, protected: true },
 ]
 
 const pageNames = {
@@ -27,6 +37,12 @@ const pageNames = {
   '/employer/post-job': 'Create Job Post',
   '/employer/vacancies': 'My Vacancies',
   '/employer/ats': 'Applicants',
+  '/employer/job-fairs': 'Job Fairs',
+  '/employer/reports/establishment-report': 'Establishment Report / RO1-JF Form 3',
+  '/employer/upskill-hub': 'Training Programs',
+  '/employer/upskill-needs': 'Upskill Needs',
+  '/employer/upskill-needs/create': 'Submit Skill Demand',
+  '/employer/calendar': 'Interview Calendar',
 }
 
 export default function EmployerLayout() {
@@ -34,12 +50,37 @@ export default function EmployerLayout() {
   const location = useLocation()
   const logout = useAuthStore((state) => state.logout)
   const user = useAuthStore((state) => state.user)
+  const updateUser = useAuthStore((state) => state.updateUser)
   const [collapsed, setCollapsed] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
   const approved = user?.verification_status === 'verified'
   const visibleItems = navItems.filter((item) => !item.protected || approved)
-  const initials = user?.name?.split(' ').map((name) => name[0]).join('').slice(0, 2).toUpperCase() ?? 'EM'
+  
+  const logoUrl = user?.employer?.logo_url
+  const companyName = user?.employer?.company_name || user?.name
+  const initials = companyName?.split(' ').map((name) => name[0]).join('').slice(0, 2).toUpperCase() ?? 'EM'
+  
   const pageName = pageNames[location.pathname] ?? 'Employer Portal'
+
+  useEffect(() => {
+    if (!approved) {
+      const checkStatus = async () => {
+        try {
+          const { authService } = await import('@/services/authService')
+          const updatedUser = await authService.getAuthenticatedUser()
+          updateUser(updatedUser)
+        } catch (err) {
+          // silently fail
+        }
+      }
+      const interval = setInterval(checkStatus, 30000)
+      window.addEventListener('focus', checkStatus)
+      return () => {
+        clearInterval(interval)
+        window.removeEventListener('focus', checkStatus)
+      }
+    }
+  }, [approved, updateUser])
 
   const handleLogout = async () => {
     await logout()
@@ -91,8 +132,12 @@ export default function EmployerLayout() {
 
       <div className="border-t border-white/10 p-3">
         <div className={`mb-2 flex items-center ${collapsed ? 'justify-center' : 'gap-3 px-2 py-2'}`}>
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-gold text-xs font-black text-brand-navy">{initials}</span>
-          {!collapsed && <div className="min-w-0"><p className="truncate text-sm font-bold text-white">{user?.name}</p><p className="text-xs text-blue-200">Employer Account</p></div>}
+          {logoUrl ? (
+            <img src={logoUrl} alt="Company Logo" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full object-cover shadow-sm bg-white" />
+          ) : (
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-gold text-xs font-black text-brand-navy">{initials}</span>
+          )}
+          {!collapsed && <div className="min-w-0"><p className="truncate text-sm font-bold text-white">{companyName}</p><p className="text-xs text-blue-200">Employer Account</p></div>}
         </div>
         <button onClick={() => setCollapsed(!collapsed)} className={`hidden w-full items-center rounded-lg py-2.5 text-sm font-semibold text-blue-200 hover:bg-white/10 hover:text-white md:flex ${collapsed ? 'justify-center' : 'gap-3 px-3'}`}>
           <ChevronLeft className={`h-5 w-5 transition ${collapsed ? 'rotate-180' : ''}`} />{!collapsed && 'Collapse sidebar'}

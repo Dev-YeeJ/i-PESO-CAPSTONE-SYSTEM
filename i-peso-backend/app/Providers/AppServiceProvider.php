@@ -22,5 +22,9 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         JobSeeker::observe(JobSeekerObserver::class);
+        \Illuminate\Support\Facades\Event::listen(
+            \App\Events\ApplicationStatusChanged::class,
+            \App\Listeners\SendApplicationStatusNotification::class
+        );
     }
 }

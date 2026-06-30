@@ -65,6 +65,121 @@ class ReportController extends Controller
         ], 201);
     }
 
+    public function generateSPRS(Request $request): JsonResponse
+    {
+        $admin = auth()->user();
+        
+        if (!$admin instanceof Administrator) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        $validated = $request->validate([
+            'month' => 'required|integer|min:1|max:12',
+            'year' => 'required|integer|min:2020|max:2100',
+        ]);
+
+        $month = clone \Carbon\Carbon::createFromDate($validated['year'], $validated['month'], 1);
+        $start = $month->copy()->startOfMonth();
+        $end = $month->copy()->endOfMonth();
+
+        // 1.1 Job Vacancies Solicited
+        $vacancies = JobVacancy::with('employer')->whereBetween('created_at', [$start, $end])->get();
+        $localVacancies = $vacancies->sum('vacancies_count');
+        $overseasVacancies = 0; 
+
+        // 1.2 Applicants Registered
+        $seekers = JobSeeker::whereBetween('created_at', [$start, $end])->get();
+        $registeredTotal = $seekers->count();
+        $registeredFemale = $seekers->where('gender', 'Female')->count();
+
+        // 1.3 Applicants referred
+        $referredQuery = Application::whereBetween('created_at', [$start, $end]);
+        $referredTotal = $referredQuery->count();
+        $referredFemale = Application::whereBetween('created_at', [$start, $end])
+            ->whereHas('jobSeeker', fn($q) => $q->where('sex', 'female'))
+            ->count();
+
+        // 1.4 Applicants Placed
+        $placedQuery = Application::where('status', 'hired')
+                             ->whereBetween('status_changed_at', [$start, $end]);
+        $placedTotal = $placedQuery->count();
+        $placedFemale = Application::where('status', 'hired')
+                             ->whereBetween('status_changed_at', [$start, $end])
+                             ->whereHas('jobSeeker', fn($q) => $q->where('sex', 'female'))
+                             ->count();
+
+        $placedGovernment = Application::where('status', 'hired')
+                             ->whereBetween('status_changed_at', [$start, $end])
+                             ->whereHas('jobVacancy.employer', fn($q) => 
+                                 $q->where('company_type', 'like', '%Government%')
+                                   ->orWhere('company_type', 'like', '%LGU%')
+                             )->count();
+        $placedPrivate = $placedTotal - $placedGovernment;
+
+        // 1.5 SPES
+        $spesPlaced = Application::where('status', 'hired')
+                             ->whereBetween('status_changed_at', [$start, $end])
+                             ->whereHas('jobVacancy', fn($q) => $q->where('spes_tupad_eligible', true))
+                             ->count();
+        $spesFemale = Application::where('status', 'hired')
+                             ->whereBetween('status_changed_at', [$start, $end])
+                             ->whereHas('jobVacancy', fn($q) => $q->where('spes_tupad_eligible', true))
+                             ->whereHas('jobSeeker', fn($q) => $q->where('sex', 'female'))
+                             ->count();
+
+        // PEIS Registrations
+        $employersRegistered = \App\Models\Employer::whereBetween('created_at', [$start, $end])->count();
+
+        $data = [
+            'period' => $month->format('F Y'),
+            '1_1_vacancies' => [
+                'total' => $localVacancies + $overseasVacancies,
+                'local' => $localVacancies,
+                'overseas' => $overseasVacancies,
+            ],
+            '1_2_registered' => [
+                'total' => $registeredTotal,
+                'female' => $registeredFemale,
+            ],
+            '1_3_referred' => [
+                'total' => $referredTotal,
+                'female' => $referredFemale,
+            ],
+            '1_4_placed' => [
+                'total' => $placedTotal,
+                'female' => $placedFemale,
+                'private' => $placedPrivate,
+                'government' => $placedGovernment,
+                'overseas' => 0,
+            ],
+            '1_5_spes' => [
+                'total' => $spesPlaced,
+                'female' => $spesFemale,
+            ],
+            'peis' => [
+                'establishments' => $employersRegistered,
+                'applicants' => $registeredTotal,
+            ]
+        ];
+
+        // Save report history
+        $report = AnalyticsReport::create([
+            'admin_id' => $admin->admin_id,
+            'title' => "SPRS Report - " . $month->format('F Y'),
+            'report_category' => 'sprs',
+            'coverage_start' => $start,
+            'coverage_end' => $end,
+            'data_summary' => $data,
+            'status' => 'submitted',
+        ]);
+
+        return response()->json([
+            'message' => 'SPRS Report generated',
+            'data' => $data,
+            'report' => $report
+        ], 200);
+    }
+
     public function show(int $id): JsonResponse
     {
         $admin = auth()->user();
@@ -191,15 +306,20 @@ class ReportController extends Controller
     {
         $programStats = [];
 
-        $programs = GovernmentProgram::whereBetween('created_at', [$start, $end])->get();
+        $programs = GovernmentProgram::withCount([
+            'programApplications as total_applicants',
+            'programApplications as approved' => fn($q) => $q->where('status', 'approved'),
+            'programApplications as rejected' => fn($q) => $q->where('status', 'rejected'),
+            'programApplications as pending' => fn($q) => $q->where('status', 'pending'),
+        ])->whereBetween('created_at', [$start, $end])->get();
 
         foreach ($programs as $program) {
             $programStats[] = [
                 'program_name' => $program->program_name,
-                'total_applicants' => $program->programApplications()->count(),
-                'approved' => $program->programApplications()->where('status', 'approved')->count(),
-                'rejected' => $program->programApplications()->where('status', 'rejected')->count(),
-                'pending' => $program->programApplications()->where('status', 'pending')->count(),
+                'total_applicants' => $program->total_applicants,
+                'approved' => $program->approved,
+                'rejected' => $program->rejected,
+                'pending' => $program->pending,
             ];
         }
 

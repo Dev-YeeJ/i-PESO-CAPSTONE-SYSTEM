@@ -10,6 +10,7 @@ use App\Models\JobVacancy;
 use App\Models\Occupation;
 use App\Notifications\EmployerVerificationProgressUpdated;
 use App\Notifications\EmployerVerificationStatusChanged;
+use App\Services\EnhancedJobMatchingService;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Http\UploadedFile;
@@ -19,6 +20,7 @@ use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Laravel\Sanctum\Sanctum;
+use Mockery\MockInterface;
 use Tests\TestCase;
 
 class EmployerVerificationJobPostingTest extends TestCase
@@ -271,6 +273,54 @@ class EmployerVerificationJobPostingTest extends TestCase
             ->assertJsonPath('jobs.1.job_title', 'Second Job')
             ->assertJsonMissing(['job_title' => 'Expired Job'])
             ->assertJsonMissing(['job_title' => 'Closed Job']);
+    }
+
+    public function test_nearby_jobs_applies_minimum_match_and_returns_map_contract_fields(): void
+    {
+        $employer = $this->createEmployer();
+        $seeker = $this->createSeeker([
+            'latitude' => 15.9761,
+            'longitude' => 120.5711,
+        ]);
+        $payload = [
+            'employer_id' => $employer->employer_id,
+            'location' => 'Urdaneta City, Pangasinan',
+            ...$this->vacancyPayload(),
+        ];
+
+        JobVacancy::create([...$payload, 'job_title' => 'High Match Job', 'latitude' => 15.9770, 'longitude' => 120.5720]);
+        JobVacancy::create([...$payload, 'job_title' => 'Low Match Job', 'latitude' => 15.9780, 'longitude' => 120.5730]);
+
+        $this->mock(EnhancedJobMatchingService::class, function (MockInterface $mock): void {
+            $mock->shouldReceive('calculateMatch')->twice()->andReturnUsing(function (JobVacancy $job): array {
+                $percentage = $job->job_title === 'High Match Job' ? 85 : 20;
+
+                return [
+                    'percentage' => $percentage,
+                    'eligible' => true,
+                    'missing_critical_skills' => [],
+                    'factors' => ['skills' => ['details' => []]],
+                ];
+            });
+        });
+
+        Sanctum::actingAs($seeker);
+
+        $this->getJson('/api/seeker/job-map?radius_km=5&min_match=70&hide_low_match=false&hide_applied=false&coordinates_only=false')
+            ->assertOk()
+            ->assertJsonPath('count', 1)
+            ->assertJsonPath('summary.total_found', 1)
+            ->assertJsonPath('summary.high_match_count', 1)
+            ->assertJsonPath('seeker.id', $seeker->seeker_id)
+            ->assertJsonPath('filters_applied.min_match', 70)
+            ->assertJsonPath('jobs.0.job_title', 'High Match Job')
+            ->assertJsonPath('jobs.0.match_percentage', 85)
+            ->assertJsonPath('jobs.0.employer_name', 'Test Employer')
+            ->assertJsonPath('jobs.0.vacancy_id', fn ($id) => is_int($id))
+            ->assertJsonPath('jobs.0.job_fair.is_available_at_job_fair', false)
+            ->assertJsonPath('jobs.0.upskill.recommended', false)
+            ->assertJsonPath('jobs.0.actions.can_save', true)
+            ->assertJsonMissing(['job_title' => 'Low Match Job']);
     }
 
     public function test_nearby_jobs_requires_a_saved_seeker_location(): void

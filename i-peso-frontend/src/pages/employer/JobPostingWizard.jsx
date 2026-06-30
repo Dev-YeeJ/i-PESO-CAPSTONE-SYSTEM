@@ -23,6 +23,8 @@ import ExperienceTimeFrame from '@/components/form/ExperienceTimeFrame'
 import SkillTaxonomyTags from '@/components/form/SkillTaxonomyTags'
 import SmartSuggestionInput from '@/components/form/SmartSuggestionInput'
 import PsgcCascade from '@/pages/employer/components/PsgcCascade'
+import AddressPicker from '@/components/maps/AddressPicker'
+import MapPinPicker from '@/components/maps/MapPinPicker'
 import * as employerService from '@/services/employerService'
 
 const steps = [
@@ -476,55 +478,56 @@ function AlgorithmAnchorsStep({ form, errors, update, setLocation, locationSumma
         </div>
 
         <div>
-          <p className="text-sm font-bold text-slate-700">Job Location / PSGC <span className="text-red-500">*</span></p>
-          <div className="mt-2">
-            <PsgcCascade
+          <div>
+            <AddressPicker
+              title="Job Location / PSGC"
               province={form.province}
               provinceCode={form.province_code}
               city={form.city_municipality}
               cityCode={form.city_code}
               barangay={form.barangay}
               barangayCode={form.barangay_code}
-              onChange={setLocation}
+              street={form.specific_address}
+              latitude={form.latitude}
+              longitude={form.longitude}
+              onChange={(location) => {
+                setLocation({
+                  province: location.province,
+                  province_code: location.province_code,
+                  city: location.city,
+                  city_code: location.city_code,
+                  barangay: location.barangay,
+                  barangay_code: location.barangay_code,
+                })
+                update('specific_address', location.street)
+                update('latitude', location.latitude)
+                update('longitude', location.longitude)
+                update('location_accuracy', location.location_accuracy)
+                update('google_place_id', location.google_place_id)
+              }}
             />
+            {(errors.province || errors.city_municipality || errors.barangay) && (
+              <p className="mt-1.5 text-xs font-semibold text-red-600">
+                {errors.province || errors.city_municipality || errors.barangay}
+              </p>
+            )}
           </div>
-          {(errors.province || errors.city_municipality || errors.barangay) && (
-            <p className="mt-1.5 text-xs font-semibold text-red-600">
-              {errors.province || errors.city_municipality || errors.barangay}
-            </p>
-          )}
-        </div>
 
-        <Field label="Specific Address / Landmark" required={false}>
-          <input
-            name="specific_address"
-            value={form.specific_address}
-            onChange={(event) => update('specific_address', event.target.value)}
-            className={inputClass}
-            placeholder="Building, street, floor, or nearby landmark"
-            maxLength={255}
-          />
-        </Field>
-
-        <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex gap-3">
-              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-800">
-                <MapPin className="h-5 w-5" />
-              </span>
-              <div>
-                <p className="text-sm font-black text-slate-900">Map Pin Location</p>
-                <p className="mt-1 text-sm leading-6 text-slate-600">
-                  Google Maps Lat/Lng picker placeholder. The system can still geocode from the PSGC address during publishing.
-                </p>
-              </div>
+          <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4">
+            <div className="mb-2 bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-800">
+              <strong>Privacy Notice:</strong> This work location will appear to job seekers as the job site and will be used for nearby job matching.
             </div>
-            <span className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-500">
-              {form.latitude && form.longitude ? `${form.latitude}, ${form.longitude}` : 'No pin selected'}
-            </span>
-          </div>
-          {locationSummary && <p className="mt-3 rounded-lg bg-white px-3 py-2 text-xs font-semibold text-slate-600">{locationSummary}</p>}
-        </div>
+            <MapPinPicker
+              latitude={form.latitude}
+              longitude={form.longitude}
+              addressLine={`${form.specific_address || ''} ${form.barangay || ''} ${form.city_municipality || ''}`.trim()}
+              onChange={(coords) => {
+                update('latitude', coords.lat)
+                update('longitude', coords.lng)
+                update('location_accuracy', coords.accuracy || 'map_pin')
+              }}
+            />
+          </div></div>
       </div>
     </StepShell>
   )

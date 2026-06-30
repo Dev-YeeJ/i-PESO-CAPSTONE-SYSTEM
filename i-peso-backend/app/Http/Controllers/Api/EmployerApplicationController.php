@@ -73,7 +73,7 @@ class EmployerApplicationController extends Controller
         ]);
     }
 
-    public function updateStatus(Request $request, Application $application): JsonResponse
+    public function updateStatus(Request $request, Application $application, \App\Services\GoogleCalendarService $calendarService): JsonResponse
     {
         $employer = $this->employer($request);
         $this->ensureOwnership($request, $application);
@@ -81,21 +81,50 @@ class EmployerApplicationController extends Controller
         $validated = $request->validate([
             'status' => ['required', Rule::in(['reviewed', 'shortlisted', 'interview', 'hired', 'rejected'])],
             'employer_remarks' => ['nullable', 'string', 'max:5000'],
+            'employer_mismatch_reason_code' => ['nullable', Rule::in(array_keys(\App\Services\EstablishmentReportService::EMPLOYER_MISMATCH_REASONS))],
+            'seeker_mismatch_reason_code' => ['nullable', Rule::in(array_keys(\App\Services\EstablishmentReportService::SEEKER_MISMATCH_REASONS))],
+            'mismatch_reason_details' => ['nullable', 'string', 'max:5000'],
             'interview.mode_of_interview' => ['required_if:status,interview', 'nullable', Rule::in(['face_to_face', 'online', 'phone'])],
             'interview.schedule' => ['required_if:status,interview', 'nullable', 'date', 'after:now'],
             'interview.venue_or_link' => ['nullable', 'string', 'max:500'],
+            'interview.auto_meet_link' => ['nullable', 'boolean'],
             'interview.instructions' => ['nullable', 'string', 'max:5000'],
             'placement_start_date' => ['required_if:status,hired', 'nullable', 'date'],
             'placement_salary' => ['required_if:status,hired', 'nullable', 'numeric', 'min:1'],
         ]);
 
-        $application = DB::transaction(function () use ($application, $employer, $validated) {
-            $application->forceFill([
+        if (($validated['status'] ?? null) === 'interview' && ($validated['interview']['auto_meet_link'] ?? false)) {
+            try {
+                $seekerName = $application->jobSeeker->name ?? 'Applicant';
+                $jobTitle = $application->jobVacancy->job_title ?? 'Position';
+                $summary = "Interview: $seekerName - $jobTitle";
+                $result = $calendarService->createMeetEvent($employer, $validated['interview']['schedule'], $summary);
+                $validated['interview']['venue_or_link'] = $result['meet_link'];
+            } catch (\Exception $e) {
+                if ($e->getCode() === 403) {
+                    return response()->json(['message' => $e->getMessage()], 403);
+                }
+                return response()->json(['message' => 'Failed to generate meeting link.', 'error' => $e->getMessage()], 500);
+            }
+        }
+
+        $sweptApplications = [];
+
+        $application = DB::transaction(function () use ($application, $employer, $validated, &$sweptApplications) {
+            $originalStatus = $application->status;
+
+            $updates = [
                 'status' => $validated['status'],
                 'status_changed_at' => now(),
                 'status_changed_by' => $employer->employer_id,
                 'employer_remarks' => $validated['employer_remarks'] ?? $application->employer_remarks,
-            ]);
+            ];
+            foreach (['employer_mismatch_reason_code', 'seeker_mismatch_reason_code', 'mismatch_reason_details'] as $field) {
+                if (array_key_exists($field, $validated)) {
+                    $updates[$field] = $validated[$field];
+                }
+            }
+            $application->forceFill($updates);
 
             if ($validated['status'] === 'hired') {
                 $application->forceFill([
@@ -106,6 +135,34 @@ class EmployerApplicationController extends Controller
             }
 
             $application->save();
+
+            // Anti-Ghosting Mass Rejection Sweep
+            if ($validated['status'] === 'hired' && $originalStatus !== 'hired') {
+                $vacancy = $application->jobVacancy;
+                if ($vacancy && $vacancy->vacancies_count > 0) {
+                    $vacancy->decrement('vacancies_count');
+                    
+                    if ($vacancy->vacancies_count === 0) {
+                        // Vacancy is filled, sweep remaining active applications
+                        $activeStatuses = ['pending', 'reviewed', 'shortlisted', 'interview'];
+                        $sweptApplications = Application::where('post_id', $vacancy->post_id)
+                            ->where('apply_id', '!=', $application->apply_id)
+                            ->whereIn('status', $activeStatuses)
+                            ->get();
+                            
+                        foreach ($sweptApplications as $sweptApp) {
+                            $sweptApp->forceFill([
+                                'status' => 'rejected',
+                                'status_changed_at' => now(),
+                                'status_changed_by' => $employer->employer_id,
+                                'employer_remarks' => 'Automated anti-ghosting sweep: Vacancy has been filled.',
+                                'employer_mismatch_reason_code' => 'other_reason',
+                                'mismatch_reason_details' => 'Vacancy was filled before this application advanced.',
+                            ])->save();
+                        }
+                    }
+                }
+            }
 
             if ($validated['status'] === 'interview') {
                 $interview = $validated['interview'] ?? [];
@@ -125,6 +182,11 @@ class EmployerApplicationController extends Controller
         });
 
         event(new ApplicationStatusChanged($application));
+
+        // Dispatch events for all swept applications so they receive the rejection email
+        foreach ($sweptApplications as $sweptApp) {
+            event(new ApplicationStatusChanged($sweptApp));
+        }
 
         return response()->json([
             'message' => 'Application status updated.',

@@ -12,6 +12,7 @@ use App\Models\SeekerLanguage;
 use App\Models\SeekerOccupation;
 use App\Models\SeekerTraining;
 use App\Models\SeekerWorkExperience;
+use App\Services\AddressService;
 use App\Services\MatchingProfileService;
 use App\Services\OccupationTitleMatcher;
 use App\Services\SkillCategorizer;
@@ -250,6 +251,7 @@ class SeekerController extends Controller
             'workExperiences.occupation',
             'seekerSkills',
             'certificates',
+            'savedJobs',
         ]);
 
         // Organize skills by type for frontend form initialization
@@ -338,7 +340,7 @@ class SeekerController extends Controller
                             ->count()
                         : 0,
                     'skills' => $seeker->seekerSkills->count(),
-                    'saved_jobs' => 0,
+                    'saved_jobs' => clone $seeker->savedJobs->pluck('post_id'),
                 ],
                 'profile_strength' => $this->profileStrength($seeker),
             ]),
@@ -476,7 +478,21 @@ class SeekerController extends Controller
             'longitude' => $validated['longitude'] ?? null,
             'location_accuracy' => $validated['location_accuracy'] ?? null,
             'google_place_id' => $validated['google_place_id'] ?? null,
-        ])->save();
+        ]);
+        
+        $addressService = new AddressService();
+        $seeker->full_address = $addressService->buildFullAddress(
+            $validated['address_house_street'],
+            $validated['address_barangay'],
+            $validated['address_municipality_city'],
+            $validated['address_province']
+        );
+        $seeker->address_region_code = substr($validated['address_province_code'] ?? '', 0, 2) ?: null;
+        if (isset($validated['latitude']) && isset($validated['longitude'])) {
+            $seeker->location_verified_at = now();
+        }
+
+        $seeker->save();
 
         // ── Save disability records ──
         $seeker->disabilities()->delete();
@@ -631,9 +647,12 @@ class SeekerController extends Controller
             ],
             'occupation_preferences' => ['required_without:occupation_ids', 'array', 'min:1', 'max:3'],
             'occupation_preferences.*.occupation_id' => ['nullable', 'integer', 'distinct', 'exists:occupations,id'],
-            'occupation_preferences.*.general_term' => ['nullable', 'string', 'max:100', 'distinct'],
+            'occupation_preferences.*.general_term' => ['nullable', 'string', 'max:100'],
+            'occupation_preferences.*.broad_field' => ['nullable', 'string', 'max:100'],
+            'occupation_preferences.*.role_function' => ['nullable', 'string', 'max:100'],
+            'occupation_preferences.*.confidence' => ['nullable', 'integer', 'min:0', 'max:100'],
             'occupation_preferences.*.raw_job_title' => ['nullable', 'string', 'min:2', 'max:150', 'distinct:ignore_case'],
-            'occupation_preferences.*.source' => ['nullable', 'string', Rule::in(['ai_generated', 'manual'])],
+            'occupation_preferences.*.source' => ['nullable', 'string', Rule::in(['catalog', 'dictionary', 'ai', 'ai_generated', 'manual', 'user_selected_broad_field'])],
         ]);
 
         $preferences = collect($validated['occupation_preferences'] ?? [])
@@ -642,6 +661,9 @@ class SeekerController extends Controller
                 'general_term' => isset($preference['general_term'])
                     ? $this->normalizeOccupationTerm($preference['general_term'])
                     : null,
+                'broad_field' => $preference['broad_field'] ?? null,
+                'role_function' => $preference['role_function'] ?? null,
+                'confidence' => $preference['confidence'] ?? null,
                 'raw_job_title' => filled($preference['raw_job_title'] ?? null)
                     ? Str::of($preference['raw_job_title'])->squish()->limit(150, '')->toString()
                     : null,
@@ -653,6 +675,9 @@ class SeekerController extends Controller
                 ->map(fn ($occupationId) => [
                     'occupation_id' => $occupationId,
                     'general_term' => null,
+                    'broad_field' => null,
+                    'role_function' => null,
+                    'confidence' => null,
                     'raw_job_title' => null,
                     'source' => null,
                 ]);
@@ -728,12 +753,17 @@ class SeekerController extends Controller
                 'seeker_id' => $seeker->getKey(),
                 'occupation_id' => $occupation?->id,
                 'general_term' => $preference['general_term'],
+                'broad_field' => $preference['broad_field'],
+                'role_function' => $preference['role_function'],
+                'confidence' => $preference['confidence'],
+                'source' => $preference['source'],
                 'occupation_title' => $title,
                 'raw_job_title' => $preference['raw_job_title'],
                 'status' => match (true) {
                     (bool) $occupation => 'standardized',
                     (bool) $generalGroup => 'generalized',
-                    $preference['source'] === 'ai_generated' => 'ai_generated',
+                    in_array($preference['source'], ['ai', 'ai_generated']) => 'ai_generated',
+                    $preference['source'] === 'user_selected_broad_field' => 'generalized',
                     default => 'custom_pending',
                 },
                 'preference_order' => $index + 1,
@@ -1499,5 +1529,25 @@ class SeekerController extends Controller
         }
 
         return array_filter($skills);
+    }
+
+    /**
+     * POST /api/seeker/saved-jobs/{vacancy}   [auth:sanctum]
+     *
+     * Toggles the saved status of a job vacancy.
+     */
+    public function toggleSavedJob(Request $request, \App\Models\JobVacancy $vacancy): JsonResponse
+    {
+        $seeker = $this->getSeeker($request);
+        if ($seeker instanceof JsonResponse) {
+            return $seeker;
+        }
+
+        $seeker->savedJobs()->toggle($vacancy->post_id);
+
+        return response()->json([
+            'message' => 'Saved jobs updated.',
+            'saved_jobs' => $seeker->savedJobs()->pluck('job_vacancies.post_id'),
+        ]);
     }
 }
