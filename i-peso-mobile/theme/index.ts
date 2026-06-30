@@ -7,7 +7,7 @@ export const colors = {
   background: '#F8FAFC',
   surface: '#FFFFFF',
   white: '#FFFFFF',
-  info: '#1D4ED8',
+  info: '#2563EB',
   infoBackground: '#EFF6FF',
   infoBorder: '#BFDBFE',
   success: '#166534',
@@ -36,8 +36,9 @@ export const spacing = {
 
 export const radii = {
   sm: 8,
-  md: 14,
-  lg: 18,
+  md: 12,
+  lg: 16,
+  xl: 24,
   pill: 999,
 };
 
@@ -45,9 +46,9 @@ export const shadows = {
   card: {
     shadowColor: '#0F172A',
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 2,
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
   },
   elevated: {
     shadowColor: '#0F172A',
@@ -65,11 +66,20 @@ export const typography = {
   body: 14,
   small: 12,
   label: 11,
+  regular: '400' as const,
+  medium: '600' as const,
+  semibold: '700' as const,
+  bold: '800' as const,
   weight: {
     regular: '400' as const,
     medium: '600' as const,
     semibold: '700' as const,
     bold: '800' as const,
+  },
+  family: {
+    regular: 'DMSans_400Regular',
+    medium: 'DMSans_500Medium',
+    bold: 'DMSans_700Bold',
   },
 };
 

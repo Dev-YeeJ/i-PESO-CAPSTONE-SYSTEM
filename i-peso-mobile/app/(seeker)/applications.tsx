@@ -16,6 +16,8 @@ import { AlertBox } from '@/components/ui/AlertBox'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
+import { StatCard } from '@/components/ui/StatCard'
+import { SectionHeader } from '@/components/ui/SectionHeader'
 import { colors, radii, spacing, typography } from '@/theme'
 
 const SAVED_JOBS_KEY = 'ipeso_mobile_saved_jobs'
@@ -103,12 +105,17 @@ export default function ApplicationsScreen() {
           </Text>
         </Card>
 
+        <SectionHeader title="Overview" />
         <View style={styles.statsRow}>
-          <Stat label="Active" value={activeApplications} />
-          <Stat label="Hired" value={hiredApplications} />
-          <Stat label="Saved" value={savedCount} />
-          <Stat label="Profile" value={strength} suffix="%" />
+          <StatCard title="Active" value={activeApplications} />
+          <StatCard title="Hired" value={hiredApplications} />
         </View>
+        <View style={[styles.statsRow, { marginTop: spacing.sm }]}>
+          <StatCard title="Saved Jobs" value={savedCount} />
+          <StatCard title="Profile" value={`${strength}%`} />
+        </View>
+
+        <SectionHeader title="Application History" />
 
         {!loading && !applications.length ? (
           <Card style={styles.emptyStateCard} padding="md">
@@ -116,7 +123,7 @@ export default function ApplicationsScreen() {
             <Text style={styles.bodyText}>
               Open Find Jobs, choose a matching vacancy, and tap Apply now. Your application will appear here and on the employer ATS board.
             </Text>
-            <Button variant="primary" fullWidth onPress={() => router.push('/(seeker)/jobs')} style={styles.emptyButton}>
+            <Button variant="outline" fullWidth onPress={() => router.push('/(seeker)/jobs')} style={styles.emptyButton}>
               Find jobs
             </Button>
           </Card>
@@ -145,8 +152,11 @@ function ApplicationCard({ application }: { application: SeekerApplication }) {
         </Badge>
       </View>
 
-      {job ? <Text style={styles.meta}>{jobLocation(job)}</Text> : null}
-      {job ? <Text style={styles.meta}>{formatSalary(job)}</Text> : null}
+      <View style={styles.jobMetaContainer}>
+        {job ? <Text style={styles.meta}>{jobLocation(job)}</Text> : null}
+        {job ? <Text style={styles.meta}>•</Text> : null}
+        {job ? <Text style={styles.meta}>{formatSalary(job)}</Text> : null}
+      </View>
 
       <View style={styles.detailGrid}>
         <Detail label="Applied" value={formatDate(application.applied_at)} />
@@ -181,15 +191,6 @@ function ApplicationCard({ application }: { application: SeekerApplication }) {
   )
 }
 
-function Stat({ label, value, suffix = '' }: { label: string; value: number; suffix?: string }) {
-  return (
-    <View style={styles.statCard}>
-      <Text style={styles.statValue}>{value}{suffix}</Text>
-      <Text style={styles.statLabel}>{label}</Text>
-    </View>
-  )
-}
-
 function Detail({ label, value }: { label: string; value: string }) {
   return (
     <View style={styles.detailItem}>
@@ -211,7 +212,7 @@ const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: colors.background },
   content: { paddingHorizontal: spacing.xl, paddingTop: 56, paddingBottom: spacing.xxxl },
   kicker: { color: colors.info, fontSize: typography.small, fontWeight: typography.bold, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: spacing.xs },
-  title: { color: colors.primary, fontSize: typography.heading, fontWeight: typography.bold, marginBottom: spacing.xs },
+  title: { color: colors.primary, fontSize: typography.display, fontWeight: typography.bold, marginBottom: spacing.xs },
   subtitle: { color: colors.secondaryText, fontSize: typography.body, lineHeight: 20, marginBottom: spacing.lg },
   statusCard: { marginBottom: spacing.lg, alignItems: 'center', justifyContent: 'center', gap: spacing.sm },
   statusMessageCard: { borderColor: colors.border, backgroundColor: colors.surface },
@@ -221,30 +222,29 @@ const styles = StyleSheet.create({
   summaryLabel: { color: colors.info, fontSize: typography.small, fontWeight: typography.bold, marginBottom: spacing.xs },
   summaryTitle: { color: colors.primary, fontSize: typography.heading, fontWeight: typography.bold, marginBottom: spacing.xs },
   summaryText: { color: colors.secondaryText, fontSize: typography.body, lineHeight: 20 },
-  statsRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.lg },
-  statCard: { flex: 1, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radii.md, padding: spacing.md, alignItems: 'center' },
-  statValue: { color: colors.primary, fontSize: typography.title, fontWeight: typography.bold },
-  statLabel: { color: colors.secondaryText, fontSize: typography.small, fontWeight: typography.semibold, marginTop: spacing.xs },
+  statsRow: { flexDirection: 'row', gap: spacing.sm },
   emptyStateCard: { marginBottom: spacing.lg },
-  bodyText: { color: colors.muted, fontSize: typography.body, lineHeight: 20, marginBottom: spacing.lg },
-  emptyButton: { marginTop: spacing.md },
+  sectionTitle: { color: colors.primary, fontSize: typography.title, fontWeight: typography.bold, marginBottom: spacing.sm },
+  bodyText: { color: colors.secondaryText, fontSize: typography.body, lineHeight: 20, marginBottom: spacing.lg },
+  emptyButton: { marginTop: spacing.md, borderColor: colors.info },
   applicationCard: { marginBottom: spacing.sm },
   applicationHeader: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: spacing.sm },
   applicationTitleWrap: { flex: 1 },
   jobTitle: { color: colors.primary, fontSize: typography.title, lineHeight: 22, fontWeight: typography.bold },
-  company: { color: colors.muted, fontSize: typography.small, fontWeight: typography.semibold, marginTop: spacing.xs },
-  statusBadge: { alignSelf: 'flex-start' },
-  meta: { color: colors.secondaryText, fontSize: typography.small, lineHeight: 18, marginTop: spacing.xs },
+  company: { color: colors.secondaryText, fontSize: typography.small, fontWeight: typography.semibold, marginTop: spacing.xs },
+  statusBadge: { alignSelf: 'flex-start', paddingVertical: 0, paddingHorizontal: spacing.sm },
+  jobMetaContainer: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: spacing.sm },
+  meta: { color: colors.secondaryText, fontSize: typography.small, lineHeight: 18 },
   detailGrid: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md },
   detailItem: { flex: 1, backgroundColor: colors.background, borderRadius: radii.md, padding: spacing.sm },
   detailLabel: { color: colors.secondaryText, fontSize: typography.small, fontWeight: typography.semibold, textTransform: 'uppercase', marginBottom: spacing.xs },
   detailValue: { color: colors.primary, fontSize: typography.body, fontWeight: typography.semibold },
-  infoBox: { backgroundColor: colors.infoBackground, borderWidth: 1, borderColor: colors.infoBorder, borderRadius: radii.md, padding: spacing.md, marginTop: spacing.md },
-  infoTitle: { color: colors.info, fontSize: typography.body, fontWeight: typography.semibold, marginBottom: spacing.xs },
-  infoText: { color: colors.primary, fontSize: typography.small, lineHeight: 20 },
+  infoBox: { backgroundColor: colors.warningBackground, borderWidth: 1, borderColor: colors.warningBorder, borderRadius: radii.md, padding: spacing.md, marginTop: spacing.md },
+  infoTitle: { color: colors.warning, fontSize: typography.body, fontWeight: typography.semibold, marginBottom: spacing.xs },
+  infoText: { color: colors.warning, fontSize: typography.small, lineHeight: 20 },
   successBox: { backgroundColor: colors.successBackground, borderWidth: 1, borderColor: colors.successBorder, borderRadius: radii.md, padding: spacing.md, marginTop: spacing.md },
   successTitle: { color: colors.success, fontSize: typography.body, fontWeight: typography.semibold, marginBottom: spacing.xs },
-  successText: { color: colors.primary, fontSize: typography.small, lineHeight: 20 },
+  successText: { color: colors.success, fontSize: typography.small, lineHeight: 20 },
   noteBox: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radii.md, padding: spacing.md, marginTop: spacing.md },
   noteTitle: { color: colors.primary, fontSize: typography.body, fontWeight: typography.semibold, marginBottom: spacing.xs },
   noteText: { color: colors.secondaryText, fontSize: typography.small, lineHeight: 20 },

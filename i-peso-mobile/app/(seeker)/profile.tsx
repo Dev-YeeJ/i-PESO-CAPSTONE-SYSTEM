@@ -12,7 +12,6 @@ import type { ProfileStrengthItem, SeekerProfile } from '@/services/seekerServic
 import { seekerService } from '@/services/seekerService'
 import {
   addressLine,
-  allSkills,
   arrayFrom,
   recordText,
   seekerName,
@@ -22,6 +21,9 @@ import {
 import { AlertBox } from '@/components/ui/AlertBox'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
+import { Badge } from '@/components/ui/Badge'
+import { ProgressCard } from '@/components/ui/ProgressCard'
+import { SectionHeader } from '@/components/ui/SectionHeader'
 import { colors, radii, spacing, typography } from '@/theme'
 
 export default function ProfileScreen() {
@@ -52,7 +54,9 @@ export default function ProfileScreen() {
 
   const strength = profile?.profile_strength?.percentage ?? 0
   const checklist = arrayFrom<ProfileStrengthItem>(profile?.profile_strength?.items)
-  const skills = allSkills(profile)
+  const hardSkills = [...(profile?.dole_skills ?? []), ...(profile?.technical_skills ?? [])]
+  const softSkills = profile?.soft_skills ?? []
+  
   const educations = arrayFrom<Record<string, unknown>>(profile?.educations)
   const workExperiences = arrayFrom<Record<string, unknown>>(profile?.work_experiences)
   const trainings = arrayFrom<Record<string, unknown>>(profile?.trainings)
@@ -68,7 +72,7 @@ export default function ProfileScreen() {
         <Text style={styles.kicker}>My NSRP Profile</Text>
         <Text style={styles.title}>Profile</Text>
         <Text style={styles.subtitle}>
-          This is the mobile view of your job seeker profile used for matching and PESO assistance.
+          Manage your personal information, skills, and experience to get better job matches.
         </Text>
 
         {loading ? (
@@ -84,7 +88,7 @@ export default function ProfileScreen() {
           </AlertBox>
         ) : null}
 
-        <Card style={styles.profileHeaderCard} padding="md">
+        <Card padding="md" style={styles.profileHeaderCard}>
           <View style={styles.profileHeaderInner}>
             <View style={styles.avatar}>
               <Text style={styles.avatarText}>{seekerName(profile).charAt(0).toUpperCase()}</Text>
@@ -97,51 +101,67 @@ export default function ProfileScreen() {
           </View>
         </Card>
 
-        <Card style={styles.card} padding="md">
-          <View style={styles.rowBetween}>
-            <Text style={styles.sectionTitle}>Profile Strength</Text>
-            <Text style={styles.strength}>{strength}%</Text>
-          </View>
-          <View style={styles.progressTrack}>
-            <View style={[styles.progressFill, { width: `${Math.min(100, strength)}%` }]} />
-          </View>
-          {checklist.slice(0, 6).map((item) => (
+        {/* Profile Strength */}
+        <ProgressCard 
+          title="Profile Strength" 
+          progress={strength}
+          color={colors.info}
+        />
+        
+        <Card padding="md" style={styles.checklistCard}>
+          {checklist.slice(0, 5).map((item) => (
             <View key={item.key ?? item.label} style={styles.checkRow}>
               <View style={[styles.checkDot, item.complete && styles.checkDotDone]} />
               <Text style={[styles.checkText, item.complete && styles.checkTextDone]}>{item.label}</Text>
             </View>
           ))}
-          <Button variant="secondary" fullWidth onPress={() => router.push('/onboarding')} style={styles.primaryBtn} textStyle={styles.primaryBtnText}>
-            Update onboarding details
+          <Button variant="outline" fullWidth onPress={() => router.push('/onboarding')} style={styles.updateBtn}>
+            Update missing details
           </Button>
         </Card>
 
-        <Section title="Personal and Work Preferences">
+        {/* Personal & Preferences */}
+        <SectionHeader title="Personal and Work Preferences" />
+        <Card padding="md">
           <Info label="Mobile" value={textFrom(profile?.mobile_number)} />
           <Info label="Education" value={textFrom(profile?.educ_attainment)} />
           <Info label="Employment Status" value={titleCase(profile?.employment_status)} />
           <Info label="Preferred Work" value={titleCase(profile?.work_type_preference)} />
           <Info label="Preferred Location" value={titleCase(profile?.preferred_work_location)} />
-        </Section>
+        </Card>
 
-        <Section title="Skills">
-          {skills.length ? (
+        {/* Skills */}
+        <SectionHeader title="Skills" />
+        <Card padding="md">
+          <Text style={styles.skillGroupTitle}>Technical & Hard Skills</Text>
+          {hardSkills.length ? (
             <View style={styles.tagRow}>
-              {skills.slice(0, 24).map((skill) => (
-                <Text key={skill} style={styles.tag}>
-                  {skill}
-                </Text>
+              {hardSkills.slice(0, 24).map((skill) => (
+                <Badge key={skill} variant="info" style={styles.skillBadge}>{skill}</Badge>
               ))}
             </View>
           ) : (
-            <EmptyLine text="No skills listed yet. Add technical and soft skills in onboarding." />
+            <EmptyLine text="No technical skills listed." />
           )}
-        </Section>
 
-        <Section title="Education">
+          <Text style={[styles.skillGroupTitle, { marginTop: spacing.lg }]}>Soft Skills</Text>
+          {softSkills.length ? (
+            <View style={styles.tagRow}>
+              {softSkills.slice(0, 24).map((skill) => (
+                <Badge key={skill} variant="success" style={styles.skillBadge}>{skill}</Badge>
+              ))}
+            </View>
+          ) : (
+            <EmptyLine text="No soft skills listed." />
+          )}
+        </Card>
+
+        {/* Education */}
+        <SectionHeader title="Education" />
+        <View style={styles.cardList}>
           {educations.length ? (
             educations.map((education, index) => (
-              <Card key={`${recordText(education, ['institution_name'], 'education')}-${index}`} padding="sm" style={styles.miniCard}>
+              <Card key={`${recordText(education, ['institution_name'], 'education')}-${index}`} padding="md">
                 <Text style={styles.itemTitle}>{recordText(education, ['institution_name'], 'School not listed')}</Text>
                 <Text style={styles.itemMeta}>{titleCase(recordText(education, ['level'], 'Level not listed'))}</Text>
                 <Text style={styles.itemMeta}>{recordText(education, ['course_strand'], 'Course or strand not listed')}</Text>
@@ -152,59 +172,57 @@ export default function ProfileScreen() {
               </Card>
             ))
           ) : (
-            <EmptyLine text="No education records listed yet." />
+            <Card padding="md"><EmptyLine text="No education records listed yet." /></Card>
           )}
-        </Section>
+        </View>
 
-        <Section title="Work Experience">
+        {/* Work Experience */}
+        <SectionHeader title="Work Experience" />
+        <View style={styles.cardList}>
           {workExperiences.length ? (
             workExperiences.map((work, index) => (
-              <Card key={`${recordText(work, ['company_name'], 'work')}-${index}`} padding="sm" style={styles.miniCard}>
+              <Card key={`${recordText(work, ['company_name'], 'work')}-${index}`} padding="md">
                 <Text style={styles.itemTitle}>{recordText(work, ['position', 'job_title'], 'Position not listed')}</Text>
                 <Text style={styles.itemMeta}>{recordText(work, ['company_name'], 'Company not listed')}</Text>
                 <Text style={styles.itemMeta}>{recordText(work, ['number_of_months'], 'Duration not listed')} months</Text>
               </Card>
             ))
           ) : (
-            <EmptyLine text="No work experience listed yet." />
+            <Card padding="md"><EmptyLine text="No work experience listed yet." /></Card>
           )}
-        </Section>
+        </View>
 
-        <Section title="Training and Certificates">
+        {/* Training & Certificates */}
+        <SectionHeader title="Training and Certificates" />
+        <View style={styles.cardList}>
           {trainings.length || certificates.length ? (
             <>
               {trainings.slice(0, 4).map((training, index) => (
-                <Card key={`${recordText(training, ['course', 'name'], 'training')}-${index}`} padding="sm" style={styles.miniCard}>
+                <Card key={`${recordText(training, ['course', 'name'], 'training')}-${index}`} padding="md">
                   <Text style={styles.itemTitle}>{recordText(training, ['course', 'name'], 'Training not listed')}</Text>
                   <Text style={styles.itemMeta}>{recordText(training, ['training_institution', 'institution'], 'Institution not listed')}</Text>
                 </Card>
               ))}
               {certificates.slice(0, 4).map((certificate, index) => (
-                <Card key={`${recordText(certificate, ['title'], 'certificate')}-${index}`} padding="sm" style={styles.miniCard}>
+                <Card key={`${recordText(certificate, ['title'], 'certificate')}-${index}`} padding="md">
                   <Text style={styles.itemTitle}>{recordText(certificate, ['title'], 'Certificate not listed')}</Text>
                   <Text style={styles.itemMeta}>{recordText(certificate, ['issuing_body'], 'Issuer not listed')}</Text>
                 </Card>
               ))}
             </>
           ) : (
-            <EmptyLine text="No trainings or certificates listed yet." />
+            <Card padding="md"><EmptyLine text="No trainings or certificates listed yet." /></Card>
           )}
-        </Section>
+        </View>
 
-        <Section title="Documents">
+        {/* Documents */}
+        <SectionHeader title="Documents" />
+        <Card padding="md">
           <Info label="Resume" value={profile?.has_resume ? 'Uploaded' : 'Not uploaded'} />
           <Info label="Profile Photo" value={profile?.has_profile_image ? 'Uploaded' : 'Not uploaded'} />
-        </Section>
-      </ScrollView>
-    </View>
-  )
-}
+        </Card>
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <View style={styles.card}>
-      <Text style={styles.sectionTitle}>{title}</Text>
-      {children}
+      </ScrollView>
     </View>
   )
 }
@@ -226,7 +244,7 @@ const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: colors.background },
   content: { paddingHorizontal: spacing.xl, paddingTop: 56, paddingBottom: spacing.xxxl },
   kicker: { color: colors.info, fontSize: typography.small, fontWeight: typography.bold, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: spacing.xs },
-  title: { color: colors.primary, fontSize: typography.heading, fontWeight: typography.bold, marginBottom: spacing.xs },
+  title: { color: colors.primary, fontSize: typography.display, fontWeight: typography.bold, marginBottom: spacing.xs },
   subtitle: { color: colors.secondaryText, fontSize: typography.body, lineHeight: 20, marginBottom: spacing.lg },
   statusCard: { marginBottom: spacing.lg, alignItems: 'center', justifyContent: 'center', gap: spacing.sm },
   statusMessageCard: { borderColor: colors.border, backgroundColor: colors.surface },
@@ -239,26 +257,21 @@ const styles = StyleSheet.create({
   avatarText: { color: colors.surface, fontSize: typography.title, fontWeight: typography.bold },
   name: { color: colors.primary, fontSize: typography.title, fontWeight: typography.bold, marginBottom: spacing.xs },
   muted: { color: colors.secondaryText, fontSize: typography.small, lineHeight: 18 },
-  card: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radii.lg, padding: spacing.lg, marginBottom: spacing.lg },
-  rowBetween: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  sectionTitle: { color: colors.primary, fontSize: typography.title, fontWeight: typography.bold, marginBottom: spacing.sm },
-  strength: { color: colors.info, fontSize: typography.heading, fontWeight: typography.bold },
-  progressTrack: { height: 8, backgroundColor: colors.border, borderRadius: radii.sm, overflow: 'hidden', marginBottom: spacing.md },
-  progressFill: { height: '100%', backgroundColor: colors.info },
+  checklistCard: { marginTop: spacing.md, marginBottom: spacing.lg },
   checkRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.sm },
-  checkDot: { width: 9, height: 9, borderRadius: 5, backgroundColor: colors.border },
+  checkDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.border },
   checkDotDone: { backgroundColor: colors.success },
-  checkText: { color: colors.secondaryText, fontSize: typography.small, flex: 1 },
-  checkTextDone: { color: colors.primary, fontWeight: typography.bold },
-  primaryBtn: { marginTop: spacing.md },
-  primaryBtnText: { color: colors.primary },
-  infoRow: { borderBottomWidth: 1, borderBottomColor: colors.background, paddingBottom: spacing.sm, marginBottom: spacing.sm },
-  infoLabel: { color: colors.secondaryText, fontSize: typography.small, fontWeight: typography.semibold, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: spacing.xs },
-  infoValue: { color: colors.primary, fontSize: typography.body, lineHeight: 20, fontWeight: typography.medium },
+  checkText: { color: colors.secondaryText, fontSize: typography.body },
+  checkTextDone: { color: colors.primary, fontWeight: typography.medium },
+  updateBtn: { marginTop: spacing.sm },
+  infoRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.border },
+  infoLabel: { color: colors.secondaryText, fontSize: typography.body },
+  infoValue: { color: colors.primary, fontSize: typography.body, fontWeight: typography.medium, textAlign: 'right', flex: 1, marginLeft: spacing.md },
+  skillGroupTitle: { color: colors.primary, fontSize: typography.title, fontWeight: typography.bold, marginBottom: spacing.sm },
   tagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  tag: { backgroundColor: colors.infoBackground, color: colors.info, borderRadius: radii.pill, paddingHorizontal: spacing.sm, paddingVertical: spacing.xs, fontSize: typography.small, fontWeight: typography.semibold },
-  miniCard: { marginBottom: spacing.sm },
-  itemTitle: { color: colors.primary, fontSize: typography.body, fontWeight: typography.bold, marginBottom: spacing.xs },
-  itemMeta: { color: colors.secondaryText, fontSize: typography.small, lineHeight: 18 },
-  emptyText: { color: colors.secondaryText, fontSize: typography.body, lineHeight: 20 },
+  skillBadge: { paddingVertical: spacing.xs, paddingHorizontal: spacing.sm },
+  emptyText: { color: colors.secondaryText, fontSize: typography.body, fontStyle: 'italic' },
+  cardList: { gap: spacing.md },
+  itemTitle: { color: colors.primary, fontSize: typography.title, fontWeight: typography.bold, marginBottom: spacing.xs },
+  itemMeta: { color: colors.secondaryText, fontSize: typography.body, lineHeight: 20 },
 })
