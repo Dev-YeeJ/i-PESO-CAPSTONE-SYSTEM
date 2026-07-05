@@ -3,6 +3,7 @@ import { BookOpenCheck, CalendarDays, ChevronLeft, CircleCheck, ClipboardList, G
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '@/stores/authStore'
 import NotificationBell from '@/pages/seeker/components/NotificationBell'
+import IPesoLogo from '@/components/branding/IPesoLogo'
 
 const navLinks = [
   { to: '/seeker/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -44,7 +45,7 @@ export default function SeekerLayout() {
   const sidebar = (
     <>
       <div className={`flex h-[76px] items-center border-b border-white/10 ${collapsed ? 'justify-center px-3' : 'gap-3 px-5'}`}>
-        <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-brand-gold text-lg font-black text-brand-navy shadow-sm">iP</span>
+        <span className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white shadow-sm"><IPesoLogo className="h-full w-full" /></span>
         {!collapsed && <div><p className="text-lg font-extrabold leading-none text-white">i-PESO</p><p className="mt-1 text-xs font-medium text-blue-200">Job Seeker Portal</p></div>}
       </div>
       <nav className="flex-1 overflow-y-auto px-3 py-5">

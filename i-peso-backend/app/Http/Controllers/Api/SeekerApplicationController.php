@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Events\ApplicationStatusChanged;
 use App\Http\Controllers\Api\Concerns\FormatsApplications;
 use App\Http\Controllers\Controller;
 use App\Models\Application;
@@ -30,6 +31,43 @@ class SeekerApplicationController extends Controller
         return response()->json([
             'count' => $applications->count(),
             'applications' => $applications,
+        ]);
+    }
+
+    public function show(Request $request, Application $application): JsonResponse
+    {
+        $seeker = $this->seeker($request);
+
+        abort_unless($application->seeker_id === $seeker->seeker_id, 404, 'Application not found.');
+
+        return response()->json([
+            'application' => $this->formatApplication($application, false),
+        ]);
+    }
+
+    public function withdraw(Request $request, Application $application): JsonResponse
+    {
+        $seeker = $this->seeker($request);
+
+        abort_unless($application->seeker_id === $seeker->seeker_id, 404, 'Application not found.');
+
+        if (in_array($application->status, ['hired', 'rejected', 'withdrawn'], true)) {
+            throw ValidationException::withMessages([
+                'status' => ['This application can no longer be withdrawn.'],
+            ]);
+        }
+
+        $application->forceFill([
+            'status' => 'withdrawn',
+            'status_changed_at' => now(),
+            'status_changed_by' => $seeker->seeker_id,
+        ])->save();
+
+        event(new ApplicationStatusChanged($application->fresh()));
+
+        return response()->json([
+            'message' => 'Application withdrawn successfully.',
+            'application' => $this->formatApplication($application->fresh(), false),
         ]);
     }
 

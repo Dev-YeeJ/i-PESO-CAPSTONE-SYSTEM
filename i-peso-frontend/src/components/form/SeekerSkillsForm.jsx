@@ -122,15 +122,16 @@ export default function SeekerSkillsForm({
     }
 
     let ignore = false
+    const controller = new AbortController()
     const timer = window.setTimeout(async () => {
       setLoadingType(activeType)
       try {
-        const rows = await searchUnifiedSkillCatalog(activeQuery)
+        const rows = await searchUnifiedSkillCatalog(activeQuery, controller.signal)
         if (!ignore) {
           setSearchResultsByType((current) => ({ ...current, [activeType]: rows }))
         }
-      } catch {
-        if (!ignore) {
+      } catch (error) {
+        if (!ignore && error?.code !== 'ERR_CANCELED' && error?.name !== 'AbortError') {
           setSearchResultsByType((current) => ({ ...current, [activeType]: searchLocalSkills(activeQuery) }))
         }
       } finally {
@@ -140,6 +141,7 @@ export default function SeekerSkillsForm({
 
     return () => {
       ignore = true
+      controller.abort()
       window.clearTimeout(timer)
     }
   }, [activeQuery, activeType, disabled, normalizedActiveQuery])
@@ -444,10 +446,14 @@ function CardSuggestions({
         )}
       </div>
 
-      <div className="flex flex-wrap gap-2">
-        {suggestions.length === 0 ? (
+      <div className="flex max-h-36 flex-wrap gap-2 overflow-y-auto pr-1">
+        {loading && suggestions.length === 0 ? (
+          Array.from({ length: 4 }, (_, index) => (
+            <div key={index} className="h-8 w-28 animate-pulse rounded-full border border-slate-200 bg-white" />
+          ))
+        ) : suggestions.length === 0 ? (
           <p className="rounded-lg border border-dashed border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-500">
-            Type to refine suggestions.
+            No matching skills found. You can press Enter to add the typed skill.
           </p>
         ) : (
           suggestions.map((skillItem) => {
@@ -460,8 +466,8 @@ function CardSuggestions({
                 onClick={() => onAdd(skillItem)}
                 disabled={disabled || limitReached}
                 aria-label={`Add ${skillItem.name}`}
-                title={limitReached ? 'Skill limit reached' : skillItem.name}
-                className={`inline-flex max-w-full items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-xs font-extrabold transition focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                title={limitReached ? 'Skill limit reached' : `${skillTypeLabel(skillItem.type)} · ${skillCategoryLabel(skillItem)} · ${skillSourceLabel(skillItem.source)}`}
+                className={`inline-flex max-w-full items-center gap-1.5 rounded-full border px-3 py-1.5 text-left text-xs font-extrabold transition focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                   limitReached
                       ? 'cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400'
                       : 'border-slate-200 bg-white text-slate-700 hover:border-blue-200 hover:bg-blue-50 hover:text-blue-800'
@@ -478,10 +484,10 @@ function CardSuggestions({
   )
 }
 
-async function searchUnifiedSkillCatalog(query) {
+async function searchUnifiedSkillCatalog(query, signal) {
   const [technicalRows, softRows] = await Promise.all([
-    searchSkills(query, 'technical', SEARCH_LIMIT),
-    searchSkills(query, 'soft', SEARCH_LIMIT),
+    searchSkills(query, 'technical', SEARCH_LIMIT, signal),
+    searchSkills(query, 'soft', SEARCH_LIMIT, signal),
   ])
 
   return uniqueSkills([
@@ -716,9 +722,31 @@ function normalizeSkill(item) {
     type,
     is_dole: isDole,
     source,
+    category: item.category ?? item.skill_category ?? null,
     is_official: isDole || officialSource || Boolean(item.is_official ?? item.isOfficial),
     is_recommended: Boolean(item.is_recommended ?? item.isRecommended),
   }
+}
+
+function skillTypeLabel(type) {
+  return type === 'soft' ? 'Soft skill' : 'Hard skill'
+}
+
+function skillCategoryLabel(skillItem) {
+  const category = String(skillItem.category ?? '').trim()
+  if (category && !['technical', 'soft'].includes(category.toLowerCase())) return titleCase(category)
+  return skillItem.type === 'soft' ? 'Work behavior' : 'Technical capability'
+}
+
+function skillSourceLabel(source) {
+  const labels = {
+    dole: 'DOLE catalog',
+    esco: 'ESCO catalog',
+    occupation_recommended: 'Occupation suggestion',
+    user_added: 'Manual entry',
+    system: 'Skills catalog',
+  }
+  return labels[source] ?? 'Skills catalog'
 }
 
 function skill(name, type = 'hard', isDole = false, metadata = {}) {

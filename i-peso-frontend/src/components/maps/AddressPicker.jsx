@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { LocateFixed, Loader2, MapPin } from 'lucide-react'
 import PsgcCascade from '@/pages/employer/components/PsgcCascade'
 import toast from 'react-hot-toast'
+import { detectAddress } from '@/services/geoService'
 
 export default function AddressPicker({
   title = "Address & Location",
@@ -21,30 +22,53 @@ export default function AddressPicker({
   showDetectButton = true,
 }) {
   const [locating, setLocating] = useState(false)
+  const [detectionMessage, setDetectionMessage] = useState('')
 
-  const handleDetect = () => {
+  const handleDetect = async () => {
     setLocating(true)
+    setDetectionMessage('')
     if (onDetectLocation) {
       onDetectLocation(() => setLocating(false))
       return
     }
 
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        onChange({
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude,
-          location_accuracy: Math.round(position.coords.accuracy),
-        })
-        toast.success('Location captured successfully!')
-        setLocating(false)
-      },
-      (err) => {
-        toast.error('Unable to capture location. Please ensure location permissions are granted.')
-        setLocating(false)
-      },
-      { enableHighAccuracy: true, timeout: 10000 }
-    )
+    try {
+      const result = await detectAddress()
+      const nextLocation = {
+        province: result.province?.name ?? province,
+        province_code: result.province?.code ?? provinceCode,
+        city: result.city?.name ?? city,
+        city_code: result.city?.code ?? cityCode,
+        barangay: result.barangay?.name ?? barangay,
+        barangay_code: result.barangay?.code ?? barangayCode,
+        street: result.houseStreet ?? street,
+        latitude: result.lat,
+        longitude: result.lng,
+        location_accuracy: result.accuracy,
+        google_place_id: result.placeId,
+      }
+      onChange(nextLocation)
+
+      if (result.isComplete) {
+        setDetectionMessage('Address fields were filled from your current location. Please verify the details.')
+        toast.success('Address detected and filled automatically.')
+      } else {
+        const missing = result.missingFields.map((field) => ({
+          province: 'Province',
+          city: 'City/Municipality',
+          barangay: 'Barangay',
+          houseStreet: 'Specific Address',
+        }[field] ?? field))
+        setDetectionMessage(`Location detected. Please complete: ${missing.join(', ')}.`)
+        toast.success('Location detected. Complete the remaining address fields.')
+      }
+    } catch (error) {
+      const message = error.message ?? 'Unable to detect and fill the address.'
+      setDetectionMessage(message)
+      toast.error(message)
+    } finally {
+      setLocating(false)
+    }
   }
 
   const handlePsgcChange = async (data) => {
@@ -98,6 +122,12 @@ export default function AddressPicker({
           <LocateFixed className="h-4 w-4" />
           <span>GPS Location saved. Ready for map display.</span>
         </div>
+      )}
+
+      {detectionMessage && (
+        <p className="mb-4 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-medium text-blue-800">
+          {detectionMessage}
+        </p>
       )}
 
       <PsgcCascade

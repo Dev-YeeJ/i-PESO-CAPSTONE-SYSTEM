@@ -1,6 +1,7 @@
 // src/components/landing/LandingNavbar.jsx
 import { Link } from 'react-router-dom'
 import AppButton from '@/components/common/AppButton'
+import IPesoLogo from '@/components/branding/IPesoLogo'
 
 export default function LandingNavbar() {
   return (
@@ -20,10 +21,10 @@ export default function LandingNavbar() {
         <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none' }}>
           <div style={{
             width: 36, height: 36, borderRadius: 9,
-            background: 'var(--color-accent)',
+            background: '#fff', overflow: 'hidden',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             fontWeight: 800, color: '#fff', fontSize: 15,
-          }}>iP</div>
+          }}><IPesoLogo className="h-full w-full" /></div>
           <div>
             <div style={{ color: '#fff', fontWeight: 700, fontSize: 16, lineHeight: 1 }}>i-PESO</div>
             <div style={{ color: 'rgba(255,255,255,0.45)', fontSize: 10, lineHeight: 1, marginTop: 2 }}>

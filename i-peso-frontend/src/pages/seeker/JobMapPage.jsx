@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { AlertCircle, BriefcaseBusiness, CheckCircle2, Download, FileUp, Loader2, LocateFixed, MapPinned, PanelLeftOpen, RefreshCw, UserRoundCheck } from 'lucide-react'
+import { AlertCircle, BriefcaseBusiness, Loader2, LocateFixed, MapPinned, PanelLeftOpen, RefreshCw, Sparkles } from 'lucide-react'
 import toast from 'react-hot-toast'
 import JobMapAssistant from '../../components/maps/JobMapAssistant'
 import JobMapCard from '../../components/maps/JobMapCard'
@@ -8,7 +8,7 @@ import JobMapFilters from '../../components/maps/JobMapFilters'
 import JobVacancyMap from '../../components/maps/JobVacancyMap'
 import JobMapDetailsPanel from '../../components/maps/JobMapDetailsPanel'
 import { getMapJobs } from '../../services/jobMapService'
-import { applyToJob, generateSmartResume, toggleSavedJob } from '../../services/seekerService'
+import { applyToJob, toggleSavedJob } from '../../services/seekerService'
 import { rsvpToJobFair } from '../../services/jobFairService'
 
 const DEFAULT_FILTERS = {
@@ -29,7 +29,7 @@ const DEFAULT_FILTERS = {
   certificate_match_only: false,
   can_apply_only: false,
   max_missing_skills: '',
-  limit: 150,
+  limit: 30,
 }
 
 const errorMessage = (error, fallback) => error?.response?.data?.message || fallback
@@ -51,34 +51,9 @@ function SmartSummary({ summary }) {
       <p className="text-[11px] font-semibold leading-5 text-slate-600">
         <strong className="text-slate-900">{summary.total_found} jobs</strong> found
         {' · '}<strong className="text-emerald-700">{summary.high_match_count}</strong> high-match
-        {summary.nearest_distance_km !== null && <>{' · '}nearest <strong className="text-blue-800">{Number(summary.nearest_distance_km).toFixed(1)}km</strong></>}
-        {' · '}<strong>{summary.saved_count}</strong> saved
-        {' · '}<strong>{summary.applied_count}</strong> applied
-        {summary.upskill_recommendation_count > 0 && <>{' · '}<strong className="text-violet-700">{summary.upskill_recommendation_count}</strong> training matches</>}
+        {summary.nearest_distance_km !== null && <>{' · '}nearest <strong className="text-blue-800">{Number(summary.nearest_distance_km).toFixed(1)} km</strong></>}
       </p>
     </div>
-  )
-}
-
-function ReadinessCard({ seeker, onProfile, onCertificates, onResume, isGeneratingResume }) {
-  if (!seeker) return null
-  const ready = seeker.profile_completed && seeker.skills_count > 0 && seeker.latitude != null
-  const items = [
-    seeker.profile_completed ? 'Profile ready' : 'Complete your NSRP profile',
-    seeker.skills_count > 0 ? `${seeker.skills_count} skills support matching` : 'Add skills to improve matches',
-    seeker.certificate_count > 0 ? `${seeker.certificate_count} certificates recorded` : 'Add certificates to boost credibility',
-    seeker.latitude != null ? 'Address ready for nearby jobs' : 'Update address to improve nearby jobs',
-  ]
-  return (
-    <section className="mx-4 mt-3 rounded-xl border border-blue-100 bg-blue-50/70 p-3">
-      <div className="flex items-start justify-between gap-2"><div><p className="flex items-center gap-1.5 text-xs font-black text-blue-950"><UserRoundCheck className="h-4 w-4" />{ready ? 'Ready to discover jobs' : 'Improve my matches'}</p><p className="mt-1 text-[10px] text-blue-800">Your NSRP profile powers every match score.</p></div><span className={`rounded-full px-2 py-1 text-[9px] font-black ${ready ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-800'}`}>{ready ? 'READY' : 'ACTION NEEDED'}</span></div>
-      <ul className="mt-2 grid gap-1 text-[10px] font-semibold text-slate-600">{items.map((item) => <li key={item} className="flex items-center gap-1.5"><CheckCircle2 className="h-3 w-3 text-blue-700" />{item}</li>)}</ul>
-      <div className="mt-2.5 flex flex-wrap gap-1.5">
-        <button type="button" onClick={onProfile} className="rounded-lg bg-white px-2.5 py-1.5 text-[10px] font-bold text-blue-900 ring-1 ring-blue-200">Complete profile</button>
-        <button type="button" onClick={onCertificates} className="inline-flex items-center gap-1 rounded-lg bg-white px-2.5 py-1.5 text-[10px] font-bold text-blue-900 ring-1 ring-blue-200"><FileUp className="h-3 w-3" />Upload certificate</button>
-        <button type="button" onClick={onResume} disabled={isGeneratingResume} className="inline-flex items-center gap-1 rounded-lg bg-blue-950 px-2.5 py-1.5 text-[10px] font-bold text-white disabled:opacity-50"><Download className="h-3 w-3" />{isGeneratingResume ? 'Preparing…' : seeker.resume_ready ? 'Download resume' : 'Resume after profile'}</button>
-      </div>
-    </section>
   )
 }
 
@@ -129,15 +104,19 @@ export default function JobMapPage() {
   const [savingIds, setSavingIds] = useState([])
   const [rsvpingIds, setRsvpingIds] = useState([])
   const [pendingApplyJobId, setPendingApplyJobId] = useState(null)
-  const [isGeneratingResume, setIsGeneratingResume] = useState(false)
+  const [assistantOpen, setAssistantOpen] = useState(false)
   const requestId = useRef(0)
+  const abortRef = useRef(null)
 
   const fetchJobs = useCallback(async () => {
     const currentRequest = ++requestId.current
+    abortRef.current?.abort()
+    const controller = new AbortController()
+    abortRef.current = controller
     setIsLoading(true)
     setError('')
     try {
-      const data = await getMapJobs(filters)
+      const data = await getMapJobs(filters, { signal: controller.signal })
       if (currentRequest !== requestId.current) return
       setJobs(data.jobs)
       setSeeker(data.seeker)
@@ -148,14 +127,29 @@ export default function JobMapPage() {
       setPopupJobId((id) => data.jobs.some((job) => job.post_id === id) ? id : null)
     } catch (fetchError) {
       if (currentRequest !== requestId.current) return
+      if (fetchError?.code === 'ERR_CANCELED' || fetchError?.name === 'AbortError') return
       if (fetchError?.response?.data?.code === 'location_required') {
-        setJobs([])
-        setSeeker(fetchError.response.data.seeker || null)
-        setSummary(null)
-        setSeekerLocation(fetchError.response.data.seeker_location || { latitude: null, longitude: null, full_address: '' })
-        setLocationRequired(true)
-        setError('')
-        return
+        try {
+          const fallback = await getMapJobs({ ...filters, feed_mode: 'latest', sort: 'newest', limit: 30 }, { signal: controller.signal })
+          if (currentRequest !== requestId.current) return
+          setJobs(fallback.jobs)
+          setSeeker(fallback.seeker || fetchError.response.data.seeker || null)
+          setSummary(fallback.summary)
+          setSeekerLocation(fetchError.response.data.seeker_location || { latitude: null, longitude: null, full_address: '' })
+          setLocationRequired(false)
+          setLocationNotice('Showing latest active vacancies. Add your location to enable nearby map pins.')
+          setError('')
+          return
+        } catch (fallbackError) {
+          if (fallbackError?.code === 'ERR_CANCELED' || fallbackError?.name === 'AbortError') return
+          setJobs([])
+          setSeeker(fetchError.response.data.seeker || null)
+          setSummary(null)
+          setSeekerLocation(fetchError.response.data.seeker_location || { latitude: null, longitude: null, full_address: '' })
+          setLocationRequired(true)
+          setError('')
+          return
+        }
       }
       setError(errorMessage(fetchError, 'Unable to load nearby jobs. Please try again.'))
       setJobs([])
@@ -164,7 +158,13 @@ export default function JobMapPage() {
     }
   }, [filters])
 
-  useEffect(() => { fetchJobs() }, [fetchJobs])
+  useEffect(() => {
+    const timer = window.setTimeout(fetchJobs, 220)
+    return () => {
+      window.clearTimeout(timer)
+      abortRef.current?.abort()
+    }
+  }, [fetchJobs])
 
   const updateFilters = (changes) => {
     setFilters((current) => ({ ...current, ...changes }))
@@ -249,28 +249,6 @@ export default function JobMapPage() {
     navigate(`/seeker/upskill-hub${skill ? `?skill=${encodeURIComponent(skill)}` : ''}`)
   }
 
-  const downloadResume = async () => {
-    if (!seeker?.resume_ready) {
-      navigate('/seeker/profile/edit')
-      return
-    }
-    setIsGeneratingResume(true)
-    try {
-      const response = await generateSmartResume()
-      const url = URL.createObjectURL(response.data)
-      const link = document.createElement('a')
-      link.href = url
-      link.download = 'i-PESO_Smart_Resume.pdf'
-      link.click()
-      URL.revokeObjectURL(url)
-      toast.success('Smart resume generated and downloaded.')
-    } catch (resumeError) {
-      toast.error(errorMessage(resumeError, 'Unable to generate your resume.'))
-    } finally {
-      setIsGeneratingResume(false)
-    }
-  }
-
   const useCurrentLocation = () => {
     if (!navigator.geolocation) {
       setLocationNotice('Location services are not supported by this browser. You can still use your saved address.')
@@ -342,18 +320,21 @@ export default function JobMapPage() {
       </main>
 
       {/* Floating Left Panel */}
-      <aside className={`absolute z-10 flex flex-col bg-white/95 backdrop-blur-md shadow-2xl transition-all duration-300 ease-in-out ${panelOpen ? 'inset-x-0 bottom-0 h-[70%] rounded-t-3xl md:inset-auto md:left-4 md:top-4 md:bottom-4 md:w-[380px] md:rounded-2xl md:translate-x-0 xl:w-[400px]' : 'inset-x-0 bottom-0 h-[70%] translate-y-full rounded-t-3xl md:inset-auto md:left-4 md:top-4 md:bottom-4 md:w-[380px] md:rounded-2xl md:-translate-x-[110%] xl:w-[400px]'}`}>
+      <aside className={`absolute z-10 flex min-h-0 flex-col overflow-hidden bg-white/95 shadow-2xl ring-1 ring-slate-200/80 backdrop-blur-md transition-all duration-300 ease-in-out ${panelOpen ? 'inset-x-0 bottom-0 h-[72%] rounded-t-3xl md:inset-auto md:left-4 md:top-4 md:bottom-4 md:h-auto md:w-[380px] md:rounded-2xl md:translate-x-0 xl:w-[420px]' : 'inset-x-0 bottom-0 h-[72%] translate-y-full rounded-t-3xl md:inset-auto md:left-4 md:top-4 md:bottom-4 md:h-auto md:w-[380px] md:rounded-2xl md:-translate-x-[110%] xl:w-[420px]'}`}>
         <header className="z-20 flex items-center justify-between border-b border-slate-200/50 bg-transparent px-4 py-3">
           <div className="flex items-center gap-2.5">
             <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-950 text-amber-400 shadow-inner"><MapPinned className="h-4 w-4" /></span>
             <div><h1 className="text-sm font-black tracking-wide text-slate-900">AI Job Map</h1><p className="max-w-[250px] text-[10px] font-medium leading-4 text-slate-500">Discover jobs near you.</p></div>
           </div>
-          <button type="button" onClick={useCurrentLocation} disabled={isLocating} className="flex h-8 w-8 items-center justify-center rounded-md border border-slate-200 bg-white text-blue-950 shadow-sm transition hover:bg-slate-50 hover:text-blue-700 disabled:opacity-50" title="Use current location">{isLocating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <LocateFixed className="h-3.5 w-3.5" />}</button>
+          <div className="flex items-center gap-1.5">
+            <button type="button" onClick={() => setAssistantOpen((open) => !open)} aria-expanded={assistantOpen} className={`flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-[10px] font-bold shadow-sm transition ${assistantOpen ? 'border-blue-900 bg-blue-950 text-white' : 'border-slate-200 bg-white text-blue-950 hover:bg-slate-50'}`} title="AI-assisted search"><Sparkles className="h-3.5 w-3.5" /> AI Search</button>
+            <button type="button" onClick={useCurrentLocation} disabled={isLocating} className="flex h-8 w-8 items-center justify-center rounded-md border border-slate-200 bg-white text-blue-950 shadow-sm transition hover:bg-slate-50 hover:text-blue-700 disabled:opacity-50" title="Use current location">{isLocating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <LocateFixed className="h-3.5 w-3.5" />}</button>
+          </div>
         </header>
 
-        <JobMapAssistant onFiltersParsed={updateFilters} />
-        <SmartSummary summary={liveSummary} />
+        {assistantOpen && <JobMapAssistant onFiltersParsed={updateFilters} />}
         <JobMapFilters filters={filters} onFilterChange={updateFilters} onReset={resetFilters} />
+        <SmartSummary summary={liveSummary} />
 
         {activeFilters.length > 0 && (
           <div className="border-b border-slate-200 bg-slate-50 px-4 py-2">
@@ -368,15 +349,13 @@ export default function JobMapPage() {
           </div>
         )}
 
-        <ReadinessCard seeker={seeker} onProfile={() => navigate('/seeker/profile/edit')} onCertificates={() => navigate('/seeker/profile', { state: { openCertificateUpload: true } })} onResume={downloadResume} isGeneratingResume={isGeneratingResume} />
-
         {(locationNotice || !hasLocation) && (
-          <div className={`mx-4 mt-3 rounded-xl border px-3 py-2.5 text-xs leading-5 ${hasLocation ? 'border-blue-100 bg-blue-50/70 text-blue-800' : 'border-amber-200 bg-amber-50/70 text-amber-800'}`}>
+          <div className={`mx-3 mt-2 rounded-lg border px-3 py-2 text-[11px] leading-4 ${hasLocation ? 'border-blue-100 bg-blue-50/70 text-blue-800' : 'border-amber-200 bg-amber-50/70 text-amber-800'}`}>
             {locationNotice || 'Update your address to view nearby jobs on the map. You can still browse the available job list.'}
           </div>
         )}
 
-        <div className="flex-1 space-y-3 overflow-y-auto p-4">
+        <div className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain bg-slate-50/70 p-3 [scrollbar-gutter:stable]">
           {isLoading ? <><JobSkeleton /><JobSkeleton /><JobSkeleton /></> : error ? (
             <div className="rounded-2xl border border-red-200 bg-white p-5 text-center shadow-sm"><AlertCircle className="mx-auto h-7 w-7 text-red-500" /><h2 className="mt-2 text-sm font-black text-slate-800">Unable to load jobs</h2><p className="mt-1 text-xs leading-5 text-slate-500">{error}</p><button type="button" onClick={fetchJobs} className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-blue-950 px-3 py-2 text-xs font-bold text-white shadow hover:bg-blue-900"><RefreshCw className="h-3.5 w-3.5" /> Try again</button></div>
           ) : locationRequired ? (
@@ -388,6 +367,15 @@ export default function JobMapPage() {
               <JobMapCard job={job} isActive={selectedJobId === job.post_id} isApplying={applyingIds.includes(job.post_id)} isSaving={savingIds.includes(job.post_id)} isRsvping={rsvpingIds.includes(job.post_id)} onClick={() => openDetails(job)} onView={openDetails} onApply={requestApply} onSave={handleSave} onTraining={viewTraining} onJobFair={handleJobFair} />
             </div>
           ))}
+          {!isLoading && !error && jobs.length >= Number(filters.limit) && Number(filters.limit) < 100 && (
+            <button
+              type="button"
+              onClick={() => updateFilters({ limit: Math.min(100, Number(filters.limit) + 20) })}
+              className="w-full rounded-xl border border-blue-200 bg-white px-4 py-3 text-xs font-black text-blue-900 shadow-sm transition hover:bg-blue-50"
+            >
+              Load more vacancies
+            </button>
+          )}
         </div>
       </aside>
 

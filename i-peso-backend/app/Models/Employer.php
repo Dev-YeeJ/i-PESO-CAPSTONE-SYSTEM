@@ -39,8 +39,12 @@ class Employer extends Authenticatable
         'house_unit_street',
         'latitude',
         'longitude',
+        'location_accuracy',
         'google_place_id',
         'complete_address',
+        'full_address',
+        'region_code',
+        'location_verified_at',
         'company_description',
         'company_logo',
         'industry_type',
@@ -76,6 +80,8 @@ class Employer extends Authenticatable
         'representative_is_owner' => 'boolean',
         'latitude' => 'float',
         'longitude' => 'float',
+        'location_accuracy' => 'integer',
+        'location_verified_at' => 'datetime',
         'google_token_expires_at' => 'datetime',
     ];
 

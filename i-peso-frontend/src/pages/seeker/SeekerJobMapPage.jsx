@@ -1,12 +1,13 @@
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
 import api from '@/services/api'
 import { Loader2, Navigation, MapPin, ExternalLink, Sparkles, LocateFixed, Briefcase, ChevronRight, Search, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
 import { useAuthStore } from '@/stores/authStore'
 import { Link } from 'react-router-dom'
-import { APIProvider, Map, AdvancedMarker, Pin, InfoWindow, useMap } from '@vis.gl/react-google-maps'
+import { APIProvider, Map, Marker, InfoWindow, useMap } from '@vis.gl/react-google-maps'
+import { DEFAULT_MAP_CENTER, GOOGLE_MAP_ID, toMapPosition } from '@/utils/mapCoordinates'
 
 // Urdaneta City Default Coordinates
-const DEFAULT_CENTER = { lat: 15.9758, lng: 120.5707 }
+const DEFAULT_CENTER = DEFAULT_MAP_CENTER
 
 function MapBounds({ center, jobs, panToId }) {
   const map = useMap()
@@ -17,8 +18,9 @@ function MapBounds({ center, jobs, panToId }) {
     // If a specific job is clicked, pan and zoom to it
     if (panToId) {
       const job = jobs.find(j => j.id === panToId)
-      if (job && job.latitude && job.longitude) {
-        map.panTo({ lat: parseFloat(job.latitude), lng: parseFloat(job.longitude) })
+      const position = job && toMapPosition(job.latitude, job.longitude)
+      if (position) {
+        map.panTo(position)
         map.setZoom(16)
       }
       return
@@ -32,9 +34,8 @@ function MapBounds({ center, jobs, panToId }) {
     const bounds = new window.google.maps.LatLngBounds()
     bounds.extend(center)
     jobs.forEach(job => {
-      if (job.latitude && job.longitude) {
-        bounds.extend({ lat: parseFloat(job.latitude), lng: parseFloat(job.longitude) })
-      }
+      const position = toMapPosition(job.latitude, job.longitude)
+      if (position) bounds.extend(position)
     })
     map.fitBounds(bounds, { padding: 40 })
   }, [map, center, jobs, panToId])
@@ -105,20 +106,12 @@ export default function SeekerJobMapPage() {
 
   // Initialize Center
   useEffect(() => {
-    if (user?.latitude && user?.longitude) {
-      setActiveCenter({ lat: parseFloat(user.latitude), lng: parseFloat(user.longitude) })
-    } else {
-      setActiveCenter(DEFAULT_CENTER)
-    }
+    setActiveCenter(toMapPosition(user?.latitude, user?.longitude) ?? DEFAULT_CENTER)
   }, [user])
 
-  useEffect(() => {
-    if (activeCenter) {
-      fetchMapJobs()
-    }
-  }, [radius, activeCenter])
+  const fetchMapJobs = useCallback(async () => {
+    if (!activeCenter) return
 
-  const fetchMapJobs = async () => {
     try {
       setLoading(true)
       const res = await api.get('/seeker/nearby-jobs', {
@@ -135,14 +128,18 @@ export default function SeekerJobMapPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [activeCenter, radius])
+
+  useEffect(() => {
+    fetchMapJobs()
+  }, [fetchMapJobs])
 
   const handleLocateMe = () => {
     setIsLocating(true)
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
-          setActiveCenter({ lat: position.coords.latitude, lng: position.coords.longitude })
+          setActiveCenter(toMapPosition(position.coords.latitude, position.coords.longitude) ?? DEFAULT_CENTER)
           setIsLocating(false)
         },
         (error) => {
@@ -154,14 +151,6 @@ export default function SeekerJobMapPage() {
     } else {
       setIsLocating(false)
       alert("Geolocation is not supported by this browser.")
-    }
-  }
-
-  // Handle Map Dragging
-  const handleMapChange = (ev) => {
-    // Only update active center if the user actually dragged it, avoiding loop
-    if (ev.detail.center && !panToId) {
-       setActiveCenter(ev.detail.center)
     }
   }
 
@@ -331,11 +320,11 @@ export default function SeekerJobMapPage() {
           </button>
         )}
 
-        <APIProvider apiKey={import.meta.env.VITE_GOOGLE_MAPS_EMBED_API_KEY}>
+        <APIProvider version="quarterly" apiKey={import.meta.env.VITE_GOOGLE_MAPS_EMBED_API_KEY}>
           <Map
             defaultZoom={13}
             defaultCenter={activeCenter}
-            mapId="seeker-job-map"
+            mapId={GOOGLE_MAP_ID}
             disableDefaultUI={false}
             gestureHandling="greedy"
             onDragstart={() => setPanToId(null)} // Cancel pan tracking if user manually drags
@@ -344,98 +333,85 @@ export default function SeekerJobMapPage() {
             <MapBounds center={activeCenter} jobs={filteredJobs} panToId={panToId} />
 
             {/* User / Active Center Marker */}
-            <AdvancedMarker position={activeCenter} zIndex={100}>
-              <div className="relative flex h-14 w-14 items-center justify-center">
-                <div className="absolute h-full w-full animate-ping rounded-full bg-blue-400 opacity-20"></div>
-                <div className="relative flex h-8 w-8 items-center justify-center rounded-full border-[3px] border-white bg-blue-600 shadow-lg">
-                  <div className="h-2 w-2 rounded-full bg-white"></div>
-                </div>
-              </div>
-            </AdvancedMarker>
+            <Marker position={activeCenter} zIndex={100} title="Your location" />
 
             <RadiusCircle center={activeCenter} radiusKm={radius} />
 
             {filteredJobs.map(job => {
-              if (!job.latitude || !job.longitude) return null
-              const position = { lat: parseFloat(job.latitude), lng: parseFloat(job.longitude) }
+              const position = toMapPosition(job.latitude, job.longitude)
+              if (!position) return null
+              
               const isSelected = openInfoWindowId === job.id
               const isHovered = hoveredJobId === job.id
               
-              return (
-                <React.Fragment key={job.id}>
-                  <AdvancedMarker 
-                    position={position}
-                    onClick={() => {
-                      setOpenInfoWindowId(job.id)
-                      setPanToId(job.id)
-                    }}
-                    zIndex={isSelected || isHovered ? 50 : 10}
-                  >
-                    <div className={`transition-transform duration-300 ${isSelected || isHovered ? 'scale-125' : 'scale-100 hover:scale-110'}`}>
-                      <Pin 
-                        background={isSelected || isHovered ? '#2563eb' : '#ef4444'} 
-                        borderColor={isSelected || isHovered ? '#1e3a8a' : '#991b1b'} 
-                        glyphColor="#fff" 
-                      />
-                    </div>
-                  </AdvancedMarker>
+              return [
+                <Marker
+                  key={`marker-${job.id}`}
+                  position={position}
+                  onClick={() => {
+                    setOpenInfoWindowId(job.id)
+                    setPanToId(job.id)
+                  }}
+                  zIndex={isSelected || isHovered ? 50 : 10}
+                  title={`${job.job_title} · ${job.employer_name}`}
+                />,
 
-                  {isSelected && (
-                    <InfoWindow
-                      position={position}
-                      onCloseClick={() => {
-                        setOpenInfoWindowId(null)
-                        setPanToId(null)
-                      }}
-                      headerDisabled
-                      className="rounded-xl overflow-hidden shadow-2xl"
-                    >
-                      <div className="w-[280px] p-1 font-sans">
-                        <div className="flex flex-col gap-3 p-3">
-                          <div className="flex items-start gap-3">
-                            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-blue-700 text-white shadow-inner">
-                              <Briefcase className="h-6 w-6" />
-                            </div>
-                            <div>
-                              <h3 className="font-black text-slate-900 leading-tight">{job.job_title}</h3>
-                              <p className="mt-0.5 text-sm font-semibold text-slate-600 line-clamp-1">{job.employer_name}</p>
-                            </div>
+                isSelected && (
+                  <InfoWindow
+                    key={`info-${job.id}`}
+                    position={position}
+                    onCloseClick={() => {
+                      setOpenInfoWindowId(null)
+                      setPanToId(null)
+                    }}
+                    headerDisabled
+                    className="rounded-xl overflow-hidden shadow-2xl"
+                  >
+                    <div className="w-[280px] p-1 font-sans">
+                      <div className="flex flex-col gap-3 p-3">
+                        <div className="flex items-start gap-3">
+                          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-blue-700 text-white shadow-inner">
+                            <Briefcase className="h-6 w-6" />
                           </div>
-                          
-                          <div className="grid grid-cols-2 gap-2">
-                             <div className="flex flex-col rounded-xl bg-emerald-50 p-2 text-center border border-emerald-100/50">
-                               <span className="text-[10px] font-bold uppercase text-emerald-600/70 mb-0.5">Match</span>
-                               <span className="text-sm font-black text-emerald-700">{Math.round(job.match_percentage || 0)}%</span>
-                             </div>
-                             <div className="flex flex-col rounded-xl bg-blue-50 p-2 text-center border border-blue-100/50">
-                               <span className="text-[10px] font-bold uppercase text-blue-600/70 mb-0.5">Distance</span>
-                               <span className="text-sm font-black text-blue-700">{Number(job.distance_km || 0).toFixed(1)} km</span>
-                             </div>
+                          <div>
+                            <h3 className="font-black text-slate-900 leading-tight">{job.job_title}</h3>
+                            <p className="mt-0.5 text-sm font-semibold text-slate-600 line-clamp-1">{job.employer_name}</p>
                           </div>
                         </div>
-
-                        <div className="flex items-center gap-2 p-2 pt-0 border-t border-slate-100 mt-1">
-                          <Link 
-                            to={`/seeker/jobs/${job.id}`} 
-                            className="flex flex-1 items-center justify-center gap-1 rounded-xl bg-blue-600 py-2.5 text-xs font-bold text-white shadow-sm transition hover:bg-blue-700 mt-2"
-                          >
-                            View Job <ChevronRight className="h-3.5 w-3.5" />
-                          </Link>
-                          <a 
-                            href={`https://www.google.com/maps/dir/?api=1&origin=${activeCenter.lat},${activeCenter.lng}&destination=${job.latitude},${job.longitude}`}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="flex h-[38px] w-[38px] items-center justify-center rounded-xl bg-slate-100 text-slate-600 transition hover:bg-slate-200 hover:text-slate-900 mt-2"
-                            title="Get Directions"
-                          >
-                            <ExternalLink className="h-4 w-4" />
-                          </a>
+                        
+                        <div className="grid grid-cols-2 gap-2">
+                           <div className="flex flex-col rounded-xl bg-emerald-50 p-2 text-center border border-emerald-100/50">
+                             <span className="text-[10px] font-bold uppercase text-emerald-600/70 mb-0.5">Match</span>
+                             <span className="text-sm font-black text-emerald-700">{Math.round(job.match_percentage || 0)}%</span>
+                           </div>
+                           <div className="flex flex-col rounded-xl bg-blue-50 p-2 text-center border border-blue-100/50">
+                             <span className="text-[10px] font-bold uppercase text-blue-600/70 mb-0.5">Distance</span>
+                             <span className="text-sm font-black text-blue-700">{Number(job.distance_km || 0).toFixed(1)} km</span>
+                           </div>
                         </div>
                       </div>
-                    </InfoWindow>
-                  )}
-                </React.Fragment>
-              )
+
+                      <div className="flex items-center gap-2 p-2 pt-0 border-t border-slate-100 mt-1">
+                        <Link 
+                          to={`/seeker/jobs/${job.id}`} 
+                          className="flex flex-1 items-center justify-center gap-1 rounded-xl bg-blue-600 py-2.5 text-xs font-bold text-white shadow-sm transition hover:bg-blue-700 mt-2"
+                        >
+                          View Job <ChevronRight className="h-3.5 w-3.5" />
+                        </Link>
+                        <a 
+                          href={`https://www.google.com/maps/dir/?api=1&origin=${activeCenter.lat},${activeCenter.lng}&destination=${job.latitude},${job.longitude}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="flex h-[38px] w-[38px] items-center justify-center rounded-xl bg-slate-100 text-slate-600 transition hover:bg-slate-200 hover:text-slate-900 mt-2"
+                          title="Get Directions"
+                        >
+                          <ExternalLink className="h-4 w-4" />
+                        </a>
+                      </div>
+                    </div>
+                  </InfoWindow>
+                )
+              ]
             })}
           </Map>
         </APIProvider>

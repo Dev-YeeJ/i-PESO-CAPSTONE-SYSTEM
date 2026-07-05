@@ -164,7 +164,7 @@ function EligibilityStep({ form, errors, change, update }) {
       <SkillTaxonomyTags value={form.skills} onChange={(skills) => update('skills', skills)} output="objects" mode="employer" category="technical" label="Skills Taught or Targeted" placeholder="Search training skills" error={errors.skills} limit={30} />
       <div className="grid gap-5 md:grid-cols-2">
         <Field label="Target Industry" error={errors.target_industry}><input name="target_industry" value={form.target_industry ?? ''} onChange={change} className={inputClass} placeholder="e.g. Construction and Manufacturing" /></Field>
-        <div><label className="text-sm font-bold text-slate-700">Target Occupation</label><div className="mt-1.5"><OccupationCombobox selected={form.target_occupation} onChange={(occupation) => update('target_occupation', occupation)} placeholder="Search a target occupation" /></div></div>
+        <div><label className="text-sm font-bold text-slate-700">Target Occupation</label><div className="mt-1.5"><OccupationCombobox mode="catalog" selected={form.target_occupation} onChange={(occupation) => update('target_occupation', occupation)} placeholder="Search a target occupation" /></div></div>
       </div>
     </div>
   )

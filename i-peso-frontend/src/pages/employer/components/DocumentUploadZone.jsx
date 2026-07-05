@@ -96,6 +96,10 @@ export default function DocumentUploadZone({ documentType, isUploaded, onUpload,
           </svg>
           <p className="text-xs font-medium text-slate-700 mb-1">
             Drag & drop your {getDocumentLabel(documentType).toLowerCase()}{optional ? ' (optional)' : ''}
+          </p>
+          <button
+            type="button"
+            onClick={triggerFileInput}
             disabled={loading}
             className="inline-block px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >

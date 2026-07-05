@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import { motion as Motion } from 'framer-motion';
+import IPesoLogo from '@/components/branding/IPesoLogo';
 
 const LandingPage = () => {
   const navigate = useNavigate();
@@ -28,8 +29,8 @@ const LandingPage = () => {
         className="relative z-50 px-8 py-5 flex items-center justify-between max-w-7xl mx-auto"
       >
         <div className="flex items-center gap-3 cursor-pointer" onClick={() => navigate('/')}>
-          <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center font-extrabold text-white shadow-lg shadow-blue-500/20 tracking-tighter">
-            iP
+          <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl bg-white shadow-lg shadow-blue-500/20">
+            <IPesoLogo className="h-full w-full" />
           </div>
           <div>
             <p className="font-bold text-lg leading-none tracking-wide text-white">i-PESO</p>

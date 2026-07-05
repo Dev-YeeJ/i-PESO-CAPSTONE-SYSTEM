@@ -7,9 +7,13 @@ use App\Http\Controllers\Controller;
 use App\Models\Application;
 use App\Models\Employer;
 use App\Events\ApplicationStatusChanged;
+use App\Notifications\InterviewCancelledNotification;
+use App\Notifications\InterviewScheduledNotification;
+use App\Notifications\InterviewUpdatedNotification;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Validation\Rule;
 
 class EmployerApplicationController extends Controller
@@ -78,6 +82,12 @@ class EmployerApplicationController extends Controller
         $employer = $this->employer($request);
         $this->ensureOwnership($request, $application);
 
+        if (in_array($application->status, ['hired', 'rejected', 'withdrawn'], true)) {
+            return response()->json([
+                'message' => 'This application can no longer be processed.',
+            ], 409);
+        }
+
         $validated = $request->validate([
             'status' => ['required', Rule::in(['reviewed', 'shortlisted', 'interview', 'hired', 'rejected'])],
             'employer_remarks' => ['nullable', 'string', 'max:5000'],
@@ -112,6 +122,7 @@ class EmployerApplicationController extends Controller
 
         $application = DB::transaction(function () use ($application, $employer, $validated, &$sweptApplications) {
             $originalStatus = $application->status;
+            $originalInterviewSchedule = $application->interviewSchedule()->withoutGlobalScopes()->first();
 
             $updates = [
                 'status' => $validated['status'],
@@ -119,11 +130,13 @@ class EmployerApplicationController extends Controller
                 'status_changed_by' => $employer->employer_id,
                 'employer_remarks' => $validated['employer_remarks'] ?? $application->employer_remarks,
             ];
+
             foreach (['employer_mismatch_reason_code', 'seeker_mismatch_reason_code', 'mismatch_reason_details'] as $field) {
                 if (array_key_exists($field, $validated)) {
                     $updates[$field] = $validated[$field];
                 }
             }
+
             $application->forceFill($updates);
 
             if ($validated['status'] === 'hired') {
@@ -136,20 +149,18 @@ class EmployerApplicationController extends Controller
 
             $application->save();
 
-            // Anti-Ghosting Mass Rejection Sweep
             if ($validated['status'] === 'hired' && $originalStatus !== 'hired') {
                 $vacancy = $application->jobVacancy;
                 if ($vacancy && $vacancy->vacancies_count > 0) {
                     $vacancy->decrement('vacancies_count');
-                    
+
                     if ($vacancy->vacancies_count === 0) {
-                        // Vacancy is filled, sweep remaining active applications
                         $activeStatuses = ['pending', 'reviewed', 'shortlisted', 'interview'];
                         $sweptApplications = Application::where('post_id', $vacancy->post_id)
                             ->where('apply_id', '!=', $application->apply_id)
                             ->whereIn('status', $activeStatuses)
                             ->get();
-                            
+
                         foreach ($sweptApplications as $sweptApp) {
                             $sweptApp->forceFill([
                                 'status' => 'rejected',
@@ -166,7 +177,7 @@ class EmployerApplicationController extends Controller
 
             if ($validated['status'] === 'interview') {
                 $interview = $validated['interview'] ?? [];
-                $application->interviewSchedule()->updateOrCreate(
+                $interviewSchedule = $application->interviewSchedule()->updateOrCreate(
                     ['apply_id' => $application->apply_id],
                     [
                         'mode_of_interview' => $interview['mode_of_interview'],
@@ -174,8 +185,29 @@ class EmployerApplicationController extends Controller
                         'venue_or_link' => $interview['venue_or_link'] ?? null,
                         'instructions' => $interview['instructions'] ?? null,
                         'status' => 'scheduled',
+                        'interview_reminder_24h_sent_at' => null,
+                        'interview_reminder_1h_sent_at' => null,
+                        'interview_reminder_15m_sent_at' => null,
                     ]
                 );
+
+                $isReschedule = $originalInterviewSchedule
+                    && $originalInterviewSchedule->schedule
+                    && $originalInterviewSchedule->schedule->ne($interviewSchedule->schedule);
+
+                if ($interviewSchedule->wasRecentlyCreated) {
+                    Notification::send($application->jobSeeker, new InterviewScheduledNotification($application));
+                    Notification::send($application->jobVacancy?->employer, new InterviewScheduledNotification($application));
+                } elseif ($isReschedule) {
+                    Notification::send($application->jobSeeker, new InterviewUpdatedNotification($application));
+                    Notification::send($application->jobVacancy?->employer, new InterviewUpdatedNotification($application));
+                }
+            }
+
+            if ($originalStatus === 'interview' && $validated['status'] !== 'interview') {
+                $application->interviewSchedule()->update(['status' => 'cancelled']);
+                Notification::send($application->jobSeeker, new InterviewCancelledNotification($application));
+                Notification::send($application->jobVacancy?->employer, new InterviewCancelledNotification($application));
             }
 
             return $application->fresh();

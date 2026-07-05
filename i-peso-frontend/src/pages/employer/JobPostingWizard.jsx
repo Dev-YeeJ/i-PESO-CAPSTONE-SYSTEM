@@ -1,4 +1,4 @@
-import { createElement, useMemo, useState } from 'react'
+import { createElement, useState } from 'react'
 import {
   ArrowLeft,
   ArrowRight,
@@ -26,6 +26,7 @@ import PsgcCascade from '@/pages/employer/components/PsgcCascade'
 import AddressPicker from '@/components/maps/AddressPicker'
 import MapPinPicker from '@/components/maps/MapPinPicker'
 import * as employerService from '@/services/employerService'
+import { resolveCoordinatesAddress } from '@/services/geoService'
 
 const steps = [
   { number: 1, title: 'Basic Information', shortTitle: 'Basic', icon: BriefcaseBusiness },
@@ -131,11 +132,6 @@ export default function JobPostingWizard() {
 
   const currentStep = steps[step - 1]
   const progressPercent = ((step - 1) / (steps.length - 1)) * 100
-
-  const locationSummary = useMemo(
-    () => [form.specific_address, form.barangay, form.city_municipality, form.province].filter(Boolean).join(', '),
-    [form.specific_address, form.barangay, form.city_municipality, form.province],
-  )
 
   const update = (name, value) => {
     setForm((current) => ({ ...current, [name]: value }))
@@ -347,7 +343,6 @@ export default function JobPostingWizard() {
                 errors={errors}
                 update={update}
                 setLocation={setLocation}
-                locationSummary={locationSummary}
               />
             )}
             {step === 3 && <QualificationsStep form={form} errors={errors} update={update} />}
@@ -448,7 +443,40 @@ function BasicInformationStep({ form, errors, change }) {
   )
 }
 
-function AlgorithmAnchorsStep({ form, errors, update, setLocation, locationSummary }) {
+function AlgorithmAnchorsStep({ form, errors, update, setLocation }) {
+  const [resolvingPin, setResolvingPin] = useState(false)
+  const [pinMessage, setPinMessage] = useState('')
+
+  const handlePinChange = async (coords) => {
+    update('latitude', coords.latitude)
+    update('longitude', coords.longitude)
+    update('location_accuracy', null)
+    setResolvingPin(true)
+    setPinMessage('Finding the PSGC address for this pin...')
+
+    try {
+      const result = await resolveCoordinatesAddress(coords.latitude, coords.longitude)
+      setLocation({
+        province: result.province?.name ?? form.province,
+        province_code: result.province?.code ?? form.province_code,
+        city: result.city?.name ?? form.city_municipality,
+        city_code: result.city?.code ?? form.city_code,
+        barangay: result.barangay?.name ?? form.barangay,
+        barangay_code: result.barangay?.code ?? form.barangay_code,
+      })
+      if (result.houseStreet) update('specific_address', result.houseStreet)
+      if (result.placeId) update('google_place_id', result.placeId)
+
+      setPinMessage(result.isComplete
+        ? 'Province, city, barangay, and specific address were filled from the pin.'
+        : `Pin located. Please verify${result.missingFields.length ? ` or complete: ${result.missingFields.join(', ')}` : ' the address fields'}.`)
+    } catch (error) {
+      setPinMessage(error.message ?? 'Pin saved, but its address could not be filled automatically.')
+    } finally {
+      setResolvingPin(false)
+    }
+  }
+
   const setOccupationMapping = (mapping) => {
     update('occupation_mapping', mapping)
     update('occupation_id', null)
@@ -521,12 +549,14 @@ function AlgorithmAnchorsStep({ form, errors, update, setLocation, locationSumma
               latitude={form.latitude}
               longitude={form.longitude}
               addressLine={`${form.specific_address || ''} ${form.barangay || ''} ${form.city_municipality || ''}`.trim()}
-              onChange={(coords) => {
-                update('latitude', coords.lat)
-                update('longitude', coords.lng)
-                update('location_accuracy', coords.accuracy || 'map_pin')
-              }}
+              onChange={handlePinChange}
             />
+            {(resolvingPin || pinMessage) && (
+              <p className="mt-2 text-xs font-semibold text-blue-800">
+                {resolvingPin && <Loader2 className="mr-1.5 inline h-3.5 w-3.5 animate-spin" />}
+                {pinMessage}
+              </p>
+            )}
           </div></div>
       </div>
     </StepShell>

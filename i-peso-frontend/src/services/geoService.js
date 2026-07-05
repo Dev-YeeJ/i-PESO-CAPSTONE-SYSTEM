@@ -77,6 +77,35 @@ export async function reverseGeocode(latitude, longitude) {
   return response.data.location
 }
 
+async function reverseGeocodeWithFallback(latitude, longitude) {
+  try {
+    const location = await reverseGeocode(latitude, longitude)
+    if (location) return location
+  } catch {
+    console.warn('Primary reverse geocoding failed; using OpenStreetMap fallback.')
+  }
+
+  const response = await fetch(
+    `https://nominatim.openstreetmap.org/reverse?format=jsonv2&addressdetails=1&lat=${encodeURIComponent(latitude)}&lon=${encodeURIComponent(longitude)}`,
+    { headers: { Accept: 'application/json' } },
+  )
+  if (!response.ok) throw new Error('Could not determine an address for this location.')
+
+  const result = await response.json()
+  const address = result.address ?? {}
+
+  return {
+    latitude: Number(result.lat ?? latitude),
+    longitude: Number(result.lon ?? longitude),
+    formatted: result.display_name ?? '',
+    province_name: address.state ?? address.region ?? address.province ?? '',
+    city_name: address.city ?? address.municipality ?? address.town ?? address.county ?? '',
+    barangay_name: address.village ?? address.suburb ?? address.quarter ?? address.neighbourhood ?? '',
+    house_number: address.house_number ?? '',
+    street: address.road ?? address.pedestrian ?? address.residential ?? '',
+  }
+}
+
 async function matchPsgcLocation(location, accuracy = null) {
   const warnings = []
   const components = location?.address_components ?? location?.addressComponents ?? []
@@ -202,15 +231,19 @@ export async function resolveAddressSuggestion(suggestion, sessionToken = null) 
   return matchPsgcLocation(location)
 }
 
-export async function detectAddress() {
-  const { lat, lng, accuracy } = await getCurrentPosition()
-  const location = await reverseGeocode(lat, lng)
+export async function resolveCoordinatesAddress(latitude, longitude, accuracy = null) {
+  const location = await reverseGeocodeWithFallback(latitude, longitude)
 
   if (!location) {
-    throw new Error('Could not determine an address from your GPS location.')
+    throw new Error('Could not determine an address from this location.')
   }
 
   return matchPsgcLocation(location, accuracy)
+}
+
+export async function detectAddress() {
+  const { lat, lng, accuracy } = await getCurrentPosition()
+  return resolveCoordinatesAddress(lat, lng, accuracy)
 }
 
 export async function calculateRouteDistance(origin, destination, mode = 'drive') {

@@ -333,6 +333,37 @@ class EmployerVerificationJobPostingTest extends TestCase
             ->assertJsonPath('code', 'location_required');
     }
 
+    public function test_latest_dashboard_feed_works_without_a_saved_seeker_location(): void
+    {
+        $employer = $this->createEmployer();
+        $seeker = $this->createSeeker();
+        JobVacancy::create([
+            ...$this->vacancyPayload(),
+            'employer_id' => $employer->employer_id,
+            'job_title' => 'Latest Active Vacancy',
+            'location' => 'Urdaneta City, Pangasinan',
+            'latitude' => 15.9761,
+            'longitude' => 120.5711,
+        ]);
+
+        $this->mock(EnhancedJobMatchingService::class, function (MockInterface $mock): void {
+            $mock->shouldReceive('calculateMatch')->once()->andReturn([
+                'percentage' => 60,
+                'eligible' => true,
+                'missing_critical_skills' => [],
+                'factors' => ['skills' => ['details' => []]],
+            ]);
+        });
+
+        Sanctum::actingAs($seeker);
+
+        $this->getJson('/api/seeker/nearby-jobs?feed_mode=latest&sort=newest&limit=10')
+            ->assertOk()
+            ->assertJsonPath('feed_mode', 'latest')
+            ->assertJsonPath('location_available', false)
+            ->assertJsonPath('jobs.0.job_title', 'Latest Active Vacancy');
+    }
+
     public function test_employer_cannot_access_seeker_nearby_jobs(): void
     {
         Sanctum::actingAs($this->createEmployer());

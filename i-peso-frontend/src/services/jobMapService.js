@@ -1,5 +1,9 @@
 import apiClient from './api'
 
+const mapRequestCache = new Map()
+const MAP_CACHE_TTL_MS = 30_000
+const MAP_CACHE_LIMIT = 12
+
 const ALLOWED_RADII = [5, 10, 15, 25, 50]
 const ALLOWED_MATCHES = [0, 50, 70, 80]
 const ALLOWED_SORTS = ['distance', 'match', 'newest', 'salary']
@@ -62,9 +66,15 @@ const compactParams = (filters) => Object.fromEntries(
     .map(([key, value]) => [key, typeof value === 'boolean' ? Number(value) : value]),
 )
 
-export const getMapJobs = async (filters = {}) => {
+export const getMapJobs = async (filters = {}, { signal, force = false } = {}) => {
+  const params = compactParams(filters)
+  const cacheKey = JSON.stringify(params)
+  const cached = mapRequestCache.get(cacheKey)
+  if (!force && cached && Date.now() - cached.savedAt < MAP_CACHE_TTL_MS) return cached.data
+
   const response = await apiClient.get('/seeker/job-map', {
-    params: compactParams(filters),
+    params,
+    signal,
   })
 
   const jobsById = new Map()
@@ -79,7 +89,7 @@ export const getMapJobs = async (filters = {}) => {
     full_address: '',
   }
 
-  return {
+  const result = {
     ...response.data,
     seeker_location: {
       ...seekerLocation,
@@ -90,6 +100,12 @@ export const getMapJobs = async (filters = {}) => {
     seeker: response.data.seeker || null,
     summary: response.data.summary || null,
   }
+
+  if (mapRequestCache.size >= MAP_CACHE_LIMIT) {
+    mapRequestCache.delete(mapRequestCache.keys().next().value)
+  }
+  mapRequestCache.set(cacheKey, { data: result, savedAt: Date.now() })
+  return result
 }
 
 const nearestAllowed = (value, allowed) => allowed.reduce(

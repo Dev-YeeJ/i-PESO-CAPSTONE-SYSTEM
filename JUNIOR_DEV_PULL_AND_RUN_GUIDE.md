@@ -107,6 +107,7 @@ Recommended local values:
 ```env
 VITE_API_BASE_URL=http://localhost:8000/api
 VITE_GOOGLE_MAPS_EMBED_API_KEY=
+VITE_GOOGLE_MAPS_MAP_ID=DEMO_MAP_ID
 ```
 
 The frontend also falls back to `http://localhost:8000/api` if `VITE_API_BASE_URL` is missing.

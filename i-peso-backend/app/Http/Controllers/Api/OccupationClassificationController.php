@@ -8,6 +8,7 @@ use App\Services\LocalJobTermDictionary;
 use App\Services\VertexAiSuggestionService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 use RuntimeException;
 
@@ -28,30 +29,40 @@ class OccupationClassificationController extends Controller
         ]);
 
         $rawInput = trim($validated['title']);
-        $limit = $validated['limit'] ?? 5;
+        $limit    = $validated['limit'] ?? 5;
+
+        // Cache key: normalised slug + limit so small typo differences don't share stale results
+        $cacheKey = 'occ_classify:' . Str::slug($rawInput) . ':' . $limit;
+
+        $cached = Cache::get($cacheKey);
+        if ($cached !== null) {
+            return response()->json($cached);
+        }
 
         // ── Layer 0: Invalid / too-vague check via dictionary ──
         $dictResult = $this->dictionary->classify($rawInput);
 
         if (! $dictResult['is_valid_job_input']) {
-            return response()->json([
-                'raw_input' => $rawInput,
+            $response = [
+                'raw_input'          => $rawInput,
                 'is_valid_job_input' => false,
                 'needs_clarification' => false,
-                'suggestions' => [],
-                'invalid_reason' => $dictResult['invalid_reason'],
-            ]);
+                'suggestions'        => [],
+                'invalid_reason'     => $dictResult['invalid_reason'],
+            ];
+            // Cache invalid results for a short time (5 min) to avoid repeat AI calls
+            Cache::put($cacheKey, $response, 300);
+            return response()->json($response);
         }
 
         $suggestions = [];
 
         // ── Layer 1: Catalog search ──
         $catalogSuggestions = $this->searchCatalog($rawInput, $limit);
-        $suggestions = array_merge($suggestions, $catalogSuggestions);
+        $suggestions        = array_merge($suggestions, $catalogSuggestions);
 
         // ── Layer 2: Local dictionary ──
         if (! empty($dictResult['suggestions'])) {
-            // Merge dictionary results, avoiding duplicates by title
             $existingTitles = collect($suggestions)->pluck('occupation_title')->map(fn ($t) => Str::lower($t))->all();
             foreach ($dictResult['suggestions'] as $dictSuggestion) {
                 if (! in_array(Str::lower($dictSuggestion['occupation_title']), $existingTitles, true)) {
@@ -65,13 +76,19 @@ class OccupationClassificationController extends Controller
 
         if ($highConfidenceCount < 2) {
             try {
-                $aiSuggestions = app(VertexAiSuggestionService::class)->classifyOccupationTitleEnhanced($rawInput, $limit);
+                $aiResponse  = app(VertexAiSuggestionService::class)->classifyOccupationTitleEnhanced($rawInput, $limit);
+                $aiSuggestions = $aiResponse['suggestions'] ?? [];
                 $existingTitles = collect($suggestions)->pluck('occupation_title')->map(fn ($t) => Str::lower($t))->all();
 
                 foreach ($aiSuggestions as $aiSuggestion) {
                     if (! in_array(Str::lower($aiSuggestion['occupation_title']), $existingTitles, true)) {
                         $suggestions[] = $aiSuggestion;
                     }
+                }
+                
+                // Update clarification flag if AI thinks it needs clarification
+                if (isset($aiResponse['needs_clarification']) && $aiResponse['needs_clarification']) {
+                    $dictResult['needs_clarification'] = true;
                 }
             } catch (RuntimeException) {
                 // AI unavailable — continue with catalog + dictionary results
@@ -85,13 +102,18 @@ class OccupationClassificationController extends Controller
         $needsClarification = $dictResult['needs_clarification']
             || (count($suggestions) > 1 && collect($suggestions)->max('confidence') < 80);
 
-        return response()->json([
-            'raw_input' => $rawInput,
-            'is_valid_job_input' => true,
+        $response = [
+            'raw_input'           => $rawInput,
+            'is_valid_job_input'  => true,
             'needs_clarification' => $needsClarification,
-            'suggestions' => $suggestions,
-            'invalid_reason' => null,
-        ]);
+            'suggestions'         => $suggestions,
+            'invalid_reason'      => null,
+        ];
+
+        // Cache for 30 minutes — safe because catalog data changes rarely
+        Cache::put($cacheKey, $response, 1800);
+
+        return response()->json($response);
     }
 
     private function searchCatalog(string $rawInput, int $limit): array

@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { MarkerClusterer } from '@googlemaps/markerclusterer'
-import { APIProvider, AdvancedMarker, InfoWindow, Map as GoogleMap, Pin, useAdvancedMarkerRef, useMap as useGoogleMap } from '@vis.gl/react-google-maps'
+import { APIProvider, InfoWindow, Map as GoogleMap, Marker as GoogleMarker, useMap as useGoogleMap, useMarkerRef } from '@vis.gl/react-google-maps'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import 'leaflet.markercluster'
 import 'leaflet.markercluster/dist/MarkerCluster.css'
 import 'leaflet.markercluster/dist/MarkerCluster.Default.css'
+import { GOOGLE_MAP_ID, toMapPosition } from '@/utils/mapCoordinates'
 import { MapContainer, Marker, Popup, TileLayer, useMap as useLeafletMap } from 'react-leaflet'
 import { Expand, Layers3, List, LocateFixed, RotateCcw, Sparkles } from 'lucide-react'
 
@@ -112,15 +113,14 @@ function GoogleClusterManager({ markers, enabled }) {
     clusterer.current.clearMarkers()
     const markerList = Object.values(markers)
     if (enabled) clusterer.current.addMarkers(markerList)
-    else markerList.forEach((marker) => { marker.map = map })
+    else markerList.forEach((marker) => marker.setMap(map))
   }, [markers, enabled, map])
 
   return null
 }
 
 function GoogleJobMarker({ job, selected, onSelect, registerMarker }) {
-  const [markerRef, marker] = useAdvancedMarkerRef()
-  const colors = markerColors(job.match_percentage)
+  const [markerRef, marker] = useMarkerRef()
 
   useEffect(() => {
     registerMarker(job.post_id, marker)
@@ -128,9 +128,7 @@ function GoogleJobMarker({ job, selected, onSelect, registerMarker }) {
   }, [job.post_id, marker, registerMarker])
 
   return (
-    <AdvancedMarker ref={markerRef} position={{ lat: job.latitude, lng: job.longitude }} onClick={() => onSelect(job.post_id)} zIndex={selected ? 50 : 10} title={`${job.job_title} · ${Math.round(job.match_percentage)}% match`}>
-      <Pin background={selected ? '#f59e0b' : colors.background} borderColor={selected ? '#92400e' : colors.borderColor} glyphColor="#fff" scale={selected ? 1.2 : 0.9} />
-    </AdvancedMarker>
+    <GoogleMarker ref={markerRef} position={{ lat: Number(job.latitude), lng: Number(job.longitude) }} onClick={() => onSelect(job.post_id)} zIndex={selected ? 50 : 10} title={`${job.job_title} · ${Math.round(job.match_percentage)}% match`} />
   )
 }
 
@@ -217,10 +215,15 @@ export default function JobVacancyMap({ jobs, seekerLocation, selectedJobId, pop
   const googleKey = import.meta.env.VITE_GOOGLE_MAPS_EMBED_API_KEY
   const preferredProvider = import.meta.env.VITE_JOB_MAP_PROVIDER?.toLowerCase()
 
-  const center = useMemo(() => seekerLocation?.latitude != null && seekerLocation?.longitude != null
-    ? { lat: Number(seekerLocation.latitude), lng: Number(seekerLocation.longitude) }
-    : DEFAULT_CENTER, [seekerLocation])
-  const mappedJobs = jobs.filter((job) => job.latitude !== null && job.longitude !== null)
+  const seekerPosition = useMemo(
+    () => toMapPosition(seekerLocation?.latitude, seekerLocation?.longitude),
+    [seekerLocation],
+  )
+  const center = seekerPosition ?? DEFAULT_CENTER
+  const mappedJobs = useMemo(() => (Array.isArray(jobs) ? jobs : []).flatMap((job) => {
+    const position = toMapPosition(job.latitude, job.longitude)
+    return position ? [{ ...job, latitude: position.lat, longitude: position.lng }] : []
+  }), [jobs])
   const selectedJob = mappedJobs.find((job) => job.post_id === selectedJobId) || null
   const popupJob = mappedJobs.find((job) => job.post_id === popupJobId) || null
   const activeJobId = selectedJobId || popupJobId
@@ -267,13 +270,15 @@ export default function JobVacancyMap({ jobs, seekerLocation, selectedJobId, pop
       {useLeaflet ? (
         <LeafletFallbackMap center={center} jobs={mappedJobs} seekerLocation={seekerLocation} selectedJob={selectedJob} popupJob={popupJob} activeJobId={activeJobId} onMarkerSelect={onMarkerSelect} onPopupClose={onPopupClose} onViewJob={onViewJob} recenterRequest={recenterRequest} clustersEnabled={clustersEnabled} />
       ) : (
-        <APIProvider apiKey={googleKey} onError={() => setGoogleFailed(true)}>
-          <GoogleMap defaultZoom={13} defaultCenter={center} mapId="seeker-job-map" disableDefaultUI gestureHandling="greedy" style={{ width: '100%', height: '100%' }}>
+        <APIProvider version="quarterly" apiKey={googleKey} onError={() => setGoogleFailed(true)}>
+          <GoogleMap defaultZoom={13} defaultCenter={center} mapId={GOOGLE_MAP_ID} disableDefaultUI gestureHandling="greedy" style={{ width: '100%', height: '100%' }}>
             <GoogleMapUpdater center={center} jobs={mappedJobs} selectedJob={selectedJob} recenterRequest={recenterRequest} />
             <GoogleClusterManager markers={markers} enabled={clustersEnabled} />
-            {seekerLocation?.latitude != null && seekerLocation?.longitude != null && <AdvancedMarker position={center} zIndex={100} title="Your location"><Pin background="#2563eb" borderColor="#1e3a8a" glyphColor="#fff" scale={1.05} /></AdvancedMarker>}
+            {seekerPosition &&
+          <GoogleMarker position={center} zIndex={100} title="Your location" />
+        }
             {mappedJobs.map((job) => <GoogleJobMarker key={job.post_id} job={job} selected={activeJobId === job.post_id} onSelect={onMarkerSelect} registerMarker={registerMarker} />)}
-            {popupJob && <InfoWindow position={{ lat: popupJob.latitude, lng: popupJob.longitude }} onCloseClick={() => onPopupClose(popupJob.post_id)} headerDisabled><CompactJobPopup job={popupJob} onViewJob={onViewJob} /></InfoWindow>}
+            {popupJob && <InfoWindow position={{ lat: Number(popupJob.latitude), lng: Number(popupJob.longitude) }} onCloseClick={() => onPopupClose(popupJob.post_id)} headerDisabled><CompactJobPopup job={popupJob} onViewJob={onViewJob} /></InfoWindow>}
           </GoogleMap>
         </APIProvider>
       )}

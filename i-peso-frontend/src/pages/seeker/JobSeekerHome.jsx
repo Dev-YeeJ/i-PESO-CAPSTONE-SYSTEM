@@ -2,23 +2,16 @@ import { createElement, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   AlertTriangle,
-  Bell,
   Bookmark,
   BookmarkCheck,
   BriefcaseBusiness,
   Building2,
   CalendarDays,
   ChevronRight,
-  Clock3,
   Filter,
-  GraduationCap,
   Layers3,
-  List,
-  Map,
   MapPin,
-  Newspaper,
   Search,
-  Settings2,
   ShieldCheck,
   SlidersHorizontal,
   Sparkles,
@@ -33,16 +26,8 @@ import toast from 'react-hot-toast'
 import { applyToJob, toggleSavedJob as toggleSavedJobApi } from '@/services/seekerService'
 
 const feedTabs = [
-  { key: 'smart', label: 'Smart Matches', icon: Star },
+  { key: 'smart', label: 'Jobs', icon: Star },
   { key: 'saved', label: 'Saved Jobs', icon: BookmarkCheck },
-  { key: 'bulletin', label: 'PESO Bulletin', icon: Newspaper },
-]
-
-const quickFilterOptions = [
-  { key: 'distance10', label: '< 10km', icon: MapPin },
-  { key: 'fullTime', label: 'Full-Time', icon: BriefcaseBusiness },
-  { key: 'remoteHybrid', label: 'Remote/Hybrid', icon: Building2 },
-  { key: 'highMatch', label: '>80% Match', icon: Star },
 ]
 
 const sortOptions = [
@@ -51,41 +36,27 @@ const sortOptions = [
   { value: 'newest', label: 'Newest' },
 ]
 
-const jobLevels = ['Entry', 'Mid', 'Senior']
-
-const emptyFilters = {
-  salaryMin: '',
-  salaryMax: '',
-  levels: [],
-  datePosted: 'any',
-}
-
-const fallbackJobs = []
-
-const bulletins = []
-
 export default function JobSeekerHome({
   profile = null,
   user = null,
-  jobsData = null,
+  recommendedJobsData = null,
+  nearbyJobsData = null,
+  latestJobsData = null,
+  locationState = 'unknown',
   analyticsData = null,
   error = '',
   jobsError = '',
+  jobsLoading = false,
 }) {
   const [draftQuery, setDraftQuery] = useState('')
-  const [draftLocation, setDraftLocation] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
-  const [locationQuery, setLocationQuery] = useState('')
   const [activeTab, setActiveTab] = useState('smart')
   const [sortMode, setSortMode] = useState('match')
-  const [viewMode, setViewMode] = useState('list')
   const [selectedJob, setSelectedJob] = useState(null)
   const [savedJobIds, setSavedJobIds] = useState(profile?.dashboard_stats?.saved_jobs || [])
-  const [activeQuickFilters, setActiveQuickFilters] = useState([])
-  const [filters, setFilters] = useState(emptyFilters)
-  const [filtersOpen, setFiltersOpen] = useState(false)
   const [appliedJobs, setAppliedJobs] = useState({})
   const [applyingJobIds, setApplyingJobIds] = useState([])
+  const [jobFeedMode, setJobFeedMode] = useState('recommended')
 
   useEffect(() => {
     if (profile?.dashboard_stats?.saved_jobs) {
@@ -94,13 +65,16 @@ export default function JobSeekerHome({
   }, [profile])
 
   const seeker = useMemo(() => buildSeekerView(profile, user), [profile, user])
-  const apiJobs = useMemo(() => normalizeApiJobs(jobsData?.jobs ?? []), [jobsData])
-  const quickFilterSet = useMemo(() => new Set(activeQuickFilters), [activeQuickFilters])
+  const feedJobs = useMemo(() => ({
+    recommended: normalizeApiJobs(recommendedJobsData?.jobs ?? []),
+    nearby: normalizeApiJobs(nearbyJobsData?.jobs ?? []),
+    latest: normalizeApiJobs(latestJobsData?.jobs ?? []),
+  }), [latestJobsData, nearbyJobsData, recommendedJobsData])
+  const apiJobs = useMemo(() => feedJobs[jobFeedMode] ?? [], [feedJobs, jobFeedMode])
+  const hasLocation = locationState === 'available'
 
   const jobs = useMemo(() => {
-    const source = apiJobs.length ? apiJobs : fallbackJobs
-
-    return source.map((job) => ({
+    return apiJobs.map((job) => ({
       ...job,
       hasApplied: Boolean(appliedJobs[job.id]) || job.hasApplied,
       applicationStatus: appliedJobs[job.id]?.status ?? job.applicationStatus,
@@ -108,7 +82,17 @@ export default function JobSeekerHome({
     }))
   }, [apiJobs, appliedJobs])
 
-  const usingFallbackJobs = apiJobs.length === 0
+  const usingFallbackJobs = jobFeedMode === 'latest'
+
+  useEffect(() => {
+    if (feedJobs.recommended.length) {
+      setJobFeedMode('recommended')
+    } else if (hasLocation && feedJobs.nearby.length) {
+      setJobFeedMode('nearby')
+    } else {
+      setJobFeedMode('latest')
+    }
+  }, [feedJobs.latest.length, feedJobs.nearby.length, feedJobs.recommended.length, hasLocation])
   const savedJobs = useMemo(
     () => jobs.filter((job) => savedJobIds.includes(job.id)),
     [jobs, savedJobIds],
@@ -117,8 +101,6 @@ export default function JobSeekerHome({
   const filteredJobs = useMemo(() => {
     const source = activeTab === 'saved' ? savedJobs : jobs
     const query = normalizeText(searchQuery)
-    const location = normalizeText(locationQuery)
-
     return source
       .filter((job) => {
         if (!query) return true
@@ -134,25 +116,11 @@ export default function JobSeekerHome({
           ...job.requiredSkills,
         ].join(' ')).includes(query)
       })
-      .filter((job) => !location || normalizeText(job.location).includes(location))
-      .filter((job) => !quickFilterSet.has('distance10') || Number(job.distanceKm) <= 10)
-      .filter((job) => !quickFilterSet.has('fullTime') || isFullTime(job.employmentType))
-      .filter((job) => !quickFilterSet.has('remoteHybrid') || isRemoteOrHybrid(job.workSetup))
-      .filter((job) => !quickFilterSet.has('highMatch') || Number(job.matchScore) >= 80)
-      .filter((job) => !filters.salaryMin || Number(job.salaryMax || job.salaryMin || 0) >= Number(filters.salaryMin))
-      .filter((job) => !filters.salaryMax || Number(job.salaryMin || job.salaryMax || 0) <= Number(filters.salaryMax))
-      .filter((job) => filters.levels.length === 0 || filters.levels.includes(job.jobLevel))
-      .filter((job) => matchesDateFilter(job.postedAt, filters.datePosted))
-  }, [activeTab, filters, jobs, locationQuery, quickFilterSet, savedJobs, searchQuery])
+  }, [activeTab, jobs, savedJobs, searchQuery])
 
   const visibleJobs = useMemo(
     () => sortJobs(filteredJobs, sortMode),
     [filteredJobs, sortMode],
-  )
-
-  const topMatch = useMemo(
-    () => sortJobs(jobs, 'match')[0],
-    [jobs],
   )
 
   const activeApplications = Number(profile?.dashboard_stats?.active_applications ?? 0)
@@ -175,23 +143,11 @@ export default function JobSeekerHome({
   const submitSearch = (event) => {
     event.preventDefault()
     setSearchQuery(draftQuery)
-    setLocationQuery(draftLocation)
-    if (activeTab === 'bulletin') setActiveTab('smart')
   }
 
   const clearSearch = () => {
     setDraftQuery('')
-    setDraftLocation('')
     setSearchQuery('')
-    setLocationQuery('')
-  }
-
-  const toggleQuickFilter = (key) => {
-    setActiveQuickFilters((current) => (
-      current.includes(key)
-        ? current.filter((item) => item !== key)
-        : [...current, key]
-    ))
   }
 
   const toggleSavedJob = async (job) => {
@@ -205,7 +161,7 @@ export default function JobSeekerHome({
     try {
       await toggleSavedJobApi(job.id)
       toast.success(isSaved ? `${job.title} removed from saved jobs.` : `${job.title} saved.`)
-    } catch (caught) {
+    } catch {
       // Revert on error
       setSavedJobIds(savedJobIds)
       toast.error('Failed to update saved jobs.')
@@ -254,7 +210,7 @@ export default function JobSeekerHome({
             {jobsError && (
               <Notice
                 tone="warning"
-                message={`${jobsError} Showing a sample local feed until live nearby matches are available.`}
+                message={jobsError}
               />
             )}
           </div>
@@ -270,64 +226,63 @@ export default function JobSeekerHome({
 
           <main className="space-y-5">
             <SearchPanel
-              seeker={seeker}
-              topMatch={topMatch}
               usingFallbackJobs={usingFallbackJobs}
-              radiusKm={Number(jobsData?.radius_km ?? 20)}
+              radiusKm={Number(nearbyJobsData?.radius_km ?? 20)}
+              hasLocation={hasLocation}
+              noNearbyJobs={hasLocation && feedJobs.nearby.length === 0}
               draftQuery={draftQuery}
-              draftLocation={draftLocation}
-              activeQuickFilters={activeQuickFilters}
               onQueryChange={setDraftQuery}
-              onLocationChange={setDraftLocation}
               onClear={clearSearch}
               onSubmit={submitSearch}
-              onToggleQuickFilter={toggleQuickFilter}
-              onOpenFilters={() => setFiltersOpen(true)}
+            />
+
+            <JobFeedSelector
+              activeFeed={jobFeedMode}
+              hasLocation={hasLocation}
+              counts={{
+                recommended: feedJobs.recommended.length,
+                nearby: feedJobs.nearby.length,
+                latest: feedJobs.latest.length,
+              }}
+              onChange={(feed) => {
+                setJobFeedMode(feed)
+                setActiveTab('smart')
+              }}
             />
 
             <FeedControls
               activeTab={activeTab}
               savedCount={savedJobIds.length}
-              resultCount={activeTab === 'bulletin' ? bulletins.length : visibleJobs.length}
+              resultCount={visibleJobs.length}
               sortMode={sortMode}
-              viewMode={viewMode}
               onTabChange={setActiveTab}
               onSortChange={setSortMode}
-              onViewChange={setViewMode}
             />
 
-            {activeTab === 'bulletin' ? (
-              <section className="space-y-4">
-                {bulletins.map((item) => (
-                  <BulletinCard key={item.id} item={item} />
-                ))}
-              </section>
-            ) : viewMode === 'map' ? (
-              <MapPlaceholder jobs={visibleJobs} />
-            ) : (
-              <section className="space-y-4">
-                {visibleJobs.length ? (
-                  visibleJobs.map((job) => (
-                    <JobCard
-                      key={job.id}
-                      job={job}
-                      saved={savedJobIds.includes(job.id)}
-                      applying={applyingJobIds.includes(job.id)}
-                      onSave={() => toggleSavedJob(job)}
-                      onDetails={() => setSelectedJob(job)}
-                      onQuickApply={() => handleQuickApply(job)}
-                    />
-                  ))
-                ) : (
-                  <EmptyFeedState
-                    title={activeTab === 'saved' ? 'No saved jobs yet' : 'No exact matches found'}
-                    text={activeTab === 'saved'
-                      ? 'Save promising vacancies from Smart Matches so you can compare them later.'
-                      : 'No exact matches found with these strict filters. Try expanding your radius or removing the salary minimum.'}
+            <section className="space-y-4" aria-busy={jobsLoading}>
+              {jobsLoading ? (
+                <><DashboardJobSkeleton /><DashboardJobSkeleton /><DashboardJobSkeleton /></>
+              ) : visibleJobs.length ? (
+                visibleJobs.map((job) => (
+                  <JobCard
+                    key={job.id}
+                    job={job}
+                    saved={savedJobIds.includes(job.id)}
+                    applying={applyingJobIds.includes(job.id)}
+                    onSave={() => toggleSavedJob(job)}
+                    onDetails={() => setSelectedJob(job)}
+                    onQuickApply={() => handleQuickApply(job)}
                   />
-                )}
-              </section>
-            )}
+                ))
+              ) : (
+                <EmptyFeedState
+                  title={activeTab === 'saved' ? 'No saved jobs yet' : 'No matching vacancies found'}
+                  text={activeTab === 'saved'
+                    ? 'Save promising vacancies so you can compare them later.'
+                    : 'Try another keyword or switch to Latest Active Vacancies.'}
+                />
+              )}
+            </section>
           </main>
         </div>
 
@@ -342,58 +297,34 @@ export default function JobSeekerHome({
           />
         )}
 
-        {filtersOpen && (
-          <FilterDrawer
-            filters={filters}
-            onChange={setFilters}
-            onClose={() => setFiltersOpen(false)}
-            onClear={() => setFilters(emptyFilters)}
-          />
-        )}
       </div>
     </div>
   )
 }
 
 function SearchPanel({
-  seeker,
-  topMatch,
   usingFallbackJobs,
   radiusKm,
+  hasLocation,
+  noNearbyJobs,
   draftQuery,
-  draftLocation,
-  activeQuickFilters,
   onQueryChange,
-  onLocationChange,
   onClear,
   onSubmit,
-  onToggleQuickFilter,
-  onOpenFilters,
 }) {
   return (
     <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
       <div className="p-4 sm:p-5">
-        <form onSubmit={onSubmit} className="flex flex-col sm:flex-row gap-3">
+        <form onSubmit={onSubmit} className="flex gap-2 sm:gap-3">
           <div className="relative flex-1">
             <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
             <input
               value={draftQuery}
               onChange={(event) => onQueryChange(event.target.value)}
               className="h-12 w-full rounded-xl border border-slate-300 bg-slate-50 hover:bg-white pl-12 pr-4 text-sm font-semibold text-slate-900 shadow-sm outline-none transition placeholder:text-slate-500 focus:border-blue-600 focus:bg-white focus:ring-4 focus:ring-blue-100"
-              placeholder="Search by title, skill, or company"
+              placeholder="Search jobs, skills, or employers"
             />
           </div>
-
-          <div className="relative flex-1">
-            <MapPin className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
-            <input
-              value={draftLocation}
-              onChange={(event) => onLocationChange(event.target.value)}
-              className="h-12 w-full rounded-xl border border-slate-300 bg-slate-50 hover:bg-white pl-12 pr-4 text-sm font-semibold text-slate-900 shadow-sm outline-none transition placeholder:text-slate-500 focus:border-blue-600 focus:bg-white focus:ring-4 focus:ring-blue-100"
-              placeholder="City, province, or region"
-            />
-          </div>
-
           <div className="flex gap-2 shrink-0">
             <button
               type="submit"
@@ -401,7 +332,7 @@ function SearchPanel({
             >
               Search
             </button>
-            {(draftQuery || draftLocation) && (
+            {draftQuery && (
               <button
                 type="button"
                 onClick={onClear}
@@ -414,52 +345,70 @@ function SearchPanel({
           </div>
         </form>
 
-        <div className="mt-4 flex gap-2 overflow-x-auto pb-1">
-          {quickFilterOptions.map((filter) => (
-            <QuickFilterPill
-              key={filter.key}
-              filter={filter}
-              active={activeQuickFilters.includes(filter.key)}
-              onClick={() => onToggleQuickFilter(filter.key)}
-            />
-          ))}
-          <button
-            type="button"
-            onClick={onOpenFilters}
-            className="inline-flex shrink-0 items-center gap-2 rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-black text-slate-700 shadow-sm transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-100"
-          >
-            <Settings2 className="h-4 w-4" />
-            All Filters
-          </button>
-        </div>
       </div>
 
-      {usingFallbackJobs && (
+      {!hasLocation && (
         <div className="border-t border-amber-200 bg-amber-50 px-5 py-3 text-xs font-semibold leading-5 text-amber-800">
-          Showing a preview feed. Update your location in your profile to enable GPS-based nearby matching.
+          Your saved profile has no GPS coordinates. Latest active vacancies remain available; add your location to enable nearby matching.
+        </div>
+      )}
+      {noNearbyJobs && (
+        <div className="border-t border-slate-200 bg-slate-50 px-5 py-3 text-xs font-semibold leading-5 text-slate-600">
+          Your location is saved, but no active vacancies were found within {radiusKm} km. This does not mean your location is missing.
+        </div>
+      )}
+      {usingFallbackJobs && hasLocation && (
+        <div className="border-t border-blue-100 bg-blue-50 px-5 py-3 text-xs font-semibold leading-5 text-blue-800">
+          Showing the latest active vacancies as a broader fallback feed.
         </div>
       )}
     </section>
   )
 }
 
-function QuickFilterPill({ filter, active, onClick }) {
-  const Icon = filter.icon
+function JobFeedSelector({ activeFeed, hasLocation, counts, onChange }) {
+  const feeds = [
+    {
+      key: 'recommended',
+      title: 'Recommended Jobs',
+      description: counts.recommended ? 'Ranked by your profile and skills' : 'No recommended jobs yet',
+    },
+    ...(hasLocation ? [{
+      key: 'nearby',
+      title: 'Nearby Jobs',
+      description: counts.nearby ? 'Based on your saved GPS location' : 'No nearby jobs in the current radius',
+    }] : []),
+    {
+      key: 'latest',
+      title: 'Latest Active Vacancies',
+      description: 'Broader fallback across active postings',
+    },
+  ]
 
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-pressed={active}
-      className={`inline-flex shrink-0 items-center gap-2 rounded-full border px-4 py-2.5 text-sm font-black shadow-sm transition focus:outline-none focus:ring-4 focus:ring-blue-100 ${
-        active
-          ? 'border-blue-600 bg-blue-600 text-white'
-          : 'border-slate-300 bg-white text-slate-700 hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700'
-      }`}
-    >
-      {createElement(Icon, { className: 'h-4 w-4' })}
-      {filter.label}
-    </button>
+    <section className="flex gap-2 overflow-x-auto rounded-xl border border-slate-200 bg-white p-2 shadow-sm" aria-label="Dashboard job feeds">
+      {feeds.map((feed) => {
+        const active = activeFeed === feed.key
+        return (
+          <button
+            key={feed.key}
+            type="button"
+            onClick={() => onChange(feed.key)}
+            className={`min-w-max flex-1 rounded-lg px-3 py-2.5 text-left transition focus:outline-none focus:ring-4 focus:ring-blue-100 ${
+              active
+                ? 'bg-blue-700 text-white shadow-sm'
+                : 'bg-white text-slate-700 hover:bg-slate-50'
+            }`}
+          >
+            <span className="flex items-center justify-between gap-3">
+              <span className="text-xs font-black sm:text-sm">{feed.title}</span>
+              <span className={`rounded-full px-2 py-0.5 text-[11px] font-black ${active ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'}`}>{counts[feed.key]}</span>
+            </span>
+            <span className={`mt-1 block text-[11px] font-semibold ${active ? 'text-blue-100' : 'text-slate-500'}`}>{feed.description}</span>
+          </button>
+        )
+      })}
+    </section>
   )
 }
 
@@ -468,10 +417,8 @@ function FeedControls({
   savedCount,
   resultCount,
   sortMode,
-  viewMode,
   onTabChange,
   onSortChange,
-  onViewChange,
 }) {
   return (
     <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -510,45 +457,21 @@ function FeedControls({
             {resultCount} result{resultCount === 1 ? '' : 's'}
           </span>
 
-          {activeTab !== 'bulletin' && (
-            <>
-              <label className="flex items-center gap-2 text-sm font-bold text-slate-600">
-                Sort by
-                <select
-                  value={sortMode}
-                  onChange={(event) => onSortChange(event.target.value)}
-                  className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-bold text-slate-900 shadow-sm outline-none focus:border-blue-600 focus:ring-4 focus:ring-blue-100"
-                >
-                  {sortOptions.map((option) => (
-                    <option key={option.value} value={option.value}>{option.label}</option>
-                  ))}
-                </select>
-              </label>
-
-              <div className="inline-flex rounded-xl border border-slate-300 bg-white p-1 shadow-sm">
-                <ViewToggleButton active={viewMode === 'list'} icon={List} label="List" onClick={() => onViewChange('list')} />
-                <ViewToggleButton active={viewMode === 'map'} icon={Map} label="Map" onClick={() => onViewChange('map')} />
-              </div>
-            </>
-          )}
+          <label className="flex items-center gap-2 text-sm font-bold text-slate-600">
+            Sort
+            <select
+              value={sortMode}
+              onChange={(event) => onSortChange(event.target.value)}
+              className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-bold text-slate-900 shadow-sm outline-none focus:border-blue-600 focus:ring-4 focus:ring-blue-100"
+            >
+              {sortOptions.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </select>
+          </label>
         </div>
       </div>
     </section>
-  )
-}
-
-function ViewToggleButton({ active, icon: Icon, label, onClick }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-black transition ${
-        active ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-50 hover:text-blue-700'
-      }`}
-    >
-      {createElement(Icon, { className: 'h-4 w-4' })}
-      {label}
-    </button>
   )
 }
 
@@ -629,6 +552,21 @@ function JobCard({ job, saved = false, applying = false, onSave, onDetails, onQu
   )
 }
 
+function DashboardJobSkeleton() {
+  return (
+    <div className="animate-pulse rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="flex gap-4">
+        <div className="h-12 w-12 shrink-0 rounded-xl bg-slate-200" />
+        <div className="flex-1">
+          <div className="h-4 w-2/3 rounded bg-slate-200" />
+          <div className="mt-2 h-3 w-1/3 rounded bg-slate-100" />
+          <div className="mt-4 h-3 w-4/5 rounded bg-slate-100" />
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function ProfileSnapshot({ seeker, activeApplications }) {
   return (
     <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
@@ -661,12 +599,6 @@ function ProfileSnapshot({ seeker, activeApplications }) {
         </div>
       </div>
 
-      <div className="border-t border-slate-100 p-4">
-        <Link to="/seeker/profile" className="flex w-full min-h-10 items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-black text-slate-700 transition hover:bg-slate-50">
-          <UserRound className="h-4 w-4" />
-          Manage Profile
-        </Link>
-      </div>
     </section>
   )
 }
@@ -749,208 +681,6 @@ function MatchingEngineCard() {
       <div className="mt-4 grid gap-3">
         <EngineRow icon={Star} title="Merit Score" text="Occupation, skills, experience, and education." />
         <EngineRow icon={MapPin} title="GPS Distance" text="Nearby jobs can still be sorted by commute distance." />
-      </div>
-    </section>
-  )
-}
-
-function FilterDrawer({ filters, onChange, onClose, onClear }) {
-  const update = (name, value) => onChange({ ...filters, [name]: value })
-  const toggleLevel = (level) => {
-    update(
-      'levels',
-      filters.levels.includes(level)
-        ? filters.levels.filter((item) => item !== level)
-        : [...filters.levels, level],
-    )
-  }
-
-  return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-slate-950/40 px-3 py-3 sm:px-5">
-      <button type="button" className="absolute inset-0 cursor-default" onClick={onClose} aria-label="Close filters" />
-      <aside className="relative flex h-full w-full max-w-md flex-col rounded-2xl bg-white shadow-2xl">
-        <div className="flex items-start justify-between gap-4 border-b border-slate-200 p-5">
-          <div>
-            <p className="text-xs font-black uppercase tracking-[0.16em] text-blue-600">Advanced Filters</p>
-            <h2 className="mt-1 text-xl font-black text-slate-950">Refine job matches</h2>
-            <p className="mt-1 text-sm text-slate-500">Use stricter controls only when you have too many results.</p>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-xl border border-slate-200 p-2 text-slate-500 hover:bg-slate-50"
-            aria-label="Close filter drawer"
-          >
-            <X className="h-5 w-5" />
-          </button>
-        </div>
-
-        <div className="flex-1 space-y-6 overflow-y-auto p-5">
-          <FilterSection title="Salary Range" icon={WalletCards}>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <label className="block">
-                <span className="text-xs font-black uppercase tracking-wide text-slate-500">Minimum</span>
-                <input
-                  type="number"
-                  min="0"
-                  value={filters.salaryMin}
-                  onChange={(event) => update('salaryMin', event.target.value)}
-                  className="mt-2 w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm font-bold outline-none focus:border-blue-600 focus:ring-4 focus:ring-blue-100"
-                  placeholder="PHP 0"
-                />
-              </label>
-              <label className="block">
-                <span className="text-xs font-black uppercase tracking-wide text-slate-500">Maximum</span>
-                <input
-                  type="number"
-                  min="0"
-                  value={filters.salaryMax}
-                  onChange={(event) => update('salaryMax', event.target.value)}
-                  className="mt-2 w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm font-bold outline-none focus:border-blue-600 focus:ring-4 focus:ring-blue-100"
-                  placeholder="No max"
-                />
-              </label>
-            </div>
-            <div className="mt-4 space-y-3">
-              <input
-                type="range"
-                min="0"
-                max="100000"
-                step="1000"
-                value={filters.salaryMin || 0}
-                onChange={(event) => update('salaryMin', event.target.value)}
-                className="w-full accent-blue-600"
-                aria-label="Minimum salary range"
-              />
-              <input
-                type="range"
-                min="0"
-                max="100000"
-                step="1000"
-                value={filters.salaryMax || 100000}
-                onChange={(event) => update('salaryMax', event.target.value)}
-                className="w-full accent-blue-600"
-                aria-label="Maximum salary range"
-              />
-            </div>
-          </FilterSection>
-
-          <FilterSection title="Job Level" icon={GraduationCap}>
-            <div className="flex flex-wrap gap-2">
-              {jobLevels.map((level) => (
-                <button
-                  key={level}
-                  type="button"
-                  onClick={() => toggleLevel(level)}
-                  className={`rounded-full border px-4 py-2 text-sm font-black transition ${
-                    filters.levels.includes(level)
-                      ? 'border-blue-600 bg-blue-600 text-white'
-                      : 'border-slate-300 bg-white text-slate-700 hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700'
-                  }`}
-                >
-                  {level}
-                </button>
-              ))}
-            </div>
-          </FilterSection>
-
-          <FilterSection title="Date Posted" icon={Clock3}>
-            <div className="grid gap-2">
-              {[
-                { value: 'any', label: 'Any time' },
-                { value: 'day', label: 'Past 24 hours' },
-                { value: 'week', label: 'Past week' },
-              ].map((option) => (
-                <label key={option.value} className="flex cursor-pointer items-center gap-3 rounded-xl border border-slate-200 px-3 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50">
-                  <input
-                    type="radio"
-                    name="datePosted"
-                    value={option.value}
-                    checked={filters.datePosted === option.value}
-                    onChange={(event) => update('datePosted', event.target.value)}
-                    className="h-4 w-4 text-blue-600 focus:ring-blue-600"
-                  />
-                  {option.label}
-                </label>
-              ))}
-            </div>
-          </FilterSection>
-        </div>
-
-        <div className="flex gap-3 border-t border-slate-200 p-5">
-          <button
-            type="button"
-            onClick={onClear}
-            className="inline-flex min-h-11 flex-1 items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-black text-slate-700 hover:bg-slate-50"
-          >
-            Clear
-          </button>
-          <button
-            type="button"
-            onClick={onClose}
-            className="inline-flex min-h-11 flex-1 items-center justify-center rounded-xl bg-blue-600 px-4 py-2 text-sm font-black text-white hover:bg-blue-700"
-          >
-            Apply Filters
-          </button>
-        </div>
-      </aside>
-    </div>
-  )
-}
-
-function FilterSection({ title, icon: Icon, children }) {
-  return (
-    <section>
-      <h3 className="mb-3 flex items-center gap-2 text-sm font-black text-slate-950">
-        {createElement(Icon, { className: 'h-4 w-4 text-blue-600' })}
-        {title}
-      </h3>
-      {children}
-    </section>
-  )
-}
-
-function MapPlaceholder({ jobs }) {
-  return (
-    <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-      <div className="relative min-h-[30rem] bg-gradient-to-br from-blue-50 via-slate-50 to-emerald-50 p-6">
-        <div className="absolute inset-0 opacity-60 [background-image:linear-gradient(#cbd5e1_1px,transparent_1px),linear-gradient(90deg,#cbd5e1_1px,transparent_1px)] [background-size:42px_42px]" />
-        <div className="relative z-10 max-w-md rounded-xl border border-slate-200 bg-white/95 p-5 shadow-sm backdrop-blur">
-          <div className="flex items-center gap-3">
-            <span className="rounded-xl bg-blue-50 p-2 text-blue-700">
-              <Map className="h-5 w-5" />
-            </span>
-            <div>
-              <h2 className="font-black text-slate-950">Map view preview</h2>
-              <p className="mt-1 text-sm leading-6 text-slate-600">
-                This layout is ready for the live map layer. Current filtered jobs are represented as location pins.
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {jobs.slice(0, 8).map((job, index) => (
-          <div
-            key={job.id}
-            className="absolute z-10 rounded-full border-4 border-white bg-blue-600 p-2 text-white shadow-lg"
-            style={{
-              left: `${18 + ((index * 17) % 68)}%`,
-              top: `${28 + ((index * 19) % 48)}%`,
-            }}
-            title={`${job.title} - ${formatDistance(job.distanceKm)}`}
-          >
-            <MapPin className="h-4 w-4" />
-          </div>
-        ))}
-
-        {!jobs.length && (
-          <div className="relative z-10 mt-32">
-            <EmptyFeedState
-              title="No map pins to show"
-              text="No exact matches found with these strict filters. Try expanding your radius or removing the salary minimum."
-            />
-          </div>
-        )}
       </div>
     </section>
   )
@@ -1045,29 +775,6 @@ function JobDetailModal({ job, saved, applying = false, onClose, onSave, onQuick
         </div>
       </div>
     </div>
-  )
-}
-
-function BulletinCard({ item }) {
-  return (
-    <article className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md">
-      <div className="flex items-start gap-4">
-        <span className={`rounded-xl p-3 ${item.priority === 'high' ? 'bg-amber-50 text-amber-700' : 'bg-blue-50 text-blue-700'}`}>
-          <Bell className="h-5 w-5" />
-        </span>
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <h3 className="font-black text-slate-950">{item.title}</h3>
-            <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-black text-slate-600">{item.type}</span>
-          </div>
-          <p className="mt-2 text-sm leading-6 text-slate-600">{item.detail}</p>
-          <div className="mt-3 flex flex-wrap items-center gap-3 text-xs font-bold text-slate-500">
-            <span className="inline-flex items-center gap-1.5"><CalendarDays className="h-3.5 w-3.5" />{item.date}</span>
-            <span className="inline-flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5" />{item.location}</span>
-          </div>
-        </div>
-      </div>
-    </article>
   )
 }
 
@@ -1290,19 +997,6 @@ function sortJobs(rows, sortMode) {
   })
 }
 
-function matchesDateFilter(postedAt, filter) {
-  if (filter === 'any') return true
-
-  const posted = dateValue(postedAt)
-  if (!posted) return false
-
-  const ageMs = Date.now() - posted
-  if (filter === 'day') return ageMs <= 24 * 60 * 60 * 1000
-  if (filter === 'week') return ageMs <= 7 * 24 * 60 * 60 * 1000
-
-  return true
-}
-
 function nextBestAction(profile, seeker) {
   const summary = profile?.professional_summary || profile?.summary || profile?.about_me
   const checks = profile?.profile_strength?.checks ?? profile?.profile_strength?.items ?? []
@@ -1341,16 +1035,6 @@ function nextBestAction(profile, seeker) {
     cta: 'Review Matches',
     href: '/seeker/dashboard',
   }
-}
-
-function isFullTime(value) {
-  const normalized = normalizeText(value)
-  return normalized.includes('full') || normalized.includes('permanent') || normalized.includes('regular')
-}
-
-function isRemoteOrHybrid(value) {
-  const normalized = normalizeText(value)
-  return normalized.includes('remote') || normalized.includes('hybrid') || normalized.includes('wfh')
 }
 
 function inferJobLevel(experienceLevel, months) {

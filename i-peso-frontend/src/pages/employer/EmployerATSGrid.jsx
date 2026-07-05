@@ -2,10 +2,11 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { 
   Search, Filter, ChevronDown, CheckSquare, Square, 
   MapPin, GraduationCap, Calendar as CalendarIcon, Mail, Phone,
-  CheckCircle2, XCircle, Clock, Video, UserCheck, Briefcase, ChevronRight
+  CheckCircle2, XCircle, Clock, Video, UserCheck, Briefcase, ChevronRight,
+  Sparkles, FileText, UserRound, ShieldAlert
 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { getEmployerApplications, updateEmployerApplicationStatus, connectGoogleCalendar } from '@/services/employerApplicationService';
+import { getEmployerApplicationDetail, getEmployerApplications, updateEmployerApplicationStatus, connectGoogleCalendar } from '@/services/employerApplicationService';
 import { useSearchParams, Link } from 'react-router-dom';
 
 const PIPELINE_TABS = [
@@ -43,8 +44,9 @@ export default function EmployerATSGrid() {
   
   const [applications, setApplications] = useState([]);
   const [loading, setLoading] = useState(true);
-  
+  const [detailLoading, setDetailLoading] = useState(false);
   const [selectedIds, setSelectedIds] = useState(new Set());
+  const [detailApplication, setDetailApplication] = useState(null);
   
   // Modal States
   const [activeModal, setActiveModal] = useState(null); // 'profile', 'interview', 'hire', 'reject'
@@ -201,14 +203,22 @@ export default function EmployerATSGrid() {
   };
 
   // 4. Modal Handlers
-  const openProfileModal = (app) => {
+  const openProfileModal = async (app) => {
+    setDetailLoading(true);
+    setDetailApplication(null);
     setModalTarget(app);
     setActiveModal('profile');
-    
-    // R.A. 10911: Automatically move to 'reviewed' if currently 'pending'
-    if (app.status === 'pending') {
-      executeStatusChange('reviewed', {}, [app]); 
-      // Note: In real implementation, this should be silent or happen without full UI block
+
+    try {
+      const data = await getEmployerApplicationDetail(app.apply_id);
+      setDetailApplication(data.application);
+      setModalTarget(data.application);
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to load applicant details.');
+      setActiveModal(null);
+      setModalTarget(null);
+    } finally {
+      setDetailLoading(false);
     }
   };
 
@@ -226,6 +236,7 @@ export default function EmployerATSGrid() {
   const closeModal = () => {
     setActiveModal(null);
     setModalTarget(null);
+    setDetailApplication(null);
     setInterviewForm({ date: '', time: '', mode: 'online', autoMeet: true });
     setHireForm({ startDate: '', salary: '', employmentType: 'regular' });
     setRejectionForm({ employerReason: EMPLOYER_MISMATCH_REASONS[0][0], seekerReason: '', details: '' });
@@ -484,110 +495,120 @@ export default function EmployerATSGrid() {
             <div className="p-8 max-h-[75vh] overflow-y-auto">
               <div className="flex justify-between items-start mb-6">
                 <div>
-                  <h2 className="text-2xl font-bold text-slate-900">{modalTarget.seeker?.name}</h2>
-                  <p className="text-blue-600 font-medium mt-1">Applying for: {modalTarget.job?.job_title}</p>
+                  <h2 className="text-2xl font-bold text-slate-900">{detailApplication?.seeker?.name || modalTarget?.seeker?.name}</h2>
+                  <p className="text-blue-600 font-medium mt-1">Applying for: {detailApplication?.job?.job_title || modalTarget?.job?.job_title}</p>
                 </div>
                 <button onClick={closeModal} className="text-slate-400 hover:text-slate-600 bg-slate-100 p-2 rounded-full">
                   <XCircle className="h-5 w-5" />
                 </button>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                {/* Contact & Demographics */}
-                <div className="space-y-4">
-                  <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-500 mb-3">Contact & Demographics</h3>
-                  <div className="flex items-center gap-3 text-sm text-slate-700">
-                    <Mail className="h-4 w-4 text-slate-400" /> {modalTarget.seeker?.email}
-                  </div>
-                  <div className="flex items-center gap-3 text-sm text-slate-700">
-                    <Phone className="h-4 w-4 text-slate-400" /> {modalTarget.seeker?.mobile_number}
-                  </div>
-                  <div className="flex items-center gap-3 text-sm text-slate-700">
-                    <MapPin className="h-4 w-4 text-slate-400" /> {modalTarget.seeker?.address}
-                  </div>
-                  
-                  <div className="mt-6 p-4 bg-slate-50 rounded-lg border border-slate-200">
-                    <h4 className="text-xs font-semibold text-slate-500 mb-2 uppercase">Revealed Demographics</h4>
-                    <div className="grid grid-cols-2 gap-2 text-sm">
-                      <div><span className="text-slate-500">Gender:</span> <span className="font-medium text-slate-900">Not provided by default</span></div>
-                      <div><span className="text-slate-500">Age:</span> <span className="font-medium text-slate-900">Not provided by default</span></div>
-                    </div>
-                  </div>
+              {detailLoading ? (
+                <div className="space-y-3">
+                  <div className="h-4 w-40 animate-pulse rounded bg-slate-200" />
+                  <div className="h-24 animate-pulse rounded-xl bg-slate-100" />
+                  <div className="h-24 animate-pulse rounded-xl bg-slate-100" />
                 </div>
-
-                {/* Match Analysis */}
-                <div>
-                  <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-500 mb-3">Match Analysis</h3>
-                  <div className={`p-4 rounded-xl border ${getMatchColor(modalTarget.match_percentage)} mb-4`}>
-                    <div className="text-3xl font-bold">{parseFloat(modalTarget.match_percentage).toFixed(1)}%</div>
-                    <div className="text-sm font-medium mt-1">Overall Merit Match</div>
+              ) : (
+                <>
+                  <div className="mb-6 flex flex-wrap items-center gap-3">
+                    <span className={`rounded-full border px-2.5 py-1 text-[10px] font-black uppercase ${statusTone(detailApplication?.status || modalTarget?.status)}`}>
+                      {detailApplication?.status_label || modalTarget?.status_label || 'Status'}
+                    </span>
+                    <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-black uppercase text-slate-600">
+                      {Math.round(Number(detailApplication?.match_percentage ?? modalTarget?.match_percentage ?? 0))}% match
+                    </span>
+                    {((detailApplication?.status || modalTarget?.status) === 'withdrawn') && (
+                      <span className="rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-black uppercase text-amber-700">Withdrawn</span>
+                    )}
                   </div>
-                  
-                  <div className="mt-4">
-                    <h4 className="text-xs font-semibold text-slate-500 mb-2 uppercase">All Declared Skills</h4>
-                    <div className="flex flex-wrap gap-2">
-                      {modalTarget.seeker?.skills?.map((s, i) => (
-                        <span key={i} className="px-2.5 py-1 bg-slate-100 text-slate-700 rounded-md text-xs font-medium border border-slate-200">
-                          {s}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </div>
 
-              {/* Digital Resume: Work Experience & Education */}
-              <div className="mt-8 border-t border-slate-200 pt-8 grid grid-cols-1 md:grid-cols-2 gap-8">
-                {/* Work Experience */}
-                <div>
-                  <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-500 mb-4 flex items-center gap-2">
-                    <Briefcase className="h-4 w-4" /> Work Experience
-                  </h3>
-                  {modalTarget.seeker?.work_experiences?.length > 0 ? (
+                  <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
                     <div className="space-y-4">
-                      {modalTarget.seeker.work_experiences.map((exp, idx) => (
-                        <div key={idx} className="relative pl-4 border-l-2 border-slate-200">
-                          <h4 className="font-bold text-slate-900 text-sm">{exp.position}</h4>
-                          <p className="text-xs text-blue-600 font-semibold">{exp.company_name}</p>
-                          <p className="text-xs text-slate-500 mt-0.5">
-                            {exp.start_date ? new Date(exp.start_date).toLocaleDateString(undefined, { month: 'short', year: 'numeric' }) : 'Unknown'} - 
-                            {exp.currently_employed ? ' Present' : (exp.end_date ? ' ' + new Date(exp.end_date).toLocaleDateString(undefined, { month: 'short', year: 'numeric' }) : ' Unknown')}
-                          </p>
-                          {exp.responsibilities && (
-                            <p className="mt-2 text-xs text-slate-600 leading-relaxed whitespace-pre-wrap">{exp.responsibilities}</p>
-                          )}
-                        </div>
-                      ))}
+                      <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-500 mb-3">Contact & Summary</h3>
+                      <div className="flex items-center gap-3 text-sm text-slate-700"><Mail className="h-4 w-4 text-slate-400" /> {detailApplication?.seeker?.email || modalTarget?.seeker?.email}</div>
+                      <div className="flex items-center gap-3 text-sm text-slate-700"><Phone className="h-4 w-4 text-slate-400" /> {detailApplication?.seeker?.mobile_number || modalTarget?.seeker?.mobile_number}</div>
+                      <div className="flex items-center gap-3 text-sm text-slate-700"><MapPin className="h-4 w-4 text-slate-400" /> {detailApplication?.seeker?.address || modalTarget?.seeker?.address}</div>
+                      <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+                        <p className="text-xs font-black uppercase tracking-wide text-slate-400">Applied on</p>
+                        <p className="mt-1 font-semibold text-slate-900">{formatDate(detailApplication?.applied_at || modalTarget?.applied_at)}</p>
+                      </div>
                     </div>
-                  ) : (
-                    <p className="text-sm text-slate-500 italic">No work experience declared.</p>
-                  )}
-                </div>
 
-                {/* Education */}
-                <div>
-                  <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-500 mb-4 flex items-center gap-2">
-                    <GraduationCap className="h-4 w-4" /> Education History
-                  </h3>
-                  {modalTarget.seeker?.educations?.length > 0 ? (
-                    <div className="space-y-4">
-                      {modalTarget.seeker.educations.map((edu, idx) => (
-                        <div key={idx} className="relative pl-4 border-l-2 border-slate-200">
-                          <h4 className="font-bold text-slate-900 text-sm">{edu.course_strand || edu.level}</h4>
-                          <p className="text-xs text-blue-600 font-semibold">{edu.institution_name}</p>
-                          <p className="text-xs text-slate-500 mt-0.5">
-                            {edu.year_started || 'Unknown'} - {edu.year_graduated || (edu.expected_year_graduated ? `Expected ${edu.expected_year_graduated}` : 'Present')}
-                          </p>
-                          <p className="mt-1 text-xs text-slate-600 uppercase font-medium">{edu.completion_status}</p>
-                        </div>
-                      ))}
+                    <div>
+                      <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-500 mb-3">Matched skills</h3>
+                      <div className="flex flex-wrap gap-2">
+                        {(detailApplication?.seeker?.skills || modalTarget?.seeker?.skills || []).map((skill, index) => (
+                          <span key={`${skill}-${index}`} className="rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700">{skill}</span>
+                        ))}
+                        {!((detailApplication?.seeker?.skills || modalTarget?.seeker?.skills || []).length) && (
+                          <span className="text-sm text-slate-500">No declared skills yet.</span>
+                        )}
+                      </div>
                     </div>
-                  ) : (
-                    <p className="text-sm text-slate-500 italic">No education history declared.</p>
-                  )}
-                </div>
-              </div>
+                  </div>
 
+                  <div className="mt-8 border-t border-slate-200 pt-8 grid grid-cols-1 gap-8 md:grid-cols-2">
+                    <div>
+                      <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-500 mb-4 flex items-center gap-2"><Briefcase className="h-4 w-4" /> Employment profile</h3>
+                      <div className="space-y-3 text-sm text-slate-600">
+                        <div className="rounded-xl border border-slate-200 bg-white p-3"><p className="text-xs font-black uppercase tracking-wide text-slate-400">Education</p><p className="mt-1 font-semibold text-slate-900">{detailApplication?.seeker?.educ_attainment || modalTarget?.seeker?.educ_attainment || 'Not specified'}</p></div>
+                        <div className="rounded-xl border border-slate-200 bg-white p-3"><p className="text-xs font-black uppercase tracking-wide text-slate-400">Employment status</p><p className="mt-1 font-semibold text-slate-900">{detailApplication?.seeker?.employment_status || modalTarget?.seeker?.employment_status || 'Not specified'}</p></div>
+                      </div>
+                    </div>
+
+                    <div>
+                      <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-500 mb-4 flex items-center gap-2"><FileText className="h-4 w-4" /> Interview & outcome</h3>
+                      <div className="space-y-3 text-sm text-slate-600">
+                        {detailApplication?.interview || modalTarget?.interview ? (
+                          <div className="rounded-xl border border-blue-100 bg-blue-50 p-3 text-blue-900">
+                            <p className="font-black">Interview scheduled</p>
+                            <p className="mt-1">{formatDateTime(detailApplication?.interview?.schedule || modalTarget?.interview?.schedule)}</p>
+                            <p className="mt-1">{detailApplication?.interview?.venue_or_link || modalTarget?.interview?.venue_or_link || 'Venue to follow'}</p>
+                          </div>
+                        ) : (
+                          <div className="rounded-xl border border-slate-200 bg-white p-3 text-slate-600">No interview scheduled yet.</div>
+                        )}
+                        <div className="rounded-xl border border-slate-200 bg-white p-3"><p className="text-xs font-black uppercase tracking-wide text-slate-400">Employer remarks</p><p className="mt-1 font-semibold text-slate-900">{detailApplication?.employer_remarks || modalTarget?.employer_remarks || 'No remarks yet.'}</p></div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {((detailApplication?.interview || modalTarget?.interview)) && (
+                    <div className="mt-8 rounded-2xl border border-indigo-200 bg-indigo-50 p-4">
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <p className="text-xs font-black uppercase tracking-[0.18em] text-indigo-700">Interview scheduled</p>
+                          <p className="mt-1 text-sm font-black text-slate-950">{formatDateTime(detailApplication?.interview?.schedule || modalTarget?.interview?.schedule)}</p>
+                        </div>
+                        <span className="rounded-full border border-indigo-200 bg-white px-2.5 py-1 text-[10px] font-black uppercase text-indigo-700">{detailApplication?.interview?.mode_of_interview || modalTarget?.interview?.mode_of_interview}</span>
+                      </div>
+                      <p className="mt-3 text-sm text-slate-700">{detailApplication?.interview?.venue_or_link || modalTarget?.interview?.venue_or_link || 'Meeting link or venue will be shared.'}</p>
+                      <p className="mt-2 text-sm text-slate-600">{detailApplication?.interview?.instructions || modalTarget?.interview?.instructions || 'Please review the applicant details before the interview.'}</p>
+                    </div>
+                  )}
+
+                  <div className="mt-8 border-t border-slate-200 pt-8">
+                    <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-500 mb-4 flex items-center gap-2"><Sparkles className="h-4 w-4" /> Application timeline</h3>
+                    <div className="space-y-3">
+                      {(detailApplication?.timeline || modalTarget?.timeline || []).length ? (
+                        (detailApplication?.timeline || modalTarget?.timeline || []).map((item, index) => (
+                          <div key={`${item.title}-${index}`} className="flex gap-3 rounded-2xl border border-slate-200 bg-white p-3">
+                            <div className={`mt-1 h-2.5 w-2.5 shrink-0 rounded-full ${item.status === (detailApplication?.status || modalTarget?.status) ? 'bg-blue-900' : 'bg-slate-300'}`} />
+                            <div className="min-w-0">
+                              <p className="text-sm font-black text-slate-900">{item.title}</p>
+                              <p className="mt-1 text-sm text-slate-600">{item.description}</p>
+                              <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-slate-400">{item.timestamp ? formatDateTime(item.timestamp) : 'Pending'}</p>
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">No timeline entries yet.</div>
+                      )}
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
             
             <div className="border-t border-slate-100 p-6 bg-slate-50 flex justify-end gap-3 rounded-b-2xl">

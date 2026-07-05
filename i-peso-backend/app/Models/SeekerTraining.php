@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class SeekerTraining extends Model
 {
@@ -33,5 +34,10 @@ class SeekerTraining extends Model
     public function seeker(): BelongsTo
     {
         return $this->belongsTo(JobSeeker::class, 'seeker_id', 'seeker_id');
+    }
+
+    public function certificates(): HasMany
+    {
+        return $this->hasMany(SeekerCertificate::class, 'training_id');
     }
 }

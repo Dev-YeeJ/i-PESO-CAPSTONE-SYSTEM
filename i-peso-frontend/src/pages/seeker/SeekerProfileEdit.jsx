@@ -6,6 +6,8 @@ import {
   Award,
   BriefcaseBusiness,
   CheckCircle2,
+  Eye,
+  FileUp,
   FileText,
   GraduationCap,
   Languages,
@@ -21,10 +23,13 @@ import {
 import SeekerOccupationMapper from '@/components/form/SeekerOccupationMapper'
 import AddressPicker from '@/components/maps/AddressPicker'
 import SeekerSkillsForm from '@/components/form/SeekerSkillsForm'
+import EducationBackgroundEditor from '@/components/form/EducationBackgroundEditor'
 import ExperienceTimeFrame from '@/components/form/ExperienceTimeFrame'
 import PsgcCascade from '@/pages/employer/components/PsgcCascade'
 import CertificateUploadModal from './components/CertificateUploadModal'
 import {
+  deleteCertificate,
+  getCertificateFile,
   getSeekerProfile,
   saveSeekerProfileStep,
 } from '@/services/seekerService'
@@ -36,11 +41,14 @@ const labelClass = 'block text-xs font-black uppercase tracking-wide text-slate-
 const cardClass = 'rounded-2xl border border-slate-200 bg-white p-5 shadow-sm'
 
 const SECTION_TABS = [
-  { id: 'identity', label: 'Identity & Address', icon: UserCheck },
+  { id: 'identity', label: 'Identity', icon: UserCheck },
+  { id: 'address', label: 'Address & GPS', icon: MapPin },
   { id: 'employment', label: 'Employment Status', icon: ShieldCheck },
   { id: 'preferences', label: 'Job Preferences', icon: Sparkles },
-  { id: 'education', label: 'Education & Skills', icon: GraduationCap },
-  { id: 'training', label: 'Trainings & Certificates', icon: Award },
+  { id: 'education', label: 'Education', icon: GraduationCap },
+  { id: 'skills', label: 'Skills', icon: Sparkles },
+  { id: 'training', label: 'Trainings', icon: Award },
+  { id: 'certificates', label: 'Certificates', icon: FileUp },
   { id: 'languages', label: 'Languages', icon: Languages },
   { id: 'work', label: 'Work Experience', icon: BriefcaseBusiness },
 ]
@@ -59,16 +67,6 @@ const RELIGION_OPTIONS = [
   { value: 'agnostic_atheist', label: 'Agnostic / Atheist' },
   { value: 'declined', label: 'Declined to answer' },
   { value: 'other', label: 'Other' },
-]
-
-const EDUCATION_LEVELS = [
-  { value: 'elementary', label: 'Elementary' },
-  { value: 'secondary_non_k12', label: 'High School / Non-K-12' },
-  { value: 'secondary_k12', label: 'Junior High School / K-12' },
-  { value: 'senior_high_strand', label: 'Senior High School' },
-  { value: 'vocational', label: 'Vocational / Technical' },
-  { value: 'tertiary', label: 'College / Tertiary' },
-  { value: 'graduate_studies', label: 'Graduate Studies' },
 ]
 
 const EDUC_ATTAINMENT_OPTIONS = [
@@ -141,16 +139,6 @@ const TRAINING_COURSE_OPTIONS = [
   'Visual Graphic Design NC III',
 ]
 
-const CERTIFICATE_OPTIONS = [
-  'Certificate of Attendance',
-  'Certificate of Completion',
-  'Certificate of Competency',
-  'National Certificate I',
-  'National Certificate II',
-  'National Certificate III',
-  'National Certificate IV',
-]
-
 export default function SeekerProfileEdit() {
   const navigate = useNavigate()
   const updateUser = useAuthStore((state) => state.updateUser)
@@ -160,6 +148,7 @@ export default function SeekerProfileEdit() {
   const [saving, setSaving] = useState(null)
   const [errors, setErrors] = useState({})
   const [uploadOpen, setUploadOpen] = useState(false)
+  const [openingCertificate, setOpeningCertificate] = useState(null)
   const [activeSection, setActiveSection] = useState(() => sectionFromHash())
 
   useEffect(() => {
@@ -242,11 +231,19 @@ export default function SeekerProfileEdit() {
     }))
   }
 
-  const save = async (section, step, payloadBuilder) => {
-    setSaving(section)
+  const save = async (section, step, payloadBuilder, validate = null) => {
     setErrors({})
+    const payload = payloadBuilder()
+    const clientErrors = validate?.(payload) ?? {}
+    if (Object.keys(clientErrors).length) {
+      setErrors(clientErrors)
+      toast.error('Please correct the highlighted fields before saving.')
+      return
+    }
+
+    setSaving(section)
     try {
-      await saveSeekerProfileStep(step, payloadBuilder())
+      await saveSeekerProfileStep(step, payload)
       const refreshed = await getSeekerProfile()
       setProfile(refreshed)
       setForm(buildProfileEditForm(refreshed))
@@ -266,8 +263,8 @@ export default function SeekerProfileEdit() {
   }
 
   return (
-    <div className="-mx-4 -mt-8 bg-slate-50 pb-12 sm:-mx-6">
-      <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+    <div className="min-h-[calc(100vh-5rem)] bg-slate-50 pb-12">
+      <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
         <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
           <div>
             <button
@@ -289,7 +286,7 @@ export default function SeekerProfileEdit() {
           </div>
         </div>
 
-        <div className="grid gap-6 lg:grid-cols-[280px_minmax(0,1fr)]">
+        <div className="grid gap-5 lg:grid-cols-[240px_minmax(0,1fr)]">
           <aside className="space-y-4">
             <nav className="sticky top-24 rounded-2xl border border-slate-200 bg-white p-2 shadow-sm">
               {SECTION_TABS.map(({ id, label, icon }) => (
@@ -324,21 +321,21 @@ export default function SeekerProfileEdit() {
             </section>
           </aside>
 
-          <main className="space-y-6">
+          <main className="min-w-0 space-y-5">
             {activeSection === 'identity' && (
               <SectionCard
                 icon={UserCheck}
-                title="Identity & Present Address"
-                subtitle="Keep core NSRP identity and location data clean for PESO verification and job matching."
-                onSave={() => save('identity', 1, () => buildStep1Payload(form.identity))}
+                title="Identity"
+                subtitle="Keep core NSRP identity data consistent with job seeker onboarding."
+                onSave={() => save('identity', 1, () => buildStep1Payload(form.identity), validateIdentity)}
                 saving={saving === 'identity'}
               >
                 <div className="grid gap-4 md:grid-cols-2">
-                  <TextInput label="First name" value={form.identity.first_name} error={errors.first_name} onChange={(value) => updateSection('identity', { first_name: value })} />
-                  <TextInput label="Last name" value={form.identity.last_name} error={errors.last_name} onChange={(value) => updateSection('identity', { last_name: value })} />
-                  <TextInput label="Middle name" value={form.identity.middle_name} onChange={(value) => updateSection('identity', { middle_name: value })} />
+                  <TextInput label="Surname" value={form.identity.last_name} error={errors.last_name} onChange={(value) => updateSection('identity', { last_name: value })} />
+                  <TextInput label="First Name" value={form.identity.first_name} error={errors.first_name} onChange={(value) => updateSection('identity', { first_name: value })} />
+                  <TextInput label="Middle Initial (optional)" value={form.identity.middle_name} error={errors.middle_name} onChange={(value) => updateSection('identity', { middle_name: value })} />
                   <SelectInput label="Suffix" value={form.identity.suffix} onChange={(value) => updateSection('identity', { suffix: value })} options={['', 'Jr.', 'Sr.', 'II', 'III', 'IV', 'V'].map((value) => ({ value, label: value || 'None' }))} />
-                  <TextInput label="Date of birth" type="date" value={form.identity.date_of_birth} error={errors.date_of_birth} onChange={(value) => updateSection('identity', { date_of_birth: value })} />
+                  <TextInput label="Date of Birth" type="date" max={minimumBirthDate()} value={form.identity.date_of_birth} error={errors.date_of_birth} onChange={(value) => updateSection('identity', { date_of_birth: value })} />
                   <SelectInput label="Sex" value={form.identity.sex} error={errors.sex} onChange={(value) => updateSection('identity', { sex: value })} options={[{ value: '', label: 'Select sex' }, { value: 'male', label: 'Male' }, { value: 'female', label: 'Female' }]} />
                   <SelectInput label="Civil status" value={form.identity.civil_status} error={errors.civil_status} onChange={(value) => updateSection('identity', { civil_status: value })} options={[
                     { value: '', label: 'Select status' },
@@ -353,40 +350,6 @@ export default function SeekerProfileEdit() {
                   )}
                   <TextInput label="Height in feet" type="number" step="0.01" value={form.identity.height_ft} error={errors.height_ft} onChange={(value) => updateSection('identity', { height_ft: value })} />
                   <TextInput label="TIN (optional)" value={form.identity.tin} onChange={(value) => updateSection('identity', { tin: value })} />
-                </div>
-
-                <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                    <AddressPicker
-                      title="Identity & Present Address"
-                      province={form.identity.address_province}
-                      provinceCode={form.identity.address_province_code}
-                      city={form.identity.address_municipality_city}
-                      cityCode={form.identity.address_city_code}
-                      barangay={form.identity.address_barangay}
-                      barangayCode={form.identity.address_barangay_code}
-                      street={form.identity.address_house_street}
-                      latitude={form.identity.latitude}
-                      longitude={form.identity.longitude}
-                      location_accuracy={form.identity.location_accuracy}
-                      google_place_id={form.identity.google_place_id}
-                      onChange={(location) => updateSection('identity', {
-                        address_province: location.province,
-                        address_province_code: location.province_code,
-                        address_municipality_city: location.city,
-                        address_city_code: location.city_code,
-                        address_barangay: location.barangay,
-                        address_barangay_code: location.barangay_code,
-                        address_house_street: location.street,
-                        latitude: location.latitude,
-                        longitude: location.longitude,
-                        location_accuracy: location.location_accuracy,
-                        google_place_id: location.google_place_id
-                      })}
-                    />
-                  {errors.address_province && <p className="mt-2 text-xs font-semibold text-red-600">{errors.address_province}</p>}
-                  {errors.address_municipality_city && <p className="mt-1 text-xs font-semibold text-red-600">{errors.address_municipality_city}</p>}
-                  {errors.address_barangay && <p className="mt-1 text-xs font-semibold text-red-600">{errors.address_barangay}</p>}
-                  {errors.address_house_street && <p className="mt-1 text-xs font-semibold text-red-600">{errors.address_house_street}</p>}
                 </div>
 
                 <div className="mt-5 rounded-2xl border border-slate-200 bg-white p-4">
@@ -524,8 +487,8 @@ export default function SeekerProfileEdit() {
             {activeSection === 'education' && (
               <SectionCard
                 icon={GraduationCap}
-                title="Education & Skills"
-                subtitle="These records power matching, profile strength, and the resume studio."
+                title="Education"
+                subtitle="Keep the same education records and completion logic used during onboarding."
                 onSave={() => save('education', 5, () => buildStep5Payload(form.education))}
                 saving={saving === 'education'}
               >
@@ -533,33 +496,67 @@ export default function SeekerProfileEdit() {
                   <SelectInput label="Educational attainment" value={form.education.educ_attainment} onChange={(value) => updateSection('education', { educ_attainment: value })} options={[{ value: '', label: 'Auto infer from records' }, ...EDUC_ATTAINMENT_OPTIONS.map((value) => ({ value, label: value }))]} />
                   <ToggleInput label="Currently in school" checked={form.education.currently_in_school} onChange={(checked) => updateSection('education', { currently_in_school: checked })} />
                 </div>
-                <div className="space-y-3">
-                  <ArrayHeader title="Education records" onAdd={() => addListItem('education', 'educations', emptyEducation())} addLabel="Add education" />
-                  {form.education.educations.map((education, index) => (
-                    <div key={education.local_id} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                      <div className="grid gap-4 md:grid-cols-2">
-                        <SelectInput label="Level" value={education.level} onChange={(value) => updateListItem('education', 'educations', index, { level: value })} options={[{ value: '', label: 'Select level' }, ...EDUCATION_LEVELS]} />
-                        <SelectInput label="Status" value={education.completion_status} onChange={(value) => updateListItem('education', 'educations', index, { completion_status: value })} options={[
-                          { value: 'graduated', label: 'Graduated' },
-                          { value: 'undergraduate', label: 'Undergraduate / Did not finish' },
-                          { value: 'currently_studying', label: 'Currently studying' },
-                        ]} />
-                        <TextInput label="School / Institution" value={education.institution_name} onChange={(value) => updateListItem('education', 'educations', index, { institution_name: value })} />
-                        <TextInput label="Course / Strand / Program" value={education.course_strand} onChange={(value) => updateListItem('education', 'educations', index, { course_strand: value })} />
-                        <TextInput label="Year started" type="number" value={education.year_started} onChange={(value) => updateListItem('education', 'educations', index, { year_started: value })} />
-                        {education.completion_status === 'graduated' && <TextInput label="Year graduated" type="number" value={education.year_graduated} onChange={(value) => updateListItem('education', 'educations', index, { year_graduated: value })} />}
-                        {education.completion_status === 'undergraduate' && <TextInput label="Level reached" value={education.undergrad_level_reached} onChange={(value) => updateListItem('education', 'educations', index, { undergrad_level_reached: value })} />}
-                        {education.completion_status === 'undergraduate' && <TextInput label="Year last attended" type="number" value={education.undergrad_year_last_attended} onChange={(value) => updateListItem('education', 'educations', index, { undergrad_year_last_attended: value })} />}
-                        {education.completion_status === 'currently_studying' && <TextInput label="Current level" value={education.current_level} onChange={(value) => updateListItem('education', 'educations', index, { current_level: value })} />}
-                        {education.completion_status === 'currently_studying' && <TextInput label="Expected graduation year" type="number" value={education.expected_year_graduated} onChange={(value) => updateListItem('education', 'educations', index, { expected_year_graduated: value })} />}
-                      </div>
-                      <button type="button" onClick={() => removeListItem('education', 'educations', index)} className="mt-4 inline-flex items-center gap-1.5 rounded-xl bg-red-50 px-3 py-2 text-sm font-bold text-red-600 hover:bg-red-100">
-                        <Trash2 className="h-4 w-4" /> Remove education
-                      </button>
-                    </div>
-                  ))}
+                <EducationBackgroundEditor
+                  form={form.education}
+                  errors={errors}
+                  onChange={(event) => updateSection('education', { [event.target.name]: event.target.value })}
+                />
+              </SectionCard>
+            )}
+
+            {activeSection === 'address' && (
+              <SectionCard
+                icon={MapPin}
+                title="Address & GPS"
+                subtitle="Maintain the present address and map coordinates used for nearby job matching."
+                onSave={() => save('address', 1, () => buildStep1Payload(form.identity), validateIdentity)}
+                saving={saving === 'address'}
+              >
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <AddressPicker
+                    title="Present Address"
+                    province={form.identity.address_province}
+                    provinceCode={form.identity.address_province_code}
+                    city={form.identity.address_municipality_city}
+                    cityCode={form.identity.address_city_code}
+                    barangay={form.identity.address_barangay}
+                    barangayCode={form.identity.address_barangay_code}
+                    street={form.identity.address_house_street}
+                    latitude={form.identity.latitude}
+                    longitude={form.identity.longitude}
+                    location_accuracy={form.identity.location_accuracy}
+                    google_place_id={form.identity.google_place_id}
+                    onChange={(location) => updateSection('identity', {
+                      address_province: location.province,
+                      address_province_code: location.province_code,
+                      address_municipality_city: location.city,
+                      address_city_code: location.city_code,
+                      address_barangay: location.barangay,
+                      address_barangay_code: location.barangay_code,
+                      address_house_street: location.street,
+                      latitude: location.latitude,
+                      longitude: location.longitude,
+                      location_accuracy: location.location_accuracy,
+                      google_place_id: location.google_place_id,
+                    })}
+                  />
+                  {errors.address_province && <p className="mt-2 text-xs font-semibold text-red-600">{errors.address_province}</p>}
+                  {errors.address_municipality_city && <p className="mt-1 text-xs font-semibold text-red-600">{errors.address_municipality_city}</p>}
+                  {errors.address_barangay && <p className="mt-1 text-xs font-semibold text-red-600">{errors.address_barangay}</p>}
+                  {errors.address_house_street && <p className="mt-1 text-xs font-semibold text-red-600">{errors.address_house_street}</p>}
                 </div>
-                <div className="mt-6">
+              </SectionCard>
+            )}
+
+            {activeSection === 'skills' && (
+              <SectionCard
+                icon={Sparkles}
+                title="Skills"
+                subtitle="Maintain hard and soft skills without mixing them into education records."
+                onSave={() => save('skills', 5, () => buildStep5Payload(form.education))}
+                saving={saving === 'skills'}
+              >
+                <div>
                   <SeekerSkillsForm
                     value={form.education.skills}
                     preferredOccupations={form.preferences.occupation_preferences}
@@ -586,7 +583,6 @@ export default function SeekerProfileEdit() {
                         <DatalistInput label="Course / Training" value={training.course} options={TRAINING_COURSE_OPTIONS} onChange={(value) => updateListItem('training', 'trainings', index, { course: value })} />
                         <TextInput label="Training institution" value={training.training_institution} onChange={(value) => updateListItem('training', 'trainings', index, { training_institution: value })} />
                         <TextInput label="Hours of training" type="number" value={training.hours_of_training} onChange={(value) => updateListItem('training', 'trainings', index, { hours_of_training: value })} />
-                        <DatalistInput label="Certificate received" value={training.certificates_received} options={CERTIFICATE_OPTIONS} onChange={(value) => updateListItem('training', 'trainings', index, { certificates_received: value })} />
                         <div className="md:col-span-2">
                           <TextArea label="Skills acquired" rows={2} value={training.skills_acquired} onChange={(value) => updateListItem('training', 'trainings', index, { skills_acquired: value })} />
                         </div>
@@ -619,23 +615,35 @@ export default function SeekerProfileEdit() {
                   ))}
                 </div>
 
-                <div className="mt-6 rounded-2xl border border-blue-100 bg-blue-50/60 p-4">
+              </SectionCard>
+            )}
+
+            {activeSection === 'certificates' && (
+              <SectionCard
+                icon={FileUp}
+                title="Certificates"
+                subtitle="Create complete credential records with privately stored proof files."
+              >
+                <div className="rounded-2xl border border-blue-100 bg-blue-50/60 p-4">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
-                      <p className="text-sm font-black text-slate-900">Certificate proof files</p>
-                      <p className="mt-1 text-sm text-slate-600">Upload scanned certificates only as supporting evidence. Training records above remain the main NSRP source.</p>
+                      <p className="text-sm font-black text-slate-900">Private certificate vault</p>
+                      <p className="mt-1 text-sm text-slate-600">Certificates may stand alone or be linked to one of your saved training records.</p>
                     </div>
                     <button type="button" onClick={() => setUploadOpen(true)} className="inline-flex items-center gap-1.5 rounded-xl bg-blue-700 px-3 py-2 text-sm font-bold text-white hover:bg-blue-800">
-                      <Plus className="h-4 w-4" /> Upload proof
+                      <Plus className="h-4 w-4" /> Add Certificate
                     </button>
                   </div>
                   {profile?.certificates?.length > 0 && (
                     <div className="mt-4 grid gap-3 md:grid-cols-2">
                       {profile.certificates.map((certificate) => (
-                        <div key={certificate.certificate_id} className="rounded-xl border border-blue-100 bg-white p-3">
-                          <p className="font-bold text-slate-900">{certificate.title}</p>
-                          <p className="text-sm text-slate-500">{certificate.issuing_body || certificate.original_filename}</p>
-                        </div>
+                        <CertificateRecordCard
+                          key={certificate.certificate_id}
+                          certificate={certificate}
+                          opening={openingCertificate === certificate.certificate_id}
+                          onView={() => viewCertificate(certificate)}
+                          onDelete={() => removeCertificate(certificate)}
+                        />
                       ))}
                     </div>
                   )}
@@ -724,13 +732,14 @@ export default function SeekerProfileEdit() {
 
       <CertificateUploadModal
         open={uploadOpen}
+        trainings={profile?.trainings ?? []}
         onClose={() => setUploadOpen(false)}
-        onUploaded={({ certificate }) => {
+        onUploaded={(certificate) => {
+          if (!certificate?.certificate_id) return
           setProfile((current) => ({
             ...current,
             certificates: [certificate, ...(current?.certificates ?? [])],
           }))
-          toast.success('Certificate proof uploaded.')
         }}
       />
     </div>
@@ -750,15 +759,17 @@ function SectionCard({ icon, title, subtitle, children, onSave, saving }) {
             <p className="mt-1 text-sm leading-6 text-slate-500">{subtitle}</p>
           </div>
         </div>
-        <button
-          type="button"
-          onClick={onSave}
-          disabled={Boolean(saving)}
-          className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-blue-700 px-4 py-2.5 text-sm font-black text-white shadow-sm transition hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-          {saving ? 'Saving...' : 'Save Section'}
-        </button>
+        {onSave && (
+          <button
+            type="button"
+            onClick={onSave}
+            disabled={Boolean(saving)}
+            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-blue-700 px-4 py-2.5 text-sm font-black text-white shadow-sm transition hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+            {saving ? 'Saving...' : 'Save Section'}
+          </button>
+        )}
       </div>
       {children}
     </section>
@@ -930,6 +941,88 @@ function buildStep1Payload(identity) {
   }
 }
 
+function validateIdentity(identity) {
+  const errors = {}
+  const requiredTextFields = {
+    last_name: 'Surname is required.',
+    first_name: 'First name is required.',
+    date_of_birth: 'Date of birth is required.',
+    sex: 'Sex is required.',
+    civil_status: 'Civil status is required.',
+    religion: 'Religion is required.',
+    height_ft: 'Height is required.',
+    address_province: 'Province is required.',
+    address_municipality_city: 'City or municipality is required.',
+    address_barangay: 'Barangay is required.',
+    address_house_street: 'House, street, or purok is required.',
+  }
+
+  const viewCertificate = async (certificate) => {
+    setOpeningCertificate(certificate.certificate_id)
+    try {
+      const file = await getCertificateFile(certificate.certificate_id)
+      const url = URL.createObjectURL(file)
+      window.open(url, '_blank', 'noopener,noreferrer')
+      window.setTimeout(() => URL.revokeObjectURL(url), 60000)
+    } catch (error) {
+      toast.error(error.response?.data?.message ?? 'Unable to open certificate proof.')
+    } finally {
+      setOpeningCertificate(null)
+    }
+  }
+
+  const removeCertificate = async (certificate) => {
+    if (!window.confirm(`Delete "${certificate.title}" from your certificate vault?`)) return
+
+    try {
+      await deleteCertificate(certificate.certificate_id)
+      setProfile((current) => ({
+        ...current,
+        certificates: current.certificates.filter((item) => item.certificate_id !== certificate.certificate_id),
+      }))
+      toast.success('Certificate deleted.')
+    } catch (error) {
+      toast.error(error.response?.data?.message ?? 'Unable to delete certificate.')
+    }
+  }
+
+  Object.entries(requiredTextFields).forEach(([field, message]) => {
+    if (!String(identity[field] ?? '').trim()) errors[field] = message
+  })
+
+  if (identity.date_of_birth && calculateAge(identity.date_of_birth) < 15) {
+    errors.date_of_birth = 'You must be at least 15 years old.'
+  }
+  const height = Number(identity.height_ft)
+  if (identity.height_ft !== '' && (!Number.isFinite(height) || height < 2.5 || height > 8.5)) {
+    errors.height_ft = 'Height must be between 2.5 and 8.5 feet.'
+  }
+  if (identity.religion === 'other' && !String(identity.religion_other ?? '').trim()) {
+    errors.religion_other = 'Please specify your religion.'
+  }
+  if (identity.disabilities?.includes('others') && !String(identity.disability_specification ?? '').trim()) {
+    errors.disability_specification = 'Please specify the disability.'
+  }
+
+  return errors
+}
+
+function calculateAge(value) {
+  const birthDate = new Date(`${value}T00:00:00`)
+  if (Number.isNaN(birthDate.getTime())) return 0
+  const today = new Date()
+  let age = today.getFullYear() - birthDate.getFullYear()
+  const monthDifference = today.getMonth() - birthDate.getMonth()
+  if (monthDifference < 0 || (monthDifference === 0 && today.getDate() < birthDate.getDate())) age -= 1
+  return age
+}
+
+function minimumBirthDate() {
+  const date = new Date()
+  date.setFullYear(date.getFullYear() - 15)
+  return date.toISOString().slice(0, 10)
+}
+
 function buildStep2Payload(employment) {
   return {
     ...employment,
@@ -1026,6 +1119,7 @@ function normalizeOccupationPreference(occupation, index) {
 function normalizeEducation(education, index) {
   return {
     local_id: stableLocalId('education', index),
+    attainment_level: education.attainment_level ?? inferProfileAttainmentLevel(education),
     level: normalizeEducationLevel(education.level),
     institution_name: education.institution_name ?? '',
     course_strand: education.course_strand ?? '',
@@ -1088,24 +1182,62 @@ function normalizeExperience(experience, index) {
   }
 }
 
-function emptyOccupationPreference() {
-  return { local_id: cryptoId(), occupation_id: null, general_term: null, raw_job_title: '', source: 'manual', label: '' }
+function CertificateRecordCard({ certificate, opening, onView, onDelete }) {
+  const expired = certificate.expires_at && certificate.expires_at < new Date().toISOString().slice(0, 10)
+
+  return (
+    <article className="rounded-xl border border-blue-100 bg-white p-4 shadow-sm">
+      <div className="flex items-start gap-3">
+        <span className="rounded-xl bg-amber-100 p-2 text-amber-700"><Award className="h-5 w-5" /></span>
+        <div className="min-w-0 flex-1">
+          <p className="font-black text-slate-900">{certificate.title}</p>
+          <p className="mt-0.5 text-sm text-slate-500">{certificate.issuing_body}</p>
+          <div className="mt-2 flex flex-wrap gap-1.5 text-[11px] font-bold">
+            <span className="rounded-full bg-blue-50 px-2.5 py-1 text-blue-700">{certificateCategory(certificate.category)}</span>
+            <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-emerald-700">Verified by Upload</span>
+            <span className={`rounded-full px-2.5 py-1 ${expired ? 'bg-red-50 text-red-700' : 'bg-slate-100 text-slate-600'}`}>
+              {expired ? 'Expired' : certificate.expires_at ? `Expires ${formatCertificateDate(certificate.expires_at)}` : 'No expiration'}
+            </span>
+          </div>
+        </div>
+      </div>
+      <dl className="mt-3 space-y-1 text-xs leading-5 text-slate-600">
+        <div><dt className="inline font-bold">Issued: </dt><dd className="inline">{formatCertificateDate(certificate.issued_at)}</dd></div>
+        {certificate.credential_number && <div><dt className="inline font-bold">Credential no.: </dt><dd className="inline break-all">{certificate.credential_number}</dd></div>}
+        {certificate.training && <div><dt className="inline font-bold">Related training: </dt><dd className="inline">{certificate.training.course}</dd></div>}
+        {certificate.description && <div><dt className="inline font-bold">Remarks: </dt><dd className="inline">{certificate.description}</dd></div>}
+        <div><dt className="inline font-bold">Proof file: </dt><dd className="inline break-all">{certificate.original_filename}</dd></div>
+      </dl>
+      <div className="mt-4 flex gap-2">
+        <button type="button" onClick={onView} disabled={opening} className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-slate-100 px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-200 disabled:opacity-60"><Eye className="h-4 w-4" />{opening ? 'Opening…' : 'View proof'}</button>
+        <button type="button" onClick={onDelete} className="rounded-lg bg-red-50 p-2 text-red-600 hover:bg-red-100" aria-label={`Delete ${certificate.title}`}><Trash2 className="h-4 w-4" /></button>
+      </div>
+    </article>
+  )
 }
 
-function emptyEducation() {
-  return {
-    local_id: cryptoId(),
-    level: 'tertiary',
-    institution_name: '',
-    course_strand: '',
-    completion_status: 'graduated',
-    year_started: '',
-    year_graduated: '',
-    expected_year_graduated: '',
-    undergrad_level_reached: '',
-    undergrad_year_last_attended: '',
-    current_level: '',
-  }
+function certificateCategory(category) {
+  return ({
+    training_certificate: 'Training Certificate',
+    tesda_nc_certificate: 'TESDA / NC Certificate',
+    professional_certificate: 'Professional Certificate',
+    seminar_certificate: 'Seminar Certificate',
+    workshop_certificate: 'Workshop Certificate',
+    employment_certificate: 'Employment Certificate',
+    academic_certificate: 'Academic Certificate',
+    other: 'Other',
+  })[category] ?? 'Legacy Certificate'
+}
+
+function formatCertificateDate(value) {
+  if (!value) return 'Not specified'
+  const [year, month, day] = String(value).slice(0, 10).split('-').map(Number)
+  if (!year || !month || !day) return String(value)
+  return new Date(year, month - 1, day).toLocaleDateString()
+}
+
+function emptyOccupationPreference() {
+  return { local_id: cryptoId(), occupation_id: null, general_term: null, raw_job_title: '', source: 'manual', label: '' }
 }
 
 function emptyTraining() {
@@ -1126,6 +1258,7 @@ function emptyExperience() {
 
 function cleanEducation(education) {
   return {
+    attainment_level: education.attainment_level || inferProfileAttainmentLevel(education),
     level: normalizeEducationLevel(education.level),
     institution_name: cleanText(education.institution_name),
     course_strand: nullableText(education.course_strand),
@@ -1137,6 +1270,20 @@ function cleanEducation(education) {
     undergrad_year_last_attended: education.completion_status === 'undergraduate' ? numberOrNull(education.undergrad_year_last_attended) : null,
     current_level: education.completion_status === 'currently_studying' ? nullableText(education.current_level) : null,
   }
+}
+
+function inferProfileAttainmentLevel(education) {
+  const level = normalizeEducationLevel(education.level)
+  const graduated = education.completion_status === 'graduated' || Boolean(education.year_graduated)
+  if (level === 'elementary') return graduated ? 'elementary_graduate' : 'elementary_undergraduate'
+  if (level === 'vocational') return 'vocational'
+  if (level === 'tertiary') return graduated ? 'college_graduate' : 'college_undergraduate'
+  if (level === 'graduate_studies') return 'post_graduate'
+  if (level === 'senior_high_strand') return graduated ? 'senior_high_graduate' : 'senior_high_undergraduate'
+  if (['secondary_non_k12', 'secondary_k12'].includes(level)) {
+    return graduated ? 'high_school_graduate' : 'high_school_undergraduate'
+  }
+  return ''
 }
 
 function serializeSkill(skill) {

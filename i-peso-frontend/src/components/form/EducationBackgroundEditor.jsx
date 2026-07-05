@@ -2,8 +2,12 @@ import { useId, useMemo, useState } from 'react'
 import { BookOpen, Check, GraduationCap, Pencil, Plus, Search, Trash2, X } from 'lucide-react'
 
 const educationLevels = [
+  { value: 'elementary_undergraduate', label: 'Elementary Undergraduate', backendLevel: 'elementary' },
+  { value: 'elementary_graduate', label: 'Elementary Graduate', backendLevel: 'elementary' },
   { value: 'high_school_undergraduate', label: 'High School Undergraduate', backendLevel: 'secondary_non_k12' },
   { value: 'high_school_graduate', label: 'High School Graduate', backendLevel: 'secondary_non_k12' },
+  { value: 'senior_high_undergraduate', label: 'Senior High School Undergraduate', backendLevel: 'senior_high_strand', requiresCourse: true },
+  { value: 'senior_high_graduate', label: 'Senior High School Graduate', backendLevel: 'senior_high_strand', requiresCourse: true },
   { value: 'vocational', label: 'Vocational', backendLevel: 'vocational', requiresCourse: true },
   { value: 'college_undergraduate', label: 'College Undergraduate', backendLevel: 'tertiary', requiresCourse: true },
   { value: 'college_graduate', label: 'College Graduate', backendLevel: 'tertiary', requiresCourse: true },
@@ -98,6 +102,7 @@ export default function EducationBackgroundEditor({ form: controlledForm, errors
   const statusIsGraduated = draft.completion_status === 'graduated'
   const statusIsUndergraduate = draft.completion_status === 'undergraduate'
   const statusIsStudying = draft.completion_status === 'currently_studying'
+  const availableStatuses = statusesForEducationLevel(draft.attainment_level)
   const cleanDraft = cleanEducation(draft)
   const readinessErrors = validateEducation(cleanDraft)
   const duplicateIndex = educations.findIndex((education, index) => (
@@ -168,7 +173,11 @@ export default function EducationBackgroundEditor({ form: controlledForm, errors
     const label = education.institution_name || labelForLevel(education) || 'this education record'
     if (!window.confirm(`Remove ${label} from your education records?`)) return
     updateEducations(educations.filter((_, itemIndex) => itemIndex !== index))
-    if (editingIndex === index) resetDraft()
+    if (editingIndex === index) {
+      resetDraft()
+    } else if (editingIndex !== null && editingIndex > index) {
+      setEditingIndex(editingIndex - 1)
+    }
   }
 
   const saveDraft = () => {
@@ -293,7 +302,7 @@ export default function EducationBackgroundEditor({ form: controlledForm, errors
 
         {showCourse && (
           <SearchablePicker
-            label="Course / Degree"
+            label="Course / Degree / Strand"
             required
             value={draft.course_strand}
             options={programSuggestions}
@@ -305,7 +314,7 @@ export default function EducationBackgroundEditor({ form: controlledForm, errors
 
         <Field label="Education Status" required error={visibleErrors.completion_status}>
           <div role="radiogroup" aria-label="Education Status" className="grid gap-3 sm:grid-cols-3">
-            {educationStatuses.map((status) => {
+            {availableStatuses.map((status) => {
               const active = draft.completion_status === status.value
               return (
                 <button
@@ -445,7 +454,7 @@ function SearchablePicker({ label, required = false, value, options, placeholder
 
   return (
     <Field label={label} id={inputId} required={required} error={error}>
-      <div className="relative">
+      <div className="relative z-20">
         <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
         <input
           id={inputId}
@@ -466,7 +475,7 @@ function SearchablePicker({ label, required = false, value, options, placeholder
           <div
             id={listboxId}
             role="listbox"
-            className="absolute z-30 mt-2 max-h-56 w-full overflow-y-auto rounded-xl border border-slate-200 bg-white py-1 shadow-xl"
+            className="absolute inset-x-0 top-full z-[80] mt-2 max-h-64 min-w-full overflow-x-hidden overflow-y-auto overscroll-contain rounded-xl border border-slate-200 bg-white py-1 shadow-2xl"
           >
             {matches.length > 0 ? (
               matches.map((option) => (
@@ -477,15 +486,16 @@ function SearchablePicker({ label, required = false, value, options, placeholder
                   aria-selected={normalize(value) === normalize(option)}
                   onMouseDown={(event) => event.preventDefault()}
                   onClick={() => choose(option)}
-                  className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm font-semibold text-slate-700 transition hover:bg-blue-50 focus-visible:bg-blue-50 focus-visible:outline-none"
+                  title={option}
+                  className="flex w-full items-start gap-2 px-3 py-2.5 text-left text-sm font-semibold leading-5 text-slate-700 transition hover:bg-blue-50 focus-visible:bg-blue-50 focus-visible:outline-none"
                 >
-                  <BookOpen className="h-3.5 w-3.5 text-slate-400" />
-                  <span className="min-w-0 truncate">{option}</span>
+                  <BookOpen className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-400" />
+                  <span className="min-w-0 whitespace-normal break-words">{option}</span>
                 </button>
               ))
             ) : (
-              <div className="px-3 py-3 text-xs leading-5 text-slate-500">
-                No saved suggestion found. You may continue with the typed name.
+              <div className="whitespace-normal break-words px-3 py-3 text-xs leading-5 text-slate-500">
+                No matching school found. You can continue typing to enter the school name manually.
               </div>
             )}
           </div>
@@ -496,7 +506,8 @@ function SearchablePicker({ label, required = false, value, options, placeholder
 }
 
 function EducationCard({ education, onEdit, onRemove }) {
-  const statusLabel = educationStatuses.find((status) => status.value === education.completion_status)?.label
+  const statusLabel = statusesForEducationLevel(education.attainment_level || inferAttainmentLevel(education))
+    .find((status) => status.value === education.completion_status)?.label
     || (education.year_graduated ? 'Graduated' : 'Undergraduate / Did Not Finish')
   const program = education.course_strand || null
   const endYear = education.year_graduated
@@ -600,6 +611,12 @@ function validateEducation(education) {
   if (!education.level) errors.level = 'Education level is required.'
   if (!education.institution_name) errors.institution_name = 'School name is required.'
   if (!education.completion_status) errors.completion_status = 'Choose an education status.'
+  if (
+    education.completion_status
+    && !statusesForEducationLevel(education.attainment_level).some((status) => status.value === education.completion_status)
+  ) {
+    errors.completion_status = 'Choose a status that matches the selected education level.'
+  }
   if (!education.year_started) errors.year_started = 'Year started is required.'
   if (education.year_started && (startYear < 1950 || startYear > currentYear)) errors.year_started = 'Select a valid year.'
 
@@ -626,6 +643,29 @@ function validateEducation(education) {
   }
 
   return errors
+}
+
+function statusesForEducationLevel(attainmentLevel) {
+  if (['elementary_undergraduate', 'high_school_undergraduate', 'senior_high_undergraduate', 'college_undergraduate'].includes(attainmentLevel)) {
+    return [
+      { value: 'currently_studying', label: 'Currently Studying', help: 'Currently enrolled and expected to complete later.' },
+      { value: 'undergraduate', label: attainmentLevel === 'college_undergraduate' ? 'Completed Units / Did Not Finish' : 'Did Not Finish', help: 'Attended this level but did not graduate.' },
+    ]
+  }
+
+  if (attainmentLevel === 'vocational') {
+    return [
+      { value: 'graduated', label: 'Completed', help: 'Completed the vocational or technical program.' },
+      { value: 'currently_studying', label: 'Currently Studying', help: 'Currently enrolled and expected to complete later.' },
+      { value: 'undergraduate', label: 'Did Not Finish', help: 'Attended but did not complete the program.' },
+    ]
+  }
+
+  if (['elementary_graduate', 'high_school_graduate', 'senior_high_graduate', 'college_graduate'].includes(attainmentLevel)) {
+    return [{ value: 'graduated', label: 'Graduated', help: 'Completed this education level.' }]
+  }
+
+  return educationStatuses
 }
 
 function cleanEducation(education) {
@@ -695,10 +735,12 @@ function inferAttainmentLevel(education) {
   const level = normalizeBackendLevel(education.level)
   const status = education.completion_status || (education.year_graduated ? 'graduated' : '')
 
+  if (level === 'elementary') return status === 'graduated' ? 'elementary_graduate' : 'elementary_undergraduate'
   if (level === 'vocational') return 'vocational'
   if (level === 'graduate_studies') return 'post_graduate'
   if (level === 'tertiary') return status === 'graduated' ? 'college_graduate' : 'college_undergraduate'
-  if (level === 'secondary_non_k12' || level === 'secondary_k12' || level === 'senior_high_strand') {
+  if (level === 'senior_high_strand') return status === 'graduated' ? 'senior_high_graduate' : 'senior_high_undergraduate'
+  if (level === 'secondary_non_k12' || level === 'secondary_k12') {
     return status === 'graduated' ? 'high_school_graduate' : 'high_school_undergraduate'
   }
 
@@ -712,12 +754,16 @@ function labelForLevel(education) {
 
 function inferEducationalAttainment(educations = []) {
   const ranks = {
-    'High School Undergraduate': 1,
-    'High School Graduate': 2,
-    'Vocational / Technical': 3,
-    'College Undergraduate': 4,
-    'College Graduate': 5,
-    'Post-Graduate': 6,
+    'Elementary Undergraduate': 1,
+    'Elementary Graduate': 2,
+    'High School Undergraduate': 3,
+    'High School Graduate': 4,
+    'Senior High School Undergraduate': 5,
+    'Senior High School Graduate': 6,
+    'Vocational / Technical': 7,
+    'College Undergraduate': 8,
+    'College Graduate': 9,
+    'Post-Graduate': 10,
   }
 
   const inferred = educations

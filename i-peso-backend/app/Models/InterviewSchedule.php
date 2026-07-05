@@ -18,10 +18,16 @@ class InterviewSchedule extends Model
         'venue_or_link',
         'instructions',
         'status',
+        'interview_reminder_24h_sent_at',
+        'interview_reminder_1h_sent_at',
+        'interview_reminder_15m_sent_at',
     ];
 
     protected $casts = [
         'schedule' => 'datetime',
+        'interview_reminder_24h_sent_at' => 'datetime',
+        'interview_reminder_1h_sent_at' => 'datetime',
+        'interview_reminder_15m_sent_at' => 'datetime',
     ];
 
     public function application(): BelongsTo

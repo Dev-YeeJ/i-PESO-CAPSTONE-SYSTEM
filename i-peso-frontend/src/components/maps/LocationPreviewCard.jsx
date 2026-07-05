@@ -1,6 +1,7 @@
 import React from 'react'
-import { APIProvider, Map, AdvancedMarker, Pin } from '@vis.gl/react-google-maps'
+import { APIProvider, Map, Marker } from '@vis.gl/react-google-maps'
 import { MapPin, Map as MapIcon, ExternalLink, AlertTriangle } from 'lucide-react'
+import { GOOGLE_MAP_ID, toMapPosition } from '@/utils/mapCoordinates'
 
 export default function LocationPreviewCard({
   title = "Saved Location",
@@ -11,12 +12,11 @@ export default function LocationPreviewCard({
   isAdmin = false,
   verified = false,
 }) {
-  const hasCoordinates = !!(latitude && longitude)
+  const position = toMapPosition(latitude, longitude)
+  const hasCoordinates = position !== null
   const mapUrl = hasCoordinates 
     ? `https://www.google.com/maps/search/?api=1&query=${latitude},${longitude}` 
     : (fullAddress ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(fullAddress)}` : null)
-
-  const position = hasCoordinates ? { lat: Number(latitude), lng: Number(longitude) } : null
 
   return (
     <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden">
@@ -79,17 +79,15 @@ export default function LocationPreviewCard({
 
         {hasCoordinates && (
           <div className="w-full md:w-64 h-48 rounded-xl overflow-hidden border border-slate-200 relative z-0">
-            <APIProvider apiKey={import.meta.env.VITE_GOOGLE_MAPS_EMBED_API_KEY}>
+            <APIProvider version="quarterly" apiKey={import.meta.env.VITE_GOOGLE_MAPS_EMBED_API_KEY}>
               <Map
                 defaultZoom={14}
                 defaultCenter={position}
                 disableDefaultUI={true}
                 gestureHandling="none"
-                mapId="location-preview-card"
+                mapId={GOOGLE_MAP_ID}
               >
-                <AdvancedMarker position={position}>
-                  <Pin background="#2563eb" borderColor="#1e40af" glyphColor="#fff" />
-                </AdvancedMarker>
+                <Marker position={position} title={title} />
               </Map>
             </APIProvider>
           </div>

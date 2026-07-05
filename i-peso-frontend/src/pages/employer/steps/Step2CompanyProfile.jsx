@@ -135,6 +135,9 @@ export default function Step2CompanyProfile({ initialData = {}, onComplete }) {
       if (form.location_accuracy) {
         formDataToSend.append('location_accuracy', form.location_accuracy)
       }
+      if (form.google_place_id) {
+        formDataToSend.append('google_place_id', form.google_place_id)
+      }
       formDataToSend.append('company_description', form.description)
       if (form.logo) {
         formDataToSend.append('company_logo', form.logo)
@@ -286,6 +289,8 @@ export default function Step2CompanyProfile({ initialData = {}, onComplete }) {
           street={form.street_address ?? ''}
           latitude={form.latitude}
           longitude={form.longitude}
+          location_accuracy={form.location_accuracy}
+          google_place_id={form.google_place_id}
           onChange={(locationData) => {
             setForm((prev) => ({
               ...prev,

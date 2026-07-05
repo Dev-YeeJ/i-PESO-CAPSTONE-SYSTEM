@@ -620,14 +620,18 @@ export default function SeekerProfile() {
 
             <Card
               title="E-Certificates & Trainings"
-              subtitle="Training records come from your NSRP profile inputs. Uploaded files are supporting proof."
+              subtitle="Maintain complete certificate records with privately stored supporting proof."
               action={(
                 <div className="flex flex-wrap gap-2">
                   <button onClick={() => openProfileEditor('training')} className="inline-flex items-center gap-1.5 rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-700">
                     <FileText className="h-4 w-4" /> Update Records
                   </button>
-                  <button onClick={() => setUploadOpen(true)} className="inline-flex items-center gap-1.5 rounded-xl bg-blue-700 px-3 py-2 text-sm font-semibold text-white">
-                    <Plus className="h-4 w-4" /> Upload Proof
+                  <button
+                    type="button"
+                    onClick={() => setUploadOpen(true)}
+                    className="inline-flex items-center gap-1.5 rounded-xl bg-blue-700 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-800"
+                  >
+                    <Plus className="h-4 w-4" /> Add Certificate
                   </button>
                 </div>
               )}
@@ -639,23 +643,36 @@ export default function SeekerProfile() {
                   ))}
                 </div>
               ) : (
-                <EmptyState icon={Award} text="No NSRP training records saved yet." action="Add Training Record" onClick={() => openProfileEditor('training')} />
+                <EmptyState icon={Award} text="No NSRP training records saved yet. Certificates can still be added as standalone credentials." action="Add Training Record" onClick={() => openProfileEditor('training')} />
               )}
 
               {certificates.length > 0 && (
                 <div className="mt-5 border-t border-slate-100 pt-5">
-                  <p className="mb-3 text-xs font-bold uppercase tracking-wide text-slate-400">Uploaded proof files</p>
+                  <p className="mb-3 text-xs font-bold uppercase tracking-wide text-slate-400">Certificate records</p>
                   <div className="grid gap-3 sm:grid-cols-2">
                     {certificates.map((certificate) => (
                       <div key={certificate.certificate_id} className="rounded-2xl border border-slate-200 p-4">
                         <div className="flex items-start gap-3">
                           <span className="rounded-xl bg-amber-100 p-2 text-amber-700"><Award className="h-5 w-5" /></span>
                           <div className="min-w-0 flex-1">
-                            <p className="truncate font-bold text-slate-900">{certificate.title}</p>
-                            <p className="text-sm text-slate-500">{certificate.issuing_body}</p>
-                            <p className="mt-1 text-xs text-slate-400">{certificate.issued_at ? new Date(certificate.issued_at).toLocaleDateString() : certificate.original_filename}</p>
+                            <p className="font-bold text-slate-900">{certificate.title}</p>
+                            <p className="mt-0.5 text-sm text-slate-500">{certificate.issuing_body}</p>
+                            <div className="mt-2 flex flex-wrap gap-1.5 text-[11px] font-bold">
+                              <span className="rounded-full bg-blue-50 px-2.5 py-1 text-blue-700">{certificateCategory(certificate.category)}</span>
+                              <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-emerald-700">Verified by Upload</span>
+                              <span className={`rounded-full px-2.5 py-1 ${isExpiredCertificate(certificate) ? 'bg-red-50 text-red-700' : 'bg-slate-100 text-slate-600'}`}>
+                                {isExpiredCertificate(certificate) ? 'Expired' : certificate.expires_at ? `Expires ${formatCertificateDate(certificate.expires_at)}` : 'No expiration'}
+                              </span>
+                            </div>
                           </div>
                         </div>
+                        <dl className="mt-3 space-y-1 text-xs leading-5 text-slate-600">
+                          <div><dt className="inline font-bold text-slate-700">Issued: </dt><dd className="inline">{formatCertificateDate(certificate.issued_at)}</dd></div>
+                          {certificate.credential_number && <div><dt className="inline font-bold text-slate-700">Credential no.: </dt><dd className="inline break-all">{certificate.credential_number}</dd></div>}
+                          {certificate.training && <div><dt className="inline font-bold text-slate-700">Related training: </dt><dd className="inline">{certificate.training.course}</dd></div>}
+                          {certificate.description && <div><dt className="inline font-bold text-slate-700">Remarks: </dt><dd className="inline">{certificate.description}</dd></div>}
+                          <div><dt className="inline font-bold text-slate-700">Proof file: </dt><dd className="inline break-all">{certificate.original_filename}</dd></div>
+                        </dl>
                         <div className="mt-4 flex gap-2">
                           <button onClick={() => viewCertificate(certificate)} disabled={openingCertificate === certificate.certificate_id} className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-700">
                             <Eye className="h-4 w-4" /> {openingCertificate === certificate.certificate_id ? 'Opening...' : 'View'}
@@ -705,10 +722,11 @@ export default function SeekerProfile() {
 
       <CertificateUploadModal
         open={uploadOpen}
+        trainings={profile.trainings ?? []}
         onClose={() => setUploadOpen(false)}
         onUploaded={(certificate) => {
+          if (!certificate?.certificate_id) return
           setProfile((current) => ({ ...current, certificates: [certificate, ...(current.certificates ?? [])] }))
-          toast.success('Certificate added to your vault.')
         }}
       />
       <ProfilePhotoUploadModal
@@ -1422,6 +1440,31 @@ function profileStrengthHelper(key) {
     training: 'Upload certificates or add completed trainings.',
     languages: 'Record languages you can speak, read, or write.',
   })[key] ?? 'Complete this profile item.'
+}
+
+function certificateCategory(category) {
+  return ({
+    training_certificate: 'Training Certificate',
+    tesda_nc_certificate: 'TESDA / NC Certificate',
+    professional_certificate: 'Professional Certificate',
+    seminar_certificate: 'Seminar Certificate',
+    workshop_certificate: 'Workshop Certificate',
+    employment_certificate: 'Employment Certificate',
+    academic_certificate: 'Academic Certificate',
+    other: 'Other',
+  })[category] ?? 'Legacy Certificate'
+}
+
+function formatCertificateDate(value) {
+  if (!value) return 'Not specified'
+  const [year, month, day] = String(value).slice(0, 10).split('-').map(Number)
+  if (!year || !month || !day) return String(value)
+  return new Date(year, month - 1, day).toLocaleDateString()
+}
+
+function isExpiredCertificate(certificate) {
+  if (!certificate.expires_at) return false
+  return certificate.expires_at < new Date().toISOString().slice(0, 10)
 }
 
 function updateStrength(profile, states) {

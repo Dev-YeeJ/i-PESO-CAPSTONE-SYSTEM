@@ -502,11 +502,692 @@ class LocalJobTermDictionary
             ],
         ],
 
-        // ── HR ──
+        // ── Education (expanded) ──
+        [
+            'triggers' => ['teacher', 'guro', 'titser', 'maestra', 'maestro', 'teaching', 'deped teacher', 'public school teacher'],
+            'suggestions' => [
+                ['occupation_title' => 'Teacher', 'broad_field' => 'Education and Teaching', 'general_term' => 'education work', 'role_function' => 'Teaching', 'confidence' => 93, 'reason' => 'Teaching in schools or institutions.'],
+            ],
+        ],
+        [
+            'triggers' => ['instructor', 'instruct'],
+            'suggestions' => [
+                ['occupation_title' => 'Instructor', 'broad_field' => 'Education and Teaching', 'general_term' => 'education work', 'role_function' => 'Teaching / Instruction', 'confidence' => 92, 'reason' => 'Teaching or instructing students and trainees.'],
+                ['occupation_title' => 'Trainer', 'broad_field' => 'Education and Teaching', 'general_term' => 'education work', 'role_function' => 'Training and Development', 'confidence' => 80, 'reason' => 'May also refer to a skills trainer or corporate trainer.'],
+            ],
+        ],
+        [
+            'triggers' => ['trainer', 'corporate trainer', 'skills trainer', 'job trainer', 'livelihood trainer', 'tesda trainer'],
+            'suggestions' => [
+                ['occupation_title' => 'Trainer', 'broad_field' => 'Education and Teaching', 'general_term' => 'education work', 'role_function' => 'Training and Development', 'confidence' => 90, 'reason' => 'Skills and knowledge training for employees or community.'],
+            ],
+        ],
+        [
+            'triggers' => ['professor', 'assoc. professor', 'associate professor', 'assistant professor'],
+            'suggestions' => [
+                ['occupation_title' => 'Professor', 'broad_field' => 'Education and Teaching', 'general_term' => 'education work', 'role_function' => 'Academic Teaching', 'confidence' => 93, 'reason' => 'Teaching at college or university level.'],
+            ],
+        ],
+        [
+            'triggers' => ['lecturer', 'college lecturer', 'university lecturer'],
+            'suggestions' => [
+                ['occupation_title' => 'Lecturer', 'broad_field' => 'Education and Teaching', 'general_term' => 'education work', 'role_function' => 'Academic Teaching', 'confidence' => 92, 'reason' => 'Delivering lectures at academic institutions.'],
+            ],
+        ],
+        [
+            'triggers' => ['facilitator', 'workshop facilitator', 'learning facilitator', 'seminar facilitator'],
+            'suggestions' => [
+                ['occupation_title' => 'Facilitator', 'broad_field' => 'Education and Teaching', 'general_term' => 'education work', 'role_function' => 'Training / Facilitation', 'confidence' => 88, 'reason' => 'Facilitating workshops, seminars, or training sessions.'],
+            ],
+        ],
+        [
+            'triggers' => ['guidance counselor', 'school counselor', 'guidance teacher'],
+            'suggestions' => [
+                ['occupation_title' => 'Guidance Counselor', 'broad_field' => 'Education and Teaching', 'general_term' => 'education work', 'role_function' => 'Guidance and Counseling', 'confidence' => 92, 'reason' => 'Providing academic and personal guidance to students.'],
+            ],
+        ],
+        [
+            'triggers' => ['school principal', 'principal', 'vice principal', 'school head', 'school director', 'school administrator'],
+            'suggestions' => [
+                ['occupation_title' => 'School Principal', 'broad_field' => 'Education and Teaching', 'general_term' => 'education work', 'role_function' => 'School Administration', 'confidence' => 90, 'reason' => 'School leadership and administration.'],
+            ],
+        ],
+        [
+            'triggers' => ['librarian', 'school librarian', 'library aide', 'library staff'],
+            'suggestions' => [
+                ['occupation_title' => 'Librarian', 'broad_field' => 'Education and Teaching', 'general_term' => 'education work', 'role_function' => 'Library Services', 'confidence' => 90, 'reason' => 'Managing library collections and assisting patrons.'],
+            ],
+        ],
+        [
+            'triggers' => ['preschool teacher', 'kindergarten teacher', 'kinder teacher', 'daycare teacher', 'nursery teacher'],
+            'suggestions' => [
+                ['occupation_title' => 'Early Childhood Teacher', 'broad_field' => 'Education and Teaching', 'general_term' => 'education work', 'role_function' => 'Early Childhood Education', 'confidence' => 93, 'reason' => 'Teaching young children in preschool or daycare.'],
+            ],
+        ],
+        [
+            'triggers' => ['special education', 'sped teacher', 'special needs teacher', 'resource teacher'],
+            'suggestions' => [
+                ['occupation_title' => 'Special Education Teacher', 'broad_field' => 'Education and Teaching', 'general_term' => 'education work', 'role_function' => 'Special Education', 'confidence' => 93, 'reason' => 'Teaching students with special needs and disabilities.'],
+            ],
+        ],
+        [
+            'triggers' => ['tutor', 'tutorial', 'tutoring'],
+            'suggestions' => [
+                ['occupation_title' => 'Tutor', 'broad_field' => 'Education and Teaching', 'general_term' => 'education work', 'role_function' => 'Tutoring', 'confidence' => 90, 'reason' => 'One-on-one or group tutoring.'],
+            ],
+        ],
+        [
+            'triggers' => ['online teacher', 'esl teacher', 'english teacher online', 'online english teacher'],
+            'suggestions' => [
+                ['occupation_title' => 'Online Teacher / ESL Tutor', 'broad_field' => 'Education and Teaching', 'general_term' => 'education work', 'role_function' => 'Online Teaching', 'confidence' => 90, 'reason' => 'Teaching English or other subjects online.'],
+            ],
+        ],
+
+        // ── Healthcare (expanded) ──
+        [
+            'triggers' => ['doctor', 'physician', 'general practitioner', 'medical doctor', 'specialist doctor', 'internist', 'surgeon'],
+            'suggestions' => [
+                ['occupation_title' => 'Physician / Doctor', 'broad_field' => 'Healthcare', 'general_term' => 'healthcare work', 'role_function' => 'Medical Practice', 'confidence' => 93, 'reason' => 'Medical diagnosis and patient care.'],
+            ],
+        ],
+        [
+            'triggers' => ['dentist', 'dental doctor', 'dmd', 'dds', 'dental surgeon', 'orthodontist'],
+            'suggestions' => [
+                ['occupation_title' => 'Dentist', 'broad_field' => 'Healthcare', 'general_term' => 'healthcare work', 'role_function' => 'Dentistry', 'confidence' => 95, 'reason' => 'Dental care and oral health.'],
+            ],
+        ],
+        [
+            'triggers' => ['pharmacist', 'pharmacy', 'drug store staff', 'pharmacy assistant', 'pharmacy technician'],
+            'suggestions' => [
+                ['occupation_title' => 'Pharmacist', 'broad_field' => 'Healthcare', 'general_term' => 'healthcare work', 'role_function' => 'Pharmacy', 'confidence' => 92, 'reason' => 'Dispensing medicines and pharmaceutical care.'],
+            ],
+        ],
+        [
+            'triggers' => ['medical technologist', 'med tech', 'medtech', 'laboratory technologist', 'clinical laboratory', 'lab technologist'],
+            'suggestions' => [
+                ['occupation_title' => 'Medical Technologist', 'broad_field' => 'Healthcare', 'general_term' => 'healthcare work', 'role_function' => 'Medical Laboratory', 'confidence' => 93, 'reason' => 'Clinical laboratory testing and analysis.'],
+            ],
+        ],
+        [
+            'triggers' => ['radiologic technologist', 'radtech', 'rad tech', 'x-ray tech', 'xray tech', 'radiographer'],
+            'suggestions' => [
+                ['occupation_title' => 'Radiologic Technologist', 'broad_field' => 'Healthcare', 'general_term' => 'healthcare work', 'role_function' => 'Radiology / Imaging', 'confidence' => 93, 'reason' => 'Operating imaging equipment for diagnostics.'],
+            ],
+        ],
+        [
+            'triggers' => ['physical therapist', 'physiotherapist', 'physical therapy', 'rehab therapist'],
+            'suggestions' => [
+                ['occupation_title' => 'Physical Therapist', 'broad_field' => 'Healthcare', 'general_term' => 'healthcare work', 'role_function' => 'Physical Therapy', 'confidence' => 93, 'reason' => 'Rehabilitation and physical therapy.'],
+            ],
+        ],
+        [
+            'triggers' => ['occupational therapist', 'ot therapist', 'occupational therapy'],
+            'suggestions' => [
+                ['occupation_title' => 'Occupational Therapist', 'broad_field' => 'Healthcare', 'general_term' => 'healthcare work', 'role_function' => 'Occupational Therapy', 'confidence' => 93, 'reason' => 'Helping patients perform daily activities.'],
+            ],
+        ],
+        [
+            'triggers' => ['speech therapist', 'speech pathologist', 'speech language', 'speech clinician'],
+            'suggestions' => [
+                ['occupation_title' => 'Speech Therapist', 'broad_field' => 'Healthcare', 'general_term' => 'healthcare work', 'role_function' => 'Speech Therapy', 'confidence' => 93, 'reason' => 'Treating speech, language, and communication disorders.'],
+            ],
+        ],
+        [
+            'triggers' => ['dietitian', 'nutritionist', 'registered nutritionist', 'nutrition officer'],
+            'suggestions' => [
+                ['occupation_title' => 'Dietitian / Nutritionist', 'broad_field' => 'Healthcare', 'general_term' => 'healthcare work', 'role_function' => 'Nutrition and Dietetics', 'confidence' => 92, 'reason' => 'Nutrition counseling and dietary planning.'],
+            ],
+        ],
+        [
+            'triggers' => ['psychologist', 'clinical psychologist', 'counseling psychologist'],
+            'suggestions' => [
+                ['occupation_title' => 'Psychologist', 'broad_field' => 'Healthcare', 'general_term' => 'healthcare work', 'role_function' => 'Psychology', 'confidence' => 92, 'reason' => 'Psychological assessment and mental health counseling.'],
+            ],
+        ],
+        [
+            'triggers' => ['paramedic', 'emt', 'emergency medical', 'ambulance staff'],
+            'suggestions' => [
+                ['occupation_title' => 'Paramedic / EMT', 'broad_field' => 'Healthcare', 'general_term' => 'healthcare work', 'role_function' => 'Emergency Medical Services', 'confidence' => 92, 'reason' => 'Emergency pre-hospital medical care.'],
+            ],
+        ],
+        [
+            'triggers' => ['optometrist', 'optical assistant', 'optician', 'eye care specialist'],
+            'suggestions' => [
+                ['occupation_title' => 'Optometrist', 'broad_field' => 'Healthcare', 'general_term' => 'healthcare work', 'role_function' => 'Optometry / Eye Care', 'confidence' => 90, 'reason' => 'Eye examination and vision care.'],
+            ],
+        ],
+        [
+            'triggers' => ['dental assistant', 'dental aide', 'dental technician', 'dental hygienist'],
+            'suggestions' => [
+                ['occupation_title' => 'Dental Assistant', 'broad_field' => 'Healthcare', 'general_term' => 'healthcare work', 'role_function' => 'Dental Support', 'confidence' => 90, 'reason' => 'Assisting dentists in procedures and patient care.'],
+            ],
+        ],
+
+        // ── Engineering (expanded) ──
+        [
+            'triggers' => ['civil engineer', 'structural engineer', 'site engineer', 'civil engineering', 'geotechnical engineer'],
+            'suggestions' => [
+                ['occupation_title' => 'Civil Engineer', 'broad_field' => 'Engineering and Architecture', 'general_term' => 'engineering work', 'role_function' => 'Civil / Structural Engineering', 'confidence' => 95, 'reason' => 'Civil and structural engineering projects.'],
+            ],
+        ],
+        [
+            'triggers' => ['mechanical engineer', 'mechanical engineering'],
+            'suggestions' => [
+                ['occupation_title' => 'Mechanical Engineer', 'broad_field' => 'Engineering and Architecture', 'general_term' => 'engineering work', 'role_function' => 'Mechanical Engineering', 'confidence' => 95, 'reason' => 'Design and maintenance of mechanical systems.'],
+            ],
+        ],
+        [
+            'triggers' => ['electrical engineer', 'power engineer', 'electrical engineering'],
+            'suggestions' => [
+                ['occupation_title' => 'Electrical Engineer', 'broad_field' => 'Engineering and Architecture', 'general_term' => 'engineering work', 'role_function' => 'Electrical Engineering', 'confidence' => 95, 'reason' => 'Electrical systems design and installation.'],
+            ],
+        ],
+        [
+            'triggers' => ['electronics engineer', 'ece', 'electronics and communications', 'electronics engineering'],
+            'suggestions' => [
+                ['occupation_title' => 'Electronics Engineer', 'broad_field' => 'Engineering and Architecture', 'general_term' => 'engineering work', 'role_function' => 'Electronics Engineering', 'confidence' => 93, 'reason' => 'Electronics and communications engineering.'],
+            ],
+        ],
+        [
+            'triggers' => ['chemical engineer', 'chemical engineering', 'process engineer'],
+            'suggestions' => [
+                ['occupation_title' => 'Chemical Engineer', 'broad_field' => 'Engineering and Architecture', 'general_term' => 'engineering work', 'role_function' => 'Chemical Engineering', 'confidence' => 95, 'reason' => 'Chemical processes and plant engineering.'],
+            ],
+        ],
+        [
+            'triggers' => ['industrial engineer', 'industrial engineering'],
+            'suggestions' => [
+                ['occupation_title' => 'Industrial Engineer', 'broad_field' => 'Engineering and Architecture', 'general_term' => 'engineering work', 'role_function' => 'Industrial Engineering', 'confidence' => 95, 'reason' => 'Production efficiency and industrial systems.'],
+            ],
+        ],
+        [
+            'triggers' => ['environmental engineer', 'environmental scientist', 'environmental officer', 'pollution control officer'],
+            'suggestions' => [
+                ['occupation_title' => 'Environmental Engineer', 'broad_field' => 'Engineering and Architecture', 'general_term' => 'engineering work', 'role_function' => 'Environmental Engineering', 'confidence' => 92, 'reason' => 'Environmental compliance and sustainability.'],
+            ],
+        ],
+        [
+            'triggers' => ['geodetic engineer', 'land surveyor', 'surveyor', 'geodesy'],
+            'suggestions' => [
+                ['occupation_title' => 'Geodetic Engineer / Surveyor', 'broad_field' => 'Engineering and Architecture', 'general_term' => 'engineering work', 'role_function' => 'Geodesy / Surveying', 'confidence' => 93, 'reason' => 'Land surveying and mapping.'],
+            ],
+        ],
+        [
+            'triggers' => ['mining engineer', 'geological engineer', 'geologist', 'mining technician'],
+            'suggestions' => [
+                ['occupation_title' => 'Mining Engineer', 'broad_field' => 'Engineering and Architecture', 'general_term' => 'engineering work', 'role_function' => 'Mining Engineering', 'confidence' => 92, 'reason' => 'Mining operations and geological work.'],
+            ],
+        ],
+        [
+            'triggers' => ['draftsman', 'drafter', 'cad operator', 'autocad', 'revit', 'drafting'],
+            'suggestions' => [
+                ['occupation_title' => 'Draftsman / CAD Operator', 'broad_field' => 'Engineering and Architecture', 'general_term' => 'engineering work', 'role_function' => 'Technical Drawing / CAD', 'confidence' => 90, 'reason' => 'Technical drawing and CAD design work.'],
+            ],
+        ],
+        [
+            'triggers' => ['project engineer', 'quantity surveyor', 'cost estimator', 'estimator'],
+            'suggestions' => [
+                ['occupation_title' => 'Project / Cost Engineer', 'broad_field' => 'Engineering and Architecture', 'general_term' => 'engineering work', 'role_function' => 'Project / Cost Engineering', 'confidence' => 90, 'reason' => 'Project management and cost estimation.'],
+            ],
+        ],
+        [
+            'triggers' => ['safety officer', 'safety engineer', 'ohs officer', 'oshs officer', 'health and safety officer'],
+            'suggestions' => [
+                ['occupation_title' => 'Safety Officer (OHS)', 'broad_field' => 'Engineering and Architecture', 'general_term' => 'engineering work', 'role_function' => 'Occupational Safety', 'confidence' => 90, 'reason' => 'Workplace safety and compliance.'],
+            ],
+        ],
+        [
+            'triggers' => ['engineer', 'inhinyero', 'engineering'],
+            'suggestions' => [
+                ['occupation_title' => 'Engineer', 'broad_field' => 'Engineering and Architecture', 'general_term' => 'engineering work', 'role_function' => 'Engineering', 'confidence' => 85, 'reason' => 'Engineering work — discipline depends on specialization.'],
+            ],
+        ],
+        [
+            'triggers' => ['architect', 'arkitekto', 'architecture'],
+            'suggestions' => [
+                ['occupation_title' => 'Architect', 'broad_field' => 'Engineering and Architecture', 'general_term' => 'engineering work', 'role_function' => 'Architecture / Design', 'confidence' => 93, 'reason' => 'Architectural design and planning.'],
+            ],
+        ],
+
+        // ── Construction (expanded) ──
+        [
+            'triggers' => ['painter', 'pintor', 'house painter', 'building painter'],
+            'suggestions' => [
+                ['occupation_title' => 'Painter', 'broad_field' => 'Construction', 'general_term' => 'construction work', 'role_function' => 'Painting', 'confidence' => 92, 'reason' => 'Surface painting of buildings and structures.'],
+            ],
+        ],
+        [
+            'triggers' => ['heavy equipment operator', 'crane operator', 'bulldozer operator', 'excavator operator', 'backhoe operator', 'payloader'],
+            'suggestions' => [
+                ['occupation_title' => 'Heavy Equipment Operator', 'broad_field' => 'Construction', 'general_term' => 'construction work', 'role_function' => 'Equipment Operation', 'confidence' => 92, 'reason' => 'Operating construction and earthmoving equipment.'],
+            ],
+        ],
+        [
+            'triggers' => ['construction foreman', 'site foreman', 'construction supervisor', 'site supervisor'],
+            'suggestions' => [
+                ['occupation_title' => 'Construction Foreman', 'broad_field' => 'Construction', 'general_term' => 'construction work', 'role_function' => 'Site Supervision', 'confidence' => 90, 'reason' => 'Supervising construction site workers and activities.'],
+            ],
+        ],
+
+        // ── Skilled Trades (expanded) ──
+        [
+            'triggers' => ['electronics technician', 'electronics repair', 'appliance repair', 'electronic tech', 'cellphone repair'],
+            'suggestions' => [
+                ['occupation_title' => 'Electronics Technician', 'broad_field' => 'Skilled Trades and Repair', 'general_term' => 'skilled trades', 'role_function' => 'Electronics Repair', 'confidence' => 90, 'reason' => 'Electronic device repair and maintenance.'],
+            ],
+        ],
+        [
+            'triggers' => ['motorcycle mechanic', 'motorbike mechanic', 'motorcycle repair'],
+            'suggestions' => [
+                ['occupation_title' => 'Motorcycle Mechanic', 'broad_field' => 'Skilled Trades and Repair', 'general_term' => 'skilled trades', 'role_function' => 'Motorcycle Repair', 'confidence' => 90, 'reason' => 'Motorcycle maintenance and repair.'],
+            ],
+        ],
+        [
+            'triggers' => ['dressmaker', 'modista', 'tailor', 'seamstress', 'mananahi', 'sewing'],
+            'suggestions' => [
+                ['occupation_title' => 'Dressmaker / Tailor', 'broad_field' => 'Skilled Trades and Repair', 'general_term' => 'skilled trades', 'role_function' => 'Tailoring / Dressmaking', 'confidence' => 92, 'reason' => 'Clothing construction, alterations, and tailoring.'],
+            ],
+        ],
+
+        // ── Marketing & Communications ──
+        [
+            'triggers' => ['marketing officer', 'marketing assistant', 'marketing coordinator', 'marketing executive', 'marketing staff'],
+            'suggestions' => [
+                ['occupation_title' => 'Marketing Officer', 'broad_field' => 'Marketing and Communications', 'general_term' => 'marketing work', 'role_function' => 'Marketing', 'confidence' => 90, 'reason' => 'Marketing campaigns and brand promotion.'],
+            ],
+        ],
+        [
+            'triggers' => ['digital marketer', 'digital marketing', 'online marketing', 'digital marketing specialist'],
+            'suggestions' => [
+                ['occupation_title' => 'Digital Marketing Specialist', 'broad_field' => 'Marketing and Communications', 'general_term' => 'marketing work', 'role_function' => 'Digital Marketing', 'confidence' => 90, 'reason' => 'Online and digital marketing campaigns.'],
+            ],
+        ],
+        [
+            'triggers' => ['seo specialist', 'seo analyst', 'search engine optimization', 'sem specialist'],
+            'suggestions' => [
+                ['occupation_title' => 'SEO / SEM Specialist', 'broad_field' => 'Marketing and Communications', 'general_term' => 'marketing work', 'role_function' => 'Search Marketing', 'confidence' => 90, 'reason' => 'Search engine optimization and paid search.'],
+            ],
+        ],
+        [
+            'triggers' => ['content writer', 'copywriter', 'web content writer', 'technical writer', 'article writer', 'creative writer'],
+            'suggestions' => [
+                ['occupation_title' => 'Content Writer / Copywriter', 'broad_field' => 'Marketing and Communications', 'general_term' => 'marketing work', 'role_function' => 'Content Writing', 'confidence' => 90, 'reason' => 'Writing content for websites, ads, and publications.'],
+            ],
+        ],
+        [
+            'triggers' => ['public relations', 'pr officer', 'communications officer', 'corporate communications'],
+            'suggestions' => [
+                ['occupation_title' => 'PR / Communications Officer', 'broad_field' => 'Marketing and Communications', 'general_term' => 'marketing work', 'role_function' => 'Public Relations', 'confidence' => 88, 'reason' => 'Managing public image and communications.'],
+            ],
+        ],
+        [
+            'triggers' => ['brand manager', 'brand officer', 'brand marketing', 'product manager'],
+            'suggestions' => [
+                ['occupation_title' => 'Brand / Product Manager', 'broad_field' => 'Marketing and Communications', 'general_term' => 'marketing work', 'role_function' => 'Brand Management', 'confidence' => 88, 'reason' => 'Managing brands and product portfolios.'],
+            ],
+        ],
+
+        // ── Finance (expanded) ──
+        [
+            'triggers' => ['auditor', 'internal auditor', 'external auditor', 'audit associate', 'financial auditor'],
+            'suggestions' => [
+                ['occupation_title' => 'Auditor', 'broad_field' => 'Accounting and Finance', 'general_term' => 'finance work', 'role_function' => 'Auditing', 'confidence' => 92, 'reason' => 'Financial auditing and compliance review.'],
+            ],
+        ],
+        [
+            'triggers' => ['financial analyst', 'finance analyst', 'budget analyst', 'financial planning'],
+            'suggestions' => [
+                ['occupation_title' => 'Financial Analyst', 'broad_field' => 'Accounting and Finance', 'general_term' => 'finance work', 'role_function' => 'Financial Analysis', 'confidence' => 90, 'reason' => 'Financial planning, budgeting, and analysis.'],
+            ],
+        ],
+        [
+            'triggers' => ['payroll officer', 'payroll specialist', 'payroll staff', 'payroll admin', 'payroll'],
+            'suggestions' => [
+                ['occupation_title' => 'Payroll Officer', 'broad_field' => 'Accounting and Finance', 'general_term' => 'finance work', 'role_function' => 'Payroll Processing', 'confidence' => 90, 'reason' => 'Employee payroll processing and computation.'],
+            ],
+        ],
+        [
+            'triggers' => ['credit analyst', 'credit officer', 'loan officer', 'loan processor', 'loans officer'],
+            'suggestions' => [
+                ['occupation_title' => 'Credit / Loans Officer', 'broad_field' => 'Accounting and Finance', 'general_term' => 'finance work', 'role_function' => 'Credit and Loans', 'confidence' => 90, 'reason' => 'Credit assessment and loan processing.'],
+            ],
+        ],
+        [
+            'triggers' => ['bank teller', 'bank clerk', 'bank officer', 'banking staff', 'remittance officer'],
+            'suggestions' => [
+                ['occupation_title' => 'Bank Teller / Clerk', 'broad_field' => 'Accounting and Finance', 'general_term' => 'finance work', 'role_function' => 'Banking Services', 'confidence' => 90, 'reason' => 'Banking transactions and customer service.'],
+            ],
+        ],
+        [
+            'triggers' => ['insurance agent', 'insurance advisor', 'insurance sales', 'insurance representative'],
+            'suggestions' => [
+                ['occupation_title' => 'Insurance Agent', 'broad_field' => 'Accounting and Finance', 'general_term' => 'finance work', 'role_function' => 'Insurance Sales', 'confidence' => 88, 'reason' => 'Selling insurance products to clients.'],
+            ],
+        ],
+
+        // ── HR (expanded) ──
         [
             'triggers' => ['hr', 'human resources', 'recruiter', 'recruitment'],
             'suggestions' => [
                 ['occupation_title' => 'Human Resource Officer', 'broad_field' => 'Human Resources and Recruitment', 'general_term' => 'human resources work', 'role_function' => 'HR / Recruitment', 'confidence' => 90, 'reason' => 'Human resources, hiring, and employee management.'],
+            ],
+        ],
+        [
+            'triggers' => ['training officer', 'learning and development', 'hr trainer', 'organizational development', 'od officer'],
+            'suggestions' => [
+                ['occupation_title' => 'Training Officer', 'broad_field' => 'Human Resources and Recruitment', 'general_term' => 'human resources work', 'role_function' => 'Training and Development', 'confidence' => 90, 'reason' => 'Employee training and organizational development.'],
+            ],
+        ],
+        [
+            'triggers' => ['compensation and benefits', 'benefits officer', 'employee benefits', 'hris officer'],
+            'suggestions' => [
+                ['occupation_title' => 'Compensation & Benefits Officer', 'broad_field' => 'Human Resources and Recruitment', 'general_term' => 'human resources work', 'role_function' => 'Compensation and Benefits', 'confidence' => 90, 'reason' => 'Managing employee compensation and benefits.'],
+            ],
+        ],
+        [
+            'triggers' => ['employee relations', 'labor relations', 'industrial relations', 'labor compliance'],
+            'suggestions' => [
+                ['occupation_title' => 'Employee / Labor Relations Officer', 'broad_field' => 'Human Resources and Recruitment', 'general_term' => 'human resources work', 'role_function' => 'Employee Relations', 'confidence' => 88, 'reason' => 'Managing labor relations and employee issues.'],
+            ],
+        ],
+
+        // ── Security (expanded) ──
+        [
+            'triggers' => ['police', 'pulis', 'pnp', 'police officer', 'law enforcement', 'patrolman', 'detective'],
+            'suggestions' => [
+                ['occupation_title' => 'Police Officer', 'broad_field' => 'Security and Protective Services', 'general_term' => 'security work', 'role_function' => 'Law Enforcement', 'confidence' => 90, 'reason' => 'Law enforcement and public safety.'],
+            ],
+        ],
+        [
+            'triggers' => ['firefighter', 'fire fighter', 'bfp', 'fire officer', 'fire marshall'],
+            'suggestions' => [
+                ['occupation_title' => 'Firefighter', 'broad_field' => 'Security and Protective Services', 'general_term' => 'security work', 'role_function' => 'Fire Fighting', 'confidence' => 92, 'reason' => 'Fire suppression and emergency response.'],
+            ],
+        ],
+        [
+            'triggers' => ['cctv operator', 'cctv technician', 'surveillance officer', 'cctv installer'],
+            'suggestions' => [
+                ['occupation_title' => 'CCTV / Surveillance Operator', 'broad_field' => 'Security and Protective Services', 'general_term' => 'security work', 'role_function' => 'Surveillance', 'confidence' => 90, 'reason' => 'CCTV monitoring and surveillance operations.'],
+            ],
+        ],
+
+        // ── Driving (expanded) ──
+        [
+            'triggers' => ['bus driver', 'truck driver', 'ten-wheeler', '10-wheeler', 'trailer driver'],
+            'suggestions' => [
+                ['occupation_title' => 'Bus / Truck Driver', 'broad_field' => 'Driving and Transportation', 'general_term' => 'driver', 'role_function' => 'Commercial Vehicle Driving', 'confidence' => 90, 'reason' => 'Driving buses or commercial trucks.'],
+            ],
+        ],
+        [
+            'triggers' => ['tricycle driver', 'trike driver', 'jeepney driver', 'uv express driver'],
+            'suggestions' => [
+                ['occupation_title' => 'Light Transport Driver', 'broad_field' => 'Driving and Transportation', 'general_term' => 'driver', 'role_function' => 'Public Transport', 'confidence' => 88, 'reason' => 'Driving light public transport vehicles.'],
+            ],
+        ],
+        [
+            'triggers' => ['grab driver', 'tnvs driver', 'angkas driver', 'ride share'],
+            'suggestions' => [
+                ['occupation_title' => 'TNVS / Taxi Driver', 'broad_field' => 'Driving and Transportation', 'general_term' => 'driver', 'role_function' => 'Ride-Hailing / Taxi', 'confidence' => 88, 'reason' => 'Ride-hailing and taxi driving.'],
+            ],
+        ],
+        [
+            'triggers' => ['flight attendant', 'cabin crew', 'airline staff', 'stewardess'],
+            'suggestions' => [
+                ['occupation_title' => 'Flight Attendant / Cabin Crew', 'broad_field' => 'Driving and Transportation', 'general_term' => 'driver', 'role_function' => 'Aviation / Air Crew', 'confidence' => 93, 'reason' => 'In-flight passenger service and safety.'],
+            ],
+        ],
+
+        // ── Logistics (expanded) ──
+        [
+            'triggers' => ['logistics officer', 'logistics coordinator', 'supply chain officer', 'logistics manager'],
+            'suggestions' => [
+                ['occupation_title' => 'Logistics Officer', 'broad_field' => 'Warehouse and Logistics', 'general_term' => 'logistics work', 'role_function' => 'Logistics', 'confidence' => 90, 'reason' => 'Managing logistics, transport, and supply chains.'],
+            ],
+        ],
+        [
+            'triggers' => ['procurement officer', 'purchasing officer', 'buyer', 'purchasing staff', 'purchasing agent'],
+            'suggestions' => [
+                ['occupation_title' => 'Procurement / Purchasing Officer', 'broad_field' => 'Warehouse and Logistics', 'general_term' => 'logistics work', 'role_function' => 'Procurement', 'confidence' => 90, 'reason' => 'Purchasing goods and services for the organization.'],
+            ],
+        ],
+        [
+            'triggers' => ['inventory officer', 'inventory manager', 'inventory controller', 'stock controller'],
+            'suggestions' => [
+                ['occupation_title' => 'Inventory Officer', 'broad_field' => 'Warehouse and Logistics', 'general_term' => 'logistics work', 'role_function' => 'Inventory Management', 'confidence' => 90, 'reason' => 'Managing stock and inventory records.'],
+            ],
+        ],
+        [
+            'triggers' => ['customs broker', 'freight forwarder', 'import export', 'shipping officer', 'cargo officer'],
+            'suggestions' => [
+                ['occupation_title' => 'Customs Broker / Freight Forwarder', 'broad_field' => 'Warehouse and Logistics', 'general_term' => 'logistics work', 'role_function' => 'Customs and Freight', 'confidence' => 90, 'reason' => 'Customs clearance and cargo forwarding.'],
+            ],
+        ],
+
+        // ── Manufacturing (expanded) ──
+        [
+            'triggers' => ['assembler', 'assembly worker', 'line assembler', 'assembly line worker'],
+            'suggestions' => [
+                ['occupation_title' => 'Assembler', 'broad_field' => 'Manufacturing and Factory Work', 'general_term' => 'factory worker', 'role_function' => 'Assembly', 'confidence' => 90, 'reason' => 'Assembling products on factory assembly lines.'],
+            ],
+        ],
+        [
+            'triggers' => ['quality control', 'qc inspector', 'quality inspector', 'production inspector', 'qa inspector'],
+            'suggestions' => [
+                ['occupation_title' => 'Quality Control Inspector', 'broad_field' => 'Manufacturing and Factory Work', 'general_term' => 'factory worker', 'role_function' => 'Quality Control', 'confidence' => 90, 'reason' => 'Inspecting products for quality standards.'],
+            ],
+        ],
+        [
+            'triggers' => ['garment worker', 'sewist', 'sewing machine operator', 'textile worker'],
+            'suggestions' => [
+                ['occupation_title' => 'Garment / Textile Worker', 'broad_field' => 'Manufacturing and Factory Work', 'general_term' => 'factory worker', 'role_function' => 'Garment Production', 'confidence' => 90, 'reason' => 'Garment and textile manufacturing work.'],
+            ],
+        ],
+
+        // ── Beauty (expanded) ──
+        [
+            'triggers' => ['nail technician', 'nail artist', 'nail tech', 'manicurist', 'pedicurist'],
+            'suggestions' => [
+                ['occupation_title' => 'Nail Technician', 'broad_field' => 'Beauty and Wellness', 'general_term' => 'beauty work', 'role_function' => 'Nail Care', 'confidence' => 92, 'reason' => 'Nail care, manicure, and pedicure services.'],
+            ],
+        ],
+        [
+            'triggers' => ['aesthetician', 'esthetician', 'skincare specialist', 'facialist', 'derma therapist'],
+            'suggestions' => [
+                ['occupation_title' => 'Aesthetician / Skincare Specialist', 'broad_field' => 'Beauty and Wellness', 'general_term' => 'beauty work', 'role_function' => 'Skincare / Aesthetics', 'confidence' => 90, 'reason' => 'Facial treatments and skincare services.'],
+            ],
+        ],
+        [
+            'triggers' => ['fitness instructor', 'gym trainer', 'personal trainer', 'gym instructor', 'yoga instructor', 'aerobics instructor'],
+            'suggestions' => [
+                ['occupation_title' => 'Fitness Instructor / Personal Trainer', 'broad_field' => 'Beauty and Wellness', 'general_term' => 'beauty work', 'role_function' => 'Fitness Training', 'confidence' => 90, 'reason' => 'Fitness coaching and personal training.'],
+            ],
+        ],
+        [
+            'triggers' => ['makeup artist', 'mua', 'bridal makeup', 'event makeup'],
+            'suggestions' => [
+                ['occupation_title' => 'Makeup Artist', 'broad_field' => 'Beauty and Wellness', 'general_term' => 'beauty work', 'role_function' => 'Makeup / Cosmetology', 'confidence' => 92, 'reason' => 'Professional makeup application for events.'],
+            ],
+        ],
+
+        // ── Hospitality (expanded) ──
+        [
+            'triggers' => ['hotel front desk', 'hotel receptionist', 'hotel front office', 'guest relations', 'concierge', 'bellman', 'hotel staff'],
+            'suggestions' => [
+                ['occupation_title' => 'Hotel Front Office Staff', 'broad_field' => 'Hospitality and Hotels', 'general_term' => 'hospitality work', 'role_function' => 'Front Office / Guest Services', 'confidence' => 90, 'reason' => 'Hotel front desk and guest service operations.'],
+            ],
+        ],
+        [
+            'triggers' => ['event coordinator', 'events coordinator', 'event planner', 'wedding coordinator', 'wedding planner', 'catering coordinator'],
+            'suggestions' => [
+                ['occupation_title' => 'Event Coordinator', 'broad_field' => 'Hospitality and Hotels', 'general_term' => 'hospitality work', 'role_function' => 'Events / Catering', 'confidence' => 90, 'reason' => 'Planning and coordinating events and weddings.'],
+            ],
+        ],
+        [
+            'triggers' => ['tour guide', 'travel guide', 'tourism officer', 'travel agent', 'travel consultant', 'ticketing officer'],
+            'suggestions' => [
+                ['occupation_title' => 'Tour Guide / Travel Agent', 'broad_field' => 'Hospitality and Hotels', 'general_term' => 'hospitality work', 'role_function' => 'Tourism / Travel', 'confidence' => 88, 'reason' => 'Tourism guiding and travel booking.'],
+            ],
+        ],
+        [
+            'triggers' => ['flight attendant', 'cabin crew', 'airline staff', 'stewardess'],
+            'suggestions' => [
+                ['occupation_title' => 'Flight Attendant / Cabin Crew', 'broad_field' => 'Hospitality and Hotels', 'general_term' => 'hospitality work', 'role_function' => 'Aviation / Air Crew', 'confidence' => 93, 'reason' => 'Providing in-flight service and safety.'],
+            ],
+        ],
+
+        // ── IT (expanded) ──
+        [
+            'triggers' => ['network engineer', 'network admin', 'network administrator', 'network technician', 'cisco', 'ccna'],
+            'suggestions' => [
+                ['occupation_title' => 'Network Engineer', 'broad_field' => 'IT and Computer Work', 'general_term' => 'it work', 'role_function' => 'Network Administration', 'confidence' => 92, 'reason' => 'Network infrastructure design and management.'],
+            ],
+        ],
+        [
+            'triggers' => ['system admin', 'sysadmin', 'systems administrator', 'it admin', 'server admin'],
+            'suggestions' => [
+                ['occupation_title' => 'System Administrator', 'broad_field' => 'IT and Computer Work', 'general_term' => 'it work', 'role_function' => 'Systems Administration', 'confidence' => 92, 'reason' => 'Managing servers and IT systems.'],
+            ],
+        ],
+        [
+            'triggers' => ['data analyst', 'data analysis', 'business analyst it', 'bi analyst', 'power bi', 'business intelligence'],
+            'suggestions' => [
+                ['occupation_title' => 'Data Analyst', 'broad_field' => 'IT and Computer Work', 'general_term' => 'it work', 'role_function' => 'Data Analysis', 'confidence' => 90, 'reason' => 'Data analysis and business intelligence.'],
+            ],
+        ],
+        [
+            'triggers' => ['data scientist', 'machine learning', 'ml engineer', 'ai engineer', 'artificial intelligence'],
+            'suggestions' => [
+                ['occupation_title' => 'Data Scientist / ML Engineer', 'broad_field' => 'IT and Computer Work', 'general_term' => 'it work', 'role_function' => 'Data Science / AI', 'confidence' => 90, 'reason' => 'Machine learning and data science.'],
+            ],
+        ],
+        [
+            'triggers' => ['cybersecurity', 'cyber security', 'information security', 'infosec', 'penetration test'],
+            'suggestions' => [
+                ['occupation_title' => 'Cybersecurity Analyst', 'broad_field' => 'IT and Computer Work', 'general_term' => 'it work', 'role_function' => 'Cybersecurity', 'confidence' => 90, 'reason' => 'Network and information security.'],
+            ],
+        ],
+        [
+            'triggers' => ['cloud engineer', 'cloud architect', 'aws engineer', 'azure engineer', 'devops', 'cloud computing'],
+            'suggestions' => [
+                ['occupation_title' => 'Cloud / DevOps Engineer', 'broad_field' => 'IT and Computer Work', 'general_term' => 'it work', 'role_function' => 'Cloud / DevOps', 'confidence' => 90, 'reason' => 'Cloud infrastructure and DevOps engineering.'],
+            ],
+        ],
+        [
+            'triggers' => ['qa engineer', 'quality assurance engineer', 'software tester', 'test engineer', 'automation tester'],
+            'suggestions' => [
+                ['occupation_title' => 'QA Engineer', 'broad_field' => 'IT and Computer Work', 'general_term' => 'it work', 'role_function' => 'Software Quality Assurance', 'confidence' => 90, 'reason' => 'Software quality testing and assurance.'],
+            ],
+        ],
+        [
+            'triggers' => ['ui ux', 'ux designer', 'ui designer', 'user experience', 'product designer'],
+            'suggestions' => [
+                ['occupation_title' => 'UI/UX Designer', 'broad_field' => 'IT and Computer Work', 'general_term' => 'it work', 'role_function' => 'UI/UX Design', 'confidence' => 90, 'reason' => 'User interface and experience design.'],
+            ],
+        ],
+
+        // ── Legal ──
+        [
+            'triggers' => ['lawyer', 'attorney', 'abogado', 'barrister', 'litigator', 'public attorney', 'atty', 'legal counsel'],
+            'suggestions' => [
+                ['occupation_title' => 'Lawyer / Attorney', 'broad_field' => 'Legal and Justice', 'general_term' => 'legal work', 'role_function' => 'Legal Practice', 'confidence' => 95, 'reason' => 'Legal representation and counsel.'],
+            ],
+        ],
+        [
+            'triggers' => ['paralegal', 'legal assistant', 'legal secretary', 'legal staff', 'legal officer'],
+            'suggestions' => [
+                ['occupation_title' => 'Paralegal / Legal Assistant', 'broad_field' => 'Legal and Justice', 'general_term' => 'legal work', 'role_function' => 'Legal Support', 'confidence' => 92, 'reason' => 'Assisting lawyers and legal professionals.'],
+            ],
+        ],
+        [
+            'triggers' => ['notary public', 'clerk of court', 'court employee', 'judiciary staff'],
+            'suggestions' => [
+                ['occupation_title' => 'Notary / Court Staff', 'broad_field' => 'Legal and Justice', 'general_term' => 'legal work', 'role_function' => 'Notarial / Court Services', 'confidence' => 90, 'reason' => 'Court services and notarial work.'],
+            ],
+        ],
+
+        // ── Government & Social Services ──
+        [
+            'triggers' => ['government employee', 'civil servant', 'government worker', 'public servant', 'lgu employee', 'city hall employee', 'government staff'],
+            'suggestions' => [
+                ['occupation_title' => 'Government Employee', 'broad_field' => 'Public Administration', 'general_term' => 'government work', 'role_function' => 'Government Service', 'confidence' => 85, 'reason' => 'Working for a government agency or LGU.'],
+            ],
+        ],
+        [
+            'triggers' => ['barangay official', 'barangay captain', 'barangay secretary', 'barangay treasurer', 'barangay kagawad', 'barangay tanod'],
+            'suggestions' => [
+                ['occupation_title' => 'Barangay Official / Staff', 'broad_field' => 'Public Administration', 'general_term' => 'government work', 'role_function' => 'Barangay Governance', 'confidence' => 90, 'reason' => 'Serving in barangay government offices.'],
+            ],
+        ],
+        [
+            'triggers' => ['social worker', 'case worker', 'family welfare worker', 'dswd worker', 'child welfare', 'community development'],
+            'suggestions' => [
+                ['occupation_title' => 'Social Worker', 'broad_field' => 'Public Administration', 'general_term' => 'government work', 'role_function' => 'Social Welfare', 'confidence' => 90, 'reason' => 'Providing social welfare and community services.'],
+            ],
+        ],
+        [
+            'triggers' => ['military', 'soldier', 'sundalo', 'army', 'navy', 'air force', 'afp', 'coast guard'],
+            'suggestions' => [
+                ['occupation_title' => 'Military Personnel', 'broad_field' => 'Armed Forces and Defense', 'general_term' => 'military work', 'role_function' => 'Military Service', 'confidence' => 90, 'reason' => 'Service in the armed forces.'],
+            ],
+        ],
+
+        // ── Agriculture (expanded) ──
+        [
+            'triggers' => ['livestock farmer', 'pig farmer', 'hog raiser', 'poultry farmer', 'chicken farmer', 'animal husbandry'],
+            'suggestions' => [
+                ['occupation_title' => 'Livestock / Poultry Farmer', 'broad_field' => 'Agriculture and Farming', 'general_term' => 'agriculture work', 'role_function' => 'Livestock Farming', 'confidence' => 90, 'reason' => 'Raising livestock and poultry for food.'],
+            ],
+        ],
+
+        // ── Retail (expanded) ──
+        [
+            'triggers' => ['merchandiser', 'product merchandiser', 'trade merchandiser', 'retail merchandiser'],
+            'suggestions' => [
+                ['occupation_title' => 'Merchandiser', 'broad_field' => 'Retail and Store Work', 'general_term' => 'retail work', 'role_function' => 'Merchandising', 'confidence' => 90, 'reason' => 'Arranging and promoting products in stores.'],
+            ],
+        ],
+        [
+            'triggers' => ['promodizer', 'promoter', 'product demonstrator', 'brand promoter', 'in-store promoter'],
+            'suggestions' => [
+                ['occupation_title' => 'Promodizer / Promoter', 'broad_field' => 'Retail and Store Work', 'general_term' => 'retail work', 'role_function' => 'Product Promotion', 'confidence' => 88, 'reason' => 'In-store product promotion and demonstration.'],
+            ],
+        ],
+        [
+            'triggers' => ['medical representative', 'med rep', 'pharma rep', 'pharmaceutical rep', 'detailer'],
+            'suggestions' => [
+                ['occupation_title' => 'Medical Representative', 'broad_field' => 'Retail and Store Work', 'general_term' => 'retail work', 'role_function' => 'Medical Sales', 'confidence' => 90, 'reason' => 'Promoting pharmaceutical products to medical professionals.'],
+            ],
+        ],
+        [
+            'triggers' => ['real estate agent', 'property agent', 'real estate broker', 'property broker', 'property sales'],
+            'suggestions' => [
+                ['occupation_title' => 'Real Estate Agent', 'broad_field' => 'Retail and Store Work', 'general_term' => 'retail work', 'role_function' => 'Real Estate Sales', 'confidence' => 88, 'reason' => 'Selling or renting real estate properties.'],
+            ],
+        ],
+
+        // ── Creative (expanded) ──
+        [
+            'triggers' => ['animator', '2d animator', '3d animator', 'motion graphics', 'animation'],
+            'suggestions' => [
+                ['occupation_title' => 'Animator / Motion Designer', 'broad_field' => 'Media Arts and Design', 'general_term' => 'creative work', 'role_function' => 'Animation', 'confidence' => 90, 'reason' => 'Creating animation and motion graphics.'],
+            ],
+        ],
+        [
+            'triggers' => ['journalist', 'reporter', 'news writer', 'editor media', 'proofreader'],
+            'suggestions' => [
+                ['occupation_title' => 'Journalist / Editor', 'broad_field' => 'Media Arts and Design', 'general_term' => 'creative work', 'role_function' => 'Journalism / Editorial', 'confidence' => 88, 'reason' => 'Writing and editing news and editorial content.'],
+            ],
+        ],
+        [
+            'triggers' => ['fashion designer', 'clothing designer', 'costume designer', 'wardrobe stylist'],
+            'suggestions' => [
+                ['occupation_title' => 'Fashion Designer', 'broad_field' => 'Media Arts and Design', 'general_term' => 'creative work', 'role_function' => 'Fashion Design', 'confidence' => 88, 'reason' => 'Designing clothing and fashion items.'],
+            ],
+        ],
+        [
+            'triggers' => ['broadcaster', 'radio announcer', 'tv host', 'news anchor', 'emcee', 'on-air'],
+            'suggestions' => [
+                ['occupation_title' => 'Broadcaster / Media Personality', 'broad_field' => 'Media Arts and Design', 'general_term' => 'creative work', 'role_function' => 'Broadcasting / Media', 'confidence' => 88, 'reason' => 'On-air broadcasting and media personality.'],
             ],
         ],
 

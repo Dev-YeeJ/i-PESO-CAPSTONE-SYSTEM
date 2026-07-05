@@ -97,9 +97,16 @@ export default function EmployerRegistration() {
     industry: profile?.industry ?? user?.industry ?? '',
     company_size: profile?.company_size ?? '',
     province: profile?.province ?? '',
+    province_code: profile?.province_code ?? '',
     city: profile?.city_municipality ?? '',
+    city_code: profile?.city_code ?? '',
     barangay: profile?.barangay ?? '',
+    barangay_code: profile?.barangay_code ?? '',
     street_address: profile?.house_unit_street ?? '',
+    latitude: profile?.latitude ?? null,
+    longitude: profile?.longitude ?? null,
+    location_accuracy: profile?.location_accuracy ?? null,
+    google_place_id: profile?.google_place_id ?? null,
     description: profile?.company_description ?? '',
   }
 

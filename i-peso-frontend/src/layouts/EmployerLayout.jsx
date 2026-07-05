@@ -19,6 +19,7 @@ import {
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import NotificationBell from '@/pages/employer/components/NotificationBell'
 import { useAuthStore } from '@/stores/authStore'
+import IPesoLogo from '@/components/branding/IPesoLogo'
 
 const navItems = [
   { to: '/employer/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -69,7 +70,7 @@ export default function EmployerLayout() {
           const { authService } = await import('@/services/authService')
           const updatedUser = await authService.getAuthenticatedUser()
           updateUser(updatedUser)
-        } catch (err) {
+        } catch {
           // silently fail
         }
       }
@@ -90,7 +91,7 @@ export default function EmployerLayout() {
   const sidebar = (
     <>
       <div className={`flex h-[76px] items-center border-b border-white/10 ${collapsed ? 'justify-center px-3' : 'gap-3 px-5'}`}>
-        <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-brand-gold text-lg font-black text-brand-navy shadow-sm">iP</span>
+        <span className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white shadow-sm"><IPesoLogo className="h-full w-full" /></span>
         {!collapsed && (
           <div>
             <p className="text-lg font-extrabold leading-none text-white">i-PESO</p>

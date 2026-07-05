@@ -48,6 +48,7 @@ class ApplicationStatusNotification extends Notification implements ShouldQueue
             'interview' => "Interview Scheduled",
             'hired' => "You're Hired!",
             'rejected' => "Status Update",
+            'withdrawn' => "Application Withdrawn",
         ];
 
         $messageMap = [
@@ -57,13 +58,14 @@ class ApplicationStatusNotification extends Notification implements ShouldQueue
             'interview' => "$companyName scheduled an interview for $jobTitle.",
             'hired' => "Congratulations! $companyName hired you for $jobTitle.",
             'rejected' => "$companyName updated your application for $jobTitle.",
+            'withdrawn' => "You withdrew your application for $jobTitle.",
         ];
 
         return [
             'status' => $status,
             'title' => $titleMap[$status] ?? "Application Update",
             'message' => $messageMap[$status] ?? "There is an update on your application.",
-            'application_id' => $this->application->id,
+            'application_id' => $this->application->apply_id,
             'action_url' => '/seeker/applications'
         ];
     }
@@ -74,12 +76,17 @@ class ApplicationStatusNotification extends Notification implements ShouldQueue
     public function toMail(object $notifiable): MailMessage
     {
         $status = $this->application->status;
-        $seekerName = $notifiable->name ?? 'Job Seeker';
+        $seekerName = collect([
+            $notifiable->first_name ?? null,
+            $notifiable->middle_name ?? null,
+            $notifiable->last_name ?? null,
+        ])->filter()->join(' ') ?: ($notifiable->name ?? 'Job Seeker');
         $companyName = $this->application->jobVacancy->employer->company_name ?? 'the employer';
         $jobTitle = $this->application->jobVacancy->job_title ?? 'the position';
         
         $matchScore = $this->application->match_percentage ? number_format((float)$this->application->match_percentage, 1) : '95';
-        $url = config('app.frontend_url') . ($status === 'rejected' ? '/seeker/matches' : '/seeker/applications');
+        $url = rtrim((string) config('app.frontend_url'), '/')
+            .($status === 'rejected' ? '/seeker/job-map' : '/seeker/applications');
 
         $interview = $this->application->interviewSchedule;
         $interviewDate = $interview && $interview->schedule ? \Carbon\Carbon::parse($interview->schedule)->format('F j, Y \a\t g:i A') : 'TBD';
@@ -94,6 +101,7 @@ class ApplicationStatusNotification extends Notification implements ShouldQueue
             'interview' => "Interview Scheduled: $jobTitle",
             'hired' => "🎉 You're Hired: $jobTitle",
             'rejected' => "Update on your application: $jobTitle",
+            'withdrawn' => "Application Withdrawn: $jobTitle",
         ];
 
         return (new MailMessage)

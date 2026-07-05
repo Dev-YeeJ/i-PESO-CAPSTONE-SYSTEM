@@ -145,6 +145,9 @@ export default function NotificationBell() {
                   <span className="min-w-0 flex-1">
                     <span className="block text-sm font-semibold text-slate-900">{notification.data?.title}</span>
                     <span className="mt-0.5 block text-xs leading-5 text-slate-600">{notification.data?.message}</span>
+                    {notification.data?.interview_schedule && (
+                      <span className="mt-1 block text-[11px] font-semibold uppercase tracking-wide text-indigo-700">{notification.data.interview_schedule}</span>
+                    )}
                     <span className="mt-1 block text-[11px] font-medium text-slate-400">
                       {new Date(notification.created_at).toLocaleString()}
                     </span>

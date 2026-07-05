@@ -151,6 +151,7 @@ const cleanEducationForSubmit = (education) => {
     : ''
 
   return {
+    attainment_level: education.attainment_level || null,
     level: level || null,
     institution_name: String(education.institution_name ?? '').trim().replace(/\s+/g, ' ') || null,
     course_strand: courseStrand || null,
@@ -315,6 +316,8 @@ const normalizeOccupationText = (value) => String(value ?? '')
   .trim()
   .replace(/\s+/g, ' ')
 
+// Kept for compatibility with pending broad-field normalization work.
+// eslint-disable-next-line no-unused-vars
 const inferBroadOccupationTerm = (occupation) => {
   const existing = normalizeOccupationText(occupation?.general_term || occupation?.matched_general_term)
   if (existing) return existing
@@ -417,16 +420,6 @@ const TRAINING_INSTITUTION_OPTIONS = [
   'TESDA Accredited Training Center',
   'TESDA Provincial Training Center',
   'Technical Vocational Institution',
-]
-
-const CERTIFICATE_OPTIONS = [
-  'Certificate of Attendance',
-  'Certificate of Completion',
-  'Certificate of Competency',
-  'National Certificate I',
-  'National Certificate II',
-  'National Certificate III',
-  'National Certificate IV',
 ]
 
 const ELIGIBILITY_NAME_OPTIONS = [
@@ -1955,13 +1948,6 @@ function Step6({ form, errors, onAddTraining, onRemoveTraining, onUpdateTraining
                         options={TRAINING_SKILL_OPTIONS}
                         placeholder="Skills acquired (optional)"
                       />
-                      <SearchableSingleSelect
-                        name={`training_certificate_${i}`}
-                        value={train.certificates_received || ''}
-                        onChange={(event) => onUpdateTraining('trainings', i, { certificates_received: event.target.value })}
-                        options={CERTIFICATE_OPTIONS}
-                        placeholder="Certificate received (optional)"
-                      />
                     </div>
                   </td>
                   <td style={{ padding: '10px' }}>
@@ -2443,27 +2429,24 @@ function WorkExperienceCards({ form, errors, onAddExperience, onRemoveExperience
                   </div>
 
                   <div className="grid gap-4">
-                    <OccupationCombobox
-                      id={`position-title-${i}`}
-                      selected={
-                        exp.occupation_id
-                          ? { id: exp.occupation_id, title: exp.position }
-                          : exp.position
-                            ? { id: 'custom', title: exp.position }
-                            : null
-                      }
-                      multiple={false}
-                      allowCustomFallback={true}
-                      onChange={(nextOccupation) => {
-                        onUpdateExperience('work_experiences', i, {
-                          position: nextOccupation ? nextOccupation.title : '',
-                          occupation_id: nextOccupation && nextOccupation.id !== 'custom' ? nextOccupation.id : null,
-                          occupation: nextOccupation ? nextOccupation.title : null,
-                        })
-                      }}
-                      placeholder="Search standardized job titles"
-                      error={errors[`work_experiences.${i}.position`]}
-                    />
+                    <label className="block">
+                      <span className="mb-1.5 block text-xs font-black uppercase tracking-wide text-slate-600">Job Title</span>
+                      <input
+                        id={`position-title-${i}`}
+                        type="text"
+                        value={exp.position || ''}
+                        onChange={(event) => onUpdateExperience('work_experiences', i, {
+                          position: event.target.value,
+                          occupation_id: null,
+                          occupation: null,
+                        })}
+                        placeholder="Example: Cashier, Web Developer, Office Staff"
+                        className={`h-11 w-full rounded-lg border bg-white px-3 text-sm font-semibold text-slate-900 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-blue-700 focus:ring-2 focus:ring-blue-700/15 ${errors[`work_experiences.${i}.position`] ? 'border-red-400' : 'border-slate-300'}`}
+                      />
+                      {errors[`work_experiences.${i}.position`] && (
+                        <span className="mt-1.5 block text-xs font-semibold text-red-600">{errors[`work_experiences.${i}.position`]}</span>
+                      )}
+                    </label>
 
                     <ExperienceTimeFrame
                       mode="seeker"

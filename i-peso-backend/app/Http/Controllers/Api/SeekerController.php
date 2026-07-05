@@ -250,7 +250,7 @@ class SeekerController extends Controller
             'eligibilities',
             'workExperiences.occupation',
             'seekerSkills',
-            'certificates',
+            'certificates.training',
             'savedJobs',
         ]);
 
@@ -321,7 +321,17 @@ class SeekerController extends Controller
                     'certificate_id' => $certificate->certificate_id,
                     'title' => $certificate->title,
                     'issuing_body' => $certificate->issuing_body,
+                    'category' => $certificate->category,
                     'issued_at' => $certificate->issued_at?->format('Y-m-d'),
+                    'expires_at' => $certificate->expires_at?->format('Y-m-d'),
+                    'credential_number' => $certificate->credential_number,
+                    'description' => $certificate->description,
+                    'training_id' => $certificate->training_id,
+                    'training' => $certificate->training ? [
+                        'id' => $certificate->training->getKey(),
+                        'course' => $certificate->training->course,
+                        'training_institution' => $certificate->training->training_institution,
+                    ] : null,
                     'original_filename' => $certificate->original_filename,
                     'mime_type' => $certificate->mime_type,
                     'file_size' => $certificate->file_size,
@@ -410,12 +420,14 @@ class SeekerController extends Controller
             return $seeker;
         }
 
+        $minimumBirthDate = today()->subYears(15)->toDateString();
+
         $validated = $request->validate([
             'first_name' => ['required', 'string', 'max:100'],
             'middle_name' => ['nullable', 'string', 'max:100'],
             'last_name' => ['required', 'string', 'max:100'],
             'suffix' => ['nullable', 'string', 'in:,Jr.,Sr.,II,III,IV,V'],
-            'date_of_birth' => ['required', 'date', 'before:today'],
+            'date_of_birth' => ['required', 'date', 'before_or_equal:'.$minimumBirthDate],
             'sex' => ['required', 'in:male,female'],
             'civil_status' => ['required', 'in:single,married,widowed,separated'],
             'religion' => ['required', 'string', 'in:roman_catholic,islam,iglesia_ni_cristo,aglipayan,evangelical,seventh_day_adventist,jehovah_witness,buddhist,hindu,jewish,agnostic_atheist,declined,other'],
@@ -1045,6 +1057,7 @@ class SeekerController extends Controller
             'educ_attainment' => ['nullable', 'string', Rule::in(self::EDUCATIONAL_ATTAINMENT_OPTIONS)],
             'currently_in_school' => ['required', 'boolean'],
             'educations' => ['required', 'array', 'min:1'],
+            'educations.*.attainment_level' => ['nullable', 'string', 'in:elementary_undergraduate,elementary_graduate,high_school_undergraduate,high_school_graduate,senior_high_undergraduate,senior_high_graduate,vocational,college_undergraduate,college_graduate,post_graduate'],
             'educations.*.level' => ['required', 'string', 'in:elementary,secondary_non_k12,secondary_k12,senior_high_strand,vocational,tertiary,graduate_studies'],
             'educations.*.institution_name' => ['required', 'string', 'max:255'],
             'educations.*.course_strand' => ['nullable', 'string', 'max:255'],
@@ -1097,7 +1110,22 @@ class SeekerController extends Controller
             foreach ($request->input('educations', []) as $index => $education) {
                 $level = $education['level'] ?? null;
                 $status = $education['completion_status'] ?? null;
+                $attainmentLevel = $education['attainment_level'] ?? null;
                 $yearStarted = isset($education['year_started']) ? (int) $education['year_started'] : null;
+
+                if (in_array($attainmentLevel, ['elementary_undergraduate', 'high_school_undergraduate', 'senior_high_undergraduate', 'college_undergraduate'], true) && $status === 'graduated') {
+                    $validator->errors()->add(
+                        "educations.{$index}.completion_status",
+                        'Graduated is not a valid status for an undergraduate education level.'
+                    );
+                }
+
+                if (in_array($attainmentLevel, ['elementary_graduate', 'high_school_graduate', 'senior_high_graduate', 'college_graduate'], true) && $status !== 'graduated') {
+                    $validator->errors()->add(
+                        "educations.{$index}.completion_status",
+                        'Graduate education levels must use the Graduated status.'
+                    );
+                }
 
                 if ($this->educationRequiresProgram($level) && ! filled($education['course_strand'] ?? null)) {
                     $validator->errors()->add(

@@ -84,6 +84,27 @@ class SeekerProfileFeaturesTest extends TestCase
             ->assertJsonValidationErrors('disability_specification');
     }
 
+    public function test_step_one_requires_the_seeker_to_be_at_least_fifteen(): void
+    {
+        $seeker = $this->createSeeker();
+        Sanctum::actingAs($seeker);
+
+        $this->postJson('/api/seeker/step-1', [
+            'first_name' => 'Young',
+            'last_name' => 'Applicant',
+            'date_of_birth' => today()->subYears(14)->toDateString(),
+            'sex' => 'male',
+            'civil_status' => 'single',
+            'religion' => 'roman_catholic',
+            'height_ft' => 5.2,
+            'address_province' => 'Pangasinan',
+            'address_municipality_city' => 'Urdaneta City',
+            'address_barangay' => 'Poblacion',
+            'address_house_street' => '123 Rizal Street',
+            'disabilities' => ['none'],
+        ])->assertUnprocessable()->assertJsonValidationErrors('date_of_birth');
+    }
+
     public function test_optional_work_history_step_accepts_empty_arrays(): void
     {
         $seeker = $this->createSeeker();
@@ -488,6 +509,25 @@ class SeekerProfileFeaturesTest extends TestCase
             ]);
     }
 
+    public function test_step_five_rejects_graduated_status_for_an_undergraduate_level(): void
+    {
+        $seeker = $this->createSeeker();
+        Sanctum::actingAs($seeker);
+
+        $this->postJson('/api/seeker/step-5', [
+            'currently_in_school' => false,
+            'educations' => [[
+                'attainment_level' => 'college_undergraduate',
+                'level' => 'tertiary',
+                'institution_name' => 'Pangasinan State University',
+                'course_strand' => 'Bachelor of Science in Information Technology',
+                'completion_status' => 'graduated',
+                'year_started' => 2022,
+                'year_graduated' => 2025,
+            ]],
+        ])->assertUnprocessable()->assertJsonValidationErrors('educations.0.completion_status');
+    }
+
     public function test_step_five_rejects_duplicate_education_records(): void
     {
         $seeker = $this->createSeeker();
@@ -690,16 +730,27 @@ class SeekerProfileFeaturesTest extends TestCase
     {
         Storage::fake('local');
         $seeker = $this->createSeeker();
+        $seeker->trainings()->create([
+            'course' => 'Computer Systems Servicing NC II',
+            'training_institution' => 'TESDA',
+        ]);
         Sanctum::actingAs($seeker);
 
         $response = $this->post('/api/seeker/certificates', [
             'title' => 'Computer Systems Servicing NC II',
             'issuing_body' => 'TESDA',
+            'category' => 'tesda_nc_certificate',
             'issued_at' => '2025-06-01',
+            'expires_at' => '2030-06-01',
+            'credential_number' => 'TESDA-CSS-2025-001',
+            'description' => 'National competency certificate.',
+            'training_id' => $seeker->trainings()->first()->getKey(),
             'certificate_file' => $this->fakePng('tesda-certificate.png'),
         ])
             ->assertCreated()
-            ->assertJsonPath('certificate.title', 'Computer Systems Servicing NC II');
+            ->assertJsonPath('certificate.title', 'Computer Systems Servicing NC II')
+            ->assertJsonPath('certificate.category', 'tesda_nc_certificate')
+            ->assertJsonPath('certificate.training.course', 'Computer Systems Servicing NC II');
 
         $certificateId = $response->json('certificate.certificate_id');
         $certificate = SeekerCertificate::findOrFail($certificateId);
@@ -709,6 +760,99 @@ class SeekerProfileFeaturesTest extends TestCase
         $this->get("/api/seeker/certificates/{$certificateId}/view")
             ->assertOk()
             ->assertHeader('content-type', 'image/png');
+    }
+
+    public function test_seeker_can_upload_a_complete_standalone_certificate_without_training(): void
+    {
+        Storage::fake('local');
+        $seeker = $this->createSeeker();
+        Sanctum::actingAs($seeker);
+
+        $this->post('/api/seeker/certificates', [
+            'title' => 'Workplace Safety Seminar',
+            'issuing_body' => 'Urdaneta City PESO',
+            'category' => 'seminar_certificate',
+            'issued_at' => '2025-05-10',
+            'certificate_file' => $this->fakePng('safety-seminar.png'),
+        ])
+            ->assertCreated()
+            ->assertJsonPath('certificate.training_id', null);
+    }
+
+    public function test_certificate_upload_requires_complete_record_details(): void
+    {
+        Storage::fake('local');
+        $seeker = $this->createSeeker();
+        Sanctum::actingAs($seeker);
+
+        $this->withHeader('Accept', 'application/json')->post('/api/seeker/certificates', [
+            'certificate_file' => $this->fakePng('proof-only.png'),
+        ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['title', 'issuing_body', 'category', 'issued_at']);
+
+        Storage::disk('local')->assertDirectoryEmpty("seeker_certificates/{$seeker->getKey()}");
+    }
+
+    public function test_certificate_expiration_must_be_after_issue_date(): void
+    {
+        Storage::fake('local');
+        $seeker = $this->createSeeker();
+        Sanctum::actingAs($seeker);
+
+        $this->withHeader('Accept', 'application/json')->post('/api/seeker/certificates', [
+            'title' => 'Safety Training',
+            'issuing_body' => 'PESO',
+            'category' => 'training_certificate',
+            'issued_at' => '2025-06-01',
+            'expires_at' => '2025-05-31',
+            'certificate_file' => $this->fakePng('safety.png'),
+        ])->assertUnprocessable()->assertJsonValidationErrors('expires_at');
+    }
+
+    public function test_certificate_training_link_must_belong_to_authenticated_seeker(): void
+    {
+        Storage::fake('local');
+        $seeker = $this->createSeeker();
+        $otherSeeker = $this->createSeeker();
+        $otherTraining = $otherSeeker->trainings()->create([
+            'course' => 'Welding NC II',
+            'training_institution' => 'TESDA',
+        ]);
+        Sanctum::actingAs($seeker);
+
+        $this->withHeader('Accept', 'application/json')->post('/api/seeker/certificates', [
+            'title' => 'Welding NC II',
+            'issuing_body' => 'TESDA',
+            'category' => 'tesda_nc_certificate',
+            'issued_at' => '2025-06-01',
+            'training_id' => $otherTraining->getKey(),
+            'certificate_file' => $this->fakePng('welding.png'),
+        ])->assertUnprocessable()->assertJsonValidationErrors('training_id');
+    }
+
+    public function test_certificate_rejects_unsafe_or_oversized_files(): void
+    {
+        Storage::fake('local');
+        $seeker = $this->createSeeker();
+        Sanctum::actingAs($seeker);
+
+        $base = [
+            'title' => 'Safety Training',
+            'issuing_body' => 'PESO',
+            'category' => 'training_certificate',
+            'issued_at' => '2025-06-01',
+        ];
+
+        $this->withHeader('Accept', 'application/json')->post('/api/seeker/certificates', [
+            ...$base,
+            'certificate_file' => UploadedFile::fake()->create('malware.exe', 20, 'application/x-msdownload'),
+        ])->assertUnprocessable()->assertJsonValidationErrors('certificate_file');
+
+        $this->withHeader('Accept', 'application/json')->post('/api/seeker/certificates', [
+            ...$base,
+            'certificate_file' => UploadedFile::fake()->create('oversized.pdf', 5121, 'application/pdf'),
+        ])->assertUnprocessable()->assertJsonValidationErrors('certificate_file');
     }
 
     public function test_seeker_cannot_view_another_seekers_certificate(): void
@@ -948,6 +1092,7 @@ class SeekerProfileFeaturesTest extends TestCase
                 $table->string('address_barangay')->nullable();
                 $table->string('address_municipality_city')->nullable();
                 $table->string('address_province')->nullable();
+                $table->string('address_region_code', 20)->nullable();
                 $table->string('address_province_code', 10)->nullable();
                 $table->string('address_city_code', 10)->nullable();
                 $table->string('address_barangay_code', 10)->nullable();
@@ -955,6 +1100,7 @@ class SeekerProfileFeaturesTest extends TestCase
                 $table->decimal('longitude', 10, 7)->nullable();
                 $table->unsignedInteger('location_accuracy')->nullable();
                 $table->string('google_place_id')->nullable();
+                $table->string('full_address', 500)->nullable();
                 $table->string('employment_status')->nullable();
                 $table->string('employment_type')->nullable();
                 $table->string('self_employed_type')->nullable();
@@ -993,6 +1139,10 @@ class SeekerProfileFeaturesTest extends TestCase
         $this->createSimpleRelationTable('seeker_occupations', function (Blueprint $table) {
             $table->unsignedBigInteger('occupation_id')->nullable();
             $table->string('general_term')->nullable();
+            $table->string('broad_field')->nullable();
+            $table->string('role_function')->nullable();
+            $table->decimal('confidence', 5, 4)->nullable();
+            $table->string('source')->nullable();
             $table->string('occupation_title');
             $table->string('raw_job_title')->nullable();
             $table->string('status')->default('standardized');
@@ -1066,11 +1216,58 @@ class SeekerProfileFeaturesTest extends TestCase
                 $table->unsignedBigInteger('seeker_id');
                 $table->string('title');
                 $table->string('issuing_body');
+                $table->string('category', 50)->nullable();
                 $table->string('file_path');
                 $table->string('original_filename');
                 $table->string('mime_type');
                 $table->unsignedBigInteger('file_size');
                 $table->date('issued_at')->nullable();
+                $table->date('expires_at')->nullable();
+                $table->string('credential_number', 100)->nullable();
+                $table->text('description')->nullable();
+                $table->unsignedBigInteger('training_id')->nullable();
+                $table->timestamps();
+            });
+        } else {
+            if (! Schema::hasColumn('seeker_certificates', 'category')) {
+                Schema::table('seeker_certificates', function (Blueprint $table) {
+                    $table->string('category', 50)->nullable();
+                });
+            }
+            if (! Schema::hasColumn('seeker_certificates', 'expires_at')) {
+                Schema::table('seeker_certificates', function (Blueprint $table) {
+                    $table->date('expires_at')->nullable();
+                });
+            }
+            if (! Schema::hasColumn('seeker_certificates', 'credential_number')) {
+                Schema::table('seeker_certificates', function (Blueprint $table) {
+                    $table->string('credential_number', 100)->nullable();
+                });
+            }
+            if (! Schema::hasColumn('seeker_certificates', 'description')) {
+                Schema::table('seeker_certificates', function (Blueprint $table) {
+                    $table->text('description')->nullable();
+                });
+            }
+            if (! Schema::hasColumn('seeker_certificates', 'training_id')) {
+                Schema::table('seeker_certificates', function (Blueprint $table) {
+                    $table->unsignedBigInteger('training_id')->nullable();
+                });
+            }
+        }
+
+        if (! Schema::hasTable('job_vacancies')) {
+            Schema::create('job_vacancies', function (Blueprint $table) {
+                $table->id('post_id');
+                $table->timestamps();
+            });
+        }
+
+        if (! Schema::hasTable('seeker_saved_jobs')) {
+            Schema::create('seeker_saved_jobs', function (Blueprint $table) {
+                $table->id();
+                $table->unsignedBigInteger('seeker_id');
+                $table->unsignedBigInteger('vacancy_id');
                 $table->timestamps();
             });
         }

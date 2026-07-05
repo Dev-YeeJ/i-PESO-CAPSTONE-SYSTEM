@@ -10,6 +10,7 @@ use App\Models\JobVacancy;
 use App\Models\Occupation;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Schema;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
@@ -84,6 +85,90 @@ class HiringApplicationFlowTest extends TestCase
             ->assertOk()
             ->assertJsonPath('data.0.status', 'hired')
             ->assertJsonPath('data.0.job.employer.company_name', 'Verified Employer Inc.');
+    }
+
+    public function test_employer_scheduling_interview_sends_immediate_notifications_to_both_parties(): void
+    {
+        Notification::fake();
+
+        $employer = $this->createEmployer();
+        $seeker = $this->createSeeker();
+        $vacancy = $this->createVacancy($employer);
+
+        Sanctum::actingAs($seeker);
+        $this->postJson("/api/seeker/jobs/{$vacancy->post_id}/apply")->assertCreated();
+
+        $application = Application::firstOrFail();
+
+        Sanctum::actingAs($employer);
+        $this->patchJson("/api/employer/applications/{$application->apply_id}/status", [
+            'status' => 'interview',
+            'interview' => [
+                'mode_of_interview' => 'online',
+                'schedule' => now()->addDay()->format('Y-m-d H:i:s'),
+                'venue_or_link' => 'https://meet.google.com/abc-defg-hij',
+                'instructions' => 'Please join on time.',
+            ],
+        ])->assertOk();
+
+        Notification::assertSentTo($seeker, \App\Notifications\InterviewScheduledNotification::class);
+        Notification::assertSentTo($employer, \App\Notifications\InterviewScheduledNotification::class);
+    }
+
+    public function test_seekers_can_view_application_timeline_and_withdraw(): void
+    {
+        $employer = $this->createEmployer();
+        $seeker = $this->createSeeker();
+        $vacancy = $this->createVacancy($employer);
+
+        Sanctum::actingAs($seeker);
+        $this->postJson("/api/seeker/jobs/{$vacancy->post_id}/apply")
+            ->assertCreated();
+
+        $application = Application::firstOrFail();
+
+        $this->getJson("/api/seeker/applications/{$application->apply_id}")
+            ->assertOk()
+            ->assertJsonPath('application.apply_id', $application->apply_id)
+            ->assertJsonPath('application.can_withdraw', true)
+            ->assertJsonPath('application.timeline.0.title', 'Application submitted');
+
+        $this->postJson("/api/seeker/applications/{$application->apply_id}/withdraw")
+            ->assertOk()
+            ->assertJsonPath('application.status', 'withdrawn')
+            ->assertJsonPath('application.can_withdraw', false);
+    }
+
+    public function test_employer_can_view_application_details_and_cannot_reprocess_withdrawn_application(): void
+    {
+        $employer = $this->createEmployer();
+        $seeker = $this->createSeeker();
+        $vacancy = $this->createVacancy($employer);
+
+        Sanctum::actingAs($seeker);
+        $this->postJson("/api/seeker/jobs/{$vacancy->post_id}/apply")
+            ->assertCreated();
+
+        $application = Application::firstOrFail();
+
+        Sanctum::actingAs($employer);
+        $this->getJson("/api/employer/applications/{$application->apply_id}")
+            ->assertOk()
+            ->assertJsonPath('application.apply_id', $application->apply_id)
+            ->assertJsonPath('application.timeline.0.title', 'Application submitted');
+
+        $this->patchJson("/api/employer/applications/{$application->apply_id}/status", [
+            'status' => 'reviewed',
+        ])->assertOk();
+
+        Sanctum::actingAs($seeker);
+        $this->postJson("/api/seeker/applications/{$application->apply_id}/withdraw")
+            ->assertOk();
+
+        Sanctum::actingAs($employer);
+        $this->patchJson("/api/employer/applications/{$application->apply_id}/status", [
+            'status' => 'shortlisted',
+        ])->assertStatus(409);
     }
 
     private function createEmployer(): Employer
@@ -362,6 +447,9 @@ class HiringApplicationFlowTest extends TestCase
                 $table->string('venue_or_link', 500)->nullable();
                 $table->text('instructions')->nullable();
                 $table->string('status')->default('scheduled');
+                $table->timestamp('interview_reminder_24h_sent_at')->nullable();
+                $table->timestamp('interview_reminder_1h_sent_at')->nullable();
+                $table->timestamp('interview_reminder_15m_sent_at')->nullable();
                 $table->timestamps();
             });
         }

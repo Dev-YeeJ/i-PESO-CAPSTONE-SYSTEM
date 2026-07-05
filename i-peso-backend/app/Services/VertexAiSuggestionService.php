@@ -151,7 +151,7 @@ class VertexAiSuggestionService
             ]],
             'generationConfig' => [
                 'temperature' => 0.2,
-                'maxOutputTokens' => 900,
+                'maxOutputTokens' => 3000,
                 'responseMimeType' => 'application/json',
                 'responseSchema' => $this->responseSchema(),
             ],
@@ -169,7 +169,7 @@ class VertexAiSuggestionService
             ]],
             'generationConfig' => [
                 'temperature' => 0.1,
-                'maxOutputTokens' => 700,
+                'maxOutputTokens' => 2500,
                 'responseMimeType' => 'application/json',
                 'responseSchema' => $this->occupationClassificationEnhancedSchema(),
             ],
@@ -187,7 +187,7 @@ class VertexAiSuggestionService
             ]],
             'generationConfig' => [
                 'temperature' => 0.1,
-                'maxOutputTokens' => 700,
+                'maxOutputTokens' => 2500,
                 'responseMimeType' => 'application/json',
                 'responseSchema' => $this->occupationClassificationSchema(),
             ],

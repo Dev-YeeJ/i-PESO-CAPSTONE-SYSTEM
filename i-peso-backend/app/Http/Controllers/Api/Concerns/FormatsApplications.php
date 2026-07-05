@@ -32,11 +32,13 @@ trait FormatsApplications
             'mismatch_reason_details' => $application->mismatch_reason_details,
             'status' => $application->status,
             'status_label' => $this->applicationStatusLabel($application->status),
+            'can_withdraw' => $this->canWithdraw($application),
             'match_percentage' => (float) $application->match_percentage,
             'employer_remarks' => $application->employer_remarks,
             'submitted_documents' => $application->submitted_documents ?? [],
             'applied_at' => $application->created_at?->toISOString(),
             'status_changed_at' => $application->status_changed_at?->toISOString(),
+            'timeline' => $this->buildTimeline($application),
             'job' => $vacancy ? [
                 'post_id' => $vacancy->post_id,
                 'job_title' => $vacancy->job_title,
@@ -100,7 +102,66 @@ trait FormatsApplications
             'interview' => 'Interview',
             'hired' => 'Hired',
             'rejected' => 'Rejected',
+            'withdrawn' => 'Withdrawn',
             default => ucfirst($status),
         };
+    }
+
+    private function canWithdraw(Application $application): bool
+    {
+        return ! in_array($application->status, ['hired', 'rejected', 'withdrawn'], true);
+    }
+
+    private function buildTimeline(Application $application): array
+    {
+        $timeline = [[
+            'title' => 'Application submitted',
+            'description' => 'Your application was submitted and is waiting for review.',
+            'timestamp' => $application->created_at?->toISOString(),
+            'status' => 'submitted',
+        ]];
+
+        $status = $application->status;
+
+        if ($status === 'reviewed') {
+            $timeline[] = [
+                'title' => 'Application reviewed',
+                'description' => 'The employer reviewed your application and opened your profile.',
+                'timestamp' => $application->status_changed_at?->toISOString(),
+                'status' => 'reviewed',
+            ];
+        }
+
+        if (in_array($status, ['shortlisted', 'interview', 'hired', 'rejected', 'withdrawn'], true)) {
+            $timeline[] = [
+                'title' => match ($status) {
+                    'shortlisted' => 'Shortlisted',
+                    'interview' => 'Interview scheduled',
+                    'hired' => 'Hired',
+                    'rejected' => 'Application rejected',
+                    'withdrawn' => 'Application withdrawn',
+                },
+                'description' => match ($status) {
+                    'shortlisted' => 'The employer shortlisted your application for the next step.',
+                    'interview' => 'The employer scheduled an interview for this application.',
+                    'hired' => 'The employer marked this application as hired.',
+                    'rejected' => 'The employer closed this application.',
+                    'withdrawn' => 'You withdrew this application.',
+                },
+                'timestamp' => $application->status_changed_at?->toISOString(),
+                'status' => $status,
+            ];
+        }
+
+        if ($status === 'interview' && $application->interviewSchedule) {
+            $timeline[] = [
+                'title' => 'Interview details shared',
+                'description' => 'The interview date, venue, and instructions were shared.',
+                'timestamp' => $application->interviewSchedule->created_at?->toISOString(),
+                'status' => 'interview_details',
+            ];
+        }
+
+        return $timeline;
     }
 }

@@ -132,6 +132,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/job-map', [SeekerNearbyJobController::class, 'getNearbyJobs'])
             ->middleware('throttle:60,1');
         Route::get('/applications', [SeekerApplicationController::class, 'index']);
+        Route::get('/applications/{application}', [SeekerApplicationController::class, 'show']);
+        Route::post('/applications/{application}/withdraw', [SeekerApplicationController::class, 'withdraw']);
         Route::post('/jobs/{vacancy}/apply', [SeekerApplicationController::class, 'apply'])
             ->middleware('throttle:20,1');
         Route::post('/saved-jobs/{vacancy}', [SeekerController::class, 'toggleSavedJob']);

@@ -42,6 +42,7 @@ class SeekerNearbyJobController extends Controller
             'keyword' => ['nullable', 'string', 'max:100'],
             'location_keyword' => ['nullable', 'string', 'max:100'],
             'sort' => ['nullable', 'string', 'in:distance,match,newest,salary'],
+            'feed_mode' => ['nullable', 'string', 'in:nearby,recommended,latest'],
             'job_type' => ['nullable', 'string', 'max:60'],
             'salary_min' => ['nullable', 'numeric', 'min:0'],
             'salary_max' => ['nullable', 'numeric', 'min:0'],
@@ -69,11 +70,13 @@ class SeekerNearbyJobController extends Controller
         // Matching is calculated after the database query. Keep a generous,
         // deterministic candidate pool so high-match vacancies are not lost
         // behind an arbitrary "latest 100" cutoff.
-        $candidateLimit = min(500, max($limit * 4, 150));
+        $candidateLimit = min(300, max($limit * 2, 50));
 
         $lat = isset($validated['lat']) ? (float) $validated['lat'] : $seeker->latitude;
         $lng = isset($validated['lng']) ? (float) $validated['lng'] : $seeker->longitude;
         $hasLocation = $lat !== null && $lng !== null;
+        $feedMode = $validated['feed_mode'] ?? 'nearby';
+        $usesDistanceFilter = $feedMode === 'nearby' && $hasLocation;
 
         $seekerPayload = $this->seekerPayload(
             $seeker,
@@ -81,7 +84,7 @@ class SeekerNearbyJobController extends Controller
             $seeker->longitude !== null ? (float) $seeker->longitude : null,
         );
 
-        if (! $hasLocation) {
+        if (! $hasLocation && $feedMode === 'nearby') {
             return response()->json([
                 'message' => 'Update your address to view nearby jobs on the map.',
                 'code' => 'location_required',
@@ -205,13 +208,13 @@ class SeekerNearbyJobController extends Controller
         }
 
         // Distance filtering using Haversine formula in SQL
-        if ($hasLocation) {
+        if ($usesDistanceFilter) {
             $query->withinRadius($lat, $lng, $radiusKm, true);
 
             if (($validated['sort'] ?? 'distance') === 'distance') {
                 $query->orderBy('distance_km', 'asc');
             }
-        } elseif (($validated['sort'] ?? 'newest') === 'newest' || empty($validated['sort'])) {
+        } elseif (($validated['sort'] ?? ($feedMode === 'recommended' ? 'match' : 'newest')) === 'newest') {
             $query->latest();
         }
 
@@ -258,7 +261,7 @@ class SeekerNearbyJobController extends Controller
                 }
 
                 $googleMapsUrl = null;
-                if ($job->latitude && $job->longitude) {
+                if ($hasLocation && $job->latitude && $job->longitude) {
                     $googleMapsUrl = "https://www.google.com/maps/dir/?api=1&origin={$lat},{$lng}&destination={$job->latitude},{$job->longitude}";
                 }
 
@@ -421,6 +424,8 @@ class SeekerNearbyJobController extends Controller
             'seeker' => $seekerPayload,
             'summary' => $summary,
             'radius_km' => $radiusKm,
+            'feed_mode' => $feedMode,
+            'location_available' => $hasLocation,
             'origin' => $hasLocation ? [
                 'latitude' => $lat,
                 'longitude' => $lng,

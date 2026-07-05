@@ -1,44 +1,41 @@
 @extends('emails.layouts.premium')
 
+@section('title', $title)
+@section('preheader', $message)
+
 @section('content')
+    @if($status === 'action_required')
+        <span class="eyebrow eyebrow-danger">Action required</span>
+    @elseif($status === 'progress')
+        <span class="eyebrow eyebrow-success">Verification progress</span>
+    @else
+        <span class="eyebrow">Application update</span>
+    @endif
 
-@if($status === 'action_required')
-    <span class="badge badge-red">Action Required</span>
-@elseif($status === 'progress')
-    <span class="badge badge-green">Approved</span>
-@else
-    <span class="badge badge-blue">Update</span>
-@endif
+    <h1>{{ $title }}</h1>
+    <p>{{ $message }}</p>
 
-<h1>{{ $title }}</h1>
-<p>{{ $message }}</p>
+    @if($documentType && $documentLabel)
+        <div class="panel {{ $status === 'action_required' ? 'panel-danger' : ($status === 'progress' ? 'panel-success' : 'panel-accent') }}">
+            <p class="detail-label">Document reviewed</p>
+            <p class="detail-value">{{ $documentLabel }}</p>
+            @if($status === 'action_required')
+                <p style="margin:8px 0 0;color:#b91c1c;font-size:13px;font-weight:700;">Correction required</p>
+            @elseif($status === 'progress')
+                <p style="margin:8px 0 0;color:#047857;font-size:13px;font-weight:700;">Successfully verified</p>
+            @endif
+        </div>
+    @endif
 
-@if($documentType && $documentLabel)
-    <div class="card-inner text-center">
-        <p style="margin-bottom: 8px; color: #64748b; font-size: 14px; text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px;">Document Checked</p>
-        <div style="font-size: 24px; font-weight: 700; color: #0f172a;">{{ $documentLabel }}</div>
-        
-        @if($status === 'action_required')
-            <p style="margin-top: 8px; font-size: 14px; color: #b91c1c;"><strong>Rejected</strong> - Needs Correction</p>
-        @elseif($status === 'progress')
-            <p style="margin-top: 8px; font-size: 14px; color: #15803d;"><strong>Verified</strong> - Successfully Checked</p>
-        @endif
+    @if($remarks)
+        <div class="panel panel-warning">
+            <p class="detail-label">PESO administrator remarks</p>
+            <p style="margin:6px 0 0;color:#78350f;">{{ $remarks }}</p>
+        </div>
+    @endif
+
+    <div class="button-wrap">
+        <a href="{{ $actionUrl }}" class="button button-gold">{{ $actionLabel ?? 'View dashboard' }}</a>
     </div>
-@endif
-
-@if($remarks)
-    <div class="card-inner" style="border-left: 4px solid #f59e0b; background-color: #fffbeb;">
-        <h3 style="margin-top: 0; color: #b45309; font-size: 16px;">PESO Admin Remarks:</h3>
-        <p style="margin-bottom: 0; color: #92400e;">{{ $remarks }}</p>
-    </div>
-@endif
-
-<p>You can monitor the full status of your verification application by logging into your dashboard.</p>
-
-<div class="text-center mt-8">
-    <a href="{{ $actionUrl }}" class="button">
-        {{ $actionLabel ?? 'View Dashboard' }}
-    </a>
-</div>
-
+    <p class="helper text-center">Your employer dashboard contains the latest verification state and available next steps.</p>
 @endsection

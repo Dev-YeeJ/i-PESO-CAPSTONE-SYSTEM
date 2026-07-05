@@ -10,11 +10,13 @@ export const getSeekerAnalytics = async () => {
   return response.data.analytics
 }
 
-export const getNearbyJobs = async ({ radiusKm = 15, limit = 20 } = {}) => {
+export const getNearbyJobs = async ({ radiusKm = 15, limit = 20, feedMode = 'nearby', sort } = {}) => {
   const response = await apiClient.get('/seeker/nearby-jobs', {
     params: {
       radius_km: radiusKm,
       limit,
+      feed_mode: feedMode,
+      ...(sort ? { sort } : {}),
     },
   })
 
@@ -23,6 +25,16 @@ export const getNearbyJobs = async ({ radiusKm = 15, limit = 20 } = {}) => {
 
 export const getSeekerApplications = async () => {
   const response = await apiClient.get('/seeker/applications')
+  return response.data
+}
+
+export const getSeekerApplicationDetail = async (applicationId) => {
+  const response = await apiClient.get(`/seeker/applications/${applicationId}`)
+  return response.data
+}
+
+export const withdrawSeekerApplication = async (applicationId) => {
+  const response = await apiClient.post(`/seeker/applications/${applicationId}/withdraw`)
   return response.data
 }
 
@@ -36,8 +48,8 @@ export const applyToJob = async (postId) => {
   return response.data
 }
 
-export const uploadCertificate = async (formData) => {
-  const response = await apiClient.post('/seeker/certificates', formData)
+export const uploadCertificate = async (formData, { onUploadProgress } = {}) => {
+  const response = await apiClient.post('/seeker/certificates', formData, { onUploadProgress })
   return response.data
 }
 
@@ -108,4 +120,3 @@ export const toggleSavedJob = async (postId) => {
   const response = await apiClient.post(`/seeker/saved-jobs/${postId}`)
   return response.data
 }
-

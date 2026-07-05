@@ -1,11 +1,23 @@
 import apiClient from './api'
 
-export async function searchSkills(search = '', category = 'technical', limit = 12) {
+const skillSearchCache = new Map()
+const SKILL_CACHE_LIMIT = 60
+
+export async function searchSkills(search = '', category = 'technical', limit = 12, signal = undefined) {
+  const cacheKey = `${category}:${String(search).trim().toLowerCase()}:${limit}`
+  if (skillSearchCache.has(cacheKey)) return skillSearchCache.get(cacheKey)
+
   const response = await apiClient.get('/skills', {
     params: { search, category, limit },
+    signal,
   })
 
-  return response.data.data ?? []
+  const rows = response.data.data ?? []
+  if (skillSearchCache.size >= SKILL_CACHE_LIMIT) {
+    skillSearchCache.delete(skillSearchCache.keys().next().value)
+  }
+  skillSearchCache.set(cacheKey, rows)
+  return rows
 }
 
 export async function getSkillRecommendations() {
