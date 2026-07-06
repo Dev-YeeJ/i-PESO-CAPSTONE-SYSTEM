@@ -1,65 +1,16 @@
-import { useState } from 'react'
-import { PageHeader, DataTable } from '@/pages/admin/_components'
+import { MessageSquareText, ShieldCheck } from 'lucide-react'
+import { Card } from '@/components/ui'
+import PageHeader from '@/pages/admin/_components/PageHeader'
+
+const templates = [
+  ['Application status', 'Notifies a seeker when an application status changes.'],
+  ['Interview scheduled', 'Provides the job, company, date, and time.'],
+  ['Interview rescheduled', 'Confirms the revised interview date and time.'],
+  ['Interview cancelled', 'Advises the seeker to check their account for details.'],
+  ['Interview reminder', 'Reminds the seeker to prepare required documents.'],
+  ['Employer verification', 'Confirms the employer account verification result.'],
+]
 
 export default function SMSTemplatesPage() {
-  const [templates, setTemplates] = useState([
-    {
-      id: 1,
-      name: 'New Job Posting Alert',
-      message: 'Hi! A new job matching your skills has been posted. Check it out: [link]',
-      usage_count: 145,
-      last_used: '2024-06-01',
-    },
-    {
-      id: 2,
-      name: 'Profile Verification Reminder',
-      message: 'Your profile needs verification to unlock all features. Complete it here: [link]',
-      usage_count: 89,
-      last_used: '2024-05-28',
-    },
-    {
-      id: 3,
-      name: 'Job Fair Invitation',
-      message: 'You are invited to attend our Job Fair on [date]. Register now: [link]',
-      usage_count: 234,
-      last_used: '2024-06-02',
-    },
-  ])
-
-  const columns = [
-    { key: 'name', label: 'Template Name', sortable: true },
-    { key: 'message', label: 'Message Preview', sortable: false },
-    { key: 'usage_count', label: 'Times Used', sortable: true },
-    { key: 'last_used', label: 'Last Used', sortable: true },
-    {
-      key: 'actions',
-      label: 'Actions',
-      render: () => (
-        <div className="flex gap-2">
-          <button className="text-blue-600 hover:text-blue-900 text-sm">Edit</button>
-          <button className="text-red-600 hover:text-red-900 text-sm">Delete</button>
-        </div>
-      ),
-    },
-  ]
-
-  return (
-    <div className="min-h-screen bg-gray-50 p-8">
-      <PageHeader
-        title="SMS Templates"
-        subtitle="Create and manage SMS message templates for broadcasts"
-      />
-
-      <div className="mt-8 bg-white shadow rounded-lg p-6">
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-lg font-semibold text-gray-900">Templates ({templates.length})</h2>
-          <button className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
-            Create Template
-          </button>
-        </div>
-
-        <DataTable columns={columns} data={templates} />
-      </div>
-    </div>
-  )
+  return <div className="portal-page"><PageHeader title="System SMS Templates" subtitle="Read-only templates used by verified i-PESO business workflows." eyebrow="System & Reports" /><Card><div className="flex items-start gap-3"><span className="rounded-xl bg-brand-50 p-2.5 text-brand-700"><ShieldCheck className="h-5 w-5" /></span><div><h2 className="font-bold text-slate-950">Managed by the application</h2><p className="mt-1 text-sm leading-6 text-slate-600">Templates are limited to 160 characters and exclude passwords, documents, private links, and other sensitive data. Bulk broadcasts are not enabled.</p></div></div></Card><div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{templates.map(([title, description]) => <Card key={title} padding="sm"><div className="flex items-start gap-3"><MessageSquareText className="mt-0.5 h-5 w-5 shrink-0 text-brand-700" /><div><h3 className="font-bold text-slate-950">{title}</h3><p className="mt-1 text-sm leading-5 text-slate-600">{description}</p></div></div></Card>)}</div></div>
 }

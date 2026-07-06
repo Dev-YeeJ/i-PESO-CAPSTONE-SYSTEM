@@ -1,13 +1,24 @@
 import { createElement, useCallback, useEffect, useMemo, useState } from 'react'
 import {
+  AlertTriangle,
   ArrowLeft,
   ArrowRight,
+  BriefcaseBusiness,
+  CalendarDays,
   CheckCircle2,
   Clock3,
+  Compass,
+  Filter,
+  Layers3,
   MapPin,
   Search,
+  SlidersHorizontal,
+  Sparkles,
   UserRoundCheck,
   UsersRound,
+  X,
+  Mail,
+  Phone,
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { Badge, Button, Card } from '@/components/ui'
@@ -17,40 +28,67 @@ import { adminService } from '@/services/adminService'
 
 const PER_PAGE = 15
 
+const initialFilters = {
+  search: '',
+  profileStatus: 'all',
+  employmentStatus: '',
+  broadField: '',
+  preferredOccupation: '',
+  skill: '',
+  province: '',
+  city: '',
+  barangay: '',
+  hasCertificates: 'all',
+  hasApplications: 'all',
+  hiredStatus: 'all',
+  missingGps: 'all',
+  dateFrom: '',
+  dateTo: '',
+  sort: 'latest',
+}
+
 export default function JobSeekersListPage() {
   const navigate = useNavigate()
   const [seekers, setSeekers] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [search, setSearch] = useState('')
+  const [filters, setFilters] = useState(initialFilters)
   const [debouncedSearch, setDebouncedSearch] = useState('')
-  const [completion, setCompletion] = useState('all')
-  const [province, setProvince] = useState('')
   const [page, setPage] = useState(1)
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false)
   const [pagination, setPagination] = useState({ total: 0, lastPage: 1, from: 0, to: 0 })
-  const [summary, setSummary] = useState({ total: 0, complete: 0, incomplete: 0 })
+  const [summary, setSummary] = useState({ total: 0, complete: 0, incomplete: 0, withApplications: 0, hired: 0, missingGps: 0, newThisMonth: 0 })
 
   useEffect(() => {
-    const timer = window.setTimeout(() => setDebouncedSearch(search.trim()), 300)
+    const timer = window.setTimeout(() => setDebouncedSearch(filters.search.trim()), 300)
     return () => window.clearTimeout(timer)
-  }, [search])
+  }, [filters.search])
 
   const loadSummary = useCallback(async () => {
     try {
-      const [all, complete, incomplete] = await Promise.all([
-        adminService.getSeekers({ per_page: 1 }),
-        adminService.getSeekers({ per_page: 1, profile_completed: 1 }),
-        adminService.getSeekers({ per_page: 1, profile_completed: 0 }),
+      const monthStart = new Date(); monthStart.setDate(1); monthStart.setHours(0, 0, 0, 0)
+      const [all, complete, incomplete, withApplications, hired, missingGps, newThisMonth] = await Promise.all([
+        adminService.getSeekers({ per_page: 1, ...buildParams({ ...filters, search: debouncedSearch }) }),
+        adminService.getSeekers({ per_page: 1, profile_status: 'complete', ...buildParams({ ...filters, search: debouncedSearch }) }),
+        adminService.getSeekers({ per_page: 1, profile_status: 'incomplete', ...buildParams({ ...filters, search: debouncedSearch }) }),
+        adminService.getSeekers({ per_page: 1, has_applications: 1, ...buildParams({ ...filters, search: debouncedSearch }) }),
+        adminService.getSeekers({ per_page: 1, hired_status: 'hired', ...buildParams({ ...filters, search: debouncedSearch }) }),
+        adminService.getSeekers({ per_page: 1, missing_gps: 1, ...buildParams({ ...filters, search: debouncedSearch }) }),
+        adminService.getSeekers({ per_page: 1, date_from: monthStart.toISOString().slice(0, 10), ...buildParams({ ...filters, search: debouncedSearch }) }),
       ])
       setSummary({
         total: all.total ?? 0,
         complete: complete.total ?? 0,
         incomplete: incomplete.total ?? 0,
+        withApplications: withApplications.total ?? 0,
+        hired: hired.total ?? 0,
+        missingGps: missingGps.total ?? 0,
+        newThisMonth: newThisMonth.total ?? 0,
       })
     } catch {
-      // The directory remains usable if summary requests fail.
+      setSummary((current) => ({ ...current, total: 0 }))
     }
-  }, [])
+  }, [debouncedSearch, filters])
 
   const loadSeekers = useCallback(async () => {
     setLoading(true)
@@ -59,9 +97,7 @@ export default function JobSeekersListPage() {
       const result = await adminService.getSeekers({
         page,
         per_page: PER_PAGE,
-        search: debouncedSearch || undefined,
-        province: province.trim() || undefined,
-        profile_completed: completion === 'all' ? undefined : completion === 'complete' ? 1 : 0,
+        ...buildParams({ ...filters, search: debouncedSearch }),
       })
       setSeekers(result.data ?? [])
       setPagination({
@@ -75,7 +111,7 @@ export default function JobSeekersListPage() {
     } finally {
       setLoading(false)
     }
-  }, [completion, debouncedSearch, page, province])
+  }, [debouncedSearch, filters, page])
 
   useEffect(() => {
     loadSummary()
@@ -85,75 +121,97 @@ export default function JobSeekersListPage() {
     loadSeekers()
   }, [loadSeekers])
 
-  const completionRate = summary.total
-    ? Math.round((summary.complete / summary.total) * 100)
-    : 0
+  const completionRate = summary.total ? Math.round((summary.complete / summary.total) * 100) : 0
+  const filtersActive = Boolean(
+    filters.search ||
+    filters.profileStatus !== 'all' ||
+    filters.employmentStatus ||
+    filters.broadField ||
+    filters.preferredOccupation ||
+    filters.skill ||
+    filters.province ||
+    filters.city ||
+    filters.barangay ||
+    filters.hasCertificates !== 'all' ||
+    filters.hasApplications !== 'all' ||
+    filters.hiredStatus !== 'all' ||
+    filters.missingGps !== 'all' ||
+    filters.dateFrom ||
+    filters.dateTo ||
+    filters.sort !== 'latest',
+  )
 
-  const filtersActive = Boolean(search || province || completion !== 'all')
   const clearFilters = () => {
-    setSearch('')
-    setProvince('')
-    setCompletion('all')
+    setFilters(initialFilters)
+    setPage(1)
+    setShowAdvancedFilters(false)
+  }
+
+  const updateFilter = (key, value) => {
+    setFilters((current) => ({ ...current, [key]: value }))
     setPage(1)
   }
 
   const columns = useMemo(() => [
     {
-      key: 'first_name',
+      key: 'full_name',
       label: 'Job Seeker',
       render: (_, row) => {
-        const name = [row.first_name, row.middle_name, row.last_name, row.suffix].filter(Boolean).join(' ')
+        const name = row.full_name || [row.first_name, row.middle_name, row.last_name, row.suffix].filter(Boolean).join(' ')
         const initials = `${row.first_name?.[0] ?? ''}${row.last_name?.[0] ?? ''}`.toUpperCase() || 'JS'
+        const location = [row.address_barangay, row.address_municipality_city, row.address_province].filter(Boolean).join(', ')
         return (
-          <div className="flex min-w-56 items-center gap-3">
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-navy text-xs font-black text-white">{initials}</span>
+          <div className="flex min-w-64 items-start gap-3">
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-brand-navy text-xs font-black text-white">{initials}</span>
             <div className="min-w-0">
               <p className="truncate font-extrabold text-slate-950">{name || 'Unnamed seeker'}</p>
-              <p className="truncate text-xs text-slate-500">{row.email}</p>
+              <p className="truncate text-xs text-slate-500">{row.email || 'No email on file'}</p>
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                <Badge status={row.profile_completed ? 'verified' : 'pending'}>{row.profile_completed ? 'Complete' : 'Incomplete'}</Badge>
+                {row.missing_gps ? <Badge status="warning">Missing GPS</Badge> : null}
+              </div>
+              {location ? <p className="mt-2 flex items-center gap-1.5 text-xs text-slate-500"><MapPin className="h-3.5 w-3.5" />{location}</p> : null}
             </div>
           </div>
         )
       },
     },
     {
-      key: 'profile_completed',
-      label: 'Profile Readiness',
-      render: (complete) => (
-        <Badge status={complete ? 'verified' : 'pending'}>
-          {complete ? 'NSRP Complete' : 'Needs Completion'}
-        </Badge>
+      key: 'contact',
+      label: 'Contact',
+      render: (_, row) => (
+        <div className="text-sm text-slate-700">
+          <div className="flex items-center gap-2"><Mail className="h-4 w-4 text-slate-400" /> <span className="truncate">{row.email || '—'}</span></div>
+          <div className="mt-1 flex items-center gap-2"><Phone className="h-4 w-4 text-slate-400" /> <span className="truncate">{row.mobile_number || row.contact_number || '—'}</span></div>
+        </div>
+      ),
+    },
+    {
+      key: 'preferences',
+      label: 'Preferences',
+      render: (_, row) => <div className="text-sm text-slate-600"><div>{row.preferred_occupation || row.preferred_job_title || '—'}</div><div className="mt-1 text-xs text-slate-500">{row.broad_field || row.broad_occupation || '—'}</div></div>,
+    },
+    {
+      key: 'activity',
+      label: 'Activity',
+      render: (_, row) => (
+        <div className="space-y-1 text-sm text-slate-600">
+          <p><span className="font-semibold text-slate-800">{Number(row.skills_count ?? 0)}</span> skills</p>
+          <p><span className="font-semibold text-slate-800">{Number(row.certificates_count ?? 0)}</span> certs</p>
+          <p><span className="font-semibold text-slate-800">{Number(row.applications_count ?? 0)}</span> apps</p>
+          <p><span className="font-semibold text-slate-800">{Number(row.hired_count ?? row.total_hired ?? 0)}</span> hired</p>
+        </div>
       ),
     },
     {
       key: 'employment_status',
       label: 'Employment',
-      render: (status) => (
-        <span className="text-sm font-semibold capitalize text-slate-700">
-          {status?.replaceAll('_', ' ') || 'Not specified'}
-        </span>
-      ),
-    },
-    {
-      key: 'educ_attainment',
-      label: 'Education',
-      render: (education) => <span className="text-sm text-slate-600">{education || 'Not specified'}</span>,
-    },
-    {
-      key: 'address_province',
-      label: 'Location',
-      render: (provinceName, row) => (
-        <div className="flex min-w-40 items-start gap-2 text-sm text-slate-600">
-          <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
-          <span>{[row.address_municipality_city, provinceName].filter(Boolean).join(', ') || 'Not specified'}</span>
-        </div>
-      ),
+      render: (status) => <span className="text-sm font-semibold capitalize text-slate-700">{status?.replaceAll('_', ' ') || 'Not specified'}</span>,
     },
     {
       key: 'created_at',
       label: 'Registered',
-      render: (date) => date
-        ? <span className="whitespace-nowrap text-sm text-slate-600">{new Date(date).toLocaleDateString()}</span>
-        : 'N/A',
+      render: (date) => date ? <span className="whitespace-nowrap text-sm text-slate-600">{new Date(date).toLocaleDateString()}</span> : 'N/A',
     },
     {
       key: 'seeker_id',
@@ -166,37 +224,44 @@ export default function JobSeekersListPage() {
     <div className="portal-page">
       <PageHeader
         title="Job Seeker Management"
-        subtitle="Monitor NSRP profile readiness and review registered job seeker information."
+        subtitle="Monitor NSRP profile readiness, search by skills and location, and review each case profile in a defense-ready view."
         eyebrow="Constituent CRM"
       />
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <SummaryCard icon={UsersRound} label="Registered Seekers" value={summary.total} detail="All job seeker accounts" tone="navy" />
-        <SummaryCard icon={UserRoundCheck} label="NSRP Complete" value={summary.complete} detail={`${completionRate}% completion rate`} tone="green" />
-        <SummaryCard icon={Clock3} label="Needs Completion" value={summary.incomplete} detail="Profiles requiring follow-up" tone="amber" />
-        <SummaryCard icon={CheckCircle2} label="Current Results" value={pagination.total} detail="Matching active filters" tone="blue" />
+        <SummaryCard icon={UsersRound} label="Registered seekers" value={summary.total} detail="Total accounts in directory" tone="navy" />
+        <SummaryCard icon={UserRoundCheck} label="Complete profiles" value={summary.complete} detail={`${completionRate}% completion rate`} tone="green" />
+        <SummaryCard icon={Clock3} label="Needs completion" value={summary.incomplete} detail="Profiles requiring follow-up" tone="amber" />
+        <SummaryCard icon={Sparkles} label="New this month" value={summary.newThisMonth} detail="Recently registered" tone="blue" />
       </div>
 
-      <Card padding="sm">
-        <div className="grid gap-3 lg:grid-cols-[minmax(260px,1fr)_220px_220px_auto] lg:items-end">
-          <label>
+      <div className="mt-4 grid gap-4 lg:grid-cols-2 xl:grid-cols-4">
+        <SummaryCard icon={BriefcaseBusiness} label="With applications" value={summary.withApplications} detail="Linked to a vacancy" tone="navy" />
+        <SummaryCard icon={CheckCircle2} label="Hired seekers" value={summary.hired} detail="Successful placements" tone="green" />
+        <SummaryCard icon={Compass} label="Missing GPS" value={summary.missingGps} detail="Incomplete location data" tone="amber" />
+        <SummaryCard icon={Layers3} label="Current results" value={pagination.total} detail="Matching active filters" tone="blue" />
+      </div>
+
+      <Card padding="sm" className="mt-6">
+        <div className="flex flex-wrap items-end gap-3">
+          <label className="min-w-[260px] flex-1">
             <span className="text-xs font-extrabold uppercase tracking-wide text-slate-500">Search directory</span>
             <div className="relative mt-2">
               <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
               <input
-                value={search}
-                onChange={(event) => { setSearch(event.target.value); setPage(1) }}
-                placeholder="Name or email address"
+                value={filters.search}
+                onChange={(event) => updateFilter('search', event.target.value)}
+                placeholder="Search name, email, contact, occupation, skill, or location"
                 className="w-full rounded-xl border border-slate-300 py-2.5 pl-10 pr-4 text-sm focus:border-brand-navy focus:ring-2 focus:ring-brand-navy/10"
               />
             </div>
           </label>
 
-          <label>
+          <label className="w-full sm:w-48">
             <span className="text-xs font-extrabold uppercase tracking-wide text-slate-500">Profile status</span>
             <select
-              value={completion}
-              onChange={(event) => { setCompletion(event.target.value); setPage(1) }}
+              value={filters.profileStatus}
+              onChange={(event) => updateFilter('profileStatus', event.target.value)}
               className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm"
             >
               <option value="all">All profiles</option>
@@ -205,37 +270,135 @@ export default function JobSeekersListPage() {
             </select>
           </label>
 
-          <label>
-            <span className="text-xs font-extrabold uppercase tracking-wide text-slate-500">Province</span>
-            <input
-              value={province}
-              onChange={(event) => { setProvince(event.target.value); setPage(1) }}
-              placeholder="Exact province"
-              className="mt-2 w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm"
-            />
+          <label className="w-full sm:w-48">
+            <span className="text-xs font-extrabold uppercase tracking-wide text-slate-500">Employment status</span>
+            <select
+              value={filters.employmentStatus}
+              onChange={(event) => updateFilter('employmentStatus', event.target.value)}
+              className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm"
+            >
+              <option value="">All statuses</option>
+              <option value="employed">Employed</option>
+              <option value="unemployed">Unemployed</option>
+              <option value="self_employed">Self-employed</option>
+            </select>
           </label>
 
-          <Button variant="outline" onClick={clearFilters} disabled={!filtersActive}>Clear Filters</Button>
+          <Button variant="outline" icon={SlidersHorizontal} onClick={() => setShowAdvancedFilters((current) => !current)}>
+            {showAdvancedFilters ? 'Hide filters' : 'Advanced filters'}
+          </Button>
+        </div>
+
+        {showAdvancedFilters && (
+          <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            <label>
+              <span className="text-xs font-extrabold uppercase tracking-wide text-slate-500">Broad field</span>
+              <input value={filters.broadField} onChange={(event) => updateFilter('broadField', event.target.value)} placeholder="e.g. IT" className="mt-2 w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm" />
+            </label>
+            <label>
+              <span className="text-xs font-extrabold uppercase tracking-wide text-slate-500">Preferred occupation</span>
+              <input value={filters.preferredOccupation} onChange={(event) => updateFilter('preferredOccupation', event.target.value)} placeholder="Occupation" className="mt-2 w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm" />
+            </label>
+            <label>
+              <span className="text-xs font-extrabold uppercase tracking-wide text-slate-500">Skill</span>
+              <input value={filters.skill} onChange={(event) => updateFilter('skill', event.target.value)} placeholder="Skill" className="mt-2 w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm" />
+            </label>
+            <label>
+              <span className="text-xs font-extrabold uppercase tracking-wide text-slate-500">Province</span>
+              <input value={filters.province} onChange={(event) => updateFilter('province', event.target.value)} placeholder="Province" className="mt-2 w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm" />
+            </label>
+            <label>
+              <span className="text-xs font-extrabold uppercase tracking-wide text-slate-500">City / municipality</span>
+              <input value={filters.city} onChange={(event) => updateFilter('city', event.target.value)} placeholder="City" className="mt-2 w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm" />
+            </label>
+            <label>
+              <span className="text-xs font-extrabold uppercase tracking-wide text-slate-500">Barangay</span>
+              <input value={filters.barangay} onChange={(event) => updateFilter('barangay', event.target.value)} placeholder="Barangay" className="mt-2 w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm" />
+            </label>
+            <label>
+              <span className="text-xs font-extrabold uppercase tracking-wide text-slate-500">Has certificates</span>
+              <select value={filters.hasCertificates} onChange={(event) => updateFilter('hasCertificates', event.target.value)} className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm">
+                <option value="all">All</option>
+                <option value="yes">Yes</option>
+                <option value="no">No</option>
+              </select>
+            </label>
+            <label>
+              <span className="text-xs font-extrabold uppercase tracking-wide text-slate-500">Has applications</span>
+              <select value={filters.hasApplications} onChange={(event) => updateFilter('hasApplications', event.target.value)} className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm">
+                <option value="all">All</option>
+                <option value="yes">Yes</option>
+                <option value="no">No</option>
+              </select>
+            </label>
+            <label>
+              <span className="text-xs font-extrabold uppercase tracking-wide text-slate-500">Hired status</span>
+              <select value={filters.hiredStatus} onChange={(event) => updateFilter('hiredStatus', event.target.value)} className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm">
+                <option value="all">All</option>
+                <option value="hired">Hired</option>
+                <option value="not_hired">Not hired</option>
+              </select>
+            </label>
+            <label>
+              <span className="text-xs font-extrabold uppercase tracking-wide text-slate-500">Missing GPS</span>
+              <select value={filters.missingGps} onChange={(event) => updateFilter('missingGps', event.target.value)} className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm">
+                <option value="all">All</option>
+                <option value="yes">Missing</option>
+                <option value="no">Available</option>
+              </select>
+            </label>
+            <label>
+              <span className="text-xs font-extrabold uppercase tracking-wide text-slate-500">Sort</span>
+              <select value={filters.sort} onChange={(event) => updateFilter('sort', event.target.value)} className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm">
+                <option value="latest">Latest registered</option>
+                <option value="name">Name A-Z</option>
+                <option value="profile_completion">Profile completion</option>
+                <option value="application_count">Application count</option>
+                <option value="location">Location</option>
+              </select>
+            </label>
+            <label>
+              <span className="text-xs font-extrabold uppercase tracking-wide text-slate-500">Registered from</span>
+              <input type="date" value={filters.dateFrom} onChange={(event) => updateFilter('dateFrom', event.target.value)} className="mt-2 w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm" />
+            </label>
+            <label>
+              <span className="text-xs font-extrabold uppercase tracking-wide text-slate-500">Registered to</span>
+              <input type="date" value={filters.dateTo} onChange={(event) => updateFilter('dateTo', event.target.value)} className="mt-2 w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm" />
+            </label>
+          </div>
+        )}
+
+        <div className="mt-5 flex flex-wrap items-center gap-2">
+          {filtersActive && Object.entries(filters).filter(([, value]) => value && value !== 'all' && value !== 'latest').map(([key, value]) => (
+            <button key={key} type="button" onClick={() => updateFilter(key, initialFilters[key])} className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700">
+              {labelForFilter(key)}: {String(value)} <X className="h-3.5 w-3.5" />
+            </button>
+          ))}
+          {filtersActive ? (
+            <Button variant="outline" size="sm" icon={Filter} onClick={clearFilters}>Reset filters</Button>
+          ) : null}
         </div>
       </Card>
 
       {error && (
-        <div className="flex items-center justify-between gap-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+        <div className="mt-6 flex items-center justify-between gap-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
           <span>{error}</span>
           <button type="button" onClick={loadSeekers} className="font-extrabold hover:underline">Try again</button>
         </div>
       )}
 
-      <DataTable
-        columns={columns}
-        data={seekers}
-        loading={loading}
-        onRowClick={(row) => navigate(`/admin/job-seekers/${row.seeker_id}`)}
-        emptyMessage={filtersActive ? 'No job seekers match the selected filters.' : 'No job seekers are registered yet.'}
-      />
+      <div className="mt-6">
+        <DataTable
+          columns={columns}
+          data={seekers}
+          loading={loading}
+          onRowClick={(row) => navigate(`/admin/job-seekers/${row.seeker_id}`)}
+          emptyMessage={filtersActive ? 'No job seekers match the selected filters.' : 'No job seekers are registered yet.'}
+        />
+      </div>
 
       {!loading && pagination.total > 0 && (
-        <div className="flex flex-col items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 sm:flex-row">
+        <div className="mt-4 flex flex-col items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 sm:flex-row">
           <p className="text-sm text-slate-500">
             Showing <span className="font-bold text-slate-800">{pagination.from}-{pagination.to}</span> of <span className="font-bold text-slate-800">{pagination.total}</span>
           </p>
@@ -272,4 +435,50 @@ function SummaryCard({ icon, label, value, detail, tone }) {
       </div>
     </Card>
   )
+}
+
+function buildParams(filters) {
+  const params = {
+    search: filters.search || undefined,
+    profile_status: filters.profileStatus === 'all' ? undefined : filters.profileStatus,
+    employment_status: filters.employmentStatus || undefined,
+    broad_field: filters.broadField || undefined,
+    preferred_occupation: filters.preferredOccupation || undefined,
+    skill: filters.skill || undefined,
+    province: filters.province || undefined,
+    city: filters.city || undefined,
+    barangay: filters.barangay || undefined,
+    has_certificates: filters.hasCertificates === 'all' ? undefined : filters.hasCertificates === 'yes' ? 1 : 0,
+    has_applications: filters.hasApplications === 'all' ? undefined : filters.hasApplications === 'yes' ? 1 : 0,
+    hired_status: filters.hiredStatus === 'all' ? undefined : filters.hiredStatus,
+    missing_gps: filters.missingGps === 'all' ? undefined : filters.missingGps === 'yes' ? 1 : 0,
+    date_from: filters.dateFrom || undefined,
+    date_to: filters.dateTo || undefined,
+    sort: filters.sort || 'latest',
+  }
+
+  return Object.fromEntries(Object.entries(params).filter(([, value]) => value !== undefined && value !== null && value !== ''))
+}
+
+function labelForFilter(key) {
+  const labels = {
+    search: 'Search',
+    profileStatus: 'Profile',
+    employmentStatus: 'Employment',
+    broadField: 'Broad field',
+    preferredOccupation: 'Occupation',
+    skill: 'Skill',
+    province: 'Province',
+    city: 'City',
+    barangay: 'Barangay',
+    hasCertificates: 'Certificates',
+    hasApplications: 'Applications',
+    hiredStatus: 'Hired',
+    missingGps: 'GPS',
+    dateFrom: 'From',
+    dateTo: 'To',
+    sort: 'Sort',
+  }
+
+  return labels[key] ?? key
 }

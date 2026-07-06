@@ -3,6 +3,8 @@
 namespace App\Notifications;
 
 use App\Models\Application;
+use App\Notifications\Channels\SmsChannel;
+use App\Services\Sms\SmsMessageTemplates;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -29,7 +31,31 @@ class ApplicationStatusNotification extends Notification implements ShouldQueue
      */
     public function via(object $notifiable): array
     {
-        return ['mail', 'database'];
+        $channels = ['mail', 'database'];
+
+        // Interview notifications have their own richer SMS and must not be duplicated.
+        $interviewWasCancelled = $this->application->interviewSchedule?->status === 'cancelled';
+
+        if ($this->application->status !== 'interview' && ! $interviewWasCancelled) {
+            $channels[] = SmsChannel::class;
+        }
+
+        return $channels;
+    }
+
+    public function toSms(object $notifiable): array
+    {
+        return [
+            'phone_number' => $notifiable->mobile_number ?? null,
+            'content' => SmsMessageTemplates::applicationStatus(
+                $this->application->jobVacancy?->job_title ?? 'a position',
+                $this->application->status,
+            ),
+            'purpose' => 'application_status',
+            'metadata' => [
+                'application_status' => $this->application->status,
+            ],
+        ];
     }
 
     /**

@@ -10,6 +10,7 @@ use App\Models\JobSeeker;
 use App\Models\Application;
 use App\Models\JobVacancy;
 use App\Models\GovernmentProgram;
+use App\Services\AdminAnalyticsService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -29,7 +30,7 @@ class ReportController extends Controller
         return response()->json($reports);
     }
 
-    public function generate(Request $request): JsonResponse
+    public function generate(Request $request, AdminAnalyticsService $analytics): JsonResponse
     {
         $admin = auth()->user();
         
@@ -39,16 +40,36 @@ class ReportController extends Controller
 
         $validated = $request->validate([
             'title' => 'required|string|max:255',
-            'report_category' => 'required|in:placement,registration,vacancies,programs',
+            'report_category' => 'required|in:placement,registration,vacancies,programs,job_seeker_summary,employer_summary,vacancy_summary,application_status,hired_applicants,skills_distribution,most_applied_categories,most_hiring_companies,location_distribution,employment_trends,labor_market_analytics',
             'coverage_start' => 'required|date',
-            'coverage_end' => 'required|date|after:coverage_start',
+            'coverage_end' => 'required|date|after_or_equal:coverage_start',
+            'period' => 'nullable|in:monthly,yearly',
+            'province' => 'nullable|string|max:100',
+            'city' => 'nullable|string|max:150',
+            'barangay' => 'nullable|string|max:150',
+            'broad_field' => 'nullable|string|max:255',
+            'occupation' => 'nullable|string|max:255',
+            'skill' => 'nullable|string|max:150',
+            'employer_verification_status' => 'nullable|in:pending,verified,rejected',
+            'vacancy_status' => 'nullable|in:active,closed,draft',
+            'application_status' => 'nullable|in:pending,reviewed,shortlisted,interview,hired,rejected,withdrawn',
         ]);
 
-        $dataSummary = $this->generateReportData(
-            $validated['report_category'],
-            Carbon::parse($validated['coverage_start']),
-            Carbon::parse($validated['coverage_end'])
-        );
+        $dataSummary = $validated['report_category'] === 'programs'
+            ? $this->generateReportData(
+                $validated['report_category'],
+                Carbon::parse($validated['coverage_start']),
+                Carbon::parse($validated['coverage_end'])
+            )
+            : $analytics->reportData($validated['report_category'], [
+                'date_from' => $validated['coverage_start'],
+                'date_to' => $validated['coverage_end'],
+                'period' => $validated['period'] ?? 'monthly',
+                ...collect($validated)->only([
+                    'province', 'city', 'barangay', 'broad_field', 'occupation', 'skill',
+                    'employer_verification_status', 'vacancy_status', 'application_status',
+                ])->all(),
+            ]);
 
         $report = AnalyticsReport::create([
             'admin_id' => $admin->admin_id,

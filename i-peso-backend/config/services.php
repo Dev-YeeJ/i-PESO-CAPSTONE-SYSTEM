@@ -59,6 +59,17 @@ return [
         'base_url' => env('JOB_DATA_LAKE_BASE_URL', 'https://api.jobdatalake.com'),
     ],
 
+    'sms' => [
+        'driver' => env('SMS_DRIVER', 'log_only'),
+        'provider' => env('SMS_PROVIDER', 'unisms'),
+        'base_url' => env('SMS_API_BASE_URL', 'https://unismsapi.com/api'),
+        'secret_key' => env('UNISMS_SECRET_KEY'),
+        'sender_id' => env('UNISMS_SENDER_ID'),
+        'default_country' => env('SMS_DEFAULT_COUNTRY', 'PH'),
+        'log_only' => filter_var(env('SMS_LOG_ONLY', true), FILTER_VALIDATE_BOOL),
+        'timeout' => (int) env('SMS_TIMEOUT', 10),
+    ],
+
     'ses' => [
         'key' => env('AWS_ACCESS_KEY_ID'),
         'secret' => env('AWS_SECRET_ACCESS_KEY'),

@@ -3,6 +3,8 @@ import api from '@/services/api'
 import { Loader2, Navigation, MapPin, ExternalLink, Sparkles, LocateFixed, Briefcase, ChevronRight, Search, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
 import { useAuthStore } from '@/stores/authStore'
 import { Link } from 'react-router-dom'
+import toast from 'react-hot-toast'
+import { applyToJob } from '@/services/seekerService'
 import { APIProvider, Map, Marker, InfoWindow, useMap } from '@vis.gl/react-google-maps'
 import { DEFAULT_MAP_CENTER, GOOGLE_MAP_ID, toMapPosition } from '@/utils/mapCoordinates'
 
@@ -94,6 +96,9 @@ export default function SeekerJobMapPage() {
   const [openInfoWindowId, setOpenInfoWindowId] = useState(null)
   const [hoveredJobId, setHoveredJobId] = useState(null)
   const [panToId, setPanToId] = useState(null)
+  const [selectedJob, setSelectedJob] = useState(null)
+  const [applyingJobId, setApplyingJobId] = useState(null)
+  const [appliedJobIds, setAppliedJobIds] = useState([])
   const [sidebarOpen, setSidebarOpen] = useState(true)
   
   // Filtering States
@@ -392,12 +397,13 @@ export default function SeekerJobMapPage() {
                       </div>
 
                       <div className="flex items-center gap-2 p-2 pt-0 border-t border-slate-100 mt-1">
-                        <Link 
-                          to={`/seeker/jobs/${job.id}`} 
+                        <button
+                          type="button"
+                          onClick={() => setSelectedJob(job)}
                           className="flex flex-1 items-center justify-center gap-1 rounded-xl bg-blue-600 py-2.5 text-xs font-bold text-white shadow-sm transition hover:bg-blue-700 mt-2"
                         >
                           View Job <ChevronRight className="h-3.5 w-3.5" />
-                        </Link>
+                        </button>
                         <a 
                           href={`https://www.google.com/maps/dir/?api=1&origin=${activeCenter.lat},${activeCenter.lng}&destination=${job.latitude},${job.longitude}`}
                           target="_blank"
@@ -415,6 +421,94 @@ export default function SeekerJobMapPage() {
             })}
           </Map>
         </APIProvider>
+        {/* Job Detail Modal (in-place) */}
+        {selectedJob && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 px-4 py-6">
+            <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-xl bg-white shadow-2xl">
+              <div className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-slate-200 bg-white px-5 py-4">
+                <div>
+                  <h2 className="mt-1 text-xl font-black text-slate-950">{selectedJob.job_title || selectedJob.title || 'Vacancy'}</h2>
+                  <p className="mt-1 text-sm text-slate-600">{selectedJob.employer_name || selectedJob.company || ''} · {selectedJob.location || selectedJob.address || ''}</p>
+                </div>
+                <button type="button" onClick={() => setSelectedJob(null)} className="rounded-xl border border-slate-200 p-2 text-slate-500 hover:bg-slate-50" aria-label="Close details">
+                  <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+              </div>
+
+              <div className="space-y-5 p-5">
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <div className="rounded-xl border border-slate-200 p-3">
+                    <p className="text-xs font-black uppercase tracking-wide text-slate-400">Match</p>
+                    <p className="mt-1 text-sm font-black text-emerald-700">{Math.round(selectedJob.match_percentage || 0)}%</p>
+                  </div>
+                  <div className="rounded-xl border border-slate-200 p-3">
+                    <p className="text-xs font-black uppercase tracking-wide text-slate-400">Distance</p>
+                    <p className="mt-1 text-sm font-black text-blue-700">{Number(selectedJob.distance_km || 0).toFixed(1)} km</p>
+                  </div>
+                  <div className="rounded-xl border border-slate-200 p-3">
+                    <p className="text-xs font-black uppercase tracking-wide text-slate-400">Salary</p>
+                    <p className="mt-1 text-sm font-black text-slate-900">{selectedJob.salary || selectedJob.salary_range || selectedJob.salaryRange || 'Not specified'}</p>
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-slate-200 p-4">
+                  <h3 className="font-black text-slate-950">Required skills</h3>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {(selectedJob.required_skills || selectedJob.requiredSkills || selectedJob.requiredSkillsList || []).slice(0, 12).map((skill, i) => (
+                      <span key={i} className="rounded-full bg-blue-50 px-3 py-1.5 text-xs font-bold text-blue-700">{skill}</span>
+                    ))}
+                    {((selectedJob.required_skills || selectedJob.requiredSkills || []).length === 0) && (
+                      <p className="mt-2 text-sm text-slate-600">No required skills listed.</p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-slate-200 p-4">
+                  <h3 className="font-black text-slate-950">Job description</h3>
+                  <p className="mt-2 text-sm leading-6 text-slate-600">{selectedJob.description || selectedJob.job_description || 'The employer has not provided a detailed description.'}</p>
+                </div>
+              </div>
+
+              <div className="sticky bottom-0 flex flex-wrap justify-end gap-2 border-t border-slate-200 bg-white px-5 py-4">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedJob(null)
+                  }}
+                  className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-black text-slate-700 transition hover:bg-slate-50"
+                >
+                  Close
+                </button>
+
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const id = selectedJob.id || selectedJob.post_id || selectedJob.postId
+                    if (!id) {
+                      toast.error('Job identifier missing.')
+                      return
+                    }
+                    if (applyingJobId === id || appliedJobIds.includes(id) || selectedJob.has_applied || selectedJob.hasApplied) return
+                    try {
+                      setApplyingJobId(id)
+                      await applyToJob(id)
+                      setAppliedJobIds((s) => Array.from(new Set([...s, id])))
+                      toast.success('Application submitted.')
+                    } catch (err) {
+                      toast.error(err.response?.data?.message || 'Unable to apply for this job.')
+                    } finally {
+                      setApplyingJobId(null)
+                    }
+                  }}
+                  disabled={applyingJobId || appliedJobIds.includes(selectedJob.id) || selectedJob.has_applied || selectedJob.hasApplied}
+                  className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-black text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  { (selectedJob.has_applied || selectedJob.hasApplied || appliedJobIds.includes(selectedJob.id)) ? 'Applied' : (applyingJobId ? 'Applying...' : 'Apply') }
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

@@ -2,6 +2,8 @@
 
 namespace App\Notifications;
 
+use App\Notifications\Channels\SmsChannel;
+use App\Services\Sms\SmsMessageTemplates;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -19,7 +21,17 @@ class EmployerVerificationStatusChanged extends Notification implements ShouldQu
 
     public function via(object $notifiable): array
     {
-        return ['database', 'mail'];
+        return ['database', 'mail', SmsChannel::class];
+    }
+
+    public function toSms(object $notifiable): array
+    {
+        return [
+            'phone_number' => $notifiable->representative_contact_number ?: $notifiable->mobile_number,
+            'content' => SmsMessageTemplates::employerVerification($this->status),
+            'purpose' => 'employer_verification',
+            'metadata' => ['verification_status' => $this->status],
+        ];
     }
 
     public function toMail(object $notifiable): MailMessage

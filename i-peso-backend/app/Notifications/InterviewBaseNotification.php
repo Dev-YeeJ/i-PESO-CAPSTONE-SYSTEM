@@ -4,6 +4,9 @@ namespace App\Notifications;
 
 use App\Models\Application;
 use App\Models\Employer;
+use App\Models\JobSeeker;
+use App\Notifications\Channels\SmsChannel;
+use App\Services\Sms\SmsMessageTemplates;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -19,7 +22,43 @@ abstract class InterviewBaseNotification extends Notification implements ShouldQ
 
     public function via(object $notifiable): array
     {
-        return ['database', 'mail'];
+        $channels = ['database', 'mail'];
+
+        if ($notifiable instanceof JobSeeker) {
+            $channels[] = SmsChannel::class;
+        }
+
+        return $channels;
+    }
+
+    public function toSms(object $notifiable): array
+    {
+        $jobTitle = $this->application->jobVacancy?->job_title ?? 'a position';
+        $companyName = $this->application->jobVacancy?->employer?->company_name ?? 'the employer';
+        $schedule = $this->application->interviewSchedule?->schedule;
+        $type = $this->notificationType();
+
+        $content = match ($type) {
+            'reminder' => SmsMessageTemplates::interviewReminder($jobTitle, $companyName, $schedule),
+            'updated' => SmsMessageTemplates::interviewRescheduled($jobTitle, $companyName, $schedule),
+            'cancelled' => SmsMessageTemplates::interviewCancelled($jobTitle, $companyName),
+            default => SmsMessageTemplates::interviewScheduled($jobTitle, $companyName, $schedule),
+        };
+
+        return [
+            'phone_number' => $notifiable->mobile_number ?? null,
+            'content' => $content,
+            'purpose' => match ($type) {
+                'reminder' => 'interview_reminder',
+                'updated' => 'interview_rescheduled',
+                'cancelled' => 'interview_cancelled',
+                default => 'interview_scheduled',
+            },
+            'metadata' => array_filter([
+                'reminder_window' => $this->reminderWindow,
+                'notification_type' => $type,
+            ]),
+        ];
     }
 
     public function toArray(object $notifiable): array

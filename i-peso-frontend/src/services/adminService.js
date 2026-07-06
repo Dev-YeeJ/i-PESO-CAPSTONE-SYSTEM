@@ -2,6 +2,10 @@
 
 import api from './api'
 
+const cleanParams = (params = {}) => Object.fromEntries(
+  Object.entries(params).filter(([, value]) => value !== undefined && value !== null && value !== ''),
+)
+
 export const adminService = {
   // ── DASHBOARD ─────────────────────────────────────────────────
   getDashboardStats: async () => {
@@ -11,7 +15,7 @@ export const adminService = {
 
   // ── SEEKERS ───────────────────────────────────────────────────
   getSeekers: async (params = {}) => {
-    const { data } = await api.get('/admin/seekers', { params })
+    const { data } = await api.get('/admin/seekers', { params: cleanParams(params) })
     return data
   },
 
@@ -22,7 +26,7 @@ export const adminService = {
 
   // ── EMPLOYERS ──────────────────────────────────────────────────
   getEmployers: async (params = {}) => {
-    const { data } = await api.get('/admin/employers', { params })
+    const { data } = await api.get('/admin/employers', { params: cleanParams(params) })
     return data
   },
 
@@ -79,7 +83,7 @@ export const adminService = {
 
   // ── PROGRAMS ───────────────────────────────────────────────────
   getProgramsList: async (params = {}) => {
-    const { data } = await api.get('/admin/programs', { params })
+    const { data } = await api.get('/admin/programs', { params: cleanParams(params) })
     return data
   },
 
@@ -104,7 +108,7 @@ export const adminService = {
   },
 
   getProgramApplicants: async (programId, params = {}) => {
-    const { data } = await api.get(`/admin/programs/${programId}/applicants`, { params })
+    const { data } = await api.get(`/admin/programs/${programId}/applicants`, { params: cleanParams(params) })
     return data
   },
 
@@ -126,7 +130,7 @@ export const adminService = {
 
   // ── JOB FAIRS ──────────────────────────────────────────────────
   getJobFairsList: async (params = {}) => {
-    const { data } = await api.get('/admin/job-fairs', { params })
+    const { data } = await api.get('/admin/job-fairs', { params: cleanParams(params) })
     return data
   },
 
@@ -159,7 +163,7 @@ export const adminService = {
 
   // ── REPORTS ───────────────────────────────────────────────────
   getReports: async (params = {}) => {
-    const { data } = await api.get('/admin/reports', { params })
+    const { data } = await api.get('/admin/reports', { params: cleanParams(params) })
     return data
   },
 
@@ -185,7 +189,7 @@ export const adminService = {
 
   // ── ACTIVITY LOGS ──────────────────────────────────────────────
   getActivityLogs: async (params = {}) => {
-    const { data } = await api.get('/admin/activity-logs', { params })
+    const { data } = await api.get('/admin/activity-logs', { params: cleanParams(params) })
     return data
   },
 }

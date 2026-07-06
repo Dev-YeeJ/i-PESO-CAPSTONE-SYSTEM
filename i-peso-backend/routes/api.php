@@ -1,6 +1,8 @@
 <?php
 
 use App\Http\Controllers\Api\Admin\AdminDashboardController;
+use App\Http\Controllers\Api\Admin\AdminAnalyticsController;
+use App\Http\Controllers\Api\Admin\AdminSmsNotificationController;
 use App\Http\Controllers\Api\Admin\ApplicationController as AdminApplicationController;
 use App\Http\Controllers\Api\Admin\ConstituentCRM\EmployerController as AdminEmployerController;
 use App\Http\Controllers\Api\Admin\ConstituentCRM\SeekerController as AdminSeekerController;
@@ -177,6 +179,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::prefix('admin')->middleware('admin')->group(function () {
         // Dashboard
         Route::get('/dashboard/stats', [AdminDashboardController::class, 'stats']);
+        Route::get('/analytics/options', [AdminAnalyticsController::class, 'options']);
+        Route::get('/analytics', [AdminAnalyticsController::class, 'index']);
+        Route::get('/sms-notifications', [AdminSmsNotificationController::class, 'index']);
         Route::get('/applications', [AdminApplicationController::class, 'index']);
 
         // Seekers
