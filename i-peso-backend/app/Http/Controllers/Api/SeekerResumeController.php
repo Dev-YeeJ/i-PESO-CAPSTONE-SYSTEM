@@ -42,7 +42,7 @@ class SeekerResumeController extends Controller
         }
 
         $validated = $request->validate([
-            'professional_summary' => ['nullable', 'string', 'max:1200'],
+            'professional_summary' => ['required', 'string', 'max:1200'],
             'responsibility_overrides' => ['nullable', 'array'],
             'responsibility_overrides.*' => ['nullable', 'string', 'max:1200'],
         ]);
@@ -66,7 +66,7 @@ class SeekerResumeController extends Controller
                 'defaultFont' => 'Helvetica',
                 'isFontSubsettingEnabled' => false,
             ])
-            ->setPaper('A4', 'portrait');
+            ->setPaper([0, 0, 595.28, 841.89], 'portrait');
 
         $filename = 'Resume_'.$seeker->seeker_id.'_'.str($seeker->last_name)->slug('_').'.pdf';
         $path = "seeker_resumes/{$seeker->seeker_id}/latest-resume.pdf";

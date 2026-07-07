@@ -11,9 +11,11 @@ use App\Models\Application;
 use App\Models\JobVacancy;
 use App\Models\GovernmentProgram;
 use App\Services\AdminAnalyticsService;
+use App\Services\JobFairReportService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class ReportController extends Controller
 {
@@ -86,7 +88,7 @@ class ReportController extends Controller
         ], 201);
     }
 
-    public function generateSPRS(Request $request): JsonResponse
+    public function generateSPRS(Request $request, JobFairReportService $jobFairReports): JsonResponse
     {
         $admin = auth()->user();
         
@@ -151,6 +153,27 @@ class ReportController extends Controller
         // PEIS Registrations
         $employersRegistered = \App\Models\Employer::whereBetween('created_at', [$start, $end])->count();
 
+        $jobFairs = \App\Models\JobFair::query()
+            ->whereBetween(DB::raw('COALESCE(start_date, event_date)'), [$start->toDateString(), $end->toDateString()])
+            ->whereIn('status', ['completed', 'closed'])
+            ->get();
+        $jobFairSection = [
+            'fairs_conducted' => $jobFairs->count(), 'participating_companies' => 0,
+            'vacancies_solicited' => 0, 'applicants' => 0, 'hots' => 0,
+            'near_hired' => 0, 'rejected' => 0, 'self_service_reports' => 0, 'admin_proxy_reports' => 0,
+        ];
+        foreach ($jobFairs as $jobFair) {
+            $summary = $jobFairReports->sprs($jobFair);
+            $jobFairSection['participating_companies'] += $summary['1.6.4_establishments_participated'];
+            $jobFairSection['vacancies_solicited'] += $summary['1.6.5_job_vacancies_solicited'];
+            $jobFairSection['applicants'] += $summary['1.6.6_job_applicants_registered'];
+            $jobFairSection['hots'] += $summary['1.6.7_total_hots'];
+            $jobFairSection['near_hired'] += $summary['near_hired'];
+            $jobFairSection['rejected'] += $summary['rejected'];
+            $jobFairSection['self_service_reports'] += $summary['self_service_reports'];
+            $jobFairSection['admin_proxy_reports'] += $summary['admin_proxy_reports'];
+        }
+
         $data = [
             'period' => $month->format('F Y'),
             '1_1_vacancies' => [
@@ -177,6 +200,7 @@ class ReportController extends Controller
                 'total' => $spesPlaced,
                 'female' => $spesFemale,
             ],
+            '1_6_job_fairs' => $jobFairSection,
             'peis' => [
                 'establishments' => $employersRegistered,
                 'applicants' => $registeredTotal,

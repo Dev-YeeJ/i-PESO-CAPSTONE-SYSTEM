@@ -46,7 +46,7 @@ class EmployerVerificationStatusChanged extends Notification implements ShouldQu
             ->subject($title)
             ->view('emails.employer-verification', [
                 'title' => $title,
-                'message' => $message,
+                'bodyMessage' => $message,
                 'status' => $approved ? 'progress' : 'action_required',
                 'documentType' => null,
                 'documentLabel' => null,

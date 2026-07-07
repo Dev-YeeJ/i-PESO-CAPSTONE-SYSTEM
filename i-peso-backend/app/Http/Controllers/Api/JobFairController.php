@@ -13,6 +13,8 @@ use App\Models\JobFairVacancy;
 use App\Models\JobSeeker;
 use App\Models\JobVacancy;
 use App\Services\EstablishmentReportService;
+use App\Services\JobFairReportService;
+use App\Services\JobFairService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -23,20 +25,14 @@ use Illuminate\Validation\ValidationException;
 
 class JobFairController extends Controller
 {
-    public function index(Request $request): JsonResponse
+    public function index(Request $request, JobFairService $service): JsonResponse
     {
         $fairs = JobFair::query()
-            ->withCount([
-                'employerJoins as employers_count',
-                'attendees as rsvps_count',
-                'attendees as attendance_count' => fn ($query) => $query->where('is_attended', true),
-                'applications as hots_count' => fn ($query) => $query->where('is_hots', true),
-                'vacancyLinks as vacancies_count',
-            ])
-            ->whereIn('status', ['upcoming', 'ongoing', 'active'])
+            ->where('is_public', true)
+            ->whereIn('status', JobFairService::PUBLIC_STATUSES)
             ->orderByRaw('COALESCE(start_date, event_date) asc')
             ->get()
-            ->map(fn (JobFair $fair) => $this->formatFair($fair, $request->user()));
+            ->map(fn (JobFair $fair) => $service->eventPayload($fair, $request->user()));
 
         return response()->json(['data' => $fairs]);
     }
@@ -265,12 +261,12 @@ class JobFairController extends Controller
         return $reports->downloadPdf($data, "job-fair-{$fair->job_fair_id}");
     }
 
-    public function exportSprs(Request $request, int $id)
+    public function exportSprs(Request $request, int $id, JobFairReportService $reports)
     {
         abort_unless($request->user() instanceof Administrator, 403, 'Administrator account required.');
 
         $fair = JobFair::findOrFail($id);
-        $summary = $this->sprsSummary($fair);
+        $summary = $reports->sprs($fair);
 
         $pdf = Pdf::loadView('pdf.job_fairs.sprs_1_6', [
             'fair' => $fair,

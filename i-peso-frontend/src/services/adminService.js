@@ -19,6 +19,11 @@ export const adminService = {
     return data
   },
 
+  getSeekerSummary: async () => {
+    const { data } = await api.get('/admin/seekers/summary')
+    return data
+  },
+
   getSeekerDetail: async (id) => {
     const { data } = await api.get(`/admin/seekers/${id}`)
     return data
@@ -27,6 +32,11 @@ export const adminService = {
   // ── EMPLOYERS ──────────────────────────────────────────────────
   getEmployers: async (params = {}) => {
     const { data } = await api.get('/admin/employers', { params: cleanParams(params) })
+    return data
+  },
+
+  getEmployerSummary: async () => {
+    const { data } = await api.get('/admin/employers/summary')
     return data
   },
 
@@ -160,6 +170,16 @@ export const adminService = {
     })
     return response.data
   },
+
+  publishJobFair: async (id, status = 'published') => (await api.post(`/admin/job-fairs/${id}/publish`, { status })).data,
+  inviteJobFairEmployer: async (id, payload) => (await api.post(`/admin/job-fairs/${id}/invite`, payload)).data,
+  updateJobFairParticipation: async (fairId, participationId, payload) => (await api.patch(`/admin/job-fairs/${fairId}/participants/${participationId}`, payload)).data,
+  reviewJobFairRequirement: async (submissionId, payload) => (await api.patch(`/admin/job-fair-requirements/${submissionId}/review`, payload)).data,
+  viewJobFairRequirement: async (submissionId) => (await api.get(`/admin/job-fair-requirements/${submissionId}/view`, { responseType: 'blob' })).data,
+  submitJobFairProxyResults: async (fairId, payload) => (await api.post(`/admin/job-fairs/${fairId}/proxy-results`, payload)).data,
+  submitJobFairProxyConfirmation: async (fairId, payload) => (await api.post(`/admin/job-fairs/${fairId}/proxy-confirmation-slip`, payload)).data,
+  downloadJobFairResult: async (id) => (await api.get(`/admin/job-fair-results/${id}/roi-form-3`, { responseType: 'blob' })).data,
+  downloadJobFairInvitation: async (id, params = {}) => (await api.get(`/admin/job-fairs/${id}/invitation-letter`, { params, responseType: 'blob' })).data,
 
   // ── REPORTS ───────────────────────────────────────────────────
   getReports: async (params = {}) => {

@@ -10,8 +10,10 @@ use App\Models\JobVacancy;
 use App\Models\Occupation;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
@@ -169,6 +171,39 @@ class HiringApplicationFlowTest extends TestCase
         $this->patchJson("/api/employer/applications/{$application->apply_id}/status", [
             'status' => 'shortlisted',
         ])->assertStatus(409);
+    }
+
+    public function test_seeker_notification_bell_uses_count_first_and_bounded_history(): void
+    {
+        $seeker = $this->createSeeker();
+        foreach ([null, now()] as $readAt) {
+            DB::table('notifications')->insert([
+                'id' => (string) Str::uuid(),
+                'type' => 'TestNotification',
+                'notifiable_type' => JobSeeker::class,
+                'notifiable_id' => $seeker->getKey(),
+                'data' => json_encode(['title' => 'Dashboard update', 'message' => 'Test message']),
+                'read_at' => $readAt,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+        Sanctum::actingAs($seeker);
+
+        $this->getJson('/api/seeker/notifications/unread-count')
+            ->assertOk()
+            ->assertJsonPath('unread_count', 1)
+            ->assertJsonMissingPath('notifications');
+
+        $this->getJson('/api/seeker/notifications?per_page=1')
+            ->assertOk()
+            ->assertJsonCount(1, 'notifications')
+            ->assertJsonPath('pagination.total', 2);
+
+        $this->patchJson('/api/seeker/notifications/read-all')->assertOk();
+        $this->getJson('/api/seeker/notifications/unread-count')
+            ->assertOk()
+            ->assertJsonPath('unread_count', 0);
     }
 
     private function createEmployer(): Employer

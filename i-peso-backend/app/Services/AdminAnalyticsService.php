@@ -10,7 +10,9 @@ use App\Models\JobVacancy;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class AdminAnalyticsService
 {
@@ -23,7 +25,10 @@ class AdminAnalyticsService
         $filters['date_to'] = $range['to']->toDateString();
         $filters['period'] = $filters['period'] ?? 'monthly';
 
-        return [
+        ksort($filters);
+        $cacheKey = 'admin-analytics:snapshot:v2:'.hash('sha256', json_encode($filters));
+
+        return Cache::remember($cacheKey, now()->addSeconds(60), fn () => [
             'meta' => [
                 'filters' => $filters,
                 'generated_at' => now()->toIso8601String(),
@@ -35,13 +40,14 @@ class AdminAnalyticsService
             'trends' => $this->trends($filters, $range),
             'distributions' => $this->distributions($filters, $range),
             'top_lists' => $this->topLists($filters, $range),
+            'job_fair_analytics' => $this->jobFairAnalytics($range),
             'forecast' => $this->forecast($filters, $range),
-        ];
+        ]);
     }
 
     public function options(): array
     {
-        return [
+        return Cache::remember('admin-analytics:options:v1', now()->addMinutes(10), fn () => [
             'provinces' => JobSeeker::query()->whereNotNull('address_province')->distinct()->orderBy('address_province')->pluck('address_province')->values(),
             'cities' => JobSeeker::query()->whereNotNull('address_municipality_city')->distinct()->orderBy('address_municipality_city')->pluck('address_municipality_city')->values(),
             'barangays' => JobSeeker::query()->whereNotNull('address_barangay')->distinct()->orderBy('address_barangay')->pluck('address_barangay')->values(),
@@ -51,7 +57,7 @@ class AdminAnalyticsService
             'application_statuses' => ['pending', 'reviewed', 'shortlisted', 'interview', 'hired', 'rejected', 'withdrawn'],
             'vacancy_statuses' => ['active', 'closed', 'draft'],
             'employer_verification_statuses' => ['pending', 'verified', 'rejected'],
-        ];
+        ]);
     }
 
     public function reportData(string $category, array $filters): array
@@ -79,16 +85,38 @@ class AdminAnalyticsService
         $employers = $this->employerQuery($filters, $range);
         $vacancies = $this->vacancyQuery($filters, $range);
         $applications = $this->applicationQuery($filters, $range);
-        $hiredApplications = $this->applicationQuery($filters, $range, 'applications.status_changed_at')
-            ->where('applications.status', 'hired');
-        $totalSeekers = (clone $seekers)->count();
+        $seekerSummary = (clone $seekers)->selectRaw(
+            "COUNT(*) AS total, SUM(CASE WHEN profile_completed = 1 THEN 1 ELSE 0 END) AS complete_profiles, SUM(CASE WHEN profile_completed = 0 THEN 1 ELSE 0 END) AS incomplete_profiles, SUM(CASE WHEN employment_status = 'unemployed' THEN 1 ELSE 0 END) AS unemployed"
+        )->first();
+        $employerSummary = (clone $employers)->selectRaw(
+            "COUNT(*) AS total, SUM(CASE WHEN verification_status = 'verified' THEN 1 ELSE 0 END) AS verified"
+        )->first();
+        $vacancySummary = (clone $vacancies)->selectRaw(
+            "COUNT(*) AS total, SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) AS active, SUM(CASE WHEN status = 'closed' THEN 1 ELSE 0 END) AS closed"
+        )->first();
+        $applicationSummary = (clone $applications)->selectRaw(
+            "COUNT(*) AS total, SUM(CASE WHEN applications.status = 'pending' THEN 1 ELSE 0 END) AS pending"
+        )->first();
+        $hiredCount = $this->applicationQuery($filters, $range, 'applications.status_changed_at')
+            ->where('applications.status', 'hired')
+            ->count();
+        $totalSeekers = (int) ($seekerSummary->total ?? 0);
 
         $activeParticipants = $this->seekerQuery($filters, $range, false)->where(function (Builder $query) use ($range) {
             $query->whereBetween('updated_at', [$range['from'], $range['to']])
                 ->orWhereHas('applications', fn (Builder $activity) => $activity->whereBetween('created_at', [$range['from'], $range['to']]))
-                ->orWhereHas('programApplications', fn (Builder $activity) => $activity->whereBetween('created_at', [$range['from'], $range['to']]))
-                ->orWhereHas('jobFairAttendances', fn (Builder $activity) => $activity->whereBetween('created_at', [$range['from'], $range['to']]));
+                ->orWhereHas('programApplications', fn (Builder $activity) => $activity->whereBetween('created_at', [$range['from'], $range['to']]));
         })->count();
+
+        $jobFairSummary = Schema::hasTable('job_fair_result_reports')
+            ? DB::table('job_fair_result_reports')->whereBetween('submitted_at', [$range['from'], $range['to']])->selectRaw(
+                'COUNT(DISTINCT job_fair_id) AS fairs, COUNT(*) AS companies, SUM(total_vacancies_offered) AS vacancies, SUM(total_applicants) AS applicants, SUM(total_hots) AS hots, SUM(total_near_hired) AS near_hired, SUM(total_rejected) AS rejected'
+            )->first()
+            : null;
+        $jobFairsConducted = Schema::hasTable('job_fairs')
+            ? DB::table('job_fairs')->whereIn('status', ['closed', 'completed'])
+                ->whereBetween(DB::raw('COALESCE(start_date, event_date)'), [$range['from']->toDateString(), $range['to']->toDateString()])->count()
+            : 0;
 
         $scheduledInterviews = InterviewSchedule::query()
             ->where('status', 'scheduled')
@@ -99,21 +127,50 @@ class AdminAnalyticsService
         return [
             'total_registered_applicants' => $totalSeekers,
             'total_job_seekers' => $totalSeekers,
-            'complete_profiles' => (clone $seekers)->where('profile_completed', true)->count(),
-            'incomplete_profiles' => (clone $seekers)->where('profile_completed', false)->count(),
+            'complete_profiles' => (int) ($seekerSummary->complete_profiles ?? 0),
+            'incomplete_profiles' => (int) ($seekerSummary->incomplete_profiles ?? 0),
             'active_participants' => $activeParticipants,
-            'active_participants_definition' => 'Unique job seekers who updated their profile, submitted a job or program application, or joined a job fair within the selected date range.',
-            'total_employers' => (clone $employers)->count(),
-            'verified_employers' => (clone $employers)->where('verification_status', 'verified')->count(),
-            'total_job_vacancies' => (clone $vacancies)->count(),
-            'active_job_vacancies' => (clone $vacancies)->where('status', 'active')->count(),
-            'closed_job_vacancies' => (clone $vacancies)->where('status', 'closed')->count(),
-            'total_applications' => (clone $applications)->count(),
-            'hired_applicants' => $hiredApplications->count(),
-            'pending_applications' => (clone $applications)->where('applications.status', 'pending')->count(),
-            'unemployed_applicants' => (clone $seekers)->where('employment_status', 'unemployed')->count(),
+            'active_participants_definition' => 'Unique job seekers who updated their profile or submitted a job or program application within the selected date range.',
+            'total_employers' => (int) ($employerSummary->total ?? 0),
+            'verified_employers' => (int) ($employerSummary->verified ?? 0),
+            'total_job_vacancies' => (int) ($vacancySummary->total ?? 0),
+            'active_job_vacancies' => (int) ($vacancySummary->active ?? 0),
+            'closed_job_vacancies' => (int) ($vacancySummary->closed ?? 0),
+            'total_applications' => (int) ($applicationSummary->total ?? 0),
+            'hired_applicants' => $hiredCount,
+            'pending_applications' => (int) ($applicationSummary->pending ?? 0),
+            'unemployed_applicants' => (int) ($seekerSummary->unemployed ?? 0),
             'scheduled_interviews' => $scheduledInterviews,
+            'job_fairs_conducted' => $jobFairsConducted,
+            'job_fair_participating_companies' => (int) ($jobFairSummary->companies ?? 0),
+            'job_fair_vacancies' => (int) ($jobFairSummary->vacancies ?? 0),
+            'job_fair_applicants' => (int) ($jobFairSummary->applicants ?? 0),
+            'job_fair_hots' => (int) ($jobFairSummary->hots ?? 0),
+            'job_fair_near_hired' => (int) ($jobFairSummary->near_hired ?? 0),
+            'job_fair_rejected' => (int) ($jobFairSummary->rejected ?? 0),
         ];
+    }
+
+    private function jobFairAnalytics(array $range): array
+    {
+        if (! Schema::hasTable('job_fair_result_reports')) {
+            return ['top_hiring_companies' => [], 'mismatch_reasons' => [], 'positions' => []];
+        }
+        $reports = DB::table('job_fair_result_reports')->whereBetween('submitted_at', [$range['from'], $range['to']]);
+        $companies = (clone $reports)->selectRaw('company_name AS label, SUM(total_hots) AS value')
+            ->groupBy('company_name')->orderByDesc('value')->limit(self::TOP_LIMIT)->get();
+        $mismatches = Schema::hasTable('job_fair_result_mismatch_tallies') ? DB::table('job_fair_result_mismatch_tallies as tallies')
+            ->join('job_fair_result_reports as reports', 'reports.id', '=', 'tallies.result_report_id')
+            ->whereBetween('reports.submitted_at', [$range['from'], $range['to']])
+            ->selectRaw('tallies.mismatch_code AS label, SUM(tallies.count) AS value')
+            ->groupBy('tallies.mismatch_code')->orderByDesc('value')->get() : collect();
+        $positions = Schema::hasTable('job_fair_result_entries') ? DB::table('job_fair_result_entries as entries')
+            ->join('job_fair_result_reports as reports', 'reports.id', '=', 'entries.result_report_id')
+            ->whereBetween('reports.submitted_at', [$range['from'], $range['to']])
+            ->selectRaw('entries.position_applied_for AS label, COUNT(*) AS value')
+            ->groupBy('entries.position_applied_for')->orderByDesc('value')->limit(self::TOP_LIMIT)->get() : collect();
+
+        return ['top_hiring_companies' => $companies, 'mismatch_reasons' => $mismatches, 'positions' => $positions];
     }
 
     private function trends(array $filters, array $range): array

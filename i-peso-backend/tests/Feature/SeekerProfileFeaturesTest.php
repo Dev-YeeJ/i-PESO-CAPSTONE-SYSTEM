@@ -9,6 +9,7 @@ use App\Models\SeekerCertificate;
 use App\Models\SeekerEducation;
 use App\Models\SeekerSkill;
 use App\Models\SeekerWorkExperience;
+use App\Services\VertexAiSuggestionService;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Http\UploadedFile;
@@ -881,6 +882,11 @@ class SeekerProfileFeaturesTest extends TestCase
     public function test_profile_returns_nsrp_dashboard_metadata_and_certificates(): void
     {
         $seeker = $this->createSeeker();
+        $seeker->forceFill([
+            'self_employed_type_others' => 'Online seller',
+            'unemployment_reason_others' => 'Career transition',
+            'unemployment_terminated_country' => 'Japan',
+        ])->save();
         SeekerSkill::create([
             'seeker_id' => $seeker->getKey(),
             'skill_name' => 'Data Entry',
@@ -902,7 +908,61 @@ class SeekerProfileFeaturesTest extends TestCase
             ->assertJsonPath('user.dashboard_stats.skills', 1)
             ->assertJsonPath('user.certificates.0.title', 'Digital Literacy')
             ->assertJsonPath('user.dole_skills.0', 'Data Entry')
+            ->assertJsonPath('user.self_employed_type_others', 'Online seller')
+            ->assertJsonPath('user.unemployment_reason_others', 'Career transition')
+            ->assertJsonPath('user.unemployment_terminated_country', 'Japan')
             ->assertJsonStructure(['user' => ['profile_strength' => ['percentage', 'items']]]);
+    }
+
+    public function test_seeker_can_generate_a_profile_aware_professional_summary(): void
+    {
+        $seeker = $this->createSeeker();
+        Sanctum::actingAs($seeker);
+
+        $generator = \Mockery::mock(VertexAiSuggestionService::class);
+        $generator->shouldReceive('generateProfessionalSummary')
+            ->once()
+            ->withArgs(fn (JobSeeker $user, ?string $existing) => $user->is($seeker) && $existing === 'Previous draft')
+            ->andReturn([
+                'summary' => 'Office support candidate with verified data-entry skills and relevant training.',
+                'highlights_used' => ['Office Clerk', 'Data Entry'],
+                'source' => 'vertex_ai',
+            ]);
+        $this->app->instance(VertexAiSuggestionService::class, $generator);
+
+        $this->postJson('/api/seeker/ai-professional-summary', [
+            'existing_summary' => 'Previous draft',
+        ])
+            ->assertOk()
+            ->assertJsonPath('data.source', 'vertex_ai')
+            ->assertJsonPath('data.highlights_used.0', 'Office Clerk')
+            ->assertJsonPath('data.summary', 'Office support candidate with verified data-entry skills and relevant training.');
+    }
+
+    public function test_dashboard_summary_returns_only_lightweight_first_paint_data(): void
+    {
+        $seeker = $this->createSeeker();
+        SeekerSkill::create([
+            'seeker_id' => $seeker->getKey(),
+            'skill_name' => 'Data Entry',
+            'skill_type' => 'technical',
+        ]);
+        $seeker->occupations()->create([
+            'occupation_title' => 'Office Clerk',
+            'general_term' => 'Clerical Support',
+            'preference_order' => 1,
+        ]);
+        Sanctum::actingAs($seeker);
+
+        $this->getJson('/api/seeker/dashboard-summary')
+            ->assertOk()
+            ->assertJsonPath('user.seeker_id', $seeker->getKey())
+            ->assertJsonPath('user.dashboard_stats.skills', 1)
+            ->assertJsonPath('user.occupations.0.occupation_title', 'Office Clerk')
+            ->assertJsonStructure(['user' => ['profile_strength' => ['percentage', 'items']]])
+            ->assertJsonMissingPath('user.certificates')
+            ->assertJsonMissingPath('user.educations')
+            ->assertJsonMissingPath('user.work_experiences');
     }
 
     public function test_seeker_can_upload_and_view_a_private_square_profile_photo(): void
@@ -934,6 +994,41 @@ class SeekerProfileFeaturesTest extends TestCase
         $this->postJson('/api/seeker/resume/generate')
             ->assertUnprocessable()
             ->assertJsonValidationErrors('profile_image');
+    }
+
+    public function test_resume_generation_requires_a_professional_summary(): void
+    {
+        Storage::fake('local');
+        $seeker = $this->createSeeker();
+        Sanctum::actingAs($seeker);
+
+        $this->post('/api/seeker/profile-image', [
+            'profile_image' => $this->fakeSquarePng('resume-photo.png'),
+        ])->assertOk();
+
+        $this->postJson('/api/seeker/resume/generate', [
+            'professional_summary' => '   ',
+        ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('professional_summary');
+    }
+
+    public function test_resume_generation_uses_a4_page_size_for_philippine_resume(): void
+    {
+        Storage::fake('local');
+        $seeker = $this->createSeeker();
+        Sanctum::actingAs($seeker);
+
+        $this->post('/api/seeker/profile-image', [
+            'profile_image' => $this->fakeSquarePng('resume-photo.png'),
+        ])->assertOk();
+
+        $response = $this->post('/api/seeker/resume/generate', [
+            'professional_summary' => 'Experienced support professional with strong service, coordination, and documentation skills.',
+        ])->assertOk()
+            ->assertHeader('content-type', 'application/pdf');
+
+        $this->assertMatchesRegularExpression('/\\/MediaBox\\s*\\[(?:\\s*\\d+(?:\\.\\d+)?){4}\\]/', $response->getContent());
     }
 
     public function test_seeker_can_generate_a_resume_from_nsrp_data(): void

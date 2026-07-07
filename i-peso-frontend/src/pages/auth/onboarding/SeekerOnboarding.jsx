@@ -10,6 +10,7 @@ import { seekerRegistrationSteps } from '@/components/auth/registrationJourneys'
 import EducationBackgroundEditor from '@/components/form/EducationBackgroundEditor'
 import ExperienceTimeFrame from '@/components/form/ExperienceTimeFrame'
 import OccupationCombobox from '@/components/form/OccupationCombobox'
+import PreferredLocationsField from '@/components/form/PreferredLocationsField'
 import PsocCombobox from '@/components/form/PsocCombobox'
 import SeekerSkillsForm from '@/components/form/SeekerSkillsForm'
 import SingleAddressInput from '@/components/form/SingleAddressInput'
@@ -26,6 +27,15 @@ import {
   geocodeAddress,
   resolveAddressSuggestion,
 } from '@/services/geoService'
+import { serializeOccupationPreferences } from '@/utils/seekerProfilePayloads'
+import {
+  COMPANY_SUGGESTIONS as SHARED_COMPANY_SUGGESTIONS,
+  ELIGIBILITY_NAME_OPTIONS as SHARED_ELIGIBILITY_NAME_OPTIONS,
+  MONTH_DURATION_OPTIONS as SHARED_MONTH_DURATION_OPTIONS,
+  TRAINING_COURSE_OPTIONS as SHARED_TRAINING_COURSE_OPTIONS,
+  TRAINING_HOUR_OPTIONS as SHARED_TRAINING_HOUR_OPTIONS,
+  TRAINING_INSTITUTION_OPTIONS as SHARED_TRAINING_INSTITUTION_OPTIONS,
+} from '@/data/seekerProfileVocabularies'
 
 // ── Constants ─────────────────────────────────────────────────────────────
 
@@ -258,6 +268,8 @@ const LANGUAGES = [
   'Japanese',
   'Korean',
   'Arabic',
+  'French',
+  'German',
   'Others',
 ]
 
@@ -353,85 +365,6 @@ const EMPLOYMENT_STATUS_OPTIONS = [
   { value: 'ojt', label: 'OJT / On-the-Job Training' },
   { value: 'freelance', label: 'Freelance' },
   { value: 'self_employed', label: 'Self-Employed' },
-]
-
-const MONTH_DURATION_OPTIONS = [
-  { value: 0, label: 'Less than 1 month' },
-  { value: 1, label: '1 month' },
-  { value: 2, label: '2 months' },
-  { value: 3, label: '3 months' },
-  { value: 4, label: '4 months' },
-  { value: 5, label: '5 months' },
-  { value: 6, label: '6 months' },
-  { value: 9, label: '9 months' },
-  { value: 12, label: '1 year' },
-  { value: 18, label: '1 year 6 months' },
-  { value: 24, label: '2 years' },
-  { value: 36, label: '3 years' },
-  { value: 48, label: '4 years' },
-  { value: 60, label: '5 years' },
-  { value: 84, label: '7 years' },
-  { value: 120, label: '10 years' },
-  { value: 180, label: '15 years' },
-  { value: 240, label: '20 years' },
-  { value: 300, label: '25 years or more' },
-]
-
-const TRAINING_HOUR_OPTIONS = [
-  { value: 8, label: '8 hours' },
-  { value: 16, label: '16 hours' },
-  { value: 24, label: '24 hours' },
-  { value: 40, label: '40 hours' },
-  { value: 80, label: '80 hours' },
-  { value: 120, label: '120 hours' },
-  { value: 160, label: '160 hours' },
-  { value: 240, label: '240 hours' },
-  { value: 320, label: '320 hours' },
-  { value: 480, label: '480 hours' },
-  { value: 960, label: '960 hours' },
-]
-
-const TRAINING_COURSE_OPTIONS = [
-  'Automotive Servicing NC II',
-  'Barista NC II',
-  'Bookkeeping NC III',
-  'Bread and Pastry Production NC II',
-  'Caregiving NC II',
-  'Computer Systems Servicing NC II',
-  'Contact Center Services NC II',
-  'Cookery NC II',
-  'Driving NC II',
-  'Electrical Installation and Maintenance NC II',
-  'Food and Beverage Services NC II',
-  'Front Office Services NC II',
-  'Housekeeping NC II',
-  'Masonry NC II',
-  'Shielded Metal Arc Welding NC II',
-  'Technical Drafting NC II',
-  'Trainers Methodology I',
-  'Visual Graphic Design NC III',
-]
-
-const TRAINING_INSTITUTION_OPTIONS = [
-  'Department of Labor and Employment',
-  'Local Government Unit',
-  'Public Employment Service Office',
-  'TESDA',
-  'TESDA Accredited Training Center',
-  'TESDA Provincial Training Center',
-  'Technical Vocational Institution',
-]
-
-const ELIGIBILITY_NAME_OPTIONS = [
-  'Board Passer / Professional License',
-  'Career Service Professional Eligibility',
-  'Career Service Subprofessional Eligibility',
-  'Civil Service Eligibility',
-  'Criminologist Licensure Examination',
-  'Driver License',
-  'Licensure Examination for Teachers',
-  'Nursing Licensure Examination',
-  'Professional Teacher License',
 ]
 
 const TRAINING_SKILL_OPTIONS = [
@@ -899,7 +832,7 @@ const Step2 = ({ form, errors, onChange }) => (
               onChange={onChange}
             >
               <option value="">Select duration</option>
-              {MONTH_DURATION_OPTIONS.map((duration) => (
+              {SHARED_MONTH_DURATION_OPTIONS.map((duration) => (
                 <option key={duration.value} value={duration.value}>{duration.label}</option>
               ))}
             </select>
@@ -1150,34 +1083,9 @@ const SearchableMultiSelect = ({ options, selected, onChange, placeholder, limit
 }
 
 const Step3 = ({ form, errors, onChange }) => {
-  const [provinceCode, setProvinceCode] = useState('')
-  const [provinceOptions, setProvinceOptions] = useState([])
-  const [cityOptions, setCityOptions] = useState([])
-  const [cityLoading, setCityLoading] = useState(false)
-
-  useEffect(() => {
-    getProvinces().then(setProvinceOptions).catch(() => setProvinceOptions([]))
-  }, [])
-
-  useEffect(() => {
-    if (!provinceCode) return
-    getCitiesByProvince(provinceCode)
-      .then(setCityOptions)
-      .catch(() => setCityOptions([]))
-      .finally(() => setCityLoading(false))
-  }, [provinceCode])
-
   const occupations = form.preferred_occupations ?? []
   const locations = form.preferred_locations_details ?? []
   const setField = (name, value) => onChange({ target: { name, value } })
-  const selectedProvince = provinceOptions.find((province) => province.code === provinceCode)
-
-  const addLocalLocation = (cityCode) => {
-    const city = cityOptions.find((option) => option.code === cityCode)
-    if (!city || !selectedProvince || locations.length >= 3) return
-    const label = `${city.name}, ${selectedProvince.name}`
-    if (!locations.includes(label)) setField('preferred_locations_details', [...locations, label])
-  }
 
   return (
     <div>
@@ -1228,7 +1136,6 @@ const Step3 = ({ form, errors, onChange }) => {
                 <input type="radio" name="preferred_work_location" value={opt.value} checked={active} onChange={(event) => {
                   onChange(event)
                   setField('preferred_locations_details', [])
-                  setProvinceCode('')
                 }} style={{ accentColor: '#1d4ed8' }} />
                 {opt.label}
               </label>
@@ -1238,36 +1145,12 @@ const Step3 = ({ form, errors, onChange }) => {
       </FormField>
 
       {form.preferred_work_location && (
-        <div style={{ backgroundColor: '#f8fafc', borderRadius: '12px', padding: '14px', marginTop: '4px' }}>
-          <p style={{ fontSize: '12px', fontWeight: '600', color: '#374151', marginBottom: '10px' }}>
-            Select preferred {form.preferred_work_location === 'local' ? 'cities or municipalities' : 'countries'} (up to 3):
-          </p>
-          <PreferenceTags items={locations} onRemove={(item) => setField('preferred_locations_details', locations.filter((value) => value !== item))} />
-          {form.preferred_work_location === 'local' ? (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-              <select style={selectStyle(false)} value={provinceCode} onChange={(event) => {
-                const code = event.target.value
-                setProvinceCode(code)
-                setCityOptions([])
-                setCityLoading(Boolean(code))
-              }} disabled={locations.length >= 3}>
-                <option value="">Select province</option>
-                {provinceOptions.map((province) => <option key={province.code} value={province.code}>{province.name}</option>)}
-              </select>
-              <select style={selectStyle(false)} value="" onChange={(event) => addLocalLocation(event.target.value)} disabled={!provinceCode || cityLoading || locations.length >= 3}>
-                <option value="">{cityLoading ? 'Loading...' : 'Select city/municipality'}</option>
-                {cityOptions.map((city) => <option key={city.code} value={city.code}>{city.name}</option>)}
-              </select>
-            </div>
-          ) : (
-            <SearchableMultiSelect
-              options={ISO_COUNTRIES.map((country) => country.name)}
-              selected={locations}
-              onChange={(value) => setField('preferred_locations_details', value)}
-              placeholder="Search country, e.g. Japan"
-            />
-          )}
-        </div>
+        <PreferredLocationsField
+          scope={form.preferred_work_location}
+          value={locations}
+          error={errors.preferred_locations_details}
+          onChange={(value) => setField('preferred_locations_details', value)}
+        />
       )}
     </div>
   )
@@ -1746,8 +1629,8 @@ const AddressSection = ({ form, errors, onChange, gpsState, onGpsDetect, onAddre
               codeValue={form.address_province_code ?? ''}
               options={provinces}
               loading={loadingProv}
-              disabled={isLocating}
-              dimmed={isLocating}
+              disabled={isLocating || (gpsState?.success && gpsState?.isComplete)}
+              dimmed={isLocating || (gpsState?.success && gpsState?.isComplete)}
               error={errors.address_province}
               onChange={onChange}
               placeholder="Select province"
@@ -1761,8 +1644,8 @@ const AddressSection = ({ form, errors, onChange, gpsState, onGpsDetect, onAddre
               codeValue={form.address_city_code ?? ''}
               options={cities}
               loading={loadingCity}
-              disabled={isLocating || !form.address_province_code}
-              dimmed={isLocating}
+              disabled={isLocating || !form.address_province_code || (gpsState?.success && gpsState?.isComplete)}
+              dimmed={isLocating || (gpsState?.success && gpsState?.isComplete)}
               error={errors.address_municipality_city}
               onChange={onChange}
               placeholder="Select province first"
@@ -1776,8 +1659,8 @@ const AddressSection = ({ form, errors, onChange, gpsState, onGpsDetect, onAddre
               codeValue={form.address_barangay_code ?? ''}
               options={barangays}
               loading={loadingBrgy}
-              disabled={isLocating || !form.address_city_code}
-              dimmed={isLocating}
+              disabled={isLocating || !form.address_city_code || (gpsState?.success && gpsState?.isComplete)}
+              dimmed={isLocating || (gpsState?.success && gpsState?.isComplete)}
               error={errors.address_barangay}
               onChange={onChange}
               placeholder="Select city first"
@@ -1931,14 +1814,14 @@ function Step6({ form, errors, onAddTraining, onRemoveTraining, onUpdateTraining
                         name={`training_course_${i}`}
                         value={train.course || ''}
                         onChange={(event) => onUpdateTraining('trainings', i, { course: event.target.value })}
-                        options={TRAINING_COURSE_OPTIONS}
+                        options={SHARED_TRAINING_COURSE_OPTIONS}
                         placeholder="Search or select course"
                       />
                       <SearchableSingleSelect
                         name={`training_institution_${i}`}
                         value={train.training_institution || ''}
                         onChange={(event) => onUpdateTraining('trainings', i, { training_institution: event.target.value })}
-                        options={TRAINING_INSTITUTION_OPTIONS}
+                        options={SHARED_TRAINING_INSTITUTION_OPTIONS}
                         placeholder="Training institution (optional)"
                       />
                       <SearchableSingleSelect
@@ -1957,7 +1840,7 @@ function Step6({ form, errors, onAddTraining, onRemoveTraining, onUpdateTraining
                       style={{ width: '100%', padding: '6px', fontSize: '13px', border: '1px solid #d1d5db', borderRadius: '6px', backgroundColor: '#fff' }}
                     >
                       <option value="">Hours</option>
-                      {TRAINING_HOUR_OPTIONS.map((hours) => (
+                      {SHARED_TRAINING_HOUR_OPTIONS.map((hours) => (
                         <option key={hours.value} value={hours.value}>{hours.label}</option>
                       ))}
                     </select>
@@ -2018,7 +1901,7 @@ function Step6({ form, errors, onAddTraining, onRemoveTraining, onUpdateTraining
                         name={`eligibility_name_${i}`}
                         value={elig.name || ''}
                         onChange={(event) => onUpdateEligibility('eligibilities', i, { name: event.target.value })}
-                        options={ELIGIBILITY_NAME_OPTIONS}
+                        options={SHARED_ELIGIBILITY_NAME_OPTIONS}
                         placeholder="License/Eligibility name"
                       />
                       <label style={{ color: '#64748b', fontSize: '10px' }}>
@@ -2071,34 +1954,6 @@ function Step6({ form, errors, onAddTraining, onRemoveTraining, onUpdateTraining
 }
 
 // ── STEP 7: WORK EXPERIENCE ────────────────────────────────────────────────
-
-const COMPANY_SUGGESTIONS = [
-  { label: 'Department of Labor and Employment', meta: 'Government agency', keywords: 'dole labor employment government' },
-  { label: 'Jollibee Foods Corporation', meta: 'Food service and restaurant', keywords: 'jollibee fast food service crew cashier' },
-  { label: 'SM Supermalls', meta: 'Retail and mall operations', keywords: 'sm mall retail sales admin' },
-  { label: 'SM Hypermarket', meta: 'Retail and grocery', keywords: 'sm grocery supermarket cashier stock clerk' },
-  { label: 'Mang Inasal', meta: 'Food service and restaurant', keywords: 'restaurant service crew cook cashier' },
-  { label: "McDonald's Philippines", meta: 'Food service and restaurant', keywords: 'mcdonalds fast food crew cashier' },
-  { label: '7-Eleven Philippines', meta: 'Convenience store', keywords: 'seven eleven cashier retail store' },
-  { label: 'Accenture', meta: 'BPO, technology, and consulting', keywords: 'accenture bpo it support software' },
-  { label: 'Concentrix', meta: 'BPO and customer service', keywords: 'call center bpo customer support' },
-  { label: 'Teleperformance', meta: 'BPO and customer service', keywords: 'call center bpo customer support' },
-  { label: 'Foundever', meta: 'BPO and customer service', keywords: 'sitel call center bpo customer support' },
-  { label: 'Urdaneta City Government', meta: 'Local government', keywords: 'city government lgu public service' },
-  { label: 'Local Government Unit', meta: 'Government office', keywords: 'lgu municipal city hall public service' },
-  { label: 'Public Employment Service Office', meta: 'PESO office', keywords: 'peso employment office government' },
-  { label: 'Department of Education', meta: 'Education agency', keywords: 'deped school teacher education' },
-  { label: 'TESDA', meta: 'Technical education and training', keywords: 'tesda training vocational technical' },
-  { label: 'Barangay Office', meta: 'Community government office', keywords: 'barangay government office community' },
-  { label: 'Municipal Hall', meta: 'Local government office', keywords: 'municipal hall lgu government' },
-  { label: 'City Hall', meta: 'Local government office', keywords: 'city hall lgu government' },
-  { label: 'Robinsons', meta: 'Retail and mall operations', keywords: 'mall retail sales supermarket' },
-  { label: 'Puregold', meta: 'Retail and grocery', keywords: 'grocery supermarket cashier stock clerk' },
-  { label: 'Watsons', meta: 'Retail pharmacy and health store', keywords: 'pharmacy retail cashier sales' },
-  { label: 'Mercury Drug', meta: 'Pharmacy and retail', keywords: 'pharmacy cashier sales assistant' },
-  { label: 'Wilcon Depot', meta: 'Hardware and construction retail', keywords: 'hardware retail warehouse sales' },
-  { label: 'Small Business / Self-Employed', meta: 'Self-employment or family business', keywords: 'small business sari sari freelance self employed' },
-]
 
 const POSITION_SUGGESTIONS = [
   { label: 'Cashier', meta: 'Retail and store work', keywords: 'cashier pos payment store grocery' },
@@ -2395,7 +2250,7 @@ function WorkExperienceCards({ form, errors, onAddExperience, onRemoveExperience
                       id={`company-name-${i}`}
                       label="Company Name"
                       value={exp.company_name || ''}
-                      suggestions={COMPANY_SUGGESTIONS}
+                      suggestions={SHARED_COMPANY_SUGGESTIONS}
                       placeholder="Company name"
                       helper="Search by official name, alias, acronym, or keyword. Custom names are allowed."
                       onChange={(value) => onUpdateExperience('work_experiences', i, { company_name: value })}
@@ -2697,7 +2552,15 @@ export default function SeekerOnboarding() {
     if (name === 'household_id_4ps') {
       value = format4PsHouseholdId(value)
     }
-    
+
+    // Auto-format TIN as 000-000-000-000 while typing
+    if (name === 'tin' && typeof value === 'string') {
+      const digits = value.replace(/\D/g, '').slice(0, 12)
+      const parts = []
+      for (let i = 0; i < digits.length; i += 3) parts.push(digits.slice(i, i + 3))
+      value = parts.join('-')
+    }
+
     // Auto-capitalize name fields
     if ((name === 'first_name' || name === 'last_name' || name === 'middle_name') && typeof value === 'string') {
       value = capitalizeName(value)
@@ -3205,15 +3068,7 @@ export default function SeekerOnboarding() {
     work_type_preference       : form.work_type_preference,
     preferred_work_location    : form.preferred_work_location,
     preferred_locations_details: form.preferred_locations_details ?? [],
-    occupation_preferences     : (form.preferred_occupations ?? []).map((occupation) => ({
-      occupation_id: occupation.occupation_id || null,
-      general_term: occupation.general_term || null,
-      broad_field: occupation.broad_field || null,
-      role_function: occupation.role_function || null,
-      confidence: occupation.confidence || null,
-      raw_job_title: occupation.raw_job_title || occupation.occupation_title,
-      source: occupation.source || null,
-    })),
+    occupation_preferences     : serializeOccupationPreferences(form.preferred_occupations ?? []),
   })
 
   const buildStep4Payload = () => {

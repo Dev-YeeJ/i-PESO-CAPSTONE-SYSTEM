@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <title>Resume - {{ $seeker->first_name }} {{ $seeker->last_name }}</title>
     <style>
-        @page { margin: 30px 38px 34px; }
+        @page { size: A4; margin: 30px 38px 34px; }
         * { box-sizing: border-box; }
         body {
             margin: 0;

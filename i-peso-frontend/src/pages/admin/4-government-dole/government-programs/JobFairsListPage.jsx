@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { CalendarDays, Download, Plus, RefreshCw, UsersRound } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { Button, Card } from '@/components/ui'
@@ -9,34 +10,30 @@ import { adminService } from '@/services/adminService'
 const formatDate = (value) => value ? new Date(value).toLocaleDateString() : 'TBD'
 
 const metricCards = [
-  ['employers_joined', 'Employers'],
-  ['seekers_rsvped', 'RSVPs'],
-  ['attendance', 'Attended'],
-  ['hots', 'HOTS'],
+  ['approved', 'Approved'],
+  ['total_applicants', 'Applicants'],
+  ['total_hots', 'HOTS'],
+  ['proxy_reports', 'Proxy Reports'],
 ]
 
 export default function JobFairsListPage() {
-  const [fairs, setFairs] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
+  const [downloadError, setDownloadError] = useState('')
   const navigate = useNavigate()
 
-  const load = async () => {
-    setLoading(true)
-    setError('')
-    try {
-      const result = await adminService.getJobFairsList({ per_page: 50 })
-      setFairs(result.data || [])
-    } catch (requestError) {
-      setError(requestError.response?.data?.message ?? 'Unable to load job fairs.')
-    } finally {
-      setLoading(false)
-    }
-  }
+  const jobFairsQuery = useQuery({
+    queryKey: ['jobFairs', { per_page: 50 }],
+    queryFn: () => adminService.getJobFairsList({ per_page: 50 }),
+      staleTime: 1000 * 60 * 5,
+      refetchOnWindowFocus: false,
+  })
 
-  useEffect(() => {
-    load()
-  }, [])
+  const fairs = jobFairsQuery.data?.data ?? []
+  const loading = jobFairsQuery.isLoading
+  const errorMessage = jobFairsQuery.isError
+    ? jobFairsQuery.error?.response?.data?.message ?? 'Unable to load job fairs.'
+    : downloadError
+
+  const refresh = () => jobFairsQuery.refetch()
 
   const downloadSprs = async (fair) => {
     try {
@@ -48,7 +45,7 @@ export default function JobFairsListPage() {
       link.click()
       URL.revokeObjectURL(url)
     } catch (requestError) {
-      setError(requestError.response?.data?.message ?? 'Unable to generate SPRS report.')
+      setDownloadError(requestError.response?.data?.message ?? 'Unable to generate SPRS report.')
     }
   }
 
@@ -56,23 +53,23 @@ export default function JobFairsListPage() {
     <div className="portal-page">
       <PageHeader
         title="Job Fairs"
-        subtitle="Create hiring events, monitor live attendance, and produce SPRS 1.6 counts."
+        subtitle="Coordinate employers before the event and automate post-event government reports."
         eyebrow="Government & DOLE"
         actions={[
-          { label: 'Refresh', onClick: load, variant: 'secondary' },
+          { label: 'Refresh', onClick: refresh, variant: 'secondary' },
           { label: 'Create Job Fair', onClick: () => navigate('/admin/job-fairs/create'), variant: 'primary' },
         ]}
       />
 
-      {error && <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{error}</div>}
+      {errorMessage && <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{errorMessage}</div>}
 
       <Card padding="none" className="mt-6">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 p-5 sm:p-6">
           <div>
             <h2 className="text-lg font-bold text-slate-950">Digital Job Fair Directory</h2>
-            <p className="text-sm text-slate-500">Live metrics are generated from employer joins, seeker QR passes, and fair-linked applications.</p>
+            <p className="text-sm text-slate-500">Metrics merge employer self-service submissions with Admin Proxy Encoded paper forms.</p>
           </div>
-          <Button variant="outline" icon={RefreshCw} onClick={load}>Sync</Button>
+          <Button variant="outline" icon={RefreshCw} onClick={refresh}>Sync</Button>
         </div>
 
         {loading ? (
@@ -110,7 +107,7 @@ export default function JobFairsListPage() {
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2 xl:flex-col xl:items-stretch">
-                  <Button variant="outline" icon={UsersRound} onClick={() => navigate(`/admin/job-fairs/${fair.job_fair_id}/edit`)}>Manage</Button>
+                  <Button variant="outline" icon={UsersRound} onClick={() => navigate(`/admin/job-fairs/${fair.job_fair_id}`)}>Manage</Button>
                   <Button variant="navy" icon={Download} onClick={() => downloadSprs(fair)}>SPRS 1.6</Button>
                 </div>
               </div>

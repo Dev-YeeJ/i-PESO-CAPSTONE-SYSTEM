@@ -88,6 +88,32 @@ class SeekerAiSuggestionController extends Controller
         }
     }
 
+    public function professionalSummary(Request $request, VertexAiSuggestionService $suggestions): JsonResponse
+    {
+        $user = $request->user();
+        if (! $user instanceof JobSeeker) {
+            return response()->json(['message' => 'Job seeker account required.'], 403);
+        }
+
+        $validated = $request->validate([
+            'existing_summary' => ['nullable', 'string', 'max:1200'],
+        ]);
+
+        try {
+            return response()->json([
+                'data' => $suggestions->generateProfessionalSummary($user, $validated['existing_summary'] ?? null),
+                'message' => 'Professional summary generated from your verified profile.',
+            ]);
+        } catch (RuntimeException $exception) {
+            report($exception);
+
+            return response()->json([
+                'message' => $exception->getMessage(),
+                'data' => null,
+            ], 503);
+        }
+    }
+
     public function parseMapQuery(Request $request, VertexAiSuggestionService $suggestions): JsonResponse
     {
         $user = $request->user();

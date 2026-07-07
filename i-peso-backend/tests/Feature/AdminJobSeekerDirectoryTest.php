@@ -8,6 +8,7 @@ use App\Models\JobSeeker;
 use App\Models\SeekerCertificate;
 use App\Models\SeekerSkill;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
@@ -89,10 +90,29 @@ class AdminJobSeekerDirectoryTest extends TestCase
             $table->unsignedBigInteger('seeker_id');
             $table->timestamps();
         });
+
+        Schema::create('employers', function (Blueprint $table) {
+            $table->id('employer_id');
+            $table->string('company_name');
+            $table->string('email')->unique();
+            $table->string('password');
+            $table->string('verification_status')->default('pending');
+            $table->softDeletes();
+            $table->timestamps();
+        });
+
+        Schema::create('job_vacancies', function (Blueprint $table) {
+            $table->id('post_id');
+            $table->unsignedBigInteger('employer_id');
+            $table->string('status')->default('draft');
+            $table->timestamps();
+        });
     }
 
     protected function tearDown(): void
     {
+        Schema::dropIfExists('job_vacancies');
+        Schema::dropIfExists('employers');
         Schema::dropIfExists('job_fair_attendees');
         Schema::dropIfExists('seeker_occupations');
         Schema::dropIfExists('seeker_certificates');
@@ -189,5 +209,54 @@ class AdminJobSeekerDirectoryTest extends TestCase
             ->assertJsonPath('data_quality_flags.no_contact_number', true)
             ->assertJsonPath('data_quality_flags.no_applications', true)
             ->assertJsonMissingPath('certificates.0.file_path');
+    }
+
+    public function test_directory_summaries_are_returned_by_single_aggregate_endpoints(): void
+    {
+        $admin = Administrator::create([
+            'first_name' => 'PESO',
+            'last_name' => 'Administrator',
+            'email' => 'admin-summary@example.com',
+            'mobile_number' => '09170000009',
+            'password' => 'password',
+            'role' => 'admin',
+            'status' => 'active',
+        ]);
+        Sanctum::actingAs($admin);
+
+        $complete = JobSeeker::create([
+            'first_name' => 'Complete', 'last_name' => 'Seeker', 'email' => 'complete@example.com',
+            'password' => 'password', 'profile_completed' => true, 'latitude' => 15.98, 'longitude' => 120.57,
+        ]);
+        JobSeeker::create([
+            'first_name' => 'Incomplete', 'last_name' => 'Seeker', 'email' => 'incomplete@example.com',
+            'password' => 'password', 'profile_completed' => false,
+        ]);
+        $complete->applications()->create(['status' => 'hired']);
+
+        DB::table('employers')->insert([
+            ['employer_id' => 1, 'company_name' => 'Verified Co', 'email' => 'verified@example.com', 'password' => 'password', 'verification_status' => 'verified', 'created_at' => now(), 'updated_at' => now()],
+            ['employer_id' => 2, 'company_name' => 'Pending Co', 'email' => 'pending@example.com', 'password' => 'password', 'verification_status' => 'pending', 'created_at' => now(), 'updated_at' => now()],
+        ]);
+        DB::table('job_vacancies')->insert([
+            ['employer_id' => 1, 'status' => 'active', 'created_at' => now(), 'updated_at' => now()],
+            ['employer_id' => 1, 'status' => 'active', 'created_at' => now(), 'updated_at' => now()],
+        ]);
+
+        $this->getJson('/api/admin/seekers/summary')
+            ->assertOk()
+            ->assertJsonPath('total', 2)
+            ->assertJsonPath('complete', 1)
+            ->assertJsonPath('with_applications', 1)
+            ->assertJsonPath('hired', 1)
+            ->assertJsonPath('missing_gps', 1);
+
+        $this->getJson('/api/admin/employers/summary')
+            ->assertOk()
+            ->assertJsonPath('total', 2)
+            ->assertJsonPath('verified', 1)
+            ->assertJsonPath('pending', 1)
+            ->assertJsonPath('with_active_vacancies', 1)
+            ->assertJsonPath('total_active_vacancies', 2);
     }
 }

@@ -29,7 +29,8 @@ const firstValue = (...values) => values.find((value) => value !== undefined && 
 
 export const normalizeMapJob = (job = {}) => {
   const postId = Number(firstValue(job.post_id, job.vacancy_id, job.id))
-  const matchPercentage = asNumber(firstValue(job.match?.percentage, job.match_percentage), 0)
+  const rawMatchPercentage = firstValue(job.match?.percentage, job.match_percentage)
+  const matchPercentage = rawMatchPercentage === undefined ? null : asNumber(rawMatchPercentage, 0)
 
   return {
     ...job,
@@ -45,7 +46,8 @@ export const normalizeMapJob = (job = {}) => {
     salary_min: asNumber(job.salary_min),
     salary_max: asNumber(job.salary_max),
     match_percentage: matchPercentage,
-    match: { ...(job.match || {}), percentage: matchPercentage },
+    match: job.match ? { ...job.match, percentage: matchPercentage } : null,
+    match_deferred: Boolean(job.match_deferred && matchPercentage === null),
     missing_skills: firstValue(job.missing_skills, job.match?.missing_critical_skills, []),
     has_applied: Boolean(job.has_applied),
     is_saved: Boolean(job.is_saved),
@@ -67,7 +69,7 @@ const compactParams = (filters) => Object.fromEntries(
 )
 
 export const getMapJobs = async (filters = {}, { signal, force = false } = {}) => {
-  const params = compactParams(filters)
+  const params = { ...compactParams(filters), compact: 1 }
   const cacheKey = JSON.stringify(params)
   const cached = mapRequestCache.get(cacheKey)
   if (!force && cached && Date.now() - cached.savedAt < MAP_CACHE_TTL_MS) return cached.data
@@ -106,6 +108,12 @@ export const getMapJobs = async (filters = {}, { signal, force = false } = {}) =
   }
   mapRequestCache.set(cacheKey, { data: result, savedAt: Date.now() })
   return result
+}
+
+export const getMapJobDetail = async (postId, location = {}, { signal } = {}) => {
+  const params = compactParams({ lat: location.latitude, lng: location.longitude })
+  const response = await apiClient.get(`/seeker/job-map/${postId}`, { params, signal })
+  return normalizeMapJob(response.data.job)
 }
 
 const nearestAllowed = (value, allowed) => allowed.reduce(

@@ -323,6 +323,44 @@ class EmployerVerificationJobPostingTest extends TestCase
             ->assertJsonMissing(['job_title' => 'Low Match Job']);
     }
 
+    public function test_job_map_defers_detailed_matching_until_a_vacancy_is_selected(): void
+    {
+        $employer = $this->createEmployer();
+        $seeker = $this->createSeeker(['latitude' => 15.9761, 'longitude' => 120.5711]);
+        $job = JobVacancy::create([
+            ...$this->vacancyPayload(),
+            'employer_id' => $employer->employer_id,
+            'job_title' => 'Deferred Match Vacancy',
+            'location' => 'Urdaneta City, Pangasinan',
+            'latitude' => 15.9770,
+            'longitude' => 120.5720,
+        ]);
+
+        $this->mock(EnhancedJobMatchingService::class, function (MockInterface $mock): void {
+            $mock->shouldReceive('calculateMatch')->once()->andReturn([
+                'percentage' => 82,
+                'eligible' => true,
+                'missing_critical_skills' => [],
+                'factors' => ['skills' => ['score' => 80, 'details' => []]],
+            ]);
+        });
+
+        Sanctum::actingAs($seeker);
+
+        $this->getJson('/api/seeker/job-map?radius_km=5&limit=30&compact=true')
+            ->assertOk()
+            ->assertJsonPath('jobs.0.post_id', $job->post_id)
+            ->assertJsonPath('jobs.0.match_percentage', null)
+            ->assertJsonPath('jobs.0.match_deferred', true)
+            ->assertJsonPath('jobs.0.job_description', $job->job_description);
+
+        $this->getJson("/api/seeker/job-map/{$job->post_id}")
+            ->assertOk()
+            ->assertJsonPath('job.post_id', $job->post_id)
+            ->assertJsonPath('job.match_percentage', 82)
+            ->assertJsonPath('job.job_title', 'Deferred Match Vacancy');
+    }
+
     public function test_nearby_jobs_requires_a_saved_seeker_location(): void
     {
         $seeker = $this->createSeeker();

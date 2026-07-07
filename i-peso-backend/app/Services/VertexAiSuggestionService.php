@@ -41,6 +41,62 @@ class VertexAiSuggestionService
         return $this->normalizeResponse($response->json());
     }
 
+    public function generateProfessionalSummary(JobSeeker $seeker, ?string $existingSummary = null): array
+    {
+        if (! config('services.vertex_ai.enabled')) {
+            throw new RuntimeException('Vertex AI summary generation is disabled.');
+        }
+
+        $projectId = trim((string) config('services.vertex_ai.project_id'));
+        $location = trim((string) config('services.vertex_ai.location', 'us-central1'));
+        $model = trim((string) config('services.vertex_ai.model', 'gemini-2.5-flash'));
+        $accessToken = $this->tokens->token();
+
+        if ($projectId === '' || $location === '' || $model === '' || ! $accessToken) {
+            throw new RuntimeException('Vertex AI is not fully configured.');
+        }
+
+        $seeker->loadMissing([
+            'occupations',
+            'seekerSkills',
+            'educations',
+            'trainings',
+            'eligibilities',
+            'workExperiences',
+            'languages',
+            'certificates',
+        ]);
+
+        $decoded = [];
+        $summary = '';
+        for ($attempt = 0; $attempt < 2 && $summary === ''; $attempt++) {
+            $response = Http::acceptJson()
+                ->withToken($accessToken)
+                ->timeout((int) config('services.vertex_ai.timeout', 20))
+                ->post(
+                    $this->endpoint($projectId, $location, $model),
+                    $this->professionalSummaryPayload($seeker, $existingSummary),
+                );
+
+            if (! $response->successful()) {
+                throw new RuntimeException('Vertex AI could not generate a professional summary.');
+            }
+
+            $decoded = $this->decodeStructuredResponse($response->json());
+            $summary = Str::of((string) Arr::get($decoded, 'summary'))->squish()->limit(1200, '')->toString();
+        }
+
+        if ($summary === '') {
+            throw new RuntimeException('Vertex AI returned an empty professional summary after retrying.');
+        }
+
+        return [
+            'summary' => $summary,
+            'highlights_used' => $this->professionalSummaryHighlights($seeker),
+            'source' => 'vertex_ai',
+        ];
+    }
+
     public function classifyOccupationTitleEnhanced(string $title, int $limit = 5): array
     {
         if (! config('services.vertex_ai.enabled')) {
@@ -156,6 +212,120 @@ class VertexAiSuggestionService
                 'responseSchema' => $this->responseSchema(),
             ],
         ];
+    }
+
+    private function professionalSummaryPayload(JobSeeker $seeker, ?string $existingSummary): array
+    {
+        return [
+            'contents' => [[
+                'role' => 'user',
+                'parts' => [[
+                    'text' => $this->professionalSummaryPrompt($seeker, $existingSummary),
+                ]],
+            ]],
+            'generationConfig' => [
+                'temperature' => 0.65,
+                'maxOutputTokens' => 4096,
+                'responseMimeType' => 'application/json',
+                'responseSchema' => [
+                    'type' => 'OBJECT',
+                    'properties' => [
+                        'summary' => ['type' => 'STRING'],
+                    ],
+                    'required' => ['summary'],
+                ],
+            ],
+        ];
+    }
+
+    private function professionalSummaryPrompt(JobSeeker $seeker, ?string $existingSummary): string
+    {
+        $profile = [
+            'target_roles' => $seeker->occupations->map(fn ($item) => array_filter([
+                'title' => Str::of((string) ($item->occupation_title ?? $item->raw_job_title ?? $item->preferred_occupation))->lower()->title()->toString(),
+                'job_family' => $item->general_term,
+            ]))->values()->all(),
+            'employment_status' => $seeker->employment_status,
+            'work_type_preference' => Str::of((string) $seeker->work_type_preference)->replace('_', ' ')->squish()->toString(),
+            'preferred_work_location' => Str::of((string) $seeker->preferred_work_location)->replace('_', ' ')->squish()->toString(),
+            'education_attainment' => $seeker->educ_attainment,
+            'education' => $seeker->educations->map(fn ($item) => array_filter([
+                'level' => $item->level,
+                'program' => $item->course_strand,
+                'status' => $item->completion_status,
+                'institution' => $item->institution_name,
+                'honors' => $item->academic_honors,
+                'completed_courses' => $item->completed_courses,
+            ]))->values()->all(),
+            'skills' => $seeker->seekerSkills->map(fn ($item) => array_filter([
+                'name' => $item->skill_name,
+                'type' => $item->skill_type,
+                'proficiency' => $item->proficiency,
+            ]))->values()->all(),
+            'work_experience' => $seeker->workExperiences->map(fn ($item) => array_filter([
+                'position' => $item->position,
+                'responsibilities' => $this->cleanText($item->responsibilities, 400),
+                'months' => $item->number_of_months,
+                'employment_type' => $item->employment_status,
+                'currently_employed' => $item->currently_employed,
+            ]))->values()->all(),
+            'training' => $seeker->trainings->map(fn ($item) => array_filter([
+                'course' => $item->course,
+                'institution' => $item->training_institution,
+                'hours' => $item->hours_of_training,
+                'skills_acquired' => $item->skills_acquired,
+                'certificate' => $item->certificates_received,
+            ]))->values()->all(),
+            'eligibilities' => $seeker->eligibilities->map(fn ($item) => array_filter([
+                'type' => $item->type,
+                'name' => $item->name,
+            ]))->values()->all(),
+            'languages' => $seeker->languages->map(fn ($item) => array_filter([
+                'language' => $item->language_other ?: $item->language,
+                'read' => $item->can_read,
+                'write' => $item->can_write,
+                'speak' => $item->can_speak,
+                'understand' => $item->can_understand,
+            ]))->values()->all(),
+            'certificates' => $seeker->certificates->map(fn ($item) => array_filter([
+                'title' => $item->title,
+                'issuer' => $item->issuing_body,
+                'category' => $item->category,
+            ]))->values()->all(),
+        ];
+
+        return 'Write one employer-facing professional summary for a Philippine PESO job seeker. '
+            .'Use 70 to 110 words in one concise paragraph. Base every claim only on the supplied profile. '
+            .'Never invent achievements, metrics, years of experience, credentials, or personality traits. '
+            .'Prioritize the strongest evidence in this order: relevant work responsibilities, target role, technical skills, education, training or eligibility, languages, and work preference. '
+            .'If the seeker has work experience, lead with their role and demonstrated capabilities. If they have no work experience, lead with education, training, transferable skills, and readiness for the target role without calling them inexperienced. '
+            .'Use specific profile facts naturally; do not turn the paragraph into a list and do not include private or demographic information. '
+            .'Write in direct resume-summary voice without first-person pronouns and never refer to the seeker as "this individual", "he", "she", or "they". '
+            .'Do not describe a language as fluent unless fluency is explicitly stated; describe only the recorded read, write, speak, or understand capabilities. '
+            .'Avoid generic openings such as "Motivated job seeker" and clichés such as "hardworking individual". Vary the sentence structure and opening on every generation. '
+            .'If an existing summary is supplied, produce a materially different version while retaining accurate facts. '
+            .'Return only JSON matching the response schema. '
+            .'Existing summary: '.json_encode($this->cleanText($existingSummary, 1200), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES).'. '
+            .'Verified profile: '.json_encode($profile, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    }
+
+    private function professionalSummaryHighlights(JobSeeker $seeker): array
+    {
+        return collect()
+            ->merge($seeker->workExperiences->pluck('position'))
+            ->merge($seeker->occupations->map(fn ($item) => $item->occupation_title ?? $item->raw_job_title ?? $item->preferred_occupation))
+            ->push($seeker->educ_attainment)
+            ->merge($seeker->educations->pluck('course_strand'))
+            ->merge($seeker->seekerSkills->pluck('skill_name')->take(3))
+            ->merge($seeker->trainings->pluck('course'))
+            ->merge($seeker->eligibilities->pluck('name'))
+            ->merge($seeker->certificates->pluck('title'))
+            ->filter(fn ($item) => is_string($item) && trim($item) !== '')
+            ->map(fn ($item) => Str::of($item)->replace('_', ' ')->squish()->toString())
+            ->unique(fn ($item) => Str::lower($item))
+            ->take(8)
+            ->values()
+            ->all();
     }
 
     private function occupationClassificationEnhancedPayload(string $title, int $limit): array
@@ -420,6 +590,23 @@ class VertexAiSuggestionService
             'technical_skills' => $this->cleanSuggestions($decoded['technical_skills'] ?? []),
             'soft_skills' => $this->cleanSuggestions($decoded['soft_skills'] ?? []),
         ];
+    }
+
+    private function decodeStructuredResponse(array $response): array
+    {
+        foreach (array_reverse((array) data_get($response, 'candidates.0.content.parts', [])) as $part) {
+            $text = is_array($part) ? ($part['text'] ?? null) : null;
+            if (! is_string($text) || trim($text) === '') {
+                continue;
+            }
+
+            $decoded = json_decode(trim($text), true);
+            if (is_array($decoded)) {
+                return $decoded;
+            }
+        }
+
+        return [];
     }
 
     private function normalizeOccupationClassificationEnhancedResponse(array $response): array

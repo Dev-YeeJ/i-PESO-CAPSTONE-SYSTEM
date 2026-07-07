@@ -1,4 +1,6 @@
-import { createElement, useCallback, useEffect, useMemo, useState } from 'react'
+import { createElement, useEffect, useMemo, useState } from 'react'
+import { useForm } from 'react-hook-form'
+import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, ArrowRight, Briefcase, Building2, CalendarDays, CheckCircle2, FileText, Filter, MapPin, Search, SlidersHorizontal, X, Mail, Phone } from 'lucide-react'
 import { Badge, Button, Card } from '@/components/ui'
@@ -24,62 +26,62 @@ const initialFilters = {
 }
 
 export default function EmployersListPage() {
-  const [employers, setEmployers] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
-  const [filters, setFilters] = useState(initialFilters)
-  const [page, setPage] = useState(1)
-  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false)
-  const [pagination, setPagination] = useState({ total: 0, lastPage: 1, from: 0, to: 0 })
-  const [summary, setSummary] = useState({ total: 0, verified: 0, pending: 0, rejected: 0, withActiveVacancies: 0, totalActiveVacancies: 0, newThisMonth: 0 })
   const navigate = useNavigate()
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false)
+  const [page, setPage] = useState(1)
+  const [pagination, setPagination] = useState({ total: 0, lastPage: 1, from: 0, to: 0 })
+  const { watch, reset, setValue } = useForm({ defaultValues: initialFilters })
+  const filters = watch()
 
-  const loadSummary = useCallback(async () => {
-    try {
-      const monthStart = new Date(); monthStart.setDate(1); monthStart.setHours(0, 0, 0, 0)
-      const [all, verified, pending, rejected, activeVacancies, totalActiveVacancies, newThisMonth] = await Promise.all([
-        adminService.getEmployers({ per_page: 1, ...buildParams(filters) }),
-        adminService.getEmployers({ per_page: 1, verification_status: 'approved', ...buildParams(filters) }),
-        adminService.getEmployers({ per_page: 1, verification_status: 'pending', ...buildParams(filters) }),
-        adminService.getEmployers({ per_page: 1, verification_status: 'rejected', ...buildParams(filters) }),
-        adminService.getEmployers({ per_page: 1, has_active_vacancies: 1, ...buildParams(filters) }),
-        adminService.getEmployers({ per_page: 1, has_active_vacancies: 1, ...buildParams(filters) }),
-        adminService.getEmployers({ per_page: 1, date_from: monthStart.toISOString().slice(0, 10), ...buildParams(filters) }),
-      ])
-      setSummary({
-        total: all.total ?? 0,
-        verified: verified.total ?? 0,
-        pending: pending.total ?? 0,
-        rejected: rejected.total ?? 0,
-        withActiveVacancies: activeVacancies.total ?? 0,
-        totalActiveVacancies: totalActiveVacancies.total ?? 0,
-        newThisMonth: newThisMonth.total ?? 0,
-      })
-    } catch {
-      setSummary((current) => ({ ...current, total: 0 }))
-    }
+  useEffect(() => {
+    const timer = window.setTimeout(
+      () => setPage(1),
+      350,
+    )
+    return () => window.clearTimeout(timer)
   }, [filters])
 
-  const loadEmployers = useCallback(async () => {
-    setLoading(true)
-    setError('')
-    try {
-      const result = await adminService.getEmployers({
-        page,
-        per_page: 12,
-        ...buildParams(filters),
-      })
-      setEmployers(result.data ?? [])
-      setPagination({ total: result.total ?? 0, lastPage: result.last_page ?? 1, from: result.from ?? 0, to: result.to ?? 0 })
-    } catch (requestError) {
-      setError(requestError.response?.data?.message ?? 'Unable to load employers.')
-    } finally {
-      setLoading(false)
-    }
-  }, [filters, page])
+  const summaryQuery = useQuery({
+    queryKey: ['admin', 'employerSummary'],
+    queryFn: adminService.getEmployerSummary,
+    staleTime: 60_000,
+    retry: 1,
+  })
+  const summary = {
+    total: summaryQuery.data?.total ?? 0,
+    verified: summaryQuery.data?.verified ?? 0,
+    pending: summaryQuery.data?.pending ?? 0,
+    newThisMonth: summaryQuery.data?.new_this_month ?? 0,
+  }
 
-  useEffect(() => { loadSummary() }, [loadSummary])
-  useEffect(() => { loadEmployers() }, [loadEmployers])
+  const queryParams = useMemo(() => ({
+    page,
+    per_page: 12,
+    ...buildParams(filters),
+  }), [filters, page])
+
+  const employersQuery = useQuery({
+    queryKey: ['admin', 'employers', queryParams],
+    queryFn: () => adminService.getEmployers(queryParams),
+    placeholderData: (previous) => previous,
+    staleTime: 30_000,
+    retry: 1,
+  })
+
+  useEffect(() => {
+    const result = employersQuery.data
+    if (!result) return
+    setPagination({
+      total: result.total ?? 0,
+      lastPage: result.last_page ?? 1,
+      from: result.from ?? 0,
+      to: result.to ?? 0,
+    })
+  }, [employersQuery.data])
+
+  const employers = employersQuery.data?.data ?? []
+  const loading = employersQuery.isLoading
+  const error = employersQuery.isError ? employersQuery.error?.response?.data?.message ?? 'Unable to load employers.' : ''
 
   const filtersActive = Boolean(
     filters.search ||
@@ -98,15 +100,23 @@ export default function EmployersListPage() {
     filters.sort !== 'latest',
   )
 
-  const clearFilters = () => { setFilters(initialFilters); setPage(1); setShowAdvancedFilters(false) }
-  const updateFilter = (key, value) => { setFilters((current) => ({ ...current, [key]: value })); setPage(1) }
+  const clearFilters = () => {
+    reset(initialFilters)
+    setPage(1)
+    setShowAdvancedFilters(false)
+  }
 
-  const cards = useMemo(() => ([
+  const updateFilter = (key, value) => {
+    setValue(key, value)
+    setPage(1)
+  }
+
+  const cards = [
     { label: 'Total employers', value: summary.total, detail: 'Registered businesses', tone: 'navy', icon: Building2 },
     { label: 'Verified', value: summary.verified, detail: 'Approved for placements', tone: 'green', icon: CheckCircle2 },
     { label: 'Pending review', value: summary.pending, detail: 'Awaiting admin action', tone: 'amber', icon: Filter },
     { label: 'New this month', value: summary.newThisMonth, detail: 'Recently added', tone: 'blue', icon: CalendarDays },
-  ]), [summary])
+  ]
 
   return (
     <div className="-mx-4 -mt-8 min-h-screen bg-slate-50 pb-12 sm:-mx-6">
@@ -169,11 +179,44 @@ export default function EmployersListPage() {
           </div>
         </Card>
 
-        {error && <div className="mt-6 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</div>}
+        {error && (
+          <div className="mt-6 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+            {error}
+          </div>
+        )}
 
-        {loading ? <div className="mt-6 rounded-xl border border-slate-200 bg-white p-8 text-center text-slate-500">Loading employers...</div> : employers.length === 0 ? <div className="mt-6 rounded-xl border border-slate-200 bg-white p-8 text-center text-slate-500">No employers match the selected filters.</div> : <div className="mt-6 grid gap-6 xl:grid-cols-2">{employers.map((employer) => <EmployerCard key={employer.employer_id} employer={employer} onView={() => navigate(`/admin/employers/${employer.employer_id}`)} />)}</div>}
+        {loading ? (
+          <div className="mt-6 rounded-xl border border-slate-200 bg-white p-8 text-center text-slate-500">
+            Loading employers...
+          </div>
+        ) : employers.length === 0 ? (
+          <div className="mt-6 rounded-xl border border-slate-200 bg-white p-8 text-center text-slate-500">
+            No employers match the selected filters.
+          </div>
+        ) : (
+          <div className="mt-6 grid gap-6 xl:grid-cols-2">
+            {employers.map((employer) => (
+              <EmployerCard key={employer.employer_id} employer={employer} onView={() => navigate(`/admin/employers/${employer.employer_id}`)} />
+            ))}
+          </div>
+        )}
 
-        {!loading && pagination.total > 0 && <div className="mt-6 flex flex-col items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 sm:flex-row"><p className="text-sm text-slate-500">Showing <span className="font-bold text-slate-800">{pagination.from}-{pagination.to}</span> of <span className="font-bold text-slate-800">{pagination.total}</span></p><div className="flex items-center gap-2"><Button variant="outline" size="sm" icon={ArrowLeft} disabled={page <= 1} onClick={() => setPage((current) => current - 1)}>Previous</Button><span className="px-2 text-xs font-extrabold text-slate-600">Page {page} of {pagination.lastPage}</span><Button variant="outline" size="sm" icon={ArrowRight} disabled={page >= pagination.lastPage} onClick={() => setPage((current) => current + 1)}>Next</Button></div></div>}
+        {!loading && pagination.total > 0 && (
+          <div className="mt-6 flex flex-col items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 sm:flex-row">
+            <p className="text-sm text-slate-500">
+              Showing <span className="font-bold text-slate-800">{pagination.from}-{pagination.to}</span> of <span className="font-bold text-slate-800">{pagination.total}</span>
+            </p>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" icon={ArrowLeft} disabled={page <= 1} onClick={() => setPage((current) => current - 1)}>
+                Previous
+              </Button>
+              <span className="px-2 text-xs font-extrabold text-slate-600">Page {page} of {pagination.lastPage}</span>
+              <Button variant="outline" size="sm" icon={ArrowRight} disabled={page >= pagination.lastPage} onClick={() => setPage((current) => current + 1)}>
+                Next
+              </Button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

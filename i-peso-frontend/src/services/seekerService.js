@@ -5,17 +5,30 @@ export const getSeekerProfile = async () => {
   return response.data.user
 }
 
+export const generateAiProfessionalSummary = async (existingSummary = '') => {
+  const response = await apiClient.post('/seeker/ai-professional-summary', {
+    existing_summary: existingSummary || null,
+  })
+  return response.data.data
+}
+
+export const getSeekerDashboardSummary = async () => {
+  const response = await apiClient.get('/seeker/dashboard-summary')
+  return response.data.user
+}
+
 export const getSeekerAnalytics = async () => {
   const response = await apiClient.get('/seeker/analytics')
   return response.data.analytics
 }
 
-export const getNearbyJobs = async ({ radiusKm = 15, limit = 20, feedMode = 'nearby', sort } = {}) => {
+export const getNearbyJobs = async ({ radiusKm = 15, limit = 20, feedMode = 'nearby', sort, compact = false } = {}) => {
   const response = await apiClient.get('/seeker/nearby-jobs', {
     params: {
       radius_km: radiusKm,
       limit,
       feed_mode: feedMode,
+      compact: compact ? 1 : 0,
       ...(sort ? { sort } : {}),
     },
   })
@@ -100,8 +113,13 @@ export const deleteProfileImage = async () => {
 }
 
 // Notifications
-export const getNotifications = async () => {
-  const response = await apiClient.get('/seeker/notifications')
+export const getNotifications = async ({ page = 1, perPage = 20 } = {}) => {
+  const response = await apiClient.get('/seeker/notifications', { params: { page, per_page: perPage } })
+  return response.data
+}
+
+export const getNotificationUnreadCount = async () => {
+  const response = await apiClient.get('/seeker/notifications/unread-count')
   return response.data
 }
 

@@ -1,9 +1,19 @@
-import { createElement, useEffect, useMemo, useState } from 'react'
-import { ArrowRight, BriefcaseBusiness, Building2, CircleCheck, Clock3, FilePenLine, Plus, ShieldCheck } from 'lucide-react'
+import { createElement, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { ArrowRight, BriefcaseBusiness, Building2, CheckCircle2, CircleCheck, Clock3, FileCheck2, FilePenLine, FileX2, Plus, RotateCcw, ShieldCheck, Upload } from 'lucide-react'
 import PendingVerificationBanner from './components/PendingVerificationBanner'
 import { AlertBox, Badge, Button, Card, CardHeader } from '@/components/ui'
 import * as employerService from '@/services/employerService'
 import { useAuthStore } from '@/stores/authStore'
+
+const DOCUMENT_LABELS = {
+  mayors_permit: "Mayor's Permit",
+  bir_certificate: 'BIR Certificate',
+  dti_certificate: 'DTI Certificate',
+  sec_certificate: 'SEC Certificate',
+  prpa_license: 'PRPA License',
+  dme_poea_license: 'DMW/POEA License',
+  philJobnet_proof: 'PhilJobNet Proof',
+}
 
 export default function EmployerDashboard() {
   const user = useAuthStore((state) => state.user)
@@ -12,33 +22,66 @@ export default function EmployerDashboard() {
   const [vacancies, setVacancies] = useState([])
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
+  const [reuploadingType, setReuploadingType] = useState(null)
+  const [reuploadNotice, setReuploadNotice] = useState('')
 
-  useEffect(() => {
-    employerService.getProfile()
-      .then(async (result) => {
+  const loadProfile = useCallback(() => {
+    return employerService.getProfile()
+      .then((result) => {
         setProfile(result)
         updateUser({
           verification_status: result.employer.verification_status,
           company_name: result.employer.company_name,
           name: result.employer.company_name,
         })
+        setLoading(false)
         if (result.employer.verification_status === 'verified') {
-          const vacancyResult = await employerService.getVacancies({ per_page: 50 })
-          setVacancies(vacancyResult.data ?? [])
+          employerService.getVacancies({ per_page: 12 })
+            .then((vacancyResult) => setVacancies(vacancyResult.data ?? []))
+            .catch((requestError) => setError(requestError.response?.data?.message ?? 'Vacancy summary could not be loaded.'))
         }
       })
       .catch((requestError) => setError(requestError.response?.data?.message ?? 'Unable to load the employer workspace.'))
       .finally(() => setLoading(false))
   }, [updateUser])
 
+  useEffect(() => {
+    loadProfile()
+  }, [loadProfile])
+
+  const handleReupload = useCallback(async (documentType, file) => {
+    setReuploadingType(documentType)
+    setError('')
+    setReuploadNotice('')
+    try {
+      await employerService.reuploadDocument(documentType, file)
+      setReuploadNotice(`${DOCUMENT_LABELS[documentType] ?? documentType} has been re-uploaded and is now under review.`)
+      await loadProfile()
+    } catch (requestError) {
+      setError(requestError.response?.data?.message ?? requestError.response?.data?.errors?.document_file?.[0] ?? 'Unable to re-upload the document.')
+    } finally {
+      setReuploadingType(null)
+    }
+  }, [loadProfile])
+
   const status = profile?.employer?.verification_status ?? user?.verification_status ?? 'pending'
   const company = profile?.employer?.company_name ?? user?.company_name ?? user?.name ?? 'Employer'
+  const documents = profile?.documents ?? []
+  const requiredDocuments = profile?.required_documents ?? []
   const counts = useMemo(() => ({
     active: vacancies.filter((item) => item.status === 'active').length,
     draft: vacancies.filter((item) => item.status === 'draft').length,
     closed: vacancies.filter((item) => item.status === 'closed').length,
     openings: vacancies.filter((item) => item.status === 'active').reduce((sum, item) => sum + Number(item.vacancies_count ?? 0), 0),
   }), [vacancies])
+
+  const docStats = useMemo(() => {
+    const approved = documents.filter((d) => d.verification_status === 'approved').length
+    const rejected = documents.filter((d) => d.verification_status === 'rejected').length
+    const pending = documents.filter((d) => d.verification_status === 'pending' || !d.verification_status).length
+    const total = requiredDocuments.length || documents.length || 1
+    return { approved, rejected, pending, total, percent: Math.round((approved / total) * 100) }
+  }, [documents, requiredDocuments])
 
   if (loading) return <div className="portal-page animate-pulse"><div className="h-44 rounded-xl bg-slate-200" /><div className="grid gap-4 md:grid-cols-4">{[1, 2, 3, 4].map((item) => <div key={item} className="h-28 rounded-xl bg-slate-200" />)}</div></div>
 
@@ -59,7 +102,8 @@ export default function EmployerDashboard() {
       </section>
 
       {error && <AlertBox variant="danger" title="Employer workspace unavailable">{error}</AlertBox>}
-      <PendingVerificationBanner status={status} rejectionReason={profile?.employer?.rejection_reason} />
+      {reuploadNotice && <AlertBox variant="success" title="Document re-uploaded">{reuploadNotice}</AlertBox>}
+      <PendingVerificationBanner status={status} rejectionReason={profile?.employer?.rejection_reason} documents={documents} requiredDocuments={requiredDocuments} onReupload={handleReupload} reuploadingType={reuploadingType} />
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Metric icon={BriefcaseBusiness} label="Active Vacancies" value={counts.active} detail={`${counts.openings} total opening${counts.openings === 1 ? '' : 's'}`} tone="brand" />
@@ -67,6 +111,97 @@ export default function EmployerDashboard() {
         <Metric icon={CircleCheck} label="Closed Vacancies" value={counts.closed} detail="Completed postings" tone="slate" />
         <Metric icon={ShieldCheck} label="Account Access" value={status === 'verified' ? 'Enabled' : 'Limited'} detail="Based on PESO approval" tone="emerald" />
       </div>
+
+      {/* ── ACCREDITATION TRACKER ──────────────────────────────── */}
+      {status !== 'verified' && documents.length > 0 && (
+        <Card>
+          <CardHeader
+            title="Accreditation Tracker"
+            subtitle="Track the verification status of each required document submitted to PESO."
+            action={
+              <Badge variant={docStats.approved === docStats.total ? 'approved' : docStats.rejected > 0 ? 'rejected' : 'pending'}>
+                {docStats.approved} of {docStats.total} approved
+              </Badge>
+            }
+          />
+
+          {/* Progress Bar */}
+          <div className="mb-5">
+            <div className="flex items-center justify-between text-xs font-bold text-slate-500">
+              <span>Overall Verification</span>
+              <span>{docStats.percent}%</span>
+            </div>
+            <div className="mt-1.5 h-3 overflow-hidden rounded-full bg-slate-100">
+              <div
+                className="flex h-full items-center justify-center rounded-full text-[9px] font-bold text-white transition-all duration-700"
+                style={{
+                  width: `${Math.max(docStats.percent, 5)}%`,
+                  background: docStats.rejected > 0
+                    ? 'linear-gradient(90deg, #ef4444, #f97316)'
+                    : docStats.percent === 100
+                      ? 'linear-gradient(90deg, #10b981, #059669)'
+                      : 'linear-gradient(90deg, #f59e0b, #eab308)',
+                }}
+              >
+                {docStats.percent > 15 && `${docStats.percent}%`}
+              </div>
+            </div>
+          </div>
+
+          {/* Status summary tiles */}
+          <div className="mb-5 grid grid-cols-3 gap-3">
+            <AccreditationStat icon={FileCheck2} label="Approved" count={docStats.approved} color="emerald" />
+            <AccreditationStat icon={Clock3} label="Under Review" count={docStats.pending} color="amber" />
+            <AccreditationStat icon={FileX2} label="Rejected" count={docStats.rejected} color="red" />
+          </div>
+
+          {/* Per-document rows */}
+          <div className="space-y-2">
+            {requiredDocuments.map((docType) => {
+              const doc = documents.find((d) => d.document_type === docType)
+              const docStatus = doc?.verification_status ?? 'not_uploaded'
+              return (
+                <AccreditationDocRow
+                  key={docType}
+                  docType={docType}
+                  label={DOCUMENT_LABELS[docType] ?? docType}
+                  status={docStatus}
+                  uploadedAt={doc?.uploaded_at}
+                  onReupload={handleReupload}
+                  reuploadingType={reuploadingType}
+                />
+              )
+            })}
+            {/* Show any extra documents not in required list */}
+            {documents
+              .filter((d) => !requiredDocuments.includes(d.document_type))
+              .map((doc) => (
+                <AccreditationDocRow
+                  key={doc.document_id}
+                  docType={doc.document_type}
+                  label={DOCUMENT_LABELS[doc.document_type] ?? doc.document_type}
+                  status={doc.verification_status ?? 'pending'}
+                  uploadedAt={doc.uploaded_at}
+                  optional
+                  onReupload={handleReupload}
+                  reuploadingType={reuploadingType}
+                />
+              ))
+            }
+          </div>
+
+          {status === 'rejected' && (
+            <div className="mt-5 flex items-center gap-3 rounded-xl border border-red-200 bg-red-50 p-4">
+              <RotateCcw className="h-5 w-5 shrink-0 text-red-600" />
+              <div className="flex-1">
+                <p className="text-sm font-bold text-red-800">Resubmission required</p>
+                <p className="mt-0.5 text-xs leading-5 text-red-700/80">One or more documents were rejected. Navigate to Employer Registration to re-upload corrected documents.</p>
+              </div>
+              <Button to="/employer/registration" variant="danger" size="sm">Resubmit</Button>
+            </div>
+          )}
+        </Card>
+      )}
 
       {status === 'verified' ? (
         <div className="grid gap-6 xl:grid-cols-[1.35fr_0.85fr]">
@@ -106,7 +241,7 @@ export default function EmployerDashboard() {
             </div>
           </Card>
         </div>
-      ) : (
+      ) : !documents.length && (
         <Card>
           <div className="flex flex-col items-start gap-5 sm:flex-row sm:items-center">
             <span className="rounded-xl bg-amber-50 p-4 text-amber-700"><Clock3 className="h-7 w-7" /></span>
@@ -129,4 +264,90 @@ function PipelineStage({ label, count, description, color }) {
 
 function EmptyVacancy() {
   return <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 p-8 text-center"><Building2 className="mx-auto h-8 w-8 text-slate-300" /><p className="mt-3 font-bold text-slate-800">No vacancies posted</p><p className="mt-1 text-sm text-slate-500">Create your first PESO-accredited job opportunity.</p><Button to="/employer/post-job" size="sm" className="mt-4" icon={Plus}>Post a Job</Button></div>
+}
+
+function AccreditationStat({ icon, label, count, color }) {
+  const colorMap = {
+    emerald: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+    amber: 'bg-amber-50 text-amber-700 border-amber-200',
+    red: 'bg-red-50 text-red-700 border-red-200',
+  }
+  return (
+    <div className={`rounded-xl border p-3 text-center ${colorMap[color]}`}>
+      {createElement(icon, { className: 'mx-auto h-5 w-5' })}
+      <p className="mt-1.5 text-xl font-black">{count}</p>
+      <p className="mt-0.5 text-[10px] font-bold uppercase tracking-wide">{label}</p>
+    </div>
+  )
+}
+
+function AccreditationDocRow({ docType, label, status, uploadedAt, optional, onReupload, reuploadingType }) {
+  const fileInputRef = useRef(null)
+  const configs = {
+    approved: { icon: CheckCircle2, color: 'text-emerald-600', bg: 'border-emerald-200 bg-emerald-50/50', badge: 'Approved' },
+    rejected: { icon: FileX2, color: 'text-red-600', bg: 'border-red-200 bg-red-50/50', badge: 'Rejected' },
+    pending: { icon: Clock3, color: 'text-amber-600', bg: 'border-amber-200 bg-amber-50/50', badge: 'Under Review' },
+    not_uploaded: { icon: FileX2, color: 'text-slate-400', bg: 'border-slate-200 bg-slate-50', badge: 'Not Uploaded' },
+  }
+  const config = configs[status] ?? configs.pending
+  const formattedDate = uploadedAt ? new Date(uploadedAt).toLocaleDateString('en-PH', { year: 'numeric', month: 'short', day: 'numeric' }) : null
+  const canReupload = status === 'rejected' || status === 'not_uploaded'
+  const isUploading = reuploadingType === docType
+
+  const handleFileChange = (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    const validTypes = ['application/pdf', 'image/jpeg', 'image/png']
+    if (!validTypes.includes(file.type)) {
+      alert('Please upload PDF or image files only (PDF, JPG, PNG)')
+      return
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      alert('File size must be less than 10MB')
+      return
+    }
+
+    onReupload?.(docType, file)
+    e.target.value = ''
+  }
+
+  return (
+    <div className={`flex items-center gap-3 rounded-xl border px-4 py-3 transition-colors ${config.bg}`}>
+      {createElement(config.icon, { className: `h-5 w-5 shrink-0 ${config.color}` })}
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-bold text-slate-800">
+          {label}
+          {optional && <span className="ml-2 text-[10px] font-semibold uppercase text-slate-400">Optional</span>}
+        </p>
+        {formattedDate && <p className="mt-0.5 text-xs text-slate-400">Uploaded {formattedDate}</p>}
+      </div>
+      <div className="flex items-center gap-2">
+        <span className={`text-xs font-bold ${config.color}`}>{config.badge}</span>
+        {canReupload && (
+          <>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".pdf,.jpg,.jpeg,.png"
+              onChange={handleFileChange}
+              hidden
+            />
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isUploading}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-700 shadow-sm transition-all hover:-translate-y-0.5 hover:border-brand-navy hover:text-brand-navy disabled:pointer-events-none disabled:opacity-50"
+            >
+              {isUploading ? (
+                <><span className="h-3 w-3 animate-spin rounded-full border-2 border-slate-300 border-t-brand-navy" />Uploading...</>
+              ) : (
+                <><Upload className="h-3.5 w-3.5" />{status === 'not_uploaded' ? 'Upload' : 'Re-upload'}</>
+              )}
+            </button>
+          </>
+        )}
+      </div>
+    </div>
+  )
 }

@@ -1,15 +1,13 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AlertCircle, BriefcaseBusiness, Loader2, LocateFixed, MapPinned, PanelLeftOpen, RefreshCw, Sparkles } from 'lucide-react'
 import toast from 'react-hot-toast'
 import JobMapAssistant from '../../components/maps/JobMapAssistant'
 import JobMapCard from '../../components/maps/JobMapCard'
 import JobMapFilters from '../../components/maps/JobMapFilters'
-import JobVacancyMap from '../../components/maps/JobVacancyMap'
 import JobMapDetailsPanel from '../../components/maps/JobMapDetailsPanel'
-import { getMapJobs } from '../../services/jobMapService'
+import { getMapJobDetail, getMapJobs } from '../../services/jobMapService'
 import { applyToJob, toggleSavedJob } from '../../services/seekerService'
-import { rsvpToJobFair } from '../../services/jobFairService'
 
 const DEFAULT_FILTERS = {
   radius_km: 15,
@@ -31,6 +29,8 @@ const DEFAULT_FILTERS = {
   max_missing_skills: '',
   limit: 30,
 }
+
+const JobVacancyMap = lazy(() => import('../../components/maps/JobVacancyMap'))
 
 const errorMessage = (error, fallback) => error?.response?.data?.message || fallback
 
@@ -93,6 +93,9 @@ export default function JobMapPage() {
   const [seekerLocation, setSeekerLocation] = useState({ latitude: null, longitude: null, full_address: '' })
   const [filters, setFilters] = useState(DEFAULT_FILTERS)
   const [selectedJobId, setSelectedJobId] = useState(null)
+  const [detailsById, setDetailsById] = useState({})
+  const [detailLoadingId, setDetailLoadingId] = useState(null)
+  const [detailError, setDetailError] = useState('')
   const [popupJobId, setPopupJobId] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
@@ -102,11 +105,12 @@ export default function JobMapPage() {
   const [panelOpen, setPanelOpen] = useState(true)
   const [applyingIds, setApplyingIds] = useState([])
   const [savingIds, setSavingIds] = useState([])
-  const [rsvpingIds, setRsvpingIds] = useState([])
   const [pendingApplyJobId, setPendingApplyJobId] = useState(null)
   const [assistantOpen, setAssistantOpen] = useState(false)
   const requestId = useRef(0)
   const abortRef = useRef(null)
+  const detailAbortRef = useRef(null)
+  const detailRequestId = useRef(0)
 
   const fetchJobs = useCallback(async () => {
     const currentRequest = ++requestId.current
@@ -159,7 +163,7 @@ export default function JobMapPage() {
   }, [filters])
 
   useEffect(() => {
-    const timer = window.setTimeout(fetchJobs, 220)
+    const timer = window.setTimeout(fetchJobs, 400)
     return () => {
       window.clearTimeout(timer)
       abortRef.current?.abort()
@@ -180,7 +184,12 @@ export default function JobMapPage() {
     setLocationRequired(false)
   }
 
-  const updateJob = (postId, changes) => setJobs((current) => current.map((job) => job.post_id === postId ? { ...job, ...changes } : job))
+  const updateJob = (postId, changes) => {
+    setJobs((current) => current.map((job) => job.post_id === postId ? { ...job, ...changes } : job))
+    setDetailsById((current) => current[postId]
+      ? { ...current, [postId]: { ...current[postId], ...changes } }
+      : current)
+  }
 
   const requestApply = (job) => {
     if (job.has_applied) return
@@ -224,24 +233,10 @@ export default function JobMapPage() {
     }
   }
 
-  const handleJobFair = async (job) => {
+  const handleJobFair = (job) => {
     const fair = job.job_fair
     if (!fair?.job_fair_id) return
-    if (fair.has_rsvp) {
-      navigate('/seeker/job-fairs')
-      return
-    }
-    if (rsvpingIds.includes(job.post_id)) return
-    setRsvpingIds((ids) => [...ids, job.post_id])
-    try {
-      await rsvpToJobFair(fair.job_fair_id)
-      updateJob(job.post_id, { job_fair: { ...fair, has_rsvp: true, qr_pass_url: '/seeker/job-fairs' } })
-      toast.success('RSVP successful. View your QR pass.')
-    } catch (rsvpError) {
-      toast.error(errorMessage(rsvpError, 'Unable to RSVP to this job fair.'))
-    } finally {
-      setRsvpingIds((ids) => ids.filter((id) => id !== job.post_id))
-    }
+    navigate('/seeker/job-fairs')
   }
 
   const viewTraining = (job) => {
@@ -270,11 +265,34 @@ export default function JobMapPage() {
     )
   }
 
-  const openDetails = (job) => {
+  const openDetails = async (job) => {
     const id = typeof job === 'object' ? job.post_id : job
     setSelectedJobId(id)
     setPopupJobId(null)
+    setDetailError('')
     if (id) document.getElementById(`map-job-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+
+    const listJob = jobs.find((item) => item.post_id === id)
+    if (!id || detailsById[id] || !listJob?.match_deferred) return
+
+    const currentRequest = ++detailRequestId.current
+    detailAbortRef.current?.abort()
+    const controller = new AbortController()
+    detailAbortRef.current = controller
+    setDetailLoadingId(id)
+    try {
+      const detailedJob = await getMapJobDetail(id, seekerLocation, { signal: controller.signal })
+      if (currentRequest !== detailRequestId.current) return
+      setDetailsById((current) => ({ ...current, [id]: detailedJob }))
+      setJobs((current) => current.map((item) => item.post_id === id ? { ...item, ...detailedJob } : item))
+    } catch (requestError) {
+      if (requestError?.code === 'ERR_CANCELED' || requestError?.name === 'AbortError') return
+      if (currentRequest === detailRequestId.current) {
+        setDetailError(errorMessage(requestError, 'Detailed matching could not be loaded. Please try again.'))
+      }
+    } finally {
+      if (currentRequest === detailRequestId.current) setDetailLoadingId(null)
+    }
   }
 
   const previewMarkerJob = (id) => {
@@ -283,7 +301,9 @@ export default function JobMapPage() {
   }
 
   const hasLocation = seekerLocation?.latitude != null && seekerLocation?.longitude != null
-  const detailsJob = jobs.find((job) => job.post_id === selectedJobId) || null
+  const detailsJob = selectedJobId
+    ? detailsById[selectedJobId] || jobs.find((job) => job.post_id === selectedJobId) || null
+    : null
   const pendingApplyJob = jobs.find((job) => job.post_id === pendingApplyJobId) || null
   const highMatchEmpty = Number(filters.min_match) >= 70
   const liveSummary = useMemo(() => ({
@@ -313,7 +333,9 @@ export default function JobMapPage() {
     <div className="relative -mx-4 -my-6 flex h-[calc(100vh-76px)] flex-col overflow-hidden bg-slate-100 sm:-mx-6 lg:-mx-8 lg:-my-8">
       {/* Background Map Canvas */}
       <main className="absolute inset-0 z-0">
-        <JobVacancyMap jobs={hasLocation ? jobs : []} seekerLocation={seekerLocation} selectedJobId={selectedJobId} popupJobId={popupJobId} onMarkerSelect={previewMarkerJob} onPopupClose={(id) => setPopupJobId((current) => current === id ? null : current)} onViewJob={openDetails} detailsOpen={Boolean(detailsJob)} onListToggle={() => setPanelOpen((open) => !open)} onReset={resetFilters} highOnly={Number(filters.min_match) >= 80} onHighToggle={() => updateFilters({ min_match: Number(filters.min_match) >= 80 ? 0 : 80 })} />
+        <Suspense fallback={<div className="h-full w-full animate-pulse bg-slate-200" />}>
+          <JobVacancyMap jobs={hasLocation ? jobs : []} seekerLocation={seekerLocation} selectedJobId={selectedJobId} popupJobId={popupJobId} onMarkerSelect={previewMarkerJob} onPopupClose={(id) => setPopupJobId((current) => current === id ? null : current)} onViewJob={openDetails} detailsOpen={Boolean(detailsJob)} onListToggle={() => setPanelOpen((open) => !open)} onReset={resetFilters} highOnly={Number(filters.min_match) >= 80} onHighToggle={() => updateFilters({ min_match: Number(filters.min_match) >= 80 ? 0 : 80 })} />
+        </Suspense>
         {!hasLocation && !isLoading && (
           <div className="pointer-events-none absolute inset-x-4 top-16 z-10 mx-auto max-w-md rounded-xl border border-amber-200 bg-white/95 p-3 text-center text-xs font-semibold leading-5 text-amber-800 shadow-lg backdrop-blur">Update your address or use your current location to view nearby job pins.</div>
         )}
@@ -364,7 +386,7 @@ export default function JobMapPage() {
             <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-6 text-center shadow-sm"><BriefcaseBusiness className="mx-auto h-8 w-8 text-slate-300" /><h2 className="mt-3 text-sm font-black text-slate-800">{highMatchEmpty ? 'No high-match jobs found nearby' : `No jobs found within ${filters.radius_km} km`}</h2><p className="mt-1 text-xs leading-5 text-slate-500">{highMatchEmpty ? 'Try widening the radius or lowering the match filter.' : 'Try widening the radius or clearing your search filters.'}</p><div className="mt-4 flex flex-wrap justify-center gap-2"><button type="button" onClick={() => updateFilters({ radius_km: Math.min(50, Number(filters.radius_km) + 10) })} className="rounded-lg bg-blue-950 px-3 py-2 text-xs font-bold text-white shadow hover:bg-blue-900">Increase radius</button>{highMatchEmpty && <button type="button" onClick={() => updateFilters({ min_match: 0 })} className="rounded-lg border border-blue-900 px-3 py-2 text-xs font-bold text-blue-950 hover:bg-blue-50">Lower match filter</button>}<button type="button" onClick={() => navigate('/seeker/upskill-hub')} className="rounded-lg border border-violet-300 px-3 py-2 text-xs font-bold text-violet-800 hover:bg-violet-50">Open Upskill Hub</button></div></div>
           ) : jobs.map((job) => (
             <div id={`map-job-${job.post_id}`} key={job.post_id}>
-              <JobMapCard job={job} isActive={selectedJobId === job.post_id} isApplying={applyingIds.includes(job.post_id)} isSaving={savingIds.includes(job.post_id)} isRsvping={rsvpingIds.includes(job.post_id)} onClick={() => openDetails(job)} onView={openDetails} onApply={requestApply} onSave={handleSave} onTraining={viewTraining} onJobFair={handleJobFair} />
+              <JobMapCard job={job} isActive={selectedJobId === job.post_id} isApplying={applyingIds.includes(job.post_id)} isSaving={savingIds.includes(job.post_id)} onClick={() => openDetails(job)} onView={openDetails} onApply={requestApply} onSave={handleSave} onTraining={viewTraining} onJobFair={handleJobFair} />
             </div>
           ))}
           {!isLoading && !error && jobs.length >= Number(filters.limit) && Number(filters.limit) < 100 && (
@@ -387,7 +409,7 @@ export default function JobMapPage() {
 
       {/* Floating Details Panel */}
       <div className="absolute inset-0 z-20 pointer-events-none">
-        <JobMapDetailsPanel job={detailsJob} onClose={() => setSelectedJobId(null)} onApply={requestApply} onSave={handleSave} onTraining={viewTraining} onJobFair={handleJobFair} onApplicationStatus={() => navigate('/seeker/applications')} isApplying={detailsJob ? applyingIds.includes(detailsJob.post_id) : false} isSaving={detailsJob ? savingIds.includes(detailsJob.post_id) : false} isRsvping={detailsJob ? rsvpingIds.includes(detailsJob.post_id) : false} />
+        <JobMapDetailsPanel job={detailsJob} isLoading={detailLoadingId === selectedJobId} loadError={detailError} onClose={() => { detailAbortRef.current?.abort(); setSelectedJobId(null); setDetailError('') }} onApply={requestApply} onSave={handleSave} onTraining={viewTraining} onJobFair={handleJobFair} onApplicationStatus={() => navigate('/seeker/applications')} isApplying={detailsJob ? applyingIds.includes(detailsJob.post_id) : false} isSaving={detailsJob ? savingIds.includes(detailsJob.post_id) : false} />
       </div>
 
       <ApplyConfirmation job={pendingApplyJob} onCancel={() => setPendingApplyJobId(null)} onConfirm={submitApplication} applying={pendingApplyJob ? applyingIds.includes(pendingApplyJob.post_id) : false} />

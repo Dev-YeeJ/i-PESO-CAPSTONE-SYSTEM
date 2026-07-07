@@ -197,6 +197,17 @@ class EmployerRegistrationController extends Controller
                 'verification_status' => 'pending',
             ]);
 
+            // Reset employer account to pending if they were rejected and just uploaded a correction
+            if ($employer->verification_status === 'rejected') {
+                $employer->update(['verification_status' => 'pending']);
+                
+                try {
+                    $employer->notify(new \App\Notifications\EmployerVerificationProgressUpdated('registration_resubmitted'));
+                } catch (\Throwable $exception) {
+                    report($exception);
+                }
+            }
+
             return response()->json([
                 'message' => 'Document uploaded successfully.',
                 'document_id' => $document->document_id,

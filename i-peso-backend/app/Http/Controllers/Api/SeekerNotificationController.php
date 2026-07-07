@@ -3,22 +3,38 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\JobSeeker;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 
 class SeekerNotificationController extends Controller
 {
-    /**
-     * Get all notifications for the authenticated seeker.
-     */
+    /** Get a bounded notification page only when the bell is opened. */
     public function index(Request $request): JsonResponse
     {
         $user = $request->user();
-        
-        $notifications = $user->notifications()->latest()->get();
+        abort_unless($user instanceof JobSeeker, 403, 'Seeker account required.');
+
+        $perPage = max(1, min((int) $request->integer('per_page', 20), 50));
+        $notifications = $user->notifications()->latest()->paginate($perPage);
         
         return response()->json([
-            'notifications' => $notifications,
+            'notifications' => $notifications->items(),
+            'unread_count' => $user->unreadNotifications()->count(),
+            'pagination' => [
+                'current_page' => $notifications->currentPage(),
+                'last_page' => $notifications->lastPage(),
+                'total' => $notifications->total(),
+            ],
+        ]);
+    }
+
+    public function unreadCount(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        abort_unless($user instanceof JobSeeker, 403, 'Seeker account required.');
+
+        return response()->json([
             'unread_count' => $user->unreadNotifications()->count(),
         ]);
     }
@@ -39,7 +55,7 @@ class SeekerNotificationController extends Controller
      */
     public function markAllAsRead(Request $request): JsonResponse
     {
-        $request->user()->unreadNotifications->markAsRead();
+        $request->user()->unreadNotifications()->update(['read_at' => now()]);
 
         return response()->json(['message' => 'All notifications marked as read.']);
     }

@@ -27,7 +27,7 @@ class SeekerNearbyJobController extends Controller
 
         // Query-string booleans arrive as text in browsers. Normalize the
         // supported forms before Laravel's strict boolean validation runs.
-        foreach (['hide_low_match', 'hide_applied', 'coordinates_only', 'include_no_coordinates', 'saved_only', 'job_fair_only', 'upskill_recommended_only', 'certificate_match_only', 'can_apply_only'] as $booleanFilter) {
+        foreach (['hide_low_match', 'hide_applied', 'coordinates_only', 'include_no_coordinates', 'saved_only', 'job_fair_only', 'upskill_recommended_only', 'certificate_match_only', 'can_apply_only', 'compact'] as $booleanFilter) {
             if ($request->has($booleanFilter)) {
                 $request->merge([$booleanFilter => $request->boolean($booleanFilter)]);
             }
@@ -59,6 +59,8 @@ class SeekerNearbyJobController extends Controller
             'lat' => ['nullable', 'numeric', 'between:-90,90'],
             'lng' => ['nullable', 'numeric', 'between:-180,180'],
             'limit' => ['nullable', 'integer', 'min:1', 'max:150'],
+            'compact' => ['nullable', 'boolean'],
+            'job_id' => ['nullable', 'integer', 'min:1'],
         ]);
 
         $radiusKm = (float) ($validated['radius_km'] ?? 15);
@@ -67,10 +69,16 @@ class SeekerNearbyJobController extends Controller
             ! empty($validated['hide_low_match']) ? 50 : 0,
         );
         $limit = (int) ($validated['limit'] ?? 100);
-        // Matching is calculated after the database query. Keep a generous,
-        // deterministic candidate pool so high-match vacancies are not lost
-        // behind an arbitrary "latest 100" cutoff.
-        $candidateLimit = min(300, max($limit * 2, 50));
+        $requiresDetailedMatching = $minMatch > 0
+            || ($validated['sort'] ?? null) === 'match'
+            || ! empty($validated['job_fair_only'])
+            || ! empty($validated['upskill_recommended_only'])
+            || ! empty($validated['certificate_match_only'])
+            || isset($validated['max_missing_skills']);
+        $compact = ! empty($validated['compact']) && ! $requiresDetailedMatching;
+        // Matching is calculated in PHP. Bound the candidate pool so map and
+        // dashboard requests do not score hundreds of vacancies per refresh.
+        $candidateLimit = min(120, max($limit * 2, 40));
 
         $lat = isset($validated['lat']) ? (float) $validated['lat'] : $seeker->latitude;
         $lng = isset($validated['lng']) ? (float) $validated['lng'] : $seeker->longitude;
@@ -82,6 +90,7 @@ class SeekerNearbyJobController extends Controller
             $seeker,
             $seeker->latitude !== null ? (float) $seeker->latitude : null,
             $seeker->longitude !== null ? (float) $seeker->longitude : null,
+            ! $compact,
         );
 
         if (! $hasLocation && $feedMode === 'nearby') {
@@ -113,25 +122,25 @@ class SeekerNearbyJobController extends Controller
             ? $seeker->savedJobs()->pluck('job_vacancies.post_id')->map(fn ($id) => (int) $id)->all()
             : [];
 
-        $attendeesByFair = Schema::hasTable('job_fair_attendees')
+        $attendeesByFair = ! $compact && Schema::hasTable('job_fair_attendees')
             ? $seeker->jobFairAttendances()->get()->keyBy('job_fair_id')
             : collect();
 
-        $seekerCertificates = Schema::hasTable('seeker_certificates')
+        $seekerCertificates = ! $compact && Schema::hasTable('seeker_certificates')
             ? $seeker->certificates()->get(['certificate_id', 'title', 'issuing_body'])
             : collect();
 
-        $trainingPrograms = $this->trainingPrograms();
+        $trainingPrograms = $compact ? collect() : $this->trainingPrograms();
 
         $with = ['employer:employer_id,company_name'];
-        if (Schema::hasTable('job_vacancy_skills')) {
+        if (! $compact && Schema::hasTable('job_vacancy_skills')) {
             $with[] = 'skillRequirements.skill.outgoingRelationships';
             $with[] = 'skillRequirements.skill.incomingRelationships';
         }
-        if (Schema::hasTable('job_vacancy_certifications')) {
+        if (! $compact && Schema::hasTable('job_vacancy_certifications')) {
             $with[] = 'certificationRequirements';
         }
-        if (Schema::hasTable('job_fair_vacancies') && Schema::hasTable('job_fairs')) {
+        if (! $compact && Schema::hasTable('job_fair_vacancies') && Schema::hasTable('job_fairs')) {
             $with[] = 'jobFairLinks.jobFair';
         }
 
@@ -143,6 +152,10 @@ class SeekerNearbyJobController extends Controller
                     ->whereNull('application_deadline')
                     ->orWhereDate('application_deadline', '>=', today());
             });
+
+        if (isset($validated['job_id'])) {
+            $query->whereKey($validated['job_id']);
+        }
 
         // Search filters
         if (!empty($validated['keyword'])) {
@@ -221,9 +234,13 @@ class SeekerNearbyJobController extends Controller
         $jobs = $query
             ->limit($candidateLimit)
             ->get()
-            ->map(function (JobVacancy $job) use ($matching, $seeker, $applicationsByPost, $savedPostIds, $attendeesByFair, $seekerCertificates, $trainingPrograms, $hasLocation, $lat, $lng) {
-                $match = $matching->calculateMatch($job, $seeker);
+            ->map(function (JobVacancy $job) use ($matching, $seeker, $applicationsByPost, $savedPostIds, $attendeesByFair, $seekerCertificates, $trainingPrograms, $hasLocation, $lat, $lng, $compact) {
                 $application = $applicationsByPost->get($job->post_id);
+                if ($compact) {
+                    return $this->compactJobPayload($job, $seeker, $application, $savedPostIds, $hasLocation, $lat, $lng);
+                }
+
+                $match = $matching->calculateMatch($job, $seeker);
                 $missingSkills = collect($match['missing_critical_skills'] ?? []);
                 $skillDetails = collect(data_get($match, 'factors.skills.details.details', data_get($match, 'factors.skills.details', [])));
                 $matchedSkills = $skillDetails
@@ -344,7 +361,7 @@ class SeekerNearbyJobController extends Controller
                 ];
             })
             ->filter(function ($job) use ($minMatch) {
-                if (($job['match']['percentage'] ?? 0) < $minMatch) {
+                if ((float) data_get($job, 'match.percentage', 0) < $minMatch) {
                     return false;
                 }
                 return true;
@@ -373,7 +390,7 @@ class SeekerNearbyJobController extends Controller
                 $sort = $validated['sort'] ?? 'distance';
 
                 if ($sort === 'match') {
-                    $percentage = ($right['match']['percentage'] <=> $left['match']['percentage']);
+                    $percentage = ((float) data_get($right, 'match.percentage', 0) <=> (float) data_get($left, 'match.percentage', 0));
                     if ($percentage !== 0) return $percentage;
                 }
 
@@ -390,13 +407,13 @@ class SeekerNearbyJobController extends Controller
                 }
 
                 // Fallback to eligibility, then distance
-                $eligibility = ($right['match']['eligible'] <=> $left['match']['eligible']);
+                $eligibility = ((bool) data_get($right, 'match.eligible', true) <=> (bool) data_get($left, 'match.eligible', true));
                 if ($eligibility !== 0) {
                     return $eligibility;
                 }
 
                 if (! in_array($sort, ['match', 'newest', 'salary'], true)) {
-                    $percentage = ($right['match']['percentage'] <=> $left['match']['percentage']);
+                    $percentage = ((float) data_get($right, 'match.percentage', 0) <=> (float) data_get($left, 'match.percentage', 0));
                     if ($percentage !== 0) {
                         return $percentage;
                     }
@@ -445,13 +462,125 @@ class SeekerNearbyJobController extends Controller
         ]);
     }
 
-    private function seekerPayload(JobSeeker $seeker, ?float $latitude, ?float $longitude): array
-    {
-        $certificateCount = Schema::hasTable('seeker_certificates')
-            ? $seeker->certificates()->count()
-            : 0;
+    public function show(
+        Request $request,
+        JobVacancy $job,
+        EnhancedJobMatchingService $matching
+    ): JsonResponse {
+        abort_unless($request->user() instanceof JobSeeker, 403, 'Job seeker account required.');
+
+        $request->merge([
+            'job_id' => $job->getKey(),
+            'feed_mode' => 'latest',
+            'sort' => 'newest',
+            'limit' => 1,
+            'compact' => false,
+        ]);
+
+        $response = $this->getNearbyJobs($request, $matching);
+        $payload = $response->getData(true);
+        $detailedJob = collect($payload['jobs'] ?? [])->first();
+
+        abort_unless($detailedJob, 404, 'This vacancy is no longer available.');
+
+        return response()->json([
+            'job' => $detailedJob,
+            'seeker' => $payload['seeker'] ?? null,
+        ]);
+    }
+
+    private function compactJobPayload(
+        JobVacancy $job,
+        JobSeeker $seeker,
+        mixed $application,
+        array $savedPostIds,
+        bool $hasLocation,
+        mixed $latitude,
+        mixed $longitude
+    ): array {
+        $distanceKm = $job->distance_km ?? null;
+        if ($distanceKm === null && $hasLocation && $job->latitude !== null && $job->longitude !== null) {
+            $latFrom = deg2rad((float) $latitude);
+            $lonFrom = deg2rad((float) $longitude);
+            $latTo = deg2rad((float) $job->latitude);
+            $lonTo = deg2rad((float) $job->longitude);
+            $angle = 2 * asin(sqrt(
+                pow(sin(($latTo - $latFrom) / 2), 2)
+                + cos($latFrom) * cos($latTo) * pow(sin(($lonTo - $lonFrom) / 2), 2)
+            ));
+            $distanceKm = round($angle * 6371.0088, 1);
+        } elseif ($distanceKm !== null) {
+            $distanceKm = round($distanceKm, 1);
+        }
+
+        $fullWorkAddress = collect([
+            $job->specific_address,
+            $job->barangay,
+            $job->city_municipality,
+            $job->province,
+        ])->filter()->unique()->join(', ') ?: $job->location;
+
+        $googleMapsUrl = null;
+        if ($hasLocation && $job->latitude && $job->longitude) {
+            $googleMapsUrl = "https://www.google.com/maps/dir/?api=1&origin={$latitude},{$longitude}&destination={$job->latitude},{$job->longitude}";
+        }
 
         return [
+            'post_id' => $job->post_id,
+            'vacancy_id' => $job->post_id,
+            'job_title' => $job->job_title,
+            'employer_name' => $job->employer?->company_name,
+            'employer' => [
+                'employer_id' => $job->employer?->employer_id,
+                'company_name' => $job->employer?->company_name,
+            ],
+            'employment_type' => $job->employment_type,
+            'work_setup' => $job->work_setup,
+            'location' => $job->location,
+            'province' => $job->province,
+            'city_municipality' => $job->city_municipality,
+            'barangay' => $job->barangay,
+            'full_work_address' => $fullWorkAddress,
+            'latitude' => $job->latitude,
+            'longitude' => $job->longitude,
+            'salary_min' => $job->salary_min,
+            'salary_max' => $job->salary_max,
+            'salary_type' => $job->salary_type,
+            'hide_salary' => $job->hide_salary,
+            'job_description' => $job->job_description,
+            'vacancies_count' => $job->vacancies_count,
+            'experience_level' => $job->experience_level,
+            'minimum_experience_months' => $job->minimum_experience_months,
+            'required_skills' => $job->required_skills ?? [],
+            'soft_skills' => $job->soft_skills ?? [],
+            'application_deadline' => $job->application_deadline?->toDateString(),
+            'distance_km' => $distanceKm,
+            'posted_at' => $job->created_at?->toISOString(),
+            'match' => null,
+            'match_percentage' => null,
+            'match_deferred' => true,
+            'missing_skills' => [],
+            'has_applied' => (bool) $application,
+            'is_saved' => in_array((int) $job->post_id, $savedPostIds, true),
+            'application_id' => $application?->apply_id,
+            'application_status' => $application?->status,
+            'has_coordinates' => $job->latitude !== null && $job->longitude !== null,
+            'certificate_match' => ['matched' => false, 'matched_count' => 0, 'required_count' => 0, 'deferred' => true],
+            'job_fair' => ['is_available_at_job_fair' => false, 'has_rsvp' => false, 'deferred' => true],
+            'upskill' => ['recommended' => false, 'programs' => [], 'missing_skills_count' => 0, 'deferred' => true],
+            'actions' => [
+                'can_apply' => ! $application && (bool) $seeker->profile_completed,
+                'can_save' => true,
+                'can_rsvp_job_fair' => false,
+                'can_download_resume' => (bool) $seeker->profile_completed,
+            ],
+            'google_maps_url' => $googleMapsUrl,
+        ];
+    }
+
+    private function seekerPayload(JobSeeker $seeker, ?float $latitude, ?float $longitude, bool $includeStats = true): array
+    {
+        $payload = [
             'id' => $seeker->seeker_id,
             'full_name' => collect([$seeker->first_name, $seeker->middle_name, $seeker->last_name])->filter()->join(' '),
             'profile_completed' => (bool) $seeker->profile_completed,
@@ -459,9 +588,18 @@ class SeekerNearbyJobController extends Controller
             'longitude' => $longitude,
             'full_address' => $seeker->getFullAddress(),
             'resume_ready' => (bool) $seeker->profile_completed,
-            'certificate_count' => $certificateCount,
-            'skills_count' => Schema::hasTable('seeker_skills') ? $seeker->seekerSkills()->count() : 0,
         ];
+
+        if ($includeStats) {
+            $payload['certificate_count'] = Schema::hasTable('seeker_certificates')
+                ? $seeker->certificates()->count()
+                : 0;
+            $payload['skills_count'] = Schema::hasTable('seeker_skills')
+                ? $seeker->seekerSkills()->count()
+                : 0;
+        }
+
+        return $payload;
     }
 
     private function trainingPrograms(): Collection

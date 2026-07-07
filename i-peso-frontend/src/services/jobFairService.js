@@ -1,45 +1,13 @@
 import api from './api'
 
-export const listJobFairs = async () => {
-  const { data } = await api.get('/job-fairs')
-  return data.data ?? []
+export const listJobFairs = async () => (await api.get('/job-fairs')).data.data ?? []
+export const listEmployerJobFairs = async () => (await api.get('/employer/job-fairs')).data.data ?? []
+export const expressJobFairInterest = async (jobFairId) => (await api.post(`/employer/job-fairs/${jobFairId}/interest`)).data
+export const respondToJobFairInvitation = async (jobFairId, response, remarks = '') => (await api.post(`/employer/job-fairs/${jobFairId}/respond`, { response, remarks })).data
+export const uploadJobFairRequirement = async (jobFairId, requirementId, file) => {
+  const body = new FormData(); body.append('document', file)
+  return (await api.post(`/employer/job-fairs/${jobFairId}/requirements/${requirementId}`, body)).data
 }
-
-export const rsvpToJobFair = async (jobFairId) => {
-  const { data } = await api.post(`/job-fairs/${jobFairId}/rsvp`)
-  return data
-}
-
-export const joinJobFair = async (jobFairId, vacancyIds) => {
-  const { data } = await api.post(`/job-fairs/${jobFairId}/employer-join`, {
-    vacancy_ids: vacancyIds,
-  })
-  return data
-}
-
-export const scanJobFairQr = async ({ qrCodeUuid, jobFairId }) => {
-  const { data } = await api.post('/job-fairs/scan-qr', {
-    qr_code_uuid: qrCodeUuid,
-    job_fair_id: jobFairId,
-  })
-  return data
-}
-
-export const fastTrackJobFairApplication = async (payload) => {
-  const { data } = await api.post('/job-fairs/applications/fast-track', payload)
-  return data
-}
-
-export const downloadRoiForm3 = async (jobFairId) => {
-  const response = await api.get(`/job-fairs/${jobFairId}/export-roi-form-3`, {
-    responseType: 'blob',
-  })
-  return response.data
-}
-
-export const downloadSprsReport = async (jobFairId) => {
-  const response = await api.get(`/admin/job-fairs/${jobFairId}/export-sprs`, {
-    responseType: 'blob',
-  })
-  return response.data
-}
+export const submitJobFairConfirmation = async (jobFairId, payload) => (await api.post(`/employer/job-fairs/${jobFairId}/confirmation-slip`, payload)).data
+export const submitJobFairResults = async (jobFairId, payload) => (await api.post(`/employer/job-fairs/${jobFairId}/results`, payload)).data
+export const downloadJobFairResult = async (resultId) => (await api.get(`/employer/job-fair-results/${resultId}/roi-form-3`, { responseType: 'blob' })).data

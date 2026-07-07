@@ -27,6 +27,8 @@ const EmployerPostJob   = lazy(() => import('@/pages/employer/PostJobPage'))
 const EmployerVacancies = lazy(() => import('@/pages/employer/VacanciesPage'))
 const EmployerATSGrid   = lazy(() => import('@/pages/employer/EmployerATSGrid'))
 const EmployerCalendar  = lazy(() => import('@/pages/employer/InterviewCalendarPage'))
+const EmployerJobFairs  = lazy(() => import('@/pages/employer/EmployerJobFairDashboard'))
+const EmployerEstablishmentReport = lazy(() => import('@/pages/employer/EmployerEstablishmentReportPage'))
 const SeekerDashboard   = lazy(() => import('@/pages/seeker/DashboardPage'))
 const SeekerProfile     = lazy(() => import('@/pages/seeker/SeekerProfile'))
 const SeekerProfileEdit = lazy(() => import('@/pages/seeker/SeekerProfileEdit'))
@@ -60,6 +62,8 @@ const AdminGovernmentProgramForm = lazy(() => import('@/pages/admin/4-government
 const AdminProgramApplicants    = lazy(() => import('@/pages/admin/4-government-dole/government-programs/ProgramApplicantsPage'))
 const AdminJobFairsList         = lazy(() => import('@/pages/admin/4-government-dole/government-programs/JobFairsListPage'))
 const AdminJobFairForm          = lazy(() => import('@/pages/admin/4-government-dole/government-programs/JobFairFormPage'))
+const AdminJobFairDetail        = lazy(() => import('@/pages/admin/4-government-dole/government-programs/JobFairDetailPage'))
+const AdminEstablishmentReport  = lazy(() => import('@/pages/admin/4-government-dole/dole-reporting/AdminEstablishmentReportPage'))
 const AdminDOLEReporting       = lazy(() => import('@/pages/admin/4-government-dole/dole-reporting/DOLEReportingPage'))
 const AdminPEISExport          = lazy(() => import('@/pages/admin/4-government-dole/dole-reporting/PEISExportPage'))
 
@@ -234,6 +238,8 @@ export const router = createBrowserRouter([
                           { path: 'vacancies', element: S(EmployerVacancies) },
                           { path: 'ats', element: S(EmployerATSGrid) },
                           { path: 'calendar', element: S(EmployerCalendar) },
+                          { path: 'job-fairs', element: S(EmployerJobFairs) },
+                          { path: 'reports/establishment-report', element: S(EmployerEstablishmentReport) },
                         ],
                       },
                     ],
@@ -271,8 +277,10 @@ export const router = createBrowserRouter([
                       { path: 'government-programs/:id/applicants', element: S(AdminProgramApplicants) },
                       { path: 'job-fairs', element: S(AdminJobFairsList) },
                       { path: 'job-fairs/create', element: S(AdminJobFairForm) },
+                      { path: 'job-fairs/:id', element: S(AdminJobFairDetail) },
                       { path: 'job-fairs/:id/edit', element: S(AdminJobFairForm) },
                       { path: 'dole-reporting', element: S(AdminDOLEReporting) },
+                      { path: 'establishment-report', element: S(AdminEstablishmentReport) },
                       { path: 'peis-export', element: S(AdminPEISExport) },
                       
                       // CATEGORY 5: SYSTEM & REPORTS

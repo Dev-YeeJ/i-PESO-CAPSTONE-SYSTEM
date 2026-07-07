@@ -12,19 +12,33 @@ class EmployerNotificationController extends Controller
     public function index(Request $request): JsonResponse
     {
         $employer = $this->employer($request);
+        $perPage = max(1, min((int) $request->integer('per_page', 20), 50));
+
+        $notifications = $employer->notifications()->latest()->paginate($perPage);
+        $items = array_map(fn ($notification) => [
+            'id' => $notification->id,
+            'type' => class_basename($notification->type),
+            'data' => $notification->data,
+            'read_at' => $notification->read_at,
+            'created_at' => $notification->created_at,
+        ], $notifications->items());
 
         return response()->json([
-            'notifications' => $employer->notifications()
-                ->latest()
-                ->limit(20)
-                ->get()
-                ->map(fn ($notification) => [
-                    'id' => $notification->id,
-                    'type' => class_basename($notification->type),
-                    'data' => $notification->data,
-                    'read_at' => $notification->read_at,
-                    'created_at' => $notification->created_at,
-                ]),
+            'notifications' => $items,
+            'unread_count' => $employer->unreadNotifications()->count(),
+            'pagination' => [
+                'current_page' => $notifications->currentPage(),
+                'last_page' => $notifications->lastPage(),
+                'total' => $notifications->total(),
+            ],
+        ]);
+    }
+
+    public function unreadCount(Request $request): JsonResponse
+    {
+        $employer = $this->employer($request);
+
+        return response()->json([
             'unread_count' => $employer->unreadNotifications()->count(),
         ]);
     }

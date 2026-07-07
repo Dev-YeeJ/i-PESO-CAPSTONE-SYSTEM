@@ -61,7 +61,7 @@ class EstablishmentReportFlowTest extends TestCase
             ->assertJsonPath('reports.0.entries.0.application_status', 'Qualified');
     }
 
-    public function test_pdf_csv_and_legacy_job_fair_exports_remain_available(): void
+    public function test_establishment_pdf_and_csv_exports_remain_available(): void
     {
         $data = $this->seedReportData();
         Sanctum::actingAs($data['employer_one']);
@@ -81,11 +81,6 @@ class EstablishmentReportFlowTest extends TestCase
         $this->assertStringContainsString('Northstar Manufacturing', $csv->streamedContent());
         $this->assertStringContainsString('Employer Mismatch Reason', $csv->streamedContent());
 
-        $legacy = $this->get('/api/job-fairs/'.$data['fair_id'].'/export-roi-form-3')->assertOk();
-        $this->assertStringContainsString('application/pdf', (string) $legacy->headers->get('content-type'));
-
-        Sanctum::actingAs($data['employer_two']);
-        $this->get('/api/job-fairs/'.$data['fair_id'].'/export-roi-form-3')->assertForbidden();
     }
 
     private function seedReportData(): array

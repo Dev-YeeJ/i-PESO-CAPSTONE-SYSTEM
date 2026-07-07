@@ -21,16 +21,29 @@ class JobFair extends Model
         'end_date',
         'venue',
         'sector',
+        'target_sector',
+        'partner_agencies',
         'event_date',
         'start_time',
         'end_time',
+        'submission_deadline',
+        'contact_email',
+        'maximum_representatives',
         'status',
+        'is_public',
+        'published_at',
+        'published_by',
     ];
 
     protected $casts = [
         'start_date' => 'date',
         'end_date' => 'date',
         'event_date' => 'date',
+        'partner_agencies' => 'array',
+        'submission_deadline' => 'datetime',
+        'maximum_representatives' => 'integer',
+        'is_public' => 'boolean',
+        'published_at' => 'datetime',
     ];
 
     public function administrator(): BelongsTo
@@ -56,5 +69,20 @@ class JobFair extends Model
     public function applications(): HasMany
     {
         return $this->hasMany(Application::class, 'job_fair_id', 'job_fair_id');
+    }
+
+    public function requirements(): HasMany
+    {
+        return $this->hasMany(JobFairRequirement::class, 'job_fair_id', 'job_fair_id');
+    }
+
+    public function confirmationSlips(): HasMany
+    {
+        return $this->hasMany(JobFairConfirmationSlip::class, 'job_fair_id', 'job_fair_id');
+    }
+
+    public function resultReports(): HasMany
+    {
+        return $this->hasMany(JobFairResultReport::class, 'job_fair_id', 'job_fair_id');
     }
 }

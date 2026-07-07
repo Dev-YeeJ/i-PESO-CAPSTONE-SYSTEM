@@ -38,7 +38,7 @@ class EmployerVerificationProgressUpdated extends Notification implements Should
             ->subject($content['subject'])
             ->view('emails.employer-verification', [
                 'title' => $content['title'],
-                'message' => $content['message'],
+                'bodyMessage' => $content['message'],
                 'status' => $content['status'],
                 'documentType' => $this->documentType,
                 'documentLabel' => $this->documentLabel(),

@@ -9,6 +9,7 @@ use App\Models\SeekerSkill;
 use App\Models\SeekerWorkExperience;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 
@@ -38,6 +39,26 @@ class EnhancedJobMatchingService
     ) {}
 
     public function calculateMatch(JobVacancy $vacancy, JobSeeker $seeker): array
+    {
+        if (app()->environment('testing')) {
+            return $this->calculateMatchUncached($vacancy, $seeker);
+        }
+
+        $version = implode(':', [
+            $seeker->getKey(),
+            (string) $seeker->getRawOriginal('updated_at'),
+            $vacancy->getKey(),
+            (string) $vacancy->getRawOriginal('updated_at'),
+        ]);
+
+        return Cache::remember(
+            'job-match:v2:'.hash('sha256', $version),
+            now()->addMinutes(2),
+            fn () => $this->calculateMatchUncached($vacancy, $seeker)
+        );
+    }
+
+    private function calculateMatchUncached(JobVacancy $vacancy, JobSeeker $seeker): array
     {
         $baseScore = $this->baseMatching->score($vacancy, $seeker);
         $weights = $this->weightsForVacancy($vacancy);

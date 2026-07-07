@@ -228,6 +228,96 @@ class SeekerController extends Controller
     // ── PUBLIC ENDPOINTS ─────────────────────────────────────────────────────
 
     /**
+     * Lightweight dashboard bootstrap payload. Avoids loading the complete
+     * onboarding profile and its document-heavy relationships.
+     */
+    public function dashboardSummary(Request $request): JsonResponse
+    {
+        $seeker = $this->getSeeker($request);
+        if ($seeker instanceof JsonResponse) {
+            return $seeker;
+        }
+
+        $counts = [];
+        foreach ([
+            'seeker_skills' => 'seekerSkills',
+            'seeker_occupations' => 'occupations',
+            'seeker_educations' => 'educations',
+            'seeker_work_experiences' => 'workExperiences',
+            'seeker_trainings' => 'trainings',
+            'seeker_certificates' => 'certificates',
+            'seeker_languages' => 'languages',
+        ] as $table => $relation) {
+            if (Schema::hasTable($table)) {
+                $counts[] = $relation;
+            }
+        }
+
+        if (Schema::hasTable('applications')) {
+            $counts['applications as active_applications_count'] = fn ($query) => $query
+                ->whereNotIn('status', ['hired', 'rejected']);
+        }
+        $seeker->loadCount($counts);
+
+        $preferredOccupation = Schema::hasTable('seeker_occupations')
+            ? $seeker->occupations()->first()
+            : null;
+        $savedJobIds = Schema::hasTable('seeker_saved_jobs')
+            ? $seeker->savedJobs()->limit(100)->pluck('job_vacancies.post_id')->values()
+            : collect();
+
+        return response()->json([
+            'user' => [
+                'seeker_id' => $seeker->getKey(),
+                'first_name' => $seeker->first_name,
+                'middle_name' => $seeker->middle_name,
+                'last_name' => $seeker->last_name,
+                'suffix' => $seeker->suffix,
+                'educ_attainment' => $seeker->educ_attainment,
+                'latitude' => $seeker->latitude,
+                'longitude' => $seeker->longitude,
+                'profile_completed' => (bool) $seeker->profile_completed,
+                'has_profile_image' => filled($seeker->profile_image),
+                'has_resume' => filled($seeker->resume_path),
+                'occupations' => $preferredOccupation ? [[
+                    'occupation_title' => $preferredOccupation->occupation_title,
+                    'general_term' => $preferredOccupation->general_term,
+                    'raw_job_title' => $preferredOccupation->raw_job_title,
+                ]] : [],
+                'dashboard_stats' => [
+                    'active_applications' => (int) ($seeker->active_applications_count ?? 0),
+                    'skills' => (int) ($seeker->seeker_skills_count ?? 0),
+                    'saved_jobs' => $savedJobIds,
+                ],
+                'profile_strength' => $this->dashboardProfileStrength($seeker),
+            ],
+        ]);
+    }
+
+    private function dashboardProfileStrength(JobSeeker $seeker): array
+    {
+        $items = [
+            ['key' => 'photo', 'label' => 'Professional 2x2 photo', 'weight' => 10, 'complete' => filled($seeker->profile_image)],
+            ['key' => 'personal_information', 'label' => 'Personal information', 'weight' => 10, 'complete' => filled($seeker->date_of_birth) && filled($seeker->mobile_number) && filled($seeker->first_name)],
+            ['key' => 'address', 'label' => 'Complete address', 'weight' => 10, 'complete' => filled($seeker->address_barangay) && filled($seeker->address_municipality_city)],
+            ['key' => 'occupations', 'label' => 'Job preferences', 'weight' => 10, 'complete' => (int) ($seeker->occupations_count ?? 0) > 0],
+            ['key' => 'skills', 'label' => 'Skills profile', 'weight' => 10, 'complete' => (int) ($seeker->seeker_skills_count ?? 0) >= 3],
+            ['key' => 'education', 'label' => 'Education background', 'weight' => 15, 'complete' => filled($seeker->educ_attainment) || (int) ($seeker->educations_count ?? 0) > 0],
+            ['key' => 'work_experience', 'label' => 'Work experience', 'weight' => 15, 'complete' => (int) ($seeker->work_experiences_count ?? 0) > 0],
+            ['key' => 'training', 'label' => 'Training & certificates', 'weight' => 10, 'complete' => (int) ($seeker->trainings_count ?? 0) > 0 || (int) ($seeker->certificates_count ?? 0) > 0],
+            ['key' => 'languages', 'label' => 'Language proficiency', 'weight' => 10, 'complete' => (int) ($seeker->languages_count ?? 0) > 0],
+        ];
+        $completedWeight = collect($items)->where('complete', true)->sum('weight');
+
+        return [
+            'percentage' => (int) round($completedWeight),
+            'items' => $items,
+            'coreComplete' => collect(array_slice($items, 0, 5))->where('complete', true)->count(),
+            'coreTotal' => 5,
+        ];
+    }
+
+    /**
      * GET /api/seeker/profile   [auth:sanctum]
      *
      * Returns the full seeker profile including all related data.
@@ -297,8 +387,11 @@ class SeekerController extends Controller
                 'employment_status' => $seeker->employment_status,
                 'employment_type' => $seeker->employment_type,
                 'self_employed_type' => $seeker->self_employed_type,
+                'self_employed_type_others' => $seeker->self_employed_type_others,
                 'unemployment_months' => $seeker->unemployment_months,
                 'unemployment_reason' => $seeker->unemployment_reason,
+                'unemployment_reason_others' => $seeker->unemployment_reason_others,
+                'unemployment_terminated_country' => $seeker->unemployment_terminated_country,
                 'is_ofw' => $seeker->is_ofw,
                 'ofw_country' => $seeker->ofw_country,
                 'is_former_ofw' => $seeker->is_former_ofw,

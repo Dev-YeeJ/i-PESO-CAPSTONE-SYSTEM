@@ -11,6 +11,37 @@ use Illuminate\Support\Facades\Schema;
 
 class SeekerController extends Controller
 {
+    public function summary(): JsonResponse
+    {
+        abort_unless(auth()->user() instanceof Administrator, 403, 'Unauthorized');
+
+        $monthStart = now()->startOfMonth();
+        $applicationColumns = Schema::hasTable('applications')
+            ? ', SUM(CASE WHEN EXISTS (SELECT 1 FROM applications WHERE applications.seeker_id = job_seekers.seeker_id) THEN 1 ELSE 0 END) AS with_applications'
+                .", SUM(CASE WHEN EXISTS (SELECT 1 FROM applications WHERE applications.seeker_id = job_seekers.seeker_id AND applications.status = 'hired') THEN 1 ELSE 0 END) AS hired"
+            : ', 0 AS with_applications, 0 AS hired';
+
+        $summary = JobSeeker::query()->selectRaw(
+            'COUNT(*) AS total'
+            .', SUM(CASE WHEN profile_completed = 1 THEN 1 ELSE 0 END) AS complete'
+            .', SUM(CASE WHEN profile_completed = 0 THEN 1 ELSE 0 END) AS incomplete'
+            .', SUM(CASE WHEN latitude IS NULL OR longitude IS NULL THEN 1 ELSE 0 END) AS missing_gps'
+            .', SUM(CASE WHEN created_at >= ? THEN 1 ELSE 0 END) AS new_this_month'
+            .$applicationColumns,
+            [$monthStart]
+        )->first();
+
+        return response()->json([
+            'total' => (int) ($summary->total ?? 0),
+            'complete' => (int) ($summary->complete ?? 0),
+            'incomplete' => (int) ($summary->incomplete ?? 0),
+            'with_applications' => (int) ($summary->with_applications ?? 0),
+            'hired' => (int) ($summary->hired ?? 0),
+            'missing_gps' => (int) ($summary->missing_gps ?? 0),
+            'new_this_month' => (int) ($summary->new_this_month ?? 0),
+        ]);
+    }
+
     public function index(Request $request): JsonResponse
     {
         $admin = auth()->user();
@@ -77,15 +108,15 @@ class SeekerController extends Controller
         }
 
         if ($request->filled('province')) {
-            $query->where('address_province', 'like', "%{$request->input('province')}%") ;
+            $query->where('address_province', 'like', $request->input('province').'%');
         }
 
         if ($request->filled('city')) {
-            $query->where('address_municipality_city', 'like', "%{$request->input('city')}%") ;
+            $query->where('address_municipality_city', 'like', $request->input('city').'%');
         }
 
         if ($request->filled('barangay')) {
-            $query->where('address_barangay', 'like', "%{$request->input('barangay')}%") ;
+            $query->where('address_barangay', 'like', $request->input('barangay').'%');
         }
 
         if ($request->filled('broad_field')) {

@@ -49,8 +49,13 @@ export const deleteVacancy = async (id) => {
   return response.data
 }
 
-export const getNotifications = async () => {
-  const response = await apiClient.get('/employer/notifications')
+export const getNotifications = async ({ page = 1, perPage = 20 } = {}) => {
+  const response = await apiClient.get('/employer/notifications', { params: { page, per_page: perPage } })
+  return response.data
+}
+
+export const getNotificationUnreadCount = async () => {
+  const response = await apiClient.get('/employer/notifications/unread-count')
   return response.data
 }
 
@@ -73,5 +78,14 @@ export const getCalendarEvents = async (start, end) => {
   const response = await apiClient.get('/employer/calendar/events', {
     params: { start, end }
   })
+  return response.data
+}
+
+export const reuploadDocument = async (documentType, file) => {
+  const formData = new FormData()
+  formData.append('document_type', documentType)
+  formData.append('document_file', file)
+
+  const response = await apiClient.post('/employer/register/step-3', formData)
   return response.data
 }

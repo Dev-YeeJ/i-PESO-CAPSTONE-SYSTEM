@@ -1,4 +1,6 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
+import { useForm } from 'react-hook-form'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd'
 import {
   Archive,
@@ -38,27 +40,31 @@ const emptyForm = {
 }
 
 export default function EmployerATSBoard() {
-  const [applications, setApplications] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
   const [activeApplication, setActiveApplication] = useState(null)
-  const [statusForm, setStatusForm] = useState(emptyForm)
   const [saving, setSaving] = useState(false)
+  const queryClient = useQueryClient()
+  const statusForm = useForm({ defaultValues: emptyForm })
+  const { register, reset, watch, handleSubmit, getValues, setValue } = statusForm
+  const status = watch('status')
 
-  const loadApplications = async () => {
-    setError('')
-    try {
-      const data = await getEmployerApplications({ per_page: 100 })
-      setApplications(data.data ?? [])
-    } catch (caught) {
-      setError(caught.response?.data?.message || 'Unable to load applicants.')
-    }
-  }
+  const updateStatusMutation = useMutation({
+    mutationFn: ({ applicationId, payload }) => updateEmployerApplicationStatus(applicationId, payload),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['employerApplications'] }),
+  })
 
-  useEffect(() => {
-    loadApplications().finally(() => setLoading(false))
-  }, [])
+  const applicationsQuery = useQuery({
+    queryKey: ['employerApplications', { per_page: 100 }],
+    queryFn: () => getEmployerApplications({ per_page: 100 }),
+    staleTime: 1000 * 60 * 5,
+    refetchOnWindowFocus: false,
+  })
+
+  const applications = applicationsQuery.data?.data ?? []
+  const loading = applicationsQuery.isLoading
+  const errorMessage = applicationsQuery.isError
+    ? applicationsQuery.error?.response?.data?.message || 'Unable to load applicants.'
+    : ''
 
   const filteredApplications = useMemo(() => {
     const needle = searchQuery.trim().toLowerCase()
@@ -104,37 +110,42 @@ export default function EmployerATSBoard() {
     }
   }
 
-  const openStatusForm = (application, status) => {
+  const openStatusForm = (application, statusValue) => {
     setActiveApplication(application)
-    setStatusForm({
+    reset({
       ...emptyForm,
-      status,
+      status: statusValue,
       employer_remarks: application.employer_remarks ?? '',
+      interview: {
+        ...emptyForm.interview,
+        ...(application.interview ?? {}),
+      },
+      placement_start_date: application.placement?.start_date ?? '',
+      placement_salary: application.placement?.salary ?? '',
+      employment_type: application.placement?.employment_type ?? 'regular',
     })
   }
 
   const closeStatusForm = () => {
     setActiveApplication(null)
-    setStatusForm(emptyForm)
     setSaving(false)
+    reset(emptyForm)
   }
 
-  const submitStatus = async () => {
+  const submitStatus = async (formValues) => {
     if (!activeApplication) return
 
     setSaving(true)
     try {
-      const payload = buildPayload(statusForm)
-      const data = await updateEmployerApplicationStatus(activeApplication.apply_id, payload)
-      setApplications((current) => current.map((application) => (
-        application.apply_id === activeApplication.apply_id ? data.application : application
-      )))
+      const payload = buildPayload(formValues)
+      await updateStatusMutation.mutateAsync({ applicationId: activeApplication.apply_id, payload })
       toast.success('Application status updated.')
       closeStatusForm()
     } catch (caught) {
       const body = caught.response?.data
       const firstError = body?.errors ? Object.values(body.errors)[0]?.[0] : ''
       toast.error(firstError || body?.message || 'Unable to update application.')
+    } finally {
       setSaving(false)
     }
   }
@@ -173,9 +184,9 @@ export default function EmployerATSBoard() {
         </div>
       )}
 
-      {error && (
+      {errorMessage && (
         <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-bold text-red-700">
-          {error}
+          {errorMessage}
         </div>
       )}
 
@@ -207,11 +218,13 @@ export default function EmployerATSBoard() {
       {activeApplication && (
         <StatusModal
           application={activeApplication}
-          form={statusForm}
-          setForm={setStatusForm}
+          status={status}
+          register={register}
+          setValue={setValue}
+          watch={watch}
           saving={saving}
           onClose={closeStatusForm}
-          onSubmit={submitStatus}
+          onSubmit={handleSubmit(submitStatus)}
         />
       )}
     </div>
@@ -332,15 +345,16 @@ function ApplicantCard({ application, onMove }) {
   )
 }
 
-function StatusModal({ application, form, setForm, saving, onClose, onSubmit }) {
+function StatusModal({ application, status, register, setValue, watch, saving, onClose, onSubmit }) {
   const seeker = application.seeker ?? {}
-  const selectedColumn = columns.find((column) => column.id === form.status)
-  const requiresInterview = form.status === 'interview'
-  const requiresPlacement = form.status === 'hired'
+  const selectedColumn = columns.find((column) => column.id === status)
+  const requiresInterview = status === 'interview'
+  const requiresPlacement = status === 'hired'
   const [generatingMeet, setGeneratingMeet] = useState(false)
 
   const handleGenerateMeet = async () => {
-    if (!form.interview.schedule) {
+    const scheduleValue = watch('interview.schedule')
+    if (!scheduleValue) {
       toast.error('Please set the interview schedule first.')
       return
     }
@@ -348,14 +362,12 @@ function StatusModal({ application, form, setForm, saving, onClose, onSubmit }) 
     setGeneratingMeet(true)
     try {
       const data = await generateGoogleMeetLink({
-        schedule: form.interview.schedule,
+        schedule: scheduleValue,
         summary: `Interview: ${seeker.name || 'Applicant'} - ${application.job?.job_title || 'Position'}`,
-        description: form.employer_remarks || 'Interview scheduled via i-PESO ATS.',
+        description: watch('employer_remarks') || 'Interview scheduled via i-PESO ATS.',
       })
-      setForm((current) => ({
-        ...current,
-        interview: { ...current.interview, venue_or_link: data.meet_link, mode_of_interview: 'online' },
-      }))
+      setValue('interview.venue_or_link', data.meet_link)
+      setValue('interview.mode_of_interview', 'online')
       toast.success('Google Meet link generated!')
     } catch (caught) {
       if (caught.response?.status === 403 && caught.response?.data?.message?.includes('Google Calendar not connected')) {
@@ -381,7 +393,7 @@ function StatusModal({ application, form, setForm, saving, onClose, onSubmit }) 
           <div>
             <p className="text-xs font-black uppercase tracking-[0.18em] text-blue-800">Update Application</p>
             <h2 className="mt-1 text-xl font-black text-slate-950">{seeker.name || 'Applicant'}</h2>
-            <p className="mt-1 text-sm text-slate-500">Move to {selectedColumn?.title ?? form.status}</p>
+            <p className="mt-1 text-sm text-slate-500">Move to {selectedColumn?.title ?? status}</p>
           </div>
           <button type="button" onClick={onClose} className="rounded-xl border border-slate-200 p-2 text-slate-500 hover:bg-slate-50">
             <X className="h-5 w-5" />
@@ -392,8 +404,7 @@ function StatusModal({ application, form, setForm, saving, onClose, onSubmit }) 
           <label className="block">
             <span className="text-sm font-bold text-slate-700">Employer remarks</span>
             <textarea
-              value={form.employer_remarks}
-              onChange={(event) => setForm((current) => ({ ...current, employer_remarks: event.target.value }))}
+              {...register('employer_remarks')}
               rows={3}
               className="mt-2 w-full rounded-xl border border-slate-300 px-3.5 py-3 text-sm outline-none focus:border-blue-900 focus:ring-2 focus:ring-blue-900/10"
               placeholder="Optional note for applicant, PESO, or HR record"
@@ -407,8 +418,7 @@ function StatusModal({ application, form, setForm, saving, onClose, onSubmit }) 
                 <label className="block">
                   <span className="text-sm font-bold text-slate-700">Mode</span>
                   <select
-                    value={form.interview.mode_of_interview}
-                    onChange={(event) => setForm((current) => ({ ...current, interview: { ...current.interview, mode_of_interview: event.target.value } }))}
+                    {...register('interview.mode_of_interview')}
                     className="mt-2 w-full rounded-xl border border-slate-300 px-3.5 py-3 text-sm outline-none"
                   >
                     <option value="face_to_face">Face to face</option>
@@ -420,8 +430,7 @@ function StatusModal({ application, form, setForm, saving, onClose, onSubmit }) 
                   <span className="text-sm font-bold text-slate-700">Schedule</span>
                   <input
                     type="datetime-local"
-                    value={form.interview.schedule}
-                    onChange={(event) => setForm((current) => ({ ...current, interview: { ...current.interview, schedule: event.target.value } }))}
+                    {...register('interview.schedule')}
                     className="mt-2 w-full rounded-xl border border-slate-300 px-3.5 py-3 text-sm outline-none"
                   />
                 </label>
@@ -438,8 +447,7 @@ function StatusModal({ application, form, setForm, saving, onClose, onSubmit }) 
                     </button>
                   </div>
                   <input
-                    value={form.interview.venue_or_link}
-                    onChange={(event) => setForm((current) => ({ ...current, interview: { ...current.interview, venue_or_link: event.target.value } }))}
+                    {...register('interview.venue_or_link')}
                     className="mt-2 w-full rounded-xl border border-slate-300 px-3.5 py-3 text-sm outline-none"
                     placeholder="PESO office, company address, or meeting link"
                   />
@@ -456,8 +464,7 @@ function StatusModal({ application, form, setForm, saving, onClose, onSubmit }) 
                   <span className="text-sm font-bold text-slate-700">Start date</span>
                   <input
                     type="date"
-                    value={form.placement_start_date}
-                    onChange={(event) => setForm((current) => ({ ...current, placement_start_date: event.target.value }))}
+                    {...register('placement_start_date')}
                     className="mt-2 w-full rounded-xl border border-slate-300 px-3.5 py-3 text-sm outline-none"
                   />
                 </label>
@@ -466,8 +473,7 @@ function StatusModal({ application, form, setForm, saving, onClose, onSubmit }) 
                   <input
                     type="number"
                     min="1"
-                    value={form.placement_salary}
-                    onChange={(event) => setForm((current) => ({ ...current, placement_salary: event.target.value }))}
+                    {...register('placement_salary')}
                     className="mt-2 w-full rounded-xl border border-slate-300 px-3.5 py-3 text-sm outline-none"
                     placeholder="0"
                   />

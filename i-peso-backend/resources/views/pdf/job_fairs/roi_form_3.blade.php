@@ -1,91 +1,13 @@
-<!doctype html>
-<html>
-<head>
-    <meta charset="utf-8">
-    <style>
-        body { font-family: DejaVu Sans, sans-serif; font-size: 11px; color: #111827; }
-        h1 { font-size: 18px; margin: 0 0 4px; text-align: center; }
-        h2 { font-size: 13px; margin: 16px 0 8px; }
-        table { width: 100%; border-collapse: collapse; margin-top: 8px; }
-        th, td { border: 1px solid #9ca3af; padding: 7px; text-align: left; vertical-align: top; }
-        th { background: #e5e7eb; }
-        .meta { margin-top: 12px; line-height: 1.5; }
-        .grid { width: 100%; margin-top: 12px; }
-        .grid td { width: 25%; text-align: center; }
-        .count { font-size: 18px; font-weight: bold; }
-    </style>
-</head>
-<body>
-    <h1>ESTABLISHMENT REPORT</h1>
-    <div style="text-align:center; font-weight:bold;">RO1-JF Form 3</div>
-
-    <div class="meta">
-        <strong>Establishment:</strong> {{ $employer->company_name ?? $employer->trade_name ?? $employer->email }}<br>
-        <strong>Representative:</strong> {{ $employer->representative_name ?? trim(($employer->representative_first_name ?? '') . ' ' . ($employer->representative_last_name ?? '')) }}<br>
-        <strong>Event:</strong> {{ $fair->title }}<br>
-        <strong>Venue:</strong> {{ $fair->venue }}<br>
-        <strong>Date:</strong> {{ optional($fair->start_date ?? $fair->event_date)->format('F d, Y') }}
-    </div>
-
-    <table class="grid">
-        <tr>
-            <td><div class="count">{{ $summary['vacancies'] }}</div>Linked Vacancies</td>
-            <td><div class="count">{{ $summary['applicants'] }}</div>Applicants Screened</td>
-            <td><div class="count">{{ $summary['hots'] }}</div>HOTS</td>
-            <td><div class="count">{{ $summary['mismatches'] }}</div>Mismatch Cases</td>
-        </tr>
-    </table>
-
-    <h2>Applicant Action Register</h2>
-    <table>
-        <thead>
-            <tr>
-                <th>Applicant</th>
-                <th>Vacancy</th>
-                <th>Status</th>
-                <th>HOTS</th>
-                <th>Mismatch Code</th>
-                <th>Placement Details</th>
-            </tr>
-        </thead>
-        <tbody>
-            @forelse($applications as $application)
-                <tr>
-                    <td>{{ trim(($application->jobSeeker->first_name ?? '') . ' ' . ($application->jobSeeker->last_name ?? '')) }}</td>
-                    <td>{{ $application->jobVacancy->job_title ?? 'N/A' }}</td>
-                    <td>{{ ucfirst($application->status) }}</td>
-                    <td>{{ $application->is_hots ? 'Yes' : 'No' }}</td>
-                    <td>{{ $application->dole_mismatch_code ?? 'N/A' }}</td>
-                    <td>
-                        @if($application->placement_start_date)
-                            Start: {{ $application->placement_start_date->format('F d, Y') }}<br>
-                            Salary: PHP {{ number_format((float) $application->placement_salary, 2) }}
-                        @else
-                            N/A
-                        @endif
-                    </td>
-                </tr>
-            @empty
-                <tr><td colspan="6">No applicant actions recorded.</td></tr>
-            @endforelse
-        </tbody>
-    </table>
-
-    <h2>Mismatch Summary</h2>
-    <table>
-        <thead>
-            <tr>
-                <th>Mismatch Code</th>
-                <th>Count</th>
-            </tr>
-        </thead>
-        <tbody>
-            @forelse($applications->whereNotNull('dole_mismatch_code')->groupBy('dole_mismatch_code') as $code => $items)
-                <tr><td>{{ $code }}</td><td>{{ $items->count() }}</td></tr>
-            @empty
-                <tr><td colspan="2">No mismatch codes recorded.</td></tr>
-            @endforelse
-        </tbody>
-    </table>
-</body>
-</html>
+<!doctype html><html><head><meta charset="utf-8"><style>
+body{font-family:DejaVu Sans,sans-serif;font-size:10px;color:#111827}h1{text-align:center;font-size:17px;margin:0}.code{text-align:center;font-weight:bold;margin:3px 0 14px}table{width:100%;border-collapse:collapse;margin-top:10px}th,td{border:1px solid #64748b;padding:6px;vertical-align:top}th{background:#e2e8f0}.meta td{width:25%}.num{text-align:center}.muted{color:#475569}.source{font-weight:bold;color:#1e3a8a}
+</style></head><body>
+<h1>ESTABLISHMENT REPORT</h1><div class="code">RO1-JF Form 3</div>
+<table class="meta"><tr><td><strong>Company</strong><br>{{ $report->company_name }}</td><td><strong>Job Fair</strong><br>{{ $report->jobFair->title }}</td><td><strong>Date / Venue</strong><br>{{ optional($report->jobFair->start_date ?? $report->jobFair->event_date)->format('F d, Y') }}<br>{{ $report->jobFair->venue }}</td><td><strong>Source</strong><br><span class="source">{{ $report->source === 'admin_proxy' ? 'Admin Proxy Encoded' : 'Employer Self-Service' }}</span></td></tr></table>
+<table><thead><tr><th>Male</th><th>Female</th><th>Total Applicants</th><th>HOTS</th><th>Near Hired</th><th>Rejected</th><th>Vacancies Solicited</th><th>Vacancies Offered</th></tr></thead><tbody><tr>
+@foreach(['total_male','total_female','total_applicants','total_hots','total_near_hired','total_rejected','total_vacancies_solicited','total_vacancies_offered'] as $field)<td class="num">{{ $report->{$field} }}</td>@endforeach
+</tr></tbody></table>
+@if($report->entries->isNotEmpty())<h3>Applicant Result Register</h3><table><thead><tr><th>#</th><th>Applicant</th><th>Gender</th><th>Position</th><th>Result</th><th>Mismatch Code</th><th>Remarks</th></tr></thead><tbody>@foreach($report->entries as $index => $entry)<tr><td>{{ $index + 1 }}</td><td>{{ $entry->applicant_name }}</td><td>{{ ucfirst($entry->gender) }}</td><td>{{ $entry->position_applied_for }}</td><td>{{ strtoupper(str_replace('_',' ',$entry->status)) }}</td><td>{{ $entry->mismatch_code ? str_replace('_',' ',$entry->mismatch_code) : 'N/A' }}</td><td>{{ $entry->remarks ?: 'N/A' }}</td></tr>@endforeach</tbody></table>@endif
+<h3>Mismatch Summary</h3><table><thead><tr><th>Mismatch reason</th><th>Count</th></tr></thead><tbody>@forelse($report->mismatchTallies as $tally)<tr><td>{{ ucwords(str_replace('_',' ',$tally->mismatch_code)) }}</td><td>{{ $tally->count }}</td></tr>@empty<tr><td colspan="2">No mismatch tally available.</td></tr>@endforelse</tbody></table>
+<p><strong>Contact:</strong> {{ $report->contact_person ?: 'N/A' }} / {{ $report->contact_number ?: 'N/A' }} &nbsp; <strong>Submitted:</strong> {{ optional($report->submitted_at)->format('F d, Y') }}</p>
+<p><strong>Remarks:</strong> {{ $report->remarks ?: 'None' }}</p><p class="muted">Generated by i-PESO using post-event omnichannel reporting. Physical job fair operations remain outside the system.</p>
+</body></html>

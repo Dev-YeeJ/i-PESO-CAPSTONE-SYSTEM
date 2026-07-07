@@ -13,6 +13,40 @@ use Illuminate\Support\Facades\Schema;
 
 class EmployerController extends Controller
 {
+    public function summary(): JsonResponse
+    {
+        abort_unless(auth()->user() instanceof Administrator, 403, 'Unauthorized');
+
+        $monthStart = now()->startOfMonth();
+        $vacancyColumn = Schema::hasTable('job_vacancies')
+            ? ", SUM(CASE WHEN EXISTS (SELECT 1 FROM job_vacancies WHERE job_vacancies.employer_id = employers.employer_id AND job_vacancies.status = 'active') THEN 1 ELSE 0 END) AS with_active_vacancies"
+            : ', 0 AS with_active_vacancies';
+
+        $summary = Employer::query()->selectRaw(
+            'COUNT(*) AS total'
+            .", SUM(CASE WHEN verification_status = 'verified' THEN 1 ELSE 0 END) AS verified"
+            .", SUM(CASE WHEN verification_status = 'pending' THEN 1 ELSE 0 END) AS pending"
+            .", SUM(CASE WHEN verification_status = 'rejected' THEN 1 ELSE 0 END) AS rejected"
+            .', SUM(CASE WHEN created_at >= ? THEN 1 ELSE 0 END) AS new_this_month'
+            .$vacancyColumn,
+            [$monthStart]
+        )->first();
+
+        $totalActiveVacancies = Schema::hasTable('job_vacancies')
+            ? DB::table('job_vacancies')->where('status', 'active')->count()
+            : 0;
+
+        return response()->json([
+            'total' => (int) ($summary->total ?? 0),
+            'verified' => (int) ($summary->verified ?? 0),
+            'pending' => (int) ($summary->pending ?? 0),
+            'rejected' => (int) ($summary->rejected ?? 0),
+            'with_active_vacancies' => (int) ($summary->with_active_vacancies ?? 0),
+            'total_active_vacancies' => (int) $totalActiveVacancies,
+            'new_this_month' => (int) ($summary->new_this_month ?? 0),
+        ]);
+    }
+
     public function index(Request $request): JsonResponse
     {
         $admin = auth()->user();
@@ -67,20 +101,23 @@ class EmployerController extends Controller
         }
 
         if ($request->filled('industry')) {
-            $query->where('industry', 'like', "%{$request->input('industry')}%")
-                ->orWhere('industry_type', 'like', "%{$request->input('industry')}%") ;
+            $industry = $request->input('industry').'%';
+            $query->where(function ($industryQuery) use ($industry) {
+                $industryQuery->where('industry', 'like', $industry)
+                    ->orWhere('industry_type', 'like', $industry);
+            });
         }
 
         if ($request->filled('province')) {
-            $query->where('province', 'like', "%{$request->input('province')}%") ;
+            $query->where('province', 'like', $request->input('province').'%');
         }
 
         if ($request->filled('city')) {
-            $query->where('city_municipality', 'like', "%{$request->input('city')}%") ;
+            $query->where('city_municipality', 'like', $request->input('city').'%');
         }
 
         if ($request->filled('barangay')) {
-            $query->where('barangay', 'like', "%{$request->input('barangay')}%") ;
+            $query->where('barangay', 'like', $request->input('barangay').'%');
         }
 
         if ($request->filled('has_active_vacancies')) {
@@ -330,6 +367,7 @@ class EmployerController extends Controller
             'no_representative_contact' => empty($employer->representative_contact_number) && empty($employer->mobile_number),
             'rejected_documents' => collect($documents)->contains(fn ($document) => ($document['verification_status'] ?? null) === 'rejected'),
         ];
+        $payload['required_documents'] = $employer->getRequiredDocuments();
 
         return response()->json($payload);
     }

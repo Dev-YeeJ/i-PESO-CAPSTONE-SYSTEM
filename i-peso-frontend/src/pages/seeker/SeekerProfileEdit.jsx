@@ -20,12 +20,14 @@ import {
   Trash2,
   UserCheck,
 } from 'lucide-react'
-import SeekerOccupationMapper from '@/components/form/SeekerOccupationMapper'
+import OccupationCombobox from '@/components/form/OccupationCombobox'
+import PreferredLocationsField from '@/components/form/PreferredLocationsField'
+import SearchableTextInput from '@/components/form/SearchableTextInput'
+import SingleAddressInput from '@/components/form/SingleAddressInput'
 import AddressPicker from '@/components/maps/AddressPicker'
 import SeekerSkillsForm from '@/components/form/SeekerSkillsForm'
 import EducationBackgroundEditor from '@/components/form/EducationBackgroundEditor'
 import ExperienceTimeFrame from '@/components/form/ExperienceTimeFrame'
-import PsgcCascade from '@/pages/employer/components/PsgcCascade'
 import CertificateUploadModal from './components/CertificateUploadModal'
 import {
   deleteCertificate,
@@ -34,6 +36,17 @@ import {
   saveSeekerProfileStep,
 } from '@/services/seekerService'
 import { useAuthStore } from '@/stores/authStore'
+import { serializeOccupationPreferences } from '@/utils/seekerProfilePayloads'
+import { ISO_COUNTRIES } from '@/data/jobPreferenceVocabularies'
+import {
+  COMPANY_SUGGESTIONS,
+  ELIGIBILITY_NAME_OPTIONS,
+  MONTH_DURATION_OPTIONS,
+  TRAINING_COURSE_OPTIONS,
+  TRAINING_HOUR_OPTIONS,
+  TRAINING_INSTITUTION_OPTIONS,
+} from '@/data/seekerProfileVocabularies'
+import { resolveAddressSuggestion } from '@/services/geoService'
 
 const inputClass = 'mt-1.5 w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm font-semibold text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-700 focus:ring-2 focus:ring-blue-700/10 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500'
 const selectClass = inputClass
@@ -105,10 +118,16 @@ const LANGUAGE_OPTIONS = [
   'bikol',
   'waray',
   'kapampangan',
+  'maranao',
+  'maguindanao',
+  'tausug',
   'mandarin',
+  'spanish',
   'japanese',
   'korean',
   'arabic',
+  'french',
+  'german',
   'others',
 ]
 
@@ -120,23 +139,6 @@ const DISABILITY_OPTIONS = [
   { value: 'mental', label: 'Mental' },
   { value: 'physical', label: 'Physical' },
   { value: 'others', label: 'Others' },
-]
-
-const TRAINING_COURSE_OPTIONS = [
-  'Automotive Servicing NC II',
-  'Barista NC II',
-  'Bookkeeping NC III',
-  'Bread and Pastry Production NC II',
-  'Caregiving NC II',
-  'Computer Systems Servicing NC II',
-  'Contact Center Services NC II',
-  'Cookery NC II',
-  'Driving NC II',
-  'Electrical Installation and Maintenance NC II',
-  'Food and Beverage Services NC II',
-  'Housekeeping NC II',
-  'Shielded Metal Arc Welding NC II',
-  'Visual Graphic Design NC III',
 ]
 
 export default function SeekerProfileEdit() {
@@ -258,6 +260,57 @@ export default function SeekerProfileEdit() {
     }
   }
 
+  const viewCertificate = async (certificate) => {
+    setOpeningCertificate(certificate.certificate_id)
+    try {
+      const file = await getCertificateFile(certificate.certificate_id)
+      const url = URL.createObjectURL(file)
+      window.open(url, '_blank', 'noopener,noreferrer')
+      window.setTimeout(() => URL.revokeObjectURL(url), 60000)
+    } catch (error) {
+      toast.error(error.response?.data?.message ?? 'Unable to open certificate proof.')
+    } finally {
+      setOpeningCertificate(null)
+    }
+  }
+
+  const removeCertificate = async (certificate) => {
+    if (!window.confirm(`Delete "${certificate.title}" from your certificate vault?`)) return
+
+    try {
+      await deleteCertificate(certificate.certificate_id)
+      setProfile((current) => ({
+        ...current,
+        certificates: current.certificates.filter((item) => item.certificate_id !== certificate.certificate_id),
+      }))
+      toast.success('Certificate deleted.')
+    } catch (error) {
+      toast.error(error.response?.data?.message ?? 'Unable to delete certificate.')
+    }
+  }
+
+  const resolveSelectedAddress = async (place) => {
+    try {
+      const result = await resolveAddressSuggestion(place)
+      updateSection('identity', {
+        address_province: result.province?.name ?? result.provinceName ?? form.identity.address_province,
+        address_province_code: result.province?.code ?? '',
+        address_municipality_city: result.city?.name ?? result.cityName ?? form.identity.address_municipality_city,
+        address_city_code: result.city?.code ?? '',
+        address_barangay: result.barangay?.name ?? result.barangayName ?? form.identity.address_barangay,
+        address_barangay_code: result.barangay?.code ?? '',
+        address_house_street: result.houseStreet ?? form.identity.address_house_street,
+        latitude: result.lat,
+        longitude: result.lng,
+        location_accuracy: result.accuracy,
+        google_place_id: result.placeId,
+      })
+      toast.success(result.isComplete ? 'Address selected and verified.' : 'Address selected. Complete any missing official fields below.')
+    } catch {
+      toast.error('The selected address could not be matched. Please complete the official fields below.')
+    }
+  }
+
   if (loading || !form) {
     return <div className="py-20 text-center text-sm text-slate-500">Loading profile editor...</div>
   }
@@ -349,7 +402,12 @@ export default function SeekerProfileEdit() {
                     <TextInput label="Specify religion" value={form.identity.religion_other} error={errors.religion_other} onChange={(value) => updateSection('identity', { religion_other: value })} />
                   )}
                   <TextInput label="Height in feet" type="number" step="0.01" value={form.identity.height_ft} error={errors.height_ft} onChange={(value) => updateSection('identity', { height_ft: value })} />
-                  <TextInput label="TIN (optional)" value={form.identity.tin} onChange={(value) => updateSection('identity', { tin: value })} />
+                  <TextInput label="TIN (optional)" value={form.identity.tin} onChange={(value) => {
+                    const digits = String(value ?? '').replace(/\D/g, '').slice(0, 12)
+                    const parts = []
+                    for (let i = 0; i < digits.length; i += 3) parts.push(digits.slice(i, i + 3))
+                    updateSection('identity', { tin: parts.join('-') })
+                  }} />
                 </div>
 
                 <div className="mt-5 rounded-2xl border border-slate-200 bg-white p-4">
@@ -385,7 +443,7 @@ export default function SeekerProfileEdit() {
                 icon={ShieldCheck}
                 title="Employment Status"
                 subtitle="This preserves the government NSRP employment classification while keeping the UI simple."
-                onSave={() => save('employment', 2, () => buildStep2Payload(form.employment))}
+                onSave={() => save('employment', 2, () => buildStep2Payload(form.employment), validateEmployment)}
                 saving={saving === 'employment'}
               >
                 <div className="grid gap-4 md:grid-cols-2">
@@ -404,16 +462,25 @@ export default function SeekerProfileEdit() {
                   {form.employment.employment_type === 'self_employed' && (
                     <SelectInput label="Self-employed category" value={form.employment.self_employed_type} error={errors.self_employed_type} onChange={(value) => updateSection('employment', { self_employed_type: value })} options={[
                       { value: '', label: 'Select category' },
+                      { value: 'fisherman_fisherfolk', label: 'Fisherman / Fisherfolk' },
                       { value: 'vendor_retailer', label: 'Vendor / Retailer' },
                       { value: 'transport', label: 'Transport' },
+                      { value: 'domestic_worker', label: 'Domestic Worker' },
                       { value: 'freelancer', label: 'Freelancer' },
                       { value: 'home_based_worker', label: 'Home-based worker' },
+                      { value: 'artisan_craft_worker', label: 'Artisan / Craft Worker' },
                       { value: 'others', label: 'Others' },
                     ]} />
                   )}
+                  {form.employment.self_employed_type === 'others' && (
+                    <TextInput label="Specify self-employed category" value={form.employment.self_employed_type_others} error={errors.self_employed_type_others} onChange={(value) => updateSection('employment', { self_employed_type_others: value })} />
+                  )}
                   {form.employment.employment_status === 'unemployed' && (
                     <>
-                      <TextInput label="Months unemployed" type="number" value={form.employment.unemployment_months} error={errors.unemployment_months} onChange={(value) => updateSection('employment', { unemployment_months: value })} />
+                      <SelectInput label="Months unemployed" value={form.employment.unemployment_months} error={errors.unemployment_months} onChange={(value) => updateSection('employment', { unemployment_months: value })} options={[
+                        { value: '', label: 'Select duration' },
+                        ...MONTH_DURATION_OPTIONS,
+                      ]} />
                       <SelectInput label="Reason for unemployment" value={form.employment.unemployment_reason} error={errors.unemployment_reason} onChange={(value) => updateSection('employment', { unemployment_reason: value })} options={[
                         { value: '', label: 'Select reason' },
                         { value: 'fresh_graduate', label: 'Fresh graduate' },
@@ -425,12 +492,18 @@ export default function SeekerProfileEdit() {
                         { value: 'terminated_calamity', label: 'Terminated due to calamity' },
                         { value: 'others', label: 'Others' },
                       ]} />
+                      {form.employment.unemployment_reason === 'others' && (
+                        <TextInput label="Specify unemployment reason" value={form.employment.unemployment_reason_others} error={errors.unemployment_reason_others} onChange={(value) => updateSection('employment', { unemployment_reason_others: value })} />
+                      )}
+                      {form.employment.unemployment_reason === 'terminated_abroad' && (
+                        <SearchableTextInput label="Country where employment ended" value={form.employment.unemployment_terminated_country} options={ISO_COUNTRIES.map((country) => country.name)} error={errors.unemployment_terminated_country} placeholder="Type or select a country" onChange={(value) => updateSection('employment', { unemployment_terminated_country: value })} />
+                      )}
                     </>
                   )}
                   <ToggleInput label="Currently OFW" checked={form.employment.is_ofw} onChange={(checked) => updateSection('employment', { is_ofw: checked })} />
-                  {form.employment.is_ofw && <TextInput label="OFW country" value={form.employment.ofw_country} error={errors.ofw_country} onChange={(value) => updateSection('employment', { ofw_country: value })} />}
+                  {form.employment.is_ofw && <SearchableTextInput label="OFW country" value={form.employment.ofw_country} options={ISO_COUNTRIES.map((country) => country.name)} error={errors.ofw_country} placeholder="Type or select a country" onChange={(value) => updateSection('employment', { ofw_country: value })} />}
                   <ToggleInput label="Former OFW" checked={form.employment.is_former_ofw} onChange={(checked) => updateSection('employment', { is_former_ofw: checked })} />
-                  {form.employment.is_former_ofw && <TextInput label="Former OFW country" value={form.employment.former_ofw_country} error={errors.former_ofw_country} onChange={(value) => updateSection('employment', { former_ofw_country: value })} />}
+                  {form.employment.is_former_ofw && <SearchableTextInput label="Former OFW country" value={form.employment.former_ofw_country} options={ISO_COUNTRIES.map((country) => country.name)} error={errors.former_ofw_country} placeholder="Type or select a country" onChange={(value) => updateSection('employment', { former_ofw_country: value })} />}
                   {form.employment.is_former_ofw && <TextInput label="Return date" type="date" value={form.employment.former_ofw_return_date} error={errors.former_ofw_return_date} onChange={(value) => updateSection('employment', { former_ofw_return_date: value })} />}
                   <ToggleInput label="4Ps beneficiary" checked={form.employment.is_4ps_beneficiary} onChange={(checked) => updateSection('employment', { is_4ps_beneficiary: checked })} />
                   {form.employment.is_4ps_beneficiary && <TextInput label="4Ps household ID" value={form.employment.household_id_4ps} error={errors.household_id_4ps} onChange={(value) => updateSection('employment', { household_id_4ps: value })} />}
@@ -443,7 +516,7 @@ export default function SeekerProfileEdit() {
                 icon={Sparkles}
                 title="Job Preferences"
                 subtitle="Update preferred roles and locations without going back to registration."
-                onSave={() => save('preferences', 3, () => buildStep3Payload(form.preferences))}
+                onSave={() => save('preferences', 3, () => buildStep3Payload(form.preferences), validatePreferences)}
                 saving={saving === 'preferences'}
               >
                 <div className="grid gap-4 md:grid-cols-2">
@@ -452,34 +525,33 @@ export default function SeekerProfileEdit() {
                     { value: 'full_time', label: 'Full-time' },
                     { value: 'part_time', label: 'Part-time' },
                   ]} />
-                  <SelectInput label="Preferred work location" value={form.preferences.preferred_work_location} error={errors.preferred_work_location} onChange={(value) => updateSection('preferences', { preferred_work_location: value })} options={[
+                  <SelectInput label="Preferred work location" value={form.preferences.preferred_work_location} error={errors.preferred_work_location} onChange={(value) => updateSection('preferences', { preferred_work_location: value, preferred_locations_text: '' })} options={[
                     { value: '', label: 'Select location scope' },
                     { value: 'local', label: 'Local' },
                     { value: 'overseas', label: 'Overseas' },
                   ]} />
                 </div>
                 <div className="mt-4">
-                  <TextArea label="Preferred locations, one per line" rows={3} value={form.preferences.preferred_locations_text} error={errors.preferred_locations_details} onChange={(value) => updateSection('preferences', { preferred_locations_text: value })} />
+                  <PreferredLocationsField
+                    scope={form.preferences.preferred_work_location}
+                    value={splitLines(form.preferences.preferred_locations_text)}
+                    error={errors.preferred_locations_details}
+                    onChange={(locations) => updateSection('preferences', { preferred_locations_text: locations.join('\n') })}
+                  />
                 </div>
-                <div className="mt-5 space-y-3">
-                  <ArrayHeader title="Preferred occupation titles" onAdd={() => addListItem('preferences', 'occupation_preferences', emptyOccupationPreference())} addLabel="Add title" />
-                  {form.preferences.occupation_preferences.map((occupation, index) => (
-                    <div key={occupation.local_id} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                      <div className="flex gap-3">
-                        <TextInput label={`Occupation ${index + 1}`} value={occupation.label} error={errors.occupation_preferences} onChange={(value) => updateListItem('preferences', 'occupation_preferences', index, {
-                          label: value,
-                          raw_job_title: value,
-                          occupation_id: null,
-                          general_term: null,
-                          source: 'manual',
-                        })} />
-                        <button type="button" onClick={() => removeListItem('preferences', 'occupation_preferences', index)} className="mt-7 rounded-xl bg-red-50 px-3 text-red-600 hover:bg-red-100" aria-label="Remove occupation">
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                  <p className="text-xs leading-5 text-slate-500">Unknown job titles are allowed here. PESO/admin can standardize them later while your raw title remains saved.</p>
+                <div className="mt-5">
+                  <label className={labelClass}>Preferred occupation titles</label>
+                  <div className="mt-2">
+                    <OccupationCombobox
+                      selected={form.preferences.occupation_preferences}
+                      multiple
+                      limit={3}
+                      onChange={(occupation_preferences) => updateSection('preferences', { occupation_preferences })}
+                      placeholder="Type a specific job title (e.g. Teacher, Cashier, React Developer)"
+                      error={errors.occupation_preferences || errors.preferred_occupations}
+                    />
+                  </div>
+                  <p className="mt-2 text-xs leading-5 text-slate-500">Uses the same standardized title matching and broad-field classification as onboarding.</p>
                 </div>
               </SectionCard>
             )}
@@ -489,7 +561,7 @@ export default function SeekerProfileEdit() {
                 icon={GraduationCap}
                 title="Education"
                 subtitle="Keep the same education records and completion logic used during onboarding."
-                onSave={() => save('education', 5, () => buildStep5Payload(form.education))}
+                onSave={() => save('education', 5, () => buildStep5Payload(form.education), validateEducationAndSkills)}
                 saving={saving === 'education'}
               >
                 <div className="mb-5 grid gap-4 md:grid-cols-2">
@@ -513,6 +585,24 @@ export default function SeekerProfileEdit() {
                 saving={saving === 'address'}
               >
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <SingleAddressInput
+                    label="Search present address"
+                    value={[
+                      form.identity.address_house_street,
+                      form.identity.address_barangay,
+                      form.identity.address_municipality_city,
+                      form.identity.address_province,
+                    ].filter(Boolean).join(', ')}
+                    placeholder="Search house, street, barangay, or city"
+                    onAddressParsed={(address) => updateSection('identity', {
+                      address_house_street: address.street || form.identity.address_house_street,
+                      address_barangay: address.barangay || form.identity.address_barangay,
+                      address_municipality_city: address.city || form.identity.address_municipality_city,
+                      address_province: address.province || form.identity.address_province,
+                    })}
+                    onPlaceResolved={resolveSelectedAddress}
+                  />
+                  <p className="mb-4 mt-2 text-xs text-slate-500">Select an address suggestion, then verify its official PSGC fields and GPS coordinates below.</p>
                   <AddressPicker
                     title="Present Address"
                     province={form.identity.address_province}
@@ -553,7 +643,7 @@ export default function SeekerProfileEdit() {
                 icon={Sparkles}
                 title="Skills"
                 subtitle="Maintain hard and soft skills without mixing them into education records."
-                onSave={() => save('skills', 5, () => buildStep5Payload(form.education))}
+                onSave={() => save('skills', 5, () => buildStep5Payload(form.education), validateEducationAndSkills)}
                 saving={saving === 'skills'}
               >
                 <div>
@@ -572,7 +662,7 @@ export default function SeekerProfileEdit() {
                 icon={Award}
                 title="Trainings, Eligibility & E-Certificates"
                 subtitle="Training records come from the NSRP registration inputs. Certificate files are optional proof attachments."
-                onSave={() => save('training', 6, () => buildStep6Payload(form.training))}
+                onSave={() => save('training', 6, () => buildStep6Payload(form.training), validateTraining)}
                 saving={saving === 'training'}
               >
                 <div className="space-y-4">
@@ -580,9 +670,13 @@ export default function SeekerProfileEdit() {
                   {form.training.trainings.map((training, index) => (
                     <div key={training.local_id} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                       <div className="grid gap-4 md:grid-cols-2">
-                        <DatalistInput label="Course / Training" value={training.course} options={TRAINING_COURSE_OPTIONS} onChange={(value) => updateListItem('training', 'trainings', index, { course: value })} />
-                        <TextInput label="Training institution" value={training.training_institution} onChange={(value) => updateListItem('training', 'trainings', index, { training_institution: value })} />
-                        <TextInput label="Hours of training" type="number" value={training.hours_of_training} onChange={(value) => updateListItem('training', 'trainings', index, { hours_of_training: value })} />
+                        <SearchableTextInput label="Course / Training" value={training.course} error={errors[`trainings.${index}.course`]} options={TRAINING_COURSE_OPTIONS} placeholder="Type or select a training course" onChange={(value) => updateListItem('training', 'trainings', index, { course: value })} />
+                        <SearchableTextInput label="Training institution" value={training.training_institution} options={TRAINING_INSTITUTION_OPTIONS} placeholder="Type or select an institution" onChange={(value) => updateListItem('training', 'trainings', index, { training_institution: value })} />
+                        <SelectInput label="Hours of training" value={training.hours_of_training} error={errors[`trainings.${index}.hours_of_training`]} onChange={(value) => updateListItem('training', 'trainings', index, { hours_of_training: value })} options={[
+                          { value: '', label: 'Select training hours' },
+                          ...TRAINING_HOUR_OPTIONS,
+                        ]} />
+                        <TextInput label="Certificate received" value={training.certificates_received} onChange={(value) => updateListItem('training', 'trainings', index, { certificates_received: value })} />
                         <div className="md:col-span-2">
                           <TextArea label="Skills acquired" rows={2} value={training.skills_acquired} onChange={(value) => updateListItem('training', 'trainings', index, { skills_acquired: value })} />
                         </div>
@@ -599,14 +693,14 @@ export default function SeekerProfileEdit() {
                   {form.training.eligibilities.map((eligibility, index) => (
                     <div key={eligibility.local_id} className="rounded-2xl border border-slate-200 bg-white p-4">
                       <div className="grid gap-4 md:grid-cols-2">
-                        <SelectInput label="Type" value={eligibility.type} onChange={(value) => updateListItem('training', 'eligibilities', index, { type: value })} options={[
+                        <SelectInput label="Type" value={eligibility.type} error={errors[`eligibilities.${index}.type`]} onChange={(value) => updateListItem('training', 'eligibilities', index, { type: value })} options={[
                           { value: '', label: 'Select type' },
                           { value: 'civil_service', label: 'Civil Service' },
                           { value: 'professional_license', label: 'Professional License' },
                         ]} />
-                        <TextInput label="Name" value={eligibility.name} onChange={(value) => updateListItem('training', 'eligibilities', index, { name: value })} />
+                        <SearchableTextInput label="Name" value={eligibility.name} error={errors[`eligibilities.${index}.name`]} options={ELIGIBILITY_NAME_OPTIONS} placeholder="Type or select eligibility" onChange={(value) => updateListItem('training', 'eligibilities', index, { name: value })} />
                         <TextInput label="Date taken" type="date" value={eligibility.date_taken} onChange={(value) => updateListItem('training', 'eligibilities', index, { date_taken: value })} />
-                        <TextInput label="Valid until" type="date" value={eligibility.valid_until} onChange={(value) => updateListItem('training', 'eligibilities', index, { valid_until: value })} />
+                        <TextInput label="Valid until" type="date" value={eligibility.valid_until} error={errors[`eligibilities.${index}.valid_until`]} onChange={(value) => updateListItem('training', 'eligibilities', index, { valid_until: value })} />
                       </div>
                       <button type="button" onClick={() => removeListItem('training', 'eligibilities', index)} className="mt-4 inline-flex items-center gap-1.5 rounded-xl bg-red-50 px-3 py-2 text-sm font-bold text-red-600 hover:bg-red-100">
                         <Trash2 className="h-4 w-4" /> Remove eligibility
@@ -656,7 +750,7 @@ export default function SeekerProfileEdit() {
                 icon={Languages}
                 title="Languages & Dialects"
                 subtitle="Record what the seeker can read, write, speak, or understand."
-                onSave={() => save('languages', 4, () => buildStep4Payload(form.languages))}
+                onSave={() => save('languages', 4, () => buildStep4Payload(form.languages), validateLanguages)}
                 saving={saving === 'languages'}
               >
                 <div className="space-y-3">
@@ -664,8 +758,8 @@ export default function SeekerProfileEdit() {
                   {form.languages.languages.map((language, index) => (
                     <div key={language.local_id} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                       <div className="grid gap-4 md:grid-cols-[1fr_2fr_auto] md:items-end">
-                        <SelectInput label="Language" value={language.language} onChange={(value) => updateListItem('languages', 'languages', index, { language: value })} options={[{ value: '', label: 'Select language' }, ...LANGUAGE_OPTIONS.map((value) => ({ value, label: titleCase(value) }))]} />
-                        {language.language === 'others' ? <TextInput label="Other language" value={language.language_other} onChange={(value) => updateListItem('languages', 'languages', index, { language_other: value })} /> : <div />}
+                        <SelectInput label="Language" value={language.language} error={errors[`languages.${index}.language`]} onChange={(value) => updateListItem('languages', 'languages', index, { language: value })} options={[{ value: '', label: 'Select language' }, ...LANGUAGE_OPTIONS.map((value) => ({ value, label: titleCase(value) }))]} />
+                        {language.language === 'others' ? <TextInput label="Other language" value={language.language_other} error={errors[`languages.${index}.language_other`]} onChange={(value) => updateListItem('languages', 'languages', index, { language_other: value })} /> : <div />}
                         <button type="button" onClick={() => removeListItem('languages', 'languages', index)} className="rounded-xl bg-red-50 px-3 py-2.5 text-red-600 hover:bg-red-100" aria-label="Remove language">
                           <Trash2 className="h-4 w-4" />
                         </button>
@@ -683,6 +777,7 @@ export default function SeekerProfileEdit() {
                           </label>
                         ))}
                       </div>
+                      {errors[`languages.${index}.proficiency`] && <p className="mt-2 text-xs font-semibold text-red-600">{errors[`languages.${index}.proficiency`]}</p>}
                     </div>
                   ))}
                 </div>
@@ -694,7 +789,7 @@ export default function SeekerProfileEdit() {
                 icon={BriefcaseBusiness}
                 title="Work Experience"
                 subtitle="Maintain work history and resume-ready responsibilities in one place."
-                onSave={() => save('work', 7, () => buildStep7Payload(form.work))}
+                onSave={() => save('work', 7, () => buildStep7Payload(form.work), validateWorkExperience)}
                 saving={saving === 'work'}
               >
                 <div className="space-y-4">
@@ -702,8 +797,8 @@ export default function SeekerProfileEdit() {
                   {form.work.work_experiences.map((experience, index) => (
                     <div key={experience.local_id} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                       <div className="grid gap-4 md:grid-cols-2">
-                        <TextInput label="Company" value={experience.company_name} onChange={(value) => updateListItem('work', 'work_experiences', index, { company_name: value })} />
-                        <TextInput label="Position" value={experience.position} onChange={(value) => updateListItem('work', 'work_experiences', index, { position: value })} />
+                        <SearchableTextInput label="Company" value={experience.company_name} error={errors[`work_experiences.${index}.company_name`]} options={COMPANY_SUGGESTIONS} placeholder="Search company or enter a custom name" onChange={(value) => updateListItem('work', 'work_experiences', index, { company_name: value })} />
+                        <TextInput label="Position" value={experience.position} error={errors[`work_experiences.${index}.position`]} onChange={(value) => updateListItem('work', 'work_experiences', index, { position: value })} />
                         <TextInput label="Company address" value={experience.company_address} onChange={(value) => updateListItem('work', 'work_experiences', index, { company_address: value })} />
                         <SelectInput label="Employment status" value={experience.employment_status} onChange={(value) => updateListItem('work', 'work_experiences', index, { employment_status: value })} options={[{ value: '', label: 'Select status' }, ...EMPLOYMENT_STATUS_OPTIONS]} />
                         <div className="md:col-span-2">
@@ -788,19 +883,6 @@ function TextInput({ label, value, onChange, type = 'text', error, ...props }) {
         {...props}
       />
       {error && <p className="mt-1.5 text-xs font-semibold text-red-600">{error}</p>}
-    </label>
-  )
-}
-
-function DatalistInput({ label, value, onChange, options }) {
-  const listId = `list-${label.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`
-  return (
-    <label className="block">
-      <span className={labelClass}>{label}</span>
-      <input value={value ?? ''} list={listId} onChange={(event) => onChange(event.target.value)} className={inputClass} />
-      <datalist id={listId}>
-        {options.map((option) => <option key={option} value={option} />)}
-      </datalist>
     </label>
   )
 }
@@ -957,35 +1039,6 @@ function validateIdentity(identity) {
     address_house_street: 'House, street, or purok is required.',
   }
 
-  const viewCertificate = async (certificate) => {
-    setOpeningCertificate(certificate.certificate_id)
-    try {
-      const file = await getCertificateFile(certificate.certificate_id)
-      const url = URL.createObjectURL(file)
-      window.open(url, '_blank', 'noopener,noreferrer')
-      window.setTimeout(() => URL.revokeObjectURL(url), 60000)
-    } catch (error) {
-      toast.error(error.response?.data?.message ?? 'Unable to open certificate proof.')
-    } finally {
-      setOpeningCertificate(null)
-    }
-  }
-
-  const removeCertificate = async (certificate) => {
-    if (!window.confirm(`Delete "${certificate.title}" from your certificate vault?`)) return
-
-    try {
-      await deleteCertificate(certificate.certificate_id)
-      setProfile((current) => ({
-        ...current,
-        certificates: current.certificates.filter((item) => item.certificate_id !== certificate.certificate_id),
-      }))
-      toast.success('Certificate deleted.')
-    } catch (error) {
-      toast.error(error.response?.data?.message ?? 'Unable to delete certificate.')
-    }
-  }
-
   Object.entries(requiredTextFields).forEach(([field, message]) => {
     if (!String(identity[field] ?? '').trim()) errors[field] = message
   })
@@ -1004,6 +1057,76 @@ function validateIdentity(identity) {
     errors.disability_specification = 'Please specify the disability.'
   }
 
+  return errors
+}
+
+function validateEmployment(employment) {
+  const errors = {}
+  if (!employment.employment_status) errors.employment_status = 'Select your current employment status.'
+  if (employment.employment_status === 'employed' && !employment.employment_type) errors.employment_type = 'Select your employment type.'
+  if (employment.employment_type === 'self_employed' && !employment.self_employed_type) errors.self_employed_type = 'Select a self-employed category.'
+  if (employment.self_employed_type === 'others' && !cleanText(employment.self_employed_type_others)) errors.self_employed_type_others = 'Specify the self-employed category.'
+  if (employment.employment_status === 'unemployed') {
+    if (employment.unemployment_months === null || employment.unemployment_months === '' || Number(employment.unemployment_months) < 0) errors.unemployment_months = 'Enter the number of months unemployed.'
+    if (!employment.unemployment_reason) errors.unemployment_reason = 'Select a reason for unemployment.'
+  }
+  if (employment.unemployment_reason === 'others' && !cleanText(employment.unemployment_reason_others)) errors.unemployment_reason_others = 'Specify the unemployment reason.'
+  if (employment.unemployment_reason === 'terminated_abroad' && !cleanText(employment.unemployment_terminated_country)) errors.unemployment_terminated_country = 'Enter the country where employment ended.'
+  if (employment.is_ofw && !cleanText(employment.ofw_country)) errors.ofw_country = 'Enter the OFW country.'
+  if (employment.is_former_ofw && !cleanText(employment.former_ofw_country)) errors.former_ofw_country = 'Enter the former OFW country.'
+  if (employment.is_former_ofw && !employment.former_ofw_return_date) errors.former_ofw_return_date = 'Enter the return date.'
+  if (employment.is_4ps_beneficiary && !/^\d{2}-\d{2}-\d{2}-\d{3}-\d{5}$/.test(employment.household_id_4ps ?? '')) errors.household_id_4ps = 'Use the format 00-00-00-000-00000.'
+  return errors
+}
+
+function validatePreferences(preferences) {
+  const errors = {}
+  if (!preferences.work_type_preference) errors.work_type_preference = 'Select a preferred type of work.'
+  if (!preferences.preferred_work_location) errors.preferred_work_location = 'Select a preferred work location.'
+  if (!preferences.preferred_locations_details?.length) errors.preferred_locations_details = 'Select at least one preferred location.'
+  if (!preferences.occupation_preferences?.length) errors.occupation_preferences = 'Select at least one preferred occupation.'
+  return errors
+}
+
+function validateLanguages(payload) {
+  const errors = {}
+  if (!payload.languages.length) errors.languages = 'Add at least one language or dialect.'
+  payload.languages.forEach((language, index) => {
+    if (!language.language) errors[`languages.${index}.language`] = 'Select a language.'
+    if (language.language === 'others' && !cleanText(language.language_other)) errors[`languages.${index}.language_other`] = 'Specify the language or dialect.'
+    if (!language.can_read && !language.can_write && !language.can_speak && !language.can_understand) errors[`languages.${index}.proficiency`] = 'Select at least one proficiency.'
+  })
+  return errors
+}
+
+function validateEducationAndSkills(payload) {
+  const errors = {}
+  if (!payload.educations.length) errors.educations = 'Add at least one education record.'
+  if (![...payload.dole_skills, ...payload.technical_skills, ...payload.soft_skills].length) errors.technical_skills = 'Select at least one hard or soft skill.'
+  return errors
+}
+
+function validateTraining(payload) {
+  const errors = {}
+  payload.trainings.forEach((training, index) => {
+    if (!training.course) errors[`trainings.${index}.course`] = 'Enter the course or training.'
+    if (training.hours_of_training !== null && training.hours_of_training < 1) errors[`trainings.${index}.hours_of_training`] = 'Training hours must be at least 1.'
+  })
+  payload.eligibilities.forEach((eligibility, index) => {
+    if (!eligibility.type) errors[`eligibilities.${index}.type`] = 'Select the eligibility type.'
+    if (!eligibility.name) errors[`eligibilities.${index}.name`] = 'Enter the eligibility or license name.'
+    if (eligibility.date_taken && eligibility.valid_until && eligibility.valid_until < eligibility.date_taken) errors[`eligibilities.${index}.valid_until`] = 'Validity date cannot be earlier than the date taken.'
+  })
+  return errors
+}
+
+function validateWorkExperience(payload) {
+  const errors = {}
+  payload.work_experiences.forEach((experience, index) => {
+    if (!experience.company_name) errors[`work_experiences.${index}.company_name`] = 'Enter the company name.'
+    if (!experience.position) errors[`work_experiences.${index}.position`] = 'Enter the job title.'
+    if (!experience.currently_employed && experience.start_date && experience.end_date && experience.end_date < experience.start_date) errors[`work_experiences.${index}.end_date`] = 'End date cannot be earlier than start date.'
+  })
   return errors
 }
 
@@ -1035,12 +1158,7 @@ function buildStep3Payload(preferences) {
     work_type_preference: preferences.work_type_preference,
     preferred_work_location: preferences.preferred_work_location,
     preferred_locations_details: splitLines(preferences.preferred_locations_text).slice(0, 3),
-    occupation_preferences: preferences.occupation_preferences.slice(0, 3).map((occupation) => ({
-      occupation_id: occupation.occupation_id || null,
-      general_term: occupation.occupation_id ? null : (occupation.general_term || null),
-      raw_job_title: occupation.occupation_id || occupation.general_term ? null : cleanText(occupation.raw_job_title || occupation.label),
-      source: occupation.occupation_id || occupation.general_term ? null : (occupation.source || 'manual'),
-    })),
+    occupation_preferences: serializeOccupationPreferences(preferences.occupation_preferences),
   }
 }
 
@@ -1110,9 +1228,12 @@ function normalizeOccupationPreference(occupation, index) {
     local_id: stableLocalId('occupation', index),
     occupation_id: occupation.occupation_id ?? occupation.id ?? null,
     general_term: occupation.general_term ?? null,
+    broad_field: occupation.broad_field ?? null,
+    role_function: occupation.role_function ?? null,
+    confidence: occupation.confidence ?? null,
     raw_job_title: occupation.raw_job_title ?? occupation.preferred_occupation ?? '',
-    source: occupation.status === 'ai_generated' ? 'ai_generated' : 'manual',
-    label: occupation.title ?? occupation.occupation_title ?? occupation.general_term ?? occupation.raw_job_title ?? '',
+    source: occupation.source ?? (occupation.status === 'ai_generated' ? 'ai_generated' : 'manual'),
+    occupation_title: occupation.title ?? occupation.occupation_title ?? occupation.general_term ?? occupation.raw_job_title ?? '',
   }
 }
 
@@ -1234,10 +1355,6 @@ function formatCertificateDate(value) {
   const [year, month, day] = String(value).slice(0, 10).split('-').map(Number)
   if (!year || !month || !day) return String(value)
   return new Date(year, month - 1, day).toLocaleDateString()
-}
-
-function emptyOccupationPreference() {
-  return { local_id: cryptoId(), occupation_id: null, general_term: null, raw_job_title: '', source: 'manual', label: '' }
 }
 
 function emptyTraining() {

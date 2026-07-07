@@ -1,38 +1,45 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Bell, CheckCheck, CircleCheck, Clock3, FileCheck2, TriangleAlert } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import {
   getNotifications,
+  getNotificationUnreadCount,
   markAllNotificationsRead,
   markNotificationRead,
 } from '@/services/employerService'
 
 export default function NotificationBell() {
   const [open, setOpen] = useState(false)
-  const [notifications, setNotifications] = useState([])
-  const [unreadCount, setUnreadCount] = useState(0)
-  const [loading, setLoading] = useState(true)
   const containerRef = useRef(null)
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
 
-  const loadNotifications = useCallback(async (showError = false) => {
-    try {
-      const result = await getNotifications()
-      setNotifications(result.notifications ?? [])
-      setUnreadCount(result.unread_count ?? 0)
-    } catch {
-      if (showError) toast.error('Unable to load notifications.')
-    } finally {
-      setLoading(false)
-    }
-  }, [])
+  const notificationsQuery = useQuery({
+    queryKey: ['employerNotifications', 'list'],
+    queryFn: getNotifications,
+    enabled: open,
+    placeholderData: (previous) => previous,
+    staleTime: 60_000,
+  })
+
+  const unreadQuery = useQuery({
+    queryKey: ['employerNotifications', 'unreadCount'],
+    queryFn: getNotificationUnreadCount,
+    refetchInterval: 30000,
+    refetchOnWindowFocus: true,
+  })
+
+  const notifications = notificationsQuery.data?.notifications ?? []
+  const unreadCount = open && notificationsQuery.data
+    ? notificationsQuery.data.unread_count ?? 0
+    : unreadQuery.data?.unread_count ?? 0
+  const loading = open && notificationsQuery.isFetching
 
   useEffect(() => {
-    loadNotifications()
-    const timer = window.setInterval(() => loadNotifications(), 30000)
-    return () => window.clearInterval(timer)
-  }, [loadNotifications])
+    if (notificationsQuery.isError) toast.error('Unable to load notifications.')
+  }, [notificationsQuery.isError])
 
   useEffect(() => {
     const closeOnOutsideClick = (event) => {
@@ -47,15 +54,25 @@ export default function NotificationBell() {
 
   const openNotification = async (notification) => {
     if (!notification.read_at) {
-      setNotifications((current) => current.map((item) => (
-        item.id === notification.id ? { ...item, read_at: new Date().toISOString() } : item
-      )))
-      setUnreadCount((current) => Math.max(0, current - 1))
+      queryClient.setQueryData(['employerNotifications', 'list'], (current) => current ? ({
+        ...current,
+        notifications: (current.notifications ?? []).map((item) => (
+          item.id === notification.id ? { ...item, read_at: new Date().toISOString() } : item
+        )),
+        unread_count: Math.max(0, (current.unread_count ?? 0) - 1),
+      }) : current)
+      queryClient.setQueryData(['employerNotifications', 'unreadCount'], (current) => current ? ({
+        ...current,
+        unread_count: Math.max(0, (current.unread_count ?? 0) - 1),
+      }) : current)
 
       try {
         await markNotificationRead(notification.id)
       } catch {
-        await loadNotifications(true)
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: ['employerNotifications', 'list'] }),
+          queryClient.invalidateQueries({ queryKey: ['employerNotifications', 'unreadCount'] }),
+        ])
         return
       }
     }
@@ -65,19 +82,26 @@ export default function NotificationBell() {
   }
 
   const markAllRead = async () => {
-    const previous = notifications
-    const previousCount = unreadCount
-    setNotifications((current) => current.map((item) => ({
-      ...item,
-      read_at: item.read_at ?? new Date().toISOString(),
-    })))
-    setUnreadCount(0)
+    const previousList = queryClient.getQueryData(['employerNotifications', 'list'])
+    const previousCount = queryClient.getQueryData(['employerNotifications', 'unreadCount'])
+    queryClient.setQueryData(['employerNotifications', 'list'], (current) => current ? ({
+      ...current,
+      notifications: (current.notifications ?? []).map((item) => ({
+        ...item,
+        read_at: item.read_at ?? new Date().toISOString(),
+      })),
+      unread_count: 0,
+    }) : current)
+    queryClient.setQueryData(['employerNotifications', 'unreadCount'], (current) => current ? ({
+      ...current,
+      unread_count: 0,
+    }) : current)
 
     try {
       await markAllNotificationsRead()
     } catch {
-      setNotifications(previous)
-      setUnreadCount(previousCount)
+      queryClient.setQueryData(['employerNotifications', 'list'], previousList)
+      queryClient.setQueryData(['employerNotifications', 'unreadCount'], previousCount)
       toast.error('Unable to mark notifications as read.')
     }
   }

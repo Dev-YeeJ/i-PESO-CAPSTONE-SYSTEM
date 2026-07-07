@@ -23,6 +23,7 @@ use App\Http\Controllers\Api\EmployerApplicationController;
 use App\Http\Controllers\Api\EmployerJobVacancyController;
 use App\Http\Controllers\Api\EmployerGovernmentProgramController;
 use App\Http\Controllers\Api\EmployerEstablishmentReportController;
+use App\Http\Controllers\Api\EmployerJobFairController;
 use App\Http\Controllers\Api\EmployerNotificationController;
 use App\Http\Controllers\Api\EmployerRegistrationController;
 use App\Http\Controllers\Api\EmployerUpskillNeedController;
@@ -64,15 +65,6 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/auth/logout', [AuthController::class, 'logout']);
 
     Route::get('/job-fairs', [JobFairController::class, 'index']);
-    Route::post('/job-fairs/{id}/rsvp', [JobFairController::class, 'rsvp'])->middleware('throttle:20,1');
-    Route::post('/job-fairs/{id}/employer-join', [JobFairController::class, 'employerJoin'])->middleware('verified.employer');
-    Route::post('/job-fairs/scan-qr', [JobFairController::class, 'scanQr'])
-        ->middleware(['verified.employer', 'throttle:30,1']);
-    Route::post('/job-fairs/applications/fast-track', [JobFairController::class, 'fastTrack'])
-        ->middleware(['verified.employer', 'throttle:60,1']);
-    Route::get('/job-fairs/{id}/export-roi-form-3', [JobFairController::class, 'exportRoiForm3'])
-        ->middleware('verified.employer');
-    Route::get('/job-fairs/{id}/export-sprs', [JobFairController::class, 'exportSprs']);
 
     Route::prefix('geo')->group(function () {
         Route::get('/autocomplete', [GoogleMapsController::class, 'autocomplete'])->middleware('throttle:30,1');
@@ -91,10 +83,19 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/register/step-4', [EmployerRegistrationController::class, 'registerStep4']);
         Route::get('/required-documents', [EmployerRegistrationController::class, 'getRequiredDocuments']);
         Route::get('/notifications', [EmployerNotificationController::class, 'index']);
+        Route::get('/notifications/unread-count', [EmployerNotificationController::class, 'unreadCount']);
         Route::patch('/notifications/read-all', [EmployerNotificationController::class, 'markAllAsRead']);
         Route::patch('/notifications/{notification}/read', [EmployerNotificationController::class, 'markAsRead']);
 
         Route::middleware('verified.employer')->group(function () {
+            Route::get('/job-fairs', [EmployerJobFairController::class, 'index']);
+            Route::post('/job-fairs/{jobFair}/interest', [EmployerJobFairController::class, 'interest']);
+            Route::post('/job-fairs/{jobFair}/respond', [EmployerJobFairController::class, 'respond']);
+            Route::post('/job-fairs/{jobFair}/requirements/{requirement}', [EmployerJobFairController::class, 'uploadRequirement']);
+            Route::get('/job-fair-requirements/{submission}/view', [EmployerJobFairController::class, 'viewRequirement']);
+            Route::post('/job-fairs/{jobFair}/confirmation-slip', [EmployerJobFairController::class, 'confirmation']);
+            Route::post('/job-fairs/{jobFair}/results', [EmployerJobFairController::class, 'results']);
+            Route::get('/job-fair-results/{resultReport}/roi-form-3', [EmployerJobFairController::class, 'downloadReport']);
             Route::get('/reports/establishment-report/preview', [EmployerEstablishmentReportController::class, 'preview']);
             Route::post('/reports/establishment-report/export', [EmployerEstablishmentReportController::class, 'export']);
             Route::apiResource('vacancies', EmployerJobVacancyController::class);
@@ -106,6 +107,7 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::delete('/upskill-needs/{employerSkillDemand}', [EmployerUpskillNeedController::class, 'destroy']);
             Route::get('/applications', [EmployerApplicationController::class, 'index']);
             Route::get('/applications/{application}', [EmployerApplicationController::class, 'show']);
+            Route::patch('/applications/bulk-status', [EmployerApplicationController::class, 'updateStatusBulk']);
             Route::patch('/applications/{application}/status', [EmployerApplicationController::class, 'updateStatus']);
             
             // Google Calendar
@@ -117,6 +119,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Seeker profile endpoints (step-by-step completion)
     Route::prefix('seeker')->group(function () {
+        Route::get('/dashboard-summary', [SeekerController::class, 'dashboardSummary']);
         Route::get('/profile', [SeekerController::class, 'getProfile']);
         Route::get('/upskill-hub', [SeekerUpskillHubController::class, 'index']);
         Route::get('/upskill-hub/recommended', [SeekerUpskillHubController::class, 'recommended']);
@@ -132,6 +135,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/nearby-jobs', [SeekerNearbyJobController::class, 'getNearbyJobs'])
             ->middleware('throttle:60,1');
         Route::get('/job-map', [SeekerNearbyJobController::class, 'getNearbyJobs'])
+            ->middleware('throttle:60,1');
+        Route::get('/job-map/{job}', [SeekerNearbyJobController::class, 'show'])
             ->middleware('throttle:60,1');
         Route::get('/applications', [SeekerApplicationController::class, 'index']);
         Route::get('/applications/{application}', [SeekerApplicationController::class, 'show']);
@@ -155,6 +160,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('/certificates/{certificate}', [SeekerCertificateController::class, 'destroy']);
         Route::post('/ai-profile-suggestions', [SeekerAiSuggestionController::class, 'suggest'])
             ->middleware('throttle:10,1');
+        Route::post('/ai-professional-summary', [SeekerAiSuggestionController::class, 'professionalSummary'])
+            ->middleware('throttle:10,1');
         Route::post('/ai-occupation-classification', [SeekerAiSuggestionController::class, 'classifyOccupation'])
             ->middleware('throttle:20,1');
         Route::post('/classify-occupation', [\App\Http\Controllers\Api\OccupationClassificationController::class, 'classify'])
@@ -171,6 +178,7 @@ Route::middleware('auth:sanctum')->group(function () {
             ->middleware('throttle:5,1');
         Route::get('/analytics', [SeekerAnalyticsController::class, 'index']);
         Route::get('/notifications', [\App\Http\Controllers\Api\SeekerNotificationController::class, 'index']);
+        Route::get('/notifications/unread-count', [\App\Http\Controllers\Api\SeekerNotificationController::class, 'unreadCount']);
         Route::patch('/notifications/read-all', [\App\Http\Controllers\Api\SeekerNotificationController::class, 'markAllAsRead']);
         Route::patch('/notifications/{notification}/read', [\App\Http\Controllers\Api\SeekerNotificationController::class, 'markAsRead']);
     });
@@ -185,6 +193,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/applications', [AdminApplicationController::class, 'index']);
 
         // Seekers
+        Route::get('/seekers/summary', [AdminSeekerController::class, 'summary']);
         Route::get('/seekers', [AdminSeekerController::class, 'index']);
         Route::get('/seekers/{id}', [AdminSeekerController::class, 'show']);
         Route::get('/job-seekers/{id}/export-nsrp-pdf', [NSRPPdfExportController::class, 'exportNSRPPdf']);
@@ -205,6 +214,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/employers/stats', [EmployerVerificationController::class, 'getStats']);
 
         // Legacy employer endpoints
+        Route::get('/employers/summary', [AdminEmployerController::class, 'summary']);
         Route::get('/employers', [AdminEmployerController::class, 'index']);
         Route::get('/employers/{id}', [AdminEmployerController::class, 'show']);
 
@@ -248,7 +258,16 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/job-fairs/{id}', [AdminJobFairController::class, 'show']);
         Route::put('/job-fairs/{id}', [AdminJobFairController::class, 'update']);
         Route::delete('/job-fairs/{id}', [AdminJobFairController::class, 'destroy']);
-        Route::get('/job-fairs/{id}/export-sprs', [JobFairController::class, 'exportSprs']);
+        Route::post('/job-fairs/{jobFair}/publish', [AdminJobFairController::class, 'publish']);
+        Route::post('/job-fairs/{jobFair}/invite', [AdminJobFairController::class, 'invite']);
+        Route::patch('/job-fairs/{jobFair}/participants/{participation}', [AdminJobFairController::class, 'participationStatus']);
+        Route::patch('/job-fair-requirements/{submission}/review', [AdminJobFairController::class, 'reviewRequirement']);
+        Route::get('/job-fair-requirements/{submission}/view', [AdminJobFairController::class, 'viewRequirement']);
+        Route::post('/job-fairs/{jobFair}/proxy-results', [AdminJobFairController::class, 'proxyResults']);
+        Route::post('/job-fairs/{jobFair}/proxy-confirmation-slip', [AdminJobFairController::class, 'proxyConfirmation']);
+        Route::get('/job-fair-results/{resultReport}/roi-form-3', [AdminJobFairController::class, 'downloadResult']);
+        Route::get('/job-fairs/{jobFair}/export-sprs', [AdminJobFairController::class, 'exportSprs']);
+        Route::get('/job-fairs/{jobFair}/invitation-letter', [AdminJobFairController::class, 'invitation']);
 
         // Reports
         Route::get('/reports/establishment-report/preview', [AdminEstablishmentReportController::class, 'preview']);

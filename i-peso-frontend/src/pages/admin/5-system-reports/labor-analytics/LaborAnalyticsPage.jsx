@@ -204,6 +204,13 @@ function AnalyticsView({ data, loading, error, filters, appliedFilters, setFilte
         <Kpi icon={CalendarRange} label="Scheduled Interviews" value={summary.scheduled_interviews} detail="Currently scheduled" />
       </section>
 
+      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="Job Fair outcome analytics">
+        <Kpi icon={CalendarRange} label="Job Fairs Conducted" value={summary.job_fairs_conducted} detail={`${summary.job_fair_participating_companies || 0} participating companies`} />
+        <Kpi icon={BriefcaseBusiness} label="Job Fair Vacancies" value={summary.job_fair_vacancies} detail={`${summary.job_fair_applicants || 0} applicants`} />
+        <Kpi icon={CheckCircle2} label="Job Fair HOTS" value={summary.job_fair_hots} detail={`${summary.job_fair_near_hired || 0} near hired`} />
+        <Kpi icon={FileChartColumn} label="Job Fair Rejected" value={summary.job_fair_rejected} detail="Merged self-service and proxy reports" />
+      </section>
+
       <Insight icon={UserRoundCheck} title="How Active Participants is defined">{summary.active_participants_definition}</Insight>
 
       <SectionTitle title="Applicant and employment trends" subtitle="Registered job seekers and job applications are intentionally reported as separate indicators." />

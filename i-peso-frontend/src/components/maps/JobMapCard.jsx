@@ -14,8 +14,9 @@ const formatSalary = (job) => {
   return `₱${Number(job.salary_min || job.salary_max).toLocaleString()}`
 }
 
-export default function JobMapCard({ job, isActive, isApplying, isSaving, isRsvping, onClick, onView, onApply, onSave, onTraining, onJobFair }) {
-  const matchPercentage = Math.round(job.match_percentage || 0)
+export default function JobMapCard({ job, isActive, isApplying, isSaving, onClick, onView, onApply, onSave, onTraining, onJobFair }) {
+  const hasMatch = job.match_percentage !== null && job.match_percentage !== undefined
+  const matchPercentage = hasMatch ? Math.round(job.match_percentage) : null
   const missingSkillCount = job.missing_skills?.length || 0
 
   return (
@@ -34,8 +35,8 @@ export default function JobMapCard({ job, isActive, isApplying, isSaving, isRsvp
             <BriefcaseBusiness className="h-3.5 w-3.5 shrink-0" /> {job.employer_name}
           </p>
         </div>
-        <span className={`shrink-0 rounded-full px-2 py-1 text-[10px] font-black ring-1 ring-inset ${matchClass(matchPercentage)}`}>
-          {matchPercentage}% match
+        <span className={`shrink-0 rounded-full px-2 py-1 text-[10px] font-black ring-1 ring-inset ${hasMatch ? matchClass(matchPercentage) : 'bg-blue-50 text-blue-700 ring-blue-200'}`}>
+          {hasMatch ? `${matchPercentage}% match` : 'View match'}
         </span>
       </div>
 
@@ -83,7 +84,7 @@ export default function JobMapCard({ job, isActive, isApplying, isSaving, isRsvp
       {(job.upskill?.recommended || job.job_fair?.is_available_at_job_fair) && (
         <div className="mt-2 flex flex-wrap gap-1.5">
           {job.upskill?.recommended && <button type="button" onClick={(event) => { event.stopPropagation(); onTraining(job) }} className="inline-flex items-center gap-1 rounded-lg bg-violet-50 px-2.5 py-1.5 text-[10px] font-bold text-violet-800 hover:bg-violet-100"><GraduationCap className="h-3 w-3" /> View training</button>}
-          {job.job_fair?.is_available_at_job_fair && <button type="button" disabled={isRsvping} onClick={(event) => { event.stopPropagation(); onJobFair(job) }} className="inline-flex items-center gap-1 rounded-lg bg-blue-50 px-2.5 py-1.5 text-[10px] font-bold text-blue-800 hover:bg-blue-100 disabled:opacity-50"><CalendarDays className="h-3 w-3" /> {isRsvping ? 'Saving RSVP…' : job.job_fair.has_rsvp ? 'View QR pass' : 'RSVP to job fair'}</button>}
+          {job.job_fair?.is_available_at_job_fair && <button type="button" onClick={(event) => { event.stopPropagation(); onJobFair(job) }} className="inline-flex items-center gap-1 rounded-lg bg-blue-50 px-2.5 py-1.5 text-[10px] font-bold text-blue-800 hover:bg-blue-100"><CalendarDays className="h-3 w-3" /> View event details</button>}
         </div>
       )}
     </article>

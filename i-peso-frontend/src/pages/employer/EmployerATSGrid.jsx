@@ -1,4 +1,6 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useMemo, useState } from 'react';
+import { useForm } from 'react-hook-form';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { 
   Search, Filter, ChevronDown, CheckSquare, Square, 
   MapPin, GraduationCap, Calendar as CalendarIcon, Mail, Phone,
@@ -6,7 +8,7 @@ import {
   Sparkles, FileText, UserRound, ShieldAlert
 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { getEmployerApplicationDetail, getEmployerApplications, updateEmployerApplicationStatus, connectGoogleCalendar } from '@/services/employerApplicationService';
+import { getEmployerApplicationDetail, getEmployerApplications, updateEmployerApplicationStatusBulk, connectGoogleCalendar } from '@/services/employerApplicationService';
 import { useSearchParams, Link } from 'react-router-dom';
 
 const PIPELINE_TABS = [
@@ -34,6 +36,40 @@ const SEEKER_MISMATCH_REASONS = [
   ['other_reason', 'Other reason'],
 ];
 
+const statusTone = (status) => {
+  switch (status) {
+    case 'pending': return 'bg-slate-50 border-slate-200 text-slate-600';
+    case 'reviewed': return 'bg-blue-50 border-blue-200 text-blue-700';
+    case 'shortlisted': return 'bg-purple-50 border-purple-200 text-purple-700';
+    case 'interview': return 'bg-amber-50 border-amber-200 text-amber-700';
+    case 'hired': return 'bg-emerald-50 border-emerald-200 text-emerald-700';
+    case 'rejected': return 'bg-red-50 border-red-200 text-red-700';
+    case 'withdrawn': return 'bg-slate-100 border-slate-300 text-slate-500';
+    default: return 'bg-slate-50 border-slate-200 text-slate-600';
+  }
+};
+
+const formatDate = (dateString) => {
+  if (!dateString) return 'N/A';
+  return new Date(dateString).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
+};
+
+const formatDateTime = (dateString) => {
+  if (!dateString) return 'N/A';
+  return new Date(dateString).toLocaleString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true
+  });
+};
+
 export default function EmployerATSGrid() {
   const [searchParams, setSearchParams] = useSearchParams();
   const vacancyId = searchParams.get('vacancy_id');
@@ -42,37 +78,48 @@ export default function EmployerATSGrid() {
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState('match_score');
   
-  const [applications, setApplications] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [detailLoading, setDetailLoading] = useState(false);
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [detailApplication, setDetailApplication] = useState(null);
   
+  const queryClient = useQueryClient();
+  const updateStatusMutation = useMutation({
+    mutationFn: ({ applicationId, payload }) => updateEmployerApplicationStatus(applicationId, payload),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['employerApplications'] }),
+  });
+
   // Modal States
   const [activeModal, setActiveModal] = useState(null); // 'profile', 'interview', 'hire', 'reject'
   const [modalTarget, setModalTarget] = useState(null); // Single application or array of applications for bulk
 
-  // Form States
-  const [interviewForm, setInterviewForm] = useState({ date: '', time: '', mode: 'online', autoMeet: true });
-  const [hireForm, setHireForm] = useState({ startDate: '', salary: '', employmentType: 'regular' });
-  const [rejectionForm, setRejectionForm] = useState({ employerReason: EMPLOYER_MISMATCH_REASONS[0][0], seekerReason: '', details: '' });
+  const interviewForm = useForm({
+    defaultValues: { date: '', time: '', mode: 'online', autoMeet: true },
+  });
+  const { register: registerInterview, handleSubmit: handleSubmitInterview, watch: watchInterview, reset: resetInterview, getValues: getInterviewValues } = interviewForm;
+
+  const hireForm = useForm({
+    defaultValues: { startDate: '', salary: '', employmentType: 'regular' },
+  });
+  const { register: registerHire, reset: resetHire, getValues: getHireValues } = hireForm;
+
+  const rejectionForm = useForm({
+    defaultValues: { employerReason: EMPLOYER_MISMATCH_REASONS[0][0], seekerReason: '', details: '' },
+  });
+  const { register: registerRejection, reset: resetRejection, getValues: getRejectionValues } = rejectionForm;
+
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  useEffect(() => {
-    fetchData();
-  }, []);
+  const applicationsQuery = useQuery({
+    queryKey: ['employerApplications', { per_page: 100 }],
+    queryFn: () => getEmployerApplications({ per_page: 100 }),
+    staleTime: 1000 * 60 * 5,
+    refetchOnWindowFocus: false,
+  })
 
-  const fetchData = async () => {
-    setLoading(true);
-    try {
-      const res = await getEmployerApplications({ per_page: 100 });
-      setApplications(res.data || []);
-    } catch {
-      toast.error('Failed to load applications');
-    } finally {
-      setLoading(false);
-    }
-  };
+  const applications = applicationsQuery.data?.data || []
+  const loading = applicationsQuery.isLoading
+  const queryError = applicationsQuery.isError ? applicationsQuery.error : null
+  const errorMessage = queryError?.response?.data?.message || 'Failed to load applications'
 
   // 1. Filtering & Sorting Logic
   const filteredApps = useMemo(() => {
@@ -156,34 +203,43 @@ export default function EmployerATSGrid() {
      */
 
     try {
-      // Execute for each target (In production, use a bulk API endpoint)
-      for (const app of targets) {
-        const updatePayload = { status: targetStatus, ...payload };
-        
-        // Mock payload injection based on DOLE requirements
-        if (targetStatus === 'hired') {
-          updatePayload.placement_start_date = hireForm.startDate;
-          updatePayload.placement_salary = hireForm.salary;
-          updatePayload.employment_type = hireForm.employmentType;
-        }
-        
-        if (targetStatus === 'interview') {
-          updatePayload.interview = {
-            schedule: `${interviewForm.date} ${interviewForm.time}`,
-            mode_of_interview: interviewForm.mode,
-            auto_meet_link: interviewForm.autoMeet,
-          };
-        }
+      const hireValues = getHireValues();
+      const interviewValues = getInterviewValues();
+      const rejectionValues = getRejectionValues();
 
-        await updateEmployerApplicationStatus(app.apply_id, updatePayload);
+      const updatePayload = { status: targetStatus, ...payload };
+      
+      if (targetStatus === 'hired') {
+        updatePayload.placement_start_date = hireValues.startDate;
+        updatePayload.placement_salary = hireValues.salary;
+        updatePayload.employment_type = hireValues.employmentType;
       }
+      
+      if (targetStatus === 'interview') {
+        updatePayload.interview = {
+          schedule: `${interviewValues.date} ${interviewValues.time}`,
+          mode_of_interview: interviewValues.mode,
+          auto_meet_link: interviewValues.autoMeet,
+        };
+      }
+
+      if (targetStatus === 'rejected') {
+        updatePayload.employer_mismatch_reason_code = rejectionValues.employerReason;
+        updatePayload.seeker_mismatch_reason_code = rejectionValues.seekerReason || null;
+        updatePayload.mismatch_reason_details = rejectionValues.details || null;
+        updatePayload.employer_remarks = rejectionValues.details || null;
+      }
+
+      updatePayload.application_ids = targets.map(app => app.apply_id);
+
+      await updateEmployerApplicationStatusBulk(updatePayload);
 
       toast.success(`Successfully moved ${targets.length} candidates to ${targetStatus}`);
       
       // Close Modals & Clear Selection
       closeModal();
       setSelectedIds(new Set());
-      fetchData(); // Refresh list to reflect changes
+      await applicationsQuery.refetch(); // Refresh list to reflect changes
 
     } catch (err) {
       if (err.response?.status === 403 && (err.response?.data?.message?.includes('Google Calendar not connected') || err.response?.data?.message?.includes('token expired'))) {
@@ -237,9 +293,9 @@ export default function EmployerATSGrid() {
     setActiveModal(null);
     setModalTarget(null);
     setDetailApplication(null);
-    setInterviewForm({ date: '', time: '', mode: 'online', autoMeet: true });
-    setHireForm({ startDate: '', salary: '', employmentType: 'regular' });
-    setRejectionForm({ employerReason: EMPLOYER_MISMATCH_REASONS[0][0], seekerReason: '', details: '' });
+    resetInterview();
+    resetHire();
+    resetRejection();
   };
 
   // UI Helpers
@@ -639,29 +695,29 @@ export default function EmployerATSGrid() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">Date</label>
-                  <input type="date" value={interviewForm.date} onChange={e => setInterviewForm({...interviewForm, date: e.target.value})} className="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none" required />
+                  <input type="date" {...registerInterview('date')} className="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none" required />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">Time</label>
-                  <input type="time" value={interviewForm.time} onChange={e => setInterviewForm({...interviewForm, time: e.target.value})} className="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none" required />
+                  <input type="time" {...registerInterview('time')} className="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none" required />
                 </div>
               </div>
               
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Mode of Interview</label>
-                <select value={interviewForm.mode} onChange={e => setInterviewForm({...interviewForm, mode: e.target.value})} className="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+                <select {...registerInterview('mode')} className="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none">
                   <option value="online">Online (Video Call)</option>
                   <option value="face_to_face">Face-to-Face (On-site)</option>
                   <option value="phone">Phone Call</option>
                 </select>
               </div>
 
-              {interviewForm.mode === 'online' && (
+              {watchInterview('mode') === 'online' && (
                 <div className="p-4 border border-blue-100 bg-blue-50 rounded-xl flex items-start gap-3 mt-4">
                   <div className="mt-0.5"><Video className="h-5 w-5 text-blue-600" /></div>
                   <div className="flex-1">
                     <label className="flex items-center cursor-pointer">
-                      <input type="checkbox" checked={interviewForm.autoMeet} onChange={e => setInterviewForm({...interviewForm, autoMeet: e.target.checked})} className="sr-only peer" />
+                      <input type="checkbox" {...registerInterview('autoMeet')} className="sr-only peer" />
                       <div className="w-11 h-6 bg-slate-300 rounded-full peer peer-checked:bg-blue-600 peer-focus:ring-4 peer-focus:ring-blue-300 transition-all after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-full relative"></div>
                       <span className="ml-3 text-sm font-semibold text-slate-900">Auto-generate Google Meet Link</span>
                     </label>
@@ -675,7 +731,7 @@ export default function EmployerATSGrid() {
               <button onClick={closeModal} className="px-5 py-2.5 text-sm font-medium text-slate-600 hover:text-slate-800">Cancel</button>
               <button 
                 onClick={() => executeStatusChange('interview')} 
-                disabled={isSubmitting || !interviewForm.date || !interviewForm.time}
+                disabled={isSubmitting || !watchInterview('date') || !watchInterview('time')}
                 className="px-5 py-2.5 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center shadow-sm"
               >
                 {isSubmitting ? 'Scheduling...' : 'Schedule Interview'}
@@ -703,20 +759,20 @@ export default function EmployerATSGrid() {
             <div className="p-6 space-y-5">
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-1">Official Start Date <span className="text-red-500">*</span></label>
-                <input type="date" value={hireForm.startDate} onChange={e => setHireForm({...hireForm, startDate: e.target.value})} className="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 outline-none" required />
+                <input type="date" {...registerHire('startDate')} className="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 outline-none" required />
               </div>
               
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-1">Placement Salary (PHP) <span className="text-red-500">*</span></label>
                 <div className="relative">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 font-medium">₱</span>
-                  <input type="number" placeholder="e.g. 25000" value={hireForm.salary} onChange={e => setHireForm({...hireForm, salary: e.target.value})} className="w-full pl-8 pr-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 outline-none" required />
+                  <input type="number" placeholder="e.g. 25000" {...registerHire('salary')} className="w-full pl-8 pr-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 outline-none" required />
                 </div>
               </div>
 
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-1">Employment Type <span className="text-red-500">*</span></label>
-                <select value={hireForm.employmentType} onChange={e => setHireForm({...hireForm, employmentType: e.target.value})} className="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 outline-none">
+                <select {...registerHire('employmentType')} className="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 outline-none">
                   <option value="regular">Regular / Permanent</option>
                   <option value="contractual">Contractual / Project-based</option>
                   <option value="probationary">Probationary</option>
@@ -729,7 +785,7 @@ export default function EmployerATSGrid() {
               <button onClick={closeModal} className="px-5 py-2.5 text-sm font-medium text-slate-600 hover:text-slate-800">Cancel</button>
               <button 
                 onClick={() => executeStatusChange('hired')} 
-                disabled={isSubmitting || !hireForm.startDate || !hireForm.salary}
+                disabled={isSubmitting || !getHireValues().startDate || !getHireValues().salary}
                 className="px-6 py-2.5 text-sm font-bold bg-emerald-600 text-white rounded-lg hover:bg-emerald-500 disabled:opacity-50 flex items-center shadow-md shadow-emerald-600/20"
               >
                 {isSubmitting ? 'Syncing...' : 'Confirm Hire & Sync to PESO'}
@@ -751,32 +807,35 @@ export default function EmployerATSGrid() {
             <div className="space-y-5 p-6">
               <div>
                 <label className="mb-1 block text-sm font-semibold text-slate-700">Employer-Side Reason <span className="text-red-500">*</span></label>
-                <select value={rejectionForm.employerReason} onChange={(event) => setRejectionForm((current) => ({ ...current, employerReason: event.target.value }))} className="w-full rounded-lg border border-slate-300 p-2.5 text-sm">
+                <select {...registerRejection('employerReason')} className="w-full rounded-lg border border-slate-300 p-2.5 text-sm">
                   {EMPLOYER_MISMATCH_REASONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
                 </select>
               </div>
               <div>
                 <label className="mb-1 block text-sm font-semibold text-slate-700">Seeker-Side Reason</label>
-                <select value={rejectionForm.seekerReason} onChange={(event) => setRejectionForm((current) => ({ ...current, seekerReason: event.target.value }))} className="w-full rounded-lg border border-slate-300 p-2.5 text-sm">
+                <select {...registerRejection('seekerReason')} className="w-full rounded-lg border border-slate-300 p-2.5 text-sm">
                   {SEEKER_MISMATCH_REASONS.map(([value, label]) => <option key={value || 'none'} value={value}>{label}</option>)}
                 </select>
               </div>
               <div>
                 <label className="mb-1 block text-sm font-semibold text-slate-700">Additional Details</label>
-                <textarea value={rejectionForm.details} onChange={(event) => setRejectionForm((current) => ({ ...current, details: event.target.value }))} rows={3} maxLength={5000} className="w-full resize-y rounded-lg border border-slate-300 p-2.5 text-sm" placeholder="Optional report context" />
+                <textarea {...registerRejection('details')} rows={3} maxLength={5000} className="w-full resize-y rounded-lg border border-slate-300 p-2.5 text-sm" placeholder="Optional report context" />
               </div>
             </div>
 
             <div className="flex justify-end gap-3 border-t border-slate-100 bg-slate-50 p-6">
               <button onClick={closeModal} className="px-5 py-2.5 text-sm font-medium text-slate-600 hover:text-slate-800">Cancel</button>
               <button
-                onClick={() => executeStatusChange('rejected', {
-                  employer_mismatch_reason_code: rejectionForm.employerReason,
-                  seeker_mismatch_reason_code: rejectionForm.seekerReason || null,
-                  mismatch_reason_details: rejectionForm.details || null,
-                  employer_remarks: rejectionForm.details || null,
-                })}
-                disabled={isSubmitting || !rejectionForm.employerReason}
+                onClick={() => {
+                  const rejectionValues = getRejectionValues();
+                  executeStatusChange('rejected', {
+                    employer_mismatch_reason_code: rejectionValues.employerReason,
+                    seeker_mismatch_reason_code: rejectionValues.seekerReason || null,
+                    mismatch_reason_details: rejectionValues.details || null,
+                    employer_remarks: rejectionValues.details || null,
+                  });
+                }}
+                disabled={isSubmitting || !getRejectionValues().employerReason}
                 className="rounded-lg bg-rose-700 px-5 py-2.5 text-sm font-bold text-white hover:bg-rose-800 disabled:opacity-50"
               >
                 {isSubmitting ? 'Saving...' : 'Reject and Record Reason'}

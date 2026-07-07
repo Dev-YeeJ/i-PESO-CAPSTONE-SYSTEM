@@ -15,6 +15,11 @@ export const updateEmployerApplicationStatus = async (applicationId, payload) =>
   return response.data
 }
 
+export const updateEmployerApplicationStatusBulk = async (payload) => {
+  const response = await apiClient.patch(`/employer/applications/bulk-status`, payload)
+  return response.data
+}
+
 export const generateGoogleMeetLink = async (payload) => {
   const response = await apiClient.post('/employer/calendar/generate-meet-link', payload)
   return response.data

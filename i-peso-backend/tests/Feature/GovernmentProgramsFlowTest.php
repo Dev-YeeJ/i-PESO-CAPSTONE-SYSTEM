@@ -183,14 +183,15 @@ class GovernmentProgramsFlowTest extends TestCase
             ->assertJsonValidationErrors('program');
     }
 
-    public function test_existing_job_fair_routes_remain_registered(): void
+    public function test_zero_interference_job_fair_routes_are_registered_without_qr_workflow(): void
     {
         $uris = collect(Route::getRoutes()->getRoutes())->map(fn ($route) => $route->uri());
 
         $this->assertTrue($uris->contains('api/job-fairs'));
-        $this->assertTrue($uris->contains('api/job-fairs/{id}/rsvp'));
-        $this->assertTrue($uris->contains('api/job-fairs/scan-qr'));
-        $this->assertTrue($uris->contains('api/job-fairs/{id}/export-roi-form-3'));
+        $this->assertTrue($uris->contains('api/employer/job-fairs/{jobFair}/results'));
+        $this->assertTrue($uris->contains('api/admin/job-fairs/{jobFair}/proxy-results'));
+        $this->assertFalse($uris->contains('api/job-fairs/{id}/rsvp'));
+        $this->assertFalse($uris->contains('api/job-fairs/scan-qr'));
     }
 
     private function createTables(): void

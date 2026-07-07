@@ -1,4 +1,6 @@
-import { createElement, useCallback, useEffect, useMemo, useState } from 'react'
+import { createElement, useEffect, useMemo, useState } from 'react'
+import { useForm } from 'react-hook-form'
+import { useQuery } from '@tanstack/react-query'
 import {
   AlertTriangle,
   ArrowLeft,
@@ -49,79 +51,64 @@ const initialFilters = {
 
 export default function JobSeekersListPage() {
   const navigate = useNavigate()
-  const [seekers, setSeekers] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
-  const [filters, setFilters] = useState(initialFilters)
-  const [debouncedSearch, setDebouncedSearch] = useState('')
-  const [page, setPage] = useState(1)
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false)
+  const [page, setPage] = useState(1)
   const [pagination, setPagination] = useState({ total: 0, lastPage: 1, from: 0, to: 0 })
-  const [summary, setSummary] = useState({ total: 0, complete: 0, incomplete: 0, withApplications: 0, hired: 0, missingGps: 0, newThisMonth: 0 })
+  const { watch, reset, setValue } = useForm({ defaultValues: initialFilters })
+  const filters = watch()
 
   useEffect(() => {
-    const timer = window.setTimeout(() => setDebouncedSearch(filters.search.trim()), 300)
+    const timer = window.setTimeout(() => setPage(1), 350)
     return () => window.clearTimeout(timer)
-  }, [filters.search])
+  }, [filters])
 
-  const loadSummary = useCallback(async () => {
-    try {
-      const monthStart = new Date(); monthStart.setDate(1); monthStart.setHours(0, 0, 0, 0)
-      const [all, complete, incomplete, withApplications, hired, missingGps, newThisMonth] = await Promise.all([
-        adminService.getSeekers({ per_page: 1, ...buildParams({ ...filters, search: debouncedSearch }) }),
-        adminService.getSeekers({ per_page: 1, profile_status: 'complete', ...buildParams({ ...filters, search: debouncedSearch }) }),
-        adminService.getSeekers({ per_page: 1, profile_status: 'incomplete', ...buildParams({ ...filters, search: debouncedSearch }) }),
-        adminService.getSeekers({ per_page: 1, has_applications: 1, ...buildParams({ ...filters, search: debouncedSearch }) }),
-        adminService.getSeekers({ per_page: 1, hired_status: 'hired', ...buildParams({ ...filters, search: debouncedSearch }) }),
-        adminService.getSeekers({ per_page: 1, missing_gps: 1, ...buildParams({ ...filters, search: debouncedSearch }) }),
-        adminService.getSeekers({ per_page: 1, date_from: monthStart.toISOString().slice(0, 10), ...buildParams({ ...filters, search: debouncedSearch }) }),
-      ])
-      setSummary({
-        total: all.total ?? 0,
-        complete: complete.total ?? 0,
-        incomplete: incomplete.total ?? 0,
-        withApplications: withApplications.total ?? 0,
-        hired: hired.total ?? 0,
-        missingGps: missingGps.total ?? 0,
-        newThisMonth: newThisMonth.total ?? 0,
-      })
-    } catch {
-      setSummary((current) => ({ ...current, total: 0 }))
-    }
-  }, [debouncedSearch, filters])
+  const summaryQuery = useQuery({
+    queryKey: ['admin', 'seekerSummary'],
+    queryFn: adminService.getSeekerSummary,
+    staleTime: 60_000,
+    retry: 1,
+  })
+  const summary = {
+    total: summaryQuery.data?.total ?? 0,
+    complete: summaryQuery.data?.complete ?? 0,
+    incomplete: summaryQuery.data?.incomplete ?? 0,
+    withApplications: summaryQuery.data?.with_applications ?? 0,
+    hired: summaryQuery.data?.hired ?? 0,
+    missingGps: summaryQuery.data?.missing_gps ?? 0,
+    newThisMonth: summaryQuery.data?.new_this_month ?? 0,
+  }
 
-  const loadSeekers = useCallback(async () => {
-    setLoading(true)
-    setError('')
-    try {
-      const result = await adminService.getSeekers({
-        page,
-        per_page: PER_PAGE,
-        ...buildParams({ ...filters, search: debouncedSearch }),
-      })
-      setSeekers(result.data ?? [])
-      setPagination({
-        total: result.total ?? 0,
-        lastPage: result.last_page ?? 1,
-        from: result.from ?? 0,
-        to: result.to ?? 0,
-      })
-    } catch (requestError) {
-      setError(requestError.response?.data?.message ?? 'Unable to load job seekers.')
-    } finally {
-      setLoading(false)
-    }
-  }, [debouncedSearch, filters, page])
+  const queryParams = useMemo(() => ({
+    page,
+    per_page: PER_PAGE,
+    ...buildParams(filters),
+  }), [filters, page])
+
+  const seekersQuery = useQuery({
+    queryKey: ['admin', 'seekers', queryParams],
+    queryFn: () => adminService.getSeekers(queryParams),
+    placeholderData: (previous) => previous,
+    staleTime: 30_000,
+    retry: 1,
+  })
 
   useEffect(() => {
-    loadSummary()
-  }, [loadSummary])
+    const result = seekersQuery.data
+    if (!result) return
+    setPagination({
+      total: result.total ?? 0,
+      lastPage: result.last_page ?? 1,
+      from: result.from ?? 0,
+      to: result.to ?? 0,
+    })
+  }, [seekersQuery.data])
 
-  useEffect(() => {
-    loadSeekers()
-  }, [loadSeekers])
+  const seekers = seekersQuery.data?.data ?? []
+  const loading = seekersQuery.isLoading
+  const error = seekersQuery.isError ? seekersQuery.error?.response?.data?.message ?? 'Unable to load job seekers.' : ''
 
-  const completionRate = summary.total ? Math.round((summary.complete / summary.total) * 100) : 0
+  const completionRate = summaryQuery.data?.total ? Math.round((summaryQuery.data.complete / summaryQuery.data.total) * 100) : 0
+
   const filtersActive = Boolean(
     filters.search ||
     filters.profileStatus !== 'all' ||
@@ -142,13 +129,13 @@ export default function JobSeekersListPage() {
   )
 
   const clearFilters = () => {
-    setFilters(initialFilters)
+    reset(initialFilters)
     setPage(1)
     setShowAdvancedFilters(false)
   }
 
   const updateFilter = (key, value) => {
-    setFilters((current) => ({ ...current, [key]: value }))
+    setValue(key, value)
     setPage(1)
   }
 
@@ -383,7 +370,7 @@ export default function JobSeekersListPage() {
       {error && (
         <div className="mt-6 flex items-center justify-between gap-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
           <span>{error}</span>
-          <button type="button" onClick={loadSeekers} className="font-extrabold hover:underline">Try again</button>
+          <button type="button" onClick={() => seekersQuery.refetch()} className="font-extrabold hover:underline">Try again</button>
         </div>
       )}
 
@@ -394,6 +381,7 @@ export default function JobSeekersListPage() {
           loading={loading}
           onRowClick={(row) => navigate(`/admin/job-seekers/${row.seeker_id}`)}
           emptyMessage={filtersActive ? 'No job seekers match the selected filters.' : 'No job seekers are registered yet.'}
+          virtualize
         />
       </div>
 

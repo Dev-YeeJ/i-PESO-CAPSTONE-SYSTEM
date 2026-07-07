@@ -1,5 +1,5 @@
 // i-peso-frontend/src/pages/admin/programs/ProgramsListPage.jsx
-import { useEffect, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { Card } from '@/components/ui'
 import PageHeader from '@/pages/admin/_components/PageHeader'
@@ -8,19 +8,19 @@ import StatusBadge from '@/pages/admin/_components/StatusBadge'
 import { adminService } from '@/services/adminService'
 
 export default function ProgramsListPage() {
-  const [programs, setPrograms] = useState([])
-  const [loading, setLoading] = useState(true)
   const navigate = useNavigate()
+  const programsQuery = useQuery({
+    queryKey: ['programs', { per_page: 15 }],
+    queryFn: () => adminService.getProgramsList({ per_page: 15 }),
+    staleTime: 1000 * 60 * 5,
+    refetchOnWindowFocus: false,
+  })
 
-  useEffect(() => {
-    adminService.getProgramsList({ per_page: 15 }).then(d => {
-      setPrograms(d.data || [])
-      setLoading(false)
-    }).catch(e => {
-      console.error(e)
-      setLoading(false)
-    })
-  }, [])
+  const programs = programsQuery.data?.data ?? []
+  const loading = programsQuery.isLoading
+  const errorMessage = programsQuery.isError
+    ? programsQuery.error?.response?.data?.message ?? 'Unable to load programs.'
+    : ''
 
   return (
     <div className="portal-page">
@@ -53,4 +53,4 @@ export default function ProgramsListPage() {
       </Card>
     </div>
   )
-}
+}

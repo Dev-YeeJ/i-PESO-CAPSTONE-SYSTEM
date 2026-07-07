@@ -14,7 +14,12 @@ const emptyForm = {
   start_time: '08:00',
   end_time: '17:00',
   sector: 'local',
-  status: 'upcoming',
+  target_sector: '',
+  partner_agencies: '',
+  submission_deadline: '',
+  contact_email: '',
+  maximum_representatives: 2,
+  status: 'draft',
 }
 
 export default function JobFairFormPage() {
@@ -43,7 +48,12 @@ export default function JobFairFormPage() {
           start_time: (fair.start_time ?? '08:00').slice(0, 5),
           end_time: (fair.end_time ?? '17:00').slice(0, 5),
           sector: fair.sector ?? 'local',
-          status: fair.status ?? 'upcoming',
+          target_sector: fair.target_sector ?? '',
+          partner_agencies: (fair.partner_agencies ?? []).join(', '),
+          submission_deadline: fair.submission_deadline?.slice(0, 16) ?? '',
+          contact_email: fair.contact_email ?? '',
+          maximum_representatives: fair.maximum_representatives ?? 2,
+          status: fair.status ?? 'draft',
         })
         setMetrics(fair.metrics ?? null)
       })
@@ -70,6 +80,9 @@ export default function JobFairFormPage() {
     const payload = {
       ...form,
       event_date: form.start_date,
+      partner_agencies: form.partner_agencies.split(',').map((item) => item.trim()).filter(Boolean),
+      maximum_representatives: Number(form.maximum_representatives),
+      submission_deadline: form.submission_deadline || null,
     }
 
     try {
@@ -91,7 +104,7 @@ export default function JobFairFormPage() {
     <div className="portal-page">
       <PageHeader
         title={id ? 'Edit Job Fair' : 'Create Job Fair'}
-        subtitle="Define the event scope used by RSVP passes, booth queues, and DOLE reports."
+        subtitle="Publish the official bulletin, coordinate employers, and prepare post-event government reporting."
         eyebrow="Government & DOLE"
         actions={[{ label: 'Back', onClick: () => navigate('/admin/job-fairs'), variant: 'secondary' }]}
       />
@@ -100,7 +113,7 @@ export default function JobFairFormPage() {
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
         <Card>
-          <CardHeader title="Event Details" subtitle="Use this as the official source for the fair’s QR passes and reports." />
+          <CardHeader title="Event Details" subtitle="Official source for announcements, employer coordination, and reports." />
           {loading ? (
             <div className="py-16 text-center text-sm font-semibold text-slate-500">Loading event...</div>
           ) : (
@@ -118,6 +131,14 @@ export default function JobFairFormPage() {
               <div>
                 <label className="block text-sm font-bold text-slate-700">Venue</label>
                 <input name="venue" value={form.venue} onChange={handleChange} required className="mt-2 w-full rounded-lg border border-slate-300 px-4 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100" />
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <div><label className="block text-sm font-bold text-slate-700">Target Sector</label><input name="target_sector" value={form.target_sector} onChange={handleChange} placeholder="e.g. Multi-sector" className="mt-2 w-full rounded-lg border border-slate-300 px-4 py-2.5 text-sm" /></div>
+                <div><label className="block text-sm font-bold text-slate-700">Partner Agencies</label><input name="partner_agencies" value={form.partner_agencies} onChange={handleChange} placeholder="DOLE, CB Mall Urdaneta City" className="mt-2 w-full rounded-lg border border-slate-300 px-4 py-2.5 text-sm" /></div>
+                <div><label className="block text-sm font-bold text-slate-700">Submission Deadline</label><input type="datetime-local" name="submission_deadline" value={form.submission_deadline} onChange={handleChange} className="mt-2 w-full rounded-lg border border-slate-300 px-4 py-2.5 text-sm" /></div>
+                <div><label className="block text-sm font-bold text-slate-700">PESO Contact Email</label><input type="email" name="contact_email" value={form.contact_email} onChange={handleChange} className="mt-2 w-full rounded-lg border border-slate-300 px-4 py-2.5 text-sm" /></div>
+                <div><label className="block text-sm font-bold text-slate-700">Maximum Representatives</label><input type="number" min="1" max="10" name="maximum_representatives" value={form.maximum_representatives} onChange={handleChange} className="mt-2 w-full rounded-lg border border-slate-300 px-4 py-2.5 text-sm" /></div>
               </div>
 
               <div className="grid gap-4 md:grid-cols-2">
@@ -151,8 +172,10 @@ export default function JobFairFormPage() {
                 <div>
                   <label className="block text-sm font-bold text-slate-700">Status</label>
                   <select name="status" value={form.status} onChange={handleChange} className="mt-2 w-full rounded-lg border border-slate-300 px-4 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100">
-                    <option value="upcoming">Upcoming</option>
-                    <option value="active">Active</option>
+                    <option value="draft">Draft</option>
+                    <option value="published">Published</option>
+                    <option value="accepting_employers">Accepting Employers</option>
+                    <option value="closed">Closed</option>
                     <option value="completed">Completed</option>
                     <option value="cancelled">Cancelled</option>
                   </select>
@@ -168,13 +191,13 @@ export default function JobFairFormPage() {
         </Card>
 
         <Card>
-          <CardHeader title="Live Readiness" subtitle="Available after employers and seekers start joining." />
+          <CardHeader title="Reporting Readiness" subtitle="Participation and post-event reporting only." />
           <div className="grid grid-cols-2 gap-3">
             {[
-              ['Employers', metrics?.employers_joined ?? 0],
-              ['Vacancies', metrics?.vacancies ?? 0],
-              ['RSVPs', metrics?.seekers_rsvped ?? 0],
-              ['HOTS', metrics?.hots ?? 0],
+              ['Approved', metrics?.approved ?? 0],
+              ['Reports', (metrics?.self_service_reports ?? 0) + (metrics?.proxy_reports ?? 0)],
+              ['Applicants', metrics?.total_applicants ?? 0],
+              ['HOTS', metrics?.total_hots ?? 0],
             ].map(([label, value]) => (
               <div key={label} className="rounded-lg border border-slate-200 bg-slate-50 p-3">
                 <p className="text-xl font-black text-slate-950">{value}</p>

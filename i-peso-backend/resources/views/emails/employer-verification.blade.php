@@ -1,7 +1,7 @@
 @extends('emails.layouts.premium')
 
 @section('title', $title)
-@section('preheader', $message)
+@section('preheader', $bodyMessage)
 
 @section('content')
     @if($status === 'action_required')
@@ -13,7 +13,7 @@
     @endif
 
     <h1>{{ $title }}</h1>
-    <p>{{ $message }}</p>
+    <p>{{ $bodyMessage }}</p>
 
     @if($documentType && $documentLabel)
         <div class="panel {{ $status === 'action_required' ? 'panel-danger' : ($status === 'progress' ? 'panel-success' : 'panel-accent') }}">

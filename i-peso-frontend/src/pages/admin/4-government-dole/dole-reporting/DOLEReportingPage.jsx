@@ -242,6 +242,16 @@ export default function DOLEReportingPage() {
                         Female: {generatedReport['1_5_spes']?.female || 0}
                       </td>
                     </tr>
+                    <tr>
+                      <td className="border border-black p-2">1.6 Job Fairs Conducted</td>
+                      <td className="border border-black p-2 text-center font-bold">{generatedReport['1_6_job_fairs']?.fairs_conducted ?? 0}</td>
+                      <td className="border border-black p-2">
+                        Companies: {generatedReport['1_6_job_fairs']?.participating_companies ?? 0}<br />
+                        Vacancies solicited: {generatedReport['1_6_job_fairs']?.vacancies_solicited ?? 0}<br />
+                        Applicants: {generatedReport['1_6_job_fairs']?.applicants ?? 0}<br />
+                        HOTS: {generatedReport['1_6_job_fairs']?.hots ?? 0}
+                      </td>
+                    </tr>
                   </tbody>
                 </table>
 

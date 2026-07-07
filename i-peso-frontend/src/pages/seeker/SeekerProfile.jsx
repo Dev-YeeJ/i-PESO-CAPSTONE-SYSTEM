@@ -29,6 +29,7 @@ import CertificateUploadModal from './components/CertificateUploadModal'
 import ProfilePhotoUploadModal from './components/ProfilePhotoUploadModal'
 import {
   deleteCertificate,
+  generateAiProfessionalSummary,
   generateSmartResume,
   getCertificateFile,
   getProfileImage,
@@ -56,6 +57,7 @@ export default function SeekerProfile() {
   const [professionalSummary, setProfessionalSummary] = useState('')
   const [summaryDraft, setSummaryDraft] = useState('')
   const [summaryEditing, setSummaryEditing] = useState(false)
+  const [summaryGenerating, setSummaryGenerating] = useState(false)
   const [openExperienceEditors, setOpenExperienceEditors] = useState({})
   const [experienceDrafts, setExperienceDrafts] = useState({})
   const [experienceResponsibilities, setExperienceResponsibilities] = useState({})
@@ -222,17 +224,20 @@ export default function SeekerProfile() {
     openProfileEditor(sectionByKey[item.key] ?? 'identity')
   }
 
-  const generateProfessionalSummary = () => {
-    const skillText = allSkills.slice(0, 5).join(', ') || 'adaptable workplace skills'
-    const occupation = profile.occupations?.[0]?.title
-      ?? profile.occupations?.[0]?.general_term
-      ?? profile.occupations?.[0]?.preferred_occupation
-      ?? 'a suitable role'
-    const education = profile.educ_attainment || 'a strong learning background'
+  const generateProfessionalSummary = async () => {
+    setSummaryGenerating(true)
+    const toastId = toast.loading('Reviewing your verified profile...')
 
-    setSummaryDraft(`Motivated job seeker pursuing opportunities in ${occupation}, with a foundation in ${education}. Brings practical strengths in ${skillText}, with a readiness to contribute to organized and service-focused teams. Committed to continuous learning, reliable performance, and building long-term value for future employers.`)
-    setSummaryEditing(true)
-    toast.success('AI summary draft created. You can still edit it before saving.')
+    try {
+      const result = await generateAiProfessionalSummary(summaryDraft.trim() || professionalSummary.trim())
+      setSummaryDraft(result.summary)
+      setSummaryEditing(true)
+      toast.success('A new profile-aware summary is ready for review.', { id: toastId })
+    } catch (error) {
+      toast.error(error.response?.data?.message ?? 'Unable to generate your professional summary.', { id: toastId })
+    } finally {
+      setSummaryGenerating(false)
+    }
   }
 
   const saveProfessionalSummary = () => {
@@ -267,8 +272,13 @@ export default function SeekerProfile() {
       return
     }
 
+    if (!professionalSummary.trim()) {
+      toast.error('Add a professional summary before downloading your standard Philippine resume.')
+      return
+    }
+
     setGeneratingResume(true)
-    const toastId = toast.loading('Generating your smart resume PDF...')
+    const toastId = toast.loading('Generating your standard Philippine resume PDF...')
     try {
       const response = await generateSmartResume({
         professional_summary: professionalSummary.trim() || null,
@@ -281,7 +291,7 @@ export default function SeekerProfile() {
       link.click()
       URL.revokeObjectURL(url)
       setProfile((current) => current ? ({ ...current, has_resume: true }) : current)
-      toast.success('Smart resume generated and downloaded.', { id: toastId })
+      toast.success('Standard Philippine resume generated and downloaded.', { id: toastId })
     } catch (error) {
       toast.error(error.response?.data?.message ?? 'Unable to generate your resume.', { id: toastId })
     } finally {
@@ -331,7 +341,7 @@ export default function SeekerProfile() {
     <div className="-mx-4 -mt-8 bg-slate-50 pb-12 sm:-mx-6">
       <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
         <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-          <div className="relative h-44 bg-[radial-gradient(circle_at_top_left,_rgba(96,165,250,0.35),_transparent_32%),linear-gradient(135deg,_#0f172a,_#1d4ed8_58%,_#38bdf8)] sm:h-56">
+          <div className="relative h-36 bg-[radial-gradient(circle_at_top_left,_rgba(96,165,250,0.35),_transparent_32%),linear-gradient(135deg,_#0f172a,_#1d4ed8_58%,_#38bdf8)] sm:h-40">
             <div className="absolute inset-0 bg-[linear-gradient(120deg,_rgba(255,255,255,0.16)_0,_rgba(255,255,255,0)_45%)]" />
             <div className="absolute bottom-5 left-5 right-5 flex flex-wrap items-end justify-between gap-3 text-white">
               <div>
@@ -346,9 +356,9 @@ export default function SeekerProfile() {
           </div>
 
           <div className="px-5 pb-6 sm:px-7">
-            <div className="-mt-16 flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-              <div className="flex flex-col gap-5 sm:flex-row sm:items-end">
-                <div className="relative shrink-0">
+            <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+              <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
+                <div className="relative -mt-10 shrink-0 sm:-mt-12">
                   <div className="flex h-32 w-32 items-center justify-center overflow-hidden rounded-3xl border-4 border-white bg-blue-100 text-3xl font-black text-blue-800 shadow-xl">
                     {photoUrl
                       ? <img src={photoUrl} alt={fullName(profile)} className="h-full w-full object-cover" />
@@ -410,9 +420,11 @@ export default function SeekerProfile() {
                 <button
                   type="button"
                   onClick={generateProfessionalSummary}
+                  disabled={summaryGenerating}
                   className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-50 px-3 py-2 text-sm font-bold text-indigo-600 ring-1 ring-indigo-100 transition hover:bg-indigo-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 >
-                  <Sparkles className="h-4 w-4" /> Auto-Generate with AI
+                  {summaryGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                  {summaryGenerating ? 'Generating...' : professionalSummary || summaryDraft ? 'Regenerate with AI' : 'Generate with AI'}
                 </button>
               )}
             >
@@ -455,15 +467,8 @@ export default function SeekerProfile() {
                 </div>
               ) : (
                 <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6">
-                  <p className="text-sm font-bold text-slate-800">Stand out to employers! Profiles with summaries get 3x more views.</p>
-                  <p className="mt-1 text-sm leading-6 text-slate-500">Add a brief summary of your career goals, preferred occupation, and top skills.</p>
-                  <button
-                    type="button"
-                    onClick={generateProfessionalSummary}
-                    className="mt-4 inline-flex items-center gap-1.5 rounded-xl bg-indigo-50 px-3 py-2 text-sm font-bold text-indigo-600 ring-1 ring-indigo-100 transition hover:bg-indigo-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  >
-                    <Sparkles className="h-4 w-4" /> Auto-Generate with AI
-                  </button>
+                  <p className="text-sm font-bold text-slate-800">Create an employer-ready introduction from your verified profile.</p>
+                  <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-500">The generator can use your target occupation, work history, education, skills, training, eligibility, languages, and certificates. Review the draft before saving it to your resume.</p>
                 </div>
               )}
             </Card>
@@ -964,7 +969,7 @@ function ResumeStudioModal({
             <button
               type="button"
               onClick={onDownload}
-              disabled={generating}
+              disabled={generating || !String(professionalSummary || '').trim()}
               className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-blue-700 px-4 py-3 text-sm font-black text-white shadow-sm transition hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {generating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
