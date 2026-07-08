@@ -130,6 +130,67 @@ export interface SeekerApplicationsResponse {
   applications?: SeekerApplication[]
 }
 
+// Phase 3 Interfaces
+export interface SeekerNotification {
+  id: string
+  type: string
+  notifiable_type: string
+  notifiable_id: number | string
+  data: {
+    title: string
+    message: string
+    type?: string
+    action_url?: string
+    action_type?: string
+    reference_id?: number | string
+  }
+  read_at: string | null
+  created_at: string
+}
+
+export interface JobFair {
+  job_fair_id: number | string
+  title: string
+  description?: string | null
+  start_date: string
+  end_date: string
+  status: string
+  venue?: string | null
+  city_municipality?: string | null
+  province?: string | null
+  employers_count?: number
+  vacancies_count?: number
+  banner_image_path?: string | null
+  has_rsvped?: boolean
+}
+
+export interface GovernmentProgram {
+  program_id: number | string
+  title: string
+  description: string
+  program_type: string
+  status: string
+  requirements?: string | null
+  benefits?: string | null
+  capacity?: number | null
+  start_date?: string | null
+  end_date?: string | null
+  location?: string | null
+  contact_person?: string | null
+  contact_number?: string | null
+  contact_email?: string | null
+}
+
+export interface GovernmentProgramApplication {
+  application_id: number | string
+  program_id: number | string
+  seeker_id: number | string
+  status: string
+  remarks?: string | null
+  applied_at: string
+  program?: GovernmentProgram
+}
+
 export const seekerService = {
   async getProfile(): Promise<SeekerProfile> {
     const res = await apiClient.get('/seeker/profile')
@@ -160,5 +221,54 @@ export const seekerService = {
   async saveStep(step: number, payload: Record<string, unknown>) {
     const res = await apiClient.post(`/seeker/step-${step}`, payload)
     return res.data
+  },
+
+  async toggleSavedJob(postId: number | string): Promise<{ message: string, saved_jobs: number[] }> {
+    const res = await apiClient.post(`/seeker/saved-jobs/${postId}`)
+    return res.data
+  },
+
+  // Notifications
+  async getNotifications(): Promise<SeekerNotification[]> {
+    const res = await apiClient.get('/seeker/notifications')
+    return res.data?.data || res.data || []
+  },
+
+  async markNotificationsRead(): Promise<void> {
+    await apiClient.patch('/seeker/notifications/read-all')
+  },
+
+  async markNotificationRead(id: string): Promise<void> {
+    await apiClient.patch(`/seeker/notifications/${id}/read`)
+  },
+
+  // Job Fairs
+  async getJobFairs(): Promise<{ data: JobFair[] }> {
+    const res = await apiClient.get('/job-fairs')
+    return res.data
+  },
+
+  async getJobFair(id: string | number): Promise<JobFair> {
+    const res = await apiClient.get(`/job-fairs/${id}`)
+    return res.data?.data || res.data
+  },
+
+  async rsvpJobFair(id: string | number): Promise<void> {
+    await apiClient.post(`/job-fairs/${id}/rsvp`)
+  },
+
+  // Upskill Hub / Government Programs
+  async getUpskillHub(): Promise<{ programs: GovernmentProgram[] }> {
+    const res = await apiClient.get('/seeker/upskill-hub')
+    return res.data
+  },
+
+  async getGovernmentProgram(id: string | number): Promise<GovernmentProgram> {
+    const res = await apiClient.get(`/seeker/government-programs/${id}`)
+    return res.data?.data || res.data
+  },
+
+  async applyGovernmentProgram(id: string | number): Promise<void> {
+    await apiClient.post(`/seeker/government-programs/${id}/apply`)
   },
 }

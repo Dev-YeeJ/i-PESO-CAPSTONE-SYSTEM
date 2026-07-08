@@ -1,5 +1,4 @@
-import AsyncStorage from '@react-native-async-storage/async-storage'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import {
   ActivityIndicator,
   Alert,
@@ -11,6 +10,8 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useRouter } from 'expo-router'
 import type { NearbyJob } from '@/services/seekerService'
 import { seekerService } from '@/services/seekerService'
 import {
@@ -28,82 +29,77 @@ import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { colors, radii, spacing, typography } from '@/theme'
 
-const SAVED_JOBS_KEY = 'ipeso_mobile_saved_jobs'
 type Filter = 'all' | 'nearby' | 'saved'
 
 export default function JobsScreen() {
-  const [jobs, setJobs] = useState<NearbyJob[]>([])
-  const [savedIds, setSavedIds] = useState<string[]>([])
+  const queryClient = useQueryClient()
+  const router = useRouter()
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState<Filter>('all')
-  const [expandedId, setExpandedId] = useState<string | null>(null)
-  const [applyingIds, setApplyingIds] = useState<string[]>([])
-  const [loading, setLoading] = useState(true)
-  const [refreshing, setRefreshing] = useState(false)
-  const [message, setMessage] = useState('')
 
-  const loadSaved = useCallback(async () => {
-    const raw = await AsyncStorage.getItem(SAVED_JOBS_KEY)
-    const parsed = raw ? JSON.parse(raw) : []
-    setSavedIds(Array.isArray(parsed) ? parsed.map(String) : [])
-  }, [])
+  const { data: savedJobsData, isLoading: isLoadingSaved, refetch: refetchSaved } = useQuery({
+    queryKey: ['savedJobs'],
+    queryFn: async () => {
+      const profile = await seekerService.getProfile()
+      return profile.dashboard_stats?.saved_jobs?.map(String) || []
+    },
+  })
+  const savedIds = savedJobsData || []
 
-  const loadJobs = useCallback(async () => {
-    setMessage('')
-    try {
-      const data = await seekerService.getNearbyJobs({ radiusKm: 20, limit: 30 })
-      setJobs(data.jobs ?? [])
-    } catch (caught: unknown) {
-      const body = (caught as { response?: { data?: { message?: string } } }).response?.data
-      setJobs([])
-      setMessage(body?.message || 'Unable to load nearby jobs. Check the backend connection and your saved address.')
+  const {
+    data: jobsData,
+    isLoading: isLoadingJobs,
+    error: jobsError,
+    refetch: refetchJobs,
+    isRefetching,
+  } = useQuery({
+    queryKey: ['nearbyJobs'],
+    queryFn: () => seekerService.getNearbyJobs({ radiusKm: 20, limit: 30 }),
+    retry: false,
+  })
+  const jobs = jobsData?.jobs || []
+
+  const toggleSavedMutation = useMutation({
+    mutationFn: (jobId: string) => seekerService.toggleSavedJob(jobId),
+    onMutate: async (jobId) => {
+      await queryClient.cancelQueries({ queryKey: ['savedJobs'] })
+      const previous = queryClient.getQueryData<string[]>(['savedJobs']) || []
+      
+      const isSaved = previous.includes(jobId)
+      const next = isSaved ? previous.filter(id => id !== jobId) : [...previous, jobId]
+      queryClient.setQueryData(['savedJobs'], next)
+      
+      return { previous }
+    },
+    onError: (err, jobId, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(['savedJobs'], context.previous)
+      }
+      Alert.alert('Error', 'Failed to update saved job status. Please try again.')
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['savedJobs'] })
     }
-  }, [])
+  })
 
-  useEffect(() => {
-    Promise.all([loadJobs(), loadSaved()]).finally(() => setLoading(false))
-  }, [loadJobs, loadSaved])
+  const loading = isLoadingJobs || isLoadingSaved
+  const refreshing = isRefetching
+  
+  const errorMessage = jobsError 
+    ? ((jobsError as any).response?.data?.message || 'Unable to load nearby jobs. Check the backend connection and your saved address.') 
+    : ''
 
-  const onRefresh = useCallback(async () => {
-    setRefreshing(true)
-    await Promise.all([loadJobs(), loadSaved()])
-    setRefreshing(false)
-  }, [loadJobs, loadSaved])
+  const onRefresh = useCallback(() => {
+    refetchJobs()
+    refetchSaved()
+  }, [refetchJobs, refetchSaved])
 
-  const toggleSaved = async (jobId: string) => {
-    const next = savedIds.includes(jobId)
-      ? savedIds.filter((id) => id !== jobId)
-      : [...savedIds, jobId]
-
-    setSavedIds(next)
-    await AsyncStorage.setItem(SAVED_JOBS_KEY, JSON.stringify(next))
+  const toggleSaved = (jobId: string) => {
+    toggleSavedMutation.mutate(jobId)
   }
 
   const applyToJob = async (job: NearbyJob) => {
-    const jobId = String(job.post_id)
-    if (job.has_applied || applyingIds.includes(jobId)) return
-
-    setApplyingIds((current) => [...current, jobId])
-    try {
-      const data = await seekerService.applyToJob(job.post_id)
-      setJobs((current) => current.map((item) => (
-        String(item.post_id) === jobId
-          ? {
-              ...item,
-              has_applied: true,
-              application_id: data.application?.apply_id ?? item.application_id,
-              application_status: data.application?.status ?? 'pending',
-            }
-          : item
-      )))
-      Alert.alert('Application submitted', 'Your application is now visible to the employer and PESO admin.')
-    } catch (caught: unknown) {
-      const body = (caught as { response?: { data?: { message?: string; errors?: Record<string, string[]> } } }).response?.data
-      const firstError = body?.errors ? Object.values(body.errors)[0]?.[0] : ''
-      Alert.alert('Application failed', firstError || body?.message || 'Unable to submit your application. Check your backend connection.')
-    } finally {
-      setApplyingIds((current) => current.filter((id) => id !== jobId))
-    }
+    // Moved to [id].tsx, keeping dummy to prevent reference errors if needed
   }
 
   const filteredJobs = useMemo(() => {
@@ -161,9 +157,9 @@ export default function JobsScreen() {
           </Card>
         ) : null}
 
-        {message ? (
+        {errorMessage ? (
           <AlertBox variant="warning" style={styles.alertBox}>
-            {message}
+            {errorMessage}
           </AlertBox>
         ) : null}
 
@@ -180,18 +176,14 @@ export default function JobsScreen() {
 
         {filteredJobs.map((job) => {
           const jobId = String(job.post_id)
-          const expanded = expandedId === jobId
           const saved = savedIds.includes(jobId)
-          const applied = Boolean(job.has_applied)
-          const applying = applyingIds.includes(jobId)
           const requiredSkills = listFrom(job.required_skills).slice(0, 5)
-          const softSkills = listFrom(job.soft_skills).slice(0, 4)
 
           return (
             <Card key={jobId} style={styles.jobCardTouch} padding="md">
               <TouchableOpacity
                 activeOpacity={0.9}
-                onPress={() => setExpandedId(expanded ? null : jobId)}
+                onPress={() => router.push(`/jobs/${jobId}`)}
               >
                 <View style={styles.jobHeader}>
                   <View style={styles.jobTitleWrap}>
@@ -215,65 +207,6 @@ export default function JobsScreen() {
                     <Text key={skill} style={styles.tag}>{skill}</Text>
                   ))}
                 </View>
-
-                {expanded ? (
-                  <View style={styles.details}>
-                    <Detail label="Deadline" value={formatDate(job.application_deadline)} />
-                    <Detail label="Vacancies" value={textFrom(job.vacancies_count, 'Not listed')} />
-                    <Detail label="Education" value={titleCase(job.minimum_education, 'Not listed')} />
-                    <Detail label="Experience" value={titleCase(job.experience_level, 'Not listed')} />
-
-                    <Text style={styles.detailLabel}>Description</Text>
-                    <Text style={styles.description}>{textFrom(job.job_description, 'No description provided.')}</Text>
-
-                    {requiredSkills.length ? (
-                      <>
-                        <Text style={styles.detailLabel}>Required Skills</Text>
-                        <View style={styles.tagRow}>
-                          {requiredSkills.map((skill) => <Text key={skill} style={styles.tag}>{skill}</Text>)}
-                        </View>
-                      </>
-                    ) : null}
-
-                    {softSkills.length ? (
-                      <>
-                        <Text style={styles.detailLabel}>Soft Skills</Text>
-                        <View style={styles.tagRow}>
-                          {softSkills.map((skill) => <Text key={skill} style={styles.tagMuted}>{skill}</Text>)}
-                        </View>
-                      </>
-                    ) : null}
-
-                    <View style={styles.actions}>
-                      <Button
-                        variant="outline"
-                        fullWidth
-                        onPress={() => toggleSaved(jobId)}
-                        style={styles.saveBtn}
-                      >
-                        {saved ? 'Remove saved' : 'Save job'}
-                      </Button>
-                      <Button
-                        variant={applied ? 'secondary' : 'success'}
-                        fullWidth
-                        onPress={() => applyToJob(job)}
-                        disabled={applied || applying}
-                        style={styles.applyBtn}
-                      >
-                        {applied ? `Applied: ${titleCase(job.application_status, 'Pending')}` : applying ? 'Submitting...' : 'Apply now'}
-                      </Button>
-                      {applied ? (
-                        <View style={styles.infoBox}>
-                          <Text style={styles.infoText}>
-                            Track employer updates in My Applications.
-                          </Text>
-                        </View>
-                      ) : null}
-                    </View>
-                  </View>
-                ) : (
-                  <Text style={styles.tapHint}>Tap for details</Text>
-                )}
               </TouchableOpacity>
             </Card>
           )

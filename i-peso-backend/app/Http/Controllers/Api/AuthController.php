@@ -13,6 +13,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -51,11 +52,33 @@ class AuthController extends Controller
      * Generate a 6-digit OTP, cache it under a verify-specific key,
      * and send it via the OtpMail mailable.
      */
-    private function generateAndSendOtp(string $email): void
+    private function generateAndSendOtp(string $email): string
     {
         $otp = str_pad(random_int(0, 999999), 6, '0', STR_PAD_LEFT);
         Cache::put("ipeso_otp_{$email}", Hash::make($otp), now()->addMinutes(10));
         Mail::to($email)->send(new OtpMail($otp));
+
+        if ($this->shouldExposeLocalOtp()) {
+            Log::info('Local development OTP generated.', [
+                'email' => $email,
+                'otp' => $otp,
+                'expires_in_minutes' => 10,
+            ]);
+        }
+
+        return $otp;
+    }
+
+    private function shouldExposeLocalOtp(): bool
+    {
+        return app()->environment('local') && (bool) config('app.debug');
+    }
+
+    private function localOtpPayload(string $otp): array
+    {
+        return $this->shouldExposeLocalOtp()
+            ? ['dev_otp' => $otp]
+            : [];
     }
 
     private function normalizeMobileNumber(mixed $value): string
@@ -182,12 +205,12 @@ class AuthController extends Controller
             }
         });
 
-        $this->generateAndSendOtp($validated['email']);
+        $otp = $this->generateAndSendOtp($validated['email']);
 
-        return response()->json([
+        return response()->json(array_merge([
             'message' => 'Registration successful. Please check your email for your verification code.',
             'email'   => $validated['email'],
-        ], 201);
+        ], $this->localOtpPayload($otp)), 201);
     }
 
     /**
@@ -276,13 +299,13 @@ class AuthController extends Controller
         }
 
         if (! $user->email_verified_at) {
-            $this->generateAndSendOtp($email);
+            $otp = $this->generateAndSendOtp($email);
 
-            return response()->json([
+            return response()->json(array_merge([
                 'message'          => 'Your email is not verified. A new code has been sent to your inbox.',
                 'email_unverified' => true,
                 'email'            => $email,
-            ], 403);
+            ], $this->localOtpPayload($otp)), 403);
         }
 
         // Revoke previous tokens — one active session per user
@@ -328,12 +351,12 @@ class AuthController extends Controller
             ], 429);
         }
 
-        $this->generateAndSendOtp($email);
+        $otp = $this->generateAndSendOtp($email);
         Cache::forget("ipeso_otp_attempts_{$email}");
 
-        return response()->json([
+        return response()->json(array_merge([
             'message' => 'A new 6-digit verification code has been sent to your email.',
-        ], 200);
+        ], $this->localOtpPayload($otp)), 200);
     }
 
     /**

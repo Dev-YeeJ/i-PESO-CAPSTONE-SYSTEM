@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import AsyncStorage from '@react-native-async-storage/async-storage'
+import * as SecureStore from 'expo-secure-store'
 
 const TOKEN_KEY = 'ipeso_token'
 
@@ -35,7 +35,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   isInitialized: false,
 
   setAuth: async (user, token) => {
-    await AsyncStorage.setItem(TOKEN_KEY, token)
+    await SecureStore.setItemAsync(TOKEN_KEY, token)
     set({ user, token, isAuthenticated: true, isInitialized: true })
   },
 
@@ -48,7 +48,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   initializeAuth: async () => {
     if (get().isInitialized) return
     try {
-      const token = await AsyncStorage.getItem(TOKEN_KEY)
+      const token = await SecureStore.getItemAsync(TOKEN_KEY)
       if (token) {
         set({ token })
         const { authService } = await import('@/services/authService')
@@ -72,7 +72,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   clearAuth: async () => {
-    await AsyncStorage.removeItem(TOKEN_KEY)
+    await SecureStore.deleteItemAsync(TOKEN_KEY)
     set({ user: null, token: null, isAuthenticated: false })
   },
 }))

@@ -1,9 +1,9 @@
 import axios from 'axios'
-import AsyncStorage from '@react-native-async-storage/async-storage'
+import * as SecureStore from 'expo-secure-store'
 import Constants from 'expo-constants'
 
 const DEFAULT_API_PORT = 8000
-const DEFAULT_FALLBACK_HOST = '192.168.137.1' // ← your LAN IP as fallback
+const DEFAULT_FALLBACK_HOST = '192.168.0.190' // ← your LAN IP as fallback
 const DEFAULT_ANDROID_EMULATOR_HOST = '10.0.2.2'
 
 function apiUrlForHost(host: string) {
@@ -26,13 +26,13 @@ function extractHost(value: string) {
 
 function computeBaseUrl() {
   const configuredApiUrl =
-    process.env.EXPO_PUBLIC_API_URL ||
     Constants.expoConfig?.extra?.EXPO_PUBLIC_API_URL ||
     Constants.expoConfig?.extra?.apiBaseUrl ||
     (Constants as any).manifest2?.extra?.EXPO_PUBLIC_API_URL ||
     (Constants as any).manifest2?.extra?.apiBaseUrl ||
     (Constants as any).manifest?.extra?.EXPO_PUBLIC_API_URL ||
-    (Constants as any).manifest?.extra?.apiBaseUrl
+    (Constants as any).manifest?.extra?.apiBaseUrl ||
+    process.env.EXPO_PUBLIC_API_URL
 
   if (configuredApiUrl) {
     return String(configuredApiUrl).replace(/\/$/, '')
@@ -77,7 +77,7 @@ const apiClient = axios.create({
 
 apiClient.interceptors.request.use(
   async (config) => {
-    const token = await AsyncStorage.getItem('ipeso_token')
+    const token = await SecureStore.getItemAsync('ipeso_token')
     if (token) {
       config.headers['Authorization'] = `Bearer ${token}`
     }
@@ -90,7 +90,7 @@ apiClient.interceptors.response.use(
   (response) => response,
   async (error) => {
     if (error.response?.status === 401) {
-      await AsyncStorage.removeItem('ipeso_token')
+      await SecureStore.deleteItemAsync('ipeso_token')
       const { useAuthStore } = await import('@/stores/authStore')
       useAuthStore.getState().clearAuth()
     }

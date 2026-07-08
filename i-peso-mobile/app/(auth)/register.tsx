@@ -178,7 +178,9 @@ export default function RegisterScreen() {
       const data = await authService.register(payload)
       router.push({
         pathname: '/(auth)/verify-email',
-        params: { email: data.email ?? payload.email },
+        params: {
+          email: data.email ?? payload.email,
+        },
       })
     } catch (error: unknown) {
       const err = error as AxiosError<ApiErrorBody>
