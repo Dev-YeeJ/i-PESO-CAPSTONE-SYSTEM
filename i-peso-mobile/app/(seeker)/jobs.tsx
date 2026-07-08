@@ -64,11 +64,11 @@ export default function JobsScreen() {
     onMutate: async (jobId) => {
       await queryClient.cancelQueries({ queryKey: ['savedJobs'] })
       const previous = queryClient.getQueryData<string[]>(['savedJobs']) || []
-      
+
       const isSaved = previous.includes(jobId)
       const next = isSaved ? previous.filter(id => id !== jobId) : [...previous, jobId]
       queryClient.setQueryData(['savedJobs'], next)
-      
+
       return { previous }
     },
     onError: (err, jobId, context) => {
@@ -84,9 +84,9 @@ export default function JobsScreen() {
 
   const loading = isLoadingJobs || isLoadingSaved
   const refreshing = isRefetching
-  
-  const errorMessage = jobsError 
-    ? ((jobsError as any).response?.data?.message || 'Unable to load nearby jobs. Check the backend connection and your saved address.') 
+
+  const errorMessage = jobsError
+    ? ((jobsError as any).response?.data?.message || 'Unable to load nearby jobs. Check the backend connection and your saved address.')
     : ''
 
   const onRefresh = useCallback(() => {
