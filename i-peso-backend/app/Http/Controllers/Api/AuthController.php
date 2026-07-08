@@ -413,7 +413,7 @@ class AuthController extends Controller
         $role = match (true) {
             $user instanceof JobSeeker     => 'seeker',
             $user instanceof Employer      => 'employer',
-            $user instanceof Administrator => 'admin',
+            $user instanceof Administrator => 'administrator',
             default                        => 'unknown',
         };
 
