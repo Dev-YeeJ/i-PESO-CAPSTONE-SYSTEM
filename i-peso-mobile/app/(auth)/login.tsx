@@ -62,7 +62,9 @@ export default function LoginScreen() {
       if (status === 403 && err.response?.data?.email_unverified) {
         router.push({
           pathname: '/(auth)/verify-email',
-          params: { email: err.response.data.email },
+          params: {
+            email: err.response.data.email,
+          },
         })
         return
       }

@@ -11,10 +11,14 @@ interface AuthState {
   setAuth: (user: any, token: string) => Promise<void>
 }
 
+interface VerifyEmailParams {
+  email?: string
+}
+
 const RESEND_COOLDOWN = 60
 
 export default function VerifyEmailScreen() {
-  const { email } = useLocalSearchParams<{ email: string }>()
+  const { email } = useLocalSearchParams<VerifyEmailParams>()
   const setAuth   = useAuthStore((s: AuthState) => s.setAuth)
 
   const [digits, setDigits]           = useState(Array(6).fill(''))
@@ -225,4 +229,7 @@ const s = StyleSheet.create({
   resendCount    : { fontWeight: '700', color: '#475569', fontSize: 13 },
   backBtn        : { marginTop: 4 },
   backText       : { color: '#94a3b8', fontSize: 12, fontWeight: '500' },
+  localOtpBox    : { marginTop: 18, padding: 12, width: '100%', borderRadius: 14, backgroundColor: '#e0f2fe', borderWidth: 1, borderColor: '#bae6fd' },
+  localOtpLabel  : { color: '#0c4a6e', fontSize: 12, marginBottom: 4 },
+  localOtpCode   : { color: '#0f172a', fontSize: 20, fontWeight: '700' },
 })
