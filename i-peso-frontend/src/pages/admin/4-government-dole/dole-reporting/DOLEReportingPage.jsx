@@ -17,6 +17,12 @@ export default function DOLEReportingPage() {
   const [isGenerating, setIsGenerating] = useState(false)
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1)
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
+  const [signatories, setSignatories] = useState({
+    prepared_by: { name: '', position: '' },
+    checked_by: { name: '', position: '' },
+    approved_by: { name: '', position: '' },
+  })
+  const [exportingId, setExportingId] = useState(null)
 
   // Print view state
   const [generatedReport, setGeneratedReport] = useState(null)
@@ -40,7 +46,7 @@ export default function DOLEReportingPage() {
     e.preventDefault()
     setIsGenerating(true)
     try {
-      const res = await adminService.generateSPRS(selectedMonth, selectedYear)
+      const res = await adminService.generateSPRS(selectedMonth, selectedYear, { signatories })
       toast.success(res.message)
       setGeneratedReport(res.data)
       setShowGenerateModal(false)
@@ -52,6 +58,26 @@ export default function DOLEReportingPage() {
       setIsGenerating(false)
     }
   }
+
+  const handleExportPdf = async (row) => {
+    setExportingId(row.id)
+    try {
+      const blob = await adminService.exportSprsPdf(row.id)
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `sprs-${row.id}.pdf`
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch (err) {
+      toast.error('Failed to export SPRS PDF')
+      console.error(err)
+    } finally {
+      setExportingId(null)
+    }
+  }
+
+  const setSigner = (role, field, value) => setSignatories((s) => ({ ...s, [role]: { ...s[role], [field]: value } }))
 
   const columns = [
     { key: 'month', label: 'Report Period', render: (val, row) => new Date(row.coverage_start || row.report_date).toLocaleDateString(undefined, { month: 'long', year: 'numeric' }) },
@@ -73,12 +99,22 @@ export default function DOLEReportingPage() {
       key: 'actions',
       label: 'Actions',
       render: (val, row) => (
-        <button 
-          onClick={() => setGeneratedReport(row.data_summary)}
-          className="text-brand-600 hover:text-brand-900 text-sm font-bold"
-        >
-          View Details
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setGeneratedReport(row.data_summary)}
+            className="text-brand-600 hover:text-brand-900 text-sm font-bold"
+          >
+            View Details
+          </button>
+          <button
+            onClick={() => handleExportPdf(row)}
+            disabled={exportingId === row.id}
+            className="inline-flex items-center gap-1 text-slate-600 hover:text-slate-900 text-sm font-bold disabled:opacity-50"
+          >
+            {exportingId === row.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Printer className="h-4 w-4" />}
+            PDF
+          </button>
+        </div>
       ),
     },
   ]
@@ -156,6 +192,25 @@ export default function DOLEReportingPage() {
                     max="2100"
                   />
                 </div>
+              </div>
+              <div className="mb-5 space-y-3">
+                <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Signatories (optional)</p>
+                {[['prepared_by', 'Prepared by'], ['checked_by', 'Checked by'], ['approved_by', 'Approved by']].map(([role, label]) => (
+                  <div key={role} className="grid grid-cols-2 gap-2">
+                    <input
+                      className="rounded-lg border border-slate-300 p-2 text-sm"
+                      placeholder={`${label} — name`}
+                      value={signatories[role].name}
+                      onChange={(e) => setSigner(role, 'name', e.target.value)}
+                    />
+                    <input
+                      className="rounded-lg border border-slate-300 p-2 text-sm"
+                      placeholder="Position"
+                      value={signatories[role].position}
+                      onChange={(e) => setSigner(role, 'position', e.target.value)}
+                    />
+                  </div>
+                ))}
               </div>
               <Button type="submit" disabled={isGenerating} className="w-full">
                 {isGenerating ? <Loader2 className="h-5 w-5 animate-spin" /> : 'Generate & Extract Data'}

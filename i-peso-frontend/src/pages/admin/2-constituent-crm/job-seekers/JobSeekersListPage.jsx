@@ -1,4 +1,4 @@
-import { createElement, useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { useQuery } from '@tanstack/react-query'
 import {
@@ -26,6 +26,7 @@ import { useNavigate } from 'react-router-dom'
 import { Badge, Button, Card } from '@/components/ui'
 import DataTable from '@/pages/admin/_components/DataTable'
 import PageHeader from '@/pages/admin/_components/PageHeader'
+import StatCard from '@/pages/admin/_components/StatCard'
 import { adminService } from '@/services/adminService'
 
 const PER_PAGE = 15
@@ -216,17 +217,17 @@ export default function JobSeekersListPage() {
       />
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <SummaryCard icon={UsersRound} label="Registered seekers" value={summary.total} detail="Total accounts in directory" tone="navy" />
-        <SummaryCard icon={UserRoundCheck} label="Complete profiles" value={summary.complete} detail={`${completionRate}% completion rate`} tone="green" />
-        <SummaryCard icon={Clock3} label="Needs completion" value={summary.incomplete} detail="Profiles requiring follow-up" tone="amber" />
-        <SummaryCard icon={Sparkles} label="New this month" value={summary.newThisMonth} detail="Recently registered" tone="blue" />
+        <StatCard icon={UsersRound} color="blue" label="Registered seekers" value={num(summary.total)} subtitle="Total accounts in directory" hint="All job-seeker accounts in the directory." />
+        <StatCard icon={UserRoundCheck} color="green" label="Complete profiles" value={num(summary.complete)} subtitle={`${completionRate}% completion rate`} hint="Profiles that meet NSRP completeness requirements." />
+        <StatCard icon={Clock3} color="amber" label="Needs completion" value={num(summary.incomplete)} subtitle="Profiles requiring follow-up" hint="Profiles still missing required NSRP fields." />
+        <StatCard icon={Sparkles} color="slate" label="New this month" value={num(summary.newThisMonth)} subtitle="Recently registered" hint="Seekers registered in the current calendar month." />
       </div>
 
       <div className="mt-4 grid gap-4 lg:grid-cols-2 xl:grid-cols-4">
-        <SummaryCard icon={BriefcaseBusiness} label="With applications" value={summary.withApplications} detail="Linked to a vacancy" tone="navy" />
-        <SummaryCard icon={CheckCircle2} label="Hired seekers" value={summary.hired} detail="Successful placements" tone="green" />
-        <SummaryCard icon={Compass} label="Missing GPS" value={summary.missingGps} detail="Incomplete location data" tone="amber" />
-        <SummaryCard icon={Layers3} label="Current results" value={pagination.total} detail="Matching active filters" tone="blue" />
+        <StatCard icon={BriefcaseBusiness} color="blue" label="With applications" value={num(summary.withApplications)} subtitle="Linked to a vacancy" hint="Seekers linked to at least one vacancy application." />
+        <StatCard icon={CheckCircle2} color="green" label="Hired seekers" value={num(summary.hired)} subtitle="Successful placements" hint="Seekers with a recorded hire." />
+        <StatCard icon={Compass} color="amber" label="Missing GPS" value={num(summary.missingGps)} subtitle="Incomplete location data" hint="Profiles without captured location coordinates — a data-quality gap." />
+        <StatCard icon={Layers3} color="slate" label="Current results" value={num(pagination.total)} subtitle="Matching active filters" hint="Seekers matching the currently applied filters." />
       </div>
 
       <Card padding="sm" className="mt-6">
@@ -380,7 +381,9 @@ export default function JobSeekersListPage() {
           data={seekers}
           loading={loading}
           onRowClick={(row) => navigate(`/admin/job-seekers/${row.seeker_id}`)}
-          emptyMessage={filtersActive ? 'No job seekers match the selected filters.' : 'No job seekers are registered yet.'}
+          emptyTitle={filtersActive ? 'No job seekers match your filters' : 'No job seekers registered yet'}
+          emptyDescription={filtersActive ? 'Try clearing or broadening the filters above.' : 'Registered job seekers will appear here.'}
+          caption="Job seekers directory. Each row opens the seeker's profile."
           virtualize
         />
       </div>
@@ -401,29 +404,7 @@ export default function JobSeekersListPage() {
   )
 }
 
-function SummaryCard({ icon, label, value, detail, tone }) {
-  const tones = {
-    navy: 'bg-slate-100 text-brand-navy',
-    green: 'bg-emerald-50 text-emerald-700',
-    amber: 'bg-amber-50 text-amber-700',
-    blue: 'bg-blue-50 text-blue-700',
-  }
-
-  return (
-    <Card padding="sm">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <p className="text-xs font-extrabold uppercase tracking-wide text-slate-500">{label}</p>
-          <p className="mt-2 text-3xl font-black text-slate-950">{Number(value ?? 0).toLocaleString()}</p>
-          <p className="mt-1 text-xs text-slate-500">{detail}</p>
-        </div>
-        <span className={`rounded-xl p-2.5 ${tones[tone]}`}>
-          {createElement(icon, { className: 'h-5 w-5' })}
-        </span>
-      </div>
-    </Card>
-  )
-}
+function num(value) { return Number(value ?? 0).toLocaleString() }
 
 function buildParams(filters) {
   const params = {

@@ -1,6 +1,7 @@
-import { BriefcaseBusiness, CalendarClock, CheckCircle2, MapPin, XCircle } from 'lucide-react'
+import { BriefcaseBusiness, CalendarClock, CheckCircle2, Compass, MapPin } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Button, EmptyState, LoadingSkeleton } from '@/components/ui'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { getSeekerApplicationDetail, getSeekerApplications, withdrawSeekerApplication } from '@/services/seekerService'
 
 const statusTone = {
@@ -13,6 +14,18 @@ const statusTone = {
   withdrawn: 'border-slate-300 bg-slate-100 text-slate-700',
 }
 
+// Plain-language "what happens now" for each status — the brief asks that seekers
+// always know what a status means and what to do next.
+const nextSteps = {
+  pending: 'The employer hasn’t opened your application yet. No action needed — check back in a few days.',
+  reviewed: 'The employer has viewed your application. If you’re shortlisted, you’ll be invited to an interview.',
+  shortlisted: 'You’re on the shortlist. Watch for an interview invitation and keep your phone reachable.',
+  interview: 'An interview is scheduled. Bring your resume, certificates, and a valid ID, and arrive early.',
+  hired: 'Congratulations — you’ve been hired! The employer will coordinate your start date with you.',
+  rejected: 'This application wasn’t successful this time. Keep going — new vacancies are posted often.',
+  withdrawn: 'You withdrew this application. You can apply to other vacancies anytime.',
+}
+
 export default function MyApplications() {
   const [applications, setApplications] = useState([])
   const [loading, setLoading] = useState(true)
@@ -20,6 +33,7 @@ export default function MyApplications() {
   const [activeApplication, setActiveApplication] = useState(null)
   const [detailLoading, setDetailLoading] = useState(false)
   const [withdrawingId, setWithdrawingId] = useState(null)
+  const [pendingWithdraw, setPendingWithdraw] = useState(null)
 
   const loadApplications = async () => {
     setError('')
@@ -56,9 +70,7 @@ export default function MyApplications() {
   }
 
   const handleWithdraw = async (application) => {
-    const confirmed = window.confirm('Withdraw this application? This will stop future employer updates for this application.')
-    if (!confirmed) return
-
+    if (!application) return
     setWithdrawingId(application.apply_id)
     try {
       const data = await withdrawSeekerApplication(application.apply_id)
@@ -68,7 +80,15 @@ export default function MyApplications() {
       setError(requestError.response?.data?.message || 'Unable to withdraw this application.')
     } finally {
       setWithdrawingId(null)
+      setPendingWithdraw(null)
     }
+  }
+
+  // Open the withdraw confirmation, closing the detail dialog first so we never
+  // stack two dialogs on top of each other.
+  const askWithdraw = (application) => {
+    setActiveApplication(null)
+    setPendingWithdraw(application)
   }
 
   return (
@@ -79,17 +99,22 @@ export default function MyApplications() {
         <p className="mt-2 text-sm text-slate-600">Track every application submitted through the dashboard, AI Job Map, and job fairs.</p>
       </header>
 
-      {error && <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-700">{error}</div>}
+      {error && (
+        <div className="flex items-center justify-between gap-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-700">
+          <span>{error}</span>
+          <button type="button" onClick={loadApplications} className="font-extrabold hover:underline">Try again</button>
+        </div>
+      )}
 
       {loading ? (
-        <div className="py-16 text-center text-sm font-semibold text-slate-500">Loading applications…</div>
+        <LoadingSkeleton variant="card" rows={4} />
       ) : applications.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-slate-300 bg-white py-16 text-center">
-          <BriefcaseBusiness className="mx-auto h-10 w-10 text-slate-300" />
-          <h2 className="mt-3 font-black text-slate-800">No applications yet</h2>
-          <p className="mt-1 text-sm text-slate-500">Explore nearby vacancies and submit your first application.</p>
-          <Link to="/seeker/job-map" className="mt-4 inline-flex rounded-xl bg-blue-950 px-4 py-2.5 text-sm font-bold text-white">Open AI Job Map</Link>
-        </div>
+        <EmptyState
+          icon={BriefcaseBusiness}
+          title="No applications yet"
+          description="Explore nearby vacancies and submit your first application."
+          action={{ label: 'Open AI Job Map', icon: Compass, to: '/seeker/job-map' }}
+        />
       ) : (
         <div className="grid gap-4 lg:grid-cols-2">
           {applications.map((application) => (
@@ -108,24 +133,30 @@ export default function MyApplications() {
                 <span className="flex items-center gap-2"><CalendarClock className="h-3.5 w-3.5 text-slate-400" />Applied {application.applied_at ? new Date(application.applied_at).toLocaleDateString('en-PH', { dateStyle: 'medium' }) : 'recently'}</span>
               </div>
 
+              {nextSteps[application.status] && (
+                <p className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs leading-5 text-slate-600">
+                  <span className="font-bold text-slate-700">What’s next: </span>{nextSteps[application.status]}
+                </p>
+              )}
+
               {application.interview && (
-                <div className="mt-4 rounded-xl bg-indigo-50 p-3 text-xs font-semibold text-indigo-800">
+                <div className="mt-3 rounded-xl bg-indigo-50 p-3 text-xs font-semibold text-indigo-800">
                   Interview: {new Date(application.interview.schedule).toLocaleString('en-PH', { dateStyle: 'medium', timeStyle: 'short' })} · {application.interview.mode_of_interview}
                 </div>
               )}
 
               {application.employer_remarks && (
-                <p className="mt-4 rounded-xl bg-slate-50 p-3 text-xs leading-5 text-slate-600">Employer note: {application.employer_remarks}</p>
+                <p className="mt-3 rounded-xl bg-slate-50 p-3 text-xs leading-5 text-slate-600">Employer note: {application.employer_remarks}</p>
               )}
 
               <div className="mt-5 flex flex-wrap gap-2">
-                <button type="button" onClick={() => openDetails(application)} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700 hover:border-blue-900 hover:text-blue-900">
+                <Button variant="outline" size="sm" onClick={() => openDetails(application)}>
                   {detailLoading && activeApplication?.apply_id === application.apply_id ? 'Loading…' : 'View details'}
-                </button>
+                </Button>
                 {application.can_withdraw && (
-                  <button type="button" onClick={() => handleWithdraw(application)} disabled={withdrawingId === application.apply_id} className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm font-bold text-red-700 hover:bg-red-100 disabled:opacity-70">
-                    {withdrawingId === application.apply_id ? 'Withdrawing…' : 'Withdraw'}
-                  </button>
+                  <Button variant="ghost" size="sm" className="text-red-600 hover:bg-red-50 hover:text-red-700" onClick={() => askWithdraw(application)}>
+                    Withdraw
+                  </Button>
                 )}
               </div>
             </article>
@@ -133,26 +164,28 @@ export default function MyApplications() {
         </div>
       )}
 
-      {activeApplication && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center bg-slate-950/60 px-4 py-6">
-          <div className="w-full max-w-2xl rounded-2xl border border-slate-200 bg-white shadow-2xl">
-            <div className="flex items-start justify-between border-b border-slate-200 px-5 py-4">
-              <div>
-                <p className="text-xs font-black uppercase tracking-[0.18em] text-blue-800">Application details</p>
-                <h2 className="mt-1 text-xl font-black text-slate-950">{activeApplication.job?.job_title || 'Application'}</h2>
-                <p className="mt-1 text-sm text-slate-500">{activeApplication.job?.employer?.company_name || 'Employer'}</p>
-              </div>
-              <button type="button" onClick={() => setActiveApplication(null)} className="rounded-xl border border-slate-200 p-2 text-slate-500 hover:bg-slate-50">
-                <XCircle className="h-5 w-5" />
-              </button>
-            </div>
+      {/* Application detail */}
+      <Dialog open={!!activeApplication} onOpenChange={(open) => !open && setActiveApplication(null)}>
+        <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{activeApplication?.job?.job_title || 'Application'}</DialogTitle>
+            <DialogDescription>{activeApplication?.job?.employer?.company_name || 'Employer'}</DialogDescription>
+          </DialogHeader>
 
-            <div className="max-h-[80vh] space-y-5 overflow-y-auto px-5 py-5">
+          {activeApplication && (
+            <div className="space-y-5">
               <div className="flex flex-wrap items-center gap-3">
                 <span className={`rounded-full border px-2.5 py-1 text-[10px] font-black uppercase ${statusTone[activeApplication.status] || statusTone.pending}`}>{activeApplication.status_label || activeApplication.status}</span>
                 <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-black uppercase text-slate-600">{Math.round(activeApplication.match_percentage || 0)}% match</span>
                 {!activeApplication.can_withdraw && <span className="rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-black uppercase text-amber-700">Final state locked</span>}
               </div>
+
+              {nextSteps[activeApplication.status] && (
+                <div className="rounded-2xl border border-blue-100 bg-blue-50/70 p-4">
+                  <p className="text-xs font-black uppercase tracking-wide text-blue-800">What happens next</p>
+                  <p className="mt-1 text-sm leading-6 text-slate-700">{nextSteps[activeApplication.status]}</p>
+                </div>
+              )}
 
               <div className="grid gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700 sm:grid-cols-2">
                 <div><p className="text-xs font-black uppercase tracking-wide text-slate-400">Location</p><p className="mt-1 font-semibold">{activeApplication.job?.location || 'Location not specified'}</p></div>
@@ -180,7 +213,7 @@ export default function MyApplications() {
                 <div className="mt-3 space-y-3">
                   {(activeApplication.timeline || []).map((item, index) => (
                     <div key={`${item.title}-${index}`} className="flex gap-3 rounded-2xl border border-slate-200 bg-white p-3">
-                      <div className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full bg-blue-900" />
+                      <div className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full bg-brand-navy" />
                       <div>
                         <p className="text-sm font-black text-slate-900">{item.title}</p>
                         <p className="mt-1 text-sm text-slate-600">{item.description}</p>
@@ -188,6 +221,9 @@ export default function MyApplications() {
                       </div>
                     </div>
                   ))}
+                  {!(activeApplication.timeline || []).length && (
+                    <p className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-3 text-sm text-slate-500">No timeline events recorded yet.</p>
+                  )}
                 </div>
               </div>
 
@@ -198,18 +234,34 @@ export default function MyApplications() {
                 </div>
               )}
             </div>
+          )}
 
-            <div className="flex items-center justify-end gap-3 border-t border-slate-200 bg-slate-50 px-5 py-4">
-              <button type="button" onClick={() => setActiveApplication(null)} className="rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 hover:border-slate-500">Close</button>
-              {activeApplication.can_withdraw && (
-                <button type="button" onClick={() => handleWithdraw(activeApplication)} disabled={withdrawingId === activeApplication.apply_id} className="rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-sm font-bold text-red-700 hover:bg-red-100 disabled:opacity-70">
-                  {withdrawingId === activeApplication.apply_id ? 'Withdrawing…' : 'Withdraw application'}
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setActiveApplication(null)}>Close</Button>
+            {activeApplication?.can_withdraw && (
+              <Button variant="danger" onClick={() => askWithdraw(activeApplication)}>Withdraw application</Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Withdraw confirmation */}
+      <Dialog open={!!pendingWithdraw} onOpenChange={(open) => !open && setPendingWithdraw(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Withdraw this application?</DialogTitle>
+            <DialogDescription>
+              You’ll stop receiving employer updates for &ldquo;{pendingWithdraw?.job?.job_title || 'this vacancy'}&rdquo;. This can’t be undone, but you can apply to other vacancies anytime.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setPendingWithdraw(null)}>Keep application</Button>
+            <Button variant="danger" onClick={() => handleWithdraw(pendingWithdraw)} disabled={withdrawingId === pendingWithdraw?.apply_id}>
+              {withdrawingId === pendingWithdraw?.apply_id ? 'Withdrawing…' : 'Withdraw application'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

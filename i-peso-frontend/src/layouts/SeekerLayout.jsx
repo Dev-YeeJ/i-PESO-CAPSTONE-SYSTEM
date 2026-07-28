@@ -10,7 +10,7 @@ const navLinks = [
   { to: '/seeker/job-fairs', label: 'Job Fairs', icon: CalendarDays },
   { to: '/seeker/job-map', label: 'AI Job Map', icon: MapPin },
   { to: '/seeker/applications', label: 'My Applications', icon: ClipboardList },
-  { to: '/seeker/upskill-hub', label: 'Upskill Hub', icon: GraduationCap },
+  { to: '/seeker/government-programs', label: 'Government Programs', icon: GraduationCap },
   { to: '/seeker/program-applications', label: 'Program Applications', icon: BookOpenCheck },
   { to: '/seeker/profile', label: 'My Profile', icon: UserRound },
 ]
@@ -20,8 +20,7 @@ const pageNames = {
   '/seeker/job-fairs': 'Job Fairs',
   '/seeker/job-map': 'AI Job Map',
   '/seeker/applications': 'My Applications',
-  '/seeker/upskill-hub': 'Upskill Hub',
-  '/seeker/upskill-hub/recommended': 'Recommended Programs',
+  '/seeker/government-programs': 'Government Programs',
   '/seeker/program-applications': 'Program Applications',
   '/seeker/profile': 'My Profile',
   '/seeker/profile/edit': 'Update Profile',

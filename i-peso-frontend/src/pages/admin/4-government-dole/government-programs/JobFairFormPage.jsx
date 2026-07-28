@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { ArrowLeft, Save } from 'lucide-react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Button, Card, CardHeader } from '@/components/ui'
+import { Button, Card, CardHeader, LoadingSkeleton } from '@/components/ui'
 import PageHeader from '@/pages/admin/_components/PageHeader'
 import { adminService } from '@/services/adminService'
 
@@ -115,7 +115,7 @@ export default function JobFairFormPage() {
         <Card>
           <CardHeader title="Event Details" subtitle="Official source for announcements, employer coordination, and reports." />
           {loading ? (
-            <div className="py-16 text-center text-sm font-semibold text-slate-500">Loading event...</div>
+            <LoadingSkeleton variant="card" rows={3} />
           ) : (
             <form onSubmit={handleSubmit} className="space-y-5">
               <div>

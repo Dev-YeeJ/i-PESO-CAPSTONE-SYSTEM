@@ -67,6 +67,16 @@ export const adminService = {
     return data
   },
 
+  // Unified review: docs are approved by default; only `rejected_documents`
+  // ([{ document_id, reason }]) are rejected. The backend decides approve vs reject.
+  finalizeEmployerVerification: async (id, { rejectedDocuments = [], remarks = null } = {}) => {
+    const { data } = await api.post(`/admin/employers/${id}/finalize`, {
+      rejected_documents: rejectedDocuments,
+      remarks,
+    })
+    return data
+  },
+
   reviewEmployerDocument: async (id, verificationStatus, adminNotes = null) => {
     const { data } = await api.post(`/admin/documents/${id}/review`, {
       verification_status: verificationStatus,
@@ -192,8 +202,13 @@ export const adminService = {
     return data
   },
 
-  generateSPRS: async (month, year) => {
-    const { data } = await api.post('/admin/reports/generate-sprs', { month, year })
+  generateSPRS: async (month, year, extras = {}) => {
+    const { data } = await api.post('/admin/reports/generate-sprs', { month, year, ...extras })
+    return data
+  },
+
+  exportSprsPdf: async (id) => {
+    const { data } = await api.get(`/admin/reports/${id}/export-sprs-pdf`, { responseType: 'blob' })
     return data
   },
 

@@ -12,10 +12,12 @@ import {
 import toast from 'react-hot-toast'
 import { Button, Card } from '@/components/ui'
 import PageHeader from '@/pages/admin/_components/PageHeader'
+import StatCard from '@/pages/admin/_components/StatCard'
 import { adminService } from '@/services/adminService'
 import { analyticsService } from '@/services/analyticsService'
+import { CHART_COLORS } from '@/design-system/chartColors'
 
-const COLORS = ['#123b65', '#d89b28', '#0f766e', '#7c3aed', '#2563eb', '#dc2626', '#64748b', '#059669']
+const COLORS = CHART_COLORS
 const today = new Date()
 const initialFilters = {
   date_from: new Date(today.getFullYear(), today.getMonth() - 11, 1).toISOString().slice(0, 10),
@@ -38,10 +40,29 @@ const reportCatalog = [
   ['labor_market_analytics', 'Labor Market Analytics Report', 'Complete analytics snapshot including the experimental forecast.', 'All dashboard filters'],
 ]
 
+// Applied filters are mirrored to the URL query string so an analytics view can
+// be bookmarked and shared. Only non-default values are written (clean URLs).
+function buildParams(filters, view) {
+  const params = {}
+  for (const [key, value] of Object.entries(filters)) {
+    if (value && String(value) !== String(initialFilters[key])) params[key] = value
+  }
+  if (view === 'reports') params.view = 'reports'
+  return params
+}
+function paramsToFilters(searchParams) {
+  const result = { ...initialFilters }
+  for (const key of Object.keys(initialFilters)) {
+    const value = searchParams.get(key)
+    if (value !== null) result[key] = value
+  }
+  return result
+}
+
 export default function LaborAnalyticsPage() {
   const [searchParams, setSearchParams] = useSearchParams()
-  const [filters, setFilters] = useState(initialFilters)
-  const [appliedFilters, setAppliedFilters] = useState(initialFilters)
+  const [filters, setFilters] = useState(() => paramsToFilters(searchParams))
+  const [appliedFilters, setAppliedFilters] = useState(() => paramsToFilters(searchParams))
   const [options, setOptions] = useState({})
   const [data, setData] = useState(null)
   const [reports, setReports] = useState([])
@@ -52,7 +73,7 @@ export default function LaborAnalyticsPage() {
   const requestSequence = useRef(0)
   const navigate = useNavigate()
   const view = searchParams.get('view') === 'reports' ? 'reports' : 'analytics'
-  const selectView = (nextView) => setSearchParams(nextView === 'reports' ? { view: 'reports' } : {}, { replace: true })
+  const selectView = (nextView) => setSearchParams(buildParams(appliedFilters, nextView), { replace: true })
 
   const loadAnalytics = useCallback(async (nextFilters = appliedFilters) => {
     const requestId = ++requestSequence.current
@@ -79,18 +100,20 @@ export default function LaborAnalyticsPage() {
         else toast.error('Saved reports could not be loaded.')
       })
       .finally(() => setReportsLoading(false))
-    loadAnalytics(initialFilters)
+    loadAnalytics(appliedFilters)
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const applyFilters = (event) => {
     event.preventDefault()
     setAppliedFilters(filters)
+    setSearchParams(buildParams(filters, view))
     loadAnalytics(filters)
   }
 
   const resetFilters = () => {
     setFilters(initialFilters)
     setAppliedFilters(initialFilters)
+    setSearchParams(buildParams(initialFilters, view))
     loadAnalytics(initialFilters)
   }
 
@@ -98,6 +121,7 @@ export default function LaborAnalyticsPage() {
     const nextFilters = { ...appliedFilters, [key]: initialFilters[key] }
     setFilters(nextFilters)
     setAppliedFilters(nextFilters)
+    setSearchParams(buildParams(nextFilters, view))
     loadAnalytics(nextFilters)
   }
 
@@ -194,21 +218,21 @@ function AnalyticsView({ data, loading, error, filters, appliedFilters, setFilte
       {loading && <div className="h-1 overflow-hidden rounded-full bg-brand-100"><div className="h-full w-1/2 animate-pulse rounded-full bg-brand-600" /></div>}
 
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Kpi icon={UsersRound} label="Total Registered Applicants" value={summary.total_registered_applicants} detail={`${summary.complete_profiles || 0} complete · ${summary.incomplete_profiles || 0} incomplete`} />
-        <Kpi icon={UserRoundCheck} label="Active Participants" value={summary.active_participants} detail="Activity in selected date range" />
-        <Kpi icon={Building2} label="Total Employers" value={summary.total_employers} detail={`${summary.verified_employers || 0} verified`} />
-        <Kpi icon={BriefcaseBusiness} label="Job Vacancies" value={summary.total_job_vacancies} detail={`${summary.active_job_vacancies || 0} active · ${summary.closed_job_vacancies || 0} closed`} />
-        <Kpi icon={FileChartColumn} label="Total Applications" value={summary.total_applications} detail={`${summary.pending_applications || 0} pending`} />
-        <Kpi icon={CheckCircle2} label="Hired Applicants" value={summary.hired_applicants} detail="Recorded application status: hired" />
-        <Kpi icon={Activity} label="Unemployed Applicants" value={summary.unemployed_applicants} detail="Current self-reported status" />
-        <Kpi icon={CalendarRange} label="Scheduled Interviews" value={summary.scheduled_interviews} detail="Currently scheduled" />
+        <StatCard icon={UsersRound} color="blue" label="Total Registered Applicants" value={safeNumber(summary.total_registered_applicants)} subtitle={`${summary.complete_profiles || 0} complete · ${summary.incomplete_profiles || 0} incomplete`} hint="Distinct job seekers registered within the selected date range." />
+        <StatCard icon={UserRoundCheck} color="blue" label="Active Participants" value={safeNumber(summary.active_participants)} subtitle="Activity in selected date range" hint="Seekers with recorded activity in the selected range. See the definition note below." />
+        <StatCard icon={Building2} color="slate" label="Total Employers" value={safeNumber(summary.total_employers)} subtitle={`${summary.verified_employers || 0} verified`} hint="Employer accounts within the selected range, across all verification statuses." />
+        <StatCard icon={BriefcaseBusiness} color="green" label="Job Vacancies" value={safeNumber(summary.total_job_vacancies)} subtitle={`${summary.active_job_vacancies || 0} active · ${summary.closed_job_vacancies || 0} closed`} hint="Vacancies posted within the selected range (active and closed)." />
+        <StatCard icon={FileChartColumn} color="amber" label="Total Applications" value={safeNumber(summary.total_applications)} subtitle={`${summary.pending_applications || 0} pending`} hint="Applications submitted within the selected range." />
+        <StatCard icon={CheckCircle2} color="green" label="Hired Applicants" value={safeNumber(summary.hired_applicants)} subtitle="Application status: hired" hint="Applications whose status is 'hired' within the selected range." />
+        <StatCard icon={Activity} color="red" label="Unemployed Applicants" value={safeNumber(summary.unemployed_applicants)} subtitle="Current self-reported status" hint="Seekers whose current self-reported status is unemployed. This is a registrant count, not an official unemployment rate." />
+        <StatCard icon={CalendarRange} color="slate" label="Scheduled Interviews" value={safeNumber(summary.scheduled_interviews)} subtitle="Currently scheduled" hint="Interviews currently in a scheduled state." />
       </section>
 
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="Job Fair outcome analytics">
-        <Kpi icon={CalendarRange} label="Job Fairs Conducted" value={summary.job_fairs_conducted} detail={`${summary.job_fair_participating_companies || 0} participating companies`} />
-        <Kpi icon={BriefcaseBusiness} label="Job Fair Vacancies" value={summary.job_fair_vacancies} detail={`${summary.job_fair_applicants || 0} applicants`} />
-        <Kpi icon={CheckCircle2} label="Job Fair HOTS" value={summary.job_fair_hots} detail={`${summary.job_fair_near_hired || 0} near hired`} />
-        <Kpi icon={FileChartColumn} label="Job Fair Rejected" value={summary.job_fair_rejected} detail="Merged self-service and proxy reports" />
+        <StatCard icon={CalendarRange} color="blue" label="Job Fairs Conducted" value={safeNumber(summary.job_fairs_conducted)} subtitle={`${summary.job_fair_participating_companies || 0} participating companies`} hint="Job fairs held within the selected range." />
+        <StatCard icon={BriefcaseBusiness} color="green" label="Job Fair Vacancies" value={safeNumber(summary.job_fair_vacancies)} subtitle={`${summary.job_fair_applicants || 0} applicants`} hint="Vacancies offered across job fairs in the selected range." />
+        <StatCard icon={CheckCircle2} color="green" label="Job Fair HOTS" value={safeNumber(summary.job_fair_hots)} subtitle={`${summary.job_fair_near_hired || 0} near hired`} hint="Hired On The Spot at job fairs within the selected range." />
+        <StatCard icon={FileChartColumn} color="red" label="Job Fair Rejected" value={safeNumber(summary.job_fair_rejected)} subtitle="Self-service + proxy reports" hint="Applicants not hired at job fairs, merged from self-service and proxy reports." />
       </section>
 
       <Insight icon={UserRoundCheck} title="How Active Participants is defined">{summary.active_participants_definition}</Insight>
@@ -233,16 +257,16 @@ function AnalyticsView({ data, loading, error, filters, appliedFilters, setFilte
       <SectionTitle title="Skills and job demand" subtitle="Supply from seeker profiles compared with demand recorded on vacancies." />
       <div className="grid gap-6 xl:grid-cols-3">
         <ChartCard title="Common Job Seeker Skills"><HorizontalBars data={top.job_seeker_skills} /></ChartCard>
-        <ChartCard title="Demanded Vacancy Skills"><HorizontalBars data={top.vacancy_demanded_skills} color="#d89b28" /></ChartCard>
-        <ChartCard title="Most Applied Job Categories"><HorizontalBars data={top.most_applied_job_categories} color="#0f766e" /></ChartCard>
+        <ChartCard title="Demanded Vacancy Skills"><HorizontalBars data={top.vacancy_demanded_skills} color={COLORS[1]} /></ChartCard>
+        <ChartCard title="Most Applied Job Categories"><HorizontalBars data={top.most_applied_job_categories} color={COLORS[2]} /></ChartCard>
       </div>
 
       <SectionTitle title="Location analytics" subtitle="Top locations are limited to keep the dashboard readable and responsive." />
       <div className="grid gap-6 md:grid-cols-2">
         <ChartCard title="Job Seekers by Barangay"><HorizontalBars data={distributions.job_seeker_locations?.barangay} /></ChartCard>
-        <ChartCard title="Job Seekers by City / Municipality"><HorizontalBars data={distributions.job_seeker_locations?.city_municipality} color="#d89b28" /></ChartCard>
-        <ChartCard title="Employers by Location"><HorizontalBars data={distributions.employer_locations?.city_municipality} color="#7c3aed" /></ChartCard>
-        <ChartCard title="Vacancies by Location"><HorizontalBars data={distributions.vacancy_locations?.city_municipality} color="#0f766e" /></ChartCard>
+        <ChartCard title="Job Seekers by City / Municipality"><HorizontalBars data={distributions.job_seeker_locations?.city_municipality} color={COLORS[1]} /></ChartCard>
+        <ChartCard title="Employers by Location"><HorizontalBars data={distributions.employer_locations?.city_municipality} color={COLORS[3]} /></ChartCard>
+        <ChartCard title="Vacancies by Location"><HorizontalBars data={distributions.vacancy_locations?.city_municipality} color={COLORS[2]} /></ChartCard>
       </div>
 
       <SectionTitle title="Company and vacancy analytics" subtitle="Employer activity is separated into applications, vacancies, and confirmed hires." />
@@ -291,11 +315,10 @@ function Forecast({ forecast }) {
   return <section className="overflow-hidden rounded-2xl border border-amber-200 bg-gradient-to-br from-amber-50 to-white shadow-sm"><div className="flex items-start gap-4 border-b border-amber-100 p-5 sm:p-6"><span className="shrink-0 rounded-xl bg-amber-100 p-3 text-amber-800"><Sparkles className="h-6 w-6" /></span><div className="min-w-0"><p className="text-xs font-black uppercase tracking-[0.18em] text-amber-700">Experimental Forecast</p><h2 className="mt-1 text-xl font-black text-slate-950">Next-month labor demand signal</h2><p className="mt-1 text-sm leading-6 text-slate-600">{forecast.explanation || forecast.message || 'Forecast information is not available.'}</p></div></div>{forecast.available && items.length ? <div className="grid gap-4 p-5 sm:grid-cols-2 sm:p-6 xl:grid-cols-3 2xl:grid-cols-5">{items.map((item, index) => <div key={item.item || index} className="rounded-xl border border-amber-100 bg-white p-4"><p className="line-clamp-2 min-h-10 text-sm font-bold text-slate-900">{item.item || 'Unspecified category'}</p><p className="mt-3 text-3xl font-black text-brand-900">{safeNumber(item.predicted_next_month_count)}</p><p className="text-xs text-slate-500">predicted postings · {item.trend_direction || 'stable'}</p><p className="mt-2 text-xs font-semibold text-amber-800">R² fit: {formatFit(item.r_squared)}</p></div>)}</div> : <div className="p-5 sm:p-6"><Empty label="Not enough historical data yet to generate reliable predictions." /></div>}{forecast.confidence_note && <p className="border-t border-amber-100 px-5 py-4 text-xs leading-5 text-slate-600 sm:px-6">{forecast.confidence_note}</p>}</section>
 }
 
-function Kpi({ icon, label, value, detail }) { return <Card padding="sm"><div className="flex items-start justify-between gap-3"><div><p className="text-xs font-bold uppercase tracking-wide text-slate-500">{label}</p><p className="mt-2 text-3xl font-black text-slate-950">{Number(value || 0).toLocaleString()}</p><p className="mt-1 text-xs text-slate-500">{detail}</p></div><span className="rounded-xl bg-brand-50 p-2.5 text-brand-700">{createElement(icon, { className: 'h-5 w-5' })}</span></div></Card> }
 function ChartCard({ title, subtitle, children }) { return <Card className="min-w-0"><div className="mb-5"><h3 className="font-bold leading-5 text-slate-950">{title}</h3>{subtitle && <p className="mt-1 text-xs leading-5 text-slate-500">{subtitle}</p>}</div>{children}</Card> }
-function TrendChart({ series, lines }) { return series.length ? <div className="h-72 min-w-0"><ResponsiveContainer><LineChart data={series} margin={{ top: 8, right: 12, left: -12, bottom: 4 }}><CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" /><XAxis dataKey="period" tickFormatter={formatPeriod} tick={{ fontSize: 10, fill: '#64748b' }} minTickGap={24} /><YAxis allowDecimals={false} tick={{ fontSize: 10, fill: '#64748b' }} /><Tooltip content={<ChartTooltip />} /><Legend verticalAlign="bottom" height={30} wrapperStyle={{ fontSize: 11, paddingTop: 8 }} />{lines.map((line, index) => <Line key={line} type="monotone" dataKey={line} stroke={COLORS[index]} strokeWidth={3} dot={{ r: 2.5 }} activeDot={{ r: 5 }} />)}</LineChart></ResponsiveContainer></div> : <Empty /> }
-function Donut({ data = [] }) { return data.length ? <div className="space-y-3"><div className="h-48"><ResponsiveContainer><PieChart><Pie data={data} dataKey="value" nameKey="label" innerRadius={48} outerRadius={76} paddingAngle={2}>{data.map((item, index) => <Cell key={item.label} fill={COLORS[index % COLORS.length]} />)}</Pie><Tooltip content={<ChartTooltip />} /></PieChart></ResponsiveContainer></div><div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">{data.map((item, index) => <div key={item.label} className="flex min-w-0 items-center gap-2 text-xs"><span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: COLORS[index % COLORS.length] }} /><span className="min-w-0 flex-1 truncate text-slate-600" title={item.label}>{item.label}</span><span className="font-bold text-slate-900">{safeNumber(item.value)}</span></div>)}</div></div> : <Empty /> }
-function HorizontalBars({ data = [], color = COLORS[0] }) { const rows = data.slice(0, 8); return rows.length ? <div className="h-72 min-w-0"><ResponsiveContainer><BarChart data={rows} layout="vertical" margin={{ left: 8, right: 16 }}><CartesianGrid strokeDasharray="3 3" horizontal={false} /><XAxis type="number" allowDecimals={false} tick={{ fontSize: 10, fill: '#64748b' }} /><YAxis dataKey="label" type="category" width={132} tickFormatter={(value) => truncateLabel(value, 18)} tick={{ fontSize: 10, fill: '#475569' }} /><Tooltip content={<ChartTooltip />} cursor={{ fill: '#f1f5f9' }} /><Bar dataKey="value" name="Count" fill={color} radius={[0, 6, 6, 0]} maxBarSize={24} /></BarChart></ResponsiveContainer></div> : <Empty /> }
+function TrendChart({ series, lines }) { return series.length ? <div className="h-72 min-w-0" role="img" aria-label={`Line chart of ${lines.join(' and ')} across ${series.length} periods.`}><ResponsiveContainer><LineChart data={series} margin={{ top: 8, right: 12, left: -12, bottom: 4 }}><CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" /><XAxis dataKey="period" tickFormatter={formatPeriod} tick={{ fontSize: 10, fill: '#64748b' }} minTickGap={24} /><YAxis allowDecimals={false} tick={{ fontSize: 10, fill: '#64748b' }} /><Tooltip content={<ChartTooltip />} /><Legend verticalAlign="bottom" height={30} wrapperStyle={{ fontSize: 11, paddingTop: 8 }} />{lines.map((line, index) => <Line key={line} type="monotone" dataKey={line} stroke={COLORS[index]} strokeWidth={3} dot={{ r: 2.5 }} activeDot={{ r: 5 }} />)}</LineChart></ResponsiveContainer></div> : <Empty /> }
+function Donut({ data = [] }) { return data.length ? <div className="space-y-3"><div className="h-48" role="img" aria-label={`Proportional chart. ${seriesSummary(data)}.`}><ResponsiveContainer><PieChart><Pie data={data} dataKey="value" nameKey="label" innerRadius={48} outerRadius={76} paddingAngle={2}>{data.map((item, index) => <Cell key={item.label} fill={COLORS[index % COLORS.length]} />)}</Pie><Tooltip content={<ChartTooltip />} /></PieChart></ResponsiveContainer></div><div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">{data.map((item, index) => <div key={item.label} className="flex min-w-0 items-center gap-2 text-xs"><span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: COLORS[index % COLORS.length] }} /><span className="min-w-0 flex-1 truncate text-slate-600" title={item.label}>{item.label}</span><span className="font-bold text-slate-900">{safeNumber(item.value)}</span></div>)}</div></div> : <Empty /> }
+function HorizontalBars({ data = [], color = COLORS[0] }) { const rows = data.slice(0, 8); return rows.length ? <div className="h-72 min-w-0" role="img" aria-label={`Bar chart. ${seriesSummary(rows)}.`}><ResponsiveContainer><BarChart data={rows} layout="vertical" margin={{ left: 8, right: 16 }}><CartesianGrid strokeDasharray="3 3" horizontal={false} /><XAxis type="number" allowDecimals={false} tick={{ fontSize: 10, fill: '#64748b' }} /><YAxis dataKey="label" type="category" width={132} tickFormatter={(value) => truncateLabel(value, 18)} tick={{ fontSize: 10, fill: '#475569' }} /><Tooltip content={<ChartTooltip />} cursor={{ fill: '#f1f5f9' }} /><Bar dataKey="value" name="Count" fill={color} radius={[0, 6, 6, 0]} maxBarSize={24} /></BarChart></ResponsiveContainer></div> : <Empty /> }
 function RankList({ data = [], unit }) { return data.length ? <ol className="space-y-3">{data.slice(0, 7).map((item, index) => <li key={item.label} className="flex items-center gap-3"><span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-brand-50 text-xs font-black text-brand-800">{index + 1}</span><span className="min-w-0 flex-1 truncate text-sm font-semibold text-slate-800" title={item.label}>{item.label}</span><span className="shrink-0 text-xs font-bold text-slate-500">{safeNumber(item.value)} {unit}</span></li>)}</ol> : <Empty /> }
 function Insight({ icon, title, children }) { return <div className="flex items-start gap-3 rounded-xl border border-blue-100 bg-blue-50/70 p-4"><span className="mt-0.5 text-brand-700">{createElement(icon, { className: 'h-5 w-5' })}</span><div><p className="text-sm font-bold text-brand-950">{title}</p><p className="mt-1 text-sm leading-6 text-slate-600">{children}</p></div></div> }
 function SectionTitle({ title, subtitle }) { return <div className="pt-2"><h2 className="text-xl font-black text-slate-950">{title}</h2><p className="mt-1 text-sm text-slate-500">{subtitle}</p></div> }
@@ -318,5 +341,6 @@ function formatDateRange(from, to) { if (!from || !to) return 'Date range not se
 function formatPeriod(value) { const text = String(value || ''); if (/^\d{4}-\d{2}$/.test(text)) return new Date(`${text}-01T00:00:00`).toLocaleDateString('en-PH', { month: 'short', year: '2-digit' }); return text }
 function truncateLabel(value, limit) { const text = String(value || 'Not specified'); return text.length > limit ? `${text.slice(0, limit - 1)}…` : text }
 function safeNumber(value) { const numeric = Number(value); return Number.isFinite(numeric) ? numeric.toLocaleString() : '0' }
+function seriesSummary(data = [], max = 8) { return data.slice(0, max).map((item) => `${item.label}: ${safeNumber(item.value)}`).join(', ') || 'no data' }
 function formatFit(value) { const numeric = Number(value); return Number.isFinite(numeric) ? numeric.toFixed(2) : 'Not available' }
 function pretty(value = '') { return String(value).replaceAll('_', ' ').replace(/\b\w/g, (letter) => letter.toUpperCase()) }

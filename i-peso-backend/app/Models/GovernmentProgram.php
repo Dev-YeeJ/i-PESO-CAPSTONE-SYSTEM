@@ -22,6 +22,7 @@ class GovernmentProgram extends Model
         'description',
         'target_beneficiaries',
         'eligibility_requirements',
+        'eligibility_rules',
         'required_documents',
         'target_industry',
         'target_occupation_id',
@@ -49,6 +50,7 @@ class GovernmentProgram extends Model
 
     protected $casts = [
         'eligibility_requirements' => 'array',
+        'eligibility_rules' => 'array',
         'required_documents' => 'array',
         'schedule' => 'datetime',
         'start_date' => 'date',
@@ -94,11 +96,6 @@ class GovernmentProgram extends Model
     public function applications(): HasMany
     {
         return $this->hasMany(ProgramApplication::class, 'program_id', 'program_id');
-    }
-
-    public function skillDemands(): HasMany
-    {
-        return $this->hasMany(EmployerSkillDemand::class, 'linked_program_id', 'program_id');
     }
 
     public function isAcceptingApplications(): bool

@@ -1,6 +1,6 @@
-import { createElement, useState } from 'react'
-import { BrainCircuit, PlayCircle, BarChart3, Users, CheckCircle2 } from 'lucide-react'
-import { Card, Button } from '@/components/ui'
+import { useState } from 'react'
+import { BrainCircuit, BarChart3, Users, CheckCircle2 } from 'lucide-react'
+import { Card, Button, StatCard } from '@/components/ui'
 import PageHeader from '@/pages/admin/_components/PageHeader'
 import DataTable from '@/pages/admin/_components/DataTable'
 
@@ -46,9 +46,9 @@ export default function SmartMatchesPage() {
       />
 
       <div className="grid gap-4 sm:grid-cols-3">
-        <SummaryCard icon={BarChart3} label="Total Matches" value={matches.length} detail="Historical runs" tone="navy" />
-        <SummaryCard icon={Users} label="Positions Filled" value={0} detail="Attributed to Smart Matches" tone="green" />
-        <SummaryCard icon={CheckCircle2} label="Avg Success Rate" value="0%" detail="Candidate acceptance rate" tone="blue" />
+        <StatCard icon={BarChart3} color="blue" label="Total Matches" value={matches.length} subtitle="Historical runs" />
+        <StatCard icon={Users} color="green" label="Positions Filled" value={0} subtitle="Attributed to Smart Matches" />
+        <StatCard icon={CheckCircle2} color="blue" label="Avg Success Rate" value="0%" subtitle="Candidate acceptance rate" />
       </div>
 
       <Card padding="none" className="mt-6">
@@ -80,27 +80,4 @@ export default function SmartMatchesPage() {
   )
 }
 
-function SummaryCard({ icon, label, value, detail, tone }) {
-  const tones = {
-    navy: 'bg-slate-100 text-brand-navy',
-    green: 'bg-emerald-50 text-emerald-700',
-    amber: 'bg-amber-50 text-amber-700',
-    blue: 'bg-blue-50 text-blue-700',
-  }
-
-  return (
-    <Card padding="sm">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <p className="text-xs font-extrabold uppercase tracking-wide text-slate-500">{label}</p>
-          <p className="mt-2 text-3xl font-black text-slate-950">{value}</p>
-          <p className="mt-1 text-xs text-slate-500">{detail}</p>
-        </div>
-        <span className={`rounded-xl p-2.5 ${tones[tone]}`}>
-          {createElement(icon, { className: 'h-5 w-5' })}
-        </span>
-      </div>
-    </Card>
-  )
-}
 

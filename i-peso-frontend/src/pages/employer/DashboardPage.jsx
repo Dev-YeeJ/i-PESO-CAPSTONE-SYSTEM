@@ -1,7 +1,7 @@
 import { createElement, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowRight, BriefcaseBusiness, Building2, CheckCircle2, CircleCheck, Clock3, FileCheck2, FilePenLine, FileX2, Plus, RotateCcw, ShieldCheck, Upload } from 'lucide-react'
 import PendingVerificationBanner from './components/PendingVerificationBanner'
-import { AlertBox, Badge, Button, Card, CardHeader } from '@/components/ui'
+import { AlertBox, Badge, Button, Card, CardHeader, LoadingSkeleton, StatCard } from '@/components/ui'
 import * as employerService from '@/services/employerService'
 import { useAuthStore } from '@/stores/authStore'
 
@@ -83,7 +83,13 @@ export default function EmployerDashboard() {
     return { approved, rejected, pending, total, percent: Math.round((approved / total) * 100) }
   }, [documents, requiredDocuments])
 
-  if (loading) return <div className="portal-page animate-pulse"><div className="h-44 rounded-xl bg-slate-200" /><div className="grid gap-4 md:grid-cols-4">{[1, 2, 3, 4].map((item) => <div key={item} className="h-28 rounded-xl bg-slate-200" />)}</div></div>
+  if (loading) return (
+    <div className="portal-page">
+      <LoadingSkeleton variant="text" rows={2} className="max-w-md" />
+      <LoadingSkeleton variant="stat" rows={4} />
+      <LoadingSkeleton variant="card" rows={2} />
+    </div>
+  )
 
   return (
     <div className="portal-page">
@@ -106,10 +112,10 @@ export default function EmployerDashboard() {
       <PendingVerificationBanner status={status} rejectionReason={profile?.employer?.rejection_reason} documents={documents} requiredDocuments={requiredDocuments} onReupload={handleReupload} reuploadingType={reuploadingType} />
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Metric icon={BriefcaseBusiness} label="Active Vacancies" value={counts.active} detail={`${counts.openings} total opening${counts.openings === 1 ? '' : 's'}`} tone="brand" />
-        <Metric icon={FilePenLine} label="Draft Vacancies" value={counts.draft} detail="Not visible to seekers" tone="amber" />
-        <Metric icon={CircleCheck} label="Closed Vacancies" value={counts.closed} detail="Completed postings" tone="slate" />
-        <Metric icon={ShieldCheck} label="Account Access" value={status === 'verified' ? 'Enabled' : 'Limited'} detail="Based on PESO approval" tone="emerald" />
+        <StatCard icon={BriefcaseBusiness} color="blue" label="Active Vacancies" value={counts.active} subtitle={`${counts.openings} total opening${counts.openings === 1 ? '' : 's'}`} hint="Published vacancies currently visible to job seekers." />
+        <StatCard icon={FilePenLine} color="amber" label="Draft Vacancies" value={counts.draft} subtitle="Not visible to seekers" hint="Saved postings you have not published yet." />
+        <StatCard icon={CircleCheck} color="slate" label="Closed Vacancies" value={counts.closed} subtitle="Completed postings" hint="Postings that are no longer accepting applications." />
+        <StatCard icon={ShieldCheck} color="green" label="Account Access" value={status === 'verified' ? 'Enabled' : 'Limited'} subtitle="Based on PESO approval" hint="Whether your PESO accreditation currently allows posting vacancies." />
       </div>
 
       {/* ── ACCREDITATION TRACKER ──────────────────────────────── */}
@@ -251,11 +257,6 @@ export default function EmployerDashboard() {
       )}
     </div>
   )
-}
-
-function Metric({ icon, label, value, detail, tone }) {
-  const tones = { brand: 'bg-blue-50 text-blue-700', amber: 'bg-amber-50 text-amber-700', slate: 'bg-slate-100 text-slate-600', emerald: 'bg-emerald-50 text-emerald-700' }
-  return <Card padding="sm"><div className="flex justify-between gap-4"><div><p className="text-xs font-bold uppercase tracking-wide text-slate-500">{label}</p><p className="mt-2 text-2xl font-black text-slate-950">{value}</p><p className="mt-1 text-xs text-slate-500">{detail}</p></div><span className={`h-fit rounded-xl p-2.5 ${tones[tone]}`}>{createElement(icon, { className: 'h-5 w-5' })}</span></div></Card>
 }
 
 function PipelineStage({ label, count, description, color }) {

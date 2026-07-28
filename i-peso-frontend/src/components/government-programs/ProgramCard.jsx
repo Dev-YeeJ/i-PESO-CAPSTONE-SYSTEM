@@ -1,6 +1,7 @@
 import { ArrowRight, CalendarDays, CircleCheck, Clock3, MapPin, UsersRound } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { categoryLabel, categoryTone, statusLabel, statusTone } from './programConstants'
+import EligibilityBadge from './EligibilityBadge'
 
 const dateText = (value) => value
   ? new Intl.DateTimeFormat('en-PH', { month: 'short', day: 'numeric', year: 'numeric' }).format(new Date(`${value}T00:00:00`))
@@ -24,6 +25,7 @@ export default function ProgramCard({ program, to, actionLabel = 'View program',
             <CircleCheck className="h-3.5 w-3.5" /> Recommended
           </span>
         )}
+        <EligibilityBadge eligibility={program.eligibility} />
       </div>
 
       <h2 className="mt-4 text-lg font-black leading-6 text-slate-950">{program.title}</h2>

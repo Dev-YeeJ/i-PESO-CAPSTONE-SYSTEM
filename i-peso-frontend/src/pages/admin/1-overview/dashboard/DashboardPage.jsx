@@ -1,4 +1,5 @@
-import { createElement, useEffect, useMemo, useState } from 'react'
+import { createElement, useMemo } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import {
   ArrowRight,
   BriefcaseBusiness,
@@ -12,28 +13,19 @@ import {
   UsersRound,
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
-import { Badge, Button, Card, CardHeader } from '@/components/ui'
+import { Badge, Button, Card, CardHeader, EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui'
 import DataTable from '@/pages/admin/_components/DataTable'
 import PageHeader from '@/pages/admin/_components/PageHeader'
+import StatCard from '@/pages/admin/_components/StatCard'
 import StatusBadge from '@/pages/admin/_components/StatusBadge'
 import { adminService } from '@/services/adminService'
 
 export default function DashboardPage() {
-  const [stats, setStats] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
-
-  const fetchStats = () => {
-    setLoading(true)
-    adminService.getDashboardStats()
-      .then(setStats)
-      .catch((requestError) => setError(requestError.response?.data?.message ?? 'Failed to load dashboard statistics.'))
-      .finally(() => setLoading(false))
-  }
-
-  useEffect(() => {
-    fetchStats()
-  }, [])
+  const { data: stats, isLoading, isError, error, refetch } = useQuery({
+    queryKey: ['admin', 'dashboard-stats'],
+    queryFn: () => adminService.getDashboardStats(),
+  })
+  const errorMessage = error?.response?.data?.message ?? 'Failed to load dashboard statistics.'
 
   const handleExportCSV = () => {
     if (!stats?.recent_registrations?.length) return
@@ -62,16 +54,33 @@ export default function DashboardPage() {
     ]
   }, [stats])
 
-  if (loading) return <div className="portal-page animate-pulse"><div className="h-24 rounded-2xl bg-slate-200" /><div className="grid gap-4 lg:grid-cols-4">{[1, 2, 3, 4].map((item) => <div key={item} className="h-32 rounded-2xl bg-slate-200" />)}</div></div>
+  if (isLoading) return (
+    <div className="portal-page">
+      <LoadingSkeleton variant="text" rows={2} className="max-w-md" />
+      <LoadingSkeleton variant="stat" rows={4} />
+      <LoadingSkeleton variant="card" rows={2} />
+    </div>
+  )
+
+  if (isError && !stats) return (
+    <div className="portal-page">
+      <PageHeader title="Operations Dashboard" subtitle="Monitor employment services, accreditation workload, and platform activity." />
+      <Card><ErrorState description={errorMessage} onRetry={refetch} /></Card>
+    </div>
+  )
 
   return (
     <div className="portal-page">
-      <PageHeader 
-        title="Operations Dashboard" 
+      <PageHeader
+        title="Operations Dashboard"
         subtitle="Monitor employment services, accreditation workload, and platform activity."
-        actions={[{ label: 'Refresh Data', icon: RefreshCw, variant: 'outline', onClick: fetchStats }]}
+        actions={[{ label: 'Refresh Data', icon: RefreshCw, variant: 'outline', onClick: () => refetch() }]}
       />
-      {error && <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</div>}
+      {isError && stats && (
+        <div className="rounded-xl border border-warning bg-warning-bg px-4 py-3 text-sm text-amber-800" role="status">
+          Showing the last loaded data — refreshing failed. {errorMessage}
+        </div>
+      )}
 
       <section className="portal-card-hero relative overflow-hidden rounded-xl border border-blue-900 bg-brand-navy px-6 py-7 text-white shadow-elevated sm:px-8">
         <div className="absolute -right-20 -top-24 h-64 w-64 rounded-full bg-brand-500/20 blur-3xl" />
@@ -88,20 +97,42 @@ export default function DashboardPage() {
       </section>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Kpi icon={UsersRound} label="Registered Seekers" value={stats?.total_seekers ?? 0} detail={`${stats?.profile_completion_rate?.toFixed(1) ?? 0}% profile completion`} tone="brand" />
-        <Kpi icon={Building2} label="Registered Employers" value={stats?.total_employers ?? 0} detail="Constituent employer accounts" tone="violet" />
-        <Kpi icon={BriefcaseBusiness} label="Active Vacancies" value={stats?.active_vacancies ?? 0} detail="Published opportunities" tone="emerald" />
-        <Kpi 
-          icon={CheckCircle2} 
-          label="Monthly Applications" 
-          value={stats?.applications_this_month ?? 0} 
-          detail={
+        <StatCard
+          icon={UsersRound}
+          color="blue"
+          label="Registered Seekers"
+          value={Number(stats?.total_seekers ?? 0).toLocaleString()}
+          subtitle={`${stats?.profile_completion_rate?.toFixed(1) ?? 0}% profile completion`}
+          hint="Distinct job-seeker accounts registered to date."
+        />
+        <StatCard
+          icon={Building2}
+          color="slate"
+          label="Registered Employers"
+          value={Number(stats?.total_employers ?? 0).toLocaleString()}
+          subtitle="Constituent employer accounts"
+          hint="Employer accounts registered to date, across all verification statuses."
+        />
+        <StatCard
+          icon={BriefcaseBusiness}
+          color="green"
+          label="Active Vacancies"
+          value={Number(stats?.active_vacancies ?? 0).toLocaleString()}
+          subtitle="Published, not expired"
+          hint="Vacancies currently published and open. Excludes drafts and expired postings."
+        />
+        <StatCard
+          icon={CheckCircle2}
+          color="amber"
+          label="Monthly Applications"
+          value={Number(stats?.applications_this_month ?? 0).toLocaleString()}
+          subtitle={
             <span className="flex gap-2">
-              <span className="text-emerald-600 font-semibold">{stats?.hired_this_month ?? 0} Hired</span> &bull; 
-              <span className="text-red-500 font-semibold">{stats?.rejected_this_month ?? 0} Rejected</span>
+              <span className="font-semibold text-success">{stats?.hired_this_month ?? 0} hired</span> &bull;
+              <span className="font-semibold text-danger">{stats?.rejected_this_month ?? 0} rejected</span>
             </span>
-          } 
-          tone="amber" 
+          }
+          hint="Applications submitted this calendar month."
         />
       </div>
 
@@ -175,15 +206,10 @@ export default function DashboardPage() {
               </Link>
             ))}
           </div>
-        ) : <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 py-10 text-center text-sm text-slate-500">No recent application activity.</div>}
+        ) : <EmptyState size="sm" title="No recent application activity" description="New applications from job seekers will appear here as they come in." />}
       </Card>
     </div>
   )
-}
-
-function Kpi({ icon, label, value, detail, tone }) {
-  const tones = { brand: 'bg-brand-50 text-brand-700', violet: 'bg-violet-50 text-violet-700', emerald: 'bg-emerald-50 text-emerald-700', amber: 'bg-accent-50 text-accent-700' }
-  return <Card padding="sm"><div className="flex items-start justify-between gap-4"><div><p className="text-xs font-bold uppercase tracking-wide text-slate-500">{label}</p><p className="mt-2 text-3xl font-black text-slate-950">{Number(value).toLocaleString()}</p><p className="mt-1 text-xs text-slate-500">{detail}</p></div><span className={`rounded-xl p-2.5 ${tones[tone]}`}>{createElement(icon, { className: 'h-5 w-5' })}</span></div></Card>
 }
 
 function Indicator({ icon, label, value, warning }) {

@@ -9,8 +9,8 @@
    ============================================================ */
 
 :root {
-  /* Brand */
-  --color-primary:       #1a4b8c;
+  /* Brand — canonical i-PESO civic navy (single source; matches brand-navy token) */
+  --color-primary:       #123563;
   --color-primary-dark:  #0f2d56;
   --color-primary-light: #2563b8;
   --color-primary-50:    #e8f0fc;
@@ -68,6 +68,35 @@
 
   /* Transitions */
   --transition: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ============================================================
+   shadcn/ui theme tokens — mapped to the i-PESO palette (HSL).
+   Consumed by shadcn primitives via tailwind.config color aliases.
+   Intentionally NOT applied to <body>/* so existing pages are
+   unaffected — this only themes shadcn components.
+   ============================================================ */
+:root {
+  --background: 0 0% 100%;
+  --foreground: 222 47% 11%;
+  --card: 0 0% 100%;
+  --card-foreground: 222 47% 11%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 222 47% 11%;
+  --primary: 38 92% 50%;             /* i-PESO gold */
+  --primary-foreground: 214 69% 23%; /* navy text on gold */
+  --secondary: 210 40% 96%;
+  --secondary-foreground: 222 47% 11%;
+  --muted: 210 40% 96%;
+  --muted-foreground: 215 16% 47%;
+  --accent: 210 40% 96%;
+  --accent-foreground: 222 47% 11%;
+  --destructive: 0 72% 51%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 214 32% 91%;
+  --input: 214 32% 91%;
+  --ring: 221 83% 53%;
+  --radius: 0.5rem;
 }
 
 /* ── Reset & Base ── */
@@ -144,7 +173,7 @@ select:focus-visible {
   }
 
   .portal-sidebar {
-    @apply bg-[#123563] text-white shadow-xl;
+    @apply bg-brand-navy text-white shadow-xl;
   }
 
   .portal-sidebar-divider {
@@ -1016,4 +1045,60 @@ select:focus-visible {
 .guest-shell button.bg-blue-600:hover,
 .guest-shell button.bg-blue-700:hover {
   background-color: #fbbf24 !important;
+}
+
+/* ============================================================
+   Auth surfaces — calm, solid civic treatment.
+   Removes glassmorphism (backdrop blur, aurora blobs, grid overlays,
+   translucent panels) per the design brief; keeps the existing DOM and
+   white-on-navy / dark-on-white text intact. Supersedes the earlier
+   .auth-glass-* / registration / onboarding / reset glass styling.
+   ============================================================ */
+.auth-glass-shell,
+.reset-auth-shell {
+  background: linear-gradient(160deg, #0f2a52 0%, #123563 60%, #17356a 100%);
+}
+
+/* Remove blurred ambient decoration (aurora blobs + grid overlays). */
+.auth-aurora,
+.auth-grid,
+.registration-journey-grid {
+  display: none !important;
+}
+
+/* No backdrop blur anywhere on auth surfaces. */
+.auth-glass-panel,
+.auth-service-pill,
+.glass-nav-link,
+.auth-role-card,
+.auth-glass-shell section,
+.onboarding-progress-glass,
+.registration-journey-aside,
+.registration-form-panel,
+.registration-mobile-progress,
+.reset-auth-shell .bg-white {
+  backdrop-filter: none !important;
+}
+
+/* Solid dark panels (white text). */
+.auth-glass-panel {
+  background: #16305c !important;
+  border-color: rgba(255, 255, 255, 0.12) !important;
+  box-shadow: 0 18px 40px rgba(3, 10, 31, 0.38) !important;
+}
+.onboarding-progress-glass,
+.registration-journey-aside,
+.registration-mobile-progress {
+  background: #102c56 !important;
+}
+.auth-service-pill,
+.glass-nav-link {
+  background: rgba(255, 255, 255, 0.08) !important;
+}
+
+/* Solid light cards (dark text). */
+.auth-glass-shell section,
+.auth-role-card,
+.reset-auth-shell .bg-white {
+  background: #ffffff !important;
 }

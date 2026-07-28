@@ -278,7 +278,7 @@ class EmployerController extends Controller
 
         $documents = [];
         if (Schema::hasTable('employer_documents')) {
-            $documents = $employer->documents()->select(['document_id', 'employer_id', 'document_type', 'original_filename', 'mime_type', 'file_size', 'uploaded_at', 'verification_status', 'admin_notes'])->get()->toArray();
+            $documents = $employer->documents()->select(['document_id', 'employer_id', 'document_type', 'original_filename', 'mime_type', 'file_size', 'uploaded_at', 'verification_status', 'admin_notes', 'expiration_date'])->get()->toArray();
         }
 
         $vacancies = [];

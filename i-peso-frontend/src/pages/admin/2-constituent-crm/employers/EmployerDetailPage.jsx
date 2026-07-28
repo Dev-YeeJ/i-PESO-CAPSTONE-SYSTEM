@@ -2,7 +2,6 @@ import { createElement, useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { AlertTriangle, ArrowLeft, Building2, CheckCircle2, Download, Eye, FileText, MapPin, ShieldAlert, ShieldCheck, XCircle } from 'lucide-react'
 import { Badge, Button, Card } from '@/components/ui'
-import StatusBadge from '@/pages/admin/_components/StatusBadge'
 import { adminService } from '@/services/adminService'
 
 const DOCUMENT_LABELS = {
@@ -13,7 +12,19 @@ const DOCUMENT_LABELS = {
   prpa_license: 'PRPA License',
   dme_poea_license: 'DMW/POEA License',
   philJobnet_proof: 'PhilJobNet Proof',
+  government_id: 'Government ID',
+  authorization_letter: 'Authorization Letter',
 }
+
+// Preset rejection reasons — the admin picks one instead of typing free-text notes.
+const REJECTION_REASONS = [
+  'Document is blurry or unreadable',
+  'Document has expired',
+  'Wrong document type uploaded',
+  'Information does not match company records',
+  'Document is incomplete or missing pages',
+  'Document appears altered or invalid',
+]
 
 const formatValue = (value, fallback = 'Not provided') => {
   if (value === null || value === undefined || value === '') return fallback
@@ -37,12 +48,11 @@ export default function EmployerDetailPage() {
   const [downloadDocument, setDownloadDocument] = useState(null)
   const [downloadReason, setDownloadReason] = useState('')
   const [downloading, setDownloading] = useState(false)
-  const [reviewingDocumentId, setReviewingDocumentId] = useState(null)
-  const [documentNotes, setDocumentNotes] = useState({})
-  const [approvalRemarks, setApprovalRemarks] = useState('')
+  // Unified review: every uploaded document is treated as "approved" unless the
+  // admin rejects it. Keyed by document_id → preset rejection reason string.
+  const [decisions, setDecisions] = useState({})
   const [notice, setNotice] = useState('')
   const [error, setError] = useState('')
-  const [rejectionReason, setRejectionReason] = useState('')
   // Confirmation dialog state
   const [confirmDialog, setConfirmDialog] = useState(null)
 
@@ -66,68 +76,45 @@ export default function EmployerDetailPage() {
     if (previewDocument?.url) URL.revokeObjectURL(previewDocument.url)
   }, [previewDocument])
 
-  const approve = async () => {
+  // Flag a document for rejection with a preset reason (toggles the row to red).
+  const rejectRow = (documentId, reason) => {
+    setError('')
+    setDecisions((current) => ({ ...current, [documentId]: reason }))
+  }
+
+  // Revert a rejected row back to the default "approved" state.
+  const undoRejectRow = (documentId) => {
+    setDecisions((current) => {
+      const next = { ...current }
+      delete next[documentId]
+      return next
+    })
+  }
+
+  // Single unified action — the backend decides approve vs reject based on which
+  // required documents were flagged.
+  const finalize = async () => {
+    const rejectedDocuments = Object.entries(decisions).map(([documentId, reason]) => ({
+      document_id: Number(documentId),
+      reason,
+    }))
+
     setActionLoading(true)
     setError('')
     setNotice('')
     try {
-      const result = await adminService.approveEmployer(id, approvalRemarks.trim() || null)
-      setNotice(result.notification_queued ? 'Employer approved. Email and dashboard notifications were queued for delivery.' : 'Employer approved, but notifications could not be queued.')
-      setApprovalRemarks('')
-      await loadEmployer()
+      const result = await adminService.finalizeEmployerVerification(id, { rejectedDocuments })
+      // Auto-close: return to the employer directory after a successful decision.
+      navigate('/admin/employers', {
+        state: {
+          flash: result.outcome === 'approved'
+            ? `${companyProfile.company_name || employer.company_name} has been approved and verified.`
+            : `${companyProfile.company_name || employer.company_name} has been rejected. The employer was notified of the reason.`,
+        },
+      })
     } catch (requestError) {
-      setError(requestError.response?.data?.error ?? 'Unable to approve this employer.')
-    } finally {
+      setError(requestError.response?.data?.error ?? requestError.response?.data?.message ?? 'Unable to save the verification decision.')
       setActionLoading(false)
-      setConfirmDialog(null)
-    }
-  }
-
-  const reject = async () => {
-    if (rejectionReason.trim().length < 10) {
-      setError('Provide a rejection reason of at least 10 characters.')
-      setConfirmDialog(null)
-      return
-    }
-
-    setActionLoading(true)
-    setError('')
-    setNotice('')
-    try {
-      const result = await adminService.rejectEmployer(id, rejectionReason.trim())
-      setNotice(result.notification_queued ? 'Employer rejected. Email and dashboard notifications with the reason were queued for delivery.' : 'Employer rejected, but notifications could not be queued.')
-      setRejectionReason('')
-      await loadEmployer()
-    } catch (requestError) {
-      setError(requestError.response?.data?.message ?? 'Unable to reject this employer.')
-    } finally {
-      setActionLoading(false)
-      setConfirmDialog(null)
-    }
-  }
-
-  const reviewDocument = async (document, verificationStatus) => {
-    const notes = documentNotes[document.document_id]?.trim() || null
-
-    if (verificationStatus === 'rejected' && (!notes || notes.length < 10)) {
-      setError('Enter document notes of at least 10 characters before rejecting a document.')
-      setConfirmDialog(null)
-      return
-    }
-
-    setReviewingDocumentId(document.document_id)
-    setError('')
-    setNotice('')
-
-    try {
-      const result = await adminService.reviewEmployerDocument(document.document_id, verificationStatus, notes)
-      setNotice(result.notification_queued ? `${DOCUMENT_LABELS[document.document_type] ?? document.document_type} marked as ${verificationStatus}.` : `${DOCUMENT_LABELS[document.document_type] ?? document.document_type} marked as ${verificationStatus}.`)
-      setDocumentNotes((current) => ({ ...current, [document.document_id]: '' }))
-      await loadEmployer()
-    } catch (requestError) {
-      setError(requestError.response?.data?.message ?? 'Unable to save the document review.')
-    } finally {
-      setReviewingDocumentId(null)
       setConfirmDialog(null)
     }
   }
@@ -183,64 +170,40 @@ export default function EmployerDetailPage() {
     setConfirmDialog({ title, message, variant, confirmLabel, onConfirm })
   }
 
-  const handleApproveEmployer = () => {
-    // Check if all required docs are approved
-    const requiredDocs = Array.isArray(employer?.required_documents) ? employer.required_documents : []
-    const uploadedDocs = verificationDocuments
-    const unapproved = requiredDocs.filter((type) => {
-      const doc = uploadedDocs.find((d) => d.document_type === type)
-      return !doc || doc.verification_status !== 'approved'
-    })
+  // One adaptive action: approve the employer, or reject it when a required
+  // document was flagged / is missing.
+  const handleFinalize = () => {
+    const rejectedCount = Object.keys(decisions).length
 
-    if (unapproved.length > 0) {
-      setError(`Cannot approve: ${unapproved.length} required document(s) have not been approved yet — ${unapproved.map((t) => DOCUMENT_LABELS[t] ?? t).join(', ')}.`)
+    if (willReject) {
+      const missingNote = missingDocuments.length > 0
+        ? ` Missing required document(s): ${missingDocuments.map((t) => DOCUMENT_LABELS[t] ?? t).join(', ')}.`
+        : ''
+      const activeVacancyCount = activeVacanciesSummary?.total ?? 0
+      const warningText = activeVacancyCount > 0
+        ? ` This employer has ${activeVacancyCount} active vacanc${activeVacancyCount === 1 ? 'y' : 'ies'} that will be automatically closed.`
+        : ''
+
+      showConfirm({
+        title: 'Reject Employer Accreditation',
+        message: `A required document was rejected or is missing, so "${companyProfile.company_name || employer.company_name}" will be rejected.${missingNote}${warningText} The employer will receive an email and dashboard notification with the reason.`,
+        variant: 'reject',
+        confirmLabel: 'Confirm Rejection',
+        onConfirm: finalize,
+      })
       return
     }
 
-    showConfirm({
-      title: 'Approve Employer Accreditation',
-      message: `You are about to approve "${companyProfile.company_name || employer.company_name}" as a verified PESO employer. This will enable job posting and vacancy management. The employer will receive an email and dashboard notification.`,
-      variant: 'approve',
-      confirmLabel: 'Confirm Approval',
-      onConfirm: approve,
-    })
-  }
-
-  const handleRejectEmployer = () => {
-    if (rejectionReason.trim().length < 10) {
-      setError('Provide a rejection reason of at least 10 characters.')
-      return
-    }
-
-    const activeVacancyCount = activeVacanciesSummary?.total ?? 0
-    const warningText = activeVacancyCount > 0
-      ? ` WARNING: This employer has ${activeVacancyCount} active vacanc${activeVacancyCount === 1 ? 'y' : 'ies'} that will be automatically closed.`
+    const rejectedNote = rejectedCount > 0
+      ? ` ${rejectedCount} optional document(s) were flagged but do not block approval.`
       : ''
 
     showConfirm({
-      title: 'Reject Employer Accreditation',
-      message: `You are about to reject "${companyProfile.company_name || employer.company_name}". Reason: "${rejectionReason.trim()}".${warningText} The employer will receive an email and dashboard notification with the rejection reason.`,
-      variant: 'reject',
-      confirmLabel: 'Confirm Rejection',
-      onConfirm: reject,
-    })
-  }
-
-  const handleDocumentReview = (document, verificationStatus) => {
-    const notes = documentNotes[document.document_id]?.trim() || null
-    const docLabel = DOCUMENT_LABELS[document.document_type] ?? document.document_type
-
-    if (verificationStatus === 'rejected' && (!notes || notes.length < 10)) {
-      setError('Enter document notes of at least 10 characters before rejecting a document.')
-      return
-    }
-
-    showConfirm({
-      title: `${verificationStatus === 'approved' ? 'Approve' : 'Reject'} Document`,
-      message: `You are about to mark "${docLabel}" as ${verificationStatus}.${notes ? ` Notes: "${notes}".` : ''} The employer will be notified of this change.`,
-      variant: verificationStatus === 'approved' ? 'approve' : 'reject',
-      confirmLabel: `${verificationStatus === 'approved' ? 'Approve' : 'Reject'} Document`,
-      onConfirm: () => reviewDocument(document, verificationStatus),
+      title: 'Approve Employer Accreditation',
+      message: `You are about to approve "${companyProfile.company_name || employer.company_name}" as a verified PESO employer. All submitted requirements will be marked approved.${rejectedNote} This enables job posting and the employer will be notified.`,
+      variant: 'approve',
+      confirmLabel: 'Confirm Approval',
+      onConfirm: finalize,
     })
   }
 
@@ -261,13 +224,36 @@ export default function EmployerDetailPage() {
   const verificationStatus = employer.verification_status ?? companyProfile.verification_status ?? 'pending'
   const verificationRemarks = employer.verification_remarks ?? companyProfile.rejection_reason ?? employer.rejection_reason
 
-  // Document review progress
-  const approvedDocsCount = verificationDocuments.filter((d) => d.verification_status === 'approved').length
-  const rejectedDocsCount = verificationDocuments.filter((d) => d.verification_status === 'rejected').length
-  const allRequiredApproved = requiredDocuments.length > 0 && requiredDocuments.every((type) => {
+  // Unified review derivations — every uploaded doc counts as approved unless flagged.
+  const isRejected = (doc) => doc && Boolean(decisions[doc.document_id])
+
+  // Rows for the landscape table: every required type (uploaded or missing),
+  // followed by any other uploaded documents (government ID, authorization letter, etc.).
+  const documentRows = [
+    ...requiredDocuments.map((type) => ({
+      type,
+      required: true,
+      document: verificationDocuments.find((d) => d.document_type === type) || null,
+    })),
+    ...verificationDocuments
+      .filter((d) => !requiredDocuments.includes(d.document_type))
+      .map((d) => ({ type: d.document_type, required: false, document: d })),
+  ]
+
+  const requiredCount = requiredDocuments.length
+  const approvedRequiredCount = requiredDocuments.filter((type) => {
     const doc = verificationDocuments.find((d) => d.document_type === type)
-    return doc && doc.verification_status === 'approved'
+    return doc && !isRejected(doc)
+  }).length
+  const approvalPct = requiredCount ? Math.round((approvedRequiredCount / requiredCount) * 100) : 0
+
+  const hasRejectedRequired = requiredDocuments.some((type) => {
+    const doc = verificationDocuments.find((d) => d.document_type === type)
+    return doc && isRejected(doc)
   })
+  const hasMissingRequired = missingDocuments.length > 0
+  const willReject = hasRejectedRequired || hasMissingRequired
+  const rejectedCount = Object.keys(decisions).length
 
   return (
     <div className="-mx-4 -mt-8 bg-slate-50 pb-12 sm:-mx-6">
@@ -331,104 +317,116 @@ export default function EmployerDetailPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <h2 className="text-lg font-black text-slate-950">Verification documents</h2>
-                  <p className="mt-1 text-sm text-slate-500">Review each document individually before approving the employer.</p>
+                  <p className="mt-1 text-sm text-slate-500">Every submitted requirement is approved by default — only reject the ones with a problem.</p>
                 </div>
                 <div className="flex gap-2">
                   <Badge status={verificationDocuments.length ? 'active' : 'warning'}>{verificationDocuments.length ? `${verificationDocuments.length} uploaded` : 'No documents'}</Badge>
-                  {verificationDocuments.length > 0 && (
-                    <Badge status={allRequiredApproved ? 'approved' : rejectedDocsCount > 0 ? 'rejected' : 'pending'}>
-                      {approvedDocsCount}/{requiredDocuments.length || verificationDocuments.length} approved
+                  {requiredCount > 0 && (
+                    <Badge status={willReject ? 'rejected' : 'approved'}>
+                      {approvedRequiredCount}/{requiredCount} approved
                     </Badge>
                   )}
                 </div>
               </div>
 
-              {/* Document review progress bar */}
-              {verificationDocuments.length > 0 && (
+              {/* Approval progress bar */}
+              {requiredCount > 0 && (
                 <div className="mt-4">
                   <div className="flex items-center justify-between text-xs font-bold text-slate-400">
-                    <span>Review progress</span>
-                    <span>{Math.round((approvedDocsCount / (requiredDocuments.length || verificationDocuments.length)) * 100)}%</span>
+                    <span>Approval progress</span>
+                    <span>{approvalPct}%</span>
                   </div>
                   <div className="mt-1 h-2 overflow-hidden rounded-full bg-slate-100">
                     <div
                       className="h-full rounded-full transition-all duration-500"
                       style={{
-                        width: `${Math.max((approvedDocsCount / (requiredDocuments.length || verificationDocuments.length)) * 100, 2)}%`,
-                        background: rejectedDocsCount > 0
+                        width: `${Math.max(approvalPct, 2)}%`,
+                        background: willReject
                           ? 'linear-gradient(90deg, #ef4444, #f97316)'
-                          : allRequiredApproved
-                            ? 'linear-gradient(90deg, #10b981, #059669)'
-                            : 'linear-gradient(90deg, #f59e0b, #eab308)',
+                          : 'linear-gradient(90deg, #10b981, #059669)',
                       }}
                     />
                   </div>
                 </div>
               )}
 
-              {/* Missing documents warning */}
-              {missingDocuments.length > 0 && (
-                <div className="mt-4 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-                  <div>
-                    <p className="font-bold">Missing required documents</p>
-                    <p className="mt-0.5 text-xs">{missingDocuments.map((t) => DOCUMENT_LABELS[t] ?? t).join(', ')}</p>
-                  </div>
-                </div>
-              )}
-
-              {verificationDocuments.length ? (
-                <div className="mt-5 space-y-3">
-                  {verificationDocuments.map((document) => {
-                    const docStatus = document.verification_status ?? 'pending'
-                    const statusStyles = {
-                      approved: 'border-l-emerald-500',
-                      rejected: 'border-l-red-500',
-                      pending: 'border-l-amber-500',
-                    }
-
-                    return (
-                      <div key={document.document_id} className={`rounded-xl border border-slate-200 border-l-4 p-4 ${statusStyles[docStatus] ?? statusStyles.pending}`}>
-                        <div className="flex flex-wrap items-start justify-between gap-3">
-                          <div>
+              {/* Landscape (table) layout of the requirements */}
+              <div className="mt-5 overflow-x-auto">
+                <table className="w-full min-w-[640px] border-collapse text-left text-sm">
+                  <thead>
+                    <tr className="border-b border-slate-200 text-[11px] font-extrabold uppercase tracking-wide text-slate-400">
+                      <th className="px-3 py-2">Document</th>
+                      <th className="px-3 py-2">Status</th>
+                      <th className="px-3 py-2">Expiration</th>
+                      <th className="px-3 py-2 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {documentRows.map((row) => {
+                      const doc = row.document
+                      const label = DOCUMENT_LABELS[row.type] ?? row.type
+                      const rejected = isRejected(doc)
+                      return (
+                        <tr key={`${row.type}-${doc?.document_id ?? 'missing'}`} className="border-b border-slate-100 align-top">
+                          <td className="px-3 py-3">
                             <div className="flex items-center gap-2">
-                              <p className="font-bold text-slate-900">{DOCUMENT_LABELS[document.document_type] ?? document.document_type}</p>
-                              {requiredDocuments.includes(document.document_type) && (
-                                <span className="rounded-md bg-blue-50 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-blue-600">Required</span>
+                              <span className="font-bold text-slate-900">{label}</span>
+                              {row.required && <span className="rounded-md bg-blue-50 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-blue-600">Required</span>}
+                            </div>
+                            {doc ? (
+                              <p className="mt-1 text-xs text-slate-400">{doc.original_filename} · Uploaded {formatDate(doc.uploaded_at || doc.created_at)}</p>
+                            ) : (
+                              <p className="mt-1 text-xs text-amber-600">No file submitted</p>
+                            )}
+                          </td>
+                          <td className="px-3 py-3">
+                            {!doc ? (
+                              <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-bold text-amber-700"><AlertTriangle className="h-3.5 w-3.5" />Not submitted</span>
+                            ) : rejected ? (
+                              <div>
+                                <span className="inline-flex items-center gap-1 rounded-full bg-red-50 px-2.5 py-1 text-xs font-bold text-red-700"><XCircle className="h-3.5 w-3.5" />Rejected</span>
+                                <p className="mt-1 text-xs text-red-600">{decisions[doc.document_id]}</p>
+                              </div>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700"><CheckCircle2 className="h-3.5 w-3.5" />Approved</span>
+                            )}
+                          </td>
+                          <td className="px-3 py-3 text-xs text-slate-600">
+                            {row.type === 'mayors_permit' ? (doc?.expiration_date ? formatDate(doc.expiration_date) : '—') : '—'}
+                          </td>
+                          <td className="px-3 py-3">
+                            <div className="flex flex-wrap items-center justify-end gap-2">
+                              {doc && (
+                                <>
+                                  <Button variant="outline" size="sm" icon={Eye} onClick={() => viewDocument(doc)} disabled={viewingDocumentId === doc.document_id}>
+                                    {viewingDocumentId === doc.document_id ? 'Loading...' : 'View'}
+                                  </Button>
+                                  <Button variant="outline" size="sm" icon={Download} onClick={() => { setDownloadDocument(doc); setDownloadReason('') }}>Download</Button>
+                                  {rejected ? (
+                                    <Button variant="outline" size="sm" icon={CheckCircle2} onClick={() => undoRejectRow(doc.document_id)}>Undo</Button>
+                                  ) : (
+                                    <select
+                                      value=""
+                                      onChange={(event) => { if (event.target.value) rejectRow(doc.document_id, event.target.value) }}
+                                      className="rounded-lg border border-red-200 bg-red-50 px-2 py-1.5 text-xs font-bold text-red-700 focus:outline-none focus:ring-1 focus:ring-red-300"
+                                    >
+                                      <option value="">Reject…</option>
+                                      {REJECTION_REASONS.map((reason) => <option key={reason} value={reason}>{reason}</option>)}
+                                    </select>
+                                  )}
+                                </>
                               )}
                             </div>
-                            <p className="mt-1 text-sm text-slate-500">{document.original_filename}</p>
-                            <p className="mt-1 text-xs text-slate-400">Uploaded {formatDate(document.uploaded_at || document.created_at)}</p>
-                            {document.admin_notes && (
-                              <div className="mt-2 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600">
-                                <span className="font-bold">Admin notes:</span> {document.admin_notes}
-                              </div>
-                            )}
-                          </div>
-                          <div className="flex flex-wrap gap-2">
-                            <StatusBadge status={docStatus} />
-                            <Button variant="outline" size="sm" icon={Eye} onClick={() => viewDocument(document)} disabled={viewingDocumentId === document.document_id}>
-                              {viewingDocumentId === document.document_id ? 'Loading...' : 'View'}
-                            </Button>
-                            <Button variant="outline" size="sm" icon={Download} onClick={() => { setDownloadDocument(document); setDownloadReason('') }}>Download</Button>
-                          </div>
-                        </div>
-                        <input value={documentNotes[document.document_id] ?? ''} onChange={(event) => setDocumentNotes((current) => ({ ...current, [document.document_id]: event.target.value }))} placeholder="Add note for review (required for rejection, min 10 chars)" className="mt-3 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:border-brand-navy focus:outline-none focus:ring-1 focus:ring-brand-navy" />
-                        <div className="mt-3 flex flex-wrap gap-2">
-                          <Button variant="danger" size="sm" icon={XCircle} onClick={() => handleDocumentReview(document, 'rejected')} disabled={reviewingDocumentId === document.document_id}>
-                            {reviewingDocumentId === document.document_id ? 'Processing...' : 'Reject'}
-                          </Button>
-                          <Button variant="secondary" size="sm" icon={CheckCircle2} onClick={() => handleDocumentReview(document, 'approved')} disabled={reviewingDocumentId === document.document_id}>
-                            {reviewingDocumentId === document.document_id ? 'Processing...' : 'Approve'}
-                          </Button>
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              ) : (
-                <div className="mt-5 rounded-xl border border-dashed border-slate-200 bg-slate-50 p-5 text-center text-sm text-slate-500">No documents have been uploaded for this employer.</div>
-              )}
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+                {documentRows.length === 0 && (
+                  <div className="mt-3 rounded-xl border border-dashed border-slate-200 bg-slate-50 p-5 text-center text-sm text-slate-500">No documents have been uploaded for this employer.</div>
+                )}
+              </div>
             </Card>
 
             <Card>
@@ -473,46 +471,42 @@ export default function EmployerDetailPage() {
             <Card>
               <h2 className="text-lg font-black text-slate-950">Review decision</h2>
 
-              {/* Guard rail: show readiness checklist */}
+              {/* Readiness summary */}
               <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3">
                 <p className="text-xs font-extrabold uppercase tracking-wide text-slate-500">Approval Readiness</p>
                 <div className="mt-2 space-y-1.5">
                   <ReadinessCheck
-                    label="All required documents uploaded"
-                    passed={missingDocuments.length === 0}
-                    detail={missingDocuments.length > 0 ? `${missingDocuments.length} missing` : null}
+                    label="All required documents submitted"
+                    passed={!hasMissingRequired}
+                    detail={hasMissingRequired ? `${missingDocuments.length} missing` : null}
                   />
                   <ReadinessCheck
-                    label="All required documents approved"
-                    passed={allRequiredApproved}
-                    detail={!allRequiredApproved && verificationDocuments.length > 0 ? `${approvedDocsCount}/${requiredDocuments.length || verificationDocuments.length} approved` : null}
-                  />
-                  <ReadinessCheck
-                    label="No rejected documents"
-                    passed={rejectedDocsCount === 0}
-                    detail={rejectedDocsCount > 0 ? `${rejectedDocsCount} rejected` : null}
+                    label="No required document rejected"
+                    passed={!hasRejectedRequired}
+                    detail={hasRejectedRequired ? 'Blocks approval' : null}
                   />
                 </div>
               </div>
 
               <div className="mt-4 space-y-3">
-                <label className="block text-sm text-slate-600"><span className="mb-1.5 block text-xs font-extrabold uppercase tracking-wide text-slate-400">Approval remarks</span><textarea value={approvalRemarks} onChange={(event) => setApprovalRemarks(event.target.value)} rows={3} className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:border-brand-navy focus:outline-none focus:ring-1 focus:ring-brand-navy" placeholder="Optional admin remarks" /></label>
-                <label className="block text-sm text-slate-600"><span className="mb-1.5 block text-xs font-extrabold uppercase tracking-wide text-slate-400">Rejection reason</span><textarea value={rejectionReason} onChange={(event) => setRejectionReason(event.target.value)} rows={3} className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:border-brand-navy focus:outline-none focus:ring-1 focus:ring-brand-navy" placeholder="Required for rejection (min 10 characters)" /></label>
-                <div className="flex flex-wrap gap-2">
-                  <Button
-                    variant="secondary"
-                    icon={ShieldCheck}
-                    onClick={handleApproveEmployer}
-                    disabled={actionLoading || !allRequiredApproved}
-                  >
-                    {actionLoading ? 'Working...' : 'Approve employer'}
-                  </Button>
-                  <Button variant="danger" icon={XCircle} onClick={handleRejectEmployer} disabled={actionLoading}>Reject employer</Button>
-                </div>
-                {!allRequiredApproved && verificationDocuments.length > 0 && (
-                  <p className="text-xs text-amber-700">
-                    ⚠ Approval is disabled until all required documents have been individually approved.
-                  </p>
+                <p className="text-sm leading-6 text-slate-600">
+                  {willReject
+                    ? 'A required document is rejected or missing — finalizing will reject this employer and notify them of the reason.'
+                    : 'All submitted requirements will be approved and this employer will be verified.'}
+                </p>
+                <Button
+                  variant={willReject ? 'danger' : 'secondary'}
+                  icon={willReject ? XCircle : ShieldCheck}
+                  onClick={handleFinalize}
+                  disabled={actionLoading}
+                  className={willReject
+                    ? 'w-full'
+                    : 'w-full !border-emerald-600 !bg-emerald-600 !text-white hover:!bg-emerald-700'}
+                >
+                  {actionLoading ? 'Working...' : willReject ? 'Reject Employer' : 'Approve Employer'}
+                </Button>
+                {rejectedCount > 0 && !willReject && (
+                  <p className="text-xs text-slate-500">{rejectedCount} optional document(s) flagged — these do not block approval.</p>
                 )}
               </div>
             </Card>
@@ -577,6 +571,7 @@ export default function EmployerDetailPage() {
                 variant={confirmDialog.variant === 'approve' ? 'secondary' : 'danger'}
                 onClick={confirmDialog.onConfirm}
                 disabled={actionLoading}
+                className={confirmDialog.variant === 'approve' ? '!border-emerald-600 !bg-emerald-600 !text-white hover:!bg-emerald-700' : ''}
               >
                 {actionLoading ? 'Processing...' : confirmDialog.confirmLabel}
               </Button>

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Download, FileText, Mail, RefreshCw, Save, ShieldCheck } from 'lucide-react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Button, Card, CardHeader } from '@/components/ui'
+import { Button, Card, CardHeader, LoadingSkeleton } from '@/components/ui'
 import PageHeader from '@/pages/admin/_components/PageHeader'
 import { adminService } from '@/services/adminService'
 
@@ -20,7 +20,7 @@ export default function JobFairDetailPage() {
   const action = async (work, success) => { setError(''); setNotice(''); try { await work(); setNotice(success); await load() } catch (e) { setError(Object.values(e.response?.data?.errors ?? {}).flat().join(' ') || e.response?.data?.message || 'Action failed.') } }
   const blobDownload = async (work, filename) => { try { const blob = await work(); const url = URL.createObjectURL(blob); const link = document.createElement('a'); link.href = url; link.download = filename; link.click(); URL.revokeObjectURL(url) } catch (e) { setError(e.response?.data?.message ?? 'Download failed.') } }
 
-  if (loading && !fair) return <div className="portal-page py-20 text-center text-sm text-slate-500">Loading Job Fair workspace…</div>
+  if (loading && !fair) return <div className="portal-page"><LoadingSkeleton variant="text" rows={2} className="max-w-md" /><LoadingSkeleton variant="stat" rows={4} /><LoadingSkeleton variant="card" rows={2} /></div>
   return <div className="portal-page">
     <PageHeader title={fair?.title ?? 'Job Fair'} subtitle="Pre-event coordination and post-event omnichannel reporting." eyebrow="Zero-Interference Job Fair" actions={[{ label: 'Back', onClick: () => navigate('/admin/job-fairs'), variant: 'secondary' }, { label: 'Edit', onClick: () => navigate(`/admin/job-fairs/${id}/edit`), variant: 'secondary' }]} />
     {error && <div className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm font-semibold text-rose-700">{error}</div>}{notice && <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-semibold text-emerald-700">{notice}</div>}

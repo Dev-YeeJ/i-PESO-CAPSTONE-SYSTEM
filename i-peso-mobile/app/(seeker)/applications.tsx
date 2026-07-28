@@ -1,17 +1,19 @@
-import AsyncStorage from '@react-native-async-storage/async-storage'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback } from 'react'
 import {
   ActivityIndicator,
+  Alert,
   RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
+  TouchableOpacity,
   View,
 } from 'react-native'
 import { router } from 'expo-router'
-import type { SeekerApplication, SeekerProfile } from '@/services/seekerService'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import type { SeekerApplication } from '@/services/seekerService'
 import { seekerService } from '@/services/seekerService'
-import { arrayFrom, formatDate, formatSalary, jobCompany, jobLocation, seekerName, textFrom, titleCase } from '@/utils/seekerView'
+import { formatDate, formatSalary, jobCompany, jobLocation, seekerName, textFrom, titleCase } from '@/utils/seekerView'
 import { AlertBox } from '@/components/ui/AlertBox'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
@@ -20,58 +22,54 @@ import { StatCard } from '@/components/ui/StatCard'
 import { SectionHeader } from '@/components/ui/SectionHeader'
 import { colors, radii, spacing, typography } from '@/theme'
 
-const SAVED_JOBS_KEY = 'ipeso_mobile_saved_jobs'
-
 type StatusBadgeVariant = 'neutral' | 'info' | 'success' | 'warning' | 'danger'
 
 export default function ApplicationsScreen() {
-  const [profile, setProfile] = useState<SeekerProfile | null>(null)
-  const [applications, setApplications] = useState<SeekerApplication[]>([])
-  const [savedCount, setSavedCount] = useState(0)
-  const [loading, setLoading] = useState(true)
-  const [refreshing, setRefreshing] = useState(false)
-  const [error, setError] = useState('')
+  const queryClient = useQueryClient()
 
-  const load = useCallback(async () => {
-    setError('')
+  const { data: profile } = useQuery({ queryKey: ['seekerProfile'], queryFn: () => seekerService.getProfile() })
+  const {
+    data: applicationsData,
+    isLoading,
+    isRefetching,
+    error,
+    refetch,
+  } = useQuery({ queryKey: ['applications'], queryFn: () => seekerService.getApplications() })
 
-    try {
-      const [profileData, applicationsData, rawSaved] = await Promise.all([
-        seekerService.getProfile(),
-        seekerService.getApplications(),
-        AsyncStorage.getItem(SAVED_JOBS_KEY),
-      ])
+  const applications = applicationsData?.applications ?? []
 
-      setProfile(profileData)
-      setApplications(applicationsData.applications ?? [])
-      setSavedCount(arrayFrom(rawSaved ? JSON.parse(rawSaved) : []).length)
-    } catch {
-      setError('Unable to load application activity. Check the backend connection.')
-    }
-  }, [])
+  const onRefresh = useCallback(() => { refetch() }, [refetch])
 
-  useEffect(() => {
-    load().finally(() => setLoading(false))
-  }, [load])
+  const withdrawMutation = useMutation({
+    mutationFn: (id: number | string) => seekerService.withdrawApplication(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['applications'] })
+      queryClient.invalidateQueries({ queryKey: ['jobs'] })
+    },
+    onError: () => Alert.alert('Unable to withdraw', 'Please check your connection and try again.'),
+  })
 
-  const onRefresh = useCallback(async () => {
-    setRefreshing(true)
-    await load()
-    setRefreshing(false)
-  }, [load])
+  const confirmWithdraw = (application: SeekerApplication) => {
+    Alert.alert(
+      'Withdraw application?',
+      `This will withdraw your application for ${textFrom(application.job?.job_title, 'this job')}.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Withdraw', style: 'destructive', onPress: () => withdrawMutation.mutate(application.apply_id) },
+      ]
+    )
+  }
 
-  const activeApplications = useMemo(
-    () => applications.filter((application) => !['hired', 'rejected'].includes(application.status)).length,
-    [applications]
-  )
+  const activeApplications = applications.filter((application) => !['hired', 'rejected', 'withdrawn'].includes(application.status)).length
   const hiredApplications = applications.filter((application) => application.status === 'hired').length
+  const savedCount = profile?.dashboard_stats?.saved_jobs?.length ?? 0
   const strength = profile?.profile_strength?.percentage ?? 0
 
   return (
     <View style={styles.flex}>
       <ScrollView
         contentContainerStyle={styles.content}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.info} />}
+        refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={onRefresh} tintColor={colors.info} />}
         showsVerticalScrollIndicator={false}
       >
         <Text style={styles.kicker}>Application Activity</Text>
@@ -80,7 +78,7 @@ export default function ApplicationsScreen() {
           Track submitted jobs, employer updates, interviews, and placements from i-PESO.
         </Text>
 
-        {loading ? (
+        {isLoading ? (
           <Card style={[styles.statusCard, styles.statusMessageCard]} padding="md">
             <ActivityIndicator color={colors.info} />
             <Text style={styles.loadingText}>Loading activity...</Text>
@@ -89,7 +87,7 @@ export default function ApplicationsScreen() {
 
         {error ? (
           <AlertBox variant="danger" style={styles.alertBox}>
-            {error}
+            Unable to load application activity. Check the backend connection.
           </AlertBox>
         ) : null}
 
@@ -101,7 +99,7 @@ export default function ApplicationsScreen() {
               : 'No applications submitted yet'}
           </Text>
           <Text style={styles.summaryText}>
-            Employers can now move your application from pending review to interview, hired, or rejected.
+            Employers can move your application from pending review to interview, hired, or rejected.
           </Text>
         </Card>
 
@@ -117,7 +115,7 @@ export default function ApplicationsScreen() {
 
         <SectionHeader title="Application History" />
 
-        {!loading && !applications.length ? (
+        {!isLoading && !applications.length ? (
           <Card style={styles.emptyStateCard} padding="md">
             <Text style={styles.sectionTitle}>Start Applying</Text>
             <Text style={styles.bodyText}>
@@ -130,64 +128,89 @@ export default function ApplicationsScreen() {
         ) : null}
 
         {applications.map((application) => (
-          <ApplicationCard key={String(application.apply_id)} application={application} />
+          <ApplicationCard
+            key={String(application.apply_id)}
+            application={application}
+            onWithdraw={() => confirmWithdraw(application)}
+            withdrawing={withdrawMutation.isPending && withdrawMutation.variables === application.apply_id}
+          />
         ))}
       </ScrollView>
     </View>
   )
 }
 
-function ApplicationCard({ application }: { application: SeekerApplication }) {
+function ApplicationCard({
+  application,
+  onWithdraw,
+  withdrawing,
+}: {
+  application: SeekerApplication
+  onWithdraw: () => void
+  withdrawing: boolean
+}) {
   const job = application.job
 
   return (
-    <Card style={styles.applicationCard} padding="md">
-      <View style={styles.applicationHeader}>
-        <View style={styles.applicationTitleWrap}>
-          <Text style={styles.jobTitle}>{textFrom(job?.job_title, 'Untitled job')}</Text>
-          <Text style={styles.company}>{job ? jobCompany(job) : 'Employer not listed'}</Text>
+    <TouchableOpacity activeOpacity={0.9} onPress={() => router.push(`/(seeker)/applications/${application.apply_id}`)}>
+      <Card style={styles.applicationCard} padding="md">
+        <View style={styles.applicationHeader}>
+          <View style={styles.applicationTitleWrap}>
+            <Text style={styles.jobTitle}>{textFrom(job?.job_title, 'Untitled job')}</Text>
+            <Text style={styles.company}>{job ? jobCompany(job) : 'Employer not listed'}</Text>
+          </View>
+          <Badge variant={statusVariant(application.status)} style={styles.statusBadge}>
+            {application.status_label ?? titleCase(application.status)}
+          </Badge>
         </View>
-        <Badge variant={statusVariant(application.status)} style={styles.statusBadge}>
-          {application.status_label ?? titleCase(application.status)}
-        </Badge>
-      </View>
 
-      <View style={styles.jobMetaContainer}>
-        {job ? <Text style={styles.meta}>{jobLocation(job)}</Text> : null}
-        {job ? <Text style={styles.meta}>•</Text> : null}
-        {job ? <Text style={styles.meta}>{formatSalary(job)}</Text> : null}
-      </View>
-
-      <View style={styles.detailGrid}>
-        <Detail label="Applied" value={formatDate(application.applied_at)} />
-        <Detail label="Match" value={`${Math.round(Number(application.match_percentage ?? 0))}%`} />
-      </View>
-
-      {application.interview ? (
-        <View style={styles.infoBox}>
-          <Text style={styles.infoTitle}>Interview Schedule</Text>
-          <Text style={styles.infoText}>{titleCase(application.interview.mode_of_interview, 'Interview')}</Text>
-          <Text style={styles.infoText}>{formatDate(application.interview.schedule)}</Text>
-          <Text style={styles.infoText}>{textFrom(application.interview.venue_or_link, 'Venue or link to follow')}</Text>
-          {application.interview.instructions ? <Text style={styles.infoText}>{application.interview.instructions}</Text> : null}
+        <View style={styles.jobMetaContainer}>
+          {job ? <Text style={styles.meta}>{jobLocation(job)}</Text> : null}
+          {job ? <Text style={styles.meta}>•</Text> : null}
+          {job ? <Text style={styles.meta}>{formatSalary(job)}</Text> : null}
         </View>
-      ) : null}
 
-      {application.placement ? (
-        <View style={styles.successBox}>
-          <Text style={styles.successTitle}>Placement Captured</Text>
-          <Text style={styles.successText}>Start date: {formatDate(application.placement.start_date)}</Text>
-          <Text style={styles.successText}>Salary: PHP {Number(application.placement.salary ?? 0).toLocaleString()}</Text>
+        <View style={styles.detailGrid}>
+          <Detail label="Applied" value={formatDate(application.applied_at)} />
+          <Detail label="Match" value={`${Math.round(Number(application.match_percentage ?? 0))}%`} />
         </View>
-      ) : null}
 
-      {application.employer_remarks ? (
-        <View style={styles.noteBox}>
-          <Text style={styles.noteTitle}>Employer Remarks</Text>
-          <Text style={styles.noteText}>{application.employer_remarks}</Text>
+        {application.interview ? (
+          <View style={styles.infoBox}>
+            <Text style={styles.infoTitle}>Interview Schedule</Text>
+            <Text style={styles.infoText}>{titleCase(application.interview.mode_of_interview, 'Interview')}</Text>
+            <Text style={styles.infoText}>{formatDate(application.interview.schedule)}</Text>
+            <Text style={styles.infoText}>{textFrom(application.interview.venue_or_link, 'Venue or link to follow')}</Text>
+          </View>
+        ) : null}
+
+        {application.placement ? (
+          <View style={styles.successBox}>
+            <Text style={styles.successTitle}>Placement Captured</Text>
+            <Text style={styles.successText}>Start date: {formatDate(application.placement.start_date)}</Text>
+            <Text style={styles.successText}>Salary: PHP {Number(application.placement.salary ?? 0).toLocaleString()}</Text>
+          </View>
+        ) : null}
+
+        {application.employer_remarks ? (
+          <View style={styles.noteBox}>
+            <Text style={styles.noteTitle}>Employer Remarks</Text>
+            <Text style={styles.noteText}>{application.employer_remarks}</Text>
+          </View>
+        ) : null}
+
+        <View style={styles.cardActions}>
+          <Button variant="outline" size="sm" onPress={() => router.push(`/(seeker)/applications/${application.apply_id}`)} style={styles.cardActionBtn}>
+            View details
+          </Button>
+          {application.can_withdraw ? (
+            <Button variant="danger" size="sm" onPress={onWithdraw} disabled={withdrawing} style={styles.cardActionBtn}>
+              {withdrawing ? 'Withdrawing...' : 'Withdraw'}
+            </Button>
+          ) : null}
         </View>
-      ) : null}
-    </Card>
+      </Card>
+    </TouchableOpacity>
   )
 }
 
@@ -202,9 +225,9 @@ function Detail({ label, value }: { label: string; value: string }) {
 
 function statusVariant(status: string): StatusBadgeVariant {
   if (status === 'hired') return 'success'
-  if (status === 'rejected') return 'danger'
+  if (status === 'rejected' || status === 'withdrawn') return 'danger'
   if (status === 'interview' || status === 'shortlisted') return 'warning'
-  if (status === 'pending' || status === 'review' || status === 'interviewed') return 'info'
+  if (status === 'pending' || status === 'reviewed') return 'info'
   return 'neutral'
 }
 
@@ -212,7 +235,7 @@ const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: colors.background },
   content: { paddingHorizontal: spacing.xl, paddingTop: 56, paddingBottom: spacing.xxxl },
   kicker: { color: colors.info, fontSize: typography.small, fontWeight: typography.bold, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: spacing.xs },
-  title: { color: colors.primary, fontSize: typography.display, fontWeight: typography.bold, marginBottom: spacing.xs },
+  title: { color: colors.primary, fontSize: typography.hero, fontFamily: typography.family.display, marginBottom: spacing.xs },
   subtitle: { color: colors.secondaryText, fontSize: typography.body, lineHeight: 20, marginBottom: spacing.lg },
   statusCard: { marginBottom: spacing.lg, alignItems: 'center', justifyContent: 'center', gap: spacing.sm },
   statusMessageCard: { borderColor: colors.border, backgroundColor: colors.surface },
@@ -248,4 +271,6 @@ const styles = StyleSheet.create({
   noteBox: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radii.md, padding: spacing.md, marginTop: spacing.md },
   noteTitle: { color: colors.primary, fontSize: typography.body, fontWeight: typography.semibold, marginBottom: spacing.xs },
   noteText: { color: colors.secondaryText, fontSize: typography.small, lineHeight: 20 },
+  cardActions: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md },
+  cardActionBtn: { flex: 1, marginBottom: 0 },
 })

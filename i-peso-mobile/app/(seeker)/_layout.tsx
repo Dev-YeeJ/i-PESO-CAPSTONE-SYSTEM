@@ -74,6 +74,16 @@ export default function SeekerLayout() {
           tabBarIcon: ({ color }) => <TabIcon name="person" color={color} />,
         }}
       />
+      <Tabs.Screen name="jobs/[id]" options={{ href: null }} />
+      <Tabs.Screen name="applications/[id]" options={{ href: null }} />
+      <Tabs.Screen name="profile/edit" options={{ href: null }} />
+      <Tabs.Screen name="notifications" options={{ href: null }} />
+      <Tabs.Screen name="job-fairs" options={{ href: null }} />
+      <Tabs.Screen name="job-fairs/[id]" options={{ href: null }} />
+      <Tabs.Screen name="upskill-hub" options={{ href: null }} />
+      <Tabs.Screen name="upskill-hub/[id]" options={{ href: null }} />
+      <Tabs.Screen name="program-applications" options={{ href: null }} />
+      <Tabs.Screen name="citizen-charter" options={{ href: null }} />
     </Tabs>
   )
 }

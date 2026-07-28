@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class JobFairResultReport extends Model
 {
     protected $fillable = [
-        'job_fair_id', 'job_fair_employer_id', 'employer_id', 'company_name', 'normalized_company_name',
+        'job_fair_id', 'job_fair_employer_id', 'employer_id', 'company_name', 'office_location', 'normalized_company_name',
         'dedupe_key', 'employer_type', 'source', 'contact_person', 'contact_number', 'total_male',
         'total_female', 'total_applicants', 'total_hots', 'total_near_hired', 'total_rejected',
         'total_vacancies_solicited', 'total_vacancies_offered', 'remarks', 'encoded_by_admin_id',

@@ -1,15 +1,26 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import {
   ActivityIndicator,
+  Alert,
+  Image,
+  Modal,
   RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
+  TouchableOpacity,
   View,
 } from 'react-native'
 import { router } from 'expo-router'
-import type { ProfileStrengthItem, SeekerProfile } from '@/services/seekerService'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import * as ImagePicker from 'expo-image-picker'
+import * as DocumentPicker from 'expo-document-picker'
+import type { ProfileStrengthItem, SeekerCertificate } from '@/services/seekerService'
 import { seekerService } from '@/services/seekerService'
+import { useAuthStore } from '@/stores/authStore'
+import { downloadAndShare, postAndDownload } from '@/utils/fileTransfer'
+import { apiErrorMessage } from '@/utils/apiError'
 import {
   addressLine,
   arrayFrom,
@@ -22,45 +33,170 @@ import { AlertBox } from '@/components/ui/AlertBox'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
-import { ProgressCard } from '@/components/ui/ProgressCard'
 import { SectionHeader } from '@/components/ui/SectionHeader'
+import { MatchRing } from '@/components/ui/MatchRing'
 import { colors, radii, spacing, typography } from '@/theme'
 
+const CERTIFICATE_CATEGORIES = [
+  'training_certificate', 'tesda_nc_certificate', 'professional_certificate',
+  'seminar_certificate', 'workshop_certificate', 'employment_certificate',
+  'academic_certificate', 'other',
+]
+
 export default function ProfileScreen() {
-  const [profile, setProfile] = useState<SeekerProfile | null>(null)
-  const [loading, setLoading] = useState(true)
+  const token = useAuthStore((state) => state.token)
+  const queryClient = useQueryClient()
   const [refreshing, setRefreshing] = useState(false)
-  const [error, setError] = useState('')
+  const [photoBusy, setPhotoBusy] = useState(false)
+  const [certModalOpen, setCertModalOpen] = useState(false)
+  const [resumeModalOpen, setResumeModalOpen] = useState(false)
+  const [summary, setSummary] = useState('')
+  const [resumeBusy, setResumeBusy] = useState(false)
+  const [aiSummaryBusy, setAiSummaryBusy] = useState(false)
+  const [aiSummaryNotice, setAiSummaryNotice] = useState('')
+  const [actionError, setActionError] = useState('')
 
-  const loadProfile = useCallback(async () => {
-    setError('')
-    try {
-      const data = await seekerService.getProfile()
-      setProfile(data)
-    } catch {
-      setError('Unable to load your profile. Check the backend connection.')
-    }
-  }, [])
+  const { data: profile, isLoading, error, refetch } = useQuery({
+    queryKey: ['seekerProfile'],
+    queryFn: () => seekerService.getProfile(),
+  })
 
-  useEffect(() => {
-    loadProfile().finally(() => setLoading(false))
-  }, [loadProfile])
+  const { data: analytics } = useQuery({
+    queryKey: ['seekerAnalytics'],
+    queryFn: () => seekerService.getAnalytics(),
+  })
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true)
-    await loadProfile()
+    await refetch()
     setRefreshing(false)
-  }, [loadProfile])
+  }, [refetch])
 
   const strength = profile?.profile_strength?.percentage ?? 0
   const checklist = arrayFrom<ProfileStrengthItem>(profile?.profile_strength?.items)
   const hardSkills = [...(profile?.dole_skills ?? []), ...(profile?.technical_skills ?? [])]
   const softSkills = profile?.soft_skills ?? []
-  
   const educations = arrayFrom<Record<string, unknown>>(profile?.educations)
   const workExperiences = arrayFrom<Record<string, unknown>>(profile?.work_experiences)
   const trainings = arrayFrom<Record<string, unknown>>(profile?.trainings)
-  const certificates = arrayFrom<Record<string, unknown>>(profile?.certificates)
+  const eligibilities = arrayFrom<Record<string, unknown>>(profile?.eligibilities)
+  const languages = arrayFrom<Record<string, unknown>>(profile?.languages)
+  const occupations = arrayFrom<Record<string, unknown>>(profile?.occupations)
+  const certificates: SeekerCertificate[] = profile?.certificates ?? []
+
+  const imageSource = useMemo(() => {
+    if (!profile?.has_profile_image || !token) return null
+    return { uri: seekerService.profileImageUrl(profile.id), headers: { Authorization: `Bearer ${token}` } }
+  }, [profile?.has_profile_image, profile?.id, token])
+
+  const invalidateProfile = () => queryClient.invalidateQueries({ queryKey: ['seekerProfile'] })
+
+  const pickAndUploadPhoto = async () => {
+    setActionError('')
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync()
+    if (!permission.granted) {
+      setActionError('Photo library permission is required to upload a profile photo.')
+      return
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.85,
+    })
+    if (result.canceled || !result.assets?.length) return
+
+    const asset = result.assets[0]
+    setPhotoBusy(true)
+    try {
+      await seekerService.uploadProfileImage(asset.uri, asset.mimeType || 'image/jpeg')
+      await invalidateProfile()
+    } catch (caught) {
+      setActionError(apiErrorMessage(caught, 'Unable to upload photo. Use a square JPG/PNG at least 300x300px, under 2MB.'))
+    } finally {
+      setPhotoBusy(false)
+    }
+  }
+
+  const deletePhoto = () => {
+    Alert.alert('Remove profile photo?', 'You will need to upload a new photo before generating a resume.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Remove',
+        style: 'destructive',
+        onPress: async () => {
+          setPhotoBusy(true)
+          try {
+            await seekerService.deleteProfileImage()
+            await invalidateProfile()
+          } catch (caught) {
+            setActionError(apiErrorMessage(caught, 'Unable to remove photo.'))
+          } finally {
+            setPhotoBusy(false)
+          }
+        },
+      },
+    ])
+  }
+
+  const viewCertificate = async (certificate: SeekerCertificate) => {
+    try {
+      await downloadAndShare(seekerService.certificateViewUrl(certificate.certificate_id), certificate.original_filename || `${certificate.title}.pdf`)
+    } catch {
+      Alert.alert('Unable to open certificate', 'Please check your connection and try again.')
+    }
+  }
+
+  const deleteCertificate = (certificate: SeekerCertificate) => {
+    Alert.alert('Delete certificate?', certificate.title, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await seekerService.deleteCertificate(certificate.certificate_id)
+            await invalidateProfile()
+          } catch (caught) {
+            Alert.alert('Unable to delete', apiErrorMessage(caught, 'Please try again.'))
+          }
+        },
+      },
+    ])
+  }
+
+  const generateSummaryWithAI = async () => {
+    setAiSummaryBusy(true)
+    setAiSummaryNotice('')
+    const result = await seekerService.generateProfessionalSummaryAI(summary.trim() || undefined)
+    if (result?.summary) {
+      setSummary(result.summary)
+    } else {
+      setAiSummaryNotice('AI summary generation is unavailable right now. You can still write your own summary.')
+    }
+    setAiSummaryBusy(false)
+  }
+
+  const generateResume = async () => {
+    if (!profile?.has_profile_image) {
+      Alert.alert('Photo required', 'Upload a professional 2x2 photo before generating your resume.')
+      return
+    }
+    if (!summary.trim()) {
+      setActionError('Add a short professional summary before generating your resume.')
+      return
+    }
+    setResumeBusy(true)
+    setActionError('')
+    try {
+      await postAndDownload('/seeker/resume/generate', { professional_summary: summary.trim() }, `iPESO_Resume_${profile?.last_name || 'seeker'}.pdf`)
+      setResumeModalOpen(false)
+    } catch (caught) {
+      setActionError(apiErrorMessage(caught, 'Unable to generate resume. Check your backend connection.'))
+    } finally {
+      setResumeBusy(false)
+    }
+  }
 
   return (
     <View style={styles.flex}>
@@ -75,7 +211,7 @@ export default function ProfileScreen() {
           Manage your personal information, skills, and experience to get better job matches.
         </Text>
 
-        {loading ? (
+        {isLoading ? (
           <Card style={[styles.statusCard, styles.statusMessageCard]} padding="md">
             <ActivityIndicator color={colors.info} />
             <Text style={styles.loadingText}>Loading profile...</Text>
@@ -84,54 +220,123 @@ export default function ProfileScreen() {
 
         {error ? (
           <AlertBox variant="danger" style={styles.alertBox}>
-            {error}
+            Unable to load your profile. Check the backend connection.
+          </AlertBox>
+        ) : null}
+
+        {actionError ? (
+          <AlertBox variant="danger" style={styles.alertBox}>
+            {actionError}
           </AlertBox>
         ) : null}
 
         <Card padding="md" style={styles.profileHeaderCard}>
           <View style={styles.profileHeaderInner}>
-            <View style={styles.avatar}>
-              <Text style={styles.avatarText}>{seekerName(profile).charAt(0).toUpperCase()}</Text>
-            </View>
+            <TouchableOpacity onPress={pickAndUploadPhoto} disabled={photoBusy} activeOpacity={0.85}>
+              <View style={styles.avatar}>
+                {photoBusy ? (
+                  <ActivityIndicator color={colors.surface} />
+                ) : imageSource ? (
+                  <Image source={imageSource} style={styles.avatarImage} />
+                ) : (
+                  <Text style={styles.avatarText}>{seekerName(profile).charAt(0).toUpperCase()}</Text>
+                )}
+              </View>
+              <Text style={styles.avatarEditLabel}>{imageSource ? 'Change' : 'Add photo'}</Text>
+            </TouchableOpacity>
             <View style={styles.profileHeaderText}>
               <Text style={styles.name}>{seekerName(profile)}</Text>
               <Text style={styles.muted}>{textFrom(profile?.email, 'Email not listed')}</Text>
               <Text style={styles.muted}>{addressLine(profile)}</Text>
+              {imageSource ? (
+                <TouchableOpacity onPress={deletePhoto} disabled={photoBusy}>
+                  <Text style={styles.removePhotoText}>Remove photo</Text>
+                </TouchableOpacity>
+              ) : null}
             </View>
           </View>
         </Card>
 
-        {/* Profile Strength */}
-        <ProgressCard 
-          title="Profile Strength" 
-          progress={strength}
-          color={colors.info}
-        />
-        
+        <Card padding="md" style={styles.strengthCard}>
+          <MatchRing percentage={strength} size={76} strokeWidth={6} />
+          <View style={styles.strengthText}>
+            <Text style={styles.strengthTitle}>Profile Strength</Text>
+            <Text style={styles.strengthSub}>
+              {strength < 100 ? 'Complete every section to reach 100%.' : 'Your profile is fully updated!'}
+            </Text>
+          </View>
+        </Card>
+
         <Card padding="md" style={styles.checklistCard}>
-          {checklist.slice(0, 5).map((item) => (
+          {checklist.map((item) => (
             <View key={item.key ?? item.label} style={styles.checkRow}>
               <View style={[styles.checkDot, item.complete && styles.checkDotDone]} />
               <Text style={[styles.checkText, item.complete && styles.checkTextDone]}>{item.label}</Text>
             </View>
           ))}
-          <Button variant="outline" fullWidth onPress={() => router.push('/onboarding')} style={styles.updateBtn}>
-            Update missing details
-          </Button>
         </Card>
 
-        {/* Personal & Preferences */}
-        <SectionHeader title="Personal and Work Preferences" />
+        {analytics && (analytics.total_views_30_days > 0 || analytics.recent_viewers.length > 0) ? (
+          <>
+            <SectionHeader title="Profile Insights" />
+            <Card padding="md" style={styles.analyticsCard}>
+              <View style={styles.analyticsStatsRow}>
+                <View style={styles.analyticsStat}>
+                  <Text style={styles.analyticsStatValue}>{analytics.total_views_30_days}</Text>
+                  <Text style={styles.analyticsStatLabel}>Profile views (30d)</Text>
+                </View>
+                <View style={styles.analyticsStat}>
+                  <Text style={styles.analyticsStatValue}>{analytics.search_appearances}</Text>
+                  <Text style={styles.analyticsStatLabel}>Search appearances</Text>
+                </View>
+              </View>
+              {analytics.recent_viewers.length ? (
+                <View style={styles.recentViewers}>
+                  <Text style={styles.recentViewersTitle}>Recently viewed by</Text>
+                  {analytics.recent_viewers.map((viewer, index) => (
+                    <Text key={index} style={styles.recentViewerRow}>{viewer.company_name}</Text>
+                  ))}
+                </View>
+              ) : null}
+            </Card>
+          </>
+        ) : null}
+
+        <SectionHeader
+          title="Personal Information"
+          action={<EditLink section={1} />}
+        />
         <Card padding="md">
+          <Info label="Date of Birth" value={textFrom(profile?.date_of_birth)} />
+          <Info label="Sex" value={titleCase(profile?.sex)} />
+          <Info label="Civil Status" value={titleCase(profile?.civil_status)} />
           <Info label="Mobile" value={textFrom(profile?.mobile_number)} />
-          <Info label="Education" value={textFrom(profile?.educ_attainment)} />
+          <Info label="Address" value={addressLine(profile)} />
+        </Card>
+
+        <SectionHeader title="Employment & Preferences" action={<EditLink section={2} />} />
+        <Card padding="md">
           <Info label="Employment Status" value={titleCase(profile?.employment_status)} />
           <Info label="Preferred Work" value={titleCase(profile?.work_type_preference)} />
           <Info label="Preferred Location" value={titleCase(profile?.preferred_work_location)} />
+          <Info label="Preferred Areas" value={(profile?.preferred_locations_details ?? []).join(', ') || 'Not set'} />
         </Card>
 
-        {/* Skills */}
-        <SectionHeader title="Skills" />
+        <SectionHeader title="Preferred Occupations" action={<EditLink section={3} />} />
+        <Card padding="md">
+          {occupations.length ? occupations.map((o, i) => (
+            <Info key={i} label={`Choice ${i + 1}`} value={recordText(o, ['occupation_title', 'raw_job_title', 'general_term'], 'Not set')} />
+          )) : <EmptyLine text="No preferred occupations listed yet." />}
+        </Card>
+
+        <SectionHeader title="Languages" action={<EditLink section={4} />} />
+        <Card padding="md">
+          {languages.length ? languages.map((l, i) => (
+            <Info key={i} label={titleCase(recordText(l, ['language']))} value={['can_read', 'can_write', 'can_speak', 'can_understand'].filter((k) => l[k]).map((k) => k.replace('can_', '')).join(', ') || 'None'} />
+          )) : <EmptyLine text="No languages listed yet." />}
+        </Card>
+
+        <SectionHeader title="Skills" action={<EditLink section={5} />} />
         <Card padding="md">
           <Text style={styles.skillGroupTitle}>Technical & Hard Skills</Text>
           {hardSkills.length ? (
@@ -140,9 +345,7 @@ export default function ProfileScreen() {
                 <Badge key={skill} variant="info" style={styles.skillBadge}>{skill}</Badge>
               ))}
             </View>
-          ) : (
-            <EmptyLine text="No technical skills listed." />
-          )}
+          ) : <EmptyLine text="No technical skills listed." />}
 
           <Text style={[styles.skillGroupTitle, { marginTop: spacing.lg }]}>Soft Skills</Text>
           {softSkills.length ? (
@@ -151,79 +354,222 @@ export default function ProfileScreen() {
                 <Badge key={skill} variant="success" style={styles.skillBadge}>{skill}</Badge>
               ))}
             </View>
-          ) : (
-            <EmptyLine text="No soft skills listed." />
-          )}
+          ) : <EmptyLine text="No soft skills listed." />}
         </Card>
 
-        {/* Education */}
-        <SectionHeader title="Education" />
+        <SectionHeader title="Education" action={<EditLink section={5} />} />
         <View style={styles.cardList}>
-          {educations.length ? (
-            educations.map((education, index) => (
-              <Card key={`${recordText(education, ['institution_name'], 'education')}-${index}`} padding="md">
-                <Text style={styles.itemTitle}>{recordText(education, ['institution_name'], 'School not listed')}</Text>
-                <Text style={styles.itemMeta}>{titleCase(recordText(education, ['level'], 'Level not listed'))}</Text>
-                <Text style={styles.itemMeta}>{recordText(education, ['course_strand'], 'Course or strand not listed')}</Text>
-                <Text style={styles.itemMeta}>
-                  {textFrom(education.year_started, '')}
-                  {education.year_graduated ? ` - ${textFrom(education.year_graduated, '')}` : ''}
-                </Text>
-              </Card>
-            ))
-          ) : (
-            <Card padding="md"><EmptyLine text="No education records listed yet." /></Card>
-          )}
+          {educations.length ? educations.map((education, index) => (
+            <Card key={index} padding="md">
+              <Text style={styles.itemTitle}>{recordText(education, ['institution_name'], 'School not listed')}</Text>
+              <Text style={styles.itemMeta}>{titleCase(recordText(education, ['level']))}</Text>
+              <Text style={styles.itemMeta}>{recordText(education, ['course_strand'], 'Course or strand not listed')}</Text>
+              <Text style={styles.itemMeta}>
+                {textFrom(education.year_started, '')}
+                {education.year_graduated ? ` - ${textFrom(education.year_graduated, '')}` : ''}
+              </Text>
+            </Card>
+          )) : <Card padding="md"><EmptyLine text="No education records listed yet." /></Card>}
         </View>
 
-        {/* Work Experience */}
-        <SectionHeader title="Work Experience" />
+        <SectionHeader title="Work Experience" action={<EditLink section={7} />} />
         <View style={styles.cardList}>
-          {workExperiences.length ? (
-            workExperiences.map((work, index) => (
-              <Card key={`${recordText(work, ['company_name'], 'work')}-${index}`} padding="md">
-                <Text style={styles.itemTitle}>{recordText(work, ['position', 'job_title'], 'Position not listed')}</Text>
-                <Text style={styles.itemMeta}>{recordText(work, ['company_name'], 'Company not listed')}</Text>
-                <Text style={styles.itemMeta}>{recordText(work, ['number_of_months'], 'Duration not listed')} months</Text>
-              </Card>
-            ))
-          ) : (
-            <Card padding="md"><EmptyLine text="No work experience listed yet." /></Card>
-          )}
+          {workExperiences.length ? workExperiences.map((work, index) => (
+            <Card key={index} padding="md">
+              <Text style={styles.itemTitle}>{recordText(work, ['position'], 'Position not listed')}</Text>
+              <Text style={styles.itemMeta}>{recordText(work, ['company_name'], 'Company not listed')}</Text>
+              <Text style={styles.itemMeta}>{textFrom(work.number_of_months, 'Duration not listed')} months · {titleCase(recordText(work, ['employment_status']))}</Text>
+            </Card>
+          )) : <Card padding="md"><EmptyLine text="No work experience listed yet." /></Card>}
         </View>
 
-        {/* Training & Certificates */}
-        <SectionHeader title="Training and Certificates" />
+        <SectionHeader title="Training & Eligibility" action={<EditLink section={6} />} />
         <View style={styles.cardList}>
-          {trainings.length || certificates.length ? (
+          {trainings.length || eligibilities.length ? (
             <>
-              {trainings.slice(0, 4).map((training, index) => (
-                <Card key={`${recordText(training, ['course', 'name'], 'training')}-${index}`} padding="md">
-                  <Text style={styles.itemTitle}>{recordText(training, ['course', 'name'], 'Training not listed')}</Text>
-                  <Text style={styles.itemMeta}>{recordText(training, ['training_institution', 'institution'], 'Institution not listed')}</Text>
+              {trainings.map((training, index) => (
+                <Card key={`t${index}`} padding="md">
+                  <Text style={styles.itemTitle}>{recordText(training, ['course'], 'Training not listed')}</Text>
+                  <Text style={styles.itemMeta}>{recordText(training, ['training_institution'], 'Institution not listed')}</Text>
                 </Card>
               ))}
-              {certificates.slice(0, 4).map((certificate, index) => (
-                <Card key={`${recordText(certificate, ['title'], 'certificate')}-${index}`} padding="md">
-                  <Text style={styles.itemTitle}>{recordText(certificate, ['title'], 'Certificate not listed')}</Text>
-                  <Text style={styles.itemMeta}>{recordText(certificate, ['issuing_body'], 'Issuer not listed')}</Text>
+              {eligibilities.map((elig, index) => (
+                <Card key={`e${index}`} padding="md">
+                  <Text style={styles.itemTitle}>{recordText(elig, ['name'], 'Eligibility not listed')}</Text>
+                  <Text style={styles.itemMeta}>{titleCase(recordText(elig, ['type']))}</Text>
                 </Card>
               ))}
             </>
-          ) : (
-            <Card padding="md"><EmptyLine text="No trainings or certificates listed yet." /></Card>
-          )}
+          ) : <Card padding="md"><EmptyLine text="No trainings or eligibilities listed yet." /></Card>}
         </View>
 
-        {/* Documents */}
-        <SectionHeader title="Documents" />
+        <SectionHeader
+          title="Certificates"
+          action={
+            <TouchableOpacity onPress={() => setCertModalOpen(true)}>
+              <Text style={styles.editLinkText}>+ Add</Text>
+            </TouchableOpacity>
+          }
+        />
+        <View style={styles.cardList}>
+          {certificates.length ? certificates.map((certificate) => (
+            <Card key={String(certificate.certificate_id)} padding="md">
+              <Text style={styles.itemTitle}>{certificate.title}</Text>
+              <Text style={styles.itemMeta}>{certificate.issuing_body} · {titleCase(certificate.category)}</Text>
+              <Text style={styles.itemMeta}>Issued {textFrom(certificate.issued_at)}</Text>
+              <View style={styles.certActions}>
+                <Button variant="outline" size="sm" onPress={() => viewCertificate(certificate)} style={styles.certActionBtn}>View</Button>
+                <Button variant="danger" size="sm" onPress={() => deleteCertificate(certificate)} style={styles.certActionBtn}>Delete</Button>
+              </View>
+            </Card>
+          )) : <Card padding="md"><EmptyLine text="No certificates uploaded yet." /></Card>}
+        </View>
+
+        <SectionHeader title="Resume" />
         <Card padding="md">
-          <Info label="Resume" value={profile?.has_resume ? 'Uploaded' : 'Not uploaded'} />
-          <Info label="Profile Photo" value={profile?.has_profile_image ? 'Uploaded' : 'Not uploaded'} />
+          <Info label="Resume" value={profile?.has_resume ? 'Generated' : 'Not generated'} />
+          <Button variant="outline" fullWidth onPress={() => setResumeModalOpen(true)} style={styles.updateBtn}>
+            {profile?.has_resume ? 'Regenerate resume' : 'Generate resume'}
+          </Button>
         </Card>
 
+        <Button variant="primary" fullWidth onPress={() => router.push('/(seeker)/profile/edit')} style={styles.editAllBtn}>
+          Edit profile details
+        </Button>
       </ScrollView>
+
+      <CertificateUploadModal
+        visible={certModalOpen}
+        trainings={trainings}
+        onClose={() => setCertModalOpen(false)}
+        onUploaded={async () => {
+          setCertModalOpen(false)
+          await invalidateProfile()
+        }}
+      />
+
+      <Modal visible={resumeModalOpen} animationType="slide" transparent onRequestClose={() => setResumeModalOpen(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Generate Resume</Text>
+            <Text style={styles.modalHint}>Write a short professional summary (max 1200 characters). It will appear at the top of your generated PDF resume.</Text>
+            <TextInput
+              style={styles.modalTextarea}
+              value={summary}
+              onChangeText={setSummary}
+              placeholder="e.g. Detail-oriented administrative professional with 3 years of experience..."
+              placeholderTextColor={colors.subtle}
+              multiline
+              maxLength={1200}
+            />
+            <Button variant="outline" onPress={generateSummaryWithAI} disabled={aiSummaryBusy} style={styles.aiSummaryBtn}>
+              {aiSummaryBusy ? 'Generating with AI...' : 'Generate with AI'}
+            </Button>
+            {aiSummaryNotice ? <Text style={styles.aiSummaryNotice}>{aiSummaryNotice}</Text> : null}
+            <View style={styles.modalActions}>
+              <Button variant="outline" onPress={() => setResumeModalOpen(false)} style={styles.modalBtn}>Cancel</Button>
+              <Button variant="primary" onPress={generateResume} disabled={resumeBusy} style={styles.modalBtn}>
+                {resumeBusy ? 'Generating...' : 'Generate'}
+              </Button>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
+  )
+}
+
+function EditLink({ section }: { section: number }) {
+  return (
+    <TouchableOpacity onPress={() => router.push({ pathname: '/(seeker)/profile/edit', params: { section: String(section) } })}>
+      <Text style={styles.editLinkText}>Edit</Text>
+    </TouchableOpacity>
+  )
+}
+
+function CertificateUploadModal({
+  visible,
+  trainings,
+  onClose,
+  onUploaded,
+}: {
+  visible: boolean
+  trainings: Record<string, unknown>[]
+  onClose: () => void
+  onUploaded: () => void
+}) {
+  const [title, setTitle] = useState('')
+  const [issuingBody, setIssuingBody] = useState('')
+  const [category, setCategory] = useState(CERTIFICATE_CATEGORIES[0])
+  const [issuedAt, setIssuedAt] = useState('')
+  const [file, setFile] = useState<{ uri: string; name: string; mimeType: string } | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+
+  const reset = () => {
+    setTitle(''); setIssuingBody(''); setCategory(CERTIFICATE_CATEGORIES[0]); setIssuedAt(''); setFile(null); setError('')
+  }
+
+  const pickFile = async () => {
+    const result = await DocumentPicker.getDocumentAsync({ type: ['application/pdf', 'image/jpeg', 'image/png'], copyToCacheDirectory: true })
+    if (result.canceled || !result.assets?.length) return
+    const asset = result.assets[0]
+    setFile({ uri: asset.uri, name: asset.name, mimeType: asset.mimeType || 'application/pdf' })
+  }
+
+  const submit = async () => {
+    if (!title.trim() || !issuingBody.trim() || !issuedAt.trim() || !file) {
+      setError('Title, issuing body, issued date, and a file are required.')
+      return
+    }
+    setBusy(true)
+    setError('')
+    try {
+      await seekerService.uploadCertificate(file.uri, file.mimeType, file.name, {
+        title: title.trim(),
+        issuing_body: issuingBody.trim(),
+        category,
+        issued_at: issuedAt.trim(),
+      })
+      reset()
+      onUploaded()
+    } catch (caught) {
+      setError(apiErrorMessage(caught, 'Unable to upload certificate. Max size 5MB (PDF, JPG, PNG).'))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+      <View style={styles.modalOverlay}>
+        <ScrollView style={styles.modalCard} contentContainerStyle={{ paddingBottom: spacing.lg }}>
+          <Text style={styles.modalTitle}>Upload Certificate</Text>
+          {error ? <AlertBox variant="danger" style={{ marginBottom: spacing.md }}>{error}</AlertBox> : null}
+          <Text style={styles.label}>Title</Text>
+          <TextInput style={styles.modalInput} value={title} onChangeText={setTitle} placeholder="e.g. NC II Housekeeping" placeholderTextColor={colors.subtle} />
+          <Text style={styles.label}>Issuing Body</Text>
+          <TextInput style={styles.modalInput} value={issuingBody} onChangeText={setIssuingBody} placeholder="e.g. TESDA" placeholderTextColor={colors.subtle} />
+          <Text style={styles.label}>Category</Text>
+          <View style={styles.tagRow}>
+            {CERTIFICATE_CATEGORIES.map((c) => (
+              <TouchableOpacity key={c} onPress={() => setCategory(c)} style={[styles.categoryChip, category === c && styles.categoryChipActive]}>
+                <Text style={[styles.categoryChipText, category === c && styles.categoryChipTextActive]}>{c.replace(/_/g, ' ')}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          <Text style={styles.label}>Issued Date (YYYY-MM-DD)</Text>
+          <TextInput style={styles.modalInput} value={issuedAt} onChangeText={setIssuedAt} placeholder="2024-06-15" placeholderTextColor={colors.subtle} />
+          <Button variant="outline" onPress={pickFile} style={{ marginTop: spacing.sm, marginBottom: spacing.md }}>
+            {file ? file.name : 'Choose file (PDF, JPG, PNG)'}
+          </Button>
+          <View style={styles.modalActions}>
+            <Button variant="outline" onPress={() => { reset(); onClose() }} style={styles.modalBtn}>Cancel</Button>
+            <Button variant="primary" onPress={submit} disabled={busy} style={styles.modalBtn}>{busy ? 'Uploading...' : 'Upload'}</Button>
+          </View>
+        </ScrollView>
+      </View>
+    </Modal>
   )
 }
 
@@ -244,7 +590,7 @@ const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: colors.background },
   content: { paddingHorizontal: spacing.xl, paddingTop: 56, paddingBottom: spacing.xxxl },
   kicker: { color: colors.info, fontSize: typography.small, fontWeight: typography.bold, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: spacing.xs },
-  title: { color: colors.primary, fontSize: typography.display, fontWeight: typography.bold, marginBottom: spacing.xs },
+  title: { color: colors.primary, fontSize: typography.hero, fontFamily: typography.family.display, marginBottom: spacing.xs },
   subtitle: { color: colors.secondaryText, fontSize: typography.body, lineHeight: 20, marginBottom: spacing.lg },
   statusCard: { marginBottom: spacing.lg, alignItems: 'center', justifyContent: 'center', gap: spacing.sm },
   statusMessageCard: { borderColor: colors.border, backgroundColor: colors.surface },
@@ -253,17 +599,34 @@ const styles = StyleSheet.create({
   profileHeaderCard: { marginBottom: spacing.lg },
   profileHeaderInner: { flexDirection: 'row', gap: spacing.md, alignItems: 'center' },
   profileHeaderText: { flex: 1 },
-  avatar: { width: 54, height: 54, borderRadius: 27, backgroundColor: colors.info, alignItems: 'center', justifyContent: 'center' },
-  avatarText: { color: colors.surface, fontSize: typography.title, fontWeight: typography.bold },
+  avatar: { width: 64, height: 64, borderRadius: 32, backgroundColor: colors.info, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  avatarImage: { width: 64, height: 64, borderRadius: 32 },
+  avatarText: { color: colors.surface, fontSize: typography.heading, fontWeight: typography.bold },
+  avatarEditLabel: { textAlign: 'center', marginTop: spacing.xs, color: colors.info, fontSize: 10, fontWeight: typography.bold },
+  removePhotoText: { marginTop: spacing.xs, color: colors.danger, fontSize: typography.small, fontWeight: typography.semibold },
   name: { color: colors.primary, fontSize: typography.title, fontWeight: typography.bold, marginBottom: spacing.xs },
   muted: { color: colors.secondaryText, fontSize: typography.small, lineHeight: 18 },
+  strengthCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.lg },
+  strengthText: { flex: 1 },
+  strengthTitle: { fontSize: typography.title, fontFamily: typography.family.bold, color: colors.primary, marginBottom: spacing.xs },
+  strengthSub: { fontSize: typography.small, color: colors.secondaryText, lineHeight: 18 },
   checklistCard: { marginTop: spacing.md, marginBottom: spacing.lg },
+  analyticsCard: {},
+  analyticsStatsRow: { flexDirection: 'row', gap: spacing.lg },
+  analyticsStat: { flex: 1, alignItems: 'center', backgroundColor: colors.background, borderRadius: radii.md, paddingVertical: spacing.md },
+  analyticsStatValue: { color: colors.info, fontSize: typography.heading, fontWeight: typography.bold },
+  analyticsStatLabel: { color: colors.secondaryText, fontSize: typography.small, marginTop: spacing.xs, textAlign: 'center' },
+  recentViewers: { marginTop: spacing.md, borderTopWidth: 1, borderTopColor: colors.border, paddingTop: spacing.md },
+  recentViewersTitle: { color: colors.primary, fontSize: typography.small, fontWeight: typography.bold, marginBottom: spacing.xs },
+  recentViewerRow: { color: colors.secondaryText, fontSize: typography.small, paddingVertical: spacing.xs },
   checkRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.sm },
   checkDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.border },
   checkDotDone: { backgroundColor: colors.success },
   checkText: { color: colors.secondaryText, fontSize: typography.body },
   checkTextDone: { color: colors.primary, fontWeight: typography.medium },
-  updateBtn: { marginTop: spacing.sm },
+  updateBtn: { marginTop: spacing.md },
+  editAllBtn: { marginTop: spacing.xl },
+  editLinkText: { color: colors.info, fontSize: typography.small, fontWeight: typography.bold },
   infoRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.border },
   infoLabel: { color: colors.secondaryText, fontSize: typography.body },
   infoValue: { color: colors.primary, fontSize: typography.body, fontWeight: typography.medium, textAlign: 'right', flex: 1, marginLeft: spacing.md },
@@ -274,4 +637,21 @@ const styles = StyleSheet.create({
   cardList: { gap: spacing.md },
   itemTitle: { color: colors.primary, fontSize: typography.title, fontWeight: typography.bold, marginBottom: spacing.xs },
   itemMeta: { color: colors.secondaryText, fontSize: typography.body, lineHeight: 20 },
+  certActions: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md },
+  certActionBtn: { flex: 1, marginBottom: 0 },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(15,23,42,0.5)', justifyContent: 'center', padding: spacing.xl },
+  modalCard: { backgroundColor: colors.surface, borderRadius: radii.xl, padding: spacing.xl, maxHeight: '85%' },
+  modalTitle: { color: colors.primary, fontSize: typography.heading, fontWeight: typography.bold, marginBottom: spacing.sm },
+  modalHint: { color: colors.secondaryText, fontSize: typography.small, lineHeight: 18, marginBottom: spacing.md },
+  modalTextarea: { borderWidth: 1, borderColor: colors.border, borderRadius: radii.md, padding: spacing.md, minHeight: 120, textAlignVertical: 'top', color: colors.primary, fontSize: typography.body },
+  aiSummaryBtn: { marginTop: spacing.md, marginBottom: 0 },
+  aiSummaryNotice: { marginTop: spacing.sm, color: colors.secondaryText, fontSize: typography.small, lineHeight: 18 },
+  modalActions: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.lg },
+  modalBtn: { flex: 1, marginBottom: 0 },
+  modalInput: { borderWidth: 1, borderColor: colors.border, borderRadius: radii.md, padding: spacing.md, color: colors.primary, fontSize: typography.body, marginBottom: spacing.md },
+  label: { marginBottom: spacing.xs, color: colors.muted, fontSize: typography.small, fontWeight: typography.semibold },
+  categoryChip: { borderWidth: 1, borderColor: colors.border, borderRadius: radii.pill, paddingHorizontal: spacing.md, paddingVertical: spacing.xs, marginBottom: spacing.sm },
+  categoryChipActive: { borderColor: colors.info, backgroundColor: colors.infoBackground },
+  categoryChipText: { fontSize: 11, color: colors.muted, textTransform: 'capitalize' },
+  categoryChipTextActive: { color: colors.info, fontWeight: typography.bold },
 })

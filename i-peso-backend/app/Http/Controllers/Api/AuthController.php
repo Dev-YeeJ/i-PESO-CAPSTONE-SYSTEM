@@ -161,7 +161,7 @@ class AuthController extends Controller
                 Rule::unique('employers', 'email'),
                 Rule::unique('administrators', 'email'),
             ],
-            'password' => ['required', 'confirmed', Password::min(8)],
+            'password' => ['required', 'confirmed', Password::min(8)->numbers()->symbols()],
         ];
 
         if ($role === 'seeker') {
@@ -394,7 +394,7 @@ class AuthController extends Controller
         $request->validate([
             'email'    => ['required', 'email'],
             'otp'      => ['required', 'string', 'size:6'],
-            'password' => ['required', 'confirmed', Password::min(8)],
+            'password' => ['required', 'confirmed', Password::min(8)->numbers()->symbols()],
         ]);
 
         $email     = $request->input('email');

@@ -20,10 +20,12 @@ class EmployerDocument extends Model
         'uploaded_at',
         'verification_status', // pending, approved, rejected
         'admin_notes',
+        'expiration_date',
     ];
 
     protected $casts = [
         'uploaded_at' => 'datetime',
+        'expiration_date' => 'date',
     ];
 
     /**

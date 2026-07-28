@@ -242,9 +242,4 @@ class JobVacancy extends Model
     {
         return $this->hasMany(JobFairVacancy::class, 'vacancy_id', 'post_id');
     }
-
-    public function skillDemands(): HasMany
-    {
-        return $this->hasMany(EmployerSkillDemand::class, 'job_vacancy_id', 'post_id');
-    }
 }

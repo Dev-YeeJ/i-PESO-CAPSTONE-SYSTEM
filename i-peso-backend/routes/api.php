@@ -9,10 +9,10 @@ use App\Http\Controllers\Api\Admin\ConstituentCRM\SeekerController as AdminSeeke
 use App\Http\Controllers\Api\Admin\EmployerVerificationController;
 use App\Http\Controllers\Api\Admin\GovernmentDole\JobFairController as AdminJobFairController;
 use App\Http\Controllers\Api\Admin\AdminCitizenCharterController;
-use App\Http\Controllers\Api\Admin\AdminEmployerSkillDemandController;
 use App\Http\Controllers\Api\Admin\AdminEstablishmentReportController;
 use App\Http\Controllers\Api\Admin\AdminGovernmentProgramApplicationController;
 use App\Http\Controllers\Api\Admin\AdminGovernmentProgramController;
+use App\Http\Controllers\Api\Admin\AdminPlacementReportController;
 use App\Http\Controllers\Api\Admin\LocationDataQualityController;
 use App\Http\Controllers\Api\Admin\NSRPPdfExportController;
 use App\Http\Controllers\Api\Admin\OccupationMappingController;
@@ -21,12 +21,11 @@ use App\Http\Controllers\Api\Admin\SystemReports\ReportController as AdminReport
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\EmployerApplicationController;
 use App\Http\Controllers\Api\EmployerJobVacancyController;
-use App\Http\Controllers\Api\EmployerGovernmentProgramController;
 use App\Http\Controllers\Api\EmployerEstablishmentReportController;
 use App\Http\Controllers\Api\EmployerJobFairController;
 use App\Http\Controllers\Api\EmployerNotificationController;
+use App\Http\Controllers\Api\EmployerPlacementReportController;
 use App\Http\Controllers\Api\EmployerRegistrationController;
-use App\Http\Controllers\Api\EmployerUpskillNeedController;
 use App\Http\Controllers\Api\GoogleCalendarController;
 use App\Http\Controllers\Api\GoogleMapsController;
 use App\Http\Controllers\Api\JobFairController;
@@ -37,12 +36,11 @@ use App\Http\Controllers\Api\SeekerApplicationController;
 use App\Http\Controllers\Api\SeekerCertificateController;
 use App\Http\Controllers\Api\SeekerController;
 use App\Http\Controllers\Api\SeekerGovernmentProgramApplicationController;
+use App\Http\Controllers\Api\SeekerGovernmentProgramController;
 use App\Http\Controllers\Api\SeekerNearbyJobController;
 use App\Http\Controllers\Api\SeekerProfileImageController;
 use App\Http\Controllers\Api\SeekerResumeController;
-use App\Http\Controllers\Api\SeekerUpskillHubController;
 use App\Http\Controllers\Api\SkillCatalogController;
-use App\Http\Controllers\Api\SkillRecommendationController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/occupations', [OccupationController::class, 'index'])->middleware('throttle:60,1');
@@ -98,13 +96,16 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::get('/job-fair-results/{resultReport}/roi-form-3', [EmployerJobFairController::class, 'downloadReport']);
             Route::get('/reports/establishment-report/preview', [EmployerEstablishmentReportController::class, 'preview']);
             Route::post('/reports/establishment-report/export', [EmployerEstablishmentReportController::class, 'export']);
+
+            // Placement Report — flexible spreadsheet import (upload -> map -> preview -> submit)
+            Route::get('/placement-reports', [EmployerPlacementReportController::class, 'index']);
+            Route::post('/placement-reports', [EmployerPlacementReportController::class, 'store'])->middleware('throttle:20,1');
+            Route::get('/placement-reports/{placementReport}', [EmployerPlacementReportController::class, 'show']);
+            Route::post('/placement-reports/{placementReport}/preview', [EmployerPlacementReportController::class, 'preview']);
+            Route::post('/placement-reports/{placementReport}/submit', [EmployerPlacementReportController::class, 'submit']);
+            Route::delete('/placement-reports/{placementReport}', [EmployerPlacementReportController::class, 'destroy']);
+
             Route::apiResource('vacancies', EmployerJobVacancyController::class);
-            Route::get('/upskill-hub/programs', [EmployerGovernmentProgramController::class, 'index']);
-            Route::post('/upskill-hub/recommend-applicant', [EmployerGovernmentProgramController::class, 'recommendApplicant']);
-            Route::get('/upskill-needs', [EmployerUpskillNeedController::class, 'index']);
-            Route::post('/upskill-needs', [EmployerUpskillNeedController::class, 'store']);
-            Route::put('/upskill-needs/{employerSkillDemand}', [EmployerUpskillNeedController::class, 'update']);
-            Route::delete('/upskill-needs/{employerSkillDemand}', [EmployerUpskillNeedController::class, 'destroy']);
             Route::get('/applications', [EmployerApplicationController::class, 'index']);
             Route::get('/applications/{application}', [EmployerApplicationController::class, 'show']);
             Route::patch('/applications/bulk-status', [EmployerApplicationController::class, 'updateStatusBulk']);
@@ -121,11 +122,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::prefix('seeker')->group(function () {
         Route::get('/dashboard-summary', [SeekerController::class, 'dashboardSummary']);
         Route::get('/profile', [SeekerController::class, 'getProfile']);
-        Route::get('/upskill-hub', [SeekerUpskillHubController::class, 'index']);
-        Route::get('/upskill-hub/recommended', [SeekerUpskillHubController::class, 'recommended']);
-        Route::get('/citizen-charter', [SeekerUpskillHubController::class, 'citizenCharter']);
-        Route::get('/government-programs/{governmentProgram}', [SeekerUpskillHubController::class, 'show']);
-        Route::get('/government-programs/{governmentProgram}/attachment', [SeekerUpskillHubController::class, 'attachment']);
+        Route::get('/government-programs', [SeekerGovernmentProgramController::class, 'index']);
+        Route::get('/citizen-charter', [SeekerGovernmentProgramController::class, 'citizenCharter']);
+        Route::get('/government-programs/{governmentProgram}', [SeekerGovernmentProgramController::class, 'show']);
+        Route::get('/government-programs/{governmentProgram}/attachment', [SeekerGovernmentProgramController::class, 'attachment']);
         Route::post('/government-programs/{governmentProgram}/apply', [SeekerGovernmentProgramApplicationController::class, 'apply'])
             ->middleware('throttle:10,1');
         Route::get('/government-program-applications', [SeekerGovernmentProgramApplicationController::class, 'index']);
@@ -168,12 +168,6 @@ Route::middleware('auth:sanctum')->group(function () {
             ->middleware('throttle:30,1');
         Route::post('/nearby-jobs/ai-parse', [SeekerAiSuggestionController::class, 'parseMapQuery'])
             ->middleware('throttle:10,1');
-        Route::get('/skill-recommendations', [SkillRecommendationController::class, 'getRecommendations'])
-            ->middleware('throttle:20,1');
-        Route::post('/skill-gap-analysis', [SkillRecommendationController::class, 'analyzeGaps'])
-            ->middleware('throttle:20,1');
-        Route::get('/learning-resources/{skill}', [SkillRecommendationController::class, 'getLearningResources'])
-            ->middleware('throttle:30,1');
         Route::post('/resume/generate', [SeekerResumeController::class, 'generate'])
             ->middleware('throttle:5,1');
         Route::get('/analytics', [SeekerAnalyticsController::class, 'index']);
@@ -208,6 +202,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/employers/{id}/review', [EmployerVerificationController::class, 'reviewEmployer']);
         Route::post('/employers/{id}/approve', [EmployerVerificationController::class, 'approveEmployer']);
         Route::post('/employers/{id}/reject', [EmployerVerificationController::class, 'rejectEmployer']);
+        Route::post('/employers/{id}/finalize', [EmployerVerificationController::class, 'finalizeVerification']);
         Route::get('/documents/{document}/view', [EmployerVerificationController::class, 'viewDocument']);
         Route::post('/documents/{document}/download', [EmployerVerificationController::class, 'downloadDocument']);
         Route::post('/documents/{id}/review', [EmployerVerificationController::class, 'reviewDocument']);
@@ -248,10 +243,6 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('/citizen-charter/{citizenCharter}', [AdminCitizenCharterController::class, 'update']);
         Route::delete('/citizen-charter/{citizenCharter}', [AdminCitizenCharterController::class, 'destroy']);
 
-        // Employer skill demand review
-        Route::get('/employer-skill-demands', [AdminEmployerSkillDemandController::class, 'index']);
-        Route::post('/employer-skill-demands/{employerSkillDemand}/status', [AdminEmployerSkillDemandController::class, 'updateStatus']);
-
         // Job Fairs
         Route::get('/job-fairs', [AdminJobFairController::class, 'index']);
         Route::post('/job-fairs', [AdminJobFairController::class, 'store']);
@@ -272,9 +263,18 @@ Route::middleware('auth:sanctum')->group(function () {
         // Reports
         Route::get('/reports/establishment-report/preview', [AdminEstablishmentReportController::class, 'preview']);
         Route::post('/reports/establishment-report/export', [AdminEstablishmentReportController::class, 'export']);
+
+        // Placement Report review + approval (employer-submitted spreadsheet imports)
+        Route::get('/placement-reports', [AdminPlacementReportController::class, 'index']);
+        Route::get('/placement-reports/{placementReport}', [AdminPlacementReportController::class, 'show']);
+        Route::get('/placement-reports/{placementReport}/export', [AdminPlacementReportController::class, 'exportCsv']);
+        Route::post('/placement-reports/{placementReport}/approve', [AdminPlacementReportController::class, 'approve']);
+        Route::post('/placement-reports/{placementReport}/reject', [AdminPlacementReportController::class, 'reject']);
+
         Route::get('/reports', [AdminReportController::class, 'index']);
         Route::post('/reports/generate', [AdminReportController::class, 'generate']);
         Route::post('/reports/generate-sprs', [AdminReportController::class, 'generateSPRS']);
+        Route::get('/reports/{id}/export-sprs-pdf', [AdminReportController::class, 'exportSprsPdf']);
         Route::get('/reports/{id}', [AdminReportController::class, 'show']);
         Route::delete('/reports/{id}', [AdminReportController::class, 'destroy']);
 

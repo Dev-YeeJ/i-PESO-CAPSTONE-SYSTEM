@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\Concerns;
 use App\Models\GovernmentProgram;
 use App\Models\JobSeeker;
 use App\Models\ProgramApplication;
+use App\Services\EligibilityMatchingService;
 
 trait FormatsGovernmentPrograms
 {
@@ -27,6 +28,7 @@ trait FormatsGovernmentPrograms
             'description' => $program->description,
             'target_beneficiaries' => $program->target_beneficiaries,
             'eligibility_requirements' => $program->eligibility_requirements ?? [],
+            'eligibility_rules' => $program->eligibility_rules ?? [],
             'required_documents' => $program->required_documents ?? [],
             'target_industry' => $program->target_industry,
             'target_occupation' => $program->targetOccupation ? [
@@ -58,6 +60,7 @@ trait FormatsGovernmentPrograms
             'approved_count' => $program->approved_count ?? null,
             'completed_count' => $program->completed_count ?? null,
             'can_apply' => $seeker ? $program->isAcceptingApplications() && ! $ownApplication : false,
+            'eligibility' => $seeker ? app(EligibilityMatchingService::class)->evaluate($seeker, $program) : null,
             'my_application' => $ownApplication ? $this->formatProgramApplication($ownApplication) : null,
             'recommendation_score' => $program->getAttribute('recommendation_score'),
             'recommendation_reason' => $program->getAttribute('recommendation_reason'),

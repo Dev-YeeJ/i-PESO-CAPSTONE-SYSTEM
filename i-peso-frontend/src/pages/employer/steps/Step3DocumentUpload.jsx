@@ -28,10 +28,10 @@ export default function Step3DocumentUpload({ companyType, onComplete }) {
     fetchRequiredDocs()
   }, [])
 
-  const handleDocumentUpload = async (documentType, file) => {
+  const handleDocumentUpload = async (documentType, file, expirationDate = null) => {
     setUploading((prev) => ({ ...prev, [documentType]: true }))
     try {
-      await employerService.uploadDocument(documentType, file)
+      await employerService.uploadDocument(documentType, file, expirationDate)
       setUploadedDocuments((prev) => {
         if (!prev.includes(documentType)) {
           return [...prev, documentType]
@@ -87,7 +87,7 @@ export default function Step3DocumentUpload({ companyType, onComplete }) {
               key={docType}
               documentType={docType}
               isUploaded={uploadedDocuments.includes(docType)}
-              onUpload={(file) => handleDocumentUpload(docType, file)}
+              onUpload={(file, expirationDate) => handleDocumentUpload(docType, file, expirationDate)}
               loading={uploading[docType] || false}
             />
           ))}
@@ -108,7 +108,7 @@ export default function Step3DocumentUpload({ companyType, onComplete }) {
                 key={docType}
                 documentType={docType}
                 isUploaded={uploadedDocuments.includes(docType)}
-                onUpload={(file) => handleDocumentUpload(docType, file)}
+                onUpload={(file, expirationDate) => handleDocumentUpload(docType, file, expirationDate)}
                 loading={uploading[docType] || false}
                 optional
               />

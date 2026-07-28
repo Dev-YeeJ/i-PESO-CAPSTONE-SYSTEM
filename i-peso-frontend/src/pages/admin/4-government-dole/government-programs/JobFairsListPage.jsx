@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { CalendarDays, Download, Plus, RefreshCw, UsersRound } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
-import { Button, Card } from '@/components/ui'
+import { Button, Card, EmptyState, LoadingSkeleton } from '@/components/ui'
 import PageHeader from '@/pages/admin/_components/PageHeader'
 import StatusBadge from '@/pages/admin/_components/StatusBadge'
 import { adminService } from '@/services/adminService'
@@ -61,7 +61,12 @@ export default function JobFairsListPage() {
         ]}
       />
 
-      {errorMessage && <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{errorMessage}</div>}
+      {errorMessage && (
+        <div className="flex items-center justify-between gap-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
+          <span>{errorMessage}</span>
+          <button type="button" onClick={refresh} className="font-extrabold hover:underline">Try again</button>
+        </div>
+      )}
 
       <Card padding="none" className="mt-6">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 p-5 sm:p-6">
@@ -73,15 +78,14 @@ export default function JobFairsListPage() {
         </div>
 
         {loading ? (
-          <div className="p-10 text-center text-sm font-semibold text-slate-500">Loading job fairs...</div>
+          <div className="p-5 sm:p-6"><LoadingSkeleton variant="card" rows={3} /></div>
         ) : fairs.length === 0 ? (
-          <div className="px-6 py-14 text-center">
-            <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-lg bg-slate-100 text-slate-500">
-              <CalendarDays className="h-6 w-6" />
-            </span>
-            <p className="mt-4 font-extrabold text-slate-900">No job fairs scheduled</p>
-            <Button className="mt-5" icon={Plus} onClick={() => navigate('/admin/job-fairs/create')}>Create Job Fair</Button>
-          </div>
+          <EmptyState
+            icon={CalendarDays}
+            title="No job fairs scheduled"
+            description="Create a job fair to coordinate employers and automate post-event government reports."
+            action={{ label: 'Create job fair', icon: Plus, onClick: () => navigate('/admin/job-fairs/create') }}
+          />
         ) : (
           <div className="divide-y divide-slate-200">
             {fairs.map((fair) => (

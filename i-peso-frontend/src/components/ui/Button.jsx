@@ -8,6 +8,7 @@ const variants = {
   secondary: 'border border-brand-navy bg-white text-brand-navy hover:bg-brand-navy hover:text-white',
   outline: 'border border-slate-300 bg-white text-slate-700 hover:border-brand-navy hover:text-brand-navy',
   danger: 'bg-red-600 text-white hover:bg-red-700',
+  success: 'bg-success text-white shadow-sm hover:bg-emerald-700',
   ghost: 'text-slate-600 hover:bg-slate-100 hover:text-slate-950',
 }
 

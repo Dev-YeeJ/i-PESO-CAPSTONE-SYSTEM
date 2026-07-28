@@ -48,6 +48,11 @@ export default function ProgramsListPage() {
           ]}
           data={programs}
           loading={loading}
+          error={errorMessage || null}
+          onRetry={programsQuery.refetch}
+          caption="Government programs directory."
+          emptyTitle="No programs yet"
+          emptyDescription="Create a government program to get started."
           onRowClick={(row) => navigate(`/admin/government-programs/${row.program_id}/applicants`)}
         />
       </Card>

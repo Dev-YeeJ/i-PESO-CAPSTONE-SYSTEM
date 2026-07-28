@@ -3,15 +3,14 @@ import {
   BriefcaseBusiness,
   Building2,
   Calendar as CalendarIcon,
-  GraduationCap,
   FileBarChart,
+  FileSpreadsheet,
   ChevronLeft,
   CircleCheck,
   LayoutDashboard,
   LogOut,
   Menu,
   PlusCircle,
-  Wrench,
   UsersRound,
   X,
 } from 'lucide-react'
@@ -27,8 +26,7 @@ const navItems = [
   { to: '/employer/ats', label: 'Applicants', icon: UsersRound, protected: true },
   { to: '/employer/job-fairs', label: 'Job Fairs', icon: CalendarIcon, protected: true },
   { to: '/employer/reports/establishment-report', label: 'Establishment Report', icon: FileBarChart, protected: true },
-  { to: '/employer/upskill-hub', label: 'Training Programs', icon: GraduationCap, protected: true },
-  { to: '/employer/upskill-needs', label: 'Upskill Needs', icon: Wrench, protected: true },
+  { to: '/employer/reports/placement-report', label: 'Placement Report', icon: FileSpreadsheet, protected: true },
   { to: '/employer/calendar', label: 'Calendar', icon: CalendarIcon, protected: true },
 ]
 
@@ -39,9 +37,7 @@ const pageNames = {
   '/employer/ats': 'Applicants',
   '/employer/job-fairs': 'Job Fairs',
   '/employer/reports/establishment-report': 'Establishment Report / RO1-JF Form 3',
-  '/employer/upskill-hub': 'Training Programs',
-  '/employer/upskill-needs': 'Upskill Needs',
-  '/employer/upskill-needs/create': 'Submit Skill Demand',
+  '/employer/reports/placement-report': 'Placement Report',
   '/employer/calendar': 'Interview Calendar',
 }
 

@@ -23,6 +23,7 @@ import {
   Zap,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { applyToJob, toggleSavedJob as toggleSavedJobApi } from '@/services/seekerService'
 
 const feedTabs = [
@@ -688,23 +689,18 @@ function MatchingEngineCard() {
 
 function JobDetailModal({ job, saved, applying = false, onClose, onSave, onQuickApply }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 px-4 py-6">
-      <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-xl bg-white shadow-2xl">
-        <div className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-slate-200 bg-white px-5 py-4">
-          <div>
-            <div className="inline-flex items-center gap-2 rounded-full border border-blue-100 bg-blue-50 px-3 py-1 text-xs font-black text-blue-700">
-              <Layers3 className="h-3.5 w-3.5" />
-              Match explanation
-            </div>
-            <h2 className="mt-3 text-xl font-black text-slate-950">{job.title}</h2>
-            <p className="mt-1 text-sm text-slate-600">{job.company} / {job.location}</p>
-          </div>
-          <button type="button" onClick={onClose} className="rounded-xl border border-slate-200 p-2 text-slate-500 hover:bg-slate-50" aria-label="Close details">
-            <X className="h-5 w-5" />
-          </button>
-        </div>
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-h-[90vh] max-w-3xl overflow-y-auto">
+        <DialogHeader>
+          <span className="inline-flex w-fit items-center gap-2 rounded-full border border-blue-100 bg-blue-50 px-3 py-1 text-xs font-black text-blue-700">
+            <Layers3 className="h-3.5 w-3.5" />
+            Match explanation
+          </span>
+          <DialogTitle className="mt-2">{job.title}</DialogTitle>
+          <DialogDescription>{job.company} · {job.location}</DialogDescription>
+        </DialogHeader>
 
-        <div className="space-y-5 p-5">
+        <div className="space-y-5">
           <div className="grid gap-3 sm:grid-cols-4">
             <Fact icon={Star} label="Merit" value={`${job.matchScore}%`} />
             <Fact icon={MapPin} label="Distance" value={formatDistance(job.distanceKm)} />
@@ -754,7 +750,7 @@ function JobDetailModal({ job, saved, applying = false, onClose, onSave, onQuick
           </div>
         </div>
 
-        <div className="sticky bottom-0 flex flex-wrap justify-end gap-2 border-t border-slate-200 bg-white px-5 py-4">
+        <DialogFooter>
           <button
             type="button"
             onClick={onSave}
@@ -772,9 +768,9 @@ function JobDetailModal({ job, saved, applying = false, onClose, onSave, onQuick
             <Zap className="h-4 w-4" />
             {job.hasApplied ? `Applied: ${titleCase(job.applicationStatus || 'pending')}` : applying ? 'Submitting...' : '1-Click Apply'}
           </button>
-        </div>
-      </div>
-    </div>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }
 

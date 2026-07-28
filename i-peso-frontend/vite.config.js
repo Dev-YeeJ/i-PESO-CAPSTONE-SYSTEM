@@ -9,5 +9,12 @@ export default defineConfig({
     alias: [
       { find: '@', replacement: fileURLToPath(new URL('./src', import.meta.url)) }
     ]
-  }
+  },
+  test: {
+    environment: 'jsdom',
+    globals: true,
+    setupFiles: ['./src/test/setup.js'],
+    css: false,
+    include: ['src/**/*.{test,spec}.{js,jsx}'],
+  },
 })

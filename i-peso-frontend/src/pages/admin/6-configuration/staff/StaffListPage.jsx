@@ -1,13 +1,14 @@
-import { createElement, useState } from 'react'
+import { useState } from 'react'
 import { ShieldAlert, UsersRound } from 'lucide-react'
-import { Card, Button } from '@/components/ui'
+import { Card } from '@/components/ui'
 import PageHeader from '@/pages/admin/_components/PageHeader'
+import StatCard from '@/pages/admin/_components/StatCard'
 import DataTable from '@/pages/admin/_components/DataTable'
 
 export default function StaffListPage() {
   // Mock data removed. Awaiting backend integration for /admin/staff
-  const [staff, setStaff] = useState([])
-  const [loading, setLoading] = useState(false)
+  const [staff] = useState([])
+  const [loading] = useState(false)
 
   const columns = [
     { key: 'name', label: 'Name', sortable: true },
@@ -51,8 +52,8 @@ export default function StaffListPage() {
       />
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <SummaryCard icon={UsersRound} label="Total Staff" value={staff.length} detail="Active staff accounts" tone="navy" />
-        <SummaryCard icon={ShieldAlert} label="Pending Invites" value={0} detail="Waiting for activation" tone="amber" />
+        <StatCard icon={UsersRound} color="blue" label="Total Staff" value={staff.length.toLocaleString()} subtitle="Active staff accounts" hint="PESO administrator accounts with system access." />
+        <StatCard icon={ShieldAlert} color="amber" label="Pending Invites" value="0" subtitle="Waiting for activation" hint="Invited staff who have not activated their account yet." />
       </div>
 
       <Card padding="none" className="mt-6">
@@ -67,33 +68,11 @@ export default function StaffListPage() {
           columns={columns}
           data={staff}
           loading={loading}
-          emptyMessage="No staff members found. Add your first staff member to get started."
+          caption="PESO staff directory."
+          emptyTitle="No staff members yet"
+          emptyDescription="Add your first staff member to get started."
         />
       </Card>
     </div>
-  )
-}
-
-function SummaryCard({ icon, label, value, detail, tone }) {
-  const tones = {
-    navy: 'bg-slate-100 text-brand-navy',
-    green: 'bg-emerald-50 text-emerald-700',
-    amber: 'bg-amber-50 text-amber-700',
-    blue: 'bg-blue-50 text-blue-700',
-  }
-
-  return (
-    <Card padding="sm">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <p className="text-xs font-extrabold uppercase tracking-wide text-slate-500">{label}</p>
-          <p className="mt-2 text-3xl font-black text-slate-950">{Number(value ?? 0).toLocaleString()}</p>
-          <p className="mt-1 text-xs text-slate-500">{detail}</p>
-        </div>
-        <span className={`rounded-xl p-2.5 ${tones[tone]}`}>
-          {createElement(icon, { className: 'h-5 w-5' })}
-        </span>
-      </div>
-    </Card>
   )
 }

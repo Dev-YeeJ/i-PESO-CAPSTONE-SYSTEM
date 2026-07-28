@@ -50,7 +50,7 @@ class GovernmentProgramNotification extends Notification
             'status' => $status,
             'action_url' => $this->event === 'application_submitted'
                 ? "/admin/government-programs/{$this->program->program_id}/applications"
-                : "/seeker/upskill-hub/{$this->program->program_id}",
+                : "/seeker/government-programs/{$this->program->program_id}",
         ];
     }
 }

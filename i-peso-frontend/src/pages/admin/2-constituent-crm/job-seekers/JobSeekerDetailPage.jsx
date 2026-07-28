@@ -20,7 +20,7 @@ import {
   Sparkles,
   UserRound,
 } from 'lucide-react'
-import { Badge, Button, Card, CardHeader } from '@/components/ui'
+import { Badge, Button, Card, CardHeader, LoadingSkeleton } from '@/components/ui'
 import { DownloadNSRPButton } from '@/pages/admin/_components'
 import { adminService } from '@/services/adminService'
 
@@ -87,10 +87,12 @@ export default function JobSeekerDetailPage() {
 
   if (loading) {
     return (
-      <div className="flex min-h-[420px] items-center justify-center">
-        <div className="text-center">
-          <div className="mx-auto h-11 w-11 animate-spin rounded-full border-4 border-slate-200 border-t-brand-navy" />
-          <p className="mt-4 text-sm font-medium text-slate-500">Loading NSRP case profile...</p>
+      <div className="space-y-6">
+        <LoadingSkeleton variant="text" rows={2} className="max-w-md" />
+        <LoadingSkeleton variant="card" rows={1} />
+        <div className="grid gap-6 xl:grid-cols-[minmax(0,1.7fr)_minmax(320px,0.8fr)]">
+          <LoadingSkeleton variant="card" rows={3} />
+          <LoadingSkeleton variant="card" rows={3} />
         </div>
       </div>
     )

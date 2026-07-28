@@ -26,12 +26,27 @@ class AdminGovernmentProgramController extends Controller
         'job_fair',
         'spes',
         'tupad',
+        'gip',
+        'ofw_assistance',
         'livelihood_program',
         'tech_voc_training',
         'career_guidance',
         'citizen_charter',
         'other',
     ];
+
+    private const RULE_FIELDS = [
+        'age',
+        'employment_status',
+        'educ_attainment',
+        'is_4ps_beneficiary',
+        'is_ofw',
+        'sex',
+        'civil_status',
+        'residency',
+    ];
+
+    private const RULE_OPS = ['between', 'gte', 'lte', 'in', 'equals', 'min_level'];
 
     public function index(Request $request): JsonResponse
     {
@@ -182,6 +197,13 @@ class AdminGovernmentProgramController extends Controller
         if ($request->filled('title') && ! $request->filled('program_name')) {
             $request->merge(['program_name' => $request->input('title')]);
         }
+
+        // The rules builder posts eligibility_rules as a JSON string (nested arrays
+        // don't survive multipart form encoding cleanly). Decode it before validating.
+        if ($request->has('eligibility_rules') && is_string($request->input('eligibility_rules'))) {
+            $decoded = json_decode($request->input('eligibility_rules'), true);
+            $request->merge(['eligibility_rules' => is_array($decoded) ? $decoded : []]);
+        }
         if ($request->is('api/admin/programs*')) {
             $legacyStatus = $request->input('status');
             $request->merge(array_filter([
@@ -204,6 +226,17 @@ class AdminGovernmentProgramController extends Controller
             'description' => [$program ? 'sometimes' : 'required', 'string', 'max:30000'],
             'target_beneficiaries' => ['nullable', 'string', 'max:2000'],
             'eligibility_requirements' => ['nullable', 'array', 'max:50'],
+            'eligibility_rules' => ['nullable', 'array', 'max:50'],
+            'eligibility_rules.*.field' => ['required_with:eligibility_rules', 'string', Rule::in(self::RULE_FIELDS)],
+            'eligibility_rules.*.op' => ['required_with:eligibility_rules', 'string', Rule::in(self::RULE_OPS)],
+            'eligibility_rules.*.label' => ['nullable', 'string', 'max:200'],
+            'eligibility_rules.*.weight' => ['nullable', 'numeric', 'min:0', 'max:100'],
+            'eligibility_rules.*.required' => ['nullable', 'boolean'],
+            'eligibility_rules.*.min' => ['nullable', 'numeric'],
+            'eligibility_rules.*.max' => ['nullable', 'numeric'],
+            'eligibility_rules.*.value' => ['nullable'],
+            'eligibility_rules.*.values' => ['nullable', 'array', 'max:20'],
+            'eligibility_rules.*.values.*' => ['string', 'max:100'],
             'required_documents' => ['nullable', 'array', 'max:30'],
             'required_documents.*' => ['string', 'max:150'],
             'target_industry' => ['nullable', 'string', 'max:255'],

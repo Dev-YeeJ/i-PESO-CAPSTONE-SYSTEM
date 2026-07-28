@@ -2,7 +2,6 @@
 
 namespace App\Services;
 
-use App\Models\EmployerSkillDemand;
 use App\Models\GovernmentProgram;
 use App\Models\JobSeeker;
 use App\Models\JobVacancySkill;
@@ -105,19 +104,9 @@ class UpskillRecommendationService
 
     private function employerDemand(): Collection
     {
-        if (! Schema::hasTable('employer_skill_demands')) {
-            return collect();
-        }
-
-        return EmployerSkillDemand::query()
-            ->whereIn('status', ['submitted', 'reviewed', 'linked_to_program'])
-            ->orderByDesc('workers_needed')
-            ->limit(50)
-            ->get(['skill_id', 'skill_name'])
-            ->map(fn ($demand) => [
-                'skill_id' => $demand->skill_id ? (int) $demand->skill_id : null,
-                'skill_name' => $demand->skill_name,
-            ]);
+        // Employer skill-demand signal was retired with the Upskill Hub module.
+        // Recommendations now rely on the seeker's missing skills + occupation match.
+        return collect();
     }
 
     private function skillMatches(?int $skillId, string $skillName, Collection $candidates): bool

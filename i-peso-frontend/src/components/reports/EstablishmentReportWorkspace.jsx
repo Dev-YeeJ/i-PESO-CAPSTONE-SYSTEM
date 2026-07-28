@@ -1,6 +1,7 @@
 import { createElement, useCallback, useEffect, useMemo, useState } from 'react'
 import { Download, FileDown, FileText, Filter, RefreshCw, UsersRound } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { EmptyState, LoadingSkeleton } from '@/components/ui'
 import { downloadReportBlob, exportEstablishmentReport, previewEstablishmentReport } from '@/services/establishmentReportService'
 
 const emptyFilters = {
@@ -100,7 +101,7 @@ export default function EstablishmentReportWorkspace({ role }) {
         {metrics.map(([label, value, Icon, tone]) => <div key={label} className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm"><span className={`inline-flex rounded-lg p-2 ${tone}`}>{createElement(Icon, { className: 'h-4 w-4' })}</span><p className="mt-3 text-2xl font-black text-slate-950">{value}</p><p className="mt-1 text-xs font-bold text-slate-500">{label}</p></div>)}
       </section>
 
-      {loading ? <div className="rounded-lg border border-slate-200 bg-white py-20 text-center text-sm font-semibold text-slate-500">Building report preview...</div> : (report?.reports ?? []).length === 0 ? <div className="rounded-lg border border-dashed border-slate-300 bg-white py-20 text-center"><FileText className="mx-auto h-9 w-9 text-slate-300" /><h2 className="mt-3 font-black text-slate-800">No report records found</h2><p className="mt-1 text-sm text-slate-500">Adjust the filters or record applicant outcomes in ATS and Job Fair.</p></div> : (report.reports.map((establishment) => <ReportPreview key={establishment.establishment.employer_id} report={establishment} isAdmin={isAdmin} />))}
+      {loading ? <LoadingSkeleton variant="card" rows={3} /> : (report?.reports ?? []).length === 0 ? <EmptyState filtered icon={FileText} title="No report records found" description="Adjust the filters or record applicant outcomes in ATS and Job Fair." /> : (report.reports.map((establishment) =><ReportPreview key={establishment.establishment.employer_id} report={establishment} isAdmin={isAdmin} />))}
     </div>
   )
 }

@@ -80,9 +80,4 @@ class Skill extends Model
     {
         return $this->hasMany(GovernmentProgramSkill::class, 'skill_id');
     }
-
-    public function employerDemands(): HasMany
-    {
-        return $this->hasMany(EmployerSkillDemand::class, 'skill_id');
-    }
 }

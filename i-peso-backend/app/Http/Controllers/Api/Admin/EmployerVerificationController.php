@@ -248,6 +248,158 @@ class EmployerVerificationController extends Controller
     }
 
     /**
+     * Finalize employer verification in a single action.
+     *
+     * Every uploaded document is treated as APPROVED by default. Only the
+     * documents listed in `rejected_documents` are marked rejected (with a
+     * preset reason). If any *required* document ends up rejected or was never
+     * uploaded, the employer is rejected; otherwise the employer is approved.
+     *
+     * POST /api/admin/employers/{employer_id}/finalize
+     */
+    public function finalizeVerification($employer_id, Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'rejected_documents' => ['nullable', 'array'],
+            'rejected_documents.*.document_id' => ['required', 'integer'],
+            'rejected_documents.*.reason' => ['required', 'string', 'min:10', 'max:1000'],
+            'remarks' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        try {
+            $employer = Employer::with('documents')->findOrFail($employer_id);
+
+            $rejectedReasons = collect($validated['rejected_documents'] ?? [])
+                ->keyBy('document_id')
+                ->map(fn ($entry) => $entry['reason']);
+
+            $requiredTypes = $employer->getRequiredDocuments();
+            $uploadedTypes = $employer->documents->pluck('document_type')->all();
+            $missingRequired = array_values(array_diff($requiredTypes, $uploadedTypes));
+
+            // Compile the rejection narrative and decide the outcome.
+            $rejectionLines = [];
+            $rejectedRequired = false;
+
+            foreach ($employer->documents as $document) {
+                if ($rejectedReasons->has($document->document_id)) {
+                    $rejectionLines[] = $this->documentLabel($document->document_type).': '.$rejectedReasons->get($document->document_id);
+                    if (in_array($document->document_type, $requiredTypes, true)) {
+                        $rejectedRequired = true;
+                    }
+                }
+            }
+
+            foreach ($missingRequired as $type) {
+                $rejectionLines[] = $this->documentLabel($type).': Required document was not submitted.';
+            }
+
+            $isRejection = $rejectedRequired || ! empty($missingRequired);
+            $rejectionReason = implode(' | ', $rejectionLines);
+
+            DB::transaction(function () use ($employer, $rejectedReasons, $isRejection, $rejectionReason, $validated, $request) {
+                // Persist each document's decision (approved unless explicitly rejected).
+                foreach ($employer->documents as $document) {
+                    if ($rejectedReasons->has($document->document_id)) {
+                        $document->update([
+                            'verification_status' => 'rejected',
+                            'admin_notes' => $rejectedReasons->get($document->document_id),
+                        ]);
+                    } else {
+                        $document->update([
+                            'verification_status' => 'approved',
+                            'admin_notes' => null,
+                        ]);
+                    }
+                }
+
+                if ($isRejection) {
+                    $employer->update([
+                        'verification_status' => 'rejected',
+                        'verified_at' => null,
+                        'rejection_reason' => $rejectionReason,
+                        'verified_by_admin_id' => $request->user()->getKey(),
+                    ]);
+
+                    $employer->vacancies()->where('status', 'active')->update(['status' => 'closed']);
+
+                    ActivityLog::create([
+                        'user_type' => $request->user()::class,
+                        'user_id' => $request->user()->getKey(),
+                        'action' => 'finalized_employer_rejected',
+                        'description' => sprintf(
+                            'Rejected employer #%d (%s) via unified review. Reason: %s',
+                            $employer->employer_id,
+                            $employer->email,
+                            $rejectionReason
+                        ),
+                        'ip_address' => $request->ip(),
+                    ]);
+                } else {
+                    $employer->update([
+                        'verification_status' => 'verified',
+                        'verified_at' => now(),
+                        'rejection_reason' => null,
+                        'verified_by_admin_id' => $request->user()->getKey(),
+                    ]);
+
+                    ActivityLog::create([
+                        'user_type' => $request->user()::class,
+                        'user_id' => $request->user()->getKey(),
+                        'action' => 'finalized_employer_approved',
+                        'description' => sprintf(
+                            'Approved employer #%d (%s) via unified review.%s',
+                            $employer->employer_id,
+                            $employer->email,
+                            ! empty($validated['remarks']) ? " Remarks: {$validated['remarks']}" : ''
+                        ),
+                        'ip_address' => $request->ip(),
+                    ]);
+                }
+            });
+
+            $notificationQueued = $this->queueStatusNotification(
+                $employer,
+                $isRejection ? 'rejected' : 'verified',
+                $isRejection ? $rejectionReason : ($validated['remarks'] ?? null),
+            );
+
+            return response()->json([
+                'message' => $isRejection
+                    ? 'Employer registration rejected and notification queued.'
+                    : 'Employer approved successfully and notification queued.',
+                'outcome' => $isRejection ? 'rejected' : 'approved',
+                'employer_id' => $employer->employer_id,
+                'verification_status' => $employer->verification_status,
+                'rejection_reason' => $employer->rejection_reason,
+                'notification_queued' => $notificationQueued,
+            ], 200);
+        } catch (\Exception $e) {
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Human-readable label for a document type (mirrors the admin UI labels).
+     */
+    private function documentLabel(string $type): string
+    {
+        $labels = [
+            'mayors_permit' => "Mayor's Permit",
+            'bir_certificate' => 'BIR Certificate',
+            'dti_certificate' => 'DTI Certificate',
+            'sec_certificate' => 'SEC Certificate',
+            'prpa_license' => 'PRPA License',
+            'dme_poea_license' => 'DMW/POEA License',
+            'philJobnet_proof' => 'PhilJobNet Proof',
+            'government_id' => 'Government ID',
+            'authorization_letter' => 'Authorization Letter',
+        ];
+
+        return $labels[$type] ?? ucwords(str_replace('_', ' ', $type));
+    }
+
+    /**
      * Stream an uploaded employer document to an authenticated administrator.
      * GET /api/admin/documents/{document_id}/view
      */

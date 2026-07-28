@@ -44,6 +44,8 @@ const validateSeeker = (f) => {
   if (!f.complete_address?.trim())    e.complete_address = 'Complete address is required.'
   if (!f.password)                    e.password        = 'Password is required.'
   else if (f.password.length < 8)     e.password        = 'Password must be at least 8 characters.'
+  else if (!/\d/.test(f.password) || !/[^A-Za-z0-9]/.test(f.password))
+                                      e.password        = 'Password must include at least one number and one special character.'
   if (!f.password_confirmation)       e.password_confirmation = 'Please confirm your password.'
   else if (f.password !== f.password_confirmation)
                                       e.password_confirmation = 'Passwords do not match.'
@@ -61,6 +63,8 @@ const validateEmployer = (f) => {
   if (!f.complete_address?.trim())        e.complete_address    = 'Complete address is required.'
   if (!f.password)                        e.password            = 'Password is required.'
   else if (f.password.length < 8)         e.password            = 'Password must be at least 8 characters.'
+  else if (!/\d/.test(f.password) || !/[^A-Za-z0-9]/.test(f.password))
+                                          e.password            = 'Password must include at least one number and one special character.'
   if (!f.password_confirmation)           e.password_confirmation = 'Please confirm your password.'
   else if (f.password !== f.password_confirmation)
                                           e.password_confirmation = 'Passwords do not match.'
@@ -324,7 +328,7 @@ const RegisterPage = () => {
             {/* Password with strength meter */}
             <div>
               <Field label="Password" name="password" type={showPw ? 'text' : 'password'}
-                placeholder="Minimum 8 characters"
+                placeholder="Min 8 chars, incl. a number & symbol"
                 value={form.password ?? ''} onChange={handleChange} onBlur={handleBlur}
                 error={getError('password')}
                 rightElement={

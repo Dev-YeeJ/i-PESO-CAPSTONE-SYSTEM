@@ -1,6 +1,6 @@
-import { createElement, useCallback, useEffect, useRef, useState } from 'react'
-import { AlertTriangle, CheckCircle2, Clock3, MessageSquareText, RefreshCw, RotateCcw, Send, ServerCog, ShieldCheck, SkipForward } from 'lucide-react'
-import { Button, Card } from '@/components/ui'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { AlertTriangle, CheckCircle2, Clock3, MessageSquareText, RefreshCw, RotateCcw, Send, ShieldCheck, SkipForward } from 'lucide-react'
+import { Button, Card, EmptyState, StatCard } from '@/components/ui'
 import PageHeader from '@/pages/admin/_components/PageHeader'
 import { smsService } from '@/services/smsService'
 
@@ -81,12 +81,12 @@ export default function SMSNotificationsPage() {
       {error && <div className="flex items-center gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700"><AlertTriangle className="h-5 w-5" />{error}</div>}
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
-        <Kpi icon={MessageSquareText} label="Total Logged" value={summary.total} />
-        <Kpi icon={CheckCircle2} label="Sent" value={summary.sent} tone="emerald" />
-        <Kpi icon={Clock3} label="Pending / Retrying" value={(summary.pending || 0) + (summary.retrying || 0)} tone="blue" />
-        <Kpi icon={SkipForward} label="Skipped" value={summary.skipped} />
-        <Kpi icon={ShieldCheck} label="Log Only" value={summary.log_only} tone="amber" />
-        <Kpi icon={AlertTriangle} label="Failed" value={summary.failed} tone="red" />
+        <StatCard icon={MessageSquareText} color="blue" label="Total Logged" value={num(summary.total)} />
+        <StatCard icon={CheckCircle2} color="green" label="Sent" value={num(summary.sent)} />
+        <StatCard icon={Clock3} color="blue" label="Pending / Retrying" value={num((summary.pending || 0) + (summary.retrying || 0))} />
+        <StatCard icon={SkipForward} color="slate" label="Skipped" value={num(summary.skipped)} />
+        <StatCard icon={ShieldCheck} color="amber" label="Log Only" value={num(summary.log_only)} />
+        <StatCard icon={AlertTriangle} color="red" label="Failed" value={num(summary.failed)} />
       </div>
 
       <Card padding="none" className={loading ? 'ring-2 ring-brand-100' : ''}>
@@ -141,14 +141,13 @@ export default function SMSNotificationsPage() {
             </table>
           </div>
           <Pagination page={data.logs.current_page} lastPage={data.logs.last_page} onChange={goToPage} loading={loading} />
-        </> : <div className="p-6"><div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 py-12 text-center text-sm text-slate-500">No SMS records match the selected filters.</div></div>}
+        </> : <EmptyState filtered title="No SMS records match your filters" description="Try adjusting the status or purpose filters above." />}
       </Card>
     </div>
   )
 }
 
-function Kpi({ icon, label, value, tone = 'slate' }) { const tones = { slate: 'bg-slate-100 text-slate-700', emerald: 'bg-emerald-50 text-emerald-700', blue: 'bg-blue-50 text-blue-700', amber: 'bg-amber-50 text-amber-700', red: 'bg-red-50 text-red-700' }; return <Card padding="sm"><div className="flex items-start justify-between gap-3"><div><p className="text-xs font-bold uppercase tracking-wide text-slate-500">{label}</p><p className="mt-2 text-3xl font-black text-slate-950">{Number(value || 0).toLocaleString()}</p></div><span className={`rounded-xl p-2 ${tones[tone]}`}>{createElement(icon, { className: 'h-5 w-5' })}</span></div></Card> }
-function GatewayFact({ label, value }) { return <div><p className="font-semibold text-slate-500">{label}</p><p className="mt-0.5 font-bold text-slate-900">{value}</p></div> }
+function num(value) { return Number(value || 0).toLocaleString() }
 function Filter({ label, value, onChange, options, disabled }) { return <label className="min-w-0"><span className="mb-1 block text-xs font-bold text-slate-600">{label}</span><select value={value} disabled={disabled} onChange={(event) => onChange(event.target.value)} className="w-full min-w-0 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none disabled:bg-slate-100 sm:min-w-44 focus:border-brand-500 focus:ring-2 focus:ring-brand-200"><option value="">All</option>{options.map((option) => <option key={option} value={option}>{pretty(option)}</option>)}</select></label> }
 function Status({ status }) { const styles = { sent: 'bg-emerald-50 text-emerald-700', failed: 'bg-red-50 text-red-700', skipped: 'bg-slate-100 text-slate-700', log_only: 'bg-amber-50 text-amber-800', retrying: 'bg-blue-50 text-blue-700', pending: 'bg-blue-50 text-blue-700' }; return <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-bold ${styles[status] || styles.pending}`}>{pretty(status)}</span> }
 function Pagination({ page, lastPage, onChange, loading }) { if (lastPage <= 1) return null; return <div className="flex items-center justify-between border-t border-slate-100 p-4"><p className="text-xs text-slate-500">Page {page} of {lastPage}</p><div className="flex gap-2"><Button size="sm" variant="outline" disabled={loading || page <= 1} onClick={() => onChange(page - 1)}>Previous</Button><Button size="sm" variant="outline" disabled={loading || page >= lastPage} onClick={() => onChange(page + 1)}>Next</Button></div></div> }

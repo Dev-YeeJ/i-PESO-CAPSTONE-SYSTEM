@@ -352,7 +352,7 @@ class SeekerNearbyJobController extends Controller
                         'missing_skills_count' => $missingSkills->count(),
                     ],
                     'actions' => [
-                        'can_apply' => ! $application && (bool) $seeker->profile_completed,
+                        'can_apply' => ! $application,
                         'can_save' => true,
                         'can_rsvp_job_fair' => (bool) ($jobFair['is_available_at_job_fair'] && ! $jobFair['has_rsvp']),
                         'can_download_resume' => (bool) $seeker->profile_completed,
@@ -569,7 +569,7 @@ class SeekerNearbyJobController extends Controller
             'job_fair' => ['is_available_at_job_fair' => false, 'has_rsvp' => false, 'deferred' => true],
             'upskill' => ['recommended' => false, 'programs' => [], 'missing_skills_count' => 0, 'deferred' => true],
             'actions' => [
-                'can_apply' => ! $application && (bool) $seeker->profile_completed,
+                'can_apply' => ! $application,
                 'can_save' => true,
                 'can_rsvp_job_fair' => false,
                 'can_download_resume' => (bool) $seeker->profile_completed,
@@ -649,7 +649,7 @@ class SeekerNearbyJobController extends Controller
                     'program_id' => $program->program_id,
                     'title' => $program->program_name,
                     'matched_skills' => $matchedSkills,
-                    'url' => "/seeker/upskill-hub/{$program->program_id}",
+                    'url' => "/seeker/government-programs/{$program->program_id}",
                 ];
             })
             ->filter()

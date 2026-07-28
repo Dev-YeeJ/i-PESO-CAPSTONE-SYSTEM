@@ -36,6 +36,8 @@ import {
   getSeekerProfile,
 } from '@/services/seekerService'
 import { useAuthStore } from '@/stores/authStore'
+import { Button, LoadingSkeleton } from '@/components/ui'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 
 const skillGroups = [
   ['dole_skills', 'DOLE Skills', 'bg-blue-50 text-blue-700 border-blue-200'],
@@ -52,6 +54,7 @@ export default function SeekerProfile() {
   const [photoUrl, setPhotoUrl] = useState(null)
   const [photoVersion, setPhotoVersion] = useState(0)
   const [openingCertificate, setOpeningCertificate] = useState(null)
+  const [pendingDeleteCert, setPendingDeleteCert] = useState(null)
   const [resumeStudioOpen, setResumeStudioOpen] = useState(false)
   const [generatingResume, setGeneratingResume] = useState(false)
   const [professionalSummary, setProfessionalSummary] = useState('')
@@ -122,7 +125,7 @@ export default function SeekerProfile() {
   )
 
   if (loading) {
-    return <div className="py-20 text-center text-sm text-slate-500">Loading your NSRP profile...</div>
+    return <div className="mx-auto max-w-7xl space-y-6 px-4 py-6"><LoadingSkeleton variant="text" rows={2} className="max-w-md" /><LoadingSkeleton variant="card" rows={1} /><LoadingSkeleton variant="card" rows={3} /></div>
   }
 
   if (!profile) {
@@ -313,8 +316,10 @@ export default function SeekerProfile() {
     }
   }
 
-  const removeCertificate = async (certificate) => {
-    if (!window.confirm(`Delete "${certificate.title}" from your certificate vault?`)) return
+  const confirmDeleteCert = async () => {
+    const certificate = pendingDeleteCert
+    if (!certificate) return
+    setPendingDeleteCert(null)
 
     const previous = profile
     setProfile((current) => ({
@@ -682,7 +687,7 @@ export default function SeekerProfile() {
                           <button onClick={() => viewCertificate(certificate)} disabled={openingCertificate === certificate.certificate_id} className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-700">
                             <Eye className="h-4 w-4" /> {openingCertificate === certificate.certificate_id ? 'Opening...' : 'View'}
                           </button>
-                          <button onClick={() => removeCertificate(certificate)} className="rounded-lg bg-red-50 p-2 text-red-600"><Trash2 className="h-4 w-4" /></button>
+                          <button onClick={() => setPendingDeleteCert(certificate)} className="rounded-lg bg-red-50 p-2 text-red-600"><Trash2 className="h-4 w-4" /></button>
                         </div>
                       </div>
                     ))}
@@ -760,6 +765,23 @@ export default function SeekerProfile() {
         onDownload={downloadResume}
         generating={generatingResume}
       />
+
+      {pendingDeleteCert && (
+        <Dialog open onOpenChange={(open) => !open && setPendingDeleteCert(null)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Delete certificate?</DialogTitle>
+              <DialogDescription>
+                &ldquo;{pendingDeleteCert.title}&rdquo; will be removed from your certificate vault. This can&apos;t be undone.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button variant="ghost" onClick={() => setPendingDeleteCert(null)}>Cancel</Button>
+              <Button variant="danger" icon={Trash2} onClick={confirmDeleteCert}>Delete certificate</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   )
 }

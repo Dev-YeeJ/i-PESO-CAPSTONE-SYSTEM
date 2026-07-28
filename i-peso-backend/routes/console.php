@@ -9,3 +9,4 @@ Artisan::command('inspire', function () {
 })->purpose('Display an inspiring quote');
 
 Schedule::command('interviews:send-reminders')->everyFifteenMinutes();
+Schedule::command('permits:notify-expiring')->dailyAt('08:00');

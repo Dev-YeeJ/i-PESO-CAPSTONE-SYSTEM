@@ -10,10 +10,11 @@ export const saveCompanyProfile = async (formData) => {
   return response.data
 }
 
-export const uploadDocument = async (documentType, file) => {
+export const uploadDocument = async (documentType, file, expirationDate = null) => {
   const formData = new FormData()
   formData.append('document_type', documentType)
   formData.append('document_file', file)
+  if (expirationDate) formData.append('expiration_date', expirationDate)
 
   const response = await apiClient.post('/employer/register/step-3', formData)
   return response.data
@@ -81,10 +82,11 @@ export const getCalendarEvents = async (start, end) => {
   return response.data
 }
 
-export const reuploadDocument = async (documentType, file) => {
+export const reuploadDocument = async (documentType, file, expirationDate = null) => {
   const formData = new FormData()
   formData.append('document_type', documentType)
   formData.append('document_file', file)
+  if (expirationDate) formData.append('expiration_date', expirationDate)
 
   const response = await apiClient.post('/employer/register/step-3', formData)
   return response.data

@@ -78,11 +78,8 @@ class SeekerApplicationController extends Controller
     ): JsonResponse {
         $seeker = $this->seeker($request);
 
-        if (! $seeker->profile_completed) {
-            throw ValidationException::withMessages([
-                'profile' => ['Complete your NSRP profile before applying to jobs.'],
-            ]);
-        }
+        // Jobseekers may apply with just their basic registration info — the full
+        // NSRP profile (education, work history, etc.) can be completed later.
 
         if ($vacancy->status !== 'active') {
             throw ValidationException::withMessages([

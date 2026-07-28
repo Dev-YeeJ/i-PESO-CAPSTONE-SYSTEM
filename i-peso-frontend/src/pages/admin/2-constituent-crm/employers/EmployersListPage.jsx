@@ -3,8 +3,9 @@ import { useForm } from 'react-hook-form'
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, ArrowRight, Briefcase, Building2, CalendarDays, CheckCircle2, FileText, Filter, MapPin, Search, SlidersHorizontal, X, Mail, Phone } from 'lucide-react'
-import { Badge, Button, Card } from '@/components/ui'
+import { Badge, Button, Card, EmptyState, LoadingSkeleton } from '@/components/ui'
 import PageHeader from '@/pages/admin/_components/PageHeader'
+import StatCard from '@/pages/admin/_components/StatCard'
 import StatusBadge from '@/pages/admin/_components/StatusBadge'
 import { adminService } from '@/services/adminService'
 
@@ -112,10 +113,10 @@ export default function EmployersListPage() {
   }
 
   const cards = [
-    { label: 'Total employers', value: summary.total, detail: 'Registered businesses', tone: 'navy', icon: Building2 },
-    { label: 'Verified', value: summary.verified, detail: 'Approved for placements', tone: 'green', icon: CheckCircle2 },
-    { label: 'Pending review', value: summary.pending, detail: 'Awaiting admin action', tone: 'amber', icon: Filter },
-    { label: 'New this month', value: summary.newThisMonth, detail: 'Recently added', tone: 'blue', icon: CalendarDays },
+    { label: 'Total employers', value: summary.total, detail: 'Registered businesses', color: 'blue', icon: Building2, hint: 'All registered employer accounts.' },
+    { label: 'Verified', value: summary.verified, detail: 'Approved for placements', color: 'green', icon: CheckCircle2, hint: 'Employers approved to post vacancies.' },
+    { label: 'Pending review', value: summary.pending, detail: 'Awaiting admin action', color: 'amber', icon: Filter, hint: 'Employers awaiting accreditation review.' },
+    { label: 'New this month', value: summary.newThisMonth, detail: 'Recently added', color: 'slate', icon: CalendarDays, hint: 'Employers registered this calendar month.' },
   ]
 
   return (
@@ -126,7 +127,11 @@ export default function EmployersListPage() {
           <Button to="/admin/verification-queue" variant="primary">Open verification queue</Button>
         </div>
 
-        <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{cards.map((card) => <SummaryCard key={card.label} {...card} />)}</div>
+        <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          {cards.map((card) => (
+            <StatCard key={card.label} icon={card.icon} color={card.color} label={card.label} value={Number(card.value ?? 0).toLocaleString()} subtitle={card.detail} hint={card.hint} />
+          ))}
+        </div>
 
         <Card padding="sm" className="mt-6">
           <div className="flex flex-wrap items-end gap-3">
@@ -180,18 +185,23 @@ export default function EmployersListPage() {
         </Card>
 
         {error && (
-          <div className="mt-6 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-            {error}
+          <div className="mt-6 flex items-center justify-between gap-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+            <span>{error}</span>
+            <button type="button" onClick={() => employersQuery.refetch()} className="font-extrabold hover:underline">Try again</button>
           </div>
         )}
 
         {loading ? (
-          <div className="mt-6 rounded-xl border border-slate-200 bg-white p-8 text-center text-slate-500">
-            Loading employers...
-          </div>
+          <div className="mt-6"><LoadingSkeleton variant="card" rows={4} /></div>
         ) : employers.length === 0 ? (
-          <div className="mt-6 rounded-xl border border-slate-200 bg-white p-8 text-center text-slate-500">
-            No employers match the selected filters.
+          <div className="mt-6">
+            <Card>
+              <EmptyState
+                filtered={filtersActive}
+                title={filtersActive ? 'No employers match your filters' : 'No employers registered yet'}
+                description={filtersActive ? 'Try clearing or broadening the filters above.' : 'Registered employers will appear here.'}
+              />
+            </Card>
           </div>
         ) : (
           <div className="mt-6 grid gap-6 xl:grid-cols-2">
@@ -220,11 +230,6 @@ export default function EmployersListPage() {
       </div>
     </div>
   )
-}
-
-function SummaryCard({ icon, label, value, detail, tone }) {
-  const tones = { navy: 'bg-slate-100 text-brand-navy', green: 'bg-emerald-50 text-emerald-700', amber: 'bg-amber-50 text-amber-700', blue: 'bg-blue-50 text-blue-700' }
-  return <Card padding="sm"><div className="flex items-start justify-between gap-4"><div><p className="text-xs font-extrabold uppercase tracking-wide text-slate-500">{label}</p><p className="mt-2 text-3xl font-black text-slate-950">{Number(value ?? 0).toLocaleString()}</p><p className="mt-1 text-xs text-slate-500">{detail}</p></div><span className={`rounded-xl p-2.5 ${tones[tone]}`}>{createElement(icon, { className: 'h-5 w-5' })}</span></div></Card>
 }
 
 function EmployerCard({ employer, onView }) {

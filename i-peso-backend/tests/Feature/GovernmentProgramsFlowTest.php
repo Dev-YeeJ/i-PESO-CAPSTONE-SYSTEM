@@ -26,7 +26,7 @@ class GovernmentProgramsFlowTest extends TestCase
         $this->createTables();
     }
 
-    public function test_admin_seeker_and_employer_can_complete_the_upskill_hub_flow(): void
+    public function test_admin_and_seeker_can_complete_the_government_program_flow(): void
     {
         $admin = Administrator::create([
             'first_name' => 'PESO',
@@ -110,25 +110,10 @@ class GovernmentProgramsFlowTest extends TestCase
             ->assertJsonPath('data.0.status', 'approved')
             ->assertJsonPath('data.0.remarks', 'Qualified for the next training batch.');
 
-        Sanctum::actingAs($employer);
-        $demandResponse = $this->postJson('/api/employer/upskill-needs', [
-            'skill_id' => $welding->id,
-            'skill_name' => 'SMAW Welding',
-            'workers_needed' => 8,
-            'reason' => 'Qualified production welders are difficult to recruit locally.',
-            'preferred_training_timeline' => 'Within 3 months',
-        ])->assertCreated()
-            ->assertJsonPath('demand.status', 'submitted');
-
-        $demandId = $demandResponse->json('demand.demand_id');
-        Sanctum::actingAs($admin);
-        $this->postJson("/api/admin/employer-skill-demands/{$demandId}/status", [
-            'status' => 'linked_to_program',
-            'linked_program_id' => $programId,
-            'admin_remarks' => 'Linked to the next SMAW training batch.',
-        ])->assertOk()
-            ->assertJsonPath('demand.status', 'linked_to_program')
-            ->assertJsonPath('demand.linked_program_id', $programId);
+        // Seeker programs list returns the program with an eligibility payload.
+        $this->getJson('/api/seeker/government-programs')
+            ->assertOk()
+            ->assertJsonPath('programs.data.0.eligibility.status', fn ($status) => is_string($status));
     }
 
     public function test_closed_full_and_expired_programs_reject_applications(): void

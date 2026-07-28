@@ -1,6 +1,8 @@
 export const colors = {
   primary: '#0F172A',
   accent: '#F59E0B',
+  accentPressed: '#D97706',
+  accentSoft: '#FEF3C7',
   border: '#E2E8F0',
   secondaryText: '#64748B',
   muted: '#475569',
@@ -60,6 +62,8 @@ export const shadows = {
 };
 
 export const typography = {
+  hero: 32,
+  stat: 30,
   display: 28,
   heading: 22,
   title: 18,
@@ -69,17 +73,18 @@ export const typography = {
   regular: '400' as const,
   medium: '600' as const,
   semibold: '700' as const,
-  bold: '800' as const,
+  bold: '700' as const,
   weight: {
     regular: '400' as const,
     medium: '600' as const,
     semibold: '700' as const,
-    bold: '800' as const,
+    bold: '700' as const,
   },
   family: {
     regular: 'DMSans_400Regular',
     medium: 'DMSans_500Medium',
     bold: 'DMSans_700Bold',
+    display: 'DMSerifDisplay_400Regular',
   },
 };
 

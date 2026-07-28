@@ -39,6 +39,15 @@ const emptyForm = {
   placement_salary: '',
 }
 
+// Local-time "YYYY-MM-DDTHH:mm" for the datetime-local `min` attribute — prevents scheduling in the past.
+const nowLocalDateTime = () => {
+  const now = new Date()
+  now.setMinutes(now.getMinutes() - now.getTimezoneOffset())
+  return now.toISOString().slice(0, 16)
+}
+// Local-time "YYYY-MM-DD" for date `min` attributes.
+const todayLocalDate = () => nowLocalDateTime().slice(0, 10)
+
 export default function EmployerATSBoard() {
   const [searchQuery, setSearchQuery] = useState('')
   const [activeApplication, setActiveApplication] = useState(null)
@@ -430,6 +439,7 @@ function StatusModal({ application, status, register, setValue, watch, saving, o
                   <span className="text-sm font-bold text-slate-700">Schedule</span>
                   <input
                     type="datetime-local"
+                    min={nowLocalDateTime()}
                     {...register('interview.schedule')}
                     className="mt-2 w-full rounded-xl border border-slate-300 px-3.5 py-3 text-sm outline-none"
                   />
@@ -464,6 +474,7 @@ function StatusModal({ application, status, register, setValue, watch, saving, o
                   <span className="text-sm font-bold text-slate-700">Start date</span>
                   <input
                     type="date"
+                    min={todayLocalDate()}
                     {...register('placement_start_date')}
                     className="mt-2 w-full rounded-xl border border-slate-300 px-3.5 py-3 text-sm outline-none"
                   />

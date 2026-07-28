@@ -1,5 +1,5 @@
 // i-peso-frontend/src/pages/admin/programs/ProgramApplicantsPage.jsx
-import { useEffect, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { useParams, useNavigate } from 'react-router-dom'
 import PageHeader from '@/pages/admin/_components/PageHeader'
 import DataTable from '@/pages/admin/_components/DataTable'
@@ -9,18 +9,14 @@ import { adminService } from '@/services/adminService'
 export default function ProgramApplicantsPage() {
   const { id: programId } = useParams()
   const navigate = useNavigate()
-  const [applicants, setApplicants] = useState([])
-  const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    adminService.getProgramApplicants(programId).then(d => {
-      setApplicants(d.data || [])
-      setLoading(false)
-    }).catch(e => {
-      console.error(e)
-      setLoading(false)
-    })
-  }, [programId])
+  const { data, isLoading, isError, error, refetch } = useQuery({
+    queryKey: ['admin', 'programApplicants', programId],
+    queryFn: () => adminService.getProgramApplicants(programId),
+  })
+
+  const applicants = data?.data || []
+  const errorMessage = isError ? (error?.response?.data?.message ?? 'Unable to load applicants.') : ''
 
   return (
     <div className="space-y-6">
@@ -36,7 +32,12 @@ export default function ProgramApplicantsPage() {
           { key: 'created_at', label: 'Applied', render: (d) => new Date(d).toLocaleDateString() },
         ]}
         data={applicants}
-        loading={loading}
+        loading={isLoading}
+        error={errorMessage || null}
+        onRetry={refetch}
+        caption="Applicants for this government program."
+        emptyTitle="No applicants yet"
+        emptyDescription="Seekers who apply to this program will appear here."
       />
     </div>
   )

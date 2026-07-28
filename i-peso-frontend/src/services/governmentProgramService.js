@@ -20,7 +20,10 @@ const programFormData = (payload) => {
   const form = new FormData()
   const arrays = ['eligibility_requirements', 'required_documents', 'skills']
   Object.entries(payload).forEach(([key, value]) => {
-    if (arrays.includes(key)) {
+    if (key === 'eligibility_rules') {
+      // Nested arrays (e.g. `values`) don't survive multipart encoding — send JSON.
+      form.append('eligibility_rules', JSON.stringify(Array.isArray(value) ? value : []))
+    } else if (arrays.includes(key)) {
       appendArray(form, key, value)
     } else if (value !== null && value !== undefined && value !== '') {
       form.append(key, value)
@@ -45,11 +48,7 @@ export const governmentProgramService = {
   updateCitizenCharter: async (id, payload) => (await api.put(`/admin/citizen-charter/${id}`, payload)).data,
   archiveCitizenCharter: async (id) => (await api.delete(`/admin/citizen-charter/${id}`)).data,
 
-  adminSkillDemands: async (params = {}) => (await api.get('/admin/employer-skill-demands', { params })).data,
-  reviewSkillDemand: async (id, payload) => (await api.post(`/admin/employer-skill-demands/${id}/status`, payload)).data,
-
-  seekerHub: async (params = {}) => (await api.get('/seeker/upskill-hub', { params })).data,
-  recommendedPrograms: async () => (await api.get('/seeker/upskill-hub/recommended')).data.data,
+  listSeekerPrograms: async (params = {}) => (await api.get('/seeker/government-programs', { params })).data,
   seekerProgram: async (id) => (await api.get(`/seeker/government-programs/${id}`)).data.program,
   seekerProgramAttachment: async (id) => (await api.get(`/seeker/government-programs/${id}/attachment`, { responseType: 'blob' })).data,
   applyToProgram: async (id) => (await api.post(`/seeker/government-programs/${id}/apply`)).data,
@@ -62,13 +61,6 @@ export const governmentProgramService = {
     return (await api.post(`/seeker/government-program-applications/${id}/documents`, form)).data
   },
   publicCitizenCharter: async () => (await api.get('/seeker/citizen-charter')).data.data,
-
-  employerPrograms: async (params = {}) => (await api.get('/employer/upskill-hub/programs', { params })).data.data,
-  recommendApplicant: async (payload) => (await api.post('/employer/upskill-hub/recommend-applicant', payload)).data,
-  employerNeeds: async (params = {}) => (await api.get('/employer/upskill-needs', { params })).data,
-  createEmployerNeed: async (payload) => (await api.post('/employer/upskill-needs', payload)).data,
-  updateEmployerNeed: async (id, payload) => (await api.put(`/employer/upskill-needs/${id}`, payload)).data,
-  deleteEmployerNeed: async (id) => (await api.delete(`/employer/upskill-needs/${id}`)).data,
 }
 
 export default governmentProgramService

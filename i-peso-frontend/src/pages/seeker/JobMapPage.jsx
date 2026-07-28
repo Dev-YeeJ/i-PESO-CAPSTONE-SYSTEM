@@ -88,7 +88,8 @@ function ApplyConfirmation({ job, onCancel, onConfirm, applying }) {
 export default function JobMapPage() {
   const navigate = useNavigate()
   const [jobs, setJobs] = useState([])
-  const [seeker, setSeeker] = useState(null)
+  // Seeker profile is still loaded (for other views), but applying no longer gates on it.
+  const [, setSeeker] = useState(null)
   const [summary, setSummary] = useState(null)
   const [seekerLocation, setSeekerLocation] = useState({ latitude: null, longitude: null, full_address: '' })
   const [filters, setFilters] = useState(DEFAULT_FILTERS)
@@ -193,11 +194,7 @@ export default function JobMapPage() {
 
   const requestApply = (job) => {
     if (job.has_applied) return
-    if (!seeker?.profile_completed) {
-      toast.error('Complete your profile before applying.')
-      navigate('/seeker/profile/edit')
-      return
-    }
+    // Basic registration info is enough to apply — the full profile can be finished later.
     setPendingApplyJobId(job.post_id)
   }
 
@@ -241,7 +238,7 @@ export default function JobMapPage() {
 
   const viewTraining = (job) => {
     const skill = job.upskill?.programs?.[0]?.matched_skills?.[0] || job.missing_skills?.[0]?.skill || ''
-    navigate(`/seeker/upskill-hub${skill ? `?skill=${encodeURIComponent(skill)}` : ''}`)
+    navigate(`/seeker/government-programs${skill ? `?search=${encodeURIComponent(skill)}` : ''}`)
   }
 
   const useCurrentLocation = () => {
@@ -383,7 +380,7 @@ export default function JobMapPage() {
           ) : locationRequired ? (
             <div className="rounded-2xl border border-amber-200 bg-white p-6 text-center shadow-sm"><LocateFixed className="mx-auto h-8 w-8 text-amber-500" /><h2 className="mt-3 text-sm font-black text-slate-800">Location needed for nearby jobs</h2><p className="mt-1 text-xs leading-5 text-slate-500">Update your profile address or allow your current location for this search.</p><button type="button" onClick={useCurrentLocation} disabled={isLocating} className="mt-4 inline-flex items-center gap-1.5 rounded-lg bg-blue-950 px-3 py-2 text-xs font-bold text-white shadow hover:bg-blue-900 disabled:opacity-50">{isLocating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <LocateFixed className="h-3.5 w-3.5" />} Use current location</button></div>
           ) : jobs.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-6 text-center shadow-sm"><BriefcaseBusiness className="mx-auto h-8 w-8 text-slate-300" /><h2 className="mt-3 text-sm font-black text-slate-800">{highMatchEmpty ? 'No high-match jobs found nearby' : `No jobs found within ${filters.radius_km} km`}</h2><p className="mt-1 text-xs leading-5 text-slate-500">{highMatchEmpty ? 'Try widening the radius or lowering the match filter.' : 'Try widening the radius or clearing your search filters.'}</p><div className="mt-4 flex flex-wrap justify-center gap-2"><button type="button" onClick={() => updateFilters({ radius_km: Math.min(50, Number(filters.radius_km) + 10) })} className="rounded-lg bg-blue-950 px-3 py-2 text-xs font-bold text-white shadow hover:bg-blue-900">Increase radius</button>{highMatchEmpty && <button type="button" onClick={() => updateFilters({ min_match: 0 })} className="rounded-lg border border-blue-900 px-3 py-2 text-xs font-bold text-blue-950 hover:bg-blue-50">Lower match filter</button>}<button type="button" onClick={() => navigate('/seeker/upskill-hub')} className="rounded-lg border border-violet-300 px-3 py-2 text-xs font-bold text-violet-800 hover:bg-violet-50">Open Upskill Hub</button></div></div>
+            <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-6 text-center shadow-sm"><BriefcaseBusiness className="mx-auto h-8 w-8 text-slate-300" /><h2 className="mt-3 text-sm font-black text-slate-800">{highMatchEmpty ? 'No high-match jobs found nearby' : `No jobs found within ${filters.radius_km} km`}</h2><p className="mt-1 text-xs leading-5 text-slate-500">{highMatchEmpty ? 'Try widening the radius or lowering the match filter.' : 'Try widening the radius or clearing your search filters.'}</p><div className="mt-4 flex flex-wrap justify-center gap-2"><button type="button" onClick={() => updateFilters({ radius_km: Math.min(50, Number(filters.radius_km) + 10) })} className="rounded-lg bg-blue-950 px-3 py-2 text-xs font-bold text-white shadow hover:bg-blue-900">Increase radius</button>{highMatchEmpty && <button type="button" onClick={() => updateFilters({ min_match: 0 })} className="rounded-lg border border-blue-900 px-3 py-2 text-xs font-bold text-blue-950 hover:bg-blue-50">Lower match filter</button>}<button type="button" onClick={() => navigate('/seeker/government-programs')} className="rounded-lg border border-violet-300 px-3 py-2 text-xs font-bold text-violet-800 hover:bg-violet-50">Open Programs</button></div></div>
           ) : jobs.map((job) => (
             <div id={`map-job-${job.post_id}`} key={job.post_id}>
               <JobMapCard job={job} isActive={selectedJobId === job.post_id} isApplying={applyingIds.includes(job.post_id)} isSaving={savingIds.includes(job.post_id)} onClick={() => openDetails(job)} onView={openDetails} onApply={requestApply} onSave={handleSave} onTraining={viewTraining} onJobFair={handleJobFair} />

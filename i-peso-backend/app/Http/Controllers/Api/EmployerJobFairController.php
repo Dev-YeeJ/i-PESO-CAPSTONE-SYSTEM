@@ -173,6 +173,7 @@ class EmployerJobFairController extends Controller
     private function resultRules(bool $entries): array
     {
         $rules = [
+            'office_location' => ['nullable', 'string', 'max:255'],
             'contact_person' => ['nullable', 'string', 'max:255'], 'contact_number' => ['nullable', 'string', 'max:40'],
             'total_male' => ['required', 'integer', 'min:0'], 'total_female' => ['required', 'integer', 'min:0'],
             'total_applicants' => ['required', 'integer', 'min:0'], 'total_hots' => ['required', 'integer', 'min:0'],
@@ -184,6 +185,11 @@ class EmployerJobFairController extends Controller
             'entries' => ['required', 'array'], 'entries.*.applicant_name' => ['required', 'string', 'max:255'],
             'entries.*.gender' => ['required', Rule::in(['male', 'female'])], 'entries.*.position_applied_for' => ['required', 'string', 'max:255'],
             'entries.*.status' => ['required', Rule::in(['hots', 'near_hired', 'rejected'])],
+            // RO1-JF Form 3 per-applicant DOLE columns (optional so short-form entries still submit).
+            'entries.*.city_municipality' => ['nullable', 'string', 'max:255'],
+            'entries.*.contact_number' => ['nullable', 'string', 'max:40'],
+            'entries.*.age_group' => ['nullable', Rule::in(['A', 'B', 'C', 'D', 'E', 'F'])],
+            'entries.*.highest_education' => ['nullable', 'string', 'max:40'],
             'entries.*.mismatch_code' => ['nullable', Rule::in(JobFairReportService::MISMATCH_CODES)], 'entries.*.remarks' => ['nullable', 'string', 'max:2000'],
         ];
         return $rules;

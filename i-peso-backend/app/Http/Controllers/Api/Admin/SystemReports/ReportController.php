@@ -10,6 +10,11 @@ use App\Models\JobSeeker;
 use App\Models\Application;
 use App\Models\JobVacancy;
 use App\Models\GovernmentProgram;
+use App\Models\PlacementRecord;
+use App\Models\PlacementReportUpload;
+use App\Models\SprsManualAdjustment;
+use App\Models\SprsSignatory;
+use Illuminate\Support\Facades\Schema;
 use App\Services\AdminAnalyticsService;
 use App\Services\JobFairReportService;
 use Carbon\Carbon;
@@ -99,64 +104,139 @@ class ReportController extends Controller
         $validated = $request->validate([
             'month' => 'required|integer|min:1|max:12',
             'year' => 'required|integer|min:2020|max:2100',
+            'manual_adjustments' => 'nullable|array',
+            'manual_adjustments.*.indicator_key' => 'required|string|max:60',
+            'manual_adjustments.*.label' => 'required|string|max:255',
+            'manual_adjustments.*.total' => 'nullable|integer|min:0',
+            'manual_adjustments.*.female' => 'nullable|integer|min:0',
+            'signatories' => 'nullable|array',
+            'signatories.*.name' => 'nullable|string|max:255',
+            'signatories.*.position' => 'nullable|string|max:255',
         ]);
 
-        $month = clone \Carbon\Carbon::createFromDate($validated['year'], $validated['month'], 1);
+        $month = \Carbon\Carbon::createFromDate($validated['year'], $validated['month'], 1);
         $start = $month->copy()->startOfMonth();
         $end = $month->copy()->endOfMonth();
+        $prevMonth = $month->copy()->subMonth();
+        $yearStart = $month->copy()->startOfYear();
 
-        // 1.1 Job Vacancies Solicited
-        $vacancies = JobVacancy::with('employer')->whereBetween('created_at', [$start, $end])->get();
-        $localVacancies = $vacancies->sum('vacancies_count');
-        $overseasVacancies = 0; 
+        // Compute the same indicator set for current month, previous month, and
+        // year-to-date cumulative — the three column groups on the DOLE SPRS form.
+        $current = $this->computeSprsFigures($start, $end, $jobFairReports);
+        $previous = $this->computeSprsFigures($prevMonth->copy()->startOfMonth(), $prevMonth->copy()->endOfMonth(), $jobFairReports);
+        $cumulative = $this->computeSprsFigures($yearStart, $end, $jobFairReports);
 
-        // 1.2 Applicants Registered
+        $data = [
+            'period' => $month->format('F Y'),
+            'previous_period' => $prevMonth->format('F Y'),
+            'cumulative_period' => $yearStart->format('F') . '–' . $month->format('F Y'),
+            // Current-month keys kept flat for backward compatibility with the
+            // existing print view; previous/cumulative added alongside.
+            '1_1_vacancies' => [
+                'total' => $current['vacancies_total'], 'local' => $current['vacancies_local'], 'overseas' => $current['vacancies_overseas'],
+                'previous_total' => $previous['vacancies_total'], 'cumulative_total' => $cumulative['vacancies_total'],
+            ],
+            '1_2_registered' => [
+                'total' => $current['registered_total'], 'female' => $current['registered_female'],
+                'previous_total' => $previous['registered_total'], 'previous_female' => $previous['registered_female'],
+                'cumulative_total' => $cumulative['registered_total'], 'cumulative_female' => $cumulative['registered_female'],
+            ],
+            '1_3_referred' => [
+                'total' => $current['referred_total'], 'female' => $current['referred_female'],
+                'previous_total' => $previous['referred_total'], 'previous_female' => $previous['referred_female'],
+                'cumulative_total' => $cumulative['referred_total'], 'cumulative_female' => $cumulative['referred_female'],
+            ],
+            '1_4_placed' => [
+                'total' => $current['placed_total'], 'female' => $current['placed_female'],
+                'private' => $current['placed_private'], 'government' => $current['placed_government'], 'overseas' => 0,
+                'on_platform' => $current['placed_on_platform'], 'employer_reported' => $current['placed_employer_reported'],
+                'previous_total' => $previous['placed_total'], 'previous_female' => $previous['placed_female'],
+                'cumulative_total' => $cumulative['placed_total'], 'cumulative_female' => $cumulative['placed_female'],
+            ],
+            '1_5_spes' => [
+                'total' => $current['spes_total'], 'female' => $current['spes_female'],
+                'previous_total' => $previous['spes_total'], 'cumulative_total' => $cumulative['spes_total'],
+            ],
+            '1_6_job_fairs' => array_merge($current['job_fairs'], [
+                'previous_fairs_conducted' => $previous['job_fairs']['fairs_conducted'],
+                'cumulative_fairs_conducted' => $cumulative['job_fairs']['fairs_conducted'],
+            ]),
+            'peis' => [
+                'establishments' => $current['employers_registered'],
+                'applicants' => $current['registered_total'],
+                'cumulative_establishments' => $cumulative['employers_registered'],
+            ],
+        ];
+
+        $report = AnalyticsReport::create([
+            'admin_id' => $admin->admin_id,
+            'title' => 'SPRS Report - ' . $month->format('F Y'),
+            'report_category' => 'sprs',
+            'coverage_start' => $start,
+            'coverage_end' => $end,
+            'data_summary' => $data,
+            'status' => 'submitted',
+        ]);
+
+        // Persist manual (non-computable) rows and the sign-off block, then fold
+        // them into both the response and the stored snapshot.
+        $manualAdjustments = $this->persistManualAdjustments($report->id, $validated['manual_adjustments'] ?? []);
+        $signatories = $this->persistSignatories($report->id, $validated['signatories'] ?? []);
+        $data['manual_adjustments'] = $manualAdjustments;
+        $data['signatories'] = $signatories;
+        $report->update(['data_summary' => $data]);
+
+        return response()->json([
+            'message' => 'SPRS Report generated',
+            'data' => $data,
+            'report' => $report->fresh(),
+        ], 200);
+    }
+
+    /**
+     * Compute the core SPRS indicator figures for a date range. Called once per
+     * column group (current month, previous month, year-to-date cumulative).
+     */
+    private function computeSprsFigures(Carbon $start, Carbon $end, JobFairReportService $jobFairReports): array
+    {
+        $localVacancies = (int) JobVacancy::whereBetween('created_at', [$start, $end])->sum('vacancies_count');
+
         $seekers = JobSeeker::whereBetween('created_at', [$start, $end])->get();
         $registeredTotal = $seekers->count();
-        $registeredFemale = $seekers->where('gender', 'Female')->count();
+        $registeredFemale = $seekers->filter(fn ($s) => strtolower((string) $s->sex) === 'female')->count();
 
-        // 1.3 Applicants referred
-        $referredQuery = Application::whereBetween('created_at', [$start, $end]);
-        $referredTotal = $referredQuery->count();
+        $referredTotal = Application::whereBetween('created_at', [$start, $end])->count();
         $referredFemale = Application::whereBetween('created_at', [$start, $end])
-            ->whereHas('jobSeeker', fn($q) => $q->where('sex', 'female'))
-            ->count();
+            ->whereHas('jobSeeker', fn ($q) => $q->where('sex', 'female'))->count();
 
-        // 1.4 Applicants Placed
-        $placedQuery = Application::where('status', 'hired')
-                             ->whereBetween('status_changed_at', [$start, $end]);
-        $placedTotal = $placedQuery->count();
-        $placedFemale = Application::where('status', 'hired')
-                             ->whereBetween('status_changed_at', [$start, $end])
-                             ->whereHas('jobSeeker', fn($q) => $q->where('sex', 'female'))
-                             ->count();
+        $placedOnPlatform = Application::where('status', 'hired')->whereBetween('status_changed_at', [$start, $end])->count();
+        $placedFemale = Application::where('status', 'hired')->whereBetween('status_changed_at', [$start, $end])
+            ->whereHas('jobSeeker', fn ($q) => $q->where('sex', 'female'))->count();
+        $placedGovernment = Application::where('status', 'hired')->whereBetween('status_changed_at', [$start, $end])
+            ->whereHas('jobVacancy.employer', fn ($q) => $q->where('company_type', 'like', '%Government%')->orWhere('company_type', 'like', '%LGU%'))->count();
 
-        $placedGovernment = Application::where('status', 'hired')
-                             ->whereBetween('status_changed_at', [$start, $end])
-                             ->whereHas('jobVacancy.employer', fn($q) => 
-                                 $q->where('company_type', 'like', '%Government%')
-                                   ->orWhere('company_type', 'like', '%LGU%')
-                             )->count();
-        $placedPrivate = $placedTotal - $placedGovernment;
+        $employerReportedPlaced = 0;
+        $employerReportedFemale = 0;
+        if (Schema::hasTable('placement_records')) {
+            $approvedUploadIds = PlacementReportUpload::where('status', PlacementReportUpload::STATUS_APPROVED)->pluck('id');
+            $employerReportedPlaced = PlacementRecord::whereIn('upload_id', $approvedUploadIds)
+                ->whereBetween('date_hired', [$start->toDateString(), $end->toDateString()])->count();
+            $employerReportedFemale = PlacementRecord::whereIn('upload_id', $approvedUploadIds)
+                ->whereBetween('date_hired', [$start->toDateString(), $end->toDateString()])
+                ->whereRaw('LOWER(gender) LIKE ?', ['f%'])->count();
+        }
 
-        // 1.5 SPES
-        $spesPlaced = Application::where('status', 'hired')
-                             ->whereBetween('status_changed_at', [$start, $end])
-                             ->whereHas('jobVacancy', fn($q) => $q->where('spes_tupad_eligible', true))
-                             ->count();
-        $spesFemale = Application::where('status', 'hired')
-                             ->whereBetween('status_changed_at', [$start, $end])
-                             ->whereHas('jobVacancy', fn($q) => $q->where('spes_tupad_eligible', true))
-                             ->whereHas('jobSeeker', fn($q) => $q->where('sex', 'female'))
-                             ->count();
+        $spesPlaced = Application::where('status', 'hired')->whereBetween('status_changed_at', [$start, $end])
+            ->whereHas('jobVacancy', fn ($q) => $q->where('spes_tupad_eligible', true))->count();
+        $spesFemale = Application::where('status', 'hired')->whereBetween('status_changed_at', [$start, $end])
+            ->whereHas('jobVacancy', fn ($q) => $q->where('spes_tupad_eligible', true))
+            ->whereHas('jobSeeker', fn ($q) => $q->where('sex', 'female'))->count();
 
-        // PEIS Registrations
         $employersRegistered = \App\Models\Employer::whereBetween('created_at', [$start, $end])->count();
 
         $jobFairs = \App\Models\JobFair::query()
             ->whereBetween(DB::raw('COALESCE(start_date, event_date)'), [$start->toDateString(), $end->toDateString()])
-            ->whereIn('status', ['completed', 'closed'])
-            ->get();
+            ->whereIn('status', ['completed', 'closed'])->get();
         $jobFairSection = [
             'fairs_conducted' => $jobFairs->count(), 'participating_companies' => 0,
             'vacancies_solicited' => 0, 'applicants' => 0, 'hots' => 0,
@@ -174,61 +254,89 @@ class ReportController extends Controller
             $jobFairSection['admin_proxy_reports'] += $summary['admin_proxy_reports'];
         }
 
-        $data = [
-            'period' => $month->format('F Y'),
-            '1_1_vacancies' => [
-                'total' => $localVacancies + $overseasVacancies,
-                'local' => $localVacancies,
-                'overseas' => $overseasVacancies,
-            ],
-            '1_2_registered' => [
-                'total' => $registeredTotal,
-                'female' => $registeredFemale,
-            ],
-            '1_3_referred' => [
-                'total' => $referredTotal,
-                'female' => $referredFemale,
-            ],
-            '1_4_placed' => [
-                'total' => $placedTotal,
-                'female' => $placedFemale,
-                'private' => $placedPrivate,
-                'government' => $placedGovernment,
-                'overseas' => 0,
-            ],
-            '1_5_spes' => [
-                'total' => $spesPlaced,
-                'female' => $spesFemale,
-            ],
-            '1_6_job_fairs' => $jobFairSection,
-            'peis' => [
-                'establishments' => $employersRegistered,
-                'applicants' => $registeredTotal,
-            ]
+        return [
+            'vacancies_total' => $localVacancies,
+            'vacancies_local' => $localVacancies,
+            'vacancies_overseas' => 0,
+            'registered_total' => $registeredTotal,
+            'registered_female' => $registeredFemale,
+            'referred_total' => $referredTotal,
+            'referred_female' => $referredFemale,
+            'placed_total' => $placedOnPlatform + $employerReportedPlaced,
+            'placed_female' => $placedFemale + $employerReportedFemale,
+            'placed_private' => $placedOnPlatform - $placedGovernment,
+            'placed_government' => $placedGovernment,
+            'placed_on_platform' => $placedOnPlatform,
+            'placed_employer_reported' => $employerReportedPlaced,
+            'spes_total' => $spesPlaced,
+            'spes_female' => $spesFemale,
+            'employers_registered' => $employersRegistered,
+            'job_fairs' => $jobFairSection,
         ];
+    }
 
-        // Save report history
-        $report = AnalyticsReport::create([
-            'admin_id' => $admin->admin_id,
-            'title' => "SPRS Report - " . $month->format('F Y'),
-            'report_category' => 'sprs',
-            'coverage_start' => $start,
-            'coverage_end' => $end,
-            'data_summary' => $data,
-            'status' => 'submitted',
-        ]);
+    private function persistManualAdjustments(int $reportId, array $adjustments): array
+    {
+        $saved = [];
+        foreach ($adjustments as $row) {
+            if (blank($row['indicator_key'] ?? null) || blank($row['label'] ?? null)) {
+                continue;
+            }
+            $saved[] = SprsManualAdjustment::updateOrCreate(
+                ['analytics_report_id' => $reportId, 'indicator_key' => $row['indicator_key']],
+                ['label' => $row['label'], 'total' => (int) ($row['total'] ?? 0), 'female' => (int) ($row['female'] ?? 0)],
+            )->only(['indicator_key', 'label', 'total', 'female']);
+        }
 
-        return response()->json([
-            'message' => 'SPRS Report generated',
+        return $saved;
+    }
+
+    private function persistSignatories(int $reportId, array $signatories): array
+    {
+        $saved = [];
+        foreach (['prepared_by', 'checked_by', 'approved_by'] as $role) {
+            $entry = $signatories[$role] ?? null;
+            if (! is_array($entry) || blank($entry['name'] ?? null)) {
+                continue;
+            }
+            SprsSignatory::updateOrCreate(
+                ['analytics_report_id' => $reportId, 'role' => $role],
+                ['name' => $entry['name'], 'position' => $entry['position'] ?? null],
+            );
+            $saved[$role] = ['name' => $entry['name'], 'position' => $entry['position'] ?? null];
+        }
+
+        return $saved;
+    }
+
+    /**
+     * Full-form SPRS PDF matching the DOLE SPRS 2018 layout (current / previous /
+     * cumulative columns, total + female, manual rows, and signatory block).
+     */
+    public function exportSprsPdf(int $id)
+    {
+        $admin = auth()->user();
+        if (! $admin instanceof Administrator) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        $report = AnalyticsReport::findOrFail($id);
+        $data = $report->data_summary ?? [];
+
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('pdf.sprs_monthly', [
+            'report' => $report,
             'data' => $data,
-            'report' => $report
-        ], 200);
+            'signatories' => $data['signatories'] ?? [],
+            'manualAdjustments' => $data['manual_adjustments'] ?? [],
+        ])->setPaper('a4', 'portrait');
+
+        return $pdf->download('sprs-' . str_replace(' ', '-', strtolower($data['period'] ?? $report->id)) . '.pdf');
     }
 
     public function show(int $id): JsonResponse
     {
         $admin = auth()->user();
-        
+
         if (!$admin instanceof Administrator) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }

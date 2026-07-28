@@ -108,11 +108,6 @@ class Employer extends Authenticatable
         return $this->hasMany(JobFairVacancy::class, 'employer_id', 'employer_id');
     }
 
-    public function skillDemands(): HasMany
-    {
-        return $this->hasMany(EmployerSkillDemand::class, 'employer_id', 'employer_id');
-    }
-
     /**
      * Get only required documents for this employer's company type
      */

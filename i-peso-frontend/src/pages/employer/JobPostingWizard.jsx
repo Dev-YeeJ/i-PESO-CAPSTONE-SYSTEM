@@ -17,6 +17,8 @@ import {
   X,
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
+import { Button } from '@/components/ui'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import AIOccupationMapper from '@/components/form/AIOccupationMapper'
 import EducationLevelSelect, { educationRankToBackendValue } from '@/components/form/EducationLevelSelect'
 import ExperienceTimeFrame from '@/components/form/ExperienceTimeFrame'
@@ -129,6 +131,7 @@ export default function JobPostingWizard() {
   const [errors, setErrors] = useState({})
   const [serverError, setServerError] = useState('')
   const [saving, setSaving] = useState(false)
+  const [showPreview, setShowPreview] = useState(false)
 
   const currentStep = steps[step - 1]
   const progressPercent = ((step - 1) / (steps.length - 1)) * 100
@@ -249,6 +252,11 @@ export default function JobPostingWizard() {
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
+  const openPreview = () => {
+    if (!validate(5)) return
+    setShowPreview(true)
+  }
+
   const submit = async () => {
     if (!validate(5)) return
 
@@ -262,6 +270,7 @@ export default function JobPostingWizard() {
       const responseErrors = error.response?.data?.errors ?? {}
       setErrors(Object.fromEntries(Object.entries(responseErrors).map(([key, messages]) => [key, messages?.[0] ?? 'Invalid value.'])))
       setServerError(error.response?.data?.message ?? 'Unable to publish the job vacancy.')
+      setShowPreview(false)
     } finally {
       setSaving(false)
     }
@@ -373,16 +382,32 @@ export default function JobPostingWizard() {
             ) : (
               <button
                 type="button"
-                onClick={submit}
+                onClick={openPreview}
                 disabled={saving}
                 className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-blue-900 px-5 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-blue-800 disabled:pointer-events-none disabled:opacity-60"
               >
-                {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
-                {saving ? 'Publishing...' : 'Publish Job'}
+                <CheckCircle2 className="h-4 w-4" />
+                Review &amp; Publish
               </button>
             )}
           </footer>
         </section>
+
+        <Dialog open={showPreview} onOpenChange={(open) => !open && setShowPreview(false)}>
+          <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Review before publishing</DialogTitle>
+              <DialogDescription>Confirm the posting details. Publishing makes this vacancy visible to job seekers and available for matching.</DialogDescription>
+            </DialogHeader>
+            <PreviewBody form={form} />
+            <DialogFooter>
+              <Button variant="ghost" onClick={() => setShowPreview(false)}>Keep editing</Button>
+              <Button variant="success" icon={CheckCircle2} onClick={submit} disabled={saving}>
+                {saving ? 'Publishing…' : 'Confirm & publish'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   )
@@ -807,6 +832,48 @@ function Field({ label, required = true, error, className = '', children }) {
       {children}
       {error && <span className="mt-1.5 block text-xs font-semibold text-red-600">{error}</span>}
     </label>
+  )
+}
+
+function PreviewBody({ form }) {
+  const location = [form.barangay, form.city_municipality, form.province].filter(Boolean).join(', ')
+  const salary = form.hide_salary
+    ? 'Hidden from public posting'
+    : form.salary_min
+      ? `₱${Number(form.salary_min).toLocaleString()}${form.salary_max ? ` – ₱${Number(form.salary_max).toLocaleString()}` : ''} / month`
+      : '—'
+  const ageRange = form.minimum_age || form.maximum_age
+    ? `${form.minimum_age || '—'} to ${form.maximum_age || '—'}`
+    : 'No age preference'
+  const description = form.job_description
+    ? (form.job_description.length > 260 ? `${form.job_description.slice(0, 260)}…` : form.job_description)
+    : '—'
+
+  return (
+    <dl className="grid grid-cols-1 gap-x-6 gap-y-3.5 rounded-xl border border-slate-200 bg-slate-50/60 p-4 sm:grid-cols-2">
+      <PreviewRow label="Position" value={`${form.job_title || '—'} · ${form.vacancies_count} opening${Number(form.vacancies_count) === 1 ? '' : 's'}`} />
+      <PreviewRow label="Employment" value={`${form.employment_type} · ${form.work_setup}`} />
+      <PreviewRow label="Location" value={location || '—'} full />
+      {form.specific_address && <PreviewRow label="Specific address" value={form.specific_address} full />}
+      <PreviewRow label="Minimum education" value={form.minimum_education || '—'} />
+      <PreviewRow label="Experience" value={yearsToExperienceLevel(form.required_years_experience)} />
+      <PreviewRow label="Required hard skills" value={form.required_skills.length ? form.required_skills.join(', ') : '—'} full />
+      <PreviewRow label="Preferred soft skills" value={form.soft_skills.length ? form.soft_skills.join(', ') : '—'} full />
+      <PreviewRow label="Preferred gender" value={form.preferred_gender} />
+      <PreviewRow label="Age range" value={ageRange} />
+      <PreviewRow label="Salary" value={salary} />
+      <PreviewRow label="Application deadline" value={form.application_deadline || '—'} />
+      <PreviewRow label="Description" value={description} full />
+    </dl>
+  )
+}
+
+function PreviewRow({ label, value, full }) {
+  return (
+    <div className={full ? 'sm:col-span-2' : ''}>
+      <dt className="text-[11px] font-extrabold uppercase tracking-wide text-slate-400">{label}</dt>
+      <dd className="mt-0.5 whitespace-pre-line text-sm font-semibold text-slate-800">{value}</dd>
+    </div>
   )
 }
 

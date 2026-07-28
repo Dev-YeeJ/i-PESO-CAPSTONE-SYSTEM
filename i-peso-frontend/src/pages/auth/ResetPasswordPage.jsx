@@ -144,6 +144,8 @@ const ResetPasswordPage = () => {
     if (digits.join('').length < 6) e.otp      = 'Please enter the full 6-digit code.'
     if (!password)                  e.password  = 'New password is required.'
     else if (password.length < 8)   e.password  = 'Password must be at least 8 characters.'
+    else if (!/\d/.test(password) || !/[^A-Za-z0-9]/.test(password))
+                                    e.password  = 'Password must include at least one number and one special character.'
     if (!confirmPw)                 e.confirmPw = 'Please confirm your new password.'
     else if (password !== confirmPw) e.confirmPw = 'Passwords do not match.'
     return e
@@ -389,7 +391,7 @@ const ResetPasswordPage = () => {
                       setPassword(e.target.value)
                       setErrors((er) => ({ ...er, password: undefined }))
                     }}
-                    placeholder="Minimum 8 characters"
+                    placeholder="Min 8 chars, incl. a number & symbol"
                     className={[
                       'w-full px-3.5 py-2.5 pr-11 text-sm rounded-xl border bg-white',
                       'transition-all focus:outline-none focus:ring-2 focus:ring-blue-500/20',

@@ -10,7 +10,7 @@ use App\Models\GovernmentProgramApplicationDocument;
 use App\Models\JobSeeker;
 use App\Models\ProgramApplication;
 use App\Notifications\GovernmentProgramNotification;
-use App\Services\GovernmentProgramEligibilityService;
+use App\Services\EligibilityMatchingService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -26,7 +26,7 @@ class SeekerGovernmentProgramApplicationController extends Controller
     public function apply(
         Request $request,
         GovernmentProgram $governmentProgram,
-        GovernmentProgramEligibilityService $eligibility,
+        EligibilityMatchingService $eligibility,
     ): JsonResponse {
         $seeker = $this->seeker($request);
 
@@ -45,13 +45,29 @@ class SeekerGovernmentProgramApplicationController extends Controller
                 throw ValidationException::withMessages(['program' => ['This program is full.']]);
             }
 
-            $snapshot = $eligibility->evaluate($seeker, $program);
+            // Same engine that powers the seeker-facing badge, so the persisted
+            // score matches what the applicant saw. Snapshot keeps a small profile
+            // copy for the admin applicants view.
+            $eval = $eligibility->evaluate($seeker, $program);
+            $snapshot = [
+                ...$eval,
+                'profile' => [
+                    'name' => trim("{$seeker->first_name} {$seeker->middle_name} {$seeker->last_name}"),
+                    'age' => $seeker->date_of_birth?->age,
+                    'education' => $seeker->educ_attainment,
+                    'employment_status' => $seeker->employment_status,
+                    'is_4ps_beneficiary' => (bool) $seeker->is_4ps_beneficiary,
+                    'is_ofw' => (bool) ($seeker->is_ofw || $seeker->is_former_ofw),
+                    'address' => $seeker->getFullAddress(),
+                ],
+                'evaluated_at' => now()->toIso8601String(),
+            ];
 
             return $program->applications()->create([
                 'seeker_id' => $seeker->seeker_id,
                 'application_status' => 'pending',
                 'eligibility_snapshot' => $snapshot,
-                'eligibility_score' => $snapshot['score'],
+                'eligibility_score' => $eval['score'],
             ])->fresh(['program.skills', 'documents', 'certificate']);
         });
 

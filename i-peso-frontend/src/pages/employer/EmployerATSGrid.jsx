@@ -11,6 +11,13 @@ import toast from 'react-hot-toast';
 import { getEmployerApplicationDetail, getEmployerApplications, updateEmployerApplicationStatusBulk, connectGoogleCalendar } from '@/services/employerApplicationService';
 import { useSearchParams, Link } from 'react-router-dom';
 
+// Local-time "YYYY-MM-DD" for date `min` attributes — prevents scheduling in the past.
+const todayLocalDate = () => {
+  const now = new Date();
+  now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+  return now.toISOString().slice(0, 10);
+};
+
 const PIPELINE_TABS = [
   { id: 'pending', label: 'Inbox' },
   { id: 'reviewed', label: 'Reviewed' },
@@ -695,7 +702,7 @@ export default function EmployerATSGrid() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">Date</label>
-                  <input type="date" {...registerInterview('date')} className="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none" required />
+                  <input type="date" min={todayLocalDate()} {...registerInterview('date')} className="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none" required />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">Time</label>
@@ -759,7 +766,7 @@ export default function EmployerATSGrid() {
             <div className="p-6 space-y-5">
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-1">Official Start Date <span className="text-red-500">*</span></label>
-                <input type="date" {...registerHire('startDate')} className="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 outline-none" required />
+                <input type="date" min={todayLocalDate()} {...registerHire('startDate')} className="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 outline-none" required />
               </div>
               
               <div>

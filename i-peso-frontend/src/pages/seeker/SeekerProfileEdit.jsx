@@ -36,6 +36,8 @@ import {
   saveSeekerProfileStep,
 } from '@/services/seekerService'
 import { useAuthStore } from '@/stores/authStore'
+import { Button, LoadingSkeleton } from '@/components/ui'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { serializeOccupationPreferences } from '@/utils/seekerProfilePayloads'
 import { ISO_COUNTRIES } from '@/data/jobPreferenceVocabularies'
 import {
@@ -274,8 +276,12 @@ export default function SeekerProfileEdit() {
     }
   }
 
-  const removeCertificate = async (certificate) => {
-    if (!window.confirm(`Delete "${certificate.title}" from your certificate vault?`)) return
+  const [pendingDeleteCert, setPendingDeleteCert] = useState(null)
+
+  const confirmDeleteCert = async () => {
+    const certificate = pendingDeleteCert
+    if (!certificate) return
+    setPendingDeleteCert(null)
 
     try {
       await deleteCertificate(certificate.certificate_id)
@@ -312,7 +318,7 @@ export default function SeekerProfileEdit() {
   }
 
   if (loading || !form) {
-    return <div className="py-20 text-center text-sm text-slate-500">Loading profile editor...</div>
+    return <div className="mx-auto max-w-5xl space-y-6 px-4 py-6"><LoadingSkeleton variant="text" rows={2} className="max-w-md" /><LoadingSkeleton variant="card" rows={4} /></div>
   }
 
   return (
@@ -736,7 +742,7 @@ export default function SeekerProfileEdit() {
                           certificate={certificate}
                           opening={openingCertificate === certificate.certificate_id}
                           onView={() => viewCertificate(certificate)}
-                          onDelete={() => removeCertificate(certificate)}
+                          onDelete={() => setPendingDeleteCert(certificate)}
                         />
                       ))}
                     </div>
@@ -837,6 +843,23 @@ export default function SeekerProfileEdit() {
           }))
         }}
       />
+
+      {pendingDeleteCert && (
+        <Dialog open onOpenChange={(open) => !open && setPendingDeleteCert(null)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Delete certificate?</DialogTitle>
+              <DialogDescription>
+                &ldquo;{pendingDeleteCert.title}&rdquo; will be removed from your certificate vault. This can&apos;t be undone.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button variant="ghost" onClick={() => setPendingDeleteCert(null)}>Cancel</Button>
+              <Button variant="danger" onClick={confirmDeleteCert}>Delete certificate</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   )
 }

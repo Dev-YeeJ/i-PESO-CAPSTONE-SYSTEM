@@ -1,10 +1,20 @@
 // src/pages/employer/components/DocumentUploadZone.jsx
 import { useState, useRef } from 'react'
 
+// Local-time "YYYY-MM-DD" for the expiration date `min` (no past dates).
+const todayLocalDate = () => {
+  const now = new Date()
+  now.setMinutes(now.getMinutes() - now.getTimezoneOffset())
+  return now.toISOString().slice(0, 10)
+}
+
 export default function DocumentUploadZone({ documentType, isUploaded, onUpload, loading, optional = false }) {
   const [isDragging, setIsDragging] = useState(false)
   const [fileName, setFileName] = useState(null)
+  const [expirationDate, setExpirationDate] = useState('')
   const fileInputRef = useRef(null)
+
+  const requiresExpiration = documentType === 'mayors_permit'
 
   const handleDragOver = (e) => {
     e.preventDefault()
@@ -45,8 +55,14 @@ export default function DocumentUploadZone({ documentType, isUploaded, onUpload,
       return
     }
 
+    // Mayor's Permit requires an expiration date before it can be uploaded.
+    if (requiresExpiration && !expirationDate) {
+      alert("Please enter the Mayor's Permit expiration date before uploading.")
+      return
+    }
+
     setFileName(file.name)
-    await onUpload(file)
+    await onUpload(file, requiresExpiration ? expirationDate : null)
   }
 
   const triggerFileInput = () => {
@@ -83,29 +99,52 @@ export default function DocumentUploadZone({ documentType, isUploaded, onUpload,
           </svg>
           <p className="font-semibold text-sm">{getDocumentLabel(documentType)}{optional ? ' (Optional)' : ''}</p>
           <p className="text-xs text-slate-600 truncate max-w-[200px]">{fileName}</p>
+          {requiresExpiration && expirationDate && (
+            <p className="mt-1 text-xs font-medium text-slate-500">Expires: {expirationDate}</p>
+          )}
         </div>
       ) : (
-        <div
-          onDragOver={handleDragOver}
-          onDragLeave={handleDragLeave}
-          onDrop={handleDrop}
-          className={`cursor-pointer transition-all flex flex-col items-center justify-center h-full ${isDragging ? 'bg-blue-50' : ''}`}
-        >
-          <svg className="w-8 h-8 mb-2 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-          </svg>
-          <p className="text-xs font-medium text-slate-700 mb-1">
-            Drag & drop your {getDocumentLabel(documentType).toLowerCase()}{optional ? ' (optional)' : ''}
-          </p>
-          <button
-            type="button"
-            onClick={triggerFileInput}
-            disabled={loading}
-            className="inline-block px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        <div className="flex h-full flex-col justify-center">
+          {requiresExpiration && (
+            <label className="mb-3 block text-left">
+              <span className="text-xs font-semibold text-slate-700">
+                Permit Expiration Date <span className="text-red-500">*</span>
+              </span>
+              <input
+                type="date"
+                value={expirationDate}
+                min={todayLocalDate()}
+                onClick={(e) => e.stopPropagation()}
+                onChange={(e) => setExpirationDate(e.target.value)}
+                className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+              />
+            </label>
+          )}
+          <div
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+            className={`cursor-pointer transition-all flex flex-col items-center justify-center ${isDragging ? 'bg-blue-50' : ''}`}
           >
-            {loading ? 'Uploading...' : 'Click to select'}
-          </button>
-          <p className="text-xs text-slate-500 mt-3">PDF or image (max 10MB)</p>
+            <svg className="w-8 h-8 mb-2 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+            <p className="text-xs font-medium text-slate-700 mb-1">
+              Drag & drop your {getDocumentLabel(documentType).toLowerCase()}{optional ? ' (optional)' : ''}
+            </p>
+            <button
+              type="button"
+              onClick={triggerFileInput}
+              disabled={loading || (requiresExpiration && !expirationDate)}
+              className="inline-block px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {loading ? 'Uploading...' : 'Click to select'}
+            </button>
+            {requiresExpiration && !expirationDate && (
+              <p className="mt-2 text-xs font-medium text-amber-600">Enter the expiration date first</p>
+            )}
+            <p className="text-xs text-slate-500 mt-3">PDF or image (max 10MB)</p>
+          </div>
         </div>
       )}
     </div>

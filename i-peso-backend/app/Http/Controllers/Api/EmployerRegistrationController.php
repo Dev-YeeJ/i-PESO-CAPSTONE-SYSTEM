@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rules\Password;
 
 class EmployerRegistrationController extends Controller
 {
@@ -25,7 +26,7 @@ class EmployerRegistrationController extends Controller
     {
         $validator = Validator::make($request->all(), [
             'email' => 'required|email|unique:employers',
-            'password' => 'required|string|min:8|confirmed',
+            'password' => ['required', 'confirmed', Password::min(8)->numbers()->symbols()],
             'company_type' => 'required|in:sole_proprietorship,corporation_partnership,local_recruitment_agency,overseas_recruitment_agency',
         ]);
 
@@ -165,6 +166,8 @@ class EmployerRegistrationController extends Controller
         $validator = Validator::make($request->all(), [
             'document_type' => ['required', 'string', 'in:'.implode(',', $allowedDocuments)],
             'document_file' => 'required|file|mimes:pdf,jpg,jpeg,png|max:10240',
+            // Mayor's Permit must carry an expiration date so we can remind the employer before it lapses.
+            'expiration_date' => ['required_if:document_type,mayors_permit', 'nullable', 'date', 'after:today'],
         ]);
 
         if ($validator->fails()) {
@@ -195,6 +198,9 @@ class EmployerRegistrationController extends Controller
                 'mime_type' => $file->getMimeType(),
                 'uploaded_at' => now(),
                 'verification_status' => 'pending',
+                'expiration_date' => $request->document_type === 'mayors_permit'
+                    ? $request->input('expiration_date')
+                    : null,
             ]);
 
             // Reset employer account to pending if they were rejected and just uploaded a correction
