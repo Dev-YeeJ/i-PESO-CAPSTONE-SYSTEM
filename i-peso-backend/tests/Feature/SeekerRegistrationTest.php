@@ -61,8 +61,8 @@ class SeekerRegistrationTest extends TestCase
             'last_name' => 'Dela Cruz',
             'email' => 'juan@example.com',
             'mobile_number' => '09123456789',
-            'password' => 'password123',
-            'password_confirmation' => 'password123',
+            'password' => 'password123!',
+            'password_confirmation' => 'password123!',
         ]);
 
         $response
@@ -87,8 +87,8 @@ class SeekerRegistrationTest extends TestCase
             'last_name' => '  Dela   Cruz ',
             'email' => '  MARIA.CLARA@example.COM ',
             'mobile_number' => '+63 912 345 6789',
-            'password' => 'password123',
-            'password_confirmation' => 'password123',
+            'password' => 'password123!',
+            'password_confirmation' => 'password123!',
         ])->assertCreated();
 
         $this->assertDatabaseHas('job_seekers', [

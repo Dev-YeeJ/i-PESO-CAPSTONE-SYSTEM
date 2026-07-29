@@ -62,7 +62,7 @@ const validate = (form) => {
 
   if (!form.password) errors.password = 'Password is required.'
   else if (form.password.length < 8) errors.password = 'Password must be at least 8 characters.'
-  else if (!/[A-Za-z]/.test(form.password) || !/\d/.test(form.password)) errors.password = 'Use at least one letter and one number.'
+  else if (!/\d/.test(form.password) || !/[^A-Za-z0-9]/.test(form.password)) errors.password = 'Include at least one number and one symbol.'
 
   if (!form.password_confirmation) errors.password_confirmation = 'Please confirm your password.'
   else if (form.password !== form.password_confirmation) errors.password_confirmation = 'Passwords do not match.'
@@ -166,7 +166,7 @@ export default function SeekerRegistration() {
           <Field label="Email address" name="email" type="email" placeholder="you@example.com" value={form.email ?? ''} onChange={change} onBlur={blur} error={fieldError('email')} autoComplete="email" inputMode="email" maxLength={255} />
           <Field label="Mobile number" name="mobile_number" type="tel" placeholder="09XXXXXXXXX" value={form.mobile_number ?? ''} onChange={change} onBlur={blur} error={fieldError('mobile_number')} autoComplete="tel-national" inputMode="numeric" maxLength={11} />
           <div>
-            <Field label="Password" name="password" type={showPassword ? 'text' : 'password'} placeholder="At least 8 characters with a letter and number" value={form.password ?? ''} onChange={change} onBlur={blur} error={fieldError('password')} autoComplete="new-password" rightElement={<VisibilityButton shown={showPassword} onClick={() => setShowPassword((current) => !current)} />} />
+            <Field label="Password" name="password" type={showPassword ? 'text' : 'password'} placeholder="At least 8 characters with a number and symbol" value={form.password ?? ''} onChange={change} onBlur={blur} error={fieldError('password')} autoComplete="new-password" rightElement={<VisibilityButton shown={showPassword} onClick={() => setShowPassword((current) => !current)} />} />
             <PasswordStrengthMeter password={form.password} strength={strength} />
           </div>
           <Field label="Confirm password" name="password_confirmation" type={showConfirmation ? 'text' : 'password'} placeholder="Re-enter your password" value={form.password_confirmation ?? ''} onChange={change} onBlur={blur} error={fieldError('password_confirmation')} autoComplete="new-password" rightElement={<VisibilityButton shown={showConfirmation} onClick={() => setShowConfirmation((current) => !current)} />} />

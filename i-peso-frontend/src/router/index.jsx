@@ -50,6 +50,8 @@ const AdminJobSeekersList    = lazy(() => import('@/pages/admin/2-constituent-cr
 const AdminJobSeekerDetail   = lazy(() => import('@/pages/admin/2-constituent-crm/job-seekers/JobSeekerDetailPage'))
 const AdminEmployersList     = lazy(() => import('@/pages/admin/2-constituent-crm/employers/EmployersListPage'))
 const AdminEmployerDetail    = lazy(() => import('@/pages/admin/2-constituent-crm/employers/EmployerDetailPage'))
+const AdminEmployerReportsList = lazy(() => import('@/pages/admin/2-constituent-crm/employer-reports/EmployerReportsListPage'))
+const AdminEmployerReportDetail = lazy(() => import('@/pages/admin/2-constituent-crm/employer-reports/EmployerReportDetailPage'))
 
 // Admin Pages - CATEGORY 3: EMPLOYMENT HUB
 const AdminJobPostingsList = lazy(() => import('@/pages/admin/3-employment-hub/job-postings/JobPostingsListPage'))
@@ -266,6 +268,8 @@ export const router = createBrowserRouter([
                       { path: 'job-seekers/:id', element: S(AdminJobSeekerDetail) },
                       { path: 'employers', element: S(AdminEmployersList) },
                       { path: 'employers/:id', element: S(AdminEmployerDetail) },
+                      { path: 'employer-reports', element: S(AdminEmployerReportsList) },
+                      { path: 'employer-reports/:id', element: S(AdminEmployerReportDetail) },
                       
                       // CATEGORY 3: EMPLOYMENT HUB
                       { path: 'job-postings', element: S(AdminJobPostingsList) },

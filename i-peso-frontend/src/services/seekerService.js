@@ -61,6 +61,11 @@ export const applyToJob = async (postId) => {
   return response.data
 }
 
+export const reportEmployer = async (employerId, payload) => {
+  const response = await apiClient.post(`/seeker/employers/${employerId}/report`, payload)
+  return response.data
+}
+
 export const uploadCertificate = async (formData, { onUploadProgress } = {}) => {
   const response = await apiClient.post('/seeker/certificates', formData, { onUploadProgress })
   return response.data

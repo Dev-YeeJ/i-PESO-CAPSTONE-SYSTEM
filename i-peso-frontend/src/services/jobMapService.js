@@ -37,6 +37,7 @@ export const normalizeMapJob = (job = {}) => {
     post_id: postId,
     vacancy_id: postId,
     employer_name: firstValue(job.employer_name, job.employer?.company_name, 'Employer not specified'),
+    employer_id: firstValue(job.employer_id, job.employer?.employer_id, null),
     full_work_address: firstValue(job.full_work_address, job.location, job.specific_address, 'Location not specified'),
     employment_type: firstValue(job.employment_type, job.job_type, ''),
     job_type: firstValue(job.job_type, job.employment_type, ''),

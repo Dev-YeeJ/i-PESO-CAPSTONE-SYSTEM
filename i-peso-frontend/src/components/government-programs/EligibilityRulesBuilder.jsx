@@ -8,7 +8,7 @@ const EMPLOYMENT_OPTIONS = [
 ]
 
 // Education labels must match job_seekers.educ_attainment values the service ranks.
-export const EDUCATION_LEVELS = [
+const EDUCATION_LEVELS = [
   'Elementary Graduate',
   'High School Undergraduate',
   'High School Graduate',

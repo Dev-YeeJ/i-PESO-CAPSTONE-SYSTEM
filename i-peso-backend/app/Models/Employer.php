@@ -98,6 +98,14 @@ class Employer extends Authenticatable
         return $this->hasMany(JobVacancy::class, 'employer_id', 'employer_id');
     }
 
+    /**
+     * Seeker-filed reports about this employer.
+     */
+    public function reports(): HasMany
+    {
+        return $this->hasMany(EmployerReport::class, 'employer_id', 'employer_id');
+    }
+
     public function jobFairJoins(): HasMany
     {
         return $this->hasMany(JobFairEmployer::class, 'employer_id', 'employer_id');

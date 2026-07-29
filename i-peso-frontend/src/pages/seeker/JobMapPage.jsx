@@ -6,6 +6,7 @@ import JobMapAssistant from '../../components/maps/JobMapAssistant'
 import JobMapCard from '../../components/maps/JobMapCard'
 import JobMapFilters from '../../components/maps/JobMapFilters'
 import JobMapDetailsPanel from '../../components/maps/JobMapDetailsPanel'
+import ReportEmployerModal from '../../components/ReportEmployerModal'
 import { getMapJobDetail, getMapJobs } from '../../services/jobMapService'
 import { applyToJob, toggleSavedJob } from '../../services/seekerService'
 
@@ -97,6 +98,7 @@ export default function JobMapPage() {
   const [detailsById, setDetailsById] = useState({})
   const [detailLoadingId, setDetailLoadingId] = useState(null)
   const [detailError, setDetailError] = useState('')
+  const [reportTarget, setReportTarget] = useState(null)
   const [popupJobId, setPopupJobId] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
@@ -406,10 +408,11 @@ export default function JobMapPage() {
 
       {/* Floating Details Panel */}
       <div className="absolute inset-0 z-20 pointer-events-none">
-        <JobMapDetailsPanel job={detailsJob} isLoading={detailLoadingId === selectedJobId} loadError={detailError} onClose={() => { detailAbortRef.current?.abort(); setSelectedJobId(null); setDetailError('') }} onApply={requestApply} onSave={handleSave} onTraining={viewTraining} onJobFair={handleJobFair} onApplicationStatus={() => navigate('/seeker/applications')} isApplying={detailsJob ? applyingIds.includes(detailsJob.post_id) : false} isSaving={detailsJob ? savingIds.includes(detailsJob.post_id) : false} />
+        <JobMapDetailsPanel job={detailsJob} isLoading={detailLoadingId === selectedJobId} loadError={detailError} onClose={() => { detailAbortRef.current?.abort(); setSelectedJobId(null); setDetailError('') }} onApply={requestApply} onSave={handleSave} onTraining={viewTraining} onJobFair={handleJobFair} onApplicationStatus={() => navigate('/seeker/applications')} onReport={(job) => setReportTarget({ employer_id: job.employer_id || job.employer?.employer_id, employer_name: job.employer_name })} isApplying={detailsJob ? applyingIds.includes(detailsJob.post_id) : false} isSaving={detailsJob ? savingIds.includes(detailsJob.post_id) : false} />
       </div>
 
       <ApplyConfirmation job={pendingApplyJob} onCancel={() => setPendingApplyJobId(null)} onConfirm={submitApplication} applying={pendingApplyJob ? applyingIds.includes(pendingApplyJob.post_id) : false} />
+      <ReportEmployerModal open={Boolean(reportTarget)} employer={reportTarget} onClose={() => setReportTarget(null)} />
     </div>
   )
 }

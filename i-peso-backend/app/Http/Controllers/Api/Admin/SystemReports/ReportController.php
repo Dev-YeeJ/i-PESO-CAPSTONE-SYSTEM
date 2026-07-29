@@ -180,8 +180,8 @@ class ReportController extends Controller
 
         // Persist manual (non-computable) rows and the sign-off block, then fold
         // them into both the response and the stored snapshot.
-        $manualAdjustments = $this->persistManualAdjustments($report->id, $validated['manual_adjustments'] ?? []);
-        $signatories = $this->persistSignatories($report->id, $validated['signatories'] ?? []);
+        $manualAdjustments = $this->persistManualAdjustments($report->report_id, $validated['manual_adjustments'] ?? []);
+        $signatories = $this->persistSignatories($report->report_id, $validated['signatories'] ?? []);
         $data['manual_adjustments'] = $manualAdjustments;
         $data['signatories'] = $signatories;
         $report->update(['data_summary' => $data]);
@@ -330,7 +330,7 @@ class ReportController extends Controller
             'manualAdjustments' => $data['manual_adjustments'] ?? [],
         ])->setPaper('a4', 'portrait');
 
-        return $pdf->download('sprs-' . str_replace(' ', '-', strtolower($data['period'] ?? $report->id)) . '.pdf');
+        return $pdf->download('sprs-' . str_replace(' ', '-', strtolower($data['period'] ?? $report->report_id)) . '.pdf');
     }
 
     public function show(int $id): JsonResponse

@@ -275,8 +275,8 @@ export default function SeekerProfile() {
       return
     }
 
-    if (!professionalSummary.trim()) {
-      toast.error('Add a professional summary before downloading your standard Philippine resume.')
+    if (!professionalSummary.trim() && !hasResumeSourceData(profile, allSkills)) {
+      toast.error('Add a professional summary, or complete your education, skills, and work experience, before downloading your resume.')
       return
     }
 
@@ -991,7 +991,7 @@ function ResumeStudioModal({
             <button
               type="button"
               onClick={onDownload}
-              disabled={generating || !String(professionalSummary || '').trim()}
+              disabled={generating || (!String(professionalSummary || '').trim() && !hasResumeSourceData(profile, allSkills))}
               className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-blue-700 px-4 py-3 text-sm font-black text-white shadow-sm transition hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {generating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
@@ -1253,6 +1253,13 @@ function fullName(profile) {
 
 function initials(profile) {
   return [profile.first_name, profile.last_name].filter(Boolean).map((name) => name[0]).join('').toUpperCase()
+}
+
+// The backend can build a resume straight from NSRP data (education, work
+// experience, skills) when no professional summary is written. Mirror that so the
+// UI does not block generation. Keep in sync with SeekerResumeController.
+function hasResumeSourceData(profile, allSkills = []) {
+  return Boolean(profile?.educations?.length || profile?.work_experiences?.length || allSkills.length)
 }
 
 function resumeResponsibilityPayload(experiences, responsibilities) {

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Award, Banknote, Bookmark, BriefcaseBusiness, CalendarDays, Check, ExternalLink, GraduationCap, Loader2, MapPin, Navigation, Sparkles, X } from 'lucide-react'
+import { Award, Banknote, Bookmark, BriefcaseBusiness, CalendarDays, Check, ExternalLink, Flag, GraduationCap, Loader2, MapPin, Navigation, Sparkles, X } from 'lucide-react'
 
 const formatSalary = (job) => {
   if (job.hide_salary || (!job.salary_min && !job.salary_max)) return 'Salary not disclosed'
@@ -16,7 +16,7 @@ const matchTone = (percentage) => {
   return 'bg-slate-100 text-slate-600 ring-slate-200'
 }
 
-export default function JobMapDetailsPanel({ job, isLoading = false, loadError = '', onClose, onApply, onSave, onTraining, onJobFair, onApplicationStatus, isApplying, isSaving }) {
+export default function JobMapDetailsPanel({ job, isLoading = false, loadError = '', onClose, onApply, onSave, onTraining, onJobFair, onApplicationStatus, onReport, isApplying, isSaving }) {
   const [expandedJobId, setExpandedJobId] = useState(null)
   const contentRef = useRef(null)
   const descriptionRef = useRef(null)
@@ -67,7 +67,20 @@ export default function JobMapDetailsPanel({ job, isLoading = false, loadError =
             {renderedJob.distance_km !== null && <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2.5 py-1 text-[10px] font-bold text-blue-700"><Navigation className="h-3 w-3" />{Number(renderedJob.distance_km).toFixed(1)} km away</span>}
           </div>
           <h2 className="text-lg font-black leading-6 text-slate-950">{renderedJob.job_title}</h2>
-          <p className="mt-1 flex items-center gap-1.5 text-xs font-semibold text-slate-500"><BriefcaseBusiness className="h-3.5 w-3.5" />{renderedJob.employer_name}</p>
+          <div className="mt-1 flex items-center gap-1.5">
+            <p className="flex items-center gap-1.5 text-xs font-semibold text-slate-500"><BriefcaseBusiness className="h-3.5 w-3.5" />{renderedJob.employer_name}</p>
+            {onReport && (renderedJob.employer_id || renderedJob.employer?.employer_id) ? (
+              <button
+                type="button"
+                onClick={() => onReport(renderedJob)}
+                className="inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-bold text-slate-400 transition hover:bg-red-50 hover:text-red-600"
+                aria-label="Report this employer"
+                title="Report this employer"
+              >
+                <Flag className="h-3.5 w-3.5" />Report
+              </button>
+            ) : null}
+          </div>
         </div>
         <button type="button" onClick={onClose} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900" aria-label="Close job details"><X className="h-4 w-4" /></button>
       </header>

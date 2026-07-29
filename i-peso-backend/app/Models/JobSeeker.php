@@ -153,6 +153,14 @@ class JobSeeker extends Authenticatable
         return $this->hasMany(SeekerWorkExperience::class, 'seeker_id', 'seeker_id');
     }
 
+    /**
+     * Employer reports filed by this seeker.
+     */
+    public function reports(): HasMany
+    {
+        return $this->hasMany(EmployerReport::class, 'seeker_id', 'seeker_id');
+    }
+
     public function skills(): HasMany
     {
         return $this->hasMany(SeekerSkill::class, 'seeker_id', 'seeker_id');

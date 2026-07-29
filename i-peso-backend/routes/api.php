@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\Admin\ConstituentCRM\SeekerController as AdminSeeke
 use App\Http\Controllers\Api\Admin\EmployerVerificationController;
 use App\Http\Controllers\Api\Admin\GovernmentDole\JobFairController as AdminJobFairController;
 use App\Http\Controllers\Api\Admin\AdminCitizenCharterController;
+use App\Http\Controllers\Api\Admin\AdminEmployerReportController;
 use App\Http\Controllers\Api\Admin\AdminEstablishmentReportController;
 use App\Http\Controllers\Api\Admin\AdminGovernmentProgramApplicationController;
 use App\Http\Controllers\Api\Admin\AdminGovernmentProgramController;
@@ -35,6 +36,7 @@ use App\Http\Controllers\Api\SeekerAnalyticsController;
 use App\Http\Controllers\Api\SeekerApplicationController;
 use App\Http\Controllers\Api\SeekerCertificateController;
 use App\Http\Controllers\Api\SeekerController;
+use App\Http\Controllers\Api\SeekerEmployerReportController;
 use App\Http\Controllers\Api\SeekerGovernmentProgramApplicationController;
 use App\Http\Controllers\Api\SeekerGovernmentProgramController;
 use App\Http\Controllers\Api\SeekerNearbyJobController;
@@ -155,6 +157,9 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/profile-image', [SeekerProfileImageController::class, 'store']);
         Route::get('/profile-image', [SeekerProfileImageController::class, 'show']);
         Route::delete('/profile-image', [SeekerProfileImageController::class, 'destroy']);
+        // Report a suspicious / abusive employer or job posting
+        Route::post('/employers/{employer}/report', [SeekerEmployerReportController::class, 'store'])
+            ->middleware('throttle:10,1');
         Route::post('/certificates', [SeekerCertificateController::class, 'store']);
         Route::get('/certificates/{certificate}/view', [SeekerCertificateController::class, 'view']);
         Route::delete('/certificates/{certificate}', [SeekerCertificateController::class, 'destroy']);
@@ -225,6 +230,12 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/government-programs/{governmentProgram}/applications', [AdminGovernmentProgramApplicationController::class, 'index']);
         Route::post('/government-program-applications/{programApplication}/status', [AdminGovernmentProgramApplicationController::class, 'updateStatus']);
         Route::get('/government-program-applications/{programApplication}/documents/{document}', [AdminGovernmentProgramApplicationController::class, 'document']);
+
+        // Employer Reports (seeker-filed complaints about employers)
+        Route::get('/employer-reports', [AdminEmployerReportController::class, 'index']);
+        Route::get('/employer-reports/summary', [AdminEmployerReportController::class, 'summary']);
+        Route::get('/employer-reports/{employerReport}', [AdminEmployerReportController::class, 'show']);
+        Route::put('/employer-reports/{employerReport}', [AdminEmployerReportController::class, 'update']);
 
         // Backward-compatible aliases for the original Government Programs API.
         Route::get('/programs', [AdminGovernmentProgramController::class, 'index']);
