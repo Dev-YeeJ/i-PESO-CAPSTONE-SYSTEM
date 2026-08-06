@@ -10,6 +10,7 @@ import {
   CheckCircle2,
   Clock3,
   Compass,
+  Download,
   Filter,
   Layers3,
   MapPin,
@@ -28,6 +29,8 @@ import DataTable from '@/pages/admin/_components/DataTable'
 import PageHeader from '@/pages/admin/_components/PageHeader'
 import StatCard from '@/pages/admin/_components/StatCard'
 import { adminService } from '@/services/adminService'
+import { downloadBlob } from '@/services/placementReportService'
+import toast from 'react-hot-toast'
 
 const PER_PAGE = 15
 
@@ -84,6 +87,22 @@ export default function JobSeekersListPage() {
     per_page: PER_PAGE,
     ...buildParams(filters),
   }), [filters, page])
+
+  const [exporting, setExporting] = useState(false)
+
+  // Exports the full filtered result set server-side, not just the visible page.
+  const handleExport = async () => {
+    setExporting(true)
+    try {
+      const blob = await adminService.exportSeekers(buildParams(filters))
+      downloadBlob(blob, `job-seekers-${new Date().toISOString().slice(0, 10)}.csv`)
+      toast.success('Export ready.')
+    } catch (caught) {
+      toast.error(caught?.response?.data?.message ?? 'Unable to export the directory.')
+    } finally {
+      setExporting(false)
+    }
+  }
 
   const seekersQuery = useQuery({
     queryKey: ['admin', 'seekers', queryParams],
@@ -214,6 +233,12 @@ export default function JobSeekersListPage() {
         title="Job Seeker Management"
         subtitle="Monitor NSRP profile readiness, search by skills and location, and review each case profile in a defense-ready view."
         eyebrow="Constituent CRM"
+        actions={[{
+          label: exporting ? 'Preparing…' : 'Export CSV',
+          icon: Download,
+          variant: 'outline',
+          onClick: handleExport,
+        }]}
       />
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">

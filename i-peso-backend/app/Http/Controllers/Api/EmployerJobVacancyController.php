@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Employer;
 use App\Models\JobVacancy;
+use App\Services\ActivityLogger;
 use App\Services\GoogleMapsService;
 use App\Services\AddressService;
 use App\Services\MatchingProfileService;
@@ -43,6 +44,12 @@ class EmployerJobVacancyController extends Controller
         $taxonomy->syncVacancy($vacancy);
         $matchingProfiles->syncVacancyCertifications($vacancy);
 
+        ActivityLogger::logAs($employer, 'posted_vacancy', sprintf(
+            'Posted job vacancy "%s" (#%d).',
+            $vacancy->job_title,
+            $vacancy->post_id
+        ));
+
         return response()->json([
             'message' => 'Job vacancy created successfully.',
             'vacancy' => $vacancy,
@@ -68,6 +75,12 @@ class EmployerJobVacancyController extends Controller
         $taxonomy->syncVacancy($vacancy);
         $matchingProfiles->syncVacancyCertifications($vacancy);
 
+        ActivityLogger::logAs($this->employer($request), 'updated_vacancy', sprintf(
+            'Updated job vacancy "%s" (#%d).',
+            $vacancy->job_title,
+            $vacancy->post_id
+        ));
+
         return response()->json([
             'message' => 'Job vacancy updated successfully.',
             'vacancy' => $vacancy->fresh(),
@@ -77,7 +90,11 @@ class EmployerJobVacancyController extends Controller
     public function destroy(Request $request, JobVacancy $vacancy): JsonResponse
     {
         $this->ensureOwnership($request, $vacancy);
+
+        $description = sprintf('Deleted job vacancy "%s" (#%d).', $vacancy->job_title, $vacancy->post_id);
         $vacancy->delete();
+
+        ActivityLogger::logAs($this->employer($request), 'deleted_vacancy', $description);
 
         return response()->json(['message' => 'Job vacancy deleted successfully.']);
     }

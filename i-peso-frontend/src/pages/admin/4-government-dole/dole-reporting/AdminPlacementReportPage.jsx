@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { ArrowLeft, Download, CheckCircle2, XCircle, Loader2, FileSpreadsheet } from 'lucide-react'
 import { Card, CardHeader, Button, Badge } from '@/components/ui'
-import PageHeader from '@/pages/admin/_components/PageHeader'
+import { ConfirmModal, PageHeader } from '@/pages/admin/_components'
 import DataTable from '@/pages/admin/_components/DataTable'
 import toast from 'react-hot-toast'
 import {
@@ -29,6 +29,7 @@ export default function AdminPlacementReportPage() {
   const [statusFilter, setStatusFilter] = useState('pending_review')
   const [detail, setDetail] = useState(null) // { data, records }
   const [busy, setBusy] = useState(false)
+  const [rejecting, setRejecting] = useState(false)
 
   const fetchReports = () => {
     setLoading(true)
@@ -63,13 +64,12 @@ export default function AdminPlacementReportPage() {
     }
   }
 
-  const handleReject = async () => {
-    const remarks = window.prompt('Reason for rejection (the employer will see this):')
-    if (!remarks) return
+  const handleReject = async (remarks) => {
     setBusy(true)
     try {
       const res = await rejectPlacementReport(detail.data.id, remarks)
       toast.success(res.message)
+      setRejecting(false)
       setDetail(null)
       fetchReports()
     } catch (err) {
@@ -132,7 +132,7 @@ export default function AdminPlacementReportPage() {
             {d.status === 'pending_review' && (
               <>
                 <Button variant="navy" icon={busy ? Loader2 : CheckCircle2} onClick={handleApprove} disabled={busy}>Approve</Button>
-                <Button variant="danger" icon={XCircle} onClick={handleReject} disabled={busy}>Reject</Button>
+                <Button variant="danger" icon={XCircle} onClick={() => setRejecting(true)} disabled={busy}>Reject</Button>
               </>
             )}
           </div>
@@ -185,6 +185,21 @@ export default function AdminPlacementReportPage() {
           emptyMessage="No placement reports in this category."
         />
       </Card>
+
+      <ConfirmModal
+        isOpen={rejecting}
+        isDangerous
+        title="Reject this placement report?"
+        message="The employer will be notified and will see the reason you give below. They can correct and resubmit the report."
+        confirmText="Reject report"
+        requiresReason
+        reasonRequired
+        reasonLabel="Reason for rejection (required — the employer will see this)"
+        loading={busy}
+        onCancel={() => setRejecting(false)}
+        onConfirm={handleReject}
+      />
     </div>
+
   )
 }

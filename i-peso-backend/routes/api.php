@@ -189,10 +189,12 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/analytics/options', [AdminAnalyticsController::class, 'options']);
         Route::get('/analytics', [AdminAnalyticsController::class, 'index']);
         Route::get('/sms-notifications', [AdminSmsNotificationController::class, 'index']);
+        Route::post('/sms-notifications/{smsNotification}/retry', [AdminSmsNotificationController::class, 'retry']);
         Route::get('/applications', [AdminApplicationController::class, 'index']);
 
         // Seekers
         Route::get('/seekers/summary', [AdminSeekerController::class, 'summary']);
+        Route::get('/seekers/export', [AdminSeekerController::class, 'export']);
         Route::get('/seekers', [AdminSeekerController::class, 'index']);
         Route::get('/seekers/{id}', [AdminSeekerController::class, 'show']);
         Route::get('/job-seekers/{id}/export-nsrp-pdf', [NSRPPdfExportController::class, 'exportNSRPPdf']);
@@ -204,6 +206,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
         // Employers (Verification)
         Route::get('/employers/pending', [EmployerVerificationController::class, 'getPendingEmployers']);
+        Route::post('/employers/bulk-approve', [EmployerVerificationController::class, 'bulkApproveEmployers']);
         Route::get('/employers/{id}/review', [EmployerVerificationController::class, 'reviewEmployer']);
         Route::post('/employers/{id}/approve', [EmployerVerificationController::class, 'approveEmployer']);
         Route::post('/employers/{id}/reject', [EmployerVerificationController::class, 'rejectEmployer']);
@@ -215,6 +218,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
         // Legacy employer endpoints
         Route::get('/employers/summary', [AdminEmployerController::class, 'summary']);
+        Route::get('/employers/export', [AdminEmployerController::class, 'export']);
         Route::get('/employers', [AdminEmployerController::class, 'index']);
         Route::get('/employers/{id}', [AdminEmployerController::class, 'show']);
 

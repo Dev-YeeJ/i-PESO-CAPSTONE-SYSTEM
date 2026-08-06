@@ -1,10 +1,10 @@
 import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
-import { CalendarDays, Download, Plus, RefreshCw, UsersRound } from 'lucide-react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { CalendarDays, Download, Pencil, Plus, RefreshCw, Trash2, UsersRound } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
+import toast from 'react-hot-toast'
 import { Button, Card, EmptyState, LoadingSkeleton } from '@/components/ui'
-import PageHeader from '@/pages/admin/_components/PageHeader'
-import StatusBadge from '@/pages/admin/_components/StatusBadge'
+import { ConfirmModal, PageHeader, StatusBadge } from '@/pages/admin/_components'
 import { adminService } from '@/services/adminService'
 
 const formatDate = (value) => value ? new Date(value).toLocaleDateString() : 'TBD'
@@ -18,7 +18,9 @@ const metricCards = [
 
 export default function JobFairsListPage() {
   const [downloadError, setDownloadError] = useState('')
+  const [pendingDelete, setPendingDelete] = useState(null)
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
 
   const jobFairsQuery = useQuery({
     queryKey: ['jobFairs', { per_page: 50 }],
@@ -34,6 +36,18 @@ export default function JobFairsListPage() {
     : downloadError
 
   const refresh = () => jobFairsQuery.refetch()
+
+  const removeFair = useMutation({
+    mutationFn: (fairId) => adminService.deleteJobFair(fairId),
+    onSuccess: () => {
+      toast.success('Job fair deleted.')
+      setPendingDelete(null)
+      queryClient.invalidateQueries({ queryKey: ['jobFairs'] })
+    },
+    onError: (caught) => toast.error(
+      caught?.response?.data?.message ?? 'Unable to delete this job fair.',
+    ),
+  })
 
   const downloadSprs = async (fair) => {
     try {
@@ -113,12 +127,25 @@ export default function JobFairsListPage() {
                 <div className="flex flex-wrap items-center gap-2 xl:flex-col xl:items-stretch">
                   <Button variant="outline" icon={UsersRound} onClick={() => navigate(`/admin/job-fairs/${fair.job_fair_id}`)}>Manage</Button>
                   <Button variant="navy" icon={Download} onClick={() => downloadSprs(fair)}>SPRS 1.6</Button>
+                  <Button variant="outline" icon={Pencil} onClick={() => navigate(`/admin/job-fairs/${fair.job_fair_id}/edit`)}>Edit</Button>
+                  <Button variant="danger" icon={Trash2} onClick={() => setPendingDelete(fair)}>Delete</Button>
                 </div>
               </div>
             ))}
           </div>
         )}
       </Card>
+
+      <ConfirmModal
+        isOpen={Boolean(pendingDelete)}
+        isDangerous
+        title="Delete this job fair?"
+        message={`"${pendingDelete?.title ?? 'This job fair'}" and its employer participation records will no longer be available in the portal. This cannot be undone.`}
+        confirmText="Delete job fair"
+        loading={removeFair.isPending}
+        onCancel={() => setPendingDelete(null)}
+        onConfirm={() => removeFair.mutate(pendingDelete.job_fair_id)}
+      />
     </div>
   )
 }

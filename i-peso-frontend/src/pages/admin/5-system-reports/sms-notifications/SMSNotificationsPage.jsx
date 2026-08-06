@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { AlertTriangle, CheckCircle2, Clock3, MessageSquareText, RefreshCw, RotateCcw, Send, ShieldCheck, SkipForward } from 'lucide-react'
+import toast from 'react-hot-toast'
 import { Button, Card, EmptyState, StatCard } from '@/components/ui'
 import PageHeader from '@/pages/admin/_components/PageHeader'
 import { smsService } from '@/services/smsService'
@@ -13,6 +14,7 @@ export default function SMSNotificationsPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const requestSequence = useRef(0)
+  const [retryingId, setRetryingId] = useState(null)
 
   const load = useCallback(async (nextFilters) => {
     const requestId = ++requestSequence.current
@@ -46,6 +48,20 @@ export default function SMSNotificationsPage() {
     const next = { ...filters, page }
     setFilters(next)
     await load(next)
+  }
+
+  // A retry writes a new log entry, so the list is reloaded to show both attempts.
+  const retry = async (log) => {
+    setRetryingId(log.id)
+    try {
+      const result = await smsService.retry(log.id)
+      toast.success(result?.message ?? 'Message queued for delivery.')
+      await load(filters)
+    } catch (requestError) {
+      toast.error(requestError.response?.data?.message || 'The retry could not be sent.')
+    } finally {
+      setRetryingId(null)
+    }
   }
 
   const resetFilters = async () => {
@@ -106,7 +122,7 @@ export default function SMSNotificationsPage() {
 
         {loading && !data ? <TableSkeleton /> : logs.length ? <>
           <div className="overflow-x-auto" aria-busy={loading}>
-            <table className="min-w-[900px] w-full text-sm">
+            <table className="min-w-[1020px] w-full text-sm">
               <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
                 <tr>
                   <th className="px-4 py-3">Date</th>
@@ -115,6 +131,7 @@ export default function SMSNotificationsPage() {
                   <th className="px-4 py-3">Message</th>
                   <th className="px-4 py-3">Provider</th>
                   <th className="px-4 py-3">Status</th>
+                  <th className="px-4 py-3">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -135,6 +152,21 @@ export default function SMSNotificationsPage() {
                       {log.provider_reference_id && <p className="mt-1 break-all font-mono text-[10px] text-slate-400" title="Provider reference ID">{log.provider_reference_id}</p>}
                     </td>
                     <td className="px-4 py-3"><Status status={log.status} /></td>
+                    <td className="px-4 py-3">
+                      {log.status === 'failed' ? (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          icon={RotateCcw}
+                          disabled={retryingId === log.id}
+                          onClick={() => retry(log)}
+                        >
+                          {retryingId === log.id ? 'Retrying…' : 'Retry'}
+                        </Button>
+                      ) : (
+                        <span className="text-xs text-slate-400">—</span>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>

@@ -1,7 +1,14 @@
-// i-peso-frontend/src/components/admin/ConfirmModal.jsx
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { AlertTriangle } from 'lucide-react'
+import { Button } from '@/components/ui'
 
-import { useState, useCallback } from 'react'
-
+/**
+ * ConfirmModal — gate for destructive or irreversible admin actions.
+ *
+ * Set `requiresReason` to collect remarks, and `reasonRequired` when the action
+ * must not proceed without them (rejections the constituent will read). The
+ * confirm button stays disabled until a reason is supplied in that case.
+ */
 export function ConfirmModal({
   isOpen,
   title,
@@ -9,74 +16,112 @@ export function ConfirmModal({
   onConfirm,
   onCancel,
   requiresReason = false,
+  reasonRequired = false,
+  reasonLabel,
+  reasonPlaceholder = 'Enter your remarks here...',
   confirmText = 'Confirm',
   cancelText = 'Cancel',
   isDangerous = false,
+  loading = false,
 }) {
   const [remarks, setRemarks] = useState('')
-
-  const handleConfirm = useCallback(() => {
-    if (requiresReason) {
-      onConfirm(remarks)
-    } else {
-      onConfirm()
-    }
-    setRemarks('')
-  }, [remarks, requiresReason, onConfirm])
+  const [wasOpen, setWasOpen] = useState(isOpen)
+  const dialogRef = useRef(null)
 
   const handleCancel = useCallback(() => {
+    if (loading) return
     setRemarks('')
     onCancel()
-  }, [onCancel])
+  }, [loading, onCancel])
+
+  useEffect(() => {
+    if (!isOpen) return undefined
+
+    const onKeyDown = (event) => {
+      if (event.key === 'Escape') handleCancel()
+    }
+
+    document.addEventListener('keydown', onKeyDown)
+    dialogRef.current?.focus()
+
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [isOpen, handleCancel])
+
+  // Clear on open rather than on close, so a failed confirm keeps what was typed.
+  if (wasOpen !== isOpen) {
+    setWasOpen(isOpen)
+    if (isOpen && remarks !== '') setRemarks('')
+  }
 
   if (!isOpen) return null
 
+  const missingReason = requiresReason && reasonRequired && remarks.trim() === ''
+
+  const handleConfirm = () => {
+    if (missingReason || loading) return
+    onConfirm(requiresReason ? remarks.trim() : undefined)
+  }
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="bg-white rounded-2xl shadow-lg max-w-sm w-full mx-4">
-        {/* Header */}
-        <div className="px-6 py-4 border-b border-slate-200">
-          <h2 className="text-lg font-bold text-slate-900">{title}</h2>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4"
+      onMouseDown={(event) => event.target === event.currentTarget && handleCancel()}
+    >
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="confirm-modal-title"
+        tabIndex={-1}
+        className="w-full max-w-md rounded-2xl bg-white shadow-xl outline-none"
+      >
+        <div className="flex items-start gap-3 border-b border-slate-100 px-6 py-4">
+          {isDangerous && (
+            <span className="rounded-xl bg-red-50 p-2 text-red-600">
+              <AlertTriangle className="h-5 w-5" aria-hidden="true" />
+            </span>
+          )}
+          <h2 id="confirm-modal-title" className="mt-1 text-lg font-bold text-slate-950">{title}</h2>
         </div>
 
-        {/* Body */}
         <div className="px-6 py-4">
-          <p className="text-sm text-slate-600">{message}</p>
+          <p className="text-sm leading-6 text-slate-600">{message}</p>
 
           {requiresReason && (
-            <div className="mt-4">
-              <label className="block text-sm font-medium text-slate-700 mb-2">
-                Add remarks (optional)
-              </label>
+            <label className="mt-4 block">
+              <span className="mb-1.5 block text-sm font-bold text-slate-700">
+                {reasonLabel ?? (reasonRequired ? 'Reason (required)' : 'Remarks (optional)')}
+              </span>
               <textarea
                 value={remarks}
-                onChange={(e) => setRemarks(e.target.value)}
-                placeholder="Enter your remarks here..."
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                onChange={(event) => setRemarks(event.target.value)}
+                placeholder={reasonPlaceholder}
                 rows={4}
+                maxLength={3000}
+                disabled={loading}
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-800 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-200 disabled:bg-slate-100"
               />
-            </div>
+              {missingReason && (
+                <span className="mt-1 block text-xs font-semibold text-red-600">
+                  A reason is required before continuing.
+                </span>
+              )}
+            </label>
           )}
         </div>
 
-        {/* Footer */}
-        <div className="px-6 py-4 border-t border-slate-200 flex gap-3 justify-end">
-          <button
-            onClick={handleCancel}
-            className="px-4 py-2 text-sm font-semibold border border-slate-300 text-slate-700 hover:bg-slate-50 rounded-xl transition-colors"
-          >
+        <div className="flex justify-end gap-3 border-t border-slate-100 px-6 py-4">
+          <Button variant="outline" size="sm" onClick={handleCancel} disabled={loading}>
             {cancelText}
-          </button>
-          <button
+          </Button>
+          <Button
+            variant={isDangerous ? 'danger' : 'navy'}
+            size="sm"
             onClick={handleConfirm}
-            className={`px-4 py-2 text-sm font-semibold text-white rounded-xl transition-colors ${
-              isDangerous
-                ? 'bg-red-600 hover:bg-red-700'
-                : 'bg-blue-700 hover:bg-blue-800'
-            }`}
+            disabled={loading || missingReason}
           >
-            {confirmText}
-          </button>
+            {loading ? 'Working…' : confirmText}
+          </Button>
         </div>
       </div>
     </div>

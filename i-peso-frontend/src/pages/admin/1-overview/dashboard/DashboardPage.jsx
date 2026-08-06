@@ -1,6 +1,7 @@
-import { createElement, useMemo } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { createElement, useMemo, useState } from 'react'
+import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import {
+  AlertTriangle,
   ArrowRight,
   BriefcaseBusiness,
   Building2,
@@ -20,12 +21,38 @@ import StatCard from '@/pages/admin/_components/StatCard'
 import StatusBadge from '@/pages/admin/_components/StatusBadge'
 import { adminService } from '@/services/adminService'
 
+const PRESETS = [
+  { key: 'this_month', label: 'This month' },
+  { key: 'last_30', label: 'Last 30 days' },
+  { key: 'quarter', label: 'Last 90 days' },
+  { key: 'year', label: 'This year' },
+]
+
 export default function DashboardPage() {
+  const [preset, setPreset] = useState('this_month')
+  const [range, setRange] = useState(presetRange('this_month'))
+
   const { data: stats, isLoading, isError, error, refetch } = useQuery({
-    queryKey: ['admin', 'dashboard-stats'],
-    queryFn: () => adminService.getDashboardStats(),
+    queryKey: ['admin', 'dashboard-stats', range],
+    queryFn: () => adminService.getDashboardStats(range),
+    placeholderData: keepPreviousData,
   })
   const errorMessage = error?.response?.data?.message ?? 'Failed to load dashboard statistics.'
+
+  const applyPreset = (key) => {
+    setPreset(key)
+    setRange(presetRange(key))
+  }
+
+  const setCustomRange = (field, value) => {
+    setPreset('custom')
+    setRange((current) => ({ ...current, [field]: value }))
+  }
+
+  const trends = stats?.trends ?? {}
+  const period = stats?.period ?? {}
+  const attention = stats?.attention ?? []
+  const comparisonLabel = 'vs previous period'
 
   const handleExportCSV = () => {
     if (!stats?.recent_registrations?.length) return
@@ -82,19 +109,92 @@ export default function DashboardPage() {
         </div>
       )}
 
-      <section className="portal-card-hero relative overflow-hidden rounded-xl border border-blue-900 bg-brand-navy px-6 py-7 text-white shadow-elevated sm:px-8">
-        <div className="absolute -right-20 -top-24 h-64 w-64 rounded-full bg-brand-500/20 blur-3xl" />
-        <div className="relative flex flex-col justify-between gap-5 lg:flex-row lg:items-center">
-          <div>
-            <Badge variant={(stats?.pending_verifications ?? 0) > 0 ? 'pending' : 'verified'} className="border-white/10">
-              {stats?.pending_verifications ?? 0} pending employer accreditation{stats?.pending_verifications === 1 ? '' : 's'}
-            </Badge>
-            <h2 className="mt-4 text-2xl font-bold">Employer accreditation reviews are ready</h2>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-300">Review employer registration details and legal documents before allowing vacancy publication.</p>
+      <Card padding="sm">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+          <div className="flex flex-wrap gap-2">
+            {PRESETS.map((option) => (
+              <Button
+                key={option.key}
+                size="sm"
+                variant={preset === option.key ? 'navy' : 'outline'}
+                onClick={() => applyPreset(option.key)}
+              >
+                {option.label}
+              </Button>
+            ))}
           </div>
-          <Button to="/admin/verification-queue" variant="accent" icon={ClipboardCheck}>Open Employer Queue</Button>
+          <div className="flex flex-wrap items-end gap-3">
+            <label className="min-w-0">
+              <span className="mb-1 block text-xs font-bold text-slate-600">From</span>
+              <input
+                type="date"
+                value={range.date_from}
+                max={range.date_to}
+                onChange={(event) => setCustomRange('date_from', event.target.value)}
+                className={dateInputClass}
+              />
+            </label>
+            <label className="min-w-0">
+              <span className="mb-1 block text-xs font-bold text-slate-600">To</span>
+              <input
+                type="date"
+                value={range.date_to}
+                min={range.date_from}
+                onChange={(event) => setCustomRange('date_to', event.target.value)}
+                className={dateInputClass}
+              />
+            </label>
+          </div>
         </div>
-      </section>
+        {stats?.range && (
+          <p className="mt-3 text-xs text-slate-500">
+            Showing {stats.range.days} day{stats.range.days === 1 ? '' : 's'} ({stats.range.date_from} → {stats.range.date_to}),
+            compared with {stats.range.compared_to.date_from} → {stats.range.compared_to.date_to}.
+          </p>
+        )}
+      </Card>
+
+      {attention.length > 0 ? (
+        <section className="rounded-xl border border-amber-200 bg-amber-50 p-5 sm:p-6">
+          <div className="flex items-start gap-3">
+            <span className="rounded-xl bg-amber-100 p-2.5 text-amber-800">
+              <AlertTriangle className="h-5 w-5" aria-hidden="true" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <h2 className="font-bold text-slate-950">Needs your attention</h2>
+              <p className="mt-1 text-sm text-slate-600">Work currently waiting on an administrator.</p>
+              <ul className="mt-4 grid gap-3 sm:grid-cols-2">
+                {attention.map((item) => (
+                  <li key={item.key}>
+                    <Link
+                      to={item.link}
+                      className="flex items-center justify-between gap-3 rounded-xl border border-amber-200 bg-white p-4 transition hover:border-amber-300 hover:bg-amber-50/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+                    >
+                      <span className="min-w-0">
+                        <span className="block font-bold text-slate-900">{item.label}</span>
+                        <span className="mt-0.5 block text-xs text-slate-500">{item.detail}</span>
+                      </span>
+                      <Badge variant={item.severity === 'critical' ? 'rejected' : 'pending'}>{item.count}</Badge>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </section>
+      ) : (
+        <section className="portal-card-hero relative overflow-hidden rounded-xl border border-blue-900 bg-brand-navy px-6 py-7 text-white shadow-elevated sm:px-8">
+          <div className="absolute -right-20 -top-24 h-64 w-64 rounded-full bg-brand-500/20 blur-3xl" />
+          <div className="relative flex flex-col justify-between gap-5 lg:flex-row lg:items-center">
+            <div>
+              <Badge variant="verified" className="border-white/10">Nothing pending</Badge>
+              <h2 className="mt-4 text-2xl font-bold">All review queues are clear</h2>
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-300">No accreditations, program applications, or reports are waiting on an administrator right now.</p>
+            </div>
+            <Button to="/admin/verification-queue" variant="accent" icon={ClipboardCheck}>Open Employer Queue</Button>
+          </div>
+        </section>
+      )}
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard
@@ -102,24 +202,33 @@ export default function DashboardPage() {
           color="blue"
           label="Registered Seekers"
           value={Number(stats?.total_seekers ?? 0).toLocaleString()}
-          subtitle={`${stats?.profile_completion_rate?.toFixed(1) ?? 0}% profile completion`}
-          hint="Distinct job-seeker accounts registered to date."
+          subtitle={`${stats?.profile_completion_rate?.toFixed(1) ?? 0}% profile completion · ${Number(period.new_seekers ?? 0).toLocaleString()} new in range`}
+          hint="Total job-seeker accounts to date. The trend compares new registrations in the selected range with the preceding one."
+          trend={trendFor(trends.new_seekers, comparisonLabel)}
+          to="/admin/job-seekers"
+          linkLabel="Browse job seekers"
         />
         <StatCard
           icon={Building2}
           color="slate"
           label="Registered Employers"
           value={Number(stats?.total_employers ?? 0).toLocaleString()}
-          subtitle="Constituent employer accounts"
-          hint="Employer accounts registered to date, across all verification statuses."
+          subtitle={`${Number(period.new_employers ?? 0).toLocaleString()} new in range`}
+          hint="Employer accounts to date, across all verification statuses. The trend compares new registrations between periods."
+          trend={trendFor(trends.new_employers, comparisonLabel)}
+          to="/admin/employers"
+          linkLabel="Browse employers"
         />
         <StatCard
           icon={BriefcaseBusiness}
           color="green"
           label="Active Vacancies"
           value={Number(stats?.active_vacancies ?? 0).toLocaleString()}
-          subtitle="Published, not expired"
+          subtitle={`${Number(period.new_vacancies ?? 0).toLocaleString()} posted in range`}
           hint="Vacancies currently published and open. Excludes drafts and expired postings."
+          trend={trendFor(trends.new_vacancies, comparisonLabel)}
+          to="/admin/job-postings"
+          linkLabel="View job postings"
         />
         <StatCard
           icon={CheckCircle2}
@@ -132,7 +241,8 @@ export default function DashboardPage() {
               <span className="font-semibold text-danger">{stats?.rejected_this_month ?? 0} rejected</span>
             </span>
           }
-          hint="Applications submitted this calendar month."
+          hint="Applications submitted within the selected date range."
+          trend={trendFor(trends.applications, comparisonLabel)}
         />
       </div>
 
@@ -210,6 +320,30 @@ export default function DashboardPage() {
       </Card>
     </div>
   )
+}
+
+const dateInputClass = 'rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-200'
+
+/** StatCard only renders a trend when it receives a numeric value. */
+function trendFor(value, label) {
+  return typeof value === 'number' ? { value, label } : undefined
+}
+
+function presetRange(key) {
+  const today = new Date()
+  const iso = (date) => date.toISOString().slice(0, 10)
+
+  switch (key) {
+    case 'last_30':
+      return { date_from: iso(new Date(today.getTime() - 29 * 86_400_000)), date_to: iso(today) }
+    case 'quarter':
+      return { date_from: iso(new Date(today.getTime() - 89 * 86_400_000)), date_to: iso(today) }
+    case 'year':
+      return { date_from: iso(new Date(today.getFullYear(), 0, 1)), date_to: iso(today) }
+    case 'this_month':
+    default:
+      return { date_from: iso(new Date(today.getFullYear(), today.getMonth(), 1)), date_to: iso(today) }
+  }
 }
 
 function Indicator({ icon, label, value, warning }) {

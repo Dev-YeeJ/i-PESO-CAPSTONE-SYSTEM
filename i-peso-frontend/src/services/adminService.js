@@ -8,14 +8,32 @@ const cleanParams = (params = {}) => Object.fromEntries(
 
 export const adminService = {
   // ── DASHBOARD ─────────────────────────────────────────────────
-  getDashboardStats: async () => {
-    const { data } = await api.get('/admin/dashboard/stats')
+  getDashboardStats: async (params = {}) => {
+    const { data } = await api.get('/admin/dashboard/stats', { params: cleanParams(params) })
     return data
   },
 
   // ── SEEKERS ───────────────────────────────────────────────────
   getSeekers: async (params = {}) => {
     const { data } = await api.get('/admin/seekers', { params: cleanParams(params) })
+    return data
+  },
+
+  // Exports honour the same filters as the list, so what an admin sees is what
+  // they get — not just the page currently on screen.
+  exportSeekers: async (params = {}) => {
+    const { data } = await api.get('/admin/seekers/export', {
+      params: cleanParams(params),
+      responseType: 'blob',
+    })
+    return data
+  },
+
+  exportEmployers: async (params = {}) => {
+    const { data } = await api.get('/admin/employers/export', {
+      params: cleanParams(params),
+      responseType: 'blob',
+    })
     return data
   },
 
@@ -40,8 +58,16 @@ export const adminService = {
     return data
   },
 
-  getPendingEmployers: async () => {
-    const { data } = await api.get('/admin/employers/pending')
+  getPendingEmployers: async (params = {}) => {
+    const { data } = await api.get('/admin/employers/pending', { params: cleanParams(params) })
+    return data
+  },
+
+  bulkApproveEmployers: async (employerIds, remarks = null) => {
+    const { data } = await api.post('/admin/employers/bulk-approve', {
+      employer_ids: employerIds,
+      remarks,
+    })
     return data
   },
 
@@ -165,6 +191,24 @@ export const adminService = {
     const { data } = await api.post(
       `/admin/programs/${programId}/applicants/bulk-review`,
       { ids, action, remarks }
+    )
+    return data
+  },
+
+  // Full status vocabulary (under_review, qualified, for_interview, completed, …),
+  // unlike the approve/reject-only review endpoints above.
+  updateProgramApplicationStatus: async (applicationId, status, remarks = null) => {
+    const { data } = await api.post(
+      `/admin/government-program-applications/${applicationId}/status`,
+      { status, remarks }
+    )
+    return data
+  },
+
+  getProgramApplicationDocument: async (applicationId, documentId) => {
+    const { data } = await api.get(
+      `/admin/government-program-applications/${applicationId}/documents/${documentId}`,
+      { responseType: 'blob' },
     )
     return data
   },

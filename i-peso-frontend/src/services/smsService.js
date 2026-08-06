@@ -9,4 +9,10 @@ export const smsService = {
     const { data } = await api.get('/admin/sms-notifications', { params: clean(params) })
     return data
   },
+
+  // Re-sends a failed message. The retry is recorded as its own log entry.
+  retry: async (id) => {
+    const { data } = await api.post(`/admin/sms-notifications/${id}/retry`)
+    return data
+  },
 }

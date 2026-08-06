@@ -5,7 +5,10 @@ namespace App\Http\Controllers\Api\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Administrator;
 use App\Models\SmsNotification;
+use App\Services\ActivityLogger;
 use App\Services\Sms\PhoneNumberNormalizer;
+use App\Services\Sms\SmsService;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -13,6 +16,73 @@ use Illuminate\Validation\Rule;
 
 class AdminSmsNotificationController extends Controller
 {
+    /**
+     * Re-send a message that failed at the gateway.
+     * POST /api/admin/sms-notifications/{smsNotification}/retry
+     *
+     * The original record is kept untouched and the retry is written as its own
+     * entry, so the delivery history stays a truthful record of every attempt.
+     */
+    public function retry(
+        Request $request,
+        SmsNotification $smsNotification,
+        SmsService $sms,
+        PhoneNumberNormalizer $normalizer,
+    ): JsonResponse {
+        abort_unless($request->user() instanceof Administrator, 403, 'Unauthorized');
+
+        $status = $smsNotification->gateway_status ?: $smsNotification->status;
+
+        if ($status !== 'failed') {
+            return response()->json([
+                'message' => 'Only messages that failed at the gateway can be retried.',
+            ], 422);
+        }
+
+        $recipient = $this->resolveRecipient($smsNotification);
+
+        if (! $recipient) {
+            return response()->json([
+                'message' => 'The original recipient no longer exists, so this message cannot be re-sent.',
+            ], 422);
+        }
+
+        $result = $sms->send(
+            $recipient,
+            $smsNotification->phone_number,
+            (string) $smsNotification->content,
+            $smsNotification->purpose ?: $smsNotification->message_type ?: 'manual_retry',
+            ['retry_of' => $smsNotification->getKey()],
+        );
+
+        ActivityLogger::log('retried_sms', sprintf(
+            'Retried SMS #%s to %s — result: %s.',
+            $smsNotification->getKey(),
+            $normalizer->mask($smsNotification->normalized_phone_number ?: $smsNotification->phone_number),
+            $result->status
+        ));
+
+        return response()->json([
+            'message' => $result->status === 'failed'
+                ? 'The retry also failed at the gateway.'
+                : 'Message queued for delivery.',
+            'status' => $result->status,
+            'provider' => $result->provider,
+            'error' => $result->error,
+        ], $result->status === 'failed' ? 422 : 200);
+    }
+
+    private function resolveRecipient(SmsNotification $log): ?Model
+    {
+        $type = $log->recipient_type;
+
+        if (! $type || ! class_exists($type) || ! is_subclass_of($type, Model::class)) {
+            return null;
+        }
+
+        return $type::find($log->recipient_id);
+    }
+
     public function index(Request $request, PhoneNumberNormalizer $normalizer): JsonResponse
     {
         abort_unless($request->user() instanceof Administrator, 403, 'Unauthorized');

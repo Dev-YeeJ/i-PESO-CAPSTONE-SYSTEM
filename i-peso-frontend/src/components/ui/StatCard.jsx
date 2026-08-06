@@ -1,5 +1,6 @@
 // src/components/ui/StatCard.jsx
-import { ArrowDown, ArrowUp, Info, Minus } from 'lucide-react'
+import { ArrowDown, ArrowRight, ArrowUp, Info, Minus } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 
 const colorClasses = {
@@ -19,9 +20,14 @@ const colorClasses = {
  * increase reads red, not green. Direction is also shown with an arrow + sign
  * so it never relies on colour alone.
  *
+ * Pass `to` to add a drill-down link. It renders as its own link *inside* the
+ * card rather than wrapping it, so the `hint` tooltip button is never nested
+ * inside an anchor.
+ *
  * @param {{value:number,label:string}} [trend]
  * @param {boolean} [trendPositiveIsGood=true]
  * @param {string}  [hint]  short explanation of how the value is calculated
+ * @param {string}  [to]    admin route this metric drills down to
  */
 export function StatCard({
   icon: IconComponent,
@@ -32,6 +38,8 @@ export function StatCard({
   trend,
   trendPositiveIsGood = true,
   hint,
+  to,
+  linkLabel = 'View details',
 }) {
   const colors = colorClasses[color] || colorClasses.blue
 
@@ -90,6 +98,16 @@ export function StatCard({
       </div>
 
       {trendUi}
+
+      {to && (
+        <Link
+          to={to}
+          className="mt-4 inline-flex items-center gap-1 rounded text-xs font-bold text-brand-700 transition-colors hover:text-brand-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-1"
+        >
+          {linkLabel}
+          <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+        </Link>
+      )}
     </div>
   )
 }

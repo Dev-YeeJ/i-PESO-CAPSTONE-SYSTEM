@@ -5,9 +5,12 @@ namespace App\Http\Controllers\Api\Admin\ConstituentCRM;
 use App\Http\Controllers\Controller;
 use App\Models\Administrator;
 use App\Models\JobSeeker;
+use App\Services\ActivityLogger;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class SeekerController extends Controller
 {
@@ -50,142 +53,7 @@ class SeekerController extends Controller
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
-        $query = JobSeeker::query()
-            ->select([
-                'seeker_id',
-                'first_name',
-                'middle_name',
-                'last_name',
-                'suffix',
-                'mobile_number',
-                'email',
-                'educ_attainment',
-                'employment_status',
-                'address_barangay',
-                'address_municipality_city',
-                'address_province',
-                'latitude',
-                'longitude',
-                'profile_completed',
-                'is_verified',
-                'verification_status',
-                'created_at',
-            ]);
-
-        $search = trim((string) $request->string('search'));
-        if ($search !== '') {
-            $query->where(function ($q) use ($search) {
-                $q->where('first_name', 'like', "%{$search}%")
-                    ->orWhere('last_name', 'like', "%{$search}%")
-                    ->orWhere('email', 'like', "%{$search}%")
-                    ->orWhere('mobile_number', 'like', "%{$search}%")
-                    ->orWhere('middle_name', 'like', "%{$search}%")
-                    ->orWhere('suffix', 'like', "%{$search}%")
-                    ->orWhere(function ($nameQuery) use ($search) {
-                        $nameQuery->whereNotNull('first_name')->whereNotNull('last_name');
-                        $nameQuery->whereRaw("first_name || ' ' || last_name like ?", ["%{$search}%"]);
-                    });
-            });
-        }
-
-        $profileCompleted = $this->resolveBoolean($request->input('profile_completed'));
-        if ($profileCompleted !== null) {
-            $query->where('profile_completed', $profileCompleted);
-        }
-
-        $profileStatus = $request->input('profile_status');
-        if ($profileStatus !== null && $profileStatus !== '') {
-            $normalized = strtolower((string) $profileStatus);
-            if (in_array($normalized, ['complete', 'completed', '1', 'true', 'yes'], true)) {
-                $query->where('profile_completed', true);
-            } elseif (in_array($normalized, ['incomplete', 'pending', '0', 'false', 'no'], true)) {
-                $query->where('profile_completed', false);
-            }
-        }
-
-        if ($request->filled('employment_status')) {
-            $query->where('employment_status', $request->input('employment_status'));
-        }
-
-        if ($request->filled('province')) {
-            $query->where('address_province', 'like', $request->input('province').'%');
-        }
-
-        if ($request->filled('city')) {
-            $query->where('address_municipality_city', 'like', $request->input('city').'%');
-        }
-
-        if ($request->filled('barangay')) {
-            $query->where('address_barangay', 'like', $request->input('barangay').'%');
-        }
-
-        if ($request->filled('broad_field')) {
-            $query->whereHas('occupations', function ($q) use ($request) {
-                $q->where('broad_field', 'like', "%{$request->input('broad_field')}%")
-                    ->orWhere('general_term', 'like', "%{$request->input('broad_field')}%" );
-            });
-        }
-
-        if ($request->filled('preferred_occupation')) {
-            $query->whereHas('occupations', function ($q) use ($request) {
-                $q->where('occupation_title', 'like', "%{$request->input('preferred_occupation')}%")
-                    ->orWhere('general_term', 'like', "%{$request->input('preferred_occupation')}%" );
-            });
-        }
-
-        if ($request->filled('skill')) {
-            $query->whereHas('seekerSkills', function ($q) use ($request) {
-                $q->where('skill_name', 'like', "%{$request->input('skill')}%" );
-            });
-        }
-
-        if ($request->filled('has_certificates')) {
-            $hasCertificates = $this->resolveBoolean($request->input('has_certificates'));
-            if ($hasCertificates !== null) {
-                $query->{$hasCertificates ? 'whereHas' : 'whereDoesntHave'}('certificates');
-            }
-        }
-
-        if ($request->filled('has_applications')) {
-            $hasApplications = $this->resolveBoolean($request->input('has_applications'));
-            if ($hasApplications !== null) {
-                $query->{$hasApplications ? 'whereHas' : 'whereDoesntHave'}('applications');
-            }
-        }
-
-        if ($request->filled('hired_status')) {
-            $hiredStatus = strtolower((string) $request->input('hired_status'));
-            if ($hiredStatus === 'hired') {
-                $query->whereHas('applications', function ($q) {
-                    $q->where('status', 'hired');
-                });
-            } elseif ($hiredStatus === 'not_hired') {
-                $query->whereDoesntHave('applications', function ($q) {
-                    $q->where('status', 'hired');
-                });
-            }
-        }
-
-        if ($request->filled('missing_gps')) {
-            $missingGps = $this->resolveBoolean($request->input('missing_gps'));
-            if ($missingGps !== null) {
-                $query->where(function ($q) use ($missingGps) {
-                    if ($missingGps) {
-                        $q->whereNull('latitude')->orWhereNull('longitude');
-                    } else {
-                        $q->whereNotNull('latitude')->whereNotNull('longitude');
-                    }
-                });
-            }
-        }
-
-        if ($request->filled('date_from')) {
-            $query->whereDate('created_at', '>=', $request->input('date_from'));
-        }
-
-        if ($request->filled('date_to')) {
-            $query->whereDate('created_at', '<=', $request->input('date_to'));
-        }
+        $query = $this->filteredQuery($request);
 
         $perPage = (int) $request->input('per_page', 15);
         $perPage = max(1, min($perPage, 100));
@@ -444,4 +312,209 @@ class SeekerController extends Controller
 
         return null;
     }
+    /**
+     * Download the currently filtered directory as CSV.
+     * GET /api/admin/seekers/export
+     */
+    public function export(Request $request): StreamedResponse
+    {
+        abort_unless(auth()->user() instanceof Administrator, 403, 'Unauthorized');
+
+        $query = $this->filteredQuery($request)->reorder('seeker_id');
+        $filename = 'job-seekers-'.now()->format('Y-m-d').'.csv';
+
+        // Exporting constituent contact details is a disclosure worth recording.
+        ActivityLogger::log('exported_job_seekers', sprintf(
+            'Exported the job seeker directory (%d record(s)) as CSV.',
+            (clone $query)->count()
+        ));
+
+        return response()->streamDownload(function () use ($query) {
+            $handle = fopen('php://output', 'wb');
+
+            // BOM so Excel opens the file as UTF-8.
+            fwrite($handle, "\xEF\xBB\xBF");
+            fputcsv($handle, [
+                'Seeker ID', 'Full Name', 'Email', 'Mobile Number', 'Educational Attainment',
+                'Employment Status', 'Barangay', 'City / Municipality', 'Province',
+                'Profile Completed', 'Verification Status', 'Registered At',
+            ]);
+
+            $query->chunkById(500, function ($seekers) use ($handle) {
+                foreach ($seekers as $seeker) {
+                    fputcsv($handle, [
+                        $seeker->seeker_id,
+                        trim(implode(' ', array_filter([
+                            $seeker->first_name,
+                            $seeker->middle_name,
+                            $seeker->last_name,
+                            $seeker->suffix,
+                        ]))),
+                        $seeker->email,
+                        $seeker->mobile_number,
+                        $seeker->educ_attainment,
+                        $seeker->employment_status,
+                        $seeker->address_barangay,
+                        $seeker->address_municipality_city,
+                        $seeker->address_province,
+                        $seeker->profile_completed ? 'Yes' : 'No',
+                        $seeker->verification_status ?? ($seeker->is_verified ? 'verified' : 'pending'),
+                        optional($seeker->created_at)->toDateTimeString(),
+                    ]);
+                }
+            }, 'seeker_id');
+
+            fclose($handle);
+        }, $filename, [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Cache-Control' => 'private, no-store',
+        ]);
+    }
+
+    /**
+     * Base query with every directory filter applied. Shared by the paginated
+     * listing and the CSV export so the two can never disagree on what matches.
+     */
+    private function filteredQuery(Request $request): Builder
+    {
+        $query = JobSeeker::query()
+            ->select([
+                'seeker_id',
+                'first_name',
+                'middle_name',
+                'last_name',
+                'suffix',
+                'mobile_number',
+                'email',
+                'educ_attainment',
+                'employment_status',
+                'address_barangay',
+                'address_municipality_city',
+                'address_province',
+                'latitude',
+                'longitude',
+                'profile_completed',
+                'is_verified',
+                'verification_status',
+                'created_at',
+            ]);
+
+        $search = trim((string) $request->string('search'));
+        if ($search !== '') {
+            $query->where(function ($q) use ($search) {
+                $q->where('first_name', 'like', "%{$search}%")
+                    ->orWhere('last_name', 'like', "%{$search}%")
+                    ->orWhere('email', 'like', "%{$search}%")
+                    ->orWhere('mobile_number', 'like', "%{$search}%")
+                    ->orWhere('middle_name', 'like', "%{$search}%")
+                    ->orWhere('suffix', 'like', "%{$search}%")
+                    ->orWhere(function ($nameQuery) use ($search) {
+                        $nameQuery->whereNotNull('first_name')->whereNotNull('last_name');
+                        $nameQuery->whereRaw("first_name || ' ' || last_name like ?", ["%{$search}%"]);
+                    });
+            });
+        }
+
+        $profileCompleted = $this->resolveBoolean($request->input('profile_completed'));
+        if ($profileCompleted !== null) {
+            $query->where('profile_completed', $profileCompleted);
+        }
+
+        $profileStatus = $request->input('profile_status');
+        if ($profileStatus !== null && $profileStatus !== '') {
+            $normalized = strtolower((string) $profileStatus);
+            if (in_array($normalized, ['complete', 'completed', '1', 'true', 'yes'], true)) {
+                $query->where('profile_completed', true);
+            } elseif (in_array($normalized, ['incomplete', 'pending', '0', 'false', 'no'], true)) {
+                $query->where('profile_completed', false);
+            }
+        }
+
+        if ($request->filled('employment_status')) {
+            $query->where('employment_status', $request->input('employment_status'));
+        }
+
+        if ($request->filled('province')) {
+            $query->where('address_province', 'like', $request->input('province').'%');
+        }
+
+        if ($request->filled('city')) {
+            $query->where('address_municipality_city', 'like', $request->input('city').'%');
+        }
+
+        if ($request->filled('barangay')) {
+            $query->where('address_barangay', 'like', $request->input('barangay').'%');
+        }
+
+        if ($request->filled('broad_field')) {
+            $query->whereHas('occupations', function ($q) use ($request) {
+                $q->where('broad_field', 'like', "%{$request->input('broad_field')}%")
+                    ->orWhere('general_term', 'like', "%{$request->input('broad_field')}%" );
+            });
+        }
+
+        if ($request->filled('preferred_occupation')) {
+            $query->whereHas('occupations', function ($q) use ($request) {
+                $q->where('occupation_title', 'like', "%{$request->input('preferred_occupation')}%")
+                    ->orWhere('general_term', 'like', "%{$request->input('preferred_occupation')}%" );
+            });
+        }
+
+        if ($request->filled('skill')) {
+            $query->whereHas('seekerSkills', function ($q) use ($request) {
+                $q->where('skill_name', 'like', "%{$request->input('skill')}%" );
+            });
+        }
+
+        if ($request->filled('has_certificates')) {
+            $hasCertificates = $this->resolveBoolean($request->input('has_certificates'));
+            if ($hasCertificates !== null) {
+                $query->{$hasCertificates ? 'whereHas' : 'whereDoesntHave'}('certificates');
+            }
+        }
+
+        if ($request->filled('has_applications')) {
+            $hasApplications = $this->resolveBoolean($request->input('has_applications'));
+            if ($hasApplications !== null) {
+                $query->{$hasApplications ? 'whereHas' : 'whereDoesntHave'}('applications');
+            }
+        }
+
+        if ($request->filled('hired_status')) {
+            $hiredStatus = strtolower((string) $request->input('hired_status'));
+            if ($hiredStatus === 'hired') {
+                $query->whereHas('applications', function ($q) {
+                    $q->where('status', 'hired');
+                });
+            } elseif ($hiredStatus === 'not_hired') {
+                $query->whereDoesntHave('applications', function ($q) {
+                    $q->where('status', 'hired');
+                });
+            }
+        }
+
+        if ($request->filled('missing_gps')) {
+            $missingGps = $this->resolveBoolean($request->input('missing_gps'));
+            if ($missingGps !== null) {
+                $query->where(function ($q) use ($missingGps) {
+                    if ($missingGps) {
+                        $q->whereNull('latitude')->orWhereNull('longitude');
+                    } else {
+                        $q->whereNotNull('latitude')->whereNotNull('longitude');
+                    }
+                });
+            }
+        }
+
+        if ($request->filled('date_from')) {
+            $query->whereDate('created_at', '>=', $request->input('date_from'));
+        }
+
+        if ($request->filled('date_to')) {
+            $query->whereDate('created_at', '<=', $request->input('date_to'));
+        }
+
+        return $query;
+    }
+
 }

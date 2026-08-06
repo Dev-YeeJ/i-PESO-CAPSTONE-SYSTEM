@@ -7,6 +7,7 @@ use App\Mail\OtpMail;
 use App\Models\Administrator;
 use App\Models\Employer;
 use App\Models\JobSeeker;
+use App\Services\ActivityLogger;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -186,24 +187,26 @@ class AuthController extends Controller
             ], 422);
         }
 
-        DB::transaction(function () use ($role, $validated) {
+        $user = DB::transaction(function () use ($role, $validated) {
             if ($role === 'seeker') {
-                JobSeeker::create([
+                return JobSeeker::create([
                     'first_name'    => $validated['first_name'],
                     'last_name'     => $validated['last_name'],
                     'email'         => $validated['email'],
                     'password'      => Hash::make($validated['password']),
                     'mobile_number' => $validated['mobile_number'],
                 ]);
-            } else {
-                Employer::create([
-                    'email'               => $validated['email'],
-                    'password'            => Hash::make($validated['password']),
-                    'company_type'        => $validated['company_type'],
-                    'verification_status' => 'pending',
-                ]);
             }
+
+            return Employer::create([
+                'email'               => $validated['email'],
+                'password'            => Hash::make($validated['password']),
+                'company_type'        => $validated['company_type'],
+                'verification_status' => 'pending',
+            ]);
         });
+
+        ActivityLogger::logAs($user, 'registered', "New {$role} account created for {$validated['email']}.");
 
         $otp = $this->generateAndSendOtp($validated['email']);
 
@@ -252,6 +255,8 @@ class AuthController extends Controller
 
         $user->forceFill(['email_verified_at' => Carbon::now()])->save();
 
+        ActivityLogger::logAs($user, 'email_verified', "Email address {$email} verified.");
+
         Cache::forget("ipeso_otp_{$email}");
         Cache::forget($attemptKey);
 
@@ -281,6 +286,7 @@ class AuthController extends Controller
 
         if (! $result) {
             \Log::warning("Login attempt: User not found for email {$email}");
+            ActivityLogger::logGuest('login_failed', "Failed sign-in attempt for unregistered email {$email}.");
 
             return response()->json([
                 'message' => 'These credentials do not match our records.',
@@ -292,6 +298,7 @@ class AuthController extends Controller
 
         if (! Hash::check($password, $user->password)) {
             \Log::warning("Login attempt: Password mismatch for email {$email}");
+            ActivityLogger::logAs($user, 'login_failed', "Incorrect password for {$role} account {$email}.");
 
             return response()->json([
                 'message' => 'These credentials do not match our records.',
@@ -314,6 +321,7 @@ class AuthController extends Controller
         $token = $user->createToken('ipeso_access_token')->plainTextToken;
 
         \Log::info("Login successful for user {$email} with role {$role}");
+        ActivityLogger::logAs($user, 'login', "Signed in as {$role} ({$email}).");
 
         return response()->json([
             'message' => 'Login successful.',
@@ -419,6 +427,8 @@ class AuthController extends Controller
             'password' => Hash::make($request->input('password')),
         ])->save();
 
+        ActivityLogger::logAs($user, 'password_reset', "Password reset via emailed code for {$email}.");
+
         Cache::forget("ipeso_reset_{$email}");
 
         return response()->json([
@@ -450,6 +460,8 @@ class AuthController extends Controller
      */
     public function logout(Request $request): JsonResponse
     {
+        ActivityLogger::logAs($request->user(), 'logout', 'Signed out of the system.');
+
         $request->user()->currentAccessToken()->delete();
 
         return response()->json([

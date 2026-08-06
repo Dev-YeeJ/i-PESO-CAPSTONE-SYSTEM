@@ -6,10 +6,13 @@ use App\Http\Controllers\Controller;
 use App\Models\Administrator;
 use App\Models\Application;
 use App\Models\Employer;
+use App\Services\ActivityLogger;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class EmployerController extends Controller
 {
@@ -55,114 +58,7 @@ class EmployerController extends Controller
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
-        $query = Employer::query()->select([
-            'employer_id',
-            'company_name',
-            'company_type',
-            'industry',
-            'industry_type',
-            'province',
-            'city_municipality',
-            'barangay',
-            'house_unit_street',
-            'latitude',
-            'longitude',
-            'representative_name',
-            'representative_first_name',
-            'representative_last_name',
-            'mobile_number',
-            'representative_contact_number',
-            'email',
-            'verification_status',
-            'verified_at',
-            'email_verified_at',
-            'created_at',
-        ]);
-
-        $search = trim((string) $request->string('search'));
-        if ($search !== '') {
-            $query->where(function ($q) use ($search) {
-                $q->where('company_name', 'like', "%{$search}%")
-                    ->orWhere('representative_name', 'like', "%{$search}%")
-                    ->orWhere('representative_first_name', 'like', "%{$search}%")
-                    ->orWhere('representative_last_name', 'like', "%{$search}%")
-                    ->orWhere('email', 'like', "%{$search}%")
-                    ->orWhere('mobile_number', 'like', "%{$search}%")
-                    ->orWhere('representative_contact_number', 'like', "%{$search}%") ;
-            });
-        }
-
-        if ($request->filled('verification_status')) {
-            $query->where('verification_status', $request->input('verification_status'));
-        }
-
-        if ($request->filled('company_type')) {
-            $query->where('company_type', $request->input('company_type'));
-        }
-
-        if ($request->filled('industry')) {
-            $industry = $request->input('industry').'%';
-            $query->where(function ($industryQuery) use ($industry) {
-                $industryQuery->where('industry', 'like', $industry)
-                    ->orWhere('industry_type', 'like', $industry);
-            });
-        }
-
-        if ($request->filled('province')) {
-            $query->where('province', 'like', $request->input('province').'%');
-        }
-
-        if ($request->filled('city')) {
-            $query->where('city_municipality', 'like', $request->input('city').'%');
-        }
-
-        if ($request->filled('barangay')) {
-            $query->where('barangay', 'like', $request->input('barangay').'%');
-        }
-
-        if ($request->filled('has_active_vacancies')) {
-            $hasActiveVacancies = $this->resolveBoolean($request->input('has_active_vacancies'));
-            if ($hasActiveVacancies !== null) {
-                $query->{$hasActiveVacancies ? 'whereHas' : 'whereDoesntHave'}('vacancies', function ($q) {
-                    $q->where('status', 'active');
-                });
-            }
-        }
-
-        if ($request->filled('has_applications')) {
-            $hasApplications = $this->resolveBoolean($request->input('has_applications'));
-            if ($hasApplications !== null) {
-                $query->{$hasApplications ? 'whereHas' : 'whereDoesntHave'}('vacancies.applications');
-            }
-        }
-
-        if ($request->filled('has_job_fair')) {
-            $hasJobFair = $this->resolveBoolean($request->input('has_job_fair'));
-            if ($hasJobFair !== null) {
-                $query->{$hasJobFair ? 'whereHas' : 'whereDoesntHave'}('jobFairJoins');
-            }
-        }
-
-        if ($request->filled('document_status')) {
-            $documentStatus = strtolower((string) $request->input('document_status'));
-            if ($documentStatus === 'missing') {
-                $query->whereDoesntHave('documents');
-            } elseif ($documentStatus === 'uploaded') {
-                $query->whereHas('documents');
-            } elseif (in_array($documentStatus, ['pending', 'approved', 'rejected'], true)) {
-                $query->whereHas('documents', function ($q) use ($documentStatus) {
-                    $q->where('verification_status', $documentStatus);
-                });
-            }
-        }
-
-        if ($request->filled('date_from')) {
-            $query->whereDate('created_at', '>=', $request->input('date_from'));
-        }
-
-        if ($request->filled('date_to')) {
-            $query->whereDate('created_at', '<=', $request->input('date_to'));
-        }
+        $query = $this->filteredQuery($request);
 
         $perPage = (int) $request->input('per_page', 15);
         $perPage = max(1, min($perPage, 100));
@@ -397,4 +293,171 @@ class EmployerController extends Controller
 
         return null;
     }
+    /**
+     * Download the currently filtered employer directory as CSV.
+     * GET /api/admin/employers/export
+     */
+    public function export(Request $request): StreamedResponse
+    {
+        abort_unless(auth()->user() instanceof Administrator, 403, 'Unauthorized');
+
+        $query = $this->filteredQuery($request)->reorder('employer_id');
+        $filename = 'employers-'.now()->format('Y-m-d').'.csv';
+
+        ActivityLogger::log('exported_employers', sprintf(
+            'Exported the employer directory (%d record(s)) as CSV.',
+            (clone $query)->count()
+        ));
+
+        return response()->streamDownload(function () use ($query) {
+            $handle = fopen('php://output', 'wb');
+
+            // BOM so Excel opens the file as UTF-8.
+            fwrite($handle, "\xEF\xBB\xBF");
+            fputcsv($handle, [
+                'Employer ID', 'Company Name', 'Trade Name', 'Email', 'Company Type',
+                'Industry', 'Company Size', 'Verification Status', 'Registered At',
+            ]);
+
+            $query->chunkById(500, function ($employers) use ($handle) {
+                foreach ($employers as $employer) {
+                    fputcsv($handle, [
+                        $employer->employer_id,
+                        $employer->company_name,
+                        $employer->trade_name,
+                        $employer->email,
+                        $employer->company_type,
+                        $employer->industry,
+                        $employer->company_size,
+                        $employer->verification_status,
+                        optional($employer->created_at)->toDateTimeString(),
+                    ]);
+                }
+            }, 'employer_id');
+
+            fclose($handle);
+        }, $filename, [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Cache-Control' => 'private, no-store',
+        ]);
+    }
+
+    /**
+     * Base query with every directory filter applied. Shared by the paginated
+     * listing and the CSV export so the two can never disagree on what matches.
+     */
+    private function filteredQuery(Request $request): Builder
+    {
+        $query = Employer::query()->select([
+            'employer_id',
+            'company_name',
+            'company_type',
+            'industry',
+            'industry_type',
+            'province',
+            'city_municipality',
+            'barangay',
+            'house_unit_street',
+            'latitude',
+            'longitude',
+            'representative_name',
+            'representative_first_name',
+            'representative_last_name',
+            'mobile_number',
+            'representative_contact_number',
+            'email',
+            'verification_status',
+            'verified_at',
+            'email_verified_at',
+            'created_at',
+        ]);
+
+        $search = trim((string) $request->string('search'));
+        if ($search !== '') {
+            $query->where(function ($q) use ($search) {
+                $q->where('company_name', 'like', "%{$search}%")
+                    ->orWhere('representative_name', 'like', "%{$search}%")
+                    ->orWhere('representative_first_name', 'like', "%{$search}%")
+                    ->orWhere('representative_last_name', 'like', "%{$search}%")
+                    ->orWhere('email', 'like', "%{$search}%")
+                    ->orWhere('mobile_number', 'like', "%{$search}%")
+                    ->orWhere('representative_contact_number', 'like', "%{$search}%") ;
+            });
+        }
+
+        if ($request->filled('verification_status')) {
+            $query->where('verification_status', $request->input('verification_status'));
+        }
+
+        if ($request->filled('company_type')) {
+            $query->where('company_type', $request->input('company_type'));
+        }
+
+        if ($request->filled('industry')) {
+            $industry = $request->input('industry').'%';
+            $query->where(function ($industryQuery) use ($industry) {
+                $industryQuery->where('industry', 'like', $industry)
+                    ->orWhere('industry_type', 'like', $industry);
+            });
+        }
+
+        if ($request->filled('province')) {
+            $query->where('province', 'like', $request->input('province').'%');
+        }
+
+        if ($request->filled('city')) {
+            $query->where('city_municipality', 'like', $request->input('city').'%');
+        }
+
+        if ($request->filled('barangay')) {
+            $query->where('barangay', 'like', $request->input('barangay').'%');
+        }
+
+        if ($request->filled('has_active_vacancies')) {
+            $hasActiveVacancies = $this->resolveBoolean($request->input('has_active_vacancies'));
+            if ($hasActiveVacancies !== null) {
+                $query->{$hasActiveVacancies ? 'whereHas' : 'whereDoesntHave'}('vacancies', function ($q) {
+                    $q->where('status', 'active');
+                });
+            }
+        }
+
+        if ($request->filled('has_applications')) {
+            $hasApplications = $this->resolveBoolean($request->input('has_applications'));
+            if ($hasApplications !== null) {
+                $query->{$hasApplications ? 'whereHas' : 'whereDoesntHave'}('vacancies.applications');
+            }
+        }
+
+        if ($request->filled('has_job_fair')) {
+            $hasJobFair = $this->resolveBoolean($request->input('has_job_fair'));
+            if ($hasJobFair !== null) {
+                $query->{$hasJobFair ? 'whereHas' : 'whereDoesntHave'}('jobFairJoins');
+            }
+        }
+
+        if ($request->filled('document_status')) {
+            $documentStatus = strtolower((string) $request->input('document_status'));
+            if ($documentStatus === 'missing') {
+                $query->whereDoesntHave('documents');
+            } elseif ($documentStatus === 'uploaded') {
+                $query->whereHas('documents');
+            } elseif (in_array($documentStatus, ['pending', 'approved', 'rejected'], true)) {
+                $query->whereHas('documents', function ($q) use ($documentStatus) {
+                    $q->where('verification_status', $documentStatus);
+                });
+            }
+        }
+
+        if ($request->filled('date_from')) {
+            $query->whereDate('created_at', '>=', $request->input('date_from'));
+        }
+
+        if ($request->filled('date_to')) {
+            $query->whereDate('created_at', '<=', $request->input('date_to'));
+        }
+
+        return $query;
+    }
+
 }

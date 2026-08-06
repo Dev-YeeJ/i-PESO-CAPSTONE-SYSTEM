@@ -35,7 +35,8 @@ describe('VerificationQueuePage', () => {
     renderWithProviders(<VerificationQueuePage />)
 
     await screen.findByText('Ready Co')
-    const names = screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent)
+    // Company names sit at level 3, below the "Pending applications" section heading.
+    const names = screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent)
     expect(names.indexOf('Ready Co')).toBeLessThan(names.indexOf('Awaiting Co'))
   })
 

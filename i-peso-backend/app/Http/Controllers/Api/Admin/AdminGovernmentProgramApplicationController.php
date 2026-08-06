@@ -8,6 +8,7 @@ use App\Models\GovernmentProgram;
 use App\Models\GovernmentProgramApplicationDocument;
 use App\Models\ProgramApplication;
 use App\Notifications\GovernmentProgramNotification;
+use App\Services\ActivityLogger;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -23,16 +24,33 @@ class AdminGovernmentProgramApplicationController extends Controller
 
     public function index(Request $request, GovernmentProgram $governmentProgram): JsonResponse
     {
-        $applications = $governmentProgram->applications()
+        $filters = $request->validate([
+            'status' => ['nullable', 'string', 'max:30'],
+            'search' => ['nullable', 'string', 'max:255'],
+            'per_page' => ['nullable', 'integer', 'min:5', 'max:100'],
+        ]);
+
+        $matching = $governmentProgram->applications()
+            ->when($filters['status'] ?? null, fn ($query, $status) => $query->where('application_status', $status))
+            ->when($filters['search'] ?? null, function ($query, $search) {
+                $needle = '%'.addcslashes(trim($search), '%_\\').'%';
+
+                $query->whereHas('seeker', fn ($seeker) => $seeker
+                    ->where('first_name', 'like', $needle)
+                    ->orWhere('last_name', 'like', $needle)
+                    ->orWhere('email', 'like', $needle));
+            });
+
+        $applications = (clone $matching)
             ->with([
                 'seeker:seeker_id,first_name,middle_name,last_name,email,mobile_number,educ_attainment,employment_status,address_barangay,address_municipality_city,address_province',
                 'documents',
                 'certificate',
                 'reviewer:admin_id,first_name,last_name',
             ])
-            ->when($request->string('status')->toString(), fn ($query, $status) => $query->where('application_status', $status))
             ->latest('prog_apply_id')
-            ->paginate($request->integer('per_page', 20));
+            ->paginate($filters['per_page'] ?? 20)
+            ->withQueryString();
 
         $applications->through(fn (ProgramApplication $application) => [
             ...$this->formatProgramApplication($application),
@@ -57,6 +75,12 @@ class AdminGovernmentProgramApplicationController extends Controller
                 'total_slots' => $governmentProgram->total_slots,
             ],
             'applications' => $applications,
+            // Counts across the whole program so the review tabs stay stable
+            // while the admin narrows the list.
+            'status_counts' => $governmentProgram->applications()
+                ->selectRaw('application_status, COUNT(*) as total')
+                ->groupBy('application_status')
+                ->pluck('total', 'application_status'),
         ]);
     }
 
@@ -114,6 +138,16 @@ class AdminGovernmentProgramApplicationController extends Controller
         ));
         $this->recordSmsPrototype($application);
 
+        ActivityLogger::log(
+            $validated['status'] === 'approved' ? 'approved_program' : 'reviewed_program_application',
+            sprintf(
+                'Set program application #%d ("%s") to %s.',
+                $application->prog_apply_id,
+                $application->program->program_name ?? 'Unknown program',
+                $validated['status']
+            )
+        );
+
         return response()->json([
             'message' => 'Application status updated.',
             'application' => $this->formatProgramApplication($application),
@@ -136,23 +170,47 @@ class AdminGovernmentProgramApplicationController extends Controller
     public function legacyBulkReview(Request $request, GovernmentProgram $governmentProgram): JsonResponse
     {
         $validated = $request->validate([
-            'ids' => ['required', 'array', 'min:1'],
+            'ids' => ['required', 'array', 'min:1', 'max:100'],
             'ids.*' => ['integer'],
             'action' => ['required', Rule::in(['approve', 'reject'])],
             'remarks' => ['nullable', 'string', 'max:3000', 'required_if:action,reject'],
         ]);
 
-        foreach ($validated['ids'] as $id) {
-            $application = $governmentProgram->applications()->findOrFail($id);
+        $processed = [];
+        $failed = [];
+
+        // Each application is reviewed independently: running out of slots partway
+        // through must not silently discard the decisions already committed.
+        foreach (array_unique($validated['ids']) as $id) {
+            $application = $governmentProgram->applications()->find($id);
+
+            if (! $application) {
+                $failed[] = ['id' => $id, 'reason' => 'Application not found in this program.'];
+
+                continue;
+            }
+
             $childRequest = Request::create('', 'POST', [
                 'status' => $validated['action'] === 'approve' ? 'approved' : 'rejected',
                 'remarks' => $validated['remarks'] ?? null,
             ]);
             $childRequest->setUserResolver(fn () => $request->user());
-            $this->updateStatus($childRequest, $application);
+
+            try {
+                $this->updateStatus($childRequest, $application);
+                $processed[] = $id;
+            } catch (ValidationException $exception) {
+                $failed[] = ['id' => $id, 'reason' => $exception->validator->errors()->first()];
+            }
         }
 
-        return response()->json(['message' => 'Bulk review completed.']);
+        return response()->json([
+            'message' => $failed === []
+                ? sprintf('%d application(s) reviewed.', count($processed))
+                : sprintf('%d reviewed, %d could not be processed.', count($processed), count($failed)),
+            'processed' => $processed,
+            'failed' => $failed,
+        ], $processed === [] && $failed !== [] ? 422 : 200);
     }
 
     public function document(

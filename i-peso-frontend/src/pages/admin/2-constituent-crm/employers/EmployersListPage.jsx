@@ -2,12 +2,14 @@ import { createElement, useEffect, useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, ArrowRight, Briefcase, Building2, CalendarDays, CheckCircle2, FileText, Filter, MapPin, Search, SlidersHorizontal, X, Mail, Phone } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Briefcase, Building2, CalendarDays, CheckCircle2, Download, FileText, Filter, MapPin, Search, SlidersHorizontal, X, Mail, Phone } from 'lucide-react'
 import { Badge, Button, Card, EmptyState, LoadingSkeleton } from '@/components/ui'
 import PageHeader from '@/pages/admin/_components/PageHeader'
 import StatCard from '@/pages/admin/_components/StatCard'
 import StatusBadge from '@/pages/admin/_components/StatusBadge'
 import { adminService } from '@/services/adminService'
+import { downloadBlob } from '@/services/placementReportService'
+import toast from 'react-hot-toast'
 
 const initialFilters = {
   search: '',
@@ -60,6 +62,22 @@ export default function EmployersListPage() {
     per_page: 12,
     ...buildParams(filters),
   }), [filters, page])
+
+  const [exporting, setExporting] = useState(false)
+
+  // Exports the full filtered result set server-side, not just the visible page.
+  const handleExport = async () => {
+    setExporting(true)
+    try {
+      const blob = await adminService.exportEmployers(buildParams(filters))
+      downloadBlob(blob, `employers-${new Date().toISOString().slice(0, 10)}.csv`)
+      toast.success('Export ready.')
+    } catch (caught) {
+      toast.error(caught?.response?.data?.message ?? 'Unable to export the directory.')
+    } finally {
+      setExporting(false)
+    }
+  }
 
   const employersQuery = useQuery({
     queryKey: ['admin', 'employers', queryParams],
@@ -124,7 +142,12 @@ export default function EmployersListPage() {
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
           <PageHeader title="Employer Directory" subtitle="Audit companies, verify business legitimacy, and manage DOLE compliance with a cleaner admin view." eyebrow="Constituent CRM" />
-          <Button to="/admin/verification-queue" variant="primary">Open verification queue</Button>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" icon={Download} onClick={handleExport} disabled={exporting}>
+              {exporting ? 'Preparing…' : 'Export CSV'}
+            </Button>
+            <Button to="/admin/verification-queue" variant="primary">Open verification queue</Button>
+          </div>
         </div>
 
         <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">

@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Application;
 use App\Models\JobSeeker;
 use App\Models\JobVacancy;
+use App\Services\ActivityLogger;
 use App\Services\EnhancedJobMatchingService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -65,6 +66,11 @@ class SeekerApplicationController extends Controller
 
         event(new ApplicationStatusChanged($application->fresh()));
 
+        ActivityLogger::logAs($seeker, 'withdrew_application', sprintf(
+            'Withdrew application #%d.',
+            $application->getKey()
+        ));
+
         return response()->json([
             'message' => 'Application withdrawn successfully.',
             'application' => $this->formatApplication($application->fresh(), false),
@@ -121,6 +127,12 @@ class SeekerApplicationController extends Controller
                     : 0,
             ],
         ]);
+
+        ActivityLogger::logAs($seeker, 'applied_job', sprintf(
+            'Applied to "%s" (vacancy #%d).',
+            $vacancy->job_title,
+            $vacancy->post_id
+        ));
 
         return response()->json([
             'message' => 'Application submitted successfully.',

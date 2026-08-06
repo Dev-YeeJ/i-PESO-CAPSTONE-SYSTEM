@@ -3,11 +3,11 @@
 namespace App\Http\Controllers\Api\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\ActivityLog;
 use App\Models\Employer;
 use App\Models\EmployerDocument;
 use App\Notifications\EmployerVerificationProgressUpdated;
 use App\Notifications\EmployerVerificationStatusChanged;
+use App\Services\ActivityLogger;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -22,44 +22,157 @@ class EmployerVerificationController extends Controller
      * Get all pending employer registrations
      * GET /api/admin/employers/pending
      */
-    public function getPendingEmployers(): JsonResponse
+    public function getPendingEmployers(Request $request): JsonResponse
     {
+        $filters = $request->validate([
+            'search' => ['nullable', 'string', 'max:255'],
+            'readiness' => ['nullable', 'in:ready,awaiting'],
+            'sort' => ['nullable', 'in:oldest,newest'],
+            'per_page' => ['nullable', 'integer', 'min:5', 'max:100'],
+        ]);
+
         try {
-            $employers = Employer::where('verification_status', 'pending')
+            $query = Employer::query()
+                ->where('verification_status', 'pending')
                 ->with('documents')
-                ->orderBy('created_at', 'desc')
-                ->get();
+                ->when($filters['search'] ?? null, function ($builder, $search) {
+                    $needle = '%'.addcslashes(trim($search), '%_\\').'%';
+
+                    $builder->where(fn ($scoped) => $scoped
+                        ->where('company_name', 'like', $needle)
+                        ->orWhere('trade_name', 'like', $needle)
+                        ->orWhere('email', 'like', $needle)
+                        ->orWhere('representative_first_name', 'like', $needle)
+                        ->orWhere('representative_last_name', 'like', $needle));
+                });
+
+            // A verification queue is worked oldest-first, so the employer who has
+            // been waiting longest surfaces by default.
+            $employers = $query
+                ->orderBy('created_at', ($filters['sort'] ?? 'oldest') === 'newest' ? 'desc' : 'asc')
+                ->paginate($filters['per_page'] ?? 15)
+                ->withQueryString();
+
+            $employers->setCollection(
+                $employers->getCollection()->map(fn (Employer $employer) => $this->queueEntry($employer))
+            );
+
+            // Readiness depends on per-document status, so it is applied after
+            // shaping rather than as a SQL predicate.
+            if ($readiness = $filters['readiness'] ?? null) {
+                $employers->setCollection(
+                    $employers->getCollection()
+                        ->filter(fn (array $entry) => $readiness === 'ready'
+                            ? $entry['all_required_approved']
+                            : ! $entry['all_required_approved'])
+                        ->values()
+                );
+            }
 
             return response()->json([
-                'total' => $employers->count(),
-                'employers' => $employers->map(function ($employer) {
-                    $requiredDocuments = $employer->getRequiredDocuments();
-                    $requiredUploaded = $employer->documents
-                        ->whereIn('document_type', $requiredDocuments);
-                    $approvedRequiredCount = $requiredUploaded
-                        ->where('verification_status', 'approved')
-                        ->count();
-
-                    return [
-                        'employer_id' => $employer->employer_id,
-                        'email' => $employer->email,
-                        'company_name' => $employer->company_name,
-                        'company_type' => $employer->company_type,
-                        'company_size' => $employer->company_size,
-                        'representative_name' => $employer->representative_name,
-                        'created_at' => $employer->created_at,
-                        'documents_count' => $employer->documents->count(),
-                        'required_documents' => $requiredDocuments,
-                        'required_documents_count' => count($requiredDocuments),
-                        'approved_required_documents_count' => $approvedRequiredCount,
-                        'all_required_uploaded' => $employer->hasAllRequiredDocuments(),
-                        'all_required_approved' => $approvedRequiredCount === count($requiredDocuments),
-                    ];
-                }),
+                'total' => $employers->total(),
+                'employers' => $employers->items(),
+                'pagination' => [
+                    'current_page' => $employers->currentPage(),
+                    'last_page' => $employers->lastPage(),
+                    'per_page' => $employers->perPage(),
+                    'total' => $employers->total(),
+                ],
+                'summary' => $this->queueSummary(),
             ], 200);
         } catch (\Exception $e) {
             return response()->json(['error' => $e->getMessage()], 500);
         }
+    }
+
+    /**
+     * Approve several employers in one pass.
+     * POST /api/admin/employers/bulk-approve
+     */
+    public function bulkApproveEmployers(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'employer_ids' => ['required', 'array', 'min:1', 'max:50'],
+            'employer_ids.*' => ['integer'],
+            'remarks' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        $approved = [];
+        $failed = [];
+
+        foreach (array_unique($validated['employer_ids']) as $employerId) {
+            $childRequest = Request::create('', 'POST', ['remarks' => $validated['remarks'] ?? null]);
+            $childRequest->setUserResolver(fn () => $request->user());
+
+            $response = $this->approveEmployer($employerId, $childRequest);
+
+            if ($response->getStatusCode() === 200) {
+                $approved[] = $employerId;
+
+                continue;
+            }
+
+            $payload = $response->getData(true);
+            $failed[] = [
+                'employer_id' => $employerId,
+                'reason' => $payload['error'] ?? $payload['message'] ?? 'Could not be approved.',
+            ];
+        }
+
+        return response()->json([
+            'message' => $failed === []
+                ? sprintf('%d employer(s) approved.', count($approved))
+                : sprintf('%d approved, %d could not be approved.', count($approved), count($failed)),
+            'approved' => $approved,
+            'failed' => $failed,
+        ], $approved === [] && $failed !== [] ? 422 : 200);
+    }
+
+    /** Shape one pending employer for the verification queue. */
+    private function queueEntry(Employer $employer): array
+    {
+        $requiredDocuments = $employer->getRequiredDocuments();
+        $approvedRequiredCount = $employer->documents
+            ->whereIn('document_type', $requiredDocuments)
+            ->where('verification_status', 'approved')
+            ->count();
+
+        return [
+            'employer_id' => $employer->employer_id,
+            'email' => $employer->email,
+            'company_name' => $employer->company_name,
+            'company_type' => $employer->company_type,
+            'company_size' => $employer->company_size,
+            'representative_name' => $employer->representative_name,
+            'created_at' => $employer->created_at,
+            'days_waiting' => $employer->created_at?->diffInDays(now()) ?? 0,
+            'documents_count' => $employer->documents->count(),
+            'rejected_documents_count' => $employer->documents
+                ->where('verification_status', 'rejected')
+                ->count(),
+            'required_documents' => $requiredDocuments,
+            'required_documents_count' => count($requiredDocuments),
+            'approved_required_documents_count' => $approvedRequiredCount,
+            'all_required_uploaded' => $employer->hasAllRequiredDocuments(),
+            'all_required_approved' => $approvedRequiredCount === count($requiredDocuments),
+        ];
+    }
+
+    /** Queue-wide counts, unaffected by the current filters. */
+    private function queueSummary(): array
+    {
+        $pending = Employer::query()
+            ->where('verification_status', 'pending')
+            ->with('documents')
+            ->get()
+            ->map(fn (Employer $employer) => $this->queueEntry($employer));
+
+        return [
+            'pending' => $pending->count(),
+            'ready_to_approve' => $pending->where('all_required_approved', true)->count(),
+            'awaiting_documents' => $pending->where('all_required_uploaded', false)->count(),
+            'waiting_over_7_days' => $pending->where('days_waiting', '>=', 7)->count(),
+        ];
     }
 
     /**
@@ -154,18 +267,12 @@ class EmployerVerificationController extends Controller
                     'verified_by_admin_id' => $request->user()->getKey(),
                 ]);
 
-                ActivityLog::create([
-                    'user_type' => $request->user()::class,
-                    'user_id' => $request->user()->getKey(),
-                    'action' => 'approved_employer',
-                    'description' => sprintf(
-                        'Approved employer #%d (%s).%s',
-                        $employer->employer_id,
-                        $employer->email,
-                        isset($validated['remarks']) ? " Remarks: {$validated['remarks']}" : ''
-                    ),
-                    'ip_address' => $request->ip(),
-                ]);
+                ActivityLogger::logAs($request->user(), 'approved_employer', sprintf(
+                    'Approved employer #%d (%s).%s',
+                    $employer->employer_id,
+                    $employer->email,
+                    isset($validated['remarks']) ? " Remarks: {$validated['remarks']}" : ''
+                ));
             });
 
             $notificationQueued = $this->queueStatusNotification(
@@ -215,18 +322,12 @@ class EmployerVerificationController extends Controller
                     'status' => 'closed',
                 ]);
 
-                ActivityLog::create([
-                    'user_type' => $request->user()::class,
-                    'user_id' => $request->user()->getKey(),
-                    'action' => 'rejected_employer',
-                    'description' => sprintf(
-                        'Rejected employer #%d (%s). Reason: %s',
-                        $employer->employer_id,
-                        $employer->email,
-                        $request->rejection_reason
-                    ),
-                    'ip_address' => $request->ip(),
-                ]);
+                ActivityLogger::logAs($request->user(), 'rejected_employer', sprintf(
+                    'Rejected employer #%d (%s). Reason: %s',
+                    $employer->employer_id,
+                    $employer->email,
+                    $request->rejection_reason
+                ));
             });
 
             $notificationQueued = $this->queueStatusNotification(
@@ -323,18 +424,12 @@ class EmployerVerificationController extends Controller
 
                     $employer->vacancies()->where('status', 'active')->update(['status' => 'closed']);
 
-                    ActivityLog::create([
-                        'user_type' => $request->user()::class,
-                        'user_id' => $request->user()->getKey(),
-                        'action' => 'finalized_employer_rejected',
-                        'description' => sprintf(
-                            'Rejected employer #%d (%s) via unified review. Reason: %s',
-                            $employer->employer_id,
-                            $employer->email,
-                            $rejectionReason
-                        ),
-                        'ip_address' => $request->ip(),
-                    ]);
+                    ActivityLogger::logAs($request->user(), 'finalized_employer_rejected', sprintf(
+                        'Rejected employer #%d (%s) via unified review. Reason: %s',
+                        $employer->employer_id,
+                        $employer->email,
+                        $rejectionReason
+                    ));
                 } else {
                     $employer->update([
                         'verification_status' => 'verified',
@@ -343,18 +438,12 @@ class EmployerVerificationController extends Controller
                         'verified_by_admin_id' => $request->user()->getKey(),
                     ]);
 
-                    ActivityLog::create([
-                        'user_type' => $request->user()::class,
-                        'user_id' => $request->user()->getKey(),
-                        'action' => 'finalized_employer_approved',
-                        'description' => sprintf(
-                            'Approved employer #%d (%s) via unified review.%s',
-                            $employer->employer_id,
-                            $employer->email,
-                            ! empty($validated['remarks']) ? " Remarks: {$validated['remarks']}" : ''
-                        ),
-                        'ip_address' => $request->ip(),
-                    ]);
+                    ActivityLogger::logAs($request->user(), 'finalized_employer_approved', sprintf(
+                        'Approved employer #%d (%s) via unified review.%s',
+                        $employer->employer_id,
+                        $employer->email,
+                        ! empty($validated['remarks']) ? " Remarks: {$validated['remarks']}" : ''
+                    ));
                 }
             });
 
@@ -413,18 +502,12 @@ class EmployerVerificationController extends Controller
             'Document file not found.'
         );
 
-        ActivityLog::create([
-            'user_type' => $request->user()::class,
-            'user_id' => $request->user()->getKey(),
-            'action' => 'viewed_employer_document',
-            'description' => sprintf(
-                'Viewed employer document #%d (%s) for employer #%d.',
-                $document->document_id,
-                $document->document_type,
-                $document->employer_id
-            ),
-            'ip_address' => $request->ip(),
-        ]);
+        ActivityLogger::logAs($request->user(), 'viewed_employer_document', sprintf(
+            'Viewed employer document #%d (%s) for employer #%d.',
+            $document->document_id,
+            $document->document_type,
+            $document->employer_id
+        ));
 
         return Storage::disk($disk)->response(
             $document->document_path,
@@ -458,19 +541,13 @@ class EmployerVerificationController extends Controller
             'Document file not found.'
         );
 
-        ActivityLog::create([
-            'user_type' => $request->user()::class,
-            'user_id' => $request->user()->getKey(),
-            'action' => 'downloaded_employer_document',
-            'description' => sprintf(
-                'Downloaded employer document #%d (%s) for employer #%d. Reason: %s',
-                $document->document_id,
-                $document->document_type,
-                $document->employer_id,
-                $validated['reason']
-            ),
-            'ip_address' => $request->ip(),
-        ]);
+        ActivityLogger::logAs($request->user(), 'downloaded_employer_document', sprintf(
+            'Downloaded employer document #%d (%s) for employer #%d. Reason: %s',
+            $document->document_id,
+            $document->document_type,
+            $document->employer_id,
+            $validated['reason']
+        ));
 
         return Storage::disk($disk)->download(
             $document->document_path,
@@ -511,20 +588,14 @@ class EmployerVerificationController extends Controller
                 'admin_notes' => $request->admin_notes,
             ]);
 
-            ActivityLog::create([
-                'user_type' => $request->user()::class,
-                'user_id' => $request->user()->getKey(),
-                'action' => 'reviewed_employer_document',
-                'description' => sprintf(
-                    'Marked employer document #%d (%s) as %s for employer #%d.%s',
-                    $document->document_id,
-                    $document->document_type,
-                    $document->verification_status,
-                    $document->employer_id,
-                    $document->admin_notes ? " Notes: {$document->admin_notes}" : ''
-                ),
-                'ip_address' => $request->ip(),
-            ]);
+            ActivityLogger::logAs($request->user(), 'reviewed_employer_document', sprintf(
+                'Marked employer document #%d (%s) as %s for employer #%d.%s',
+                $document->document_id,
+                $document->document_type,
+                $document->verification_status,
+                $document->employer_id,
+                $document->admin_notes ? " Notes: {$document->admin_notes}" : ''
+            ));
 
             $notificationQueued = true;
             if ($previousStatus !== $document->verification_status) {
