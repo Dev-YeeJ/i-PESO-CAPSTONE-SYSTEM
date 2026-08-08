@@ -5,7 +5,7 @@ const variantStyles = {
   primary: {
     backgroundColor: colors.accent,
     borderColor: colors.accent,
-    textColor: colors.primary,
+    textColor: colors.white,
   },
   success: {
     backgroundColor: colors.success,

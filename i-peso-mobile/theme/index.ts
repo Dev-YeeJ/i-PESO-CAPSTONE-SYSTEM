@@ -1,14 +1,31 @@
 export const colors = {
+  // Brand / primary palette
   primary: '#0F172A',
+  primaryDark: '#071024',
+  // Secondary / brand blue
+  secondary: '#2563EB',
+
+  // Accent / CTA (yellow/gold)
   accent: '#F59E0B',
   accentPressed: '#D97706',
   accentSoft: '#FEF3C7',
-  border: '#E2E8F0',
-  secondaryText: '#64748B',
-  muted: '#475569',
+
+  // Surfaces
   background: '#F8FAFC',
   surface: '#FFFFFF',
   white: '#FFFFFF',
+
+  // Borders and subtle UI
+  border: '#E2E8F0',
+  overlay: 'rgba(15, 23, 42, 0.04)',
+
+  // Text
+  textPrimary: '#0F172A',
+  textSecondary: '#64748B',
+  neutralText: '#0F172A',
+  subtle: '#94A3B8',
+
+  // Utility colors
   info: '#2563EB',
   infoBackground: '#EFF6FF',
   infoBorder: '#BFDBFE',
@@ -18,12 +35,10 @@ export const colors = {
   warning: '#92400E',
   warningBackground: '#FFFBEB',
   warningBorder: '#FDE68A',
-  danger: '#991B1B',
-  dangerBackground: '#FEF2F2',
-  dangerBorder: '#FECACA',
-  neutralText: '#0F172A',
-  subtle: '#94A3B8',
-  overlay: 'rgba(15, 23, 42, 0.04)',
+  error: '#991B1B',
+  errorBackground: '#FEF2F2',
+  errorBorder: '#FECACA',
+  muted: '#475569',
 };
 
 export const spacing = {

@@ -24,7 +24,7 @@ export default function SeekerLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: colors.info,
+        tabBarActiveTintColor: colors.accent,
         tabBarInactiveTintColor: colors.subtle,
         tabBarStyle: {
           backgroundColor: colors.surface,

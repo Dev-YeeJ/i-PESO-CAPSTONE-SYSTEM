@@ -78,7 +78,7 @@ const styles = StyleSheet.create({
   label: {
     fontSize: typography.small,
     fontFamily: typography.family.bold,
-    color: colors.muted,
+    color: colors.textSecondary,
   },
   wrap: {
     flexDirection: 'row',
@@ -89,12 +89,12 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   wrapFocused: {
-    borderColor: colors.info,
+    borderColor: colors.secondary,
     backgroundColor: colors.surface,
   },
   wrapError: {
-    borderColor: colors.dangerBorder,
-    backgroundColor: colors.dangerBackground,
+    borderColor: colors.errorBorder,
+    backgroundColor: colors.errorBackground,
   },
   input: {
     flex: 1,
@@ -102,7 +102,7 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md,
     fontSize: typography.body,
     fontFamily: typography.family.regular,
-    color: colors.primary,
+    color: colors.textPrimary,
   },
   toggle: {
     paddingHorizontal: spacing.lg,

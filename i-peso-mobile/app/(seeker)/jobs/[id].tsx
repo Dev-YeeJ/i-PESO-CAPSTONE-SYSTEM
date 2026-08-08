@@ -75,7 +75,7 @@ export default function JobDetailsScreen() {
       <View style={styles.flex}>
         <ScreenHeader title="Job Details" onBack={() => router.back()} />
         <View style={styles.center}>
-          <ActivityIndicator color={colors.info} />
+          <ActivityIndicator color={colors.secondary} />
         </View>
       </View>
     )
@@ -150,7 +150,7 @@ export default function JobDetailsScreen() {
               <Text style={styles.jobTitle}>{textFrom(job.job_title, 'Untitled job')}</Text>
               <Text style={styles.company}>{jobCompany(job)}</Text>
             </View>
-            <MatchRing percentage={job.match_percentage ?? job.match?.percentage ?? 0} size={72} strokeWidth={6} label="Match" />
+            <MatchRing percentage={job.match_percentage ?? job.match?.percentage ?? 0} size={64} strokeWidth={5} label="Match" />
           </View>
           <View style={styles.badgeRow}>
             {job.job_fair?.is_available_at_job_fair ? <Badge variant="warning">Available at Job Fair</Badge> : null}
@@ -232,7 +232,7 @@ export default function JobDetailsScreen() {
         ) : null}
       </ScrollView>
 
-      <View style={styles.footer}>
+        <View style={styles.footer}>
         <Button
           variant="outline"
           onPress={() => toggleSavedMutation.mutate(String(job.post_id))}
@@ -242,7 +242,7 @@ export default function JobDetailsScreen() {
           {job.is_saved ? 'Unsave' : 'Save'}
         </Button>
         <Button
-          variant={applied ? 'secondary' : 'success'}
+          variant={applied ? 'secondary' : 'primary'}
           onPress={confirmApply}
           disabled={applied || applying}
           style={styles.applyBtn}
@@ -258,7 +258,7 @@ export default function JobDetailsScreen() {
             <Text style={styles.modalSkill}>{resourcesSkill}</Text>
 
             {resourcesLoading ? (
-              <ActivityIndicator color={colors.info} style={styles.modalLoading} />
+              <ActivityIndicator color={colors.secondary} style={styles.modalLoading} />
             ) : resources ? (
               <ScrollView style={styles.modalScroll}>
                 {resources.online_courses ? (
@@ -327,21 +327,21 @@ function FactorBar({ label, percentage, last = false }: { label: string; percent
   )
 }
 
-const styles = StyleSheet.create({
+  const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: colors.background },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: spacing.md, padding: spacing.xl },
-  content: { padding: spacing.xl, paddingBottom: spacing.xxxl },
-  header: { marginBottom: spacing.lg },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: spacing.md, padding: spacing.lg },
+  content: { padding: spacing.lg, paddingBottom: spacing.xxxl },
+  header: { marginBottom: spacing.md },
   headerTop: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md },
   jobTitleWrap: { flex: 1 },
-  jobTitle: { color: colors.primary, fontSize: typography.heading, lineHeight: 32, fontWeight: typography.bold },
-  company: { color: colors.secondaryText, fontSize: typography.title, fontWeight: typography.semibold, marginTop: spacing.xs },
+  jobTitle: { color: colors.textPrimary, fontSize: typography.heading, lineHeight: 28, fontFamily: typography.family.medium },
+  company: { color: colors.textSecondary, fontSize: typography.title, fontFamily: typography.family.medium, marginTop: spacing.xs },
   badgeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.md },
   title: { color: colors.primary, fontSize: typography.title, fontWeight: typography.bold },
   infoCard: { marginBottom: spacing.lg },
   detailRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: spacing.xs, borderBottomWidth: 1, borderBottomColor: colors.border },
-  detailLabel: { color: colors.secondaryText, fontSize: typography.small, fontWeight: typography.semibold },
-  detailValue: { color: colors.primary, fontSize: typography.small, fontWeight: typography.semibold, textAlign: 'right', flex: 1, marginLeft: spacing.md },
+  detailLabel: { color: colors.textSecondary, fontSize: typography.small, fontFamily: typography.family.medium },
+  detailValue: { color: colors.textPrimary, fontSize: typography.small, fontFamily: typography.family.medium, textAlign: 'right', flex: 1, marginLeft: spacing.md },
   factorRow: { marginBottom: spacing.md },
   factorRowLast: { marginBottom: 0 },
   factorHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: spacing.xs },
@@ -349,24 +349,24 @@ const styles = StyleSheet.create({
   factorValue: { fontSize: typography.small, fontFamily: typography.family.bold },
   factorTrack: { height: 6, borderRadius: radii.pill, backgroundColor: colors.border, overflow: 'hidden' },
   factorFill: { height: '100%', borderRadius: radii.pill },
-  sectionTitle: { color: colors.primary, fontSize: typography.title, fontWeight: typography.bold, marginTop: spacing.lg, marginBottom: spacing.md },
-  description: { color: colors.secondaryText, fontSize: typography.body, lineHeight: 24 },
+  sectionTitle: { color: colors.textPrimary, fontSize: typography.title, fontFamily: typography.family.bold, marginTop: spacing.lg, marginBottom: spacing.md },
+  description: { color: colors.textSecondary, fontSize: typography.body, lineHeight: 22 },
   tagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  tag: { backgroundColor: colors.infoBackground, color: colors.info, borderRadius: radii.pill, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, fontSize: typography.small, fontWeight: typography.semibold },
+  tag: { backgroundColor: colors.infoBackground, color: colors.info, borderRadius: radii.pill, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, fontSize: typography.small, fontFamily: typography.family.medium },
   tagMatched: { backgroundColor: colors.successBackground, color: colors.success },
-  tagMissing: { backgroundColor: colors.dangerBackground, color: colors.danger, borderRadius: radii.pill, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, fontSize: typography.small, fontWeight: typography.semibold },
-  tagMuted: { backgroundColor: colors.background, color: colors.muted, borderRadius: radii.pill, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, fontSize: typography.small, fontWeight: typography.semibold },
-  missingHint: { marginTop: spacing.sm, color: colors.secondaryText, fontSize: typography.small, lineHeight: 18 },
+  tagMissing: { backgroundColor: colors.errorBackground, color: colors.error, borderRadius: radii.pill, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, fontSize: typography.small, fontFamily: typography.family.medium },
+  tagMuted: { backgroundColor: colors.background, color: colors.muted, borderRadius: radii.pill, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, fontSize: typography.small, fontFamily: typography.family.medium },
+  missingHint: { marginTop: spacing.sm, color: colors.textSecondary, fontSize: typography.small, lineHeight: 18 },
   footer: { flexDirection: 'row', padding: spacing.md, backgroundColor: colors.surface, borderTopWidth: 1, borderTopColor: colors.border, gap: spacing.md },
   saveBtn: { flex: 1, marginBottom: 0 },
   applyBtn: { flex: 2, marginBottom: 0 },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(15,23,42,0.5)', justifyContent: 'center', padding: spacing.xl },
   modalCard: { backgroundColor: colors.surface, borderRadius: radii.xl, padding: spacing.xl, maxHeight: '75%' },
-  modalTitle: { color: colors.primary, fontSize: typography.heading, fontWeight: typography.bold },
-  modalSkill: { color: colors.info, fontSize: typography.body, fontWeight: typography.semibold, marginTop: spacing.xs, marginBottom: spacing.md },
+  modalTitle: { color: colors.textPrimary, fontSize: typography.heading, fontFamily: typography.family.bold },
+  modalSkill: { color: colors.secondary, fontSize: typography.body, fontFamily: typography.family.medium, marginTop: spacing.xs, marginBottom: spacing.md },
   modalLoading: { marginVertical: spacing.xl },
   modalScroll: { maxHeight: 320 },
-  modalEmptyText: { color: colors.secondaryText, fontSize: typography.body, marginVertical: spacing.lg },
+  modalEmptyText: { color: colors.textSecondary, fontSize: typography.body, marginVertical: spacing.lg },
   resourceBlock: { marginBottom: spacing.md },
   resourceLabel: { color: colors.primary, fontSize: typography.small, fontWeight: typography.bold, marginBottom: spacing.xs },
   resourceText: { color: colors.secondaryText, fontSize: typography.small, lineHeight: 18 },

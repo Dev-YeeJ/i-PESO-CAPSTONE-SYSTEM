@@ -73,7 +73,7 @@ const styles = StyleSheet.create({
   label: {
     fontSize: typography.small,
     fontFamily: typography.family.bold,
-    color: colors.muted,
+    color: colors.textSecondary,
   },
   input: {
     borderWidth: 1,
@@ -83,16 +83,16 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md,
     fontSize: typography.body,
     fontFamily: typography.family.regular,
-    color: colors.primary,
+    color: colors.textPrimary,
     backgroundColor: colors.background,
   },
   inputFocused: {
-    borderColor: colors.info,
+    borderColor: colors.secondary,
     backgroundColor: colors.surface,
   },
   inputError: {
-    borderColor: colors.dangerBorder,
-    backgroundColor: colors.dangerBackground,
+    borderColor: colors.errorBorder,
+    backgroundColor: colors.errorBackground,
   },
   errorText: {
     color: colors.danger,

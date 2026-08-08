@@ -25,7 +25,7 @@ export function AuthShell({ title, subtitle, onBack, apiError, headerExtra, chil
       >
         {onBack ? (
           <TouchableOpacity onPress={onBack} style={styles.backBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-            <MaterialIcons name="arrow-back" size={18} color={colors.secondaryText} />
+            <MaterialIcons name="arrow-back" size={18} color={colors.textSecondary} />
             <Text style={styles.backText}>Back</Text>
           </TouchableOpacity>
         ) : null}
@@ -62,9 +62,9 @@ const styles = StyleSheet.create({
   },
   container: {
     flexGrow: 1,
-    paddingHorizontal: spacing.xxl,
-    paddingTop: spacing.xxxl + spacing.md,
-    paddingBottom: spacing.xxxl,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.xxl + spacing.md,
+    paddingBottom: spacing.xxl,
   },
   backBtn: {
     flexDirection: 'row',
@@ -80,17 +80,17 @@ const styles = StyleSheet.create({
   },
   logoArea: {
     alignItems: 'center',
-    marginBottom: spacing.lg,
+    marginBottom: spacing.md,
   },
   logo: {
-    width: 64,
-    height: 64,
-    borderRadius: radii.lg,
+    width: 56,
+    height: 56,
+    borderRadius: radii.md,
     marginBottom: spacing.sm,
   },
   wordmark: {
     fontSize: typography.title,
-    fontFamily: typography.family.display,
+    fontFamily: typography.family.medium,
     color: colors.primary,
   },
   logoSub: {
@@ -101,16 +101,16 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   title: {
-    fontSize: typography.hero,
-    fontFamily: typography.family.display,
+    fontSize: typography.heading,
+    fontFamily: typography.family.medium,
     color: colors.primary,
     textAlign: 'center',
-    marginBottom: spacing.xs,
+    marginBottom: spacing.sm,
   },
   subtitle: {
     fontSize: typography.body,
     fontFamily: typography.family.regular,
-    color: colors.secondaryText,
+    color: colors.textSecondary,
     textAlign: 'center',
     lineHeight: 20,
     marginBottom: spacing.xl,

@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { View, ActivityIndicator, StyleSheet } from 'react-native'
+import { colors } from '@/theme'
 import { router } from 'expo-router'
 import { useAuthStore } from '@/stores/authStore'
 
@@ -27,7 +28,7 @@ export default function IndexScreen() {
 
   return (
     <View style={styles.container}>
-      <ActivityIndicator size="large" color="#1d4ed8" />
+      <ActivityIndicator size="large" color={colors.secondary} />
     </View>
   )
 }

@@ -133,7 +133,7 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   forgotLink: {
     fontSize: typography.small,
-    color: colors.info,
+    color: colors.secondary,
     fontFamily: typography.family.bold,
   },
   submit: {
@@ -147,11 +147,11 @@ const styles = StyleSheet.create({
   },
   footerText: {
     fontSize: typography.body,
-    color: colors.secondaryText,
+    color: colors.textSecondary,
   },
   footerLink: {
     fontSize: typography.body,
-    color: colors.info,
+    color: colors.secondary,
     fontFamily: typography.family.bold,
   },
   adminNote: {
