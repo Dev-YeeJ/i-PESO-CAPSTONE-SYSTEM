@@ -2,6 +2,7 @@
 // Digitizes the NSRP Form 1 (National Skills Registration Program)
 // Department of Labor and Employment — Job Seeker Registration Form
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react'
+import { AlertCircle, ArrowLeft, ArrowRight, Check } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { authService } from '@/services/authService'
 import { useAuthStore } from '@/stores/authStore'
@@ -422,45 +423,66 @@ const STEPS = [
 
 // ── Reusable sub-components ───────────────────────────────────────────────
 
-const SectionHeader = ({ icon, title, subtitle }) => (
-  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', marginBottom: '20px', padding: '14px 16px', backgroundColor: '#f8fafc', borderRadius: '10px', border: '1px solid #cbd5e1' }}>
-    <span style={{ fontSize: '20px' }}>{icon}</span>
-    <div>
-      <p style={{ fontSize: '13px', fontWeight: '800', color: '#0f172a', margin: 0 }}>{title}</p>
-      {subtitle && <p style={{ fontSize: '11px', color: '#64748b', margin: '2px 0 0', lineHeight: '1.4' }}>{subtitle}</p>}
+const ROMAN_PREFIX = /^([IVX]+)\.\s*(.+)$/
+const ROMAN_NUMERALS = ['', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X']
+
+/**
+ * Section marker for the NSRP form.
+ *
+ * The Roman numeral is real information — it is the section number printed on
+ * DOLE NSRP Form 1 — so it is set as a numeral against a rule rather than
+ * buried in a grey box. Titles arriving as "I. PERSONAL INFORMATION" are split
+ * automatically, so call sites keep their DOLE-accurate strings.
+ */
+const SectionHeader = ({ title, subtitle, num }) => {
+  const match = ROMAN_PREFIX.exec(title ?? '')
+  const numeral = match ? match[1] : (num ? ROMAN_NUMERALS[num] : null)
+  const heading = match ? match[2] : title
+
+  return (
+    <div className="rj-section">
+      {numeral && <span className="rj-section-numeral" aria-hidden="true">{numeral}</span>}
+      <div className="min-w-0">
+        <h3 className="rj-section-title">{heading}</h3>
+        {subtitle && <p className="rj-section-sub">{subtitle}</p>}
+      </div>
     </div>
-  </div>
-)
+  )
+}
 
-const FormField = ({ label, required = true, error, children, help }) => (
-  <div style={{ marginBottom: '16px' }}>
-    <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#374151', marginBottom: '5px' }}>
-      {label}
-      {required && <span style={{ color: '#ef4444', marginLeft: '3px' }}>*</span>}
-    </label>
-    {children}
-    {help && !error && <p style={{ fontSize: '11px', color: '#94a3b8', marginTop: '4px' }}>{help}</p>}
-    {error && (
-      <p style={{ fontSize: '11px', color: '#ef4444', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-        ⚠ {error}
-      </p>
-    )}
-  </div>
-)
+/**
+ * Nearly every field on this form is mandatory, so a red asterisk on each one
+ * marks nothing. We mark the exceptions instead — the optional fields — which
+ * is the smaller, more useful mark.
+ */
+const FormField = ({ label, required = true, error, children, help }) => {
+  const helpId = help && !error ? `${label}-help` : undefined
+  const errorId = error ? `${label}-error` : undefined
 
-const inputStyle = (hasError) => ({
-  width: '100%', boxSizing: 'border-box',
-  padding: '10px 13px', fontSize: '13px',
-  color: '#0f172a', backgroundColor: '#ffffff',
-  border: `1px solid ${hasError ? '#fca5a5' : '#e2e8f0'}`,
-  borderRadius: '8px', outline: 'none',
-  transition: 'border-color 0.15s',
-})
+  return (
+    <div className="rj-field">
+      <label className="rj-field-label">
+        {label}
+        {!required && <span className="rj-optional">optional</span>}
+      </label>
+      {children}
+      {help && !error && <p className="rj-help" id={helpId}>{help}</p>}
+      {error && (
+        <p className="rj-error" id={errorId} role="alert">
+          <AlertCircle style={{ width: 13, height: 13, flex: '0 0 auto', marginTop: 1 }} aria-hidden="true" />
+          {error}
+        </p>
+      )}
+    </div>
+  )
+}
 
-const selectStyle = (hasError) => ({
-  ...inputStyle(hasError),
-  cursor: 'pointer',
-})
+// Silhouette, spacing and focus ring now live in registration-journey.css so
+// inputs, selects and date fields stay identical. Only the error state is set
+// inline, because inline styles must win over the shared rule.
+const inputStyle = (hasError) => (hasError ? { borderColor: '#B42318' } : undefined)
+
+const selectStyle = inputStyle
 
 const HeightInput = ({ value, error, onChange }) => {
   const totalInches = value === '' || value == null
@@ -521,52 +543,6 @@ const HeightInput = ({ value, error, onChange }) => {
   )
 }
 
-// ── Step Progress Indicator ───────────────────────────────────────────────
-
-const StepIndicator = ({ current, completed }) => (
-  <div style={{ display: 'flex', alignItems: 'center', marginBottom: '32px' }}>
-    {STEPS.map((step, idx) => {
-      const isActive    = step.num === current
-      const isCompleted = completed.includes(step.num)
-      const isLast      = idx === STEPS.length - 1
-
-      return (
-        <div key={step.num} style={{ display: 'flex', alignItems: 'center', flex: isLast ? 0 : 1 }}>
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}>
-            <div style={{
-              width: '40px', height: '40px', borderRadius: '50%',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: isCompleted ? '16px' : '14px',
-              fontWeight: '700',
-              backgroundColor: isCompleted ? '#dcfce7' : isActive ? '#0f172a' : '#f1f5f9',
-              color: isCompleted ? '#15803d' : isActive ? '#ffffff' : '#94a3b8',
-              border: isCompleted ? '2px solid #86efac' : isActive ? '2px solid #0f172a' : '2px solid #e2e8f0',
-              transition: 'all 0.3s',
-            }}>
-              {isCompleted ? '✓' : step.num}
-            </div>
-            <span style={{
-              fontSize: '10px', fontWeight: '600',
-              color: isActive ? '#0f172a' : isCompleted ? '#15803d' : '#94a3b8',
-              whiteSpace: 'nowrap', letterSpacing: '0.2px',
-            }}>
-              {step.label}
-            </span>
-          </div>
-
-          {!isLast && (
-            <div style={{
-              flex: 1, height: '2px', margin: '0 4px 20px',
-              backgroundColor: isCompleted ? '#86efac' : '#e2e8f0',
-              transition: 'background-color 0.3s',
-            }} />
-          )}
-        </div>
-      )
-    })}
-  </div>
-)
-
 // ── STEP 1: Personal Information ──────────────────────────────────────────
 
 // ── Step1 component — replaces the existing one ──────────────────────────
@@ -574,25 +550,28 @@ const Step1 = ({ form, errors, onChange, user, onGpsDetect, onAddressSelect, gps
   return (
     <div>
       <SectionHeader
-        icon="👤"
         title="I. PERSONAL INFORMATION"
         subtitle="As required by DOLE NSRP Form 1 — September 2020"
       />
 
-      {/* Pre-filled info banner */}
-      <div style={{ backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '12px', padding: '14px 16px', marginBottom: '20px' }}>
-        <p style={{ fontSize: '12px', fontWeight: '700', color: '#15803d', marginBottom: '8px' }}>✓ Pre-filled from your registration</p>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
+      {/* Carried over from account setup. Nothing is wrong and nothing needs
+          doing, so this is a receipt on a rule — not a green alert box. */}
+      <div className="rj-carried">
+        <p className="rj-carried-lead">
+          <Check style={{ width: 12, height: 12, display: 'inline', verticalAlign: -1, marginRight: 4 }} strokeWidth={3} aria-hidden="true" />
+          Carried over from your account
+        </p>
+        <dl className="rj-carried-items">
           {[
             { label: 'Email',  value: user?.email },
             { label: 'Mobile', value: user?.mobile_number },
           ].map((item) => (
-            <div key={item.label}>
-              <p style={{ fontSize: '10px', color: '#64748b', margin: 0 }}>{item.label}</p>
-              <p style={{ fontSize: '12px', fontWeight: '600', color: '#0f172a', margin: 0 }}>{item.value || 'N/A'}</p>
+            <div key={item.label} className="rj-carried-item">
+              <dt>{item.label}</dt>
+              <dd>{item.value || 'Not provided'}</dd>
             </div>
           ))}
-        </div>
+        </dl>
       </div>
 
       {/* Name row */}
@@ -683,7 +662,7 @@ const Step1 = ({ form, errors, onChange, user, onGpsDetect, onAddressSelect, gps
 
       {/* Disability Section */}
       <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '20px', marginBottom: '4px' }}>
-        <SectionHeader icon="♿" title="DISABILITY STATUS" subtitle="Check all that apply. Select 'No Disability' if none." />
+        <SectionHeader title="DISABILITY STATUS" subtitle="Check all that apply. Select 'No Disability' if none." />
       </div>
 
       <FormField label="Disability" error={errors.disabilities}>
@@ -754,7 +733,6 @@ const Step1 = ({ form, errors, onChange, user, onGpsDetect, onAddressSelect, gps
 const Step2 = ({ form, errors, onChange }) => (
   <div>
     <SectionHeader
-      icon="💼"
       title="II. EMPLOYMENT STATUS / TYPE"
       subtitle="Indicate your current work situation and OFW status"
     />
@@ -868,7 +846,7 @@ const Step2 = ({ form, errors, onChange }) => (
 
     {/* OFW Section */}
     <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '20px', marginTop: '8px' }}>
-      <SectionHeader icon="✈️" title="OFW STATUS" subtitle="Overseas Filipino Worker information" />
+      <SectionHeader title="OFW STATUS" subtitle="Overseas Filipino Worker information" />
     </div>
 
     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
@@ -941,7 +919,7 @@ const Step2 = ({ form, errors, onChange }) => (
 
     {/* 4Ps */}
     <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '20px', marginTop: '8px' }}>
-      <SectionHeader icon="🏛️" title="4Ps BENEFICIARY" subtitle="Pantawid Pamilyang Pilipino Program" />
+      <SectionHeader title="4Ps BENEFICIARY" subtitle="Pantawid Pamilyang Pilipino Program" />
     </div>
 
     <FormField label="Are you a 4Ps beneficiary?" error={errors.is_4ps_beneficiary}>
@@ -1089,7 +1067,7 @@ const Step3 = ({ form, errors, onChange }) => {
 
   return (
     <div>
-      <SectionHeader icon="🎯" title="III. JOB PREFERENCE" subtitle="Select specific standardized occupations and your preferred work locations" />
+      <SectionHeader title="III. JOB PREFERENCE" subtitle="Select specific standardized occupations and your preferred work locations" />
 
       <div style={{ marginBottom: '20px' }}>
         <p style={{ fontSize: '13px', fontWeight: '700', color: '#374151', marginBottom: '10px' }}>
@@ -1176,7 +1154,6 @@ const Step4 = ({ form, onChange, errors }) => {
   return (
     <div>
       <SectionHeader
-        icon="🌐"
         title="IV. LANGUAGE / DIALECT PROFICIENCY"
         subtitle="Check all applicable skills per language (NSRP Form 1, Section III)"
       />
@@ -2469,7 +2446,6 @@ export default function SeekerOnboarding() {
   const updateUser  = useAuthStore((s) => s.updateUser)  // ✅ fixed: was setUser
 
   const [step, setStep]         = useState(1)
-  const [completed, setCompleted] = useState([])
   const [isLoading, setIsLoading] = useState(false)
   const [apiError, setApiError]   = useState('')
   const [errors, setErrors]       = useState({})
@@ -3190,7 +3166,6 @@ export default function SeekerOnboarding() {
       // Update user in store after each step (keeps form_validation_state fresh)
       if (data?.user) updateUser(data.user)
 
-      setCompleted((c) => [...c.filter((n) => n !== step), step])
       setStep((s) => s + 1)
       setErrors({})
     } catch (err) {
@@ -3235,30 +3210,23 @@ export default function SeekerOnboarding() {
       subtitle="National Skills Registration Program Form 1 · Department of Labor and Employment"
       progress={progressPct}
       progressLabel={`Step ${step} of ${STEPS.length} · ${STEPS[step - 1].label}`}
-      maxWidth="max-w-4xl"
+      maxWidth="max-w-5xl"
       role="seeker"
       steps={seekerRegistrationSteps}
       currentStep={step + 2}
     >
       <div className="seeker-onboarding">
-        {/* Card */}
-        <div ref={cardRef} className="registration-step-card" style={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: '16px', boxShadow: '0 18px 45px rgba(15,23,42,0.12)', overflow: 'hidden' }}>
-
-          {/* Progress bar */}
-          <div style={{ height: '4px', backgroundColor: '#f1f5f9' }}>
-            <div style={{ height: '100%', backgroundColor: '#f59e0b', width: `${progressPct}%`, transition: 'width 0.4s ease' }} />
-          </div>
-
-          <div style={{ padding: '32px' }}>
-
-            {/* Step Indicator */}
-            <div className="lg:hidden"><StepIndicator current={step} completed={completed} /></div>
+        {/* The shell panel is the card, and the shell owns the progress meter.
+            This wrapper used to draw a second card and a second progress bar
+            on top of both. */}
+        <div ref={cardRef} className="registration-step-card">
+          <div>
 
             {/* API Error */}
             {apiError && (
-              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', backgroundColor: '#fef2f2', border: '1px solid #fecaca', borderRadius: '12px', padding: '12px 14px', marginBottom: '20px' }}>
-                <span style={{ fontSize: '14px' }}>⚠️</span>
-                <p style={{ fontSize: '13px', color: '#b91c1c', margin: 0 }}>{apiError}</p>
+              <div className="rj-alert-banner" role="alert">
+                <AlertCircle style={{ width: 15, height: 15, flex: '0 0 auto', marginTop: 1 }} aria-hidden="true" />
+                <p>{apiError}</p>
               </div>
             )}
 
@@ -3311,30 +3279,40 @@ export default function SeekerOnboarding() {
               />
             )}
 
-            {/* Navigation */}
-            <div style={{ display: 'flex', gap: '12px', marginTop: '32px', paddingTop: '24px', borderTop: '1px solid #f1f5f9' }}>
+            {/* Navigation. The label names what happens and stays consistent
+                with the "steps saved" language used in the rail. */}
+            <div className="rj-nav">
               <button
+                type="button"
                 onClick={handleBack}
                 disabled={step === 1 || isLoading}
-                style={{ flex: 1, padding: '13px', fontSize: '14px', fontWeight: '600', color: step === 1 ? '#cbd5e1' : '#374151', backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '12px', cursor: step === 1 ? 'not-allowed' : 'pointer', transition: 'all 0.15s' }}
+                className="rj-btn rj-btn-back"
               >
-                ← Back
+                <ArrowLeft style={{ width: 15, height: 15 }} aria-hidden="true" />
+                Back
               </button>
               <button
+                type="button"
                 onClick={handleNext}
                 disabled={saveDisabled}
                 aria-describedby={step === 5 && selectedSkillCount === 0 ? 'skills-save-requirement' : undefined}
-                style={{ flex: 2, padding: '13px', fontSize: '14px', fontWeight: '800', color: saveDisabled ? '#64748b' : '#0f172a', backgroundColor: saveDisabled ? '#e2e8f0' : '#f59e0b', border: `1px solid ${saveDisabled ? '#cbd5e1' : '#f59e0b'}`, borderRadius: '8px', cursor: saveDisabled ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', transition: 'all 0.15s' }}
+                className="rj-btn rj-btn-next"
               >
                 {isLoading ? (
                   <>
-                    <span style={{ display: 'inline-block', width: '14px', height: '14px', border: '2px solid rgba(255,255,255,0.3)', borderTop: '2px solid #fff', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
-                    Saving…
+                    <span className="rj-spinner" aria-hidden="true" />
+                    Saving
                   </>
                 ) : step === 7 ? (
-                  '✓ Complete Profile'
+                  <>
+                    <Check style={{ width: 15, height: 15 }} strokeWidth={3} aria-hidden="true" />
+                    Finish and submit
+                  </>
                 ) : (
-                  `Save & Continue →`
+                  <>
+                    Save and continue
+                    <ArrowRight style={{ width: 15, height: 15 }} aria-hidden="true" />
+                  </>
                 )}
               </button>
             </div>

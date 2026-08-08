@@ -5,6 +5,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { RouterProvider } from 'react-router-dom'
 import { router } from '@/router'
 import '@/assets/styles/main.css'
+import '@/assets/styles/registration-journey.css'
+import '@/assets/styles/chat-widget.css'
 import { IPESO_LOGO_URL } from '@/components/branding/brandAssets'
 
 const queryClient = new QueryClient({

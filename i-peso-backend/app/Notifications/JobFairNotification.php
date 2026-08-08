@@ -4,7 +4,7 @@ namespace App\Notifications;
 
 use App\Models\JobFair;
 use App\Models\JobFairEmployer;
-use App\Notifications\Channels\JobFairLogOnlySmsChannel;
+use App\Notifications\Channels\SmsChannel;
 use Illuminate\Bus\Queueable;
 use Illuminate\Notifications\Notification;
 
@@ -20,7 +20,7 @@ class JobFairNotification extends Notification
 
     public function via(object $notifiable): array
     {
-        return ['database', JobFairLogOnlySmsChannel::class];
+        return ['database', SmsChannel::class];
     }
 
     public function toArray(object $notifiable): array

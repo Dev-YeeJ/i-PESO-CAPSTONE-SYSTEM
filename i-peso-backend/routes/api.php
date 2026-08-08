@@ -14,6 +14,8 @@ use App\Http\Controllers\Api\Admin\AdminEstablishmentReportController;
 use App\Http\Controllers\Api\Admin\AdminGovernmentProgramApplicationController;
 use App\Http\Controllers\Api\Admin\AdminGovernmentProgramController;
 use App\Http\Controllers\Api\Admin\AdminPlacementReportController;
+use App\Http\Controllers\Api\Admin\AdminRoleController;
+use App\Http\Controllers\Api\Admin\AdminStaffController;
 use App\Http\Controllers\Api\Admin\LocationDataQualityController;
 use App\Http\Controllers\Api\Admin\NSRPPdfExportController;
 use App\Http\Controllers\Api\Admin\OccupationMappingController;
@@ -31,6 +33,7 @@ use App\Http\Controllers\Api\GoogleCalendarController;
 use App\Http\Controllers\Api\GoogleMapsController;
 use App\Http\Controllers\Api\JobFairController;
 use App\Http\Controllers\Api\OccupationController;
+use App\Http\Controllers\Api\PublicChatbotController;
 use App\Http\Controllers\Api\SeekerAiSuggestionController;
 use App\Http\Controllers\Api\SeekerAnalyticsController;
 use App\Http\Controllers\Api\SeekerApplicationController;
@@ -47,6 +50,11 @@ use Illuminate\Support\Facades\Route;
 
 Route::get('/occupations', [OccupationController::class, 'index'])->middleware('throttle:60,1');
 Route::get('/skills', [SkillCatalogController::class, 'index'])->middleware('throttle:60,1');
+
+// Public assistant for visitors without an account (landing / login / register).
+// The throttle is deliberately tight: every call spends Gemini free-tier quota,
+// and an unauthenticated route is the easiest place to burn a day's worth of it.
+Route::post('/chat/public', PublicChatbotController::class)->middleware('throttle:10,1');
 
 Route::prefix('auth')->group(function () {
     Route::post('/register', [AuthController::class, 'register'])->middleware('throttle:5,1');
@@ -184,120 +192,138 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Admin endpoints (protected by auth:sanctum + Administrator model check)
     Route::prefix('admin')->middleware('admin')->group(function () {
-        // Dashboard
+        // Dashboard — visible to every signed-in admin/staff account, no module gate
         Route::get('/dashboard/stats', [AdminDashboardController::class, 'stats']);
-        Route::get('/analytics/options', [AdminAnalyticsController::class, 'options']);
-        Route::get('/analytics', [AdminAnalyticsController::class, 'index']);
-        Route::get('/sms-notifications', [AdminSmsNotificationController::class, 'index']);
-        Route::post('/sms-notifications/{smsNotification}/retry', [AdminSmsNotificationController::class, 'retry']);
-        Route::get('/applications', [AdminApplicationController::class, 'index']);
 
-        // Seekers
-        Route::get('/seekers/summary', [AdminSeekerController::class, 'summary']);
-        Route::get('/seekers/export', [AdminSeekerController::class, 'export']);
-        Route::get('/seekers', [AdminSeekerController::class, 'index']);
-        Route::get('/seekers/{id}', [AdminSeekerController::class, 'show']);
-        Route::get('/job-seekers/{id}/export-nsrp-pdf', [NSRPPdfExportController::class, 'exportNSRPPdf']);
-        Route::get('/occupation-mappings/pending', [OccupationMappingController::class, 'pending']);
-        Route::post('/occupation-mappings/{preference}/map', [OccupationMappingController::class, 'map']);
-        Route::get('/occupation-title-candidates', [OccupationMappingController::class, 'candidates']);
-        Route::post('/occupation-title-candidates/{candidate}/map', [OccupationMappingController::class, 'mapCandidate']);
-        Route::post('/occupation-title-candidates/{candidate}/reject', [OccupationMappingController::class, 'rejectCandidate']);
+        Route::middleware('admin.permission:employment_hub')->group(function () {
+            Route::get('/applications', [AdminApplicationController::class, 'index']);
+        });
 
-        // Employers (Verification)
-        Route::get('/employers/pending', [EmployerVerificationController::class, 'getPendingEmployers']);
-        Route::post('/employers/bulk-approve', [EmployerVerificationController::class, 'bulkApproveEmployers']);
-        Route::get('/employers/{id}/review', [EmployerVerificationController::class, 'reviewEmployer']);
-        Route::post('/employers/{id}/approve', [EmployerVerificationController::class, 'approveEmployer']);
-        Route::post('/employers/{id}/reject', [EmployerVerificationController::class, 'rejectEmployer']);
-        Route::post('/employers/{id}/finalize', [EmployerVerificationController::class, 'finalizeVerification']);
-        Route::get('/documents/{document}/view', [EmployerVerificationController::class, 'viewDocument']);
-        Route::post('/documents/{document}/download', [EmployerVerificationController::class, 'downloadDocument']);
-        Route::post('/documents/{id}/review', [EmployerVerificationController::class, 'reviewDocument']);
-        Route::get('/employers/stats', [EmployerVerificationController::class, 'getStats']);
+        Route::middleware('admin.permission:system_reports')->group(function () {
+            Route::get('/analytics/options', [AdminAnalyticsController::class, 'options']);
+            Route::get('/analytics', [AdminAnalyticsController::class, 'index']);
+            Route::get('/sms-notifications', [AdminSmsNotificationController::class, 'index']);
+            Route::post('/sms-notifications/{smsNotification}/retry', [AdminSmsNotificationController::class, 'retry']);
+            Route::get('/location-data-quality/metrics', [LocationDataQualityController::class, 'metrics']);
+            Route::get('/location-data-quality/analytics', [LocationDataQualityController::class, 'analytics']);
+            Route::get('/activity-logs', [AdminActivityController::class, 'index']);
+        });
 
-        // Legacy employer endpoints
-        Route::get('/employers/summary', [AdminEmployerController::class, 'summary']);
-        Route::get('/employers/export', [AdminEmployerController::class, 'export']);
-        Route::get('/employers', [AdminEmployerController::class, 'index']);
-        Route::get('/employers/{id}', [AdminEmployerController::class, 'show']);
+        Route::middleware('admin.permission:constituent_crm')->group(function () {
+            // Seekers
+            Route::get('/seekers/summary', [AdminSeekerController::class, 'summary']);
+            Route::get('/seekers/export', [AdminSeekerController::class, 'export']);
+            Route::get('/seekers', [AdminSeekerController::class, 'index']);
+            Route::get('/seekers/{id}', [AdminSeekerController::class, 'show']);
+            Route::get('/job-seekers/{id}/export-nsrp-pdf', [NSRPPdfExportController::class, 'exportNSRPPdf']);
+            Route::get('/occupation-mappings/pending', [OccupationMappingController::class, 'pending']);
+            Route::post('/occupation-mappings/{preference}/map', [OccupationMappingController::class, 'map']);
+            Route::get('/occupation-title-candidates', [OccupationMappingController::class, 'candidates']);
+            Route::post('/occupation-title-candidates/{candidate}/map', [OccupationMappingController::class, 'mapCandidate']);
+            Route::post('/occupation-title-candidates/{candidate}/reject', [OccupationMappingController::class, 'rejectCandidate']);
 
-        // Government Programs / Upskill Hub
-        Route::get('/government-programs/analytics', [AdminGovernmentProgramController::class, 'analytics']);
-        Route::get('/government-programs', [AdminGovernmentProgramController::class, 'index']);
-        Route::post('/government-programs', [AdminGovernmentProgramController::class, 'store']);
-        Route::get('/government-programs/{governmentProgram}', [AdminGovernmentProgramController::class, 'show']);
-        Route::put('/government-programs/{governmentProgram}', [AdminGovernmentProgramController::class, 'update']);
-        Route::post('/government-programs/{governmentProgram}', [AdminGovernmentProgramController::class, 'update']);
-        Route::delete('/government-programs/{governmentProgram}', [AdminGovernmentProgramController::class, 'destroy']);
-        Route::get('/government-programs/{governmentProgram}/attachment', [AdminGovernmentProgramController::class, 'attachment']);
-        Route::get('/government-programs/{governmentProgram}/applications', [AdminGovernmentProgramApplicationController::class, 'index']);
-        Route::post('/government-program-applications/{programApplication}/status', [AdminGovernmentProgramApplicationController::class, 'updateStatus']);
-        Route::get('/government-program-applications/{programApplication}/documents/{document}', [AdminGovernmentProgramApplicationController::class, 'document']);
+            // Employers (Verification)
+            Route::get('/employers/pending', [EmployerVerificationController::class, 'getPendingEmployers']);
+            Route::post('/employers/bulk-approve', [EmployerVerificationController::class, 'bulkApproveEmployers']);
+            Route::get('/employers/{id}/review', [EmployerVerificationController::class, 'reviewEmployer']);
+            Route::post('/employers/{id}/approve', [EmployerVerificationController::class, 'approveEmployer']);
+            Route::post('/employers/{id}/reject', [EmployerVerificationController::class, 'rejectEmployer']);
+            Route::post('/employers/{id}/finalize', [EmployerVerificationController::class, 'finalizeVerification']);
+            Route::get('/documents/{document}/view', [EmployerVerificationController::class, 'viewDocument']);
+            Route::post('/documents/{document}/download', [EmployerVerificationController::class, 'downloadDocument']);
+            Route::post('/documents/{id}/review', [EmployerVerificationController::class, 'reviewDocument']);
+            Route::get('/employers/stats', [EmployerVerificationController::class, 'getStats']);
 
-        // Employer Reports (seeker-filed complaints about employers)
-        Route::get('/employer-reports', [AdminEmployerReportController::class, 'index']);
-        Route::get('/employer-reports/summary', [AdminEmployerReportController::class, 'summary']);
-        Route::get('/employer-reports/{employerReport}', [AdminEmployerReportController::class, 'show']);
-        Route::put('/employer-reports/{employerReport}', [AdminEmployerReportController::class, 'update']);
+            // Legacy employer endpoints
+            Route::get('/employers/summary', [AdminEmployerController::class, 'summary']);
+            Route::get('/employers/export', [AdminEmployerController::class, 'export']);
+            Route::get('/employers', [AdminEmployerController::class, 'index']);
+            Route::get('/employers/{id}', [AdminEmployerController::class, 'show']);
 
-        // Backward-compatible aliases for the original Government Programs API.
-        Route::get('/programs', [AdminGovernmentProgramController::class, 'index']);
-        Route::post('/programs', [AdminGovernmentProgramController::class, 'store']);
-        Route::get('/programs/{governmentProgram}', [AdminGovernmentProgramController::class, 'show']);
-        Route::put('/programs/{governmentProgram}', [AdminGovernmentProgramController::class, 'update']);
-        Route::delete('/programs/{governmentProgram}', [AdminGovernmentProgramController::class, 'destroy']);
-        Route::get('/programs/{governmentProgram}/applicants', [AdminGovernmentProgramApplicationController::class, 'index']);
-        Route::post('/programs/{governmentProgram}/applicants/{programApplication}/review', [AdminGovernmentProgramApplicationController::class, 'legacyReview']);
-        Route::post('/programs/{governmentProgram}/applicants/bulk-review', [AdminGovernmentProgramApplicationController::class, 'legacyBulkReview']);
+            // Employer Reports (seeker-filed complaints about employers)
+            Route::get('/employer-reports', [AdminEmployerReportController::class, 'index']);
+            Route::get('/employer-reports/summary', [AdminEmployerReportController::class, 'summary']);
+            Route::get('/employer-reports/{employerReport}', [AdminEmployerReportController::class, 'show']);
+            Route::put('/employer-reports/{employerReport}', [AdminEmployerReportController::class, 'update']);
+        });
 
-        // Citizen Charter
-        Route::get('/citizen-charter', [AdminCitizenCharterController::class, 'index']);
-        Route::post('/citizen-charter', [AdminCitizenCharterController::class, 'store']);
-        Route::get('/citizen-charter/{citizenCharter}', [AdminCitizenCharterController::class, 'show']);
-        Route::put('/citizen-charter/{citizenCharter}', [AdminCitizenCharterController::class, 'update']);
-        Route::delete('/citizen-charter/{citizenCharter}', [AdminCitizenCharterController::class, 'destroy']);
+        Route::middleware('admin.permission:government_dole')->group(function () {
+            // Government Programs / Upskill Hub
+            Route::get('/government-programs/analytics', [AdminGovernmentProgramController::class, 'analytics']);
+            Route::get('/government-programs', [AdminGovernmentProgramController::class, 'index']);
+            Route::post('/government-programs', [AdminGovernmentProgramController::class, 'store']);
+            Route::get('/government-programs/{governmentProgram}', [AdminGovernmentProgramController::class, 'show']);
+            Route::put('/government-programs/{governmentProgram}', [AdminGovernmentProgramController::class, 'update']);
+            Route::post('/government-programs/{governmentProgram}', [AdminGovernmentProgramController::class, 'update']);
+            Route::delete('/government-programs/{governmentProgram}', [AdminGovernmentProgramController::class, 'destroy']);
+            Route::get('/government-programs/{governmentProgram}/attachment', [AdminGovernmentProgramController::class, 'attachment']);
+            Route::get('/government-programs/{governmentProgram}/applications', [AdminGovernmentProgramApplicationController::class, 'index']);
+            Route::post('/government-program-applications/{programApplication}/status', [AdminGovernmentProgramApplicationController::class, 'updateStatus']);
+            Route::get('/government-program-applications/{programApplication}/documents/{document}', [AdminGovernmentProgramApplicationController::class, 'document']);
 
-        // Job Fairs
-        Route::get('/job-fairs', [AdminJobFairController::class, 'index']);
-        Route::post('/job-fairs', [AdminJobFairController::class, 'store']);
-        Route::get('/job-fairs/{id}', [AdminJobFairController::class, 'show']);
-        Route::put('/job-fairs/{id}', [AdminJobFairController::class, 'update']);
-        Route::delete('/job-fairs/{id}', [AdminJobFairController::class, 'destroy']);
-        Route::post('/job-fairs/{jobFair}/publish', [AdminJobFairController::class, 'publish']);
-        Route::post('/job-fairs/{jobFair}/invite', [AdminJobFairController::class, 'invite']);
-        Route::patch('/job-fairs/{jobFair}/participants/{participation}', [AdminJobFairController::class, 'participationStatus']);
-        Route::patch('/job-fair-requirements/{submission}/review', [AdminJobFairController::class, 'reviewRequirement']);
-        Route::get('/job-fair-requirements/{submission}/view', [AdminJobFairController::class, 'viewRequirement']);
-        Route::post('/job-fairs/{jobFair}/proxy-results', [AdminJobFairController::class, 'proxyResults']);
-        Route::post('/job-fairs/{jobFair}/proxy-confirmation-slip', [AdminJobFairController::class, 'proxyConfirmation']);
-        Route::get('/job-fair-results/{resultReport}/roi-form-3', [AdminJobFairController::class, 'downloadResult']);
-        Route::get('/job-fairs/{jobFair}/export-sprs', [AdminJobFairController::class, 'exportSprs']);
-        Route::get('/job-fairs/{jobFair}/invitation-letter', [AdminJobFairController::class, 'invitation']);
+            // Backward-compatible aliases for the original Government Programs API.
+            Route::get('/programs', [AdminGovernmentProgramController::class, 'index']);
+            Route::post('/programs', [AdminGovernmentProgramController::class, 'store']);
+            Route::get('/programs/{governmentProgram}', [AdminGovernmentProgramController::class, 'show']);
+            Route::put('/programs/{governmentProgram}', [AdminGovernmentProgramController::class, 'update']);
+            Route::delete('/programs/{governmentProgram}', [AdminGovernmentProgramController::class, 'destroy']);
+            Route::get('/programs/{governmentProgram}/applicants', [AdminGovernmentProgramApplicationController::class, 'index']);
+            Route::post('/programs/{governmentProgram}/applicants/{programApplication}/review', [AdminGovernmentProgramApplicationController::class, 'legacyReview']);
+            Route::post('/programs/{governmentProgram}/applicants/bulk-review', [AdminGovernmentProgramApplicationController::class, 'legacyBulkReview']);
 
-        // Reports
-        Route::get('/reports/establishment-report/preview', [AdminEstablishmentReportController::class, 'preview']);
-        Route::post('/reports/establishment-report/export', [AdminEstablishmentReportController::class, 'export']);
+            // Citizen Charter
+            Route::get('/citizen-charter', [AdminCitizenCharterController::class, 'index']);
+            Route::post('/citizen-charter', [AdminCitizenCharterController::class, 'store']);
+            Route::get('/citizen-charter/{citizenCharter}', [AdminCitizenCharterController::class, 'show']);
+            Route::put('/citizen-charter/{citizenCharter}', [AdminCitizenCharterController::class, 'update']);
+            Route::delete('/citizen-charter/{citizenCharter}', [AdminCitizenCharterController::class, 'destroy']);
 
-        // Placement Report review + approval (employer-submitted spreadsheet imports)
-        Route::get('/placement-reports', [AdminPlacementReportController::class, 'index']);
-        Route::get('/placement-reports/{placementReport}', [AdminPlacementReportController::class, 'show']);
-        Route::get('/placement-reports/{placementReport}/export', [AdminPlacementReportController::class, 'exportCsv']);
-        Route::post('/placement-reports/{placementReport}/approve', [AdminPlacementReportController::class, 'approve']);
-        Route::post('/placement-reports/{placementReport}/reject', [AdminPlacementReportController::class, 'reject']);
+            // Job Fairs
+            Route::get('/job-fairs', [AdminJobFairController::class, 'index']);
+            Route::post('/job-fairs', [AdminJobFairController::class, 'store']);
+            Route::get('/job-fairs/{id}', [AdminJobFairController::class, 'show']);
+            Route::put('/job-fairs/{id}', [AdminJobFairController::class, 'update']);
+            Route::delete('/job-fairs/{id}', [AdminJobFairController::class, 'destroy']);
+            Route::post('/job-fairs/{jobFair}/publish', [AdminJobFairController::class, 'publish']);
+            Route::post('/job-fairs/{jobFair}/invite', [AdminJobFairController::class, 'invite']);
+            Route::patch('/job-fairs/{jobFair}/participants/{participation}', [AdminJobFairController::class, 'participationStatus']);
+            Route::patch('/job-fair-requirements/{submission}/review', [AdminJobFairController::class, 'reviewRequirement']);
+            Route::get('/job-fair-requirements/{submission}/view', [AdminJobFairController::class, 'viewRequirement']);
+            Route::post('/job-fairs/{jobFair}/proxy-results', [AdminJobFairController::class, 'proxyResults']);
+            Route::post('/job-fairs/{jobFair}/proxy-confirmation-slip', [AdminJobFairController::class, 'proxyConfirmation']);
+            Route::get('/job-fair-results/{resultReport}/roi-form-3', [AdminJobFairController::class, 'downloadResult']);
+            Route::get('/job-fairs/{jobFair}/export-sprs', [AdminJobFairController::class, 'exportSprs']);
+            Route::get('/job-fairs/{jobFair}/invitation-letter', [AdminJobFairController::class, 'invitation']);
 
-        Route::get('/reports', [AdminReportController::class, 'index']);
-        Route::post('/reports/generate', [AdminReportController::class, 'generate']);
-        Route::post('/reports/generate-sprs', [AdminReportController::class, 'generateSPRS']);
-        Route::get('/reports/{id}/export-sprs-pdf', [AdminReportController::class, 'exportSprsPdf']);
-        Route::get('/reports/{id}', [AdminReportController::class, 'show']);
-        Route::delete('/reports/{id}', [AdminReportController::class, 'destroy']);
+            // Reports
+            Route::get('/reports/establishment-report/preview', [AdminEstablishmentReportController::class, 'preview']);
+            Route::post('/reports/establishment-report/export', [AdminEstablishmentReportController::class, 'export']);
 
-        // Location Data Quality
-        Route::get('/location-data-quality/metrics', [LocationDataQualityController::class, 'metrics']);
-        Route::get('/location-data-quality/analytics', [LocationDataQualityController::class, 'analytics']);
+            // Placement Report review + approval (employer-submitted spreadsheet imports)
+            Route::get('/placement-reports', [AdminPlacementReportController::class, 'index']);
+            Route::get('/placement-reports/{placementReport}', [AdminPlacementReportController::class, 'show']);
+            Route::get('/placement-reports/{placementReport}/export', [AdminPlacementReportController::class, 'exportCsv']);
+            Route::post('/placement-reports/{placementReport}/approve', [AdminPlacementReportController::class, 'approve']);
+            Route::post('/placement-reports/{placementReport}/reject', [AdminPlacementReportController::class, 'reject']);
 
-        // Activity Logs
-        Route::get('/activity-logs', [AdminActivityController::class, 'index']);
+            Route::get('/reports', [AdminReportController::class, 'index']);
+            Route::post('/reports/generate', [AdminReportController::class, 'generate']);
+            Route::post('/reports/generate-sprs', [AdminReportController::class, 'generateSPRS']);
+            Route::get('/reports/{id}/export-sprs-pdf', [AdminReportController::class, 'exportSprsPdf']);
+            Route::get('/reports/{id}', [AdminReportController::class, 'show']);
+            Route::delete('/reports/{id}', [AdminReportController::class, 'destroy']);
+        });
+
+        Route::middleware('admin.permission:configuration')->group(function () {
+            Route::get('/staff', [AdminStaffController::class, 'index']);
+            Route::post('/staff', [AdminStaffController::class, 'store']);
+            Route::put('/staff/{staffMember}', [AdminStaffController::class, 'update']);
+            Route::delete('/staff/{staffMember}', [AdminStaffController::class, 'destroy']);
+
+            Route::get('/roles', [AdminRoleController::class, 'index']);
+            Route::post('/roles', [AdminRoleController::class, 'store']);
+            Route::put('/roles/{role}', [AdminRoleController::class, 'update']);
+            Route::delete('/roles/{role}', [AdminRoleController::class, 'destroy']);
+        });
     });
 });

@@ -1,4 +1,5 @@
 import { createElement, useEffect, useMemo, useState } from 'react'
+import LazyImage from '@/components/common/LazyImage'
 import {
   ArrowRight,
   Award,
@@ -364,11 +365,17 @@ export default function SeekerProfile() {
             <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
               <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
                 <div className="relative -mt-10 shrink-0 sm:-mt-12">
-                  <div className="flex h-32 w-32 items-center justify-center overflow-hidden rounded-3xl border-4 border-white bg-blue-100 text-3xl font-black text-blue-800 shadow-xl">
-                    {photoUrl
-                      ? <img src={photoUrl} alt={fullName(profile)} className="h-full w-full object-cover" />
-                      : initials(profile)}
-                  </div>
+                  <LazyImage
+                    src={photoUrl}
+                    alt={fullName(profile)}
+                    wrapperClassName="h-32 w-32 rounded-3xl border-4 border-white shadow-xl"
+                    className="h-full w-full object-cover"
+                    fallback={
+                      <div className="flex h-32 w-32 items-center justify-center rounded-3xl border-4 border-white bg-blue-100 text-3xl font-black text-blue-800 shadow-xl">
+                        {initials(profile)}
+                      </div>
+                    }
+                  />
                   <button
                     type="button"
                     onClick={() => setPhotoUploadOpen(true)}

@@ -47,6 +47,20 @@ return [
         'timeout' => env('GOOGLE_VERTEX_AI_TIMEOUT', 20),
     ],
 
+    /*
+     | Gemini API — powers the public i-PESO assistant.
+     |
+     | `model` is intentionally an env value: Google retires model IDs on its
+     | own schedule (gemini-2.5-flash is already blocked for new API keys), so
+     | swapping models must never require a code change or redeploy.
+     */
+    'gemini' => [
+        'key' => env('GEMINI_API_KEY'),
+        'model' => env('GEMINI_MODEL', 'gemini-3.1-flash-lite'),
+        'base_url' => env('GEMINI_BASE_URL', 'https://generativelanguage.googleapis.com/v1beta'),
+        'timeout' => (int) env('GEMINI_TIMEOUT', 20),
+    ],
+
     'google' => [
         'client_id' => env('GOOGLE_CLIENT_ID'),
         'client_secret' => env('GOOGLE_CLIENT_SECRET'),

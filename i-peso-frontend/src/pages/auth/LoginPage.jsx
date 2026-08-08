@@ -9,8 +9,11 @@ import { useAuthStore } from '@/stores/authStore'
 const roleRoutes = {
   seeker: '/seeker/dashboard',
   employer: '/employer/dashboard',
-  administrator: '/admin/dashboard',
 }
+
+// Generic on purpose — this screen and the /administrator screen must never
+// reveal to each other which account type an email belongs to.
+const CREDENTIALS_ERROR = 'These credentials do not match our records.'
 
 const validate = (email, password) => {
   const errors = {}
@@ -48,6 +51,12 @@ export default function LoginPage() {
     setErrors({})
     try {
       const data = await authService.login(email, password)
+
+      if (data.user.role === 'administrator') {
+        setApiError(CREDENTIALS_ERROR)
+        return
+      }
+
       useAuthStore.setState({
         user: data.user,
         token: data.token,
@@ -75,8 +84,8 @@ export default function LoginPage() {
     <AuthShell
       title="Welcome back"
       subtitle="Sign in to continue to your i-PESO employment workspace."
-      sideTitle="Continue your employment journey."
-      sideText="Your account keeps profile information, employer accreditation, notifications, and PESO services connected."
+      sideTitle="Pick up where you left off."
+      sideText="One account for your profile, activity, and PESO notifications."
     >
       {apiError && <AlertBox variant="danger" title="Sign-in failed" className="mb-5">{apiError}</AlertBox>}
       <Card>

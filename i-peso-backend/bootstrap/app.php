@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Middleware\EnsureAdministrator;
+use App\Http\Middleware\EnsureAdminPermission;
 use App\Http\Middleware\EnsureVerifiedEmployer;
 use App\Http\Middleware\SecurityHeaders;
 use Illuminate\Foundation\Application;
@@ -19,6 +20,7 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->alias([
             'admin' => EnsureAdministrator::class,
+            'admin.permission' => EnsureAdminPermission::class,
             'verified.employer' => EnsureVerifiedEmployer::class,
         ]);
     })

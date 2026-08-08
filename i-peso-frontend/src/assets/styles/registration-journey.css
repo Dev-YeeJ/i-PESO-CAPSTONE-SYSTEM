@@ -1,0 +1,768 @@
+/* ============================================================================
+   i-PESO — Registration journey design layer
+   Direction: "Official, but on your side."
+
+   The DOLE NSRP form is a real government document with numbered sections and
+   a mandated field order. That structure is not noise to hide — it is what
+   makes the record trustworthy. So we keep the Roman numerals and the section
+   language, and spend the design budget on making the demands legible: plain
+   labels, one honest progress signal, and a rail that helps instead of sells.
+
+   Serves both the seeker (9 step) and employer (5 step) journeys.
+   ========================================================================== */
+
+.registration-journey-shell {
+  /* ── Ink: deep civic navy. Darker and cooler than the old #17378f end stop,
+        so white type sits at 14:1 rather than 6:1. ── */
+  --rj-ink:        #0B1E3D;
+  --rj-ink-deep:   #06152C;
+  --rj-ink-raise:  rgba(255, 255, 255, 0.045);
+  --rj-ink-line:   rgba(255, 255, 255, 0.10);
+  --rj-on-ink:     #FFFFFF;                      /* 18.9:1 on --rj-ink-deep */
+  --rj-on-ink-2:   rgba(198, 214, 239, 0.72);    /*  6.9:1 */
+  --rj-on-ink-3:   rgba(168, 189, 222, 0.68);    /*  5.0:1 — carries the step
+                                                        labels, so it has to
+                                                        clear 4.5:1 blended */
+
+  /* ── Seal gold. Two values, deliberately: the bright one is for FILLS on
+        navy, the ink one is for TEXT on paper. The old #F59E0B scored 2.1:1
+        on white and failed WCAG everywhere it was used as a label. ── */
+  --rj-seal:       #F2A93B;                      /*  fills on navy only */
+  --rj-seal-ink:   #A0611A;                      /*  5.0:1 on white */
+  --rj-seal-wash:  #FDF6E9;
+
+  /* ── Paper: the form surface. ── */
+  --rj-paper:      #FFFFFF;
+  --rj-paper-sunk: #FAFAF8;
+  --rj-rule:       #E5E2DB;
+  --rj-rule-firm:  #CFCBC2;
+  --rj-text:       #10233F;                      /* 14.9:1 on paper */
+  --rj-text-2:     #55627A;                      /*  6.2:1 */
+  --rj-text-3:     #6B7484;                      /*  4.7:1 — hint and help
+                                                        text is content, so it
+                                                        does not get to sit at
+                                                        the old 3.1:1 grey */
+
+  --rj-verified:    #186B4E;
+  --rj-verified-bg: #F2F8F4;
+  --rj-alert:       #B42318;
+  --rj-alert-bg:    #FEF4F2;
+
+  --rj-display: 'Bricolage Grotesque', 'DM Sans', system-ui, sans-serif;
+  --rj-body:    'Public Sans', 'DM Sans', system-ui, sans-serif;
+  --rj-mono:    'DM Mono', ui-monospace, 'SFMono-Regular', monospace;
+
+  --rj-rail: 19rem;
+
+  position: relative;
+  overflow-x: hidden;
+  background: var(--rj-ink);
+  color: var(--rj-on-ink);
+  font-family: var(--rj-body);
+}
+
+/* One wash, not three gradient stops and a grid overlay competing with the
+   form. A second gold radial was here and did nothing you could see. */
+.registration-journey-grid {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(60rem 40rem at 8% -10%, rgba(59, 108, 190, 0.30), transparent 70%);
+}
+
+/* ── Rail ────────────────────────────────────────────────────────────────
+   Narrow. Its whole job is orientation and reassurance, so it gets exactly
+   the width those two things need and not a pixel more. The rest goes to
+   the form.                                                                */
+
+.registration-journey-aside {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: none;
+  height: 100vh;
+  flex-direction: column;
+  gap: 1.5rem;
+  border-right: 1px solid var(--rj-ink-line);
+  padding: 2rem 1.75rem;
+  background: var(--rj-ink-deep);
+}
+
+.registration-rail-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.16) transparent;
+}
+
+.registration-rail-scroll::-webkit-scrollbar { width: 4px; }
+.registration-rail-scroll::-webkit-scrollbar-thumb {
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.registration-rail-label {
+  margin-bottom: 0.85rem;
+  color: var(--rj-on-ink-3);
+  font-family: var(--rj-mono);
+  font-size: 0.66rem;
+  font-weight: 500;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+
+/* ── Step list ── */
+
+.registration-step-list {
+  display: grid;
+  gap: 0.1rem;
+}
+
+.registration-step {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  border-radius: 0.55rem;
+  padding: 0.5rem 0.6rem;
+  color: var(--rj-on-ink-3);
+  font-size: 0.8rem;
+  font-weight: 500;
+  transition: color 0.2s ease, background 0.2s ease;
+}
+
+.registration-step-number {
+  display: flex;
+  width: 1.5rem;
+  height: 1.5rem;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--rj-ink-line);
+  border-radius: 9999px;
+  background: var(--rj-ink-raise);
+  font-family: var(--rj-mono);
+  font-size: 0.66rem;
+  font-weight: 500;
+}
+
+.registration-step.is-complete { color: var(--rj-on-ink-2); }
+
+.registration-step.is-complete .registration-step-number {
+  border-color: transparent;
+  background: rgba(52, 211, 153, 0.17);
+  color: #6EE7B7;
+}
+
+/* The active step is the only lit thing in the rail. */
+.registration-step.is-active {
+  background: var(--rj-ink-raise);
+  color: var(--rj-on-ink);
+  font-weight: 700;
+}
+
+.registration-step.is-active .registration-step-number {
+  border-color: transparent;
+  background: var(--rj-seal);
+  color: var(--rj-ink-deep);
+  font-weight: 500;
+}
+
+/* ── "Have this ready" — the signature.
+      A 9 step government form fails at the moment someone realises they need
+      a document they do not have in front of them. This says so up front,
+      per step, and promises the work is saved if they leave to find it.   */
+
+.registration-ready {
+  border-top: 1px solid var(--rj-ink-line);
+  padding-top: 1.25rem;
+}
+
+.registration-ready-list {
+  display: grid;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.registration-ready-list li {
+  display: flex;
+  gap: 0.55rem;
+  color: var(--rj-on-ink-2);
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.registration-ready-list li::before {
+  content: '';
+  width: 0.3rem;
+  height: 0.3rem;
+  flex: 0 0 auto;
+  margin-top: 0.5rem;
+  border-radius: 9999px;
+  background: var(--rj-seal);
+}
+
+.registration-ready-note {
+  margin-top: 0.9rem;
+  color: var(--rj-on-ink-3);
+  font-size: 0.72rem;
+  line-height: 1.5;
+}
+
+.registration-rail-foot {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  border-top: 1px solid var(--rj-ink-line);
+  padding-top: 1.1rem;
+  color: var(--rj-on-ink-3);
+  font-size: 0.7rem;
+}
+
+/* ── Main column ─────────────────────────────────────────────────────── */
+
+.registration-journey-main {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  min-height: 100vh;
+  justify-content: center;
+  padding: 1.25rem 1rem 2rem;
+}
+
+.registration-home-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--rj-on-ink-3);
+  font-size: 0.78rem;
+  font-weight: 600;
+  transition: color 0.2s ease;
+}
+
+.registration-home-link:hover { color: var(--rj-on-ink); }
+
+.registration-main-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.9rem;
+}
+
+.registration-saved {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--rj-on-ink-3);
+  font-size: 0.72rem;
+  font-weight: 500;
+}
+
+/* ── Mobile progress ── */
+
+.registration-mobile-progress {
+  margin-bottom: 0.9rem;
+  border: 1px solid var(--rj-ink-line);
+  border-radius: 0.9rem;
+  padding: 0.85rem 0.9rem;
+  background: var(--rj-ink-deep);
+}
+
+.registration-mobile-progress .rj-track {
+  display: flex;
+  gap: 0.25rem;
+  margin-top: 0.7rem;
+}
+
+.registration-mobile-progress .rj-track span {
+  height: 0.2rem;
+  flex: 1;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.registration-mobile-progress .rj-track span.is-done { background: var(--rj-seal); }
+
+/* ── The form panel ──────────────────────────────────────────────────── */
+
+.registration-form-panel {
+  overflow: hidden;
+  border-radius: 1rem;
+  color: var(--rj-text);
+  background: var(--rj-paper);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.30);
+}
+
+.registration-form-heading {
+  border-bottom: 1px solid var(--rj-rule);
+  padding: 1.5rem 1.5rem 1.25rem;
+}
+
+/* One progress signal, not four: a hairline meter with a plain-language
+   caption. The stepper in the rail says which step; this says how far. */
+.registration-meter {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1.1rem;
+}
+
+.registration-meter-track {
+  position: relative;
+  height: 0.2rem;
+  flex: 1;
+  overflow: hidden;
+  border-radius: 9999px;
+  background: var(--rj-rule);
+}
+
+.registration-meter-fill {
+  height: 100%;
+  border-radius: 9999px;
+  background: var(--rj-seal-ink);
+  transition: width 0.45s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.registration-meter-caption {
+  flex: 0 0 auto;
+  color: var(--rj-text-2);
+  font-family: var(--rj-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.registration-form-heading h2 {
+  font-family: var(--rj-display);
+  font-size: 1.65rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+  color: var(--rj-text);
+}
+
+.registration-form-heading .rj-sub {
+  margin-top: 0.4rem;
+  color: var(--rj-text-2);
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+
+/* The document reference reads as a citation, not a link. It was blue and
+   bold before, which promised navigation it never delivered. */
+.registration-form-heading .rj-ref {
+  margin-top: 0.65rem;
+  color: var(--rj-text-3);
+  font-family: var(--rj-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.03em;
+}
+
+.registration-form-content {
+  padding: 1.4rem 1.5rem 1.6rem;
+}
+
+/* Neutralise the legacy nested card chrome — the panel is the card now. */
+.registration-form-content > section,
+.registration-form-content .registration-step-card {
+  overflow: visible;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.registration-form-content .registration-step-card > div { padding: 0; }
+
+/* ── Section marker ──────────────────────────────────────────────────────
+   Replaces the grey banner box. The Roman numeral is real information — it
+   is the section number on DOLE NSRP Form 1 — so it is set as a numeral,
+   large and quiet, against a rule. Costs no vertical box.                 */
+
+.rj-section {
+  display: flex;
+  align-items: baseline;
+  gap: 0.85rem;
+  margin: 0 0 1.15rem;
+  border-bottom: 1px solid var(--rj-rule);
+  padding-bottom: 0.7rem;
+}
+
+/* Scale is the contrast here: a large quiet numeral against a small firm
+   label. The numeral is set in mono because it is a document reference. */
+.rj-section-numeral {
+  flex: 0 0 auto;
+  min-width: 1.6rem;
+  color: var(--rj-seal-ink);
+  font-family: var(--rj-mono);
+  font-size: 1.3rem;
+  font-weight: 500;
+  line-height: 1;
+}
+
+/* Caps are the DOLE form's own convention for section titles, so we keep
+   them — but sized and tracked as a label rather than shouted as a heading. */
+.rj-section-title {
+  font-family: var(--rj-body);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--rj-text);
+}
+
+.rj-section-sub {
+  margin-top: 0.15rem;
+  color: var(--rj-text-3);
+  font-size: 0.74rem;
+  line-height: 1.45;
+}
+
+.rj-section + .rj-section { margin-top: 1.75rem; }
+
+/* ── Carried-over values ──
+   Was a green alert box. Nothing is wrong and nothing needs doing, so it
+   should not shout — it is a receipt, set on a rule.                      */
+
+.rj-carried {
+  margin-bottom: 1.35rem;
+  border-left: 2px solid var(--rj-verified);
+  padding: 0.1rem 0 0.1rem 0.85rem;
+}
+
+.rj-carried-lead {
+  margin-bottom: 0.3rem;
+  color: var(--rj-verified);
+  font-size: 0.74rem;
+  font-weight: 600;
+}
+
+.rj-carried-items {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.3rem 1.75rem;
+  margin: 0;
+}
+
+.rj-carried-item {
+  display: flex;
+  align-items: baseline;
+  gap: 0.45rem;
+  font-size: 0.82rem;
+}
+
+.rj-carried-item dt {
+  color: var(--rj-text-3);
+  font-size: 0.72rem;
+}
+
+.rj-carried-item dd {
+  margin: 0;
+  color: var(--rj-text);
+  font-weight: 600;
+}
+
+/* ── Fields ──────────────────────────────────────────────────────────────
+   Almost every field on this form is mandatory, so a red asterisk on each
+   one marks nothing. We mark the exceptions instead.                      */
+
+.rj-field { margin-bottom: 1rem; }
+
+.rj-field-label {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  margin-bottom: 0.35rem;
+  color: var(--rj-text);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.rj-optional {
+  color: var(--rj-text-3);
+  font-size: 0.72rem;
+  font-weight: 400;
+}
+
+.rj-help {
+  margin-top: 0.3rem;
+  color: var(--rj-text-3);
+  font-size: 0.72rem;
+  line-height: 1.45;
+}
+
+.rj-error {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.35rem;
+  margin-top: 0.3rem;
+  color: var(--rj-alert);
+  font-size: 0.72rem;
+  line-height: 1.45;
+}
+
+/* Inputs, selects and date fields share one silhouette. Native select and
+   date controls were the loudest inconsistency in the old form.
+   `:not([class])` is the dividing line: bare fields get the form's chrome,
+   while fields belonging to a component that styles itself (the comboboxes,
+   the address and education editors) are left alone. */
+.registration-form-content input:not([class]):not([type='checkbox']):not([type='radio']),
+.registration-form-content select:not([class]),
+.registration-form-content textarea:not([class]) {
+  width: 100%;
+  min-height: 2.75rem;
+  border: 1px solid var(--rj-rule-firm);
+  border-radius: 0.5rem;
+  padding: 0.55rem 0.75rem;
+  color: var(--rj-text);
+  background-color: var(--rj-paper);
+  font-family: var(--rj-body);
+  font-size: 0.875rem;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.registration-form-content select:not([class]) {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 2.25rem;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8' fill='none'%3E%3Cpath d='M1 1.5 6 6.5l5-5' stroke='%2355627A' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.85rem center;
+  cursor: pointer;
+}
+
+.registration-form-content input[type='date']:not([class]) { position: relative; }
+
+.registration-form-content input[type='date']::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  opacity: 0.45;
+  transition: opacity 0.15s ease;
+}
+
+.registration-form-content input[type='date']:hover::-webkit-calendar-picker-indicator { opacity: 0.8; }
+
+.registration-form-content input:not([class]):not([type='checkbox']):not([type='radio']):hover,
+.registration-form-content select:not([class]):hover,
+.registration-form-content textarea:not([class]):hover {
+  border-color: var(--rj-text-3);
+}
+
+.registration-form-content input:not([class]):not([type='checkbox']):not([type='radio']):focus,
+.registration-form-content select:not([class]):focus,
+.registration-form-content textarea:not([class]):focus {
+  outline: none;
+  border-color: var(--rj-seal-ink);
+  box-shadow: 0 0 0 3px rgba(160, 97, 26, 0.18);
+}
+
+.registration-form-content [aria-invalid='true'] {
+  border-color: var(--rj-alert);
+}
+
+.registration-form-content [aria-invalid='true']:focus {
+  border-color: var(--rj-alert);
+  box-shadow: 0 0 0 3px rgba(180, 35, 24, 0.14);
+}
+
+.registration-form-content ::placeholder { color: var(--rj-text-3); }
+
+.registration-form-content fieldset {
+  border: 1px solid var(--rj-rule);
+  border-radius: 0.65rem;
+  padding: 0.8rem;
+  background: var(--rj-paper-sunk);
+}
+
+.registration-form-content fieldset label { background: var(--rj-paper); }
+
+.registration-form-content fieldset label:has(input:checked) {
+  border-color: var(--rj-seal-ink);
+  background: var(--rj-seal-wash);
+}
+
+/* ── Save failure ──
+   Errors state what happened and what to do. They do not apologise and they
+   do not lead with an emoji. */
+
+.rj-alert-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  margin-bottom: 1.25rem;
+  border: 1px solid rgba(180, 35, 24, 0.28);
+  border-radius: 0.5rem;
+  padding: 0.75rem 0.9rem;
+  color: var(--rj-alert);
+  background: var(--rj-alert-bg);
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+/* ── Step navigation ── */
+
+.rj-nav {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 1.75rem;
+  border-top: 1px solid var(--rj-rule);
+  padding-top: 1.25rem;
+}
+
+.rj-btn {
+  display: inline-flex;
+  min-height: 2.9rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: 0.5rem;
+  font-family: var(--rj-body);
+  font-size: 0.875rem;
+  font-weight: 600;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.rj-btn-back {
+  flex: 0 0 auto;
+  border: 1px solid var(--rj-rule-firm);
+  padding: 0 1.25rem;
+  color: var(--rj-text-2);
+  background: var(--rj-paper);
+}
+
+.rj-btn-back:hover:not(:disabled) {
+  border-color: var(--rj-text-3);
+  color: var(--rj-text);
+}
+
+.rj-btn-back:disabled {
+  color: var(--rj-text-3);
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.rj-btn-next {
+  flex: 1;
+  border: 1px solid var(--rj-ink);
+  color: #FFFFFF;
+  background: var(--rj-ink);
+}
+
+.rj-btn-next:hover:not(:disabled) { background: #16345C; }
+
+.rj-btn-next:disabled {
+  border-color: var(--rj-rule-firm);
+  color: var(--rj-text-3);
+  background: var(--rj-paper-sunk);
+  cursor: not-allowed;
+}
+
+.rj-spinner {
+  display: inline-block;
+  width: 0.85rem;
+  height: 0.85rem;
+  border: 2px solid rgba(255, 255, 255, 0.32);
+  border-top-color: #FFFFFF;
+  border-radius: 9999px;
+  animation: rj-spin 0.7s linear infinite;
+}
+
+@keyframes rj-spin { to { transform: rotate(360deg); } }
+
+/* ── Desktop ─────────────────────────────────────────────────────────── */
+
+@media (min-width: 1024px) {
+  html:has(.registration-journey-shell),
+  body:has(.registration-journey-shell),
+  #root:has(.registration-journey-shell) {
+    height: 100%;
+    overflow: hidden;
+  }
+
+  .registration-journey-shell {
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  .registration-journey-layout {
+    height: 100vh;
+    min-height: 0;
+    grid-template-columns: var(--rj-rail) minmax(0, 1fr);
+  }
+
+  .registration-journey-aside {
+    display: flex;
+    position: relative;
+    min-height: 0;
+  }
+
+  .registration-journey-main {
+    height: 100vh;
+    min-height: 0;
+    align-items: flex-start;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+    padding: 2rem 2.5rem 2.5rem;
+  }
+
+  .registration-journey-main > div { margin: auto 0; }
+
+  .registration-mobile-progress { display: none; }
+
+  .registration-form-heading { padding: 1.9rem 2.5rem 1.5rem; }
+  .registration-form-content { padding: 1.75rem 2.5rem 2rem; }
+  .registration-form-heading h2 { font-size: 1.95rem; }
+}
+
+/* Past ~1600px the rail has all the room it needs; give the rest to the
+   form so long rows (address, education) stop wrapping. */
+@media (min-width: 1600px) {
+  .registration-journey-shell { --rj-rail: 20.5rem; }
+  .registration-form-heading { padding-left: 3rem; padding-right: 3rem; }
+  .registration-form-content { padding-left: 3rem; padding-right: 3rem; }
+}
+
+@media (max-height: 800px) and (min-width: 1024px) {
+  .registration-journey-aside { padding-top: 1.5rem; padding-bottom: 1.5rem; }
+  .registration-form-heading { padding-top: 1.4rem; padding-bottom: 1.15rem; }
+  .registration-form-content { padding-top: 1.35rem; }
+  .registration-form-heading h2 { font-size: 1.6rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .registration-meter-fill,
+  .registration-step,
+  .rj-btn { transition: none; }
+}
+
+/* ── Legacy hooks kept alive for the employer journey markup ── */
+
+.registration-change-role {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 0.9rem;
+  color: var(--rj-text-2);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.registration-change-role:hover { color: var(--rj-text); }
+
+.registration-secondary-action {
+  margin-top: 1rem;
+  border-top: 1px solid var(--rj-rule);
+  padding-top: 1rem;
+  text-align: center;
+  color: var(--rj-text-2);
+  font-size: 0.8rem;
+}
+
+.registration-secondary-action a {
+  color: var(--rj-seal-ink);
+  font-weight: 700;
+}
