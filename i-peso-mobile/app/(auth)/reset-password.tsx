@@ -12,11 +12,6 @@ import { OtpInput, type OtpInputHandle } from '@/components/ui/OtpInput'
 import { Button } from '@/components/ui/Button'
 import { colors, radii, spacing, typography } from '@/theme'
 
-interface ResetPasswordParams {
-  email?: string
-  freshSent?: string
-}
-
 interface ApiErrorBody {
   message?: string
   errors?: Record<string, string[]>
@@ -32,8 +27,9 @@ const formatTime = (secs: number) => {
 }
 
 export default function ResetPasswordScreen() {
-  const { email: rawEmail, freshSent } = useLocalSearchParams<ResetPasswordParams>()
+  const { email: rawEmail, freshSent: rawFreshSent } = useLocalSearchParams()
   const email = rawEmail ?? ''
+  const freshSent = Array.isArray(rawFreshSent) ? rawFreshSent[0] : rawFreshSent
 
   const [digits, setDigits] = useState(Array(6).fill(''))
   const otpRef = useRef<OtpInputHandle>(null)

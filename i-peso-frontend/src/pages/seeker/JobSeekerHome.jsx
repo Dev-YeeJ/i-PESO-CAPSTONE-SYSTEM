@@ -1,5 +1,6 @@
-import { createElement, useEffect, useMemo, useState } from 'react'
+import { createElement, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { AnimatePresence, motion } from 'framer-motion'
 import {
   AlertTriangle,
   Bookmark,
@@ -37,6 +38,8 @@ const sortOptions = [
   { value: 'newest', label: 'Newest' },
 ]
 
+const JOBS_PER_BATCH = 6
+
 export default function JobSeekerHome({
   profile = null,
   user = null,
@@ -58,6 +61,8 @@ export default function JobSeekerHome({
   const [appliedJobs, setAppliedJobs] = useState({})
   const [applyingJobIds, setApplyingJobIds] = useState([])
   const [jobFeedMode, setJobFeedMode] = useState('recommended')
+  const [visibleCount, setVisibleCount] = useState(JOBS_PER_BATCH)
+  const loadMoreRef = useRef(null)
 
   useEffect(() => {
     if (profile?.dashboard_stats?.saved_jobs) {
@@ -123,6 +128,11 @@ export default function JobSeekerHome({
     () => sortJobs(filteredJobs, sortMode),
     [filteredJobs, sortMode],
   )
+  const visibleFeedJobs = useMemo(
+    () => visibleJobs.slice(0, visibleCount),
+    [visibleCount, visibleJobs],
+  )
+  const canLoadMoreJobs = visibleCount < visibleJobs.length
 
   const activeApplications = Number(profile?.dashboard_stats?.active_applications ?? 0)
 
@@ -140,6 +150,27 @@ export default function JobSeekerHome({
 
     setAppliedJobs(next)
   }, [apiJobs])
+
+  useEffect(() => {
+    setVisibleCount(JOBS_PER_BATCH)
+  }, [activeTab, jobFeedMode, searchQuery, sortMode])
+
+  useEffect(() => {
+    if (jobsLoading || !canLoadMoreJobs || !loadMoreRef.current) return undefined
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setVisibleCount((current) => Math.min(current + JOBS_PER_BATCH, visibleJobs.length))
+        }
+      },
+      { rootMargin: '420px 0px' },
+    )
+
+    observer.observe(loadMoreRef.current)
+
+    return () => observer.disconnect()
+  }, [canLoadMoreJobs, jobsLoading, visibleJobs.length])
 
   const submitSearch = (event) => {
     event.preventDefault()
@@ -203,8 +234,8 @@ export default function JobSeekerHome({
   }
 
   return (
-    <div className="min-h-full bg-slate-50">
-      <div className="portal-page space-y-6">
+    <div className="min-h-full">
+      <div className="portal-page mx-auto max-w-[1440px] space-y-4 sm:space-y-6">
         {(error || jobsError) && (
           <div className="grid gap-3">
             {error && <Notice tone="danger" message={error} />}
@@ -217,8 +248,8 @@ export default function JobSeekerHome({
           </div>
         )}
 
-        <div className="grid gap-6 lg:grid-cols-[minmax(280px,0.8fr)_minmax(0,2fr)] lg:items-start">
-          <aside className="space-y-5 lg:sticky lg:top-24 lg:self-start">
+        <div className="grid gap-4 lg:grid-cols-[minmax(280px,0.8fr)_minmax(0,2fr)] lg:gap-6 lg:items-start">
+          <aside className="grid auto-cols-[minmax(260px,1fr)] grid-flow-col gap-3 overflow-x-auto pb-1 sm:gap-5 lg:sticky lg:top-24 lg:block lg:space-y-5 lg:overflow-visible lg:pb-0">
             <ProfileSnapshot seeker={seeker} activeApplications={activeApplications} />
             <NextBestAction profile={profile} seeker={seeker} />
             {analyticsData && <ProfileViewsAnalytics analytics={analyticsData} />}
@@ -260,21 +291,37 @@ export default function JobSeekerHome({
               onSortChange={setSortMode}
             />
 
-            <section className="space-y-4" aria-busy={jobsLoading}>
+            <motion.section
+              layout
+              className="space-y-3 sm:space-y-4"
+              aria-busy={jobsLoading}
+              initial="hidden"
+              animate="show"
+              variants={{
+                hidden: {},
+                show: { transition: { staggerChildren: 0.055 } },
+              }}
+            >
               {jobsLoading ? (
                 <><DashboardJobSkeleton /><DashboardJobSkeleton /><DashboardJobSkeleton /></>
               ) : visibleJobs.length ? (
-                visibleJobs.map((job) => (
-                  <JobCard
-                    key={job.id}
-                    job={job}
-                    saved={savedJobIds.includes(job.id)}
-                    applying={applyingJobIds.includes(job.id)}
-                    onSave={() => toggleSavedJob(job)}
-                    onDetails={() => setSelectedJob(job)}
-                    onQuickApply={() => handleQuickApply(job)}
-                  />
-                ))
+                <>
+                  <AnimatePresence initial={false}>
+                    {visibleFeedJobs.map((job) => (
+                      <JobCard
+                        key={job.id}
+                        job={job}
+                        saved={savedJobIds.includes(job.id)}
+                        applying={applyingJobIds.includes(job.id)}
+                        onSave={() => toggleSavedJob(job)}
+                        onDetails={() => setSelectedJob(job)}
+                        onQuickApply={() => handleQuickApply(job)}
+                      />
+                    ))}
+                  </AnimatePresence>
+                  <div ref={loadMoreRef} className="h-6" aria-hidden="true" />
+                  {canLoadMoreJobs && <DashboardJobSkeleton compact />}
+                </>
               ) : (
                 <EmptyFeedState
                   title={activeTab === 'saved' ? 'No saved jobs yet' : 'No matching vacancies found'}
@@ -283,7 +330,7 @@ export default function JobSeekerHome({
                     : 'Try another keyword or switch to Latest Active Vacancies.'}
                 />
               )}
-            </section>
+            </motion.section>
           </main>
         </div>
 
@@ -314,30 +361,31 @@ function SearchPanel({
   onSubmit,
 }) {
   return (
-    <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-      <div className="p-4 sm:p-5">
+    <section className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm shadow-slate-900/[0.03]">
+      <div className="p-3 sm:p-5">
         <form onSubmit={onSubmit} className="flex gap-2 sm:gap-3">
           <div className="relative flex-1">
             <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
             <input
               value={draftQuery}
               onChange={(event) => onQueryChange(event.target.value)}
-              className="h-12 w-full rounded-xl border border-slate-300 bg-slate-50 hover:bg-white pl-12 pr-4 text-sm font-semibold text-slate-900 shadow-sm outline-none transition placeholder:text-slate-500 focus:border-blue-600 focus:bg-white focus:ring-4 focus:ring-blue-100"
+              className="h-12 w-full rounded-lg border border-slate-300 bg-slate-50 pl-12 pr-4 text-sm font-semibold text-slate-900 shadow-sm outline-none transition placeholder:text-slate-500 hover:bg-white focus:border-blue-600 focus:bg-white focus:ring-4 focus:ring-blue-100"
               placeholder="Search jobs, skills, or employers"
             />
           </div>
           <div className="flex gap-2 shrink-0">
             <button
               type="submit"
-              className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-blue-600 px-6 text-sm font-black text-white shadow-sm transition hover:bg-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-200"
+              className="inline-flex h-12 items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 text-sm font-black text-white shadow-sm transition hover:bg-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-200 sm:px-6"
             >
-              Search
+              <Search className="h-4 w-4 sm:hidden" />
+              <span className="hidden sm:inline">Search</span>
             </button>
             {draftQuery && (
               <button
                 type="button"
                 onClick={onClear}
-                className="inline-flex h-12 w-12 items-center justify-center rounded-xl border border-slate-300 bg-white text-slate-500 transition hover:bg-slate-50 hover:text-slate-800"
+                className="inline-flex h-12 w-12 items-center justify-center rounded-lg border border-slate-300 bg-white text-slate-500 transition hover:bg-slate-50 hover:text-slate-800"
                 aria-label="Clear search"
               >
                 <X className="h-5 w-5" />
@@ -387,7 +435,7 @@ function JobFeedSelector({ activeFeed, hasLocation, counts, onChange }) {
   ]
 
   return (
-    <section className="flex gap-2 overflow-x-auto rounded-xl border border-slate-200 bg-white p-2 shadow-sm" aria-label="Dashboard job feeds">
+    <section className="flex snap-x gap-2 overflow-x-auto rounded-lg border border-slate-200 bg-white p-2 shadow-sm shadow-slate-900/[0.03]" aria-label="Dashboard job feeds">
       {feeds.map((feed) => {
         const active = activeFeed === feed.key
         return (
@@ -395,7 +443,7 @@ function JobFeedSelector({ activeFeed, hasLocation, counts, onChange }) {
             key={feed.key}
             type="button"
             onClick={() => onChange(feed.key)}
-            className={`min-w-max flex-1 rounded-lg px-3 py-2.5 text-left transition focus:outline-none focus:ring-4 focus:ring-blue-100 ${
+            className={`min-w-[210px] flex-1 snap-start rounded-md px-3 py-2.5 text-left transition focus:outline-none focus:ring-4 focus:ring-blue-100 sm:min-w-max ${
               active
                 ? 'bg-blue-700 text-white shadow-sm'
                 : 'bg-white text-slate-700 hover:bg-slate-50'
@@ -422,7 +470,7 @@ function FeedControls({
   onSortChange,
 }) {
   return (
-    <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+    <section className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm shadow-slate-900/[0.03] sm:p-4">
       <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
         <div className="flex gap-2 overflow-x-auto pb-1">
           {feedTabs.map((tab) => {
@@ -434,7 +482,7 @@ function FeedControls({
                 key={tab.key}
                 type="button"
                 onClick={() => onTabChange(tab.key)}
-                className={`inline-flex min-h-10 shrink-0 items-center gap-2 rounded-xl border px-4 py-2 text-sm font-black transition ${
+                className={`inline-flex min-h-10 shrink-0 items-center gap-2 rounded-lg border px-4 py-2 text-sm font-black transition ${
                   active
                     ? 'border-blue-600 bg-blue-600 text-white shadow-sm'
                     : 'border-slate-200 bg-white text-slate-600 hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700'
@@ -463,7 +511,7 @@ function FeedControls({
             <select
               value={sortMode}
               onChange={(event) => onSortChange(event.target.value)}
-              className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-bold text-slate-900 shadow-sm outline-none focus:border-blue-600 focus:ring-4 focus:ring-blue-100"
+              className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-bold text-slate-900 shadow-sm outline-none focus:border-blue-600 focus:ring-4 focus:ring-blue-100"
             >
               {sortOptions.map((option) => (
                 <option key={option.value} value={option.value}>{option.label}</option>
@@ -478,14 +526,34 @@ function FeedControls({
 
 function JobCard({ job, saved = false, applying = false, onSave, onDetails, onQuickApply }) {
   const matchMeta = matchMetaFor(job.matchScore)
+  const openFromKeyboard = (event) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault()
+      onDetails()
+    }
+  }
 
   return (
-    <article className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-blue-300 hover:shadow-lg cursor-pointer group" onClick={onDetails}>
+    <motion.article
+      layout
+      variants={{
+        hidden: { opacity: 0, y: 18 },
+        show: { opacity: 1, y: 0 },
+      }}
+      exit={{ opacity: 0, scale: 0.98 }}
+      whileHover={{ y: -2 }}
+      transition={{ duration: 0.22, ease: 'easeOut' }}
+      tabIndex={0}
+      role="button"
+      onClick={onDetails}
+      onKeyDown={openFromKeyboard}
+      className="group cursor-pointer rounded-lg border border-slate-200 bg-white p-4 shadow-sm shadow-slate-900/[0.03] outline-none transition-colors hover:border-blue-300 hover:shadow-md focus-visible:border-blue-500 focus-visible:ring-4 focus-visible:ring-blue-100 sm:p-5"
+    >
       <div className="flex flex-col gap-4">
-        <div className="flex items-start gap-4">
+        <div className="flex items-start gap-3 sm:gap-4">
           <CompanyMark company={job.company} />
           <div className="min-w-0 flex-1">
-            <h2 className="text-lg font-black text-blue-700 group-hover:underline">{job.title}</h2>
+            <h2 className="text-base font-black leading-snug text-blue-700 group-hover:underline sm:text-lg">{job.title}</h2>
             <p className="mt-0.5 text-sm font-semibold text-slate-900">{job.company}</p>
             <p className="mt-0.5 text-sm text-slate-500 flex items-center gap-1.5 flex-wrap">
               <span>{job.location}</span>
@@ -505,7 +573,7 @@ function JobCard({ job, saved = false, applying = false, onSave, onDetails, onQu
           <button 
             type="button" 
             onClick={(e) => { e.stopPropagation(); onSave(); }} 
-            className="text-slate-400 hover:text-blue-600 transition p-2 hover:bg-blue-50 rounded-full"
+            className="rounded-full p-2 text-slate-400 transition hover:bg-blue-50 hover:text-blue-600 focus:outline-none focus:ring-4 focus:ring-blue-100"
             aria-label={saved ? `Remove ${job.title} from saved jobs` : `Save ${job.title}`}
           >
             {saved ? <BookmarkCheck className="h-6 w-6 text-blue-600" /> : <Bookmark className="h-6 w-6" />}
@@ -524,7 +592,7 @@ function JobCard({ job, saved = false, applying = false, onSave, onDetails, onQu
           )}
         </div>
         
-        <div className="flex items-center justify-between border-t border-slate-100 pt-3 mt-1">
+        <div className="flex flex-col gap-3 border-t border-slate-100 pt-3 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-xs font-semibold text-emerald-700 flex items-center gap-1">
             {job.missingCriticalSkills.length ? (
               <span className="text-amber-600 flex items-center gap-1">
@@ -535,13 +603,13 @@ function JobCard({ job, saved = false, applying = false, onSave, onDetails, onQu
             )}
           </p>
           
-          <div className="flex gap-2">
-            <span className="text-xs text-slate-500 self-center mr-2">{formatDate(job.postedAt) || 'recently'}</span>
+          <div className="flex items-center justify-between gap-2 sm:justify-end">
+            <span className="mr-2 self-center text-xs text-slate-500">{formatDate(job.postedAt) || 'recently'}</span>
             <button
               type="button"
               onClick={(e) => { e.stopPropagation(); onQuickApply(); }}
               disabled={job.hasApplied || applying}
-              className="inline-flex items-center justify-center gap-1.5 rounded-full bg-blue-600 px-4 py-1.5 text-xs font-black text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-full bg-blue-600 px-4 py-2 text-xs font-black text-white shadow-sm transition hover:bg-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-100 disabled:cursor-not-allowed disabled:opacity-60"
             >
               <Zap className="h-3.5 w-3.5" />
               {job.hasApplied ? 'Applied' : applying ? 'Wait...' : 'Easy Apply'}
@@ -549,19 +617,33 @@ function JobCard({ job, saved = false, applying = false, onSave, onDetails, onQu
           </div>
         </div>
       </div>
-    </article>
+    </motion.article>
   )
 }
 
-function DashboardJobSkeleton() {
+function DashboardJobSkeleton({ compact = false }) {
   return (
-    <div className="animate-pulse rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-      <div className="flex gap-4">
-        <div className="h-12 w-12 shrink-0 rounded-xl bg-slate-200" />
+    <div className="animate-pulse rounded-lg border border-slate-200 bg-white p-4 shadow-sm shadow-slate-900/[0.03] sm:p-5">
+      <div className="flex gap-3 sm:gap-4">
+        <div className="h-12 w-12 shrink-0 rounded-md bg-slate-200" />
         <div className="flex-1">
           <div className="h-4 w-2/3 rounded bg-slate-200" />
           <div className="mt-2 h-3 w-1/3 rounded bg-slate-100" />
           <div className="mt-4 h-3 w-4/5 rounded bg-slate-100" />
+          {!compact && (
+            <>
+              <div className="mt-4 flex gap-2">
+                <div className="h-7 w-24 rounded-full bg-slate-100" />
+                <div className="h-7 w-20 rounded-full bg-slate-100" />
+                <div className="h-7 w-16 rounded-full bg-slate-100" />
+              </div>
+              <div className="mt-4 h-px w-full bg-slate-100" />
+              <div className="mt-4 flex items-center justify-between">
+                <div className="h-3 w-28 rounded bg-slate-100" />
+                <div className="h-9 w-24 rounded-full bg-slate-200" />
+              </div>
+            </>
+          )}
         </div>
       </div>
     </div>

@@ -4,6 +4,7 @@ import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '@/stores/authStore'
 import NotificationBell from '@/pages/seeker/components/NotificationBell'
 import IPesoLogo from '@/components/branding/IPesoLogo'
+import MobileBottomNav from '@/pages/seeker/components/MobileBottomNav'
 
 const navLinks = [
   { to: '/seeker/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -84,7 +85,7 @@ export default function SeekerLayout() {
   )
 
   return (
-    <div className="portal-shell flex min-h-screen bg-brand-canvas">
+    <div className="portal-shell flex min-h-screen bg-slate-100">
       <aside className={`portal-sidebar sticky top-0 hidden h-screen shrink-0 flex-col transition-all duration-200 md:flex ${collapsed ? 'w-20' : 'w-[280px]'}`}>{sidebar}</aside>
       {mobileOpen && (
         <div className="fixed inset-0 z-50 md:hidden">
@@ -93,13 +94,16 @@ export default function SeekerLayout() {
         </div>
       )}
       <div className="min-w-0 flex-1">
-        <header className="sticky top-0 z-30 flex h-[76px] items-center justify-between border-b border-slate-200 bg-white px-4 sm:px-6 lg:px-8">
+        <header className="sticky top-0 z-30 flex h-[68px] items-center justify-between border-b border-slate-200/80 bg-white/85 px-4 shadow-sm shadow-slate-900/[0.03] backdrop-blur-xl sm:h-[76px] sm:px-6 lg:px-8">
           <div className="flex items-center gap-3">
             <button onClick={() => { setCollapsed(false); setMobileOpen(true) }} className="rounded-lg border border-slate-200 p-2 text-slate-700 md:hidden" aria-label="Open navigation">
               {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
             </button>
             <div className="hidden items-center gap-2 text-sm font-bold sm:flex"><span className="text-brand-navy">i-PESO</span><span className="text-slate-300">/</span><span className="text-slate-600">{pageName}</span></div>
-            <p className="font-extrabold text-brand-navy sm:hidden">{pageName}</p>
+            <div className="sm:hidden">
+              <p className="text-[11px] font-black uppercase tracking-[0.16em] text-blue-700">i-PESO</p>
+              <p className="text-base font-black leading-tight text-slate-950">{pageName}</p>
+            </div>
           </div>
           <div className="flex items-center gap-3">
             <span className="hidden items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-extrabold text-emerald-700 sm:inline-flex">
@@ -107,12 +111,13 @@ export default function SeekerLayout() {
             </span>
             <NotificationBell />
             <span className="hidden h-9 w-px bg-slate-200 sm:block" />
-            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-brand-navy text-xs font-black text-white">{initials}</span>
+            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-brand-navy text-xs font-black text-white shadow-sm">{initials}</span>
             <div className="hidden lg:block"><p className="max-w-40 truncate text-sm font-bold text-slate-800">{user?.name}</p><p className="text-xs text-slate-500">Job Seeker</p></div>
           </div>
         </header>
-        <main className="px-4 py-6 sm:px-6 lg:px-8 lg:py-8"><Outlet /></main>
+        <main className="px-3 pb-28 pt-4 sm:px-6 sm:py-6 lg:px-8 lg:py-8"><Outlet /></main>
       </div>
+      <MobileBottomNav links={navLinks} />
     </div>
   )
 }

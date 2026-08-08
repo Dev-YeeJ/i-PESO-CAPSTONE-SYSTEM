@@ -22,6 +22,7 @@ export const colors = {
   // Text
   textPrimary: '#0F172A',
   textSecondary: '#64748B',
+  secondaryText: '#64748B',
   neutralText: '#0F172A',
   subtle: '#94A3B8',
 
@@ -38,6 +39,9 @@ export const colors = {
   error: '#991B1B',
   errorBackground: '#FEF2F2',
   errorBorder: '#FECACA',
+  danger: '#991B1B',
+  dangerBackground: '#FEF2F2',
+  dangerBorder: '#FECACA',
   muted: '#475569',
 };
 
