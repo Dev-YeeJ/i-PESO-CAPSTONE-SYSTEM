@@ -266,31 +266,32 @@ export default function EmployerDetailPage() {
         {error && <div className="mb-6 flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-medium text-red-800"><AlertTriangle className="h-4 w-4 shrink-0" />{error}</div>}
         {notice && <div className="mb-6 flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-medium text-emerald-800"><CheckCircle2 className="h-4 w-4 shrink-0" />{notice}</div>}
 
-        <div className="grid gap-6 xl:grid-cols-[minmax(0,1.65fr)_minmax(320px,0.85fr)]">
-          <div className="space-y-6">
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,1.65fr)_minmax(320px,0.85fr)]">
+          <div className="space-y-4">
             <Card hero padding="none" heroContent={(
-              <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
-                <div className="min-w-0">
-                  <p className="text-xs font-black uppercase tracking-[0.22em] text-blue-100">PESO Employer Audit Hub</p>
-                  <h1 className="mt-2 text-3xl font-black text-white">{companyProfile.company_name || employer.company_name || 'Employer profile'}</h1>
-                  <p className="mt-2 max-w-2xl text-sm leading-6 text-blue-50">{companyProfile.industry || employer.industry || 'Industry not specified'}</p>
+              <div className="flex flex-col gap-5">
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+                  <div className="min-w-0">
+                    <p className="text-xs font-black uppercase tracking-[0.22em] text-blue-100">PESO Employer Audit Hub</p>
+                    <h1 className="mt-2 text-3xl font-black text-white">{companyProfile.company_name || employer.company_name || 'Employer profile'}</h1>
+                    <p className="mt-2 max-w-2xl text-sm leading-6 text-blue-50">{companyProfile.industry || employer.industry || 'Industry not specified'}</p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <Badge status={verificationStatus === 'approved' ? 'approved' : verificationStatus === 'rejected' ? 'rejected' : 'pending'}>{formatValue(verificationStatus)}</Badge>
+                    {companyProfile.gps_status === 'missing' ? <Badge status="warning">Missing GPS</Badge> : <Badge status="active">GPS available</Badge>}
+                  </div>
                 </div>
-                <div className="flex flex-wrap gap-2">
-                  <Badge status={verificationStatus === 'approved' ? 'approved' : verificationStatus === 'rejected' ? 'rejected' : 'pending'}>{formatValue(verificationStatus)}</Badge>
-                  {companyProfile.gps_status === 'missing' ? <Badge status="warning">Missing GPS</Badge> : <Badge status="active">GPS available</Badge>}
+                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                  <InfoTile label="Representative" value={representative.representative_name || `${representative.representative_first_name || ''} ${representative.representative_last_name || ''}`.trim() || 'Not provided'} icon={Building2} />
+                  <InfoTile label="Contact" value={representative.representative_contact_number || representative.mobile_number || 'Not provided'} icon={FileText} />
+                  <InfoTile label="Business address" value={companyProfile.business_address || businessAddress.complete_address || 'Not provided'} icon={MapPin} />
+                  <InfoTile label="Verification remarks" value={verificationRemarks || 'No remarks recorded'} icon={ShieldAlert} />
                 </div>
               </div>
-            )}>
-              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                <InfoTile label="Representative" value={representative.representative_name || `${representative.representative_first_name || ''} ${representative.representative_last_name || ''}`.trim() || 'Not provided'} icon={Building2} />
-                <InfoTile label="Contact" value={representative.representative_contact_number || representative.mobile_number || 'Not provided'} icon={FileText} />
-                <InfoTile label="Business address" value={companyProfile.business_address || businessAddress.complete_address || 'Not provided'} icon={MapPin} />
-                <InfoTile label="Verification remarks" value={verificationRemarks || 'No remarks recorded'} icon={ShieldAlert} />
-              </div>
-            </Card>
+            )} />
 
-            <Card>
-              <div className="grid gap-6 lg:grid-cols-2">
+            <Card padding="sm">
+              <div className="grid gap-4 lg:grid-cols-2">
                 <div>
                   <h2 className="text-lg font-black text-slate-950">Company profile</h2>
                   <div className="mt-4 space-y-4">
@@ -313,7 +314,7 @@ export default function EmployerDetailPage() {
               </div>
             </Card>
 
-            <Card>
+            <Card padding="sm">
               <div className="flex items-center justify-between">
                 <div>
                   <h2 className="text-lg font-black text-slate-950">Verification documents</h2>
@@ -368,7 +369,7 @@ export default function EmployerDetailPage() {
                       const rejected = isRejected(doc)
                       return (
                         <tr key={`${row.type}-${doc?.document_id ?? 'missing'}`} className="border-b border-slate-100 align-top">
-                          <td className="px-3 py-3">
+                          <td className="px-2 py-2">
                             <div className="flex items-center gap-2">
                               <span className="font-bold text-slate-900">{label}</span>
                               {row.required && <span className="rounded-md bg-blue-50 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-blue-600">Required</span>}
@@ -379,7 +380,7 @@ export default function EmployerDetailPage() {
                               <p className="mt-1 text-xs text-amber-600">No file submitted</p>
                             )}
                           </td>
-                          <td className="px-3 py-3">
+                          <td className="px-2 py-2">
                             {!doc ? (
                               <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-bold text-amber-700"><AlertTriangle className="h-3.5 w-3.5" />Not submitted</span>
                             ) : rejected ? (
@@ -391,10 +392,10 @@ export default function EmployerDetailPage() {
                               <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700"><CheckCircle2 className="h-3.5 w-3.5" />Approved</span>
                             )}
                           </td>
-                          <td className="px-3 py-3 text-xs text-slate-600">
+                          <td className="px-2 py-2 text-xs text-slate-600">
                             {row.type === 'mayors_permit' ? (doc?.expiration_date ? formatDate(doc.expiration_date) : '—') : '—'}
                           </td>
-                          <td className="px-3 py-3">
+                          <td className="px-2 py-2">
                             <div className="flex flex-wrap items-center justify-end gap-2">
                               {doc && (
                                 <>
@@ -429,7 +430,7 @@ export default function EmployerDetailPage() {
               </div>
             </Card>
 
-            <Card>
+            <Card padding="sm">
               <h2 className="text-lg font-black text-slate-950">Vacancy and application summary</h2>
               <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                 <StatTile label="Active vacancies" value={activeVacanciesSummary.total ?? 0} />
@@ -440,8 +441,8 @@ export default function EmployerDetailPage() {
             </Card>
           </div>
 
-          <div className="space-y-6">
-            <Card>
+          <div className="space-y-4">
+            <Card padding="sm">
               <h2 className="text-lg font-black text-slate-950">Data quality flags</h2>
               <div className="mt-4 flex flex-wrap gap-2">
                 {Object.entries(dataQualityFlags).filter(([, value]) => value).map(([key]) => <Badge key={key} status="warning">{labelForFlag(key)}</Badge>)}
@@ -449,7 +450,7 @@ export default function EmployerDetailPage() {
               </div>
             </Card>
 
-            <Card>
+            <Card padding="sm">
               <h2 className="text-lg font-black text-slate-950">Operational review</h2>
               <div className="mt-4 space-y-4">
                 <InfoRow label="Verification status" value={formatValue(verificationStatus)} />
@@ -459,7 +460,7 @@ export default function EmployerDetailPage() {
               </div>
             </Card>
 
-            <Card>
+            <Card padding="sm">
               <h2 className="text-lg font-black text-slate-950">Job fair participation</h2>
               {jobFairParticipation.length ? (
                 <div className="mt-4 space-y-2">
@@ -468,7 +469,7 @@ export default function EmployerDetailPage() {
               ) : <p className="mt-4 text-sm text-slate-500">No job fair participation records.</p>}
             </Card>
 
-            <Card>
+            <Card padding="sm">
               <h2 className="text-lg font-black text-slate-950">Review decision</h2>
 
               {/* Readiness summary */}
@@ -584,15 +585,15 @@ export default function EmployerDetailPage() {
 }
 
 function InfoTile({ icon, label, value }) {
-  return <div className="rounded-2xl border border-white/15 bg-white/10 p-4 backdrop-blur"><div className="flex items-center gap-2 text-sm font-semibold text-white/90"><span className="rounded-lg bg-white/15 p-2">{createElement(icon, { className: 'h-4 w-4' })}</span>{label}</div><p className="mt-3 text-sm text-blue-50">{value}</p></div>
+  return <div className="rounded-2xl border border-white/15 bg-white/10 p-3 backdrop-blur"><div className="flex items-center gap-2 text-xs font-semibold text-white/90"><span className="rounded-lg bg-white/15 p-1.5">{createElement(icon, { className: 'h-4 w-4' })}</span>{label}</div><p className="mt-2 text-sm text-blue-50">{value}</p></div>
 }
 
 function InfoRow({ label, value }) {
-  return <div className="rounded-xl bg-slate-50 p-3"><p className="text-[11px] font-extrabold uppercase tracking-wide text-slate-400">{label}</p><p className="mt-1 text-sm font-semibold text-slate-800">{value || 'Not provided'}</p></div>
+  return <div className="rounded-xl bg-slate-50 px-3 py-2"><p className="text-[10px] font-extrabold uppercase tracking-wide text-slate-400">{label}</p><p className="mt-0.5 text-sm font-semibold text-slate-800">{value || 'Not provided'}</p></div>
 }
 
 function StatTile({ label, value }) {
-  return <div className="rounded-xl border border-slate-200 bg-slate-50 p-4"><p className="text-2xl font-black text-slate-950">{value}</p><p className="mt-1 text-xs font-extrabold uppercase tracking-wide text-slate-500">{label}</p></div>
+  return <div className="rounded-xl border border-slate-200 bg-slate-50 p-3"><p className="text-xl font-black text-slate-950">{value}</p><p className="mt-0.5 text-[10px] font-extrabold uppercase tracking-wide text-slate-500">{label}</p></div>
 }
 
 function ReadinessCheck({ label, passed, detail }) {

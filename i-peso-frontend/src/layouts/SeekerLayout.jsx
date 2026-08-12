@@ -12,7 +12,6 @@ const navLinks = [
   { to: '/seeker/job-map', label: 'AI Job Map', icon: MapPin },
   { to: '/seeker/applications', label: 'My Applications', icon: ClipboardList },
   { to: '/seeker/government-programs', label: 'Government Programs', icon: GraduationCap },
-  { to: '/seeker/program-applications', label: 'Program Applications', icon: BookOpenCheck },
   { to: '/seeker/profile', label: 'My Profile', icon: UserRound },
 ]
 

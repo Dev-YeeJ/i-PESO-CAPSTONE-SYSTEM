@@ -179,6 +179,29 @@ select:focus-visible {
     @apply bg-brand-navy text-white shadow-xl;
   }
 
+  /* Custom thin scrollbar for sidebars (works in Webkit and Firefox) */
+  .portal-sidebar nav {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+  }
+  
+  .portal-sidebar nav::-webkit-scrollbar {
+    width: 6px;
+  }
+  
+  .portal-sidebar nav::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  
+  .portal-sidebar nav::-webkit-scrollbar-thumb {
+    background-color: rgba(255, 255, 255, 0.2);
+    border-radius: 10px;
+  }
+  
+  .portal-sidebar nav::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(255, 255, 255, 0.3);
+  }
+
   .portal-sidebar-divider {
     @apply border-white/10;
   }

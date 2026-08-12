@@ -15,7 +15,7 @@ export default function SearchableTextInput({ label, value, onChange, options = 
   return (
     <label className="block">
       {label && <span className="block text-xs font-black uppercase tracking-wide text-slate-500">{label}</span>}
-      <div className="relative mt-1.5">
+      <div className={`relative mt-1.5 ${open ? 'z-50' : 'z-20'}`}>
         <input value={value ?? ''} onChange={(event) => {
           onChange(event.target.value)
           setOpen(true)

@@ -197,6 +197,8 @@ Route::middleware('auth:sanctum')->group(function () {
 
         Route::middleware('admin.permission:employment_hub')->group(function () {
             Route::get('/applications', [AdminApplicationController::class, 'index']);
+            Route::get('/vacancies', [\App\Http\Controllers\Api\Admin\EmploymentHub\JobVacancyController::class, 'index']);
+            Route::get('/vacancies/{vacancy}', [\App\Http\Controllers\Api\Admin\EmploymentHub\JobVacancyController::class, 'show']);
         });
 
         Route::middleware('admin.permission:system_reports')->group(function () {
