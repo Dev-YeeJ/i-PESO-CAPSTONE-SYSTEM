@@ -56,6 +56,9 @@ trait FormatsApplications
                 'employer' => [
                     'employer_id' => $vacancy->employer?->employer_id,
                     'company_name' => $vacancy->employer?->company_name,
+                    'company_logo_url' => $vacancy->employer?->company_logo
+                        ? \Illuminate\Support\Facades\Storage::disk('public')->url($vacancy->employer->company_logo)
+                        : null,
                 ],
             ] : null,
             'seeker' => $includeSeeker && $seeker ? [

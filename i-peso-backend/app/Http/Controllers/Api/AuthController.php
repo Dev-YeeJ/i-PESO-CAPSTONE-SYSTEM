@@ -159,7 +159,7 @@ class AuthController extends Controller
                 'email',
                 'max:255',
                 Rule::unique('job_seekers', 'email'),
-                Rule::unique('employers', 'email'),
+                Rule::unique('employers', 'email')->whereNull('deleted_at'),
                 Rule::unique('administrators', 'email'),
             ],
             'password' => ['required', 'confirmed', Password::min(8)->numbers()->symbols()],

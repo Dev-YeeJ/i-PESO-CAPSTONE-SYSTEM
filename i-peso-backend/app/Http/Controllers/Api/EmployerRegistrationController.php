@@ -25,7 +25,7 @@ class EmployerRegistrationController extends Controller
     public function registerStep1(Request $request): JsonResponse
     {
         $validator = Validator::make($request->all(), [
-            'email' => 'required|email|unique:employers',
+            'email' => ['required', 'email', \Illuminate\Validation\Rule::unique('employers')->whereNull('deleted_at')],
             'password' => ['required', 'confirmed', Password::min(8)->numbers()->symbols()],
             'company_type' => 'required|in:sole_proprietorship,corporation_partnership,local_recruitment_agency,overseas_recruitment_agency',
         ]);
@@ -203,10 +203,22 @@ class EmployerRegistrationController extends Controller
                     : null,
             ]);
 
-            // Reset employer account to pending if they were rejected and just uploaded a correction
+            // When a rejected employer uploads a corrected document, reset the employer account
+            // and ALL other still-rejected documents back to 'pending' so the admin can
+            // review the complete package fresh without stale "rejected" badges on old docs.
             if ($employer->verification_status === 'rejected') {
                 $employer->update(['verification_status' => 'pending']);
-                
+
+                // Reset every other rejected document to pending so they all appear fresh
+                // to the admin — the employer is re-presenting their full application.
+                $employer->documents()
+                    ->where('document_type', '!=', $request->document_type)
+                    ->where('verification_status', 'rejected')
+                    ->update([
+                        'verification_status' => 'pending',
+                        'admin_notes'         => null,
+                    ]);
+
                 try {
                     $employer->notify(new \App\Notifications\EmployerVerificationProgressUpdated('registration_resubmitted'));
                 } catch (\Throwable $exception) {
@@ -378,6 +390,9 @@ class EmployerRegistrationController extends Controller
                     'house_unit_street' => $employer->house_unit_street,
                     'company_description' => $employer->company_description,
                     'company_logo' => $employer->company_logo,
+                    'company_logo_url' => $employer->company_logo
+                        ? Storage::disk('public')->url($employer->company_logo)
+                        : null,
                     'representative_first_name' => $employer->representative_first_name,
                     'representative_middle_name' => $employer->representative_middle_name,
                     'representative_last_name' => $employer->representative_last_name,

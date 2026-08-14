@@ -21,11 +21,13 @@ class EmployerDocument extends Model
         'verification_status', // pending, approved, rejected
         'admin_notes',
         'expiration_date',
+        'viewed_at',
     ];
 
     protected $casts = [
         'uploaded_at' => 'datetime',
         'expiration_date' => 'date',
+        'viewed_at' => 'datetime',
     ];
 
     /**

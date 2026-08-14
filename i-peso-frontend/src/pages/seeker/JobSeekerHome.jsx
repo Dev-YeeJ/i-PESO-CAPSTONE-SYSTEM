@@ -551,7 +551,7 @@ function JobCard({ job, saved = false, applying = false, onSave, onDetails, onQu
     >
       <div className="flex flex-col gap-4">
         <div className="flex items-start gap-3 sm:gap-4">
-          <CompanyMark company={job.company} />
+          <CompanyMark company={job.company} logoPath={job.companyLogoPath} />
           <div className="min-w-0 flex-1">
             <h2 className="text-base font-black leading-snug text-blue-700 group-hover:underline sm:text-lg">{job.title}</h2>
             <p className="mt-0.5 text-sm font-semibold text-slate-900">{job.company}</p>
@@ -778,8 +778,19 @@ function JobDetailModal({ job, saved, applying = false, onClose, onSave, onQuick
             <Layers3 className="h-3.5 w-3.5" />
             Match explanation
           </span>
-          <DialogTitle className="mt-2">{job.title}</DialogTitle>
-          <DialogDescription>{job.company} · {job.location}</DialogDescription>
+          <div className="mt-4 flex items-center gap-4">
+            {job.companyLogoPath && (
+              <img
+                src={job.companyLogoPath.startsWith('http') ? job.companyLogoPath : `${import.meta.env.VITE_API_BASE_URL?.replace('/api', '') || 'http://localhost:8000'}/storage/${job.companyLogoPath}`}
+                alt={job.company}
+                className="h-12 w-12 shrink-0 rounded-lg border border-slate-200 bg-white object-cover p-1 shadow-sm"
+              />
+            )}
+            <div>
+              <DialogTitle>{job.title}</DialogTitle>
+              <DialogDescription className="mt-1">{job.company} · {job.location}</DialogDescription>
+            </div>
+          </div>
         </DialogHeader>
 
         <div className="space-y-5">
@@ -943,9 +954,17 @@ function ScoreRow({ label, value }) {
   )
 }
 
-function CompanyMark({ company }) {
+function CompanyMark({ company, logoPath }) {
+  if (logoPath) {
+    const baseUrl = import.meta.env.VITE_API_BASE_URL?.replace('/api', '') || 'http://localhost:8000'
+    const logoUrl = logoPath.startsWith('http') ? logoPath : `${baseUrl}/storage/${logoPath}`
+    return (
+      <img src={logoUrl} alt={company} className="flex h-14 w-14 shrink-0 items-center justify-center rounded-lg bg-white object-cover p-1 shadow-sm border border-slate-200" />
+    )
+  }
+
   return (
-    <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-sm border border-slate-200 bg-slate-50 shadow-sm text-sm font-black text-slate-500">
+    <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 shadow-sm text-sm font-black text-slate-500">
       {companyMonogram(company)}
     </div>
   )
@@ -1021,6 +1040,7 @@ function normalizeApiJobs(rows) {
       id: String(row.post_id ?? row.id),
       title: row.job_title ?? 'Untitled vacancy',
       company: row.employer?.company_name ?? 'PESO Partner Employer',
+      companyLogoPath: row.employer?.company_logo,
       location: [row.barangay, row.city_municipality, row.province].filter(Boolean).join(', ') || row.location || 'Location not specified',
       distanceKm: Number(row.distance_km ?? 0),
       salaryMin: Number(row.salary_min ?? 0),

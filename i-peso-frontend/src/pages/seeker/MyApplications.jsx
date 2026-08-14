@@ -120,11 +120,16 @@ export default function MyApplications() {
           {applications.map((application) => (
             <article key={application.apply_id} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
               <div className="flex items-start justify-between gap-3">
-                <div>
-                  <h2 className="font-black text-slate-950">{application.job?.job_title || 'Vacancy unavailable'}</h2>
-                  <p className="mt-1 text-sm font-semibold text-slate-500">{application.job?.employer?.company_name || 'Employer'}</p>
+                <div className="flex items-start gap-3">
+                  {application.job?.employer?.company_logo_url && (
+                    <img src={application.job.employer.company_logo_url} alt="Logo" className="h-10 w-10 shrink-0 rounded-lg border border-slate-200 bg-white object-cover p-1 shadow-sm" />
+                  )}
+                  <div>
+                    <h2 className="font-black text-slate-950">{application.job?.job_title || 'Vacancy unavailable'}</h2>
+                    <p className="mt-1 text-sm font-semibold text-slate-500">{application.job?.employer?.company_name || 'Employer'}</p>
+                  </div>
                 </div>
-                <span className={`rounded-full border px-2.5 py-1 text-[10px] font-black uppercase ${statusTone[application.status] || statusTone.pending}`}>{application.status_label || application.status}</span>
+                <span className={`shrink-0 rounded-full border px-2.5 py-1 text-[10px] font-black uppercase ${statusTone[application.status] || statusTone.pending}`}>{application.status_label || application.status}</span>
               </div>
 
               <div className="mt-4 grid gap-2 text-xs text-slate-600">
@@ -167,9 +172,16 @@ export default function MyApplications() {
       {/* Application detail */}
       <Dialog open={!!activeApplication} onOpenChange={(open) => !open && setActiveApplication(null)}>
         <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>{activeApplication?.job?.job_title || 'Application'}</DialogTitle>
-            <DialogDescription>{activeApplication?.job?.employer?.company_name || 'Employer'}</DialogDescription>
+          <DialogHeader className="mb-2">
+            <div className="flex items-center gap-4">
+              {activeApplication?.job?.employer?.company_logo_url && (
+                <img src={activeApplication.job.employer.company_logo_url} alt="Logo" className="h-12 w-12 shrink-0 rounded-lg border border-slate-200 bg-white object-cover p-1 shadow-sm" />
+              )}
+              <div>
+                <DialogTitle>{activeApplication?.job?.job_title || 'Application'}</DialogTitle>
+                <DialogDescription className="mt-1">{activeApplication?.job?.employer?.company_name || 'Employer'}</DialogDescription>
+              </div>
+            </div>
           </DialogHeader>
 
           {activeApplication && (
