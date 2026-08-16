@@ -46,12 +46,12 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: typography.small,
-    color: colors.secondaryText,
-    fontWeight: typography.medium,
+    color: colors.textSecondary,
+    fontFamily: typography.family.medium,
   },
   iconContainer: {
     padding: spacing.xs,
-    backgroundColor: colors.background,
+    backgroundColor: colors.accentSoft,
     borderRadius: radii.sm,
   },
   content: {
@@ -61,8 +61,8 @@ const styles = StyleSheet.create({
   },
   value: {
     fontSize: typography.display,
-    color: colors.primary,
-    fontWeight: typography.bold,
+    color: colors.textPrimary,
+    fontFamily: typography.family.bold,
   },
   trendBadge: {
     paddingHorizontal: spacing.xs,
@@ -73,16 +73,16 @@ const styles = StyleSheet.create({
     backgroundColor: colors.successBackground,
   },
   trendNegative: {
-    backgroundColor: colors.dangerBackground,
+    backgroundColor: colors.errorBackground,
   },
   trendText: {
     fontSize: typography.small,
-    fontWeight: typography.semibold,
+    fontFamily: typography.family.medium,
   },
   trendTextPositive: {
     color: colors.success,
   },
   trendTextNegative: {
-    color: colors.danger,
+    color: colors.error,
   },
 })

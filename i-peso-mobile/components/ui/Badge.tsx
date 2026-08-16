@@ -5,12 +5,12 @@ const badgeStyles = {
   neutral: {
     backgroundColor: colors.background,
     borderColor: colors.border,
-    textColor: colors.primary,
+    textColor: colors.textPrimary,
   },
   info: {
     backgroundColor: colors.infoBackground,
     borderColor: colors.infoBorder,
-    textColor: colors.info,
+    textColor: colors.secondary,
   },
   success: {
     backgroundColor: colors.successBackground,
@@ -23,9 +23,9 @@ const badgeStyles = {
     textColor: colors.warning,
   },
   danger: {
-    backgroundColor: colors.dangerBackground,
-    borderColor: colors.dangerBorder,
-    textColor: colors.danger,
+    backgroundColor: colors.errorBackground,
+    borderColor: colors.errorBorder,
+    textColor: colors.error,
   },
 }
 

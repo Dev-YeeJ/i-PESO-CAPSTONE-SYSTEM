@@ -54,13 +54,13 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   sm: {
-    padding: spacing.lg,
+    padding: spacing.md,
   },
   md: {
-    padding: spacing.xl,
+    padding: spacing.lg,
   },
   lg: {
-    padding: spacing.xxl,
+    padding: spacing.xl,
   },
   header: {
     width: '100%',
@@ -73,13 +73,13 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   headTitle: {
-    color: colors.primary,
+    color: colors.textPrimary,
     fontSize: typography.title,
     fontFamily: typography.family.bold,
   },
   headSubtitle: {
     marginTop: spacing.xs,
-    color: colors.secondaryText,
+    color: colors.textSecondary,
     fontSize: typography.body,
     fontFamily: typography.family.regular,
   },

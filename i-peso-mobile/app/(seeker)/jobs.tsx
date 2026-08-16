@@ -176,7 +176,7 @@ export default function JobsScreen() {
         keyboardShouldPersistTaps="handled"
         onEndReached={loadMore}
         onEndReachedThreshold={0.6}
-        refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={onRefresh} tintColor={colors.info} />}
+        refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={onRefresh} tintColor={colors.secondary} />}
         ListHeaderComponent={(
           <JobsHeader
             query={query}
@@ -401,7 +401,7 @@ function EmptyJobs() {
   return (
     <Card style={styles.emptyCard} padding="md">
       <View style={styles.emptyIcon}>
-        <MaterialIcons name="work-outline" size={28} color={colors.info} />
+        <MaterialIcons name="work-outline" size={28} color={colors.secondary} />
       </View>
       <Text style={styles.emptyTitle}>No jobs found</Text>
       <Text style={styles.emptySub}>Try another search term, widen your radius, or switch to Latest.</Text>
@@ -451,7 +451,7 @@ const styles = StyleSheet.create({
   resultPill: {
     minWidth: 64,
     borderRadius: radii.md,
-    backgroundColor: colors.primary,
+    backgroundColor: colors.secondary,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     alignItems: 'center',
@@ -462,7 +462,7 @@ const styles = StyleSheet.create({
     fontFamily: typography.family.bold,
   },
   resultLabel: {
-    color: colors.subtle,
+    color: colors.accentSoft,
     fontSize: typography.label,
     fontFamily: typography.family.bold,
   },
@@ -523,7 +523,7 @@ const styles = StyleSheet.create({
   },
   appliedText: {
     marginTop: spacing.sm,
-    color: colors.info,
+    color: colors.secondary,
     fontSize: typography.small,
     fontFamily: typography.family.bold,
   },
@@ -551,11 +551,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
   },
   filterBtnActive: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
+    backgroundColor: colors.secondary,
+    borderColor: colors.secondary,
   },
   filterText: {
-    color: colors.muted,
+    color: colors.textSecondary,
     fontSize: typography.small,
     fontFamily: typography.family.bold,
   },
@@ -576,7 +576,7 @@ const styles = StyleSheet.create({
     borderRadius: 32,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.infoBackground,
+    backgroundColor: colors.accentSoft,
     marginBottom: spacing.md,
   },
   emptyTitle: {

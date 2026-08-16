@@ -73,13 +73,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   value: {
-    fontFamily: typography.family.display,
-    color: colors.primary,
+    fontFamily: typography.family.medium,
+    color: colors.textPrimary,
   },
   label: {
     fontSize: typography.label,
     fontFamily: typography.family.bold,
-    color: colors.secondaryText,
+    color: colors.textSecondary,
     marginTop: 2,
   },
 })

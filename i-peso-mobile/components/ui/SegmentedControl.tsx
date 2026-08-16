@@ -53,15 +53,15 @@ const styles = StyleSheet.create({
     borderRadius: radii.pill,
   },
   segmentActive: {
-    backgroundColor: colors.surface,
+    backgroundColor: colors.secondary,
     ...shadows.card,
   },
   label: {
     fontSize: typography.small,
     fontFamily: typography.family.bold,
-    color: colors.secondaryText,
+    color: colors.textSecondary,
   },
   labelActive: {
-    color: colors.primary,
+    color: colors.white,
   },
 })
