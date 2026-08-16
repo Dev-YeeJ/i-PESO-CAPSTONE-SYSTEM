@@ -310,7 +310,8 @@ export default function EmployerDetailPage() {
                 </div>
               </div>
             </div>
-                   {/* Main Content and Sidebar Layout */}
+          )} />
+          {/* Main Content and Sidebar Layout */}
           <div className="grid gap-6 xl:grid-cols-[minmax(0,1.7fr)_minmax(320px,0.8fr)]">
             <main className="space-y-6">
               <Card>
