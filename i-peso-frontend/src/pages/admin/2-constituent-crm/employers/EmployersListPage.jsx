@@ -227,7 +227,7 @@ export default function EmployersListPage() {
             </Card>
           </div>
         ) : (
-          <div className="mt-6 grid gap-6 xl:grid-cols-2">
+          <div className="mt-6 flex flex-col gap-4">
             {employers.map((employer) => (
               <EmployerCard key={employer.employer_id} employer={employer} onView={() => navigate(`/admin/employers/${employer.employer_id}`)} />
             ))}
@@ -264,7 +264,7 @@ function EmployerCard({ employer, onView }) {
       </div>
       <Badge status={employer.missing_documents ? 'warning' : 'verified'}>{employer.missing_documents ? 'Missing docs' : 'Docs uploaded'}</Badge>
     </div>
-    <div className="grid gap-3 sm:grid-cols-2">
+    <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
       <InfoRow icon={Building2} label="Industry" value={employer.industry_business_type || employer.industry || 'Not specified'} />
       <InfoRow icon={MapPin} label="Address" value={employer.business_address_summary || employer.complete_address || 'Not specified'} />
       <InfoRow icon={Briefcase} label="Vacancies (active/total)" value={`${employer.active_vacancies_count ?? 0}/${employer.total_vacancies_count ?? 0}`} />

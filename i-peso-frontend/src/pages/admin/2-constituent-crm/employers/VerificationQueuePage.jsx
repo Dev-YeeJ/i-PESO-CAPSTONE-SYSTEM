@@ -217,7 +217,9 @@ export default function VerificationQueuePage() {
                 {employers.map((employer) => {
                   const required = Number(employer.required_documents_count) || 0
                   const approved = Number(employer.approved_required_documents_count) || 0
-                  const progress = required ? (approved / required) * 100 : 0
+                  const pending = Number(employer.pending_required_documents_count) || 0
+                  const reviewable = approved + pending
+                  const progress = required ? (reviewable / required) * 100 : 0
                   const waiting = Number(employer.days_waiting) || 0
 
                   return (
@@ -231,6 +233,9 @@ export default function VerificationQueuePage() {
                               <p className="mt-1 truncate text-sm text-slate-500">{employer.email}</p>
                             </div>
                             <div className="flex flex-col items-end gap-1.5">
+                              {employer.is_resubmission && (
+                                <Badge variant="warning">Resubmission</Badge>
+                              )}
                               <Badge variant={employer.all_required_approved ? 'reviewed' : 'pending'}>
                                 {employer.all_required_approved ? 'Ready for decision' : 'Document review'}
                               </Badge>
@@ -244,7 +249,7 @@ export default function VerificationQueuePage() {
                             <QueueFact
                               icon={FileSearch}
                               label="Required documents"
-                              value={`${approved}/${required} approved`}
+                              value={`${reviewable}/${required} submitted`}
                               progress={progress}
                             />
                             <QueueFact

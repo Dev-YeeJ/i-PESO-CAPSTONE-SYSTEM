@@ -454,7 +454,7 @@ function SearchablePicker({ label, required = false, value, options, placeholder
 
   return (
     <Field label={label} id={inputId} required={required} error={error}>
-      <div className="relative z-20">
+      <div className={focused ? "relative z-50" : "relative z-20"}>
         <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
         <input
           id={inputId}

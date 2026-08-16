@@ -132,29 +132,51 @@ class EmployerVerificationController extends Controller
     private function queueEntry(Employer $employer): array
     {
         $requiredDocuments = $employer->getRequiredDocuments();
+
         $approvedRequiredCount = $employer->documents
             ->whereIn('document_type', $requiredDocuments)
             ->where('verification_status', 'approved')
             ->count();
 
+        $pendingRequiredCount = $employer->documents
+            ->whereIn('document_type', $requiredDocuments)
+            ->where('verification_status', 'pending')
+            ->count();
+
+        // An employer is "ready for decision" when all required docs are uploaded
+        // (pending or approved). This covers both new submissions and resubmissions
+        // where docs were reset to pending after correction.
+        $uploadedRequiredTypes = $employer->documents
+            ->whereIn('document_type', $requiredDocuments)
+            ->whereIn('verification_status', ['pending', 'approved'])
+            ->pluck('document_type')
+            ->unique();
+
+        $allRequiredReady = count($requiredDocuments) > 0
+            && $uploadedRequiredTypes->count() === count($requiredDocuments);
+
         return [
-            'employer_id' => $employer->employer_id,
-            'email' => $employer->email,
-            'company_name' => $employer->company_name,
-            'company_type' => $employer->company_type,
-            'company_size' => $employer->company_size,
-            'representative_name' => $employer->representative_name,
-            'created_at' => $employer->created_at,
-            'days_waiting' => $employer->created_at?->diffInDays(now()) ?? 0,
-            'documents_count' => $employer->documents->count(),
-            'rejected_documents_count' => $employer->documents
+            'employer_id'                       => $employer->employer_id,
+            'email'                             => $employer->email,
+            'company_name'                      => $employer->company_name,
+            'company_type'                      => $employer->company_type,
+            'company_size'                      => $employer->company_size,
+            'representative_name'               => $employer->representative_name,
+            'created_at'                        => $employer->created_at,
+            'days_waiting'                      => $employer->created_at?->diffInDays(now()) ?? 0,
+            'documents_count'                   => $employer->documents->count(),
+            'rejected_documents_count'          => $employer->documents
                 ->where('verification_status', 'rejected')
                 ->count(),
-            'required_documents' => $requiredDocuments,
-            'required_documents_count' => count($requiredDocuments),
+            'required_documents'                => $requiredDocuments,
+            'required_documents_count'          => count($requiredDocuments),
             'approved_required_documents_count' => $approvedRequiredCount,
-            'all_required_uploaded' => $employer->hasAllRequiredDocuments(),
-            'all_required_approved' => $approvedRequiredCount === count($requiredDocuments),
+            'pending_required_documents_count'  => $pendingRequiredCount,
+            'all_required_uploaded'             => $employer->hasAllRequiredDocuments(),
+            // True when all required docs are in a reviewable state (pending or approved)
+            'all_required_approved'             => $allRequiredReady,
+            // Flag resubmissions so the admin queue can show a distinct badge
+            'is_resubmission'                   => ! empty($employer->rejection_reason),
         ];
     }
 
@@ -212,6 +234,7 @@ class EmployerVerificationController extends Controller
                     'document_type' => $doc->document_type,
                     'original_filename' => $doc->original_filename,
                     'uploaded_at' => $doc->uploaded_at,
+                    'viewed_at' => $doc->viewed_at,
                     'verification_status' => $doc->verification_status,
                     'admin_notes' => $doc->admin_notes,
                 ]),
@@ -370,6 +393,20 @@ class EmployerVerificationController extends Controller
         try {
             $employer = Employer::with('documents')->findOrFail($employer_id);
 
+            // Require all required documents to be viewed by the admin before making a final decision
+            $requiredDocs = $employer->getRequiredDocuments();
+            $unviewedRequired = $employer->documents
+                ->whereIn('document_type', $requiredDocs)
+                ->where('verification_status', '!=', 'approved')
+                ->where('viewed_at', null);
+
+            if ($unviewedRequired->isNotEmpty()) {
+                return response()->json([
+                    'error' => 'You must view all required documents before completing the review.',
+                    'unviewed_documents' => $unviewedRequired->pluck('document_type')
+                ], 422);
+            }
+
             $rejectedReasons = collect($validated['rejected_documents'] ?? [])
                 ->keyBy('document_id')
                 ->map(fn ($entry) => $entry['reason']);
@@ -508,6 +545,11 @@ class EmployerVerificationController extends Controller
             $document->document_type,
             $document->employer_id
         ));
+
+        if ($document->viewed_at === null) {
+            $document->viewed_at = now();
+            $document->save();
+        }
 
         return Storage::disk($disk)->response(
             $document->document_path,

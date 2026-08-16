@@ -1,7 +1,7 @@
 import { createElement, useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { AlertTriangle, ArrowLeft, Building2, CheckCircle2, Download, Eye, FileText, MapPin, ShieldAlert, ShieldCheck, XCircle } from 'lucide-react'
-import { Badge, Button, Card } from '@/components/ui'
+import { AlertTriangle, ArrowLeft, Building2, CheckCircle2, Download, Eye, FileText, MapPin, ShieldAlert, ShieldCheck, XCircle, Mail, Phone, User, Clock } from 'lucide-react'
+import { Badge, Button, Card, CardHeader } from '@/components/ui'
 import { adminService } from '@/services/adminService'
 
 const DOCUMENT_LABELS = {
@@ -55,6 +55,8 @@ export default function EmployerDetailPage() {
   const [error, setError] = useState('')
   // Confirmation dialog state
   const [confirmDialog, setConfirmDialog] = useState(null)
+  // Track documents viewed during this session so UI updates immediately
+  const [viewedDocumentIds, setViewedDocumentIds] = useState(new Set())
 
   const loadEmployer = useCallback(async () => {
     setLoading(true)
@@ -127,6 +129,11 @@ export default function EmployerDetailPage() {
       const file = await adminService.getEmployerDocument(document.document_id)
       const fileUrl = URL.createObjectURL(file)
       setPreviewDocument({ ...document, url: fileUrl, mimeType: file.type })
+      setViewedDocumentIds((prev) => {
+        const next = new Set(prev)
+        next.add(document.document_id)
+        return next
+      })
     } catch (requestError) {
       setError(requestError.response?.data?.message ?? 'Unable to open this document.')
     } finally {
@@ -241,11 +248,28 @@ export default function EmployerDetailPage() {
   ]
 
   const requiredCount = requiredDocuments.length
-  const approvedRequiredCount = requiredDocuments.filter((type) => {
+  // Only count docs that are truly approved in the DB. "Pending" docs are NOT yet approved
+  // even though they will be approved by default when the admin finalizes.
+  const dbApprovedRequiredCount = requiredDocuments.filter((type) => {
     const doc = verificationDocuments.find((d) => d.document_type === type)
-    return doc && !isRejected(doc)
+    return doc && doc.verification_status === 'approved'
   }).length
-  const approvalPct = requiredCount ? Math.round((approvedRequiredCount / requiredCount) * 100) : 0
+
+  // Check if all required documents have been viewed (only for unapproved docs)
+  const unviewedRequiredDocs = requiredDocuments.filter((type) => {
+    const doc = verificationDocuments.find((d) => d.document_type === type)
+    if (!doc || doc.verification_status === 'approved') return false
+    return !doc.viewed_at && !viewedDocumentIds.has(doc.document_id)
+  })
+  const allRequiredViewed = unviewedRequiredDocs.length === 0
+
+  // For the progress bar / decision badge: count docs that WILL be approved after
+  // finalization (uploaded + not flagged for rejection by admin in this session).
+  const willApproveCount = verificationDocuments.filter((doc) => !isRejected(doc)).length
+  const totalUploaded = verificationDocuments.length
+
+  // Progress shows "will approve" out of total uploaded
+  const approvalPct = totalUploaded ? Math.round((willApproveCount / totalUploaded) * 100) : 0
 
   const hasRejectedRequired = requiredDocuments.some((type) => {
     const doc = verificationDocuments.find((d) => d.document_type === type)
@@ -266,252 +290,271 @@ export default function EmployerDetailPage() {
         {error && <div className="mb-6 flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-medium text-red-800"><AlertTriangle className="h-4 w-4 shrink-0" />{error}</div>}
         {notice && <div className="mb-6 flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-medium text-emerald-800"><CheckCircle2 className="h-4 w-4 shrink-0" />{notice}</div>}
 
-        <div className="grid gap-6 xl:grid-cols-[minmax(0,1.65fr)_minmax(320px,0.85fr)]">
-          <div className="space-y-6">
-            <Card hero padding="none" heroContent={(
-              <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+        <div className="mb-4 space-y-4">
+          <Card hero padding="none" heroContent={(
+            <div className="flex flex-col gap-5">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
                 <div className="min-w-0">
-                  <p className="text-xs font-black uppercase tracking-[0.22em] text-blue-100">PESO Employer Audit Hub</p>
-                  <h1 className="mt-2 text-3xl font-black text-white">{companyProfile.company_name || employer.company_name || 'Employer profile'}</h1>
-                  <p className="mt-2 max-w-2xl text-sm leading-6 text-blue-50">{companyProfile.industry || employer.industry || 'Industry not specified'}</p>
+                  <p className="text-xs font-black uppercase tracking-[0.22em] text-blue-100">
+                    {verificationStatus === 'pending' ? 'PESO Employer Audit Hub' : 'Employer Profile'}
+                  </p>
+                  <div className="mt-2 flex items-center gap-4">
+                    {companyProfile.company_logo_url && (
+                      <img src={companyProfile.company_logo_url} alt="Logo" className="h-12 w-12 shrink-0 rounded-xl bg-white object-cover p-1 shadow-sm" />
+                    )}
+                    <h1 className="text-3xl font-black text-white">{companyProfile.company_name || employer.company_name || 'Employer profile'}</h1>
+                  </div>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   <Badge status={verificationStatus === 'approved' ? 'approved' : verificationStatus === 'rejected' ? 'rejected' : 'pending'}>{formatValue(verificationStatus)}</Badge>
-                  {companyProfile.gps_status === 'missing' ? <Badge status="warning">Missing GPS</Badge> : <Badge status="active">GPS available</Badge>}
                 </div>
               </div>
-            )}>
-              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                <InfoTile label="Representative" value={representative.representative_name || `${representative.representative_first_name || ''} ${representative.representative_last_name || ''}`.trim() || 'Not provided'} icon={Building2} />
-                <InfoTile label="Contact" value={representative.representative_contact_number || representative.mobile_number || 'Not provided'} icon={FileText} />
-                <InfoTile label="Business address" value={companyProfile.business_address || businessAddress.complete_address || 'Not provided'} icon={MapPin} />
-                <InfoTile label="Verification remarks" value={verificationRemarks || 'No remarks recorded'} icon={ShieldAlert} />
-              </div>
-            </Card>
+            </div>
+                   {/* Main Content and Sidebar Layout */}
+          <div className="grid gap-6 xl:grid-cols-[minmax(0,1.7fr)_minmax(320px,0.8fr)]">
+            <main className="space-y-6">
+              <Card>
+                <CardHeader title="Company Details" subtitle="Core business information registered in the system." />
+                <div className="grid gap-x-8 gap-y-5 sm:grid-cols-2">
+                  <InfoItem label="Company name" value={companyProfile.company_name || employer.company_name} />
+                  <InfoItem label="Industry" value={companyProfile.industry || employer.industry} />
+                  <InfoItem label="TIN" value={companyProfile.tin || employer.tin} />
+                  <InfoItem label="Business address" value={companyProfile.business_address || businessAddress.complete_address} />
+                </div>
+              </Card>
 
-            <Card>
-              <div className="grid gap-6 lg:grid-cols-2">
-                <div>
-                  <h2 className="text-lg font-black text-slate-950">Company profile</h2>
-                  <div className="mt-4 space-y-4">
-                    <InfoRow label="Company name" value={companyProfile.company_name || employer.company_name} />
-                    <InfoRow label="Company type" value={companyProfile.company_type || employer.company_type} />
-                    <InfoRow label="Industry" value={companyProfile.industry || employer.industry} />
-                    <InfoRow label="Company size" value={companyProfile.company_size || employer.company_size} />
-                    <InfoRow label="Business address" value={companyProfile.business_address || businessAddress.complete_address} />
-                  </div>
+              <Card>
+                <CardHeader title="Representative" subtitle="Authorized contact person for PESO coordination." />
+                <div className="grid gap-x-8 gap-y-5 sm:grid-cols-2">
+                  <InfoItem label="Name" value={representative.representative_name || `${representative.representative_first_name || ''} ${representative.representative_last_name || ''}`.trim()} />
+                  <InfoItem label="Designation" value={representative.representative_designation} />
+                  <InfoItem label="Contact number" value={representative.representative_contact_number || representative.mobile_number} />
+                  <InfoItem label="Email address" value={representative.email} />
                 </div>
-                <div>
-                  <h2 className="text-lg font-black text-slate-950">Representative information</h2>
-                  <div className="mt-4 space-y-4">
-                    <InfoRow label="Name" value={representative.representative_name || `${representative.representative_first_name || ''} ${representative.representative_last_name || ''}`.trim()} />
-                    <InfoRow label="Designation" value={representative.representative_designation} />
-                    <InfoRow label="Email" value={representative.email} />
-                    <InfoRow label="Contact number" value={representative.representative_contact_number || representative.mobile_number} />
-                  </div>
-                </div>
-              </div>
-            </Card>
+              </Card>
 
-            <Card>
-              <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="text-lg font-black text-slate-950">Verification documents</h2>
-                  <p className="mt-1 text-sm text-slate-500">Every submitted requirement is approved by default — only reject the ones with a problem.</p>
-                </div>
-                <div className="flex gap-2">
-                  <Badge status={verificationDocuments.length ? 'active' : 'warning'}>{verificationDocuments.length ? `${verificationDocuments.length} uploaded` : 'No documents'}</Badge>
-                  {requiredCount > 0 && (
-                    <Badge status={willReject ? 'rejected' : 'approved'}>
-                      {approvedRequiredCount}/{requiredCount} approved
-                    </Badge>
-                  )}
-                </div>
-              </div>
-
-              {/* Approval progress bar */}
-              {requiredCount > 0 && (
-                <div className="mt-4">
-                  <div className="flex items-center justify-between text-xs font-bold text-slate-400">
-                    <span>Approval progress</span>
-                    <span>{approvalPct}%</span>
+              {/* Vacancy Summary if verified */}
+              {verificationStatus !== 'pending' && (
+                <Card>
+                  <CardHeader title="Vacancy and application summary" subtitle="Overall recruitment metrics for this employer." />
+                  <div className="mt-2 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                    <StatTile label="Active vacancies" value={activeVacanciesSummary?.total ?? 0} />
+                    <StatTile label="Closed vacancies" value={closedVacanciesSummary?.total ?? 0} />
+                    <StatTile label="Applications" value={applicationsSummary?.total ?? 0} />
+                    <StatTile label="Hired" value={employer.hired_summary?.total ?? 0} />
                   </div>
-                  <div className="mt-1 h-2 overflow-hidden rounded-full bg-slate-100">
-                    <div
-                      className="h-full rounded-full transition-all duration-500"
-                      style={{
-                        width: `${Math.max(approvalPct, 2)}%`,
-                        background: willReject
-                          ? 'linear-gradient(90deg, #ef4444, #f97316)'
-                          : 'linear-gradient(90deg, #10b981, #059669)',
-                      }}
-                    />
-                  </div>
-                </div>
+                </Card>
               )}
 
-              {/* Landscape (table) layout of the requirements */}
-              <div className="mt-5 overflow-x-auto">
-                <table className="w-full min-w-[640px] border-collapse text-left text-sm">
-                  <thead>
-                    <tr className="border-b border-slate-200 text-[11px] font-extrabold uppercase tracking-wide text-slate-400">
-                      <th className="px-3 py-2">Document</th>
-                      <th className="px-3 py-2">Status</th>
-                      <th className="px-3 py-2">Expiration</th>
-                      <th className="px-3 py-2 text-right">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {documentRows.map((row) => {
-                      const doc = row.document
-                      const label = DOCUMENT_LABELS[row.type] ?? row.type
-                      const rejected = isRejected(doc)
-                      return (
-                        <tr key={`${row.type}-${doc?.document_id ?? 'missing'}`} className="border-b border-slate-100 align-top">
-                          <td className="px-3 py-3">
-                            <div className="flex items-center gap-2">
-                              <span className="font-bold text-slate-900">{label}</span>
-                              {row.required && <span className="rounded-md bg-blue-50 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-blue-600">Required</span>}
-                            </div>
-                            {doc ? (
-                              <p className="mt-1 text-xs text-slate-400">{doc.original_filename} · Uploaded {formatDate(doc.uploaded_at || doc.created_at)}</p>
-                            ) : (
-                              <p className="mt-1 text-xs text-amber-600">No file submitted</p>
-                            )}
-                          </td>
-                          <td className="px-3 py-3">
-                            {!doc ? (
-                              <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-bold text-amber-700"><AlertTriangle className="h-3.5 w-3.5" />Not submitted</span>
-                            ) : rejected ? (
-                              <div>
-                                <span className="inline-flex items-center gap-1 rounded-full bg-red-50 px-2.5 py-1 text-xs font-bold text-red-700"><XCircle className="h-3.5 w-3.5" />Rejected</span>
-                                <p className="mt-1 text-xs text-red-600">{decisions[doc.document_id]}</p>
+              <Card>
+                <div className="flex items-center justify-between p-6 pb-2">
+                  <div>
+                    <h2 className="text-lg font-black text-slate-950">Verification documents</h2>
+                    {verificationStatus === 'pending' && (
+                      <p className="mt-1 text-sm text-slate-500">Review each document. Documents will be approved unless you flag them for rejection before finalizing.</p>
+                    )}
+                  </div>
+                  <div className="flex gap-2">
+                    <Badge status={totalUploaded ? 'active' : 'warning'}>{totalUploaded ? `${totalUploaded} uploaded` : 'No documents'}</Badge>
+                  </div>
+                </div>
+
+                {/* Approval progress bar */}
+                {verificationStatus === 'pending' && requiredCount > 0 && (
+                  <div className="px-6 mt-4">
+                    <div className="flex items-center justify-between text-xs font-bold text-slate-400">
+                      <span>Approval progress</span>
+                      <span>{approvalPct}%</span>
+                    </div>
+                    <div className="mt-1 h-2 overflow-hidden rounded-full bg-slate-100">
+                      <div
+                        className="h-full rounded-full transition-all duration-500"
+                        style={{
+                          width: `${Math.max(approvalPct, 2)}%`,
+                          background: willReject
+                            ? 'linear-gradient(90deg, #ef4444, #f97316)'
+                            : 'linear-gradient(90deg, #10b981, #059669)',
+                        }}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* Landscape (table) layout of the requirements */}
+                <div className="px-6 pb-6 mt-5 overflow-x-auto">
+                  <table className="w-full border-collapse text-left text-sm whitespace-nowrap">
+                    <thead>
+                      <tr className="border-b border-slate-200 text-[11px] font-extrabold uppercase tracking-wide text-slate-400">
+                        <th className="px-3 py-2">Document</th>
+                        <th className="px-3 py-2">Status</th>
+                        <th className="px-3 py-2">Expiration</th>
+                        <th className="px-3 py-2 text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {documentRows.map((row) => {
+                        const doc = row.document
+                        const label = DOCUMENT_LABELS[row.type] ?? row.type
+                        const rejected = isRejected(doc)
+                        return (
+                          <tr key={`${row.type}-${doc?.document_id ?? 'missing'}`} className="border-b border-slate-100 align-top">
+                            <td className="px-2 py-2">
+                              <div className="flex items-center gap-2">
+                                <span className="font-bold text-slate-900">{label}</span>
+                                {row.required && <span className="rounded-md bg-blue-50 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-blue-600">Required</span>}
                               </div>
-                            ) : (
-                              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700"><CheckCircle2 className="h-3.5 w-3.5" />Approved</span>
-                            )}
-                          </td>
-                          <td className="px-3 py-3 text-xs text-slate-600">
-                            {row.type === 'mayors_permit' ? (doc?.expiration_date ? formatDate(doc.expiration_date) : '—') : '—'}
-                          </td>
-                          <td className="px-3 py-3">
-                            <div className="flex flex-wrap items-center justify-end gap-2">
-                              {doc && (
-                                <>
-                                  <Button variant="outline" size="sm" icon={Eye} onClick={() => viewDocument(doc)} disabled={viewingDocumentId === doc.document_id}>
-                                    {viewingDocumentId === doc.document_id ? 'Loading...' : 'View'}
-                                  </Button>
-                                  <Button variant="outline" size="sm" icon={Download} onClick={() => { setDownloadDocument(doc); setDownloadReason('') }}>Download</Button>
-                                  {rejected ? (
-                                    <Button variant="outline" size="sm" icon={CheckCircle2} onClick={() => undoRejectRow(doc.document_id)}>Undo</Button>
-                                  ) : (
-                                    <select
-                                      value=""
-                                      onChange={(event) => { if (event.target.value) rejectRow(doc.document_id, event.target.value) }}
-                                      className="rounded-lg border border-red-200 bg-red-50 px-2 py-1.5 text-xs font-bold text-red-700 focus:outline-none focus:ring-1 focus:ring-red-300"
-                                    >
-                                      <option value="">Reject…</option>
-                                      {REJECTION_REASONS.map((reason) => <option key={reason} value={reason}>{reason}</option>)}
-                                    </select>
-                                  )}
-                                </>
+                              {doc ? (
+                                <p className="mt-1 text-xs text-slate-400">{doc.original_filename} · Uploaded {formatDate(doc.uploaded_at || doc.created_at)}</p>
+                              ) : (
+                                <p className="mt-1 text-xs text-amber-600">No file submitted</p>
                               )}
-                            </div>
-                          </td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-                {documentRows.length === 0 && (
-                  <div className="mt-3 rounded-xl border border-dashed border-slate-200 bg-slate-50 p-5 text-center text-sm text-slate-500">No documents have been uploaded for this employer.</div>
-                )}
-              </div>
-            </Card>
-
-            <Card>
-              <h2 className="text-lg font-black text-slate-950">Vacancy and application summary</h2>
-              <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                <StatTile label="Active vacancies" value={activeVacanciesSummary.total ?? 0} />
-                <StatTile label="Closed vacancies" value={closedVacanciesSummary.total ?? 0} />
-                <StatTile label="Applications" value={applicationsSummary.total ?? 0} />
-                <StatTile label="Hired" value={applicationsSummary.hired_count ?? 0} />
-              </div>
-            </Card>
-          </div>
-
-          <div className="space-y-6">
-            <Card>
-              <h2 className="text-lg font-black text-slate-950">Data quality flags</h2>
-              <div className="mt-4 flex flex-wrap gap-2">
-                {Object.entries(dataQualityFlags).filter(([, value]) => value).map(([key]) => <Badge key={key} status="warning">{labelForFlag(key)}</Badge>)}
-                {!Object.keys(dataQualityFlags).filter((key) => dataQualityFlags[key]).length && <p className="text-sm text-slate-500">No flags detected.</p>}
-              </div>
-            </Card>
-
-            <Card>
-              <h2 className="text-lg font-black text-slate-950">Operational review</h2>
-              <div className="mt-4 space-y-4">
-                <InfoRow label="Verification status" value={formatValue(verificationStatus)} />
-                <InfoRow label="Remarks" value={verificationRemarks || 'No remarks recorded'} />
-                <InfoRow label="Registered" value={formatDate(employer.created_at)} />
-                <InfoRow label="Last updated" value={formatDate(employer.updated_at)} />
-              </div>
-            </Card>
-
-            <Card>
-              <h2 className="text-lg font-black text-slate-950">Job fair participation</h2>
-              {jobFairParticipation.length ? (
-                <div className="mt-4 space-y-2">
-                  {jobFairParticipation.map((item) => <div key={item.id} className="rounded-xl bg-slate-50 p-3 text-sm text-slate-700">Joined on {formatDate(item.joined_at || item.created_at)}</div>)}
+                            </td>
+                            <td className="px-2 py-2">
+                              {!doc ? (
+                                <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-bold text-amber-700"><AlertTriangle className="h-3.5 w-3.5" />Not submitted</span>
+                              ) : rejected ? (
+                                <div>
+                                  <span className="inline-flex items-center gap-1 rounded-full bg-red-50 px-2.5 py-1 text-xs font-bold text-red-700"><XCircle className="h-3.5 w-3.5" />Flagged for rejection</span>
+                                  <p className="mt-1 text-xs text-red-600">{decisions[doc.document_id]}</p>
+                                </div>
+                              ) : doc.verification_status === 'approved' ? (
+                                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700"><CheckCircle2 className="h-3.5 w-3.5" />Approved</span>
+                              ) : (
+                                <div className="flex flex-col items-start gap-1">
+                                  <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-bold text-amber-700"><AlertTriangle className="h-3.5 w-3.5" />Pending review</span>
+                                  {(doc.viewed_at || viewedDocumentIds.has(doc.document_id)) && (
+                                    <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-bold text-blue-700"><Eye className="h-3 w-3" />Viewed</span>
+                                  )}
+                                </div>
+                              )}
+                            </td>
+                            <td className="px-2 py-2 text-xs text-slate-600">
+                              {row.type === 'mayors_permit' ? (
+                                doc?.expiration_date ? (
+                                  <div className="flex flex-col items-start gap-1">
+                                    <span>{formatDate(doc.expiration_date)}</span>
+                                    {new Date(doc.expiration_date) < new Date() && (
+                                      <span className="rounded bg-red-100 px-1.5 py-0.5 text-[10px] font-bold text-red-700">Expired</span>
+                                    )}
+                                  </div>
+                                ) : '—'
+                              ) : '—'}
+                            </td>
+                            <td className="px-2 py-2">
+                              <div className="flex flex-wrap items-center justify-end gap-2">
+                                {doc && (
+                                  <>
+                                    <Button variant="outline" size="sm" icon={Eye} onClick={() => viewDocument(doc)} disabled={viewingDocumentId === doc.document_id}>
+                                      {viewingDocumentId === doc.document_id ? 'Loading...' : 'View'}
+                                    </Button>
+                                    <Button variant="outline" size="sm" icon={Download} onClick={() => { setDownloadDocument(doc); setDownloadReason('') }}>
+                                      <span className="hidden xl:inline">Download</span>
+                                    </Button>
+                                    {verificationStatus === 'pending' && (
+                                      rejected ? (
+                                        <Button variant="outline" size="sm" icon={CheckCircle2} onClick={() => undoRejectRow(doc.document_id)}>Undo</Button>
+                                      ) : (
+                                        <select
+                                          value=""
+                                          onChange={(event) => { if (event.target.value) rejectRow(doc.document_id, event.target.value) }}
+                                          className="w-28 rounded-lg border border-red-200 bg-red-50 px-2 py-1.5 text-xs font-bold text-red-700 focus:outline-none focus:ring-1 focus:ring-red-300"
+                                        >
+                                          <option value="">Reject…</option>
+                                          {REJECTION_REASONS.map((reason) => <option key={reason} title={reason} value={reason}>{reason}</option>)}
+                                        </select>
+                                      )
+                                    )}
+                                  </>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                  {documentRows.length === 0 && (
+                    <div className="mt-3 rounded-xl border border-dashed border-slate-200 bg-slate-50 p-5 text-center text-sm text-slate-500">No documents have been uploaded for this employer.</div>
+                  )}
                 </div>
-              ) : <p className="mt-4 text-sm text-slate-500">No job fair participation records.</p>}
-            </Card>
 
-            <Card>
-              <h2 className="text-lg font-black text-slate-950">Review decision</h2>
-
-              {/* Readiness summary */}
-              <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3">
-                <p className="text-xs font-extrabold uppercase tracking-wide text-slate-500">Approval Readiness</p>
-                <div className="mt-2 space-y-1.5">
-                  <ReadinessCheck
-                    label="All required documents submitted"
-                    passed={!hasMissingRequired}
-                    detail={hasMissingRequired ? `${missingDocuments.length} missing` : null}
-                  />
-                  <ReadinessCheck
-                    label="No required document rejected"
-                    passed={!hasRejectedRequired}
-                    detail={hasRejectedRequired ? 'Blocks approval' : null}
-                  />
-                </div>
-              </div>
-
-              <div className="mt-4 space-y-3">
-                <p className="text-sm leading-6 text-slate-600">
-                  {willReject
-                    ? 'A required document is rejected or missing — finalizing will reject this employer and notify them of the reason.'
-                    : 'All submitted requirements will be approved and this employer will be verified.'}
-                </p>
-                <Button
-                  variant={willReject ? 'danger' : 'secondary'}
-                  icon={willReject ? XCircle : ShieldCheck}
-                  onClick={handleFinalize}
-                  disabled={actionLoading}
-                  className={willReject
-                    ? 'w-full'
-                    : 'w-full !border-emerald-600 !bg-emerald-600 !text-white hover:!bg-emerald-700'}
-                >
-                  {actionLoading ? 'Working...' : willReject ? 'Reject Employer' : 'Approve Employer'}
-                </Button>
-                {rejectedCount > 0 && !willReject && (
-                  <p className="text-xs text-slate-500">{rejectedCount} optional document(s) flagged — these do not block approval.</p>
+                {/* Form Action Footer */}
+                {verificationStatus === 'pending' && (
+                  <div className="mt-2 mx-6 mb-6 flex flex-col items-center justify-between gap-4 border-t border-slate-100 pt-5 md:flex-row">
+                    <Button variant="ghost" onClick={() => navigate('/admin/employers')} icon={ArrowLeft}>Back to Queue</Button>
+                    
+                    {missingDocuments.length > 0 ? (
+                      <div className="flex items-center gap-3">
+                        <span className="text-sm font-semibold text-red-600">Missing {missingDocuments.length} required document(s)</span>
+                        <Button onClick={handleFinalize} icon={XCircle} disabled={actionLoading}>{actionLoading ? 'Loading...' : 'Reject Accreditation'}</Button>
+                      </div>
+                    ) : !allRequiredViewed ? (
+                      <div className="flex items-center gap-3">
+                        <span className="text-sm font-semibold text-amber-600">View all required documents first</span>
+                        <Button onClick={() => {}} icon={CheckCircle2} disabled>Complete Review</Button>
+                      </div>
+                    ) : (
+                      <Button onClick={handleFinalize} icon={CheckCircle2} disabled={actionLoading}>{actionLoading ? 'Loading...' : 'Complete Review'}</Button>
+                    )}
+                  </div>
                 )}
-              </div>
-            </Card>
+              </Card>
+            </main>
+
+            <aside className="space-y-6">
+              <Card>
+                <CardHeader title="Operational Review" subtitle="Verification status and updates." />
+                <div className="space-y-4">
+                  <div className="flex items-center gap-3 rounded-xl bg-slate-50 p-3">
+                    <span className={`rounded-lg p-2 ${verificationStatus === 'approved' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}><ShieldCheck className="h-4 w-4" /></span>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs text-slate-500">Status</p>
+                      <p className="text-sm font-bold text-slate-800 capitalize">{formatValue(verificationStatus)}</p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center gap-3 rounded-xl bg-slate-50 p-3">
+                    <span className="rounded-lg bg-slate-200 p-2 text-slate-700"><Clock className="h-4 w-4" /></span>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs text-slate-500">Last updated</p>
+                      <p className="text-sm font-bold text-slate-800">{formatDate(employer.updated_at)}</p>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col gap-1 rounded-xl bg-slate-50 p-3">
+                    <div className="flex items-center gap-2">
+                      <FileText className="h-4 w-4 text-slate-400" />
+                      <p className="text-xs text-slate-500">Remarks</p>
+                    </div>
+                    <p className="mt-1 text-sm font-medium text-slate-800 pl-6">{verificationRemarks || 'No remarks recorded'}</p>
+                  </div>
+                </div>
+              </Card>
+
+              {/* Extra Profile Sections for Verified Employers */}
+              {verificationStatus !== 'pending' && (
+                <>
+                  <Card>
+                    <CardHeader title="Data Quality Flags" subtitle="Operational indicators for follow-up." />
+                    <div className="flex flex-wrap gap-2">
+                      {Object.entries(dataQualityFlags || {}).filter(([, value]) => value).map(([key]) => <Badge key={key} status="warning">{key.replace(/_/g, ' ')}</Badge>)}
+                      {!Object.values(dataQualityFlags || {}).some(Boolean) && <span className="text-sm text-slate-500">No flags detected.</span>}
+                    </div>
+                  </Card>
+
+                  <Card>
+                    <CardHeader title="Job Fair Participation" subtitle="Events the employer joined." />
+                    {jobFairParticipation?.length ? (
+                      <div className="space-y-2">
+                        {jobFairParticipation.map((fair) => <div key={fair.id} className="rounded-xl border border-slate-200 bg-slate-50 p-3"><p className="text-sm font-bold text-slate-800">{fair.name}</p><p className="mt-1 text-xs text-slate-500">{formatDate(fair.date)}</p></div>)}
+                      </div>
+                    ) : <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 p-5 text-center"><p className="text-sm text-slate-500">No job fair participation records.</p></div>}
+                  </Card>
+                </>
+              )}
+            </aside>
           </div>
-        </div>
+        </div>  </div>
       </div>
 
       {/* ── DOWNLOAD MODAL ───────────────────────────────────────── */}
@@ -583,16 +626,17 @@ export default function EmployerDetailPage() {
   )
 }
 
-function InfoTile({ icon, label, value }) {
-  return <div className="rounded-2xl border border-white/15 bg-white/10 p-4 backdrop-blur"><div className="flex items-center gap-2 text-sm font-semibold text-white/90"><span className="rounded-lg bg-white/15 p-2">{createElement(icon, { className: 'h-4 w-4' })}</span>{label}</div><p className="mt-3 text-sm text-blue-50">{value}</p></div>
-}
-
-function InfoRow({ label, value }) {
-  return <div className="rounded-xl bg-slate-50 p-3"><p className="text-[11px] font-extrabold uppercase tracking-wide text-slate-400">{label}</p><p className="mt-1 text-sm font-semibold text-slate-800">{value || 'Not provided'}</p></div>
+function InfoItem({ label, value }) {
+  return (
+    <div>
+      <p className="text-xs font-bold uppercase tracking-wide text-slate-400">{label}</p>
+      <p className="mt-1 text-sm font-semibold text-slate-800">{value ? formatValue(value) : 'Not provided'}</p>
+    </div>
+  )
 }
 
 function StatTile({ label, value }) {
-  return <div className="rounded-xl border border-slate-200 bg-slate-50 p-4"><p className="text-2xl font-black text-slate-950">{value}</p><p className="mt-1 text-xs font-extrabold uppercase tracking-wide text-slate-500">{label}</p></div>
+  return <div className="rounded-xl border border-slate-200 bg-slate-50 p-3"><p className="text-xl font-black text-slate-950">{value}</p><p className="mt-0.5 text-[10px] font-extrabold uppercase tracking-wide text-slate-500">{label}</p></div>
 }
 
 function ReadinessCheck({ label, passed, detail }) {

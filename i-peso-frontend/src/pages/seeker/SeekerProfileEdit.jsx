@@ -365,19 +365,6 @@ export default function SeekerProfileEdit() {
               ))}
             </nav>
 
-            <section className={cardClass}>
-              <p className="text-sm font-black text-slate-900">Data quality checklist</p>
-              <div className="mt-3 space-y-2">
-                {completionItems.map((item) => (
-                  <div key={item.label} className="flex items-center gap-2 text-sm">
-                    <span className={`flex h-5 w-5 items-center justify-center rounded-full ${item.done ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-400'}`}>
-                      {item.done ? <CheckCircle2 className="h-3.5 w-3.5" /> : <span className="h-1.5 w-1.5 rounded-full bg-current" />}
-                    </span>
-                    <span className={item.done ? 'font-semibold text-slate-700' : 'text-slate-500'}>{item.label}</span>
-                  </div>
-                ))}
-              </div>
-            </section>
           </aside>
 
           <main className="min-w-0 space-y-5">
@@ -483,10 +470,7 @@ export default function SeekerProfileEdit() {
                   )}
                   {form.employment.employment_status === 'unemployed' && (
                     <>
-                      <SelectInput label="Months unemployed" value={form.employment.unemployment_months} error={errors.unemployment_months} onChange={(value) => updateSection('employment', { unemployment_months: value })} options={[
-                        { value: '', label: 'Select duration' },
-                        ...MONTH_DURATION_OPTIONS,
-                      ]} />
+                      <TextInput type="number" label="Months unemployed" value={form.employment.unemployment_months} error={errors.unemployment_months} onChange={(value) => updateSection('employment', { unemployment_months: value })} />
                       <SelectInput label="Reason for unemployment" value={form.employment.unemployment_reason} error={errors.unemployment_reason} onChange={(value) => updateSection('employment', { unemployment_reason: value })} options={[
                         { value: '', label: 'Select reason' },
                         { value: 'fresh_graduate', label: 'Fresh graduate' },
@@ -678,10 +662,7 @@ export default function SeekerProfileEdit() {
                       <div className="grid gap-4 md:grid-cols-2">
                         <SearchableTextInput label="Course / Training" value={training.course} error={errors[`trainings.${index}.course`]} options={TRAINING_COURSE_OPTIONS} placeholder="Type or select a training course" onChange={(value) => updateListItem('training', 'trainings', index, { course: value })} />
                         <SearchableTextInput label="Training institution" value={training.training_institution} options={TRAINING_INSTITUTION_OPTIONS} placeholder="Type or select an institution" onChange={(value) => updateListItem('training', 'trainings', index, { training_institution: value })} />
-                        <SelectInput label="Hours of training" value={training.hours_of_training} error={errors[`trainings.${index}.hours_of_training`]} onChange={(value) => updateListItem('training', 'trainings', index, { hours_of_training: value })} options={[
-                          { value: '', label: 'Select training hours' },
-                          ...TRAINING_HOUR_OPTIONS,
-                        ]} />
+                        <TextInput type="number" label="Hours of training" value={training.hours_of_training} error={errors[`trainings.${index}.hours_of_training`]} onChange={(value) => updateListItem('training', 'trainings', index, { hours_of_training: value })} />
                         <TextInput label="Certificate received" value={training.certificates_received} onChange={(value) => updateListItem('training', 'trainings', index, { certificates_received: value })} />
                         <div className="md:col-span-2">
                           <TextArea label="Skills acquired" rows={2} value={training.skills_acquired} onChange={(value) => updateListItem('training', 'trainings', index, { skills_acquired: value })} />

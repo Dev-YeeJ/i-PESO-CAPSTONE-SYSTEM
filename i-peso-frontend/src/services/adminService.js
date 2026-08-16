@@ -148,6 +148,17 @@ export const adminService = {
     return response
   },
 
+  // ── EMPLOYMENT HUB ──────────────────────────────────────────────
+  getJobVacancies: async (params = {}) => {
+    const { data } = await api.get('/admin/vacancies', { params: cleanParams(params) })
+    return data
+  },
+
+  getJobVacancyDetail: async (id) => {
+    const { data } = await api.get(`/admin/vacancies/${id}`)
+    return data
+  },
+
   // ── PROGRAMS ───────────────────────────────────────────────────
   getProgramsList: async (params = {}) => {
     const { data } = await api.get('/admin/programs', { params: cleanParams(params) })

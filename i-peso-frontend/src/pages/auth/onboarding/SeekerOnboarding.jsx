@@ -803,17 +803,13 @@ const Step2 = ({ form, errors, onChange }) => (
         <p style={{ fontSize: '12px', fontWeight: '700', color: '#92400e', marginBottom: '12px' }}>UNEMPLOYMENT DETAILS</p>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
           <FormField label="Months Unemployed" error={errors.unemployment_months} help="Select the closest duration">
-            <select
-              style={selectStyle(!!errors.unemployment_months)}
+            <input
+              type="number"
+              style={inputStyle(!!errors.unemployment_months)}
               name="unemployment_months"
               value={form.unemployment_months ?? ''}
               onChange={onChange}
-            >
-              <option value="">Select duration</option>
-              {SHARED_MONTH_DURATION_OPTIONS.map((duration) => (
-                <option key={duration.value} value={duration.value}>{duration.label}</option>
-              ))}
-            </select>
+            />
           </FormField>
           <FormField label="Reason" error={errors.unemployment_reason}>
             <select style={selectStyle(!!errors.unemployment_reason)} name="unemployment_reason"

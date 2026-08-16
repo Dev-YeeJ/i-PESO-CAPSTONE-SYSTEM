@@ -12,6 +12,25 @@ class Employer extends Authenticatable
 {
     use HasApiTokens, Notifiable, SoftDeletes;
 
+    protected static function boot()
+    {
+        parent::boot();
+
+        static::deleting(function ($employer) {
+            if ($employer->isForceDeleting()) {
+                $employer->documents()->forceDelete();
+                $employer->vacancies()->forceDelete();
+                $employer->reports()->forceDelete();
+                $employer->jobFairJoins()->forceDelete();
+            } else {
+                $employer->documents()->delete();
+                $employer->vacancies()->delete();
+                $employer->reports()->delete();
+                $employer->jobFairJoins()->delete();
+            }
+        });
+    }
+
     protected $table = 'employers';
 
     protected $primaryKey = 'employer_id';

@@ -90,22 +90,24 @@ export default function EmployerRegistration() {
       sideItems={['Legal document review', 'Email and dashboard status notifications', 'Job posting access after approval']}
     >
       <Link to="/register" className="registration-change-role"><ArrowLeft className="h-4 w-4" />Change account type</Link>
-      <Card>
+      <Card padding="sm">
         <FormError message={apiError} />
-        <form onSubmit={submit} noValidate className="space-y-4">
+        <form onSubmit={submit} noValidate className="space-y-3">
           <Field label="Company email address" name="email" type="email" placeholder="company@example.com" value={form.email ?? ''} onChange={change} onBlur={blur} error={fieldError('email')} />
-          <div>
-            <Field label="Password" name="password" type={showPassword ? 'text' : 'password'} placeholder="Minimum 8 characters" value={form.password ?? ''} onChange={change} onBlur={blur} error={fieldError('password')} rightElement={<VisibilityButton shown={showPassword} onClick={() => setShowPassword((current) => !current)} />} />
-            <PasswordStrengthMeter password={form.password} strength={strength} />
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <Field label="Password" name="password" type={showPassword ? 'text' : 'password'} placeholder="Minimum 8 characters" value={form.password ?? ''} onChange={change} onBlur={blur} error={fieldError('password')} rightElement={<VisibilityButton shown={showPassword} onClick={() => setShowPassword((current) => !current)} />} />
+              <PasswordStrengthMeter password={form.password} strength={strength} />
+            </div>
+            <Field label="Confirm password" name="password_confirmation" type={showConfirmation ? 'text' : 'password'} placeholder="Re-enter your password" value={form.password_confirmation ?? ''} onChange={change} onBlur={blur} error={fieldError('password_confirmation')} rightElement={<VisibilityButton shown={showConfirmation} onClick={() => setShowConfirmation((current) => !current)} />} />
           </div>
-          <Field label="Confirm password" name="password_confirmation" type={showConfirmation ? 'text' : 'password'} placeholder="Re-enter your password" value={form.password_confirmation ?? ''} onChange={change} onBlur={blur} error={fieldError('password_confirmation')} rightElement={<VisibilityButton shown={showConfirmation} onClick={() => setShowConfirmation((current) => !current)} />} />
 
           <fieldset>
             <legend className="mb-2 text-sm font-bold text-slate-700">Smart legal company type</legend>
             <p className="mb-3 rounded-xl border border-indigo-100 bg-indigo-50 px-3 py-2 text-xs leading-5 text-indigo-700">
               Select the closest legal classification so PESO can request the correct verification documents after email confirmation.
             </p>
-            <div className="grid gap-2">
+            <div className="grid gap-2 sm:grid-cols-2">
               {companyTypes.map((type) => (
                 <label key={type.value} className={`flex cursor-pointer items-start gap-3 rounded-lg border p-3.5 transition ${form.company_type === type.value ? 'border-brand-navy bg-slate-50 ring-1 ring-brand-navy' : 'border-slate-200 hover:border-slate-300'}`}>
                   <input type="radio" name="company_type" value={type.value} checked={form.company_type === type.value} onChange={change} onBlur={blur} className="h-4 w-4 accent-slate-900" />

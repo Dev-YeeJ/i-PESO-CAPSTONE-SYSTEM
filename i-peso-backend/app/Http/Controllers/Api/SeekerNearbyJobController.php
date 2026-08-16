@@ -132,7 +132,7 @@ class SeekerNearbyJobController extends Controller
 
         $trainingPrograms = $compact ? collect() : $this->trainingPrograms();
 
-        $with = ['employer:employer_id,company_name'];
+        $with = ['employer:employer_id,company_name,company_logo'];
         if (! $compact && Schema::hasTable('job_vacancy_skills')) {
             $with[] = 'skillRequirements.skill.outgoingRelationships';
             $with[] = 'skillRequirements.skill.incomingRelationships';

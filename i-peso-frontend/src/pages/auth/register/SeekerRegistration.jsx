@@ -156,20 +156,24 @@ export default function SeekerRegistration() {
       journey={{ role: 'seeker', steps: seekerRegistrationSteps, currentStep: 1 }}
     >
       <Link to="/register" className="registration-change-role"><ArrowLeft className="h-4 w-4" />Change account type</Link>
-      <Card>
+      <Card padding="sm">
         <FormError message={apiError} />
-        <form onSubmit={submit} noValidate className="space-y-4">
-          <div className="grid gap-4 sm:grid-cols-2">
+        <form onSubmit={submit} noValidate className="space-y-3">
+          <div className="grid gap-3 sm:grid-cols-2">
             <Field label="First name" name="first_name" placeholder="Juan" value={form.first_name ?? ''} onChange={change} onBlur={blur} error={fieldError('first_name')} autoComplete="given-name" maxLength={100} />
             <Field label="Last name" name="last_name" placeholder="Dela Cruz" value={form.last_name ?? ''} onChange={change} onBlur={blur} error={fieldError('last_name')} autoComplete="family-name" maxLength={100} />
           </div>
-          <Field label="Email address" name="email" type="email" placeholder="you@example.com" value={form.email ?? ''} onChange={change} onBlur={blur} error={fieldError('email')} autoComplete="email" inputMode="email" maxLength={255} />
-          <Field label="Mobile number" name="mobile_number" type="tel" placeholder="09XXXXXXXXX" value={form.mobile_number ?? ''} onChange={change} onBlur={blur} error={fieldError('mobile_number')} autoComplete="tel-national" inputMode="numeric" maxLength={11} />
-          <div>
-            <Field label="Password" name="password" type={showPassword ? 'text' : 'password'} placeholder="At least 8 characters with a number and symbol" value={form.password ?? ''} onChange={change} onBlur={blur} error={fieldError('password')} autoComplete="new-password" rightElement={<VisibilityButton shown={showPassword} onClick={() => setShowPassword((current) => !current)} />} />
-            <PasswordStrengthMeter password={form.password} strength={strength} />
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field label="Email address" name="email" type="email" placeholder="you@example.com" value={form.email ?? ''} onChange={change} onBlur={blur} error={fieldError('email')} autoComplete="email" inputMode="email" maxLength={255} />
+            <Field label="Mobile number" name="mobile_number" type="tel" placeholder="09XXXXXXXXX" value={form.mobile_number ?? ''} onChange={change} onBlur={blur} error={fieldError('mobile_number')} autoComplete="tel-national" inputMode="numeric" maxLength={11} />
           </div>
-          <Field label="Confirm password" name="password_confirmation" type={showConfirmation ? 'text' : 'password'} placeholder="Re-enter your password" value={form.password_confirmation ?? ''} onChange={change} onBlur={blur} error={fieldError('password_confirmation')} autoComplete="new-password" rightElement={<VisibilityButton shown={showConfirmation} onClick={() => setShowConfirmation((current) => !current)} />} />
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <Field label="Password" name="password" type={showPassword ? 'text' : 'password'} placeholder="At least 8 characters with a number and symbol" value={form.password ?? ''} onChange={change} onBlur={blur} error={fieldError('password')} autoComplete="new-password" rightElement={<VisibilityButton shown={showPassword} onClick={() => setShowPassword((current) => !current)} />} />
+              <PasswordStrengthMeter password={form.password} strength={strength} />
+            </div>
+            <Field label="Confirm password" name="password_confirmation" type={showConfirmation ? 'text' : 'password'} placeholder="Re-enter your password" value={form.password_confirmation ?? ''} onChange={change} onBlur={blur} error={fieldError('password_confirmation')} autoComplete="new-password" rightElement={<VisibilityButton shown={showConfirmation} onClick={() => setShowConfirmation((current) => !current)} />} />
+          </div>
           <Button type="submit" disabled={loading} icon={UserPlus} className="w-full">{loading ? 'Creating account...' : 'Create Job Seeker Account'}</Button>
         </form>
         <p className="registration-secondary-action">Already registered? <Link to="/login">Sign in</Link></p>

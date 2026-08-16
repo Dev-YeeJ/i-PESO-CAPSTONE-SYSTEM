@@ -11,6 +11,24 @@ class JobSeeker extends Authenticatable
 {
     use HasApiTokens, Notifiable;
 
+    protected static function boot()
+    {
+        parent::boot();
+
+        static::deleting(function ($seeker) {
+            $seeker->educations()->delete();
+            $seeker->occupations()->delete();
+            $seeker->workExperiences()->delete();
+            $seeker->reports()->delete();
+            $seeker->seekerSkills()->delete();
+            $seeker->certificates()->delete();
+            $seeker->applications()->delete();
+            $seeker->programApplications()->delete();
+            $seeker->jobFairAttendances()->delete();
+            $seeker->savedJobs()->detach();
+        });
+    }
+
     // We will assign `seeker_id` manually to support gap-filling
     // and predictable sequential IDs. Disable auto-incrementing.
 
