@@ -41,10 +41,11 @@ return [
         'enabled' => env('GOOGLE_VERTEX_AI_ENABLED', false),
         'project_id' => env('GOOGLE_CLOUD_PROJECT_ID'),
         'location' => env('GOOGLE_CLOUD_LOCATION', 'us-central1'),
-        'model' => env('GOOGLE_VERTEX_AI_MODEL', 'gemini-2.5-flash'),
+        'model' => env('GOOGLE_VERTEX_AI_MODEL', 'gemini-3.1-flash-lite'),
         'access_token' => env('GOOGLE_VERTEX_AI_ACCESS_TOKEN'),
         'credentials_path' => env('GOOGLE_APPLICATION_CREDENTIALS'),
         'timeout' => env('GOOGLE_VERTEX_AI_TIMEOUT', 20),
+        'gemini_api_key' => env('GEMINI_API_KEY'),
     ],
 
     /*

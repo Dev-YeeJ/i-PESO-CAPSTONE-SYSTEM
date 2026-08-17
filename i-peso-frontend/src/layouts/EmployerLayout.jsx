@@ -56,7 +56,10 @@ export default function EmployerLayout() {
   const companyName = user?.employer?.company_name || user?.name
   const initials = companyName?.split(' ').map((name) => name[0]).join('').slice(0, 2).toUpperCase() ?? 'EM'
   
-  const pageName = pageNames[location.pathname] ?? 'Employer Portal'
+  // Resolve page name — handle dynamic ATS route /employer/ats/:vacancyId
+  const pageName = pageNames[location.pathname]
+    ?? (location.pathname.startsWith('/employer/ats/') ? 'Applicant Tracking' : 'Employer Portal')
+
 
   useEffect(() => {
     if (!approved) {

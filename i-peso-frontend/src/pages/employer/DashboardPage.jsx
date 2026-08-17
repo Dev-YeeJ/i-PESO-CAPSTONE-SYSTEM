@@ -1,5 +1,5 @@
 import { createElement, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowRight, BriefcaseBusiness, Building2, CheckCircle2, CircleCheck, Clock3, FileCheck2, FilePenLine, FileX2, Plus, RotateCcw, ShieldCheck, Upload } from 'lucide-react'
+import { ArrowRight, BriefcaseBusiness, Building2, CheckCircle2, CircleCheck, Clock3, FileCheck2, FilePenLine, FileX2, Plus, RotateCcw, ShieldCheck, MapPin, Upload } from 'lucide-react'
 import PendingVerificationBanner from './components/PendingVerificationBanner'
 import { AlertBox, Badge, Button, Card, CardHeader, LoadingSkeleton, StatCard } from '@/components/ui'
 import * as employerService from '@/services/employerService'
@@ -114,22 +114,36 @@ export default function EmployerDashboard() {
 
   return (
     <div className="portal-page">
-      <section className="portal-card-hero relative overflow-hidden rounded-xl border border-blue-900 bg-brand-navy px-6 py-7 text-white shadow-elevated sm:px-8">
-        <div className="relative z-10 flex flex-col justify-between gap-6 lg:flex-row lg:items-center">
-          <div>
-            <p className="text-xs font-extrabold uppercase tracking-[0.16em] text-emerald-300">PESO Employer Workspace</p>
-            <div className="mt-3 flex flex-wrap items-center gap-3">
-              {profile?.employer?.company_logo_url && (
-                <img src={profile.employer.company_logo_url} alt="Logo" className="h-10 w-10 shrink-0 rounded-lg bg-white object-cover p-1 shadow-sm" />
-              )}
-              <h1 className="text-3xl font-extrabold tracking-tight">{company}</h1>
-              <Badge variant={status} className="border-white/10">Accreditation: {status}</Badge>
+      {/* Hero Banner Section */}
+      <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200 mb-6">
+        <div className="h-32 bg-gradient-to-r from-brand-navy to-blue-700 sm:h-48" />
+        <div className="relative px-5 pb-6 sm:px-7">
+          <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
+              <div className="relative -mt-10 shrink-0 sm:-mt-12">
+                <div className="relative flex h-28 w-28 items-center justify-center overflow-hidden rounded-2xl border-4 border-white bg-white shadow-lg sm:h-32 sm:w-32">
+                  {profile?.employer?.company_logo_url ? (
+                    <img src={profile.employer.company_logo_url} alt="Logo" className="h-full w-full object-contain p-2" />
+                  ) : (
+                    <Building2 className="h-10 w-10 text-slate-300 sm:h-12 sm:w-12" />
+                  )}
+                </div>
+              </div>
+              <div className="min-w-0 flex-1 pt-1 sm:pt-4">
+                <p className="text-xs font-extrabold uppercase tracking-[0.16em] text-blue-600 mb-1">PESO Employer Workspace</p>
+                <div className="flex items-center gap-2">
+                  <h1 className="truncate text-2xl font-black text-slate-950 sm:text-3xl">{company}</h1>
+                </div>
+                <p className="text-sm font-semibold text-slate-500 mt-1">{profile?.employer?.industry || 'Employer Account'}</p>
+              </div>
             </div>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-blue-100/75">Manage accredited vacancies and monitor your company&apos;s hiring activity through i-PESO.</p>
+            <div className="mt-4 flex flex-col gap-3 sm:mt-0 sm:mb-4 sm:flex-row sm:items-center">
+              <Badge status={status === 'approved' ? 'approved' : status === 'rejected' ? 'rejected' : 'pending'}>{status === 'verified' ? 'Verified' : status}</Badge>
+              {status === 'verified' && <Button to="/employer/post-job" icon={Plus}>Post New Vacancy</Button>}
+            </div>
           </div>
-          {status === 'verified' && <Button to="/employer/post-job" icon={Plus}>Post New Vacancy</Button>}
         </div>
-      </section>
+      </div>
 
       {error && <AlertBox variant="danger" title="Employer workspace unavailable">{error}</AlertBox>}
       {reuploadError && <AlertBox variant="danger" title="Document re-upload failed">{reuploadError}</AlertBox>}
@@ -154,15 +168,16 @@ export default function EmployerDashboard() {
               action={<Button to="/employer/vacancies" variant="secondary" size="sm" icon={ArrowRight}>View All</Button>}
             />
             {vacancies.length ? (
-              <div className="overflow-hidden rounded-xl border border-slate-200">
-                <div className="grid grid-cols-[1fr_auto] bg-brand-navy px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-slate-300 sm:grid-cols-[1.3fr_0.7fr_0.5fr_auto]">
-                  <span>Position</span><span className="hidden sm:block">Location</span><span className="hidden sm:block">Openings</span><span>Status</span>
-                </div>
+              <div className="grid gap-4 mt-4">
                 {vacancies.slice(0, 6).map((vacancy) => (
-                  <div key={vacancy.post_id} className="grid grid-cols-[1fr_auto] items-center gap-3 border-b border-slate-100 px-4 py-4 last:border-0 sm:grid-cols-[1.3fr_0.7fr_0.5fr_auto]">
-                    <div><p className="font-bold text-slate-900">{vacancy.job_title}</p><p className="mt-0.5 text-xs capitalize text-slate-500">{vacancy.employment_type?.replaceAll('_', ' ')}</p></div>
-                    <span className="hidden text-sm text-slate-600 sm:block">{vacancy.location}</span>
-                    <span className="hidden text-sm font-bold text-slate-700 sm:block">{vacancy.vacancies_count}</span>
+                  <div key={vacancy.post_id} className="group flex flex-col justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-5 transition-all hover:border-brand-navy hover:shadow-md sm:flex-row sm:items-center">
+                    <div>
+                      <h3 className="text-base font-bold text-slate-900">{vacancy.job_title}</h3>
+                      <div className="mt-2 flex flex-wrap gap-2 text-xs text-slate-500">
+                        <span className="flex items-center gap-1"><MapPin className="h-3 w-3" />{vacancy.location || vacancy.place_of_work || 'Multiple Locations'}</span>
+                        <span className="flex items-center gap-1"><BriefcaseBusiness className="h-3 w-3" />{vacancy.nature_of_work || vacancy.employment_type?.replaceAll('_', ' ')}</span>
+                      </div>
+                    </div>
                     <Badge variant={vacancy.status}>{vacancy.status}</Badge>
                   </div>
                 ))}

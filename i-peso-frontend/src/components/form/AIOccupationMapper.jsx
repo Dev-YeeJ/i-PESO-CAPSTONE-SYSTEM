@@ -316,19 +316,7 @@ export default function AIOccupationMapper({
               <p className="mt-1 text-xs font-semibold text-blue-100">
                 Display title preserved: {selectedSummary.displayTitle}
               </p>
-              <div className="mt-3 flex flex-wrap gap-2">
-                <span className="rounded-full bg-white/15 px-2.5 py-1 text-xs font-bold text-white">
-                  PSOC {selectedSummary.psocCode}
-                </span>
-                {selectedSummary.anchorCode && selectedSummary.anchorCode !== selectedSummary.psocCode && (
-                  <span className="rounded-full bg-white/15 px-2.5 py-1 text-xs font-bold text-white">
-                    Anchor {selectedSummary.anchorCode}
-                  </span>
-                )}
-                <span className="rounded-full bg-white/15 px-2.5 py-1 text-xs font-bold capitalize text-white">
-                  {selectedSummary.matchLevel} anchor
-                </span>
-              </div>
+
             </div>
           </div>
         </div>

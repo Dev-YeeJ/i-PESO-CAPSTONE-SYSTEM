@@ -662,7 +662,39 @@ export default function SeekerProfileEdit() {
                       <div className="grid gap-4 md:grid-cols-2">
                         <SearchableTextInput label="Course / Training" value={training.course} error={errors[`trainings.${index}.course`]} options={TRAINING_COURSE_OPTIONS} placeholder="Type or select a training course" onChange={(value) => updateListItem('training', 'trainings', index, { course: value })} />
                         <SearchableTextInput label="Training institution" value={training.training_institution} options={TRAINING_INSTITUTION_OPTIONS} placeholder="Type or select an institution" onChange={(value) => updateListItem('training', 'trainings', index, { training_institution: value })} />
-                        <TextInput type="number" label="Hours of training" value={training.hours_of_training} error={errors[`trainings.${index}.hours_of_training`]} onChange={(value) => updateListItem('training', 'trainings', index, { hours_of_training: value })} />
+                        <div>
+                          <label className={labelClass}>Hours of training</label>
+                          <div className="mt-1.5 flex items-center rounded-xl border border-slate-300 bg-white focus-within:border-blue-700 focus-within:ring-2 focus-within:ring-blue-700/10 overflow-hidden">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const cur = Number(training.hours_of_training) || 0
+                                if (cur > 0) updateListItem('training', 'trainings', index, { hours_of_training: cur - 1 })
+                              }}
+                              className="flex h-10 w-10 shrink-0 items-center justify-center bg-slate-50 text-lg font-bold text-slate-700 transition hover:bg-slate-100 focus:outline-none"
+                              aria-label="Decrease hours"
+                            >−</button>
+                            <input
+                              type="number"
+                              min="0"
+                              max="10000"
+                              value={training.hours_of_training}
+                              onChange={(e) => updateListItem('training', 'trainings', index, { hours_of_training: e.target.value })}
+                              className="w-full bg-transparent py-2.5 text-center text-sm font-semibold text-slate-900 outline-none"
+                              placeholder="0"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const cur = Number(training.hours_of_training) || 0
+                                updateListItem('training', 'trainings', index, { hours_of_training: cur + 1 })
+                              }}
+                              className="flex h-10 w-10 shrink-0 items-center justify-center bg-slate-50 text-lg font-bold text-slate-700 transition hover:bg-slate-100 focus:outline-none"
+                              aria-label="Increase hours"
+                            >+</button>
+                          </div>
+                          {errors[`trainings.${index}.hours_of_training`] && <p className="mt-1 text-xs font-semibold text-red-600">{errors[`trainings.${index}.hours_of_training`]}</p>}
+                        </div>
                         <TextInput label="Certificate received" value={training.certificates_received} onChange={(value) => updateListItem('training', 'trainings', index, { certificates_received: value })} />
                         <div className="md:col-span-2">
                           <TextArea label="Skills acquired" rows={2} value={training.skills_acquired} onChange={(value) => updateListItem('training', 'trainings', index, { skills_acquired: value })} />
@@ -680,11 +712,19 @@ export default function SeekerProfileEdit() {
                   {form.training.eligibilities.map((eligibility, index) => (
                     <div key={eligibility.local_id} className="rounded-2xl border border-slate-200 bg-white p-4">
                       <div className="grid gap-4 md:grid-cols-2">
-                        <SelectInput label="Type" value={eligibility.type} error={errors[`eligibilities.${index}.type`]} onChange={(value) => updateListItem('training', 'eligibilities', index, { type: value })} options={[
-                          { value: '', label: 'Select type' },
-                          { value: 'civil_service', label: 'Civil Service' },
-                          { value: 'professional_license', label: 'Professional License' },
-                        ]} />
+                        <div className="md:col-span-2">
+                          <label className={labelClass}>Type <span className="text-red-500">*</span></label>
+                          <select
+                            value={eligibility.type}
+                            onChange={(e) => updateListItem('training', 'eligibilities', index, { type: e.target.value })}
+                            className={`${selectClass} mt-1.5`}
+                          >
+                            <option value="">Select type — Professional License or Civil Service Eligibility</option>
+                            <option value="civil_service">Civil Service Eligibility (CSC)</option>
+                            <option value="professional_license">Professional Regulation Commission (PRC) License</option>
+                          </select>
+                          {errors[`eligibilities.${index}.type`] && <p className="mt-1 text-xs font-semibold text-red-600">{errors[`eligibilities.${index}.type`]}</p>}
+                        </div>
                         <SearchableTextInput label="Name" value={eligibility.name} error={errors[`eligibilities.${index}.name`]} options={ELIGIBILITY_NAME_OPTIONS} placeholder="Type or select eligibility" onChange={(value) => updateListItem('training', 'eligibilities', index, { name: value })} />
                         <TextInput label="Date taken" type="date" value={eligibility.date_taken} onChange={(value) => updateListItem('training', 'eligibilities', index, { date_taken: value })} />
                         <TextInput label="Valid until" type="date" value={eligibility.valid_until} error={errors[`eligibilities.${index}.valid_until`]} onChange={(value) => updateListItem('training', 'eligibilities', index, { valid_until: value })} />

@@ -1063,7 +1063,7 @@ const Step3 = ({ form, errors, onChange }) => {
 
   return (
     <div>
-      <SectionHeader title="III. JOB PREFERENCE" subtitle="Select specific standardized occupations and your preferred work locations" />
+      <SectionHeader title="III. JOB PREFERENCE" />
 
       <div style={{ marginBottom: '20px' }}>
         <p style={{ fontSize: '13px', fontWeight: '700', color: '#374151', marginBottom: '10px' }}>
@@ -1081,9 +1081,7 @@ const Step3 = ({ form, errors, onChange }) => {
           placeholder={occupations.length >= 3 ? 'Maximum of 3 occupations selected' : 'Type a specific job title (e.g. Teacher, Cashier, React Developer)'}
           error={errors.preferred_occupations}
         />
-        <p style={{ fontSize: '11px', color: '#64748b', marginTop: '7px', lineHeight: '1.5' }}>
-          Type the specific job title. The system will match it to the correct broad field automatically.
-        </p>
+
         {errors.preferred_occupations && <p style={{ fontSize: '11px', color: '#ef4444', marginTop: '6px' }}>{errors.preferred_occupations}</p>}
       </div>
 

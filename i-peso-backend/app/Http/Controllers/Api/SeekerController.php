@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Employer;
 use App\Models\JobSeeker;
 use App\Models\Occupation;
 use App\Models\SeekerDisability;
@@ -1669,6 +1670,41 @@ class SeekerController extends Controller
         return response()->json([
             'message' => 'Saved jobs updated.',
             'saved_jobs' => $seeker->savedJobs()->pluck('job_vacancies.post_id'),
+        ]);
+    }
+
+    /**
+     * GET /api/seeker/employers/{employer}   [auth:sanctum]
+     *
+     * Returns public profile information and active job vacancies for an employer.
+     */
+    public function getPublicEmployerProfile(Request $request, Employer $employer): JsonResponse
+    {
+        // Only return verified employers to seekers
+        if ($employer->verification_status !== 'verified') {
+            return response()->json(['message' => 'Employer is not publicly visible.'], 404);
+        }
+
+        // Fetch active vacancies
+        $vacancies = $employer->vacancies()
+            ->where('status', 'active')
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        return response()->json([
+            'employer' => [
+                'employer_id' => $employer->employer_id,
+                'company_name' => $employer->company_name,
+                'trade_name' => $employer->trade_name,
+                'industry' => $employer->industry,
+                'company_size' => $employer->company_size,
+                'company_logo_url' => $employer->company_logo_url,
+                'full_address' => $employer->full_address,
+                'company_description' => $employer->company_description,
+                'verification_status' => $employer->verification_status,
+                'created_at' => $employer->created_at,
+            ],
+            'vacancies' => $vacancies,
         ]);
     }
 }

@@ -1,6 +1,6 @@
 import { createElement, useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { AlertTriangle, ArrowLeft, Building2, CheckCircle2, Download, Eye, FileText, MapPin, ShieldAlert, ShieldCheck, XCircle, Mail, Phone, User, Clock } from 'lucide-react'
+import { AlertTriangle, ArrowLeft, Building2, CheckCircle2, Download, Eye, FileText, MapPin, ShieldAlert, ShieldCheck, XCircle, Mail, Phone, User, Clock, BriefcaseBusiness } from 'lucide-react'
 import { Badge, Button, Card, CardHeader } from '@/components/ui'
 import { adminService } from '@/services/adminService'
 
@@ -280,7 +280,8 @@ export default function EmployerDetailPage() {
   const rejectedCount = Object.keys(decisions).length
 
   return (
-    <div className="-mx-4 -mt-8 bg-slate-50 pb-12 sm:-mx-6">
+    <>
+      <div className="-mx-4 -mt-8 bg-slate-50 pb-12 sm:-mx-6">
       <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
         <button onClick={() => navigate('/admin/employers')} className="mb-6 flex items-center gap-2 text-sm font-bold text-slate-500 transition-colors hover:text-slate-800">
           <ArrowLeft className="h-4 w-4" />
@@ -291,26 +292,36 @@ export default function EmployerDetailPage() {
         {notice && <div className="mb-6 flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-medium text-emerald-800"><CheckCircle2 className="h-4 w-4 shrink-0" />{notice}</div>}
 
         <div className="mb-4 space-y-4">
-          <Card hero padding="none" heroContent={(
-            <div className="flex flex-col gap-5">
-              <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-                <div className="min-w-0">
-                  <p className="text-xs font-black uppercase tracking-[0.22em] text-blue-100">
-                    {verificationStatus === 'pending' ? 'PESO Employer Audit Hub' : 'Employer Profile'}
-                  </p>
-                  <div className="mt-2 flex items-center gap-4">
-                    {companyProfile.company_logo_url && (
-                      <img src={companyProfile.company_logo_url} alt="Logo" className="h-12 w-12 shrink-0 rounded-xl bg-white object-cover p-1 shadow-sm" />
-                    )}
-                    <h1 className="text-3xl font-black text-white">{companyProfile.company_name || employer.company_name || 'Employer profile'}</h1>
+          {/* Hero Banner Section */}
+          <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200">
+            <div className="h-32 bg-gradient-to-r from-brand-navy to-blue-700 sm:h-48" />
+            <div className="relative px-5 pb-6 sm:px-7">
+              <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+                <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
+                  <div className="relative -mt-10 shrink-0 sm:-mt-12">
+                    <div className="relative flex h-28 w-28 items-center justify-center overflow-hidden rounded-2xl border-4 border-white bg-white shadow-lg sm:h-32 sm:w-32">
+                      {companyProfile.company_logo_url ? (
+                        <img src={companyProfile.company_logo_url} alt="Logo" className="h-full w-full object-contain p-2" />
+                      ) : (
+                        <Building2 className="h-10 w-10 text-slate-300 sm:h-12 sm:w-12" />
+                      )}
+                    </div>
+                  </div>
+                  <div className="min-w-0 flex-1 pt-1 sm:pt-4">
+                    <p className="text-xs font-black uppercase tracking-[0.22em] text-blue-600 mb-1">
+                      {verificationStatus === 'pending' ? 'PESO Employer Audit Hub' : 'Employer Profile'}
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <h1 className="truncate text-2xl font-black text-slate-950 sm:text-3xl">{companyProfile.company_name || employer.company_name}</h1>
+                    </div>
                   </div>
                 </div>
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-3 lg:justify-end lg:pl-4">
                   <Badge status={verificationStatus === 'approved' ? 'approved' : verificationStatus === 'rejected' ? 'rejected' : 'pending'}>{formatValue(verificationStatus)}</Badge>
                 </div>
               </div>
             </div>
-          )} />
+          </div>
           {/* Main Content and Sidebar Layout */}
           <div className="grid gap-6 xl:grid-cols-[minmax(0,1.7fr)_minmax(320px,0.8fr)]">
             <main className="space-y-6">
@@ -334,17 +345,32 @@ export default function EmployerDetailPage() {
                 </div>
               </Card>
 
-              {/* Vacancy Summary if verified */}
+              {/* Job Vacancies List */}
               {verificationStatus !== 'pending' && (
-                <Card>
-                  <CardHeader title="Vacancy and application summary" subtitle="Overall recruitment metrics for this employer." />
-                  <div className="mt-2 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                    <StatTile label="Active vacancies" value={activeVacanciesSummary?.total ?? 0} />
-                    <StatTile label="Closed vacancies" value={closedVacanciesSummary?.total ?? 0} />
-                    <StatTile label="Applications" value={applicationsSummary?.total ?? 0} />
-                    <StatTile label="Hired" value={employer.hired_summary?.total ?? 0} />
-                  </div>
-                </Card>
+                <div className="space-y-4">
+                  <h2 className="text-lg font-black text-slate-900">Active Job Vacancies</h2>
+                  {employer.active_vacancies?.length > 0 ? (
+                    <div className="grid gap-4">
+                      {employer.active_vacancies.map(job => (
+                        <div key={job.post_id} className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-5 transition-all hover:border-brand-navy hover:shadow-md sm:flex-row sm:items-center sm:justify-between">
+                          <div>
+                            <h3 className="text-base font-bold text-slate-900">{job.job_title}</h3>
+                            <div className="mt-2 flex flex-wrap gap-2 text-xs text-slate-500">
+                              <span className="flex items-center gap-1"><MapPin className="h-3 w-3" />{job.location}</span>
+                              <span className="flex items-center gap-1"><BriefcaseBusiness className="h-3 w-3 capitalize" />{job.employment_type?.replaceAll('_', ' ')}</span>
+                              <span className="flex items-center gap-1"><Clock className="h-3 w-3" />Posted {formatDate(job.created_at)}</span>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <Card className="text-center">
+                      <BriefcaseBusiness className="mx-auto h-12 w-12 text-slate-300" />
+                      <p className="mt-2 text-sm font-medium text-slate-600">No active job vacancies.</p>
+                    </Card>
+                  )}
+                </div>
               )}
 
               <Card>
@@ -623,7 +649,7 @@ export default function EmployerDetailPage() {
           </div>
         </div>
       )}
-    </div>
+    </>
   )
 }
 

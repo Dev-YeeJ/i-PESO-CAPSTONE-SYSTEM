@@ -69,6 +69,39 @@ const programSuggestions = [
   'Juris Doctor',
 ]
 
+// Senior High School strands only
+const shsStrandSuggestions = [
+  // Academic - Core Subjects
+  'ABM - Accountancy, Business and Management',
+  'HUMSS - Humanities and Social Sciences',
+  'STEM - Science, Technology, Engineering and Mathematics',
+  'GAS - General Academic Strand',
+  // Academic - Specialized
+  'PBM - Pre-Baccalaureate Maritime',
+  'Sports Track',
+  'Arts and Design Track',
+  // TVL Tracks
+  'TVL-ICT - Information and Communications Technology',
+  'TVL-HE - Home Economics',
+  'TVL-IA - Industrial Arts',
+  'TVL-AFA - Agri-Fishery Arts',
+  // Specific TVL Programs
+  'TVL - Cookery',
+  'TVL - Bread and Pastry Production',
+  'TVL - Food and Beverage Services',
+  'TVL - Beauty Care and Wellness',
+  'TVL - Electrical Installation and Maintenance',
+  'TVL - Computer Hardware Servicing',
+  'TVL - Computer Systems Servicing',
+  'TVL - Programming',
+  'TVL - Automotive Servicing',
+  'TVL - Caregiving',
+  'TVL - Bookkeeping',
+  'TVL - Agricultural Crop Production',
+  'TVL - Animal Production',
+  'TVL - Shielded Metal Arc Welding',
+]
+
 const blankEducation = {
   attainment_level: '',
   level: '',
@@ -99,12 +132,17 @@ export default function EducationBackgroundEditor({ form: controlledForm, errors
   const suggestedAttainment = inferEducationalAttainment(educations)
   const levelConfig = educationLevels.find((level) => level.value === draft.attainment_level)
   const showCourse = Boolean(levelConfig?.requiresCourse)
+  const isShs = draft.attainment_level === 'senior_high_undergraduate' || draft.attainment_level === 'senior_high_graduate'
   const statusIsGraduated = draft.completion_status === 'graduated'
   const statusIsUndergraduate = draft.completion_status === 'undergraduate'
   const statusIsStudying = draft.completion_status === 'currently_studying'
   const availableStatuses = statusesForEducationLevel(draft.attainment_level)
   const cleanDraft = cleanEducation(draft)
   const readinessErrors = validateEducation(cleanDraft)
+
+  // Determine blocked levels based on existing records
+  const blockedLevels = getBlockedLevels(educations, editingIndex)
+
   const duplicateIndex = educations.findIndex((education, index) => (
     index !== editingIndex && educationKey(cleanDraft) === educationKey(cleanEducation(education))
   ))
@@ -285,7 +323,16 @@ export default function EducationBackgroundEditor({ form: controlledForm, errors
               aria-invalid={Boolean(visibleErrors.attainment_level || visibleErrors.level)}
             >
               <option value="">Select education level</option>
-              {educationLevels.map((level) => <option key={level.value} value={level.value}>{level.label}</option>)}
+              {educationLevels.map((level) => (
+                <option
+                  key={level.value}
+                  value={level.value}
+                  disabled={blockedLevels.has(level.value)}
+                  title={blockedLevels.has(level.value) ? 'Complete lower education levels first or remove the conflicting record.' : undefined}
+                >
+                  {level.label}{blockedLevels.has(level.value) ? ' (complete prerequisite first)' : ''}
+                </option>
+              ))}
             </select>
           </Field>
 
@@ -295,6 +342,7 @@ export default function EducationBackgroundEditor({ form: controlledForm, errors
             value={draft.institution_name}
             options={schoolSuggestions}
             placeholder="Search school or training center"
+            emptyMessage="No matching school found. You can type your school name manually."
             error={visibleErrors.institution_name}
             onChange={(value) => setDraftField('institution_name', value)}
           />
@@ -302,11 +350,12 @@ export default function EducationBackgroundEditor({ form: controlledForm, errors
 
         {showCourse && (
           <SearchablePicker
-            label="Course / Degree / Strand"
+            label={isShs ? 'Strand / Track' : 'Course / Degree / Program'}
             required
             value={draft.course_strand}
-            options={programSuggestions}
-            placeholder="Search course, degree, or TESDA qualification"
+            options={isShs ? shsStrandSuggestions : programSuggestions}
+            placeholder={isShs ? 'Search SHS strand or TVL track' : 'Search course, degree, or TESDA qualification'}
+            emptyMessage={isShs ? 'No matching strand found. You can type your strand manually.' : 'No matching program found. You can continue typing to enter manually.'}
             error={visibleErrors.course_strand}
             onChange={(value) => setDraftField('course_strand', value)}
           />
@@ -435,7 +484,7 @@ export default function EducationBackgroundEditor({ form: controlledForm, errors
   )
 }
 
-function SearchablePicker({ label, required = false, value, options, placeholder, error, onChange }) {
+function SearchablePicker({ label, required = false, value, options, placeholder, error, emptyMessage, onChange }) {
   const inputId = useId()
   const listboxId = useId()
   const [focused, setFocused] = useState(false)
@@ -495,7 +544,7 @@ function SearchablePicker({ label, required = false, value, options, placeholder
               ))
             ) : (
               <div className="whitespace-normal break-words px-3 py-3 text-xs leading-5 text-slate-500">
-                No matching school found. You can continue typing to enter the school name manually.
+                {emptyMessage ?? 'No matching result found. You can continue typing to enter manually.'}
               </div>
             )}
           </div>
@@ -791,4 +840,57 @@ function inferEducationalAttainment(educations = []) {
     .filter(Boolean)
 
   return inferred.sort((left, right) => (ranks[right] || 0) - (ranks[left] || 0))[0] || ''
+}
+
+// Determine which education levels should be blocked based on existing records.
+// A level is blocked when adding it would create an impossible academic timeline.
+function getBlockedLevels(educations, editingIndex) {
+  const blocked = new Set()
+
+  // Gather the completion statuses of existing records (excluding the one being edited)
+  const existing = educations
+    .filter((_, idx) => idx !== editingIndex)
+    .map((edu) => cleanEducation(edu))
+
+  const hasLevel = (level) => existing.some((e) => e.attainment_level === level)
+  const hasGraduated = (level) => existing.some((e) => e.attainment_level === level && e.completion_status === 'graduated')
+  const hasIncomplete = (level) => existing.some((e) => e.attainment_level === level && e.completion_status !== 'graduated')
+
+  // Can't add Elementary Graduate if already have one
+  if (hasLevel('elementary_graduate')) blocked.add('elementary_graduate')
+  // Can't add High School levels without finishing Elementary (if they recorded elementary as incomplete)
+  if (hasIncomplete('elementary_graduate')) {
+    blocked.add('high_school_undergraduate')
+    blocked.add('high_school_graduate')
+    blocked.add('senior_high_undergraduate')
+    blocked.add('senior_high_graduate')
+    blocked.add('vocational')
+    blocked.add('college_undergraduate')
+    blocked.add('college_graduate')
+    blocked.add('post_graduate')
+  }
+  // Can't add SHS or College if high school is marked incomplete
+  if (hasIncomplete('high_school_graduate')) {
+    blocked.add('senior_high_undergraduate')
+    blocked.add('senior_high_graduate')
+    blocked.add('college_undergraduate')
+    blocked.add('college_graduate')
+    blocked.add('post_graduate')
+  }
+  // Can't add College if SHS is incomplete (and SHS is recorded)
+  if (hasLevel('senior_high_undergraduate') || hasLevel('senior_high_graduate')) {
+    if (hasIncomplete('senior_high_graduate') && !hasGraduated('senior_high_graduate')) {
+      blocked.add('college_undergraduate')
+      blocked.add('college_graduate')
+      blocked.add('post_graduate')
+    }
+  }
+  // Can't add Post-Graduate without a College Graduate
+  if (!hasGraduated('college_graduate') && (hasLevel('college_undergraduate') || hasLevel('college_graduate'))) {
+    if (hasIncomplete('college_graduate')) {
+      blocked.add('post_graduate')
+    }
+  }
+
+  return blocked
 }

@@ -347,18 +347,8 @@ export default function SeekerProfile() {
     <div className="-mx-4 -mt-8 bg-slate-50 pb-12 sm:-mx-6">
       <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
         <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-          <div className="relative h-36 bg-[radial-gradient(circle_at_top_left,_rgba(96,165,250,0.35),_transparent_32%),linear-gradient(135deg,_#0f172a,_#1d4ed8_58%,_#38bdf8)] sm:h-40">
+          <div className="relative h-28 bg-[radial-gradient(circle_at_top_left,_rgba(96,165,250,0.35),_transparent_32%),linear-gradient(135deg,_#0f172a,_#1d4ed8_58%,_#38bdf8)] sm:h-32">
             <div className="absolute inset-0 bg-[linear-gradient(120deg,_rgba(255,255,255,0.16)_0,_rgba(255,255,255,0)_45%)]" />
-            <div className="absolute bottom-5 left-5 right-5 flex flex-wrap items-end justify-between gap-3 text-white">
-              <div>
-                <p className="text-xs font-black uppercase tracking-[0.22em] text-blue-100">DOLE NSRP Career Hub</p>
-                <p className="mt-2 max-w-xl text-sm leading-6 text-blue-50">A premium, employer-ready profile built from verified government employment data.</p>
-              </div>
-              <span className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/15 px-4 py-2 text-sm font-bold backdrop-blur">
-                <span className="h-2.5 w-2.5 rounded-full bg-emerald-300" />
-                {profileComplete ? 'Actively Applying' : 'Open to Work'}
-              </span>
-            </div>
           </div>
 
           <div className="px-5 pb-6 sm:px-7">
@@ -417,8 +407,8 @@ export default function SeekerProfile() {
 
             <div className="mt-6 grid gap-3 sm:grid-cols-3">
               <HeroStat icon={Target} label="Profile Strength" value={`${profileStrengthPercent}%`} tone="blue" />
-              <HeroStat icon={BriefcaseBusiness} label="Active Applications" value={activeApplications} tone="emerald" />
-              <HeroStat icon={Sparkles} label="Verified Skills" value={verifiedSkillCount} tone="indigo" />
+              <HeroStat icon={BriefcaseBusiness} label="Applications" value={activeApplications} tone="emerald" />
+              <HeroStat icon={Sparkles} label="Skills" value={verifiedSkillCount} tone="indigo" />
             </div>
           </div>
         </section>
@@ -513,7 +503,7 @@ export default function SeekerProfile() {
               )}
             </Card>
 
-            <Card title="Skills & Proficiencies" subtitle="Verified skills presented as employer-friendly premium chips">
+            <Card title="Skills & Proficiencies">
               {allSkills.length ? (
                 <div className="space-y-5">
                   {premiumSkillGroups.map((group) => group.skills.length > 0 && (
@@ -540,7 +530,7 @@ export default function SeekerProfile() {
               )}
             </Card>
 
-            <Card title="Work Experience" subtitle="Career timeline built from your NSRP employment history">
+            <Card title="Work Experience">
               {profile.work_experiences?.length ? (
                 <div className="relative space-y-0 pl-7">
                   <div className="absolute left-2.5 top-3 h-[calc(100%-1.5rem)] w-px bg-slate-200" aria-hidden="true" />

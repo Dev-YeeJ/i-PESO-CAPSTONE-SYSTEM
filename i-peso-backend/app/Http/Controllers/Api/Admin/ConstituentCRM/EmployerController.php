@@ -179,7 +179,7 @@ class EmployerController extends Controller
 
         $vacancies = [];
         if (Schema::hasTable('job_vacancies')) {
-            $vacancies = $employer->vacancies()->select(['post_id', 'job_title', 'status', 'created_at'])->get()->toArray();
+            $vacancies = $employer->vacancies()->select(['post_id', 'job_title', 'status', 'location', 'employment_type', 'created_at'])->get()->toArray();
         }
 
         $activeVacancies = collect($vacancies)->where('status', 'active')->values();
@@ -214,6 +214,7 @@ class EmployerController extends Controller
                 $employer->city_municipality,
                 $employer->province,
             ]))),
+            'company_logo_url' => $employer->company_logo ? (str_starts_with($employer->company_logo, 'http') ? $employer->company_logo : url('storage/' . ltrim($employer->company_logo, '/'))) : null,
             'gps_status' => empty($employer->latitude) || empty($employer->longitude) ? 'missing' : 'available',
             'verification_status' => $employer->verification_status,
             'rejection_reason' => $employer->rejection_reason,
@@ -245,6 +246,7 @@ class EmployerController extends Controller
             'total' => count($activeVacancies),
             'latest' => $activeVacancies[0] ?? null,
         ];
+        $payload['active_vacancies'] = $activeVacancies;
         $payload['closed_vacancies_summary'] = [
             'total' => count($closedVacancies),
             'latest' => $closedVacancies[0] ?? null,

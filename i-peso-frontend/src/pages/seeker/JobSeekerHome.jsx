@@ -607,12 +607,11 @@ function JobCard({ job, saved = false, applying = false, onSave, onDetails, onQu
             <span className="mr-2 self-center text-xs text-slate-500">{formatDate(job.postedAt) || 'recently'}</span>
             <button
               type="button"
-              onClick={(e) => { e.stopPropagation(); onQuickApply(); }}
-              disabled={job.hasApplied || applying}
-              className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-full bg-blue-600 px-4 py-2 text-xs font-black text-white shadow-sm transition hover:bg-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-100 disabled:cursor-not-allowed disabled:opacity-60"
+              onClick={(e) => { e.stopPropagation(); onDetails(); }}
+              className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-full bg-slate-100 px-4 py-2 text-xs font-black text-slate-700 shadow-sm transition hover:bg-slate-200 focus:outline-none focus:ring-4 focus:ring-slate-100"
             >
-              <Zap className="h-3.5 w-3.5" />
-              {job.hasApplied ? 'Applied' : applying ? 'Wait...' : 'Easy Apply'}
+              <ChevronRight className="h-3.5 w-3.5" />
+              View all details
             </button>
           </div>
         </div>
@@ -859,7 +858,7 @@ function JobDetailModal({ job, saved, applying = false, onClose, onSave, onQuick
             className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-black text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
           >
             <Zap className="h-4 w-4" />
-            {job.hasApplied ? `Applied: ${titleCase(job.applicationStatus || 'pending')}` : applying ? 'Submitting...' : '1-Click Apply'}
+            {job.hasApplied ? `Applied: ${titleCase(job.applicationStatus || 'pending')}` : applying ? 'Submitting...' : 'Apply'}
           </button>
         </DialogFooter>
       </DialogContent>

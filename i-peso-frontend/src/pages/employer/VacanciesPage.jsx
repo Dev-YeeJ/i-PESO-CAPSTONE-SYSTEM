@@ -102,13 +102,13 @@ export default function VacanciesPage() {
                     </div>
                   </div>
                   <div className="flex flex-col gap-2 shrink-0 ml-4 hidden lg:flex">
-                    <Button to={`/employer/ats?vacancy_id=${vacancy.post_id}`} variant="outline" size="sm" icon={UsersRound}>View Applicants</Button>
+                    <Button to={`/employer/ats/${vacancy.post_id}`} variant="outline" size="sm" icon={UsersRound}>View Applicants</Button>
                     <Button onClick={() => setPendingDelete(vacancy)} variant="ghost" size="sm" icon={Trash2} className="text-red-600 hover:bg-red-50 hover:text-red-700">Delete</Button>
                   </div>
                 </div>
                 {/* Mobile action buttons */}
                 <div className="flex flex-row gap-2 w-full lg:hidden mt-2 pt-4 border-t border-slate-100">
-                  <Button to={`/employer/ats?vacancy_id=${vacancy.post_id}`} variant="outline" size="sm" icon={UsersRound} className="flex-1 justify-center">Applicants</Button>
+                  <Button to={`/employer/ats/${vacancy.post_id}`} variant="outline" size="sm" icon={UsersRound} className="flex-1 justify-center">Applicants</Button>
                   <Button onClick={() => setPendingDelete(vacancy)} variant="ghost" size="sm" icon={Trash2} className="flex-1 justify-center text-red-600 hover:bg-red-50 hover:text-red-700">Delete</Button>
                 </div>
               </div>

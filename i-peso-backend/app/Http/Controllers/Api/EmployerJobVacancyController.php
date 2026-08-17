@@ -141,12 +141,7 @@ class EmployerJobVacancyController extends Controller
             ])],
             'target_courses' => ['nullable', 'array', 'max:20'],
             'target_courses.*' => ['string', 'max:150'],
-            'experience_level' => ['required', Rule::in([
-                'No Experience Required',
-                '1-3 Years',
-                '3-5 Years',
-                '5+ Years',
-            ])],
+            'experience_level' => ['required', 'string', 'max:50'],
             'required_skills' => ['required', 'array', 'min:1', 'max:30'],
             'required_skills.*' => ['string', 'max:100'],
             'hard_to_find_skills' => ['nullable', 'array', 'max:20'],
@@ -183,12 +178,12 @@ class EmployerJobVacancyController extends Controller
             unset($data['general_term']);
         }
 
-        $data['minimum_experience_months'] = match ($data['experience_level']) {
-            '1-3 Years' => 12,
-            '3-5 Years' => 36,
-            '5+ Years' => 60,
-            default => 0,
-        };
+        if (isset($request->minimum_experience_months)) {
+            $data['minimum_experience_months'] = $request->minimum_experience_months;
+        } else {
+            $years = (int) filter_var($data['experience_level'], FILTER_SANITIZE_NUMBER_INT);
+            $data['minimum_experience_months'] = $years * 12;
+        }
         $data['certifications_mandatory'] = false;
 
         if (! Schema::hasColumn('job_vacancies', 'minimum_experience_months')) {

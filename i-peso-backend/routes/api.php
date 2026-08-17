@@ -165,6 +165,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/profile-image', [SeekerProfileImageController::class, 'store']);
         Route::get('/profile-image', [SeekerProfileImageController::class, 'show']);
         Route::delete('/profile-image', [SeekerProfileImageController::class, 'destroy']);
+        // Public Employer Profile for Job Seekers
+        Route::get('/employers/{employer}', [SeekerController::class, 'getPublicEmployerProfile']);
         // Report a suspicious / abusive employer or job posting
         Route::post('/employers/{employer}/report', [SeekerEmployerReportController::class, 'store'])
             ->middleware('throttle:10,1');

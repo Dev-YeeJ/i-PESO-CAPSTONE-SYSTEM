@@ -17,25 +17,17 @@ class VertexAiSuggestionService
     public function suggest(JobSeeker $seeker, array $context = []): array
     {
         if (! config('services.vertex_ai.enabled')) {
-            throw new RuntimeException('Vertex AI suggestions are disabled.');
+            throw new RuntimeException('AI suggestions are disabled.');
         }
 
-        $projectId = trim((string) config('services.vertex_ai.project_id'));
-        $location = trim((string) config('services.vertex_ai.location', 'us-central1'));
-        $model = trim((string) config('services.vertex_ai.model', 'gemini-2.5-flash'));
-        $accessToken = $this->tokens->token();
+        [$http, $url] = $this->resolveHttpClientAndEndpoint();
 
-        if ($projectId === '' || $location === '' || $model === '' || ! $accessToken) {
-            throw new RuntimeException('Vertex AI is not fully configured.');
-        }
-
-        $response = Http::acceptJson()
-            ->withToken($accessToken)
-            ->timeout((int) config('services.vertex_ai.timeout', 20))
-            ->post($this->endpoint($projectId, $location, $model), $this->payload($seeker, $context));
+        $response = $http
+            ->timeout((int) config('services.vertex_ai.timeout', 30))
+            ->post($url, $this->payload($seeker, $context));
 
         if (! $response->successful()) {
-            throw new RuntimeException('Vertex AI did not return suggestions.');
+            throw new RuntimeException('AI did not return suggestions.');
         }
 
         return $this->normalizeResponse($response->json());
@@ -44,17 +36,10 @@ class VertexAiSuggestionService
     public function generateProfessionalSummary(JobSeeker $seeker, ?string $existingSummary = null): array
     {
         if (! config('services.vertex_ai.enabled')) {
-            throw new RuntimeException('Vertex AI summary generation is disabled.');
+            throw new RuntimeException('AI summary generation is disabled.');
         }
 
-        $projectId = trim((string) config('services.vertex_ai.project_id'));
-        $location = trim((string) config('services.vertex_ai.location', 'us-central1'));
-        $model = trim((string) config('services.vertex_ai.model', 'gemini-2.5-flash'));
-        $accessToken = $this->tokens->token();
-
-        if ($projectId === '' || $location === '' || $model === '' || ! $accessToken) {
-            throw new RuntimeException('Vertex AI is not fully configured.');
-        }
+        [$http, $url] = $this->resolveHttpClientAndEndpoint();
 
         $seeker->loadMissing([
             'occupations',
@@ -70,16 +55,13 @@ class VertexAiSuggestionService
         $decoded = [];
         $summary = '';
         for ($attempt = 0; $attempt < 2 && $summary === ''; $attempt++) {
-            $response = Http::acceptJson()
-                ->withToken($accessToken)
-                ->timeout((int) config('services.vertex_ai.timeout', 20))
-                ->post(
-                    $this->endpoint($projectId, $location, $model),
-                    $this->professionalSummaryPayload($seeker, $existingSummary),
-                );
+            $response = $http
+                ->timeout((int) config('services.vertex_ai.timeout', 30))
+                ->post($url, $this->professionalSummaryPayload($seeker, $existingSummary));
 
             if (! $response->successful()) {
-                throw new RuntimeException('Vertex AI could not generate a professional summary.');
+                \Illuminate\Support\Facades\Log::error('Gemini API Error: ' . $response->body());
+                throw new RuntimeException('AI could not generate a professional summary.');
             }
 
             $decoded = $this->decodeStructuredResponse($response->json());
@@ -87,38 +69,30 @@ class VertexAiSuggestionService
         }
 
         if ($summary === '') {
-            throw new RuntimeException('Vertex AI returned an empty professional summary after retrying.');
+            throw new RuntimeException('AI returned an empty professional summary after retrying.');
         }
 
         return [
             'summary' => $summary,
             'highlights_used' => $this->professionalSummaryHighlights($seeker),
-            'source' => 'vertex_ai',
+            'source' => 'gemini',
         ];
     }
 
     public function classifyOccupationTitleEnhanced(string $title, int $limit = 5): array
     {
         if (! config('services.vertex_ai.enabled')) {
-            throw new RuntimeException('Vertex AI suggestions are disabled.');
+            throw new RuntimeException('AI suggestions are disabled.');
         }
 
-        $projectId = trim((string) config('services.vertex_ai.project_id'));
-        $location = trim((string) config('services.vertex_ai.location', 'us-central1'));
-        $model = trim((string) config('services.vertex_ai.model', 'gemini-2.5-flash'));
-        $accessToken = $this->tokens->token();
+        [$http, $url] = $this->resolveHttpClientAndEndpoint();
 
-        if ($projectId === '' || $location === '' || $model === '' || ! $accessToken) {
-            throw new RuntimeException('Vertex AI is not fully configured.');
-        }
-
-        $response = Http::acceptJson()
-            ->withToken($accessToken)
-            ->timeout((int) config('services.vertex_ai.timeout', 20))
-            ->post($this->endpoint($projectId, $location, $model), $this->occupationClassificationEnhancedPayload($title, $limit));
+        $response = $http
+            ->timeout((int) config('services.vertex_ai.timeout', 30))
+            ->post($url, $this->occupationClassificationEnhancedPayload($title, $limit));
 
         if (! $response->successful()) {
-            throw new RuntimeException('Vertex AI did not return occupation classifications.');
+            throw new RuntimeException('AI did not return occupation classifications.');
         }
 
         return $this->normalizeOccupationClassificationEnhancedResponse($response->json());
@@ -127,25 +101,17 @@ class VertexAiSuggestionService
     public function classifyOccupationTitle(string $title, int $limit = 5): array
     {
         if (! config('services.vertex_ai.enabled')) {
-            throw new RuntimeException('Vertex AI suggestions are disabled.');
+            throw new RuntimeException('AI suggestions are disabled.');
         }
 
-        $projectId = trim((string) config('services.vertex_ai.project_id'));
-        $location = trim((string) config('services.vertex_ai.location', 'us-central1'));
-        $model = trim((string) config('services.vertex_ai.model', 'gemini-2.5-flash'));
-        $accessToken = $this->tokens->token();
+        [$http, $url] = $this->resolveHttpClientAndEndpoint();
 
-        if ($projectId === '' || $location === '' || $model === '' || ! $accessToken) {
-            throw new RuntimeException('Vertex AI is not fully configured.');
-        }
-
-        $response = Http::acceptJson()
-            ->withToken($accessToken)
-            ->timeout((int) config('services.vertex_ai.timeout', 20))
-            ->post($this->endpoint($projectId, $location, $model), $this->occupationClassificationPayload($title, $limit));
+        $response = $http
+            ->timeout((int) config('services.vertex_ai.timeout', 30))
+            ->post($url, $this->occupationClassificationPayload($title, $limit));
 
         if (! $response->successful()) {
-            throw new RuntimeException('Vertex AI did not return occupation classifications.');
+            throw new RuntimeException('AI did not return occupation classifications.');
         }
 
         return $this->normalizeOccupationClassificationResponse($response->json(), $limit);
@@ -154,25 +120,17 @@ class VertexAiSuggestionService
     public function parseMapQuery(string $query): array
     {
         if (! config('services.vertex_ai.enabled')) {
-            throw new RuntimeException('Vertex AI suggestions are disabled.');
+            throw new RuntimeException('AI suggestions are disabled.');
         }
 
-        $projectId = trim((string) config('services.vertex_ai.project_id'));
-        $location = trim((string) config('services.vertex_ai.location', 'us-central1'));
-        $model = trim((string) config('services.vertex_ai.model', 'gemini-2.5-flash'));
-        $accessToken = $this->tokens->token();
+        [$http, $url] = $this->resolveHttpClientAndEndpoint();
 
-        if ($projectId === '' || $location === '' || $model === '' || ! $accessToken) {
-            throw new RuntimeException('Vertex AI is not fully configured.');
-        }
-
-        $response = Http::acceptJson()
-            ->withToken($accessToken)
+        $response = $http
             ->timeout((int) config('services.vertex_ai.timeout', 15))
-            ->post($this->endpoint($projectId, $location, $model), $this->mapQueryPayload($query));
+            ->post($url, $this->mapQueryPayload($query));
 
         if (! $response->successful()) {
-            throw new RuntimeException('Vertex AI did not return a valid parsing result.');
+            throw new RuntimeException('AI did not return a valid parsing result.');
         }
 
         $text = data_get($response->json(), 'candidates.0.content.parts.0.text');
@@ -184,6 +142,45 @@ class VertexAiSuggestionService
         return is_array($decoded) ? $decoded : [];
     }
 
+
+
+    /**
+     * Resolve an HTTP client + endpoint URL.
+     * Priority:
+     *   1. Gemini REST API (GOOGLE_GEMINI_API_KEY) — no GCP project needed
+     *   2. Vertex AI with OAuth access token (ADC / configured token)
+     */
+    private function resolveHttpClientAndEndpoint(): array
+    {
+        $model = trim((string) config('services.vertex_ai.model', 'gemini-3.1-flash-lite'));
+        $timeout = (int) config('services.vertex_ai.timeout', 30);
+
+        // 1. Gemini REST API (just needs an API key)
+        $apiKey = trim((string) config('services.vertex_ai.gemini_api_key'));
+        if ($apiKey !== '') {
+            $url = sprintf(
+                'https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s',
+                rawurlencode($model),
+                $apiKey
+            );
+            return [Http::acceptJson()->timeout($timeout), $url];
+        }
+
+        // 2. Vertex AI
+        $projectId = trim((string) config('services.vertex_ai.project_id'));
+        $location  = trim((string) config('services.vertex_ai.location', 'us-central1'));
+        $accessToken = $this->tokens->token();
+
+        if ($projectId === '' || $location === '' || ! $accessToken) {
+            throw new RuntimeException(
+                'AI is not configured. Add GOOGLE_GEMINI_API_KEY to your .env file to enable AI features. '
+                .'Get a free key at https://aistudio.google.com/app/apikey'
+            );
+        }
+
+        $url = $this->endpoint($projectId, $location, $model);
+        return [Http::acceptJson()->withToken($accessToken)->timeout($timeout), $url];
+    }
 
     private function endpoint(string $projectId, string $location, string $model): string
     {

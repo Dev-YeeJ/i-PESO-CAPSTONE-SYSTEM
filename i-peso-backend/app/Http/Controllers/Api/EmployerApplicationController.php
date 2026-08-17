@@ -24,8 +24,11 @@ class EmployerApplicationController extends Controller
     {
         $employer = $this->employer($request);
         $validated = $request->validate([
+            'post_id' => ['nullable', 'integer', 'exists:job_vacancies,post_id'],
             'status' => ['nullable', Rule::in(['pending', 'reviewed', 'shortlisted', 'interview', 'hired', 'rejected'])],
             'search' => ['nullable', 'string', 'max:100'],
+            'sort_by' => ['nullable', Rule::in(['match_score', 'applied_date', 'name'])],
+            'sort_dir' => ['nullable', Rule::in(['asc', 'desc'])],
             'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
         ]);
 
@@ -39,6 +42,10 @@ class EmployerApplicationController extends Controller
                 'interviewSchedule',
             ])
             ->whereHas('jobVacancy', fn ($vacancy) => $vacancy->where('employer_id', $employer->employer_id));
+
+        if ($validated['post_id'] ?? null) {
+            $query->where('post_id', $validated['post_id']);
+        }
 
         if ($validated['status'] ?? null) {
             $query->where('status', $validated['status']);
@@ -57,8 +64,29 @@ class EmployerApplicationController extends Controller
             });
         }
 
+        // Server-side sorting
+        $sortBy = $validated['sort_by'] ?? 'applied_date';
+        $sortDir = $validated['sort_dir'] ?? 'desc';
+
+        switch ($sortBy) {
+            case 'match_score':
+                $query->orderBy('match_percentage', $sortDir);
+                break;
+            case 'name':
+                $query->orderBy(
+                    \App\Models\JobSeeker::select('first_name')
+                        ->whereColumn('job_seekers.seeker_id', 'applications.seeker_id')
+                        ->limit(1),
+                    $sortDir
+                );
+                break;
+            case 'applied_date':
+            default:
+                $query->orderBy('created_at', $sortDir);
+                break;
+        }
+
         $applications = $query
-            ->latest('created_at')
             ->paginate((int) ($validated['per_page'] ?? 50));
 
         $applications->getCollection()->transform(

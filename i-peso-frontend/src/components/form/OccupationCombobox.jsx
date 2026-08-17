@@ -561,11 +561,15 @@ export default function OccupationCombobox({
   const handleSelect = useCallback((item) => {
     if (isClassify) {
       if (multiple) {
-        const isDupe = values.some((v) =>
-          item.is_fallback
-            ? v.broad_field === item.broad_field
-            : normalizeStr(v.occupation_title) === normalizeStr(item.occupation_title),
-        )
+        const isDupe = values.some((v) => {
+          if (item.is_fallback) return v.broad_field === item.broad_field
+          
+          const vTitle = normalizeStr(v.occupation_title)
+          const iTitle = normalizeStr(item.occupation_title)
+          
+          if (!vTitle || !iTitle) return false
+          return vTitle === iTitle
+        })
         if (isDupe) return
       }
       const payload = {
@@ -1005,29 +1009,7 @@ function ClassifySuggestionRow({ item, index, highlighted, onSelect }) {
           <span className="text-sm font-bold leading-snug text-slate-800">
             {item.occupation_title}
           </span>
-          <span className={[
-            'inline-flex shrink-0 items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-semibold',
-            isCatalog ? 'bg-emerald-100 text-emerald-700' :
-            isDict    ? 'bg-blue-100 text-blue-700' :
-            isAi      ? 'bg-amber-100 text-amber-700' :
-                        'bg-slate-100 text-slate-600',
-          ].join(' ')}>
-            {isCatalog && <CheckCircle2 className="h-2.5 w-2.5" />}
-            {isDict    && <BookOpen     className="h-2.5 w-2.5" />}
-            {isAi      && <Sparkles     className="h-2.5 w-2.5" />}
-            {isCatalog ? 'Catalog' : isDict ? 'Dictionary' : isAi ? 'AI' : 'Match'}
-          </span>
         </div>
-        {item.confidence != null && (
-          <span className={[
-            'shrink-0 rounded-full px-2 py-0.5 text-[10px] font-extrabold',
-            item.confidence >= 85 ? 'bg-emerald-50 text-emerald-700' :
-            item.confidence >= 70 ? 'bg-blue-50 text-blue-700' :
-                                    'bg-amber-50 text-amber-700',
-          ].join(' ')}>
-            {item.confidence}%
-          </span>
-        )}
       </div>
 
       {/* Broad field + role row */}
@@ -1045,12 +1027,7 @@ function ClassifySuggestionRow({ item, index, highlighted, onSelect }) {
         )}
       </div>
 
-      {/* Reason */}
-      {item.reason && (
-        <p className="mt-0.5 text-[11px] leading-relaxed text-slate-400 group-hover:text-slate-500">
-          {item.reason}
-        </p>
-      )}
+
     </button>
   )
 }

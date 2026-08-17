@@ -5,6 +5,13 @@ export const getEmployerApplications = async (params = {}) => {
   return response.data
 }
 
+export const getVacancyApplications = async (vacancyId, params = {}) => {
+  const response = await apiClient.get('/employer/applications', {
+    params: { post_id: vacancyId, ...params }
+  })
+  return response.data
+}
+
 export const getEmployerApplicationDetail = async (applicationId) => {
   const response = await apiClient.get(`/employer/applications/${applicationId}`)
   return response.data

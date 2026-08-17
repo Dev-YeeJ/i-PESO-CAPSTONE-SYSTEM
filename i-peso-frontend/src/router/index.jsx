@@ -35,6 +35,7 @@ const EmployerDashboard = lazy(() => import('@/pages/employer/DashboardPage'))
 const EmployerPostJob   = lazy(() => import('@/pages/employer/PostJobPage'))
 const EmployerVacancies = lazy(() => import('@/pages/employer/VacanciesPage'))
 const EmployerATSGrid   = lazy(() => import('@/pages/employer/EmployerATSGrid'))
+const VacancyATSPage    = lazy(() => import('@/pages/employer/VacancyATSPage'))
 const EmployerCalendar  = lazy(() => import('@/pages/employer/InterviewCalendarPage'))
 const EmployerJobFairs  = lazy(() => import('@/pages/employer/EmployerJobFairDashboard'))
 const EmployerEstablishmentReport = lazy(() => import('@/pages/employer/EmployerEstablishmentReportPage'))
@@ -42,6 +43,7 @@ const EmployerPlacementReport = lazy(() => import('@/pages/employer/EmployerPlac
 const SeekerDashboard   = lazy(() => import('@/pages/seeker/DashboardPage'))
 const SeekerProfile     = lazy(() => import('@/pages/seeker/SeekerProfile'))
 const SeekerProfileEdit = lazy(() => import('@/pages/seeker/SeekerProfileEdit'))
+const SeekerEmployerProfile = lazy(() => import('@/pages/seeker/EmployerProfile'))
 const SeekerJobMap      = lazy(() => import('@/pages/seeker/JobMapPage'))
 const SeekerJobFairs    = lazy(() => import('@/pages/seeker/JobFairFeed'))
 const SeekerGovernmentPrograms = lazy(() => import('@/pages/seeker/GovernmentProgramsPage'))
@@ -160,6 +162,7 @@ export const router = createBrowserRouter([
                           { path: 'post-job', element: S(EmployerPostJob) },
                           { path: 'vacancies', element: S(EmployerVacancies) },
                           { path: 'ats', element: S(EmployerATSGrid) },
+                          { path: 'ats/:vacancyId', element: S(VacancyATSPage) },
                           { path: 'calendar', element: S(EmployerCalendar) },
                           { path: 'job-fairs', element: S(EmployerJobFairs) },
                           { path: 'reports/establishment-report', element: S(EmployerEstablishmentReport) },
@@ -249,6 +252,7 @@ export const router = createBrowserRouter([
                           { path: 'applications', element: S(SeekerApplications) },
                           { path: 'profile', element: S(SeekerProfile) },
                           { path: 'profile/edit', element: S(SeekerProfileEdit) },
+                          { path: 'employers/:id', element: S(SeekerEmployerProfile) },
                         ],
                       }
                     ],

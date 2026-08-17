@@ -35,6 +35,11 @@ export const getVacancies = async (params = {}) => {
   return response.data
 }
 
+export const getVacancy = async (id) => {
+  const response = await apiClient.get(`/employer/vacancies/${id}`)
+  return response.data
+}
+
 export const createVacancy = async (vacancy) => {
   const response = await apiClient.post('/employer/vacancies', vacancy)
   return response.data

@@ -845,9 +845,7 @@ function PreviewBody({ form }) {
   const ageRange = form.minimum_age || form.maximum_age
     ? `${form.minimum_age || '—'} to ${form.maximum_age || '—'}`
     : 'No age preference'
-  const description = form.job_description
-    ? (form.job_description.length > 260 ? `${form.job_description.slice(0, 260)}…` : form.job_description)
-    : '—'
+  const description = form.job_description || '—'
 
   return (
     <dl className="grid grid-cols-1 gap-x-6 gap-y-3.5 rounded-xl border border-slate-200 bg-slate-50/60 p-4 sm:grid-cols-2">
@@ -884,9 +882,8 @@ function regionFromProvinceCode(provinceCode) {
 function yearsToExperienceLevel(yearsValue) {
   const years = Number(yearsValue || 0)
   if (years <= 0) return 'No Experience Required'
-  if (years <= 3) return '1-3 Years'
-  if (years <= 5) return '3-5 Years'
-  return '5+ Years'
+  if (years === 1) return '1 Year'
+  return `${years} Years`
 }
 
 function buildPayload(form) {
@@ -914,6 +911,7 @@ function buildPayload(form) {
     minimum_education: educationRankToBackendValue(form.minimum_education_rank) || form.minimum_education,
     target_courses: [],
     experience_level: yearsToExperienceLevel(form.required_years_experience),
+    minimum_experience_months: Number(form.required_years_experience || 0) * 12,
     required_skills: form.required_skills,
     soft_skills: form.soft_skills,
     required_certifications: [],
