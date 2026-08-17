@@ -48,7 +48,6 @@ const SeekerJobMap      = lazy(() => import('@/pages/seeker/JobMapPage'))
 const SeekerJobFairs    = lazy(() => import('@/pages/seeker/JobFairFeed'))
 const SeekerGovernmentPrograms = lazy(() => import('@/pages/seeker/GovernmentProgramsPage'))
 const SeekerProgramDetails = lazy(() => import('@/pages/seeker/ProgramDetailsPage'))
-const SeekerProgramApplications = lazy(() => import('@/pages/seeker/MyProgramApplications'))
 const SeekerApplications = lazy(() => import('@/pages/seeker/MyApplications'))
 const SeekerOnboarding  = lazy(() => import('@/pages/auth/onboarding/SeekerOnboarding'))
 
@@ -248,7 +247,6 @@ export const router = createBrowserRouter([
                           { path: 'job-fairs', element: S(SeekerJobFairs) },
                           { path: 'government-programs', element: S(SeekerGovernmentPrograms) },
                           { path: 'government-programs/:id', element: S(SeekerProgramDetails) },
-                          { path: 'program-applications', element: S(SeekerProgramApplications) },
                           { path: 'applications', element: S(SeekerApplications) },
                           { path: 'profile', element: S(SeekerProfile) },
                           { path: 'profile/edit', element: S(SeekerProfileEdit) },

@@ -21,7 +21,7 @@ const pageNames = {
   '/seeker/job-map': 'AI Job Map',
   '/seeker/applications': 'My Applications',
   '/seeker/government-programs': 'Government Programs',
-  '/seeker/program-applications': 'Program Applications',
+
   '/seeker/profile': 'My Profile',
   '/seeker/profile/edit': 'Update Profile',
 }

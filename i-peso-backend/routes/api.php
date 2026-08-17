@@ -136,12 +136,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/citizen-charter', [SeekerGovernmentProgramController::class, 'citizenCharter']);
         Route::get('/government-programs/{governmentProgram}', [SeekerGovernmentProgramController::class, 'show']);
         Route::get('/government-programs/{governmentProgram}/attachment', [SeekerGovernmentProgramController::class, 'attachment']);
-        Route::post('/government-programs/{governmentProgram}/apply', [SeekerGovernmentProgramApplicationController::class, 'apply'])
-            ->middleware('throttle:10,1');
-        Route::get('/government-program-applications', [SeekerGovernmentProgramApplicationController::class, 'index']);
-        Route::post('/government-program-applications/{programApplication}/documents', [SeekerGovernmentProgramApplicationController::class, 'uploadDocument'])
-            ->middleware('throttle:10,1');
-        Route::get('/government-program-applications/{programApplication}/documents/{document}', [SeekerGovernmentProgramApplicationController::class, 'document']);
+
         Route::get('/nearby-jobs', [SeekerNearbyJobController::class, 'getNearbyJobs'])
             ->middleware('throttle:60,1');
         Route::get('/job-map', [SeekerNearbyJobController::class, 'getNearbyJobs'])
@@ -261,9 +256,7 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::post('/government-programs/{governmentProgram}', [AdminGovernmentProgramController::class, 'update']);
             Route::delete('/government-programs/{governmentProgram}', [AdminGovernmentProgramController::class, 'destroy']);
             Route::get('/government-programs/{governmentProgram}/attachment', [AdminGovernmentProgramController::class, 'attachment']);
-            Route::get('/government-programs/{governmentProgram}/applications', [AdminGovernmentProgramApplicationController::class, 'index']);
-            Route::post('/government-program-applications/{programApplication}/status', [AdminGovernmentProgramApplicationController::class, 'updateStatus']);
-            Route::get('/government-program-applications/{programApplication}/documents/{document}', [AdminGovernmentProgramApplicationController::class, 'document']);
+
 
             // Backward-compatible aliases for the original Government Programs API.
             Route::get('/programs', [AdminGovernmentProgramController::class, 'index']);
@@ -271,9 +264,7 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::get('/programs/{governmentProgram}', [AdminGovernmentProgramController::class, 'show']);
             Route::put('/programs/{governmentProgram}', [AdminGovernmentProgramController::class, 'update']);
             Route::delete('/programs/{governmentProgram}', [AdminGovernmentProgramController::class, 'destroy']);
-            Route::get('/programs/{governmentProgram}/applicants', [AdminGovernmentProgramApplicationController::class, 'index']);
-            Route::post('/programs/{governmentProgram}/applicants/{programApplication}/review', [AdminGovernmentProgramApplicationController::class, 'legacyReview']);
-            Route::post('/programs/{governmentProgram}/applicants/bulk-review', [AdminGovernmentProgramApplicationController::class, 'legacyBulkReview']);
+
 
             // Citizen Charter
             Route::get('/citizen-charter', [AdminCitizenCharterController::class, 'index']);

@@ -1,4 +1,4 @@
-import { BookOpenCheck, Grid2X2, List, Search, SlidersHorizontal } from 'lucide-react'
+import { BookOpenCheck, Grid2X2, List, Search, SlidersHorizontal, UsersRound, Clock3 } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import ProgramCard from '@/components/government-programs/ProgramCard'
@@ -33,23 +33,33 @@ export default function GovernmentProgramsPage() {
   useEffect(() => { governmentProgramService.publicCitizenCharter().then((items) => setCharter(items.slice(0, 3))).catch(() => setCharter([])) }, [])
 
   return (
-    <div className="space-y-8">
-      <header className="flex flex-col gap-4 border-b border-slate-200 pb-6 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <p className="text-xs font-black uppercase text-blue-800">PESO Programs Center</p>
-          <h1 className="mt-1 text-3xl font-black text-slate-950">Government Programs</h1>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">Browse DOLE and PESO programs — SPES, TUPAD, GIP, livelihood, training, and OFW assistance. Your profile is checked against each program's eligibility rules automatically.</p>
+    <div className="space-y-10 pb-12 max-w-7xl mx-auto">
+      {/* Hero Header */}
+      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-900 via-blue-950 to-indigo-900 px-8 py-8 text-white shadow-xl sm:px-12 sm:py-10">
+        <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-blue-500/20 blur-3xl"></div>
+        <div className="absolute -bottom-32 -left-20 h-80 w-80 rounded-full bg-indigo-500/20 blur-3xl"></div>
+        
+        <div className="relative z-10">
+          <p className="text-xs font-bold uppercase tracking-widest text-blue-300">PESO Programs Center</p>
+          <h1 className="mt-1 text-3xl font-black tracking-tight text-white drop-shadow-sm">Government Programs</h1>
+          <p className="mt-3 max-w-2xl text-base leading-relaxed text-blue-100">
+            Browse DOLE and PESO programs — SPES, TUPAD, GIP, livelihood, training, and OFW assistance. Your profile is checked against each program's eligibility rules automatically.
+          </p>
         </div>
-        <Link to="/seeker/program-applications" className="inline-flex items-center gap-2 rounded-lg bg-blue-900 px-4 py-2.5 text-sm font-bold text-white"><BookOpenCheck className="h-4 w-4" />My Applications</Link>
-      </header>
+      </div>
 
+      {/* Category Pills */}
       <section aria-label="Program categories">
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-8">
+        <div className="flex flex-wrap gap-3">
           {PROGRAM_CATEGORIES.map((category) => (
             <button
               key={category.value}
               onClick={() => setFilters((current) => ({ ...current, category: current.category === category.value ? '' : category.value }))}
-              className={`min-h-20 rounded-lg border px-3 py-3 text-left text-xs font-extrabold leading-5 transition ${filters.category === category.value ? 'border-blue-900 bg-blue-900 text-white' : 'border-slate-200 bg-white text-slate-700 hover:border-blue-300'}`}
+              className={`rounded-full px-5 py-2.5 text-sm font-bold transition-all shadow-sm ${
+                filters.category === category.value 
+                  ? 'bg-blue-900 text-white ring-2 ring-blue-900 ring-offset-2' 
+                  : 'bg-white border border-slate-200 text-slate-700 hover:border-blue-300 hover:bg-blue-50/50'
+              }`}
             >
               {category.label}
             </button>
@@ -57,49 +67,58 @@ export default function GovernmentProgramsPage() {
         </div>
       </section>
 
-      <section className="space-y-4">
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2"><SlidersHorizontal className="h-5 w-5 text-slate-500" /><h2 className="text-xl font-black text-slate-950">Browse programs</h2></div>
-          <div className="inline-flex rounded-lg border border-slate-300 bg-white p-1">
-            <button onClick={() => setViewMode('cards')} title="Card view" className={`rounded-md p-2 ${viewMode === 'cards' ? 'bg-blue-900 text-white' : 'text-slate-500'}`}><Grid2X2 className="h-4 w-4" /></button>
-            <button onClick={() => setViewMode('list')} title="List view" className={`rounded-md p-2 ${viewMode === 'list' ? 'bg-blue-900 text-white' : 'text-slate-500'}`}><List className="h-4 w-4" /></button>
-          </div>
-        </div>
-        <div className="grid gap-2 rounded-lg border border-slate-200 bg-white p-4 sm:grid-cols-2 lg:grid-cols-3">
-          <label className="relative sm:col-span-2 lg:col-span-2">
-            <span className="sr-only">Search programs</span>
-            <Search className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
-            <input value={filters.search} onChange={(event) => setFilters((current) => ({ ...current, search: event.target.value }))} placeholder="Search title, description, or industry" className="w-full rounded-lg border border-slate-300 py-2.5 pl-9 pr-3 text-sm" />
-          </label>
-          <select value={filters.status} onChange={(event) => setFilters((current) => ({ ...current, status: event.target.value }))} className="rounded-lg border border-slate-300 px-3 py-2.5 text-sm">
-            <option value="">Any status</option>
-            <option value="open">Open</option>
-            <option value="closed">Closed</option>
-            <option value="completed">Completed</option>
-          </select>
+      {/* Control Bar & Results */}
+      <section className="space-y-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between rounded-3xl border border-slate-200 bg-white p-2 shadow-sm">
+           <div className="flex w-full items-center gap-2 sm:w-auto flex-1 px-4">
+              <Search className="h-5 w-5 text-slate-400 shrink-0" />
+              <input value={filters.search} onChange={(event) => setFilters((current) => ({ ...current, search: event.target.value }))} placeholder="Search title, description, or industry..." className="w-full border-0 bg-transparent py-3 text-sm focus:outline-none focus:ring-0" />
+           </div>
+           
+           <div className="h-px bg-slate-200 sm:h-10 sm:w-px sm:mx-2 hidden sm:block"></div>
+           
+           <div className="flex items-center gap-2 px-2 pb-2 sm:pb-0">
+             <select value={filters.status} onChange={(event) => setFilters((current) => ({ ...current, status: event.target.value }))} className="rounded-xl border-none bg-slate-50 px-4 py-2.5 text-sm font-semibold focus:ring-2 focus:ring-blue-900 cursor-pointer hover:bg-slate-100">
+               <option value="">Any Status</option>
+               <option value="open">Open</option>
+               <option value="closed">Closed</option>
+               <option value="completed">Completed</option>
+             </select>
+             
+             <div className="inline-flex rounded-xl bg-slate-50 p-1">
+               <button onClick={() => setViewMode('cards')} title="Card view" className={`rounded-lg p-2 transition-colors ${viewMode === 'cards' ? 'bg-white text-blue-900 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}><Grid2X2 className="h-4 w-4" /></button>
+               <button onClick={() => setViewMode('list')} title="List view" className={`rounded-lg p-2 transition-colors ${viewMode === 'list' ? 'bg-white text-blue-900 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}><List className="h-4 w-4" /></button>
+             </div>
+           </div>
         </div>
 
-        {error && <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-700">{error}</div>}
+        {error && <div className="rounded-2xl border border-red-200 bg-red-50 p-5 text-sm font-semibold text-red-700">{error}</div>}
+        
         {loading ? (
-          <LoadingSkeleton variant="card" rows={3} />
+          <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3"><LoadingSkeleton variant="card" rows={3} /><LoadingSkeleton variant="card" rows={3} /><LoadingSkeleton variant="card" rows={3} /></div>
         ) : programs.length === 0 ? (
-          <EmptyState filtered icon={BookOpenCheck} title="No programs match these filters" description="Try clearing or broadening the filters above." action={{ label: 'Clear filters', onClick: () => setFilters(initialFilters) }} />
+          <div className="rounded-3xl border border-slate-200 bg-white p-12 shadow-sm">
+             <EmptyState filtered icon={BookOpenCheck} title="No programs match these filters" description="Try clearing or broadening the filters above." action={{ label: 'Clear filters', onClick: () => setFilters(initialFilters) }} />
+          </div>
         ) : viewMode === 'cards' ? (
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{programs.map((program) => <ProgramCard key={program.program_id} program={program} to={`/seeker/government-programs/${program.program_id}`} />)}</div>
+          <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">{programs.map((program) => <ProgramCard key={program.program_id} program={program} to={`/seeker/government-programs/${program.program_id}`} />)}</div>
         ) : (
-          <div className="space-y-2">{programs.map((program) => <ProgramListRow key={program.program_id} program={program} />)}</div>
+          <div className="space-y-3">{programs.map((program) => <ProgramListRow key={program.program_id} program={program} />)}</div>
         )}
       </section>
 
       {charter.length > 0 && (
-        <section className="border-t border-slate-200 pt-7">
-          <div className="mb-4"><h2 className="text-xl font-black text-slate-950">PESO Citizen Charter</h2><p className="mt-1 text-sm text-slate-500">Service requirements, processing commitments, and responsible offices.</p></div>
-          <div className="grid gap-3 lg:grid-cols-3">
+        <section className="mt-12 rounded-3xl border border-slate-200 bg-gradient-to-b from-slate-50 to-white p-8 shadow-sm">
+          <div className="mb-8 text-center max-w-2xl mx-auto">
+             <h2 className="text-2xl font-black text-slate-900 tracking-tight">PESO Citizen Charter</h2>
+             <p className="mt-2 text-base text-slate-500">Service requirements, processing commitments, and responsible offices to guide your walk-in applications.</p>
+          </div>
+          <div className="grid gap-6 lg:grid-cols-3">
             {charter.map((service) => (
-              <article key={service.service_id} className="rounded-lg border border-slate-200 bg-white p-5">
-                <h3 className="font-black text-slate-950">{service.service_name}</h3>
-                <p className="mt-2 line-clamp-3 text-sm leading-6 text-slate-600">{service.description}</p>
-                <dl className="mt-4 space-y-2 text-xs">
+              <article key={service.service_id} className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm hover:shadow-md transition-shadow">
+                <h3 className="font-black text-slate-900 text-lg leading-tight">{service.service_name}</h3>
+                <p className="mt-3 line-clamp-3 text-sm leading-relaxed text-slate-600">{service.description}</p>
+                <dl className="mt-6 space-y-3 text-sm border-t border-slate-100 pt-4">
                   <div className="flex justify-between gap-3"><dt className="font-bold text-slate-400">Processing</dt><dd className="text-right font-semibold text-slate-700">{service.processing_time || 'Not specified'}</dd></div>
                   <div className="flex justify-between gap-3"><dt className="font-bold text-slate-400">Fees</dt><dd className="text-right font-semibold text-slate-700">{service.fees || 'None'}</dd></div>
                 </dl>
@@ -114,20 +133,24 @@ export default function GovernmentProgramsPage() {
 
 function ProgramListRow({ program }) {
   return (
-    <article className="grid gap-3 rounded-lg border border-slate-200 bg-white p-4 sm:grid-cols-[1fr_auto_auto] sm:items-center">
+    <article className="grid gap-4 rounded-2xl border border-slate-200 bg-white p-5 sm:grid-cols-[1fr_auto_auto] sm:items-center shadow-sm transition hover:border-blue-200 hover:shadow-md group">
       <div>
-        <div className="flex flex-wrap items-center gap-2">
-          <p className="text-xs font-extrabold text-blue-800">{program.category.replaceAll('_', ' ').toUpperCase()}</p>
+        <div className="flex flex-wrap items-center gap-2 mb-2">
+          <span className="inline-flex rounded-full border border-blue-100 bg-blue-50 px-2 py-0.5 text-[10px] uppercase tracking-wider font-extrabold text-blue-700">
+            {program.category.replaceAll('_', ' ')}
+          </span>
           <EligibilityBadge eligibility={program.eligibility} />
         </div>
-        <h3 className="mt-1 font-black text-slate-950">{program.title}</h3>
+        <h3 className="text-lg font-black text-slate-900 group-hover:text-blue-900 transition-colors">{program.title}</h3>
         <p className="mt-1 line-clamp-1 text-sm text-slate-500">{program.short_description || program.description}</p>
       </div>
-      <div className="text-xs font-semibold text-slate-500">
-        <p>{program.total_slots === 0 ? 'Open capacity' : `${program.available_slots} slots left`}</p>
-        <p className="mt-1">Deadline {program.application_deadline || 'not set'}</p>
+      <div className="text-sm font-semibold text-slate-500 bg-slate-50 rounded-xl px-4 py-2 border border-slate-100">
+        <p className="flex items-center gap-2"><UsersRound className="h-4 w-4 text-emerald-400" />{program.total_slots === 0 ? 'Open capacity' : `${program.available_slots} slots left`}</p>
+        <p className="mt-1 flex items-center gap-2"><Clock3 className="h-4 w-4 text-blue-400" />Deadline {program.application_deadline || 'not set'}</p>
       </div>
-      <Link to={`/seeker/government-programs/${program.program_id}`} className="inline-flex items-center justify-center gap-1 rounded-lg border border-blue-900 px-3 py-2 text-sm font-bold text-blue-900">View</Link>
+      <Link to={`/seeker/government-programs/${program.program_id}`} className="inline-flex h-full min-h-[44px] items-center justify-center rounded-xl bg-slate-900 px-6 text-sm font-extrabold text-white transition hover:bg-blue-900 shadow-sm">
+        View
+      </Link>
     </article>
   )
 }

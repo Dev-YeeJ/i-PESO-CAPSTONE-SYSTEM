@@ -13,7 +13,7 @@ const BLANK = {
   start_date: '', end_date: '', application_deadline: '', total_slots: 0,
   program_status: 'open', visibility: 'public',
   venue: '', location_address: '', contact_person: '', contact_email: '', contact_phone: '',
-  eligibility_requirements: [], required_documents: [], eligibility_rules: [],
+  eligibility_requirements: [], required_documents: [], citizen_charter_steps: [], eligibility_rules: [],
 }
 
 const toStringList = (items = []) => items.map((item) => (typeof item === 'string' ? item : item?.label ?? '')).filter(Boolean)
@@ -38,6 +38,7 @@ export default function GovernmentProgramFormPage() {
           total_slots: program.total_slots ?? 0,
           eligibility_requirements: toStringList(program.eligibility_requirements),
           required_documents: toStringList(program.required_documents),
+          citizen_charter_steps: toStringList(program.citizen_charter_steps),
           eligibility_rules: Array.isArray(program.eligibility_rules) ? program.eligibility_rules : [],
         })
       })
@@ -61,6 +62,7 @@ export default function GovernmentProgramFormPage() {
         total_slots: Number(form.total_slots) || 0,
         eligibility_requirements: toStringList(form.eligibility_requirements),
         required_documents: toStringList(form.required_documents),
+        citizen_charter_steps: toStringList(form.citizen_charter_steps),
         eligibility_rules: rules,
         ...(attachment ? { attachment } : {}),
       }
@@ -153,6 +155,10 @@ export default function GovernmentProgramFormPage() {
 
         <Card title="Required documents">
           <StringList items={form.required_documents} onChange={(v) => set('required_documents', v)} placeholder="e.g. Barangay certificate" addLabel="Add document" />
+        </Card>
+
+        <Card title="Citizen Charter Steps" subtitle="Step-by-step instructions for walk-in applicants (e.g. 'Proceed to Window 2', 'Undergo 10min interview'). Shown on the seeker dashboard.">
+          <StringList items={form.citizen_charter_steps} onChange={(v) => set('citizen_charter_steps', v)} placeholder="e.g. Proceed to Window 2 for initial assessment" addLabel="Add step" />
         </Card>
 
         <Card title="Eligibility rules (scoring)" subtitle="These power the automatic eligibility badge and score seekers see. Required rules gate eligibility.">

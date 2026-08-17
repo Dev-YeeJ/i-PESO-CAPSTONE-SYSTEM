@@ -1,5 +1,4 @@
 export const PROGRAM_CATEGORIES = [
-  { value: 'job_fair', label: 'Job Fair' },
   { value: 'spes', label: 'SPES' },
   { value: 'tupad', label: 'TUPAD' },
   { value: 'gip', label: 'GIP (Gov Internship)' },
@@ -34,7 +33,6 @@ export const categoryLabel = (value) => PROGRAM_CATEGORIES.find((item) => item.v
 export const statusLabel = (value) => [...PROGRAM_STATUSES, ...APPLICATION_STATUSES].find((item) => item.value === value)?.label ?? value?.replaceAll('_', ' ') ?? 'Unknown'
 
 export const categoryTone = {
-  job_fair: 'border-blue-200 bg-blue-50 text-blue-700',
   spes: 'border-amber-200 bg-amber-50 text-amber-700',
   tupad: 'border-teal-200 bg-teal-50 text-teal-700',
   gip: 'border-indigo-200 bg-indigo-50 text-indigo-700',

@@ -239,6 +239,8 @@ class AdminGovernmentProgramController extends Controller
             'eligibility_rules.*.values.*' => ['string', 'max:100'],
             'required_documents' => ['nullable', 'array', 'max:30'],
             'required_documents.*' => ['string', 'max:150'],
+            'citizen_charter_steps' => ['nullable', 'array', 'max:30'],
+            'citizen_charter_steps.*' => ['string', 'max:255'],
             'target_industry' => ['nullable', 'string', 'max:255'],
             'target_occupation_id' => ['nullable', 'integer', 'exists:occupations,id'],
             'venue' => ['nullable', 'string', 'max:255'],

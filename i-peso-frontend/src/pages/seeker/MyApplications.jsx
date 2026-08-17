@@ -14,8 +14,6 @@ const statusTone = {
   withdrawn: 'border-slate-300 bg-slate-100 text-slate-700',
 }
 
-// Plain-language "what happens now" for each status — the brief asks that seekers
-// always know what a status means and what to do next.
 const nextSteps = {
   pending: 'The employer hasn’t opened your application yet. No action needed — check back in a few days.',
   reviewed: 'The employer has viewed your application. If you’re shortlisted, you’ll be invited to an interview.',
@@ -84,174 +82,189 @@ export default function MyApplications() {
     }
   }
 
-  // Open the withdraw confirmation, closing the detail dialog first so we never
-  // stack two dialogs on top of each other.
   const askWithdraw = (application) => {
     setActiveApplication(null)
     setPendingWithdraw(application)
   }
 
   return (
-    <div className="space-y-6">
-      <header className="border-b border-slate-200 pb-6">
-        <p className="text-xs font-black uppercase text-blue-800">Employment journey</p>
-        <h1 className="mt-1 text-3xl font-black text-slate-950">My Applications</h1>
-        <p className="mt-2 text-sm text-slate-600">Track every application submitted through the dashboard, AI Job Map, and job fairs.</p>
-      </header>
-
-      {error && (
-        <div className="flex items-center justify-between gap-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-700">
-          <span>{error}</span>
-          <button type="button" onClick={loadApplications} className="font-extrabold hover:underline">Try again</button>
+    <div className="space-y-10 pb-12 max-w-7xl mx-auto">
+      {/* Hero Header */}
+      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-900 via-blue-950 to-indigo-900 px-8 py-8 text-white shadow-xl sm:px-12 sm:py-10">
+        <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-blue-500/20 blur-3xl"></div>
+        <div className="absolute -bottom-32 -left-20 h-80 w-80 rounded-full bg-indigo-500/20 blur-3xl"></div>
+        
+        <div className="relative z-10">
+          <p className="text-xs font-bold uppercase tracking-widest text-blue-300">Employment Journey</p>
+          <h1 className="mt-1 text-3xl font-black tracking-tight text-white drop-shadow-sm">My Applications</h1>
+          <p className="mt-3 max-w-2xl text-base leading-relaxed text-blue-100">
+            Track every application submitted through the dashboard, AI Job Map, and job fairs.
+          </p>
         </div>
-      )}
+      </div>
 
-      {loading ? (
-        <LoadingSkeleton variant="card" rows={4} />
-      ) : applications.length === 0 ? (
-        <EmptyState
-          icon={BriefcaseBusiness}
-          title="No applications yet"
-          description="Explore nearby vacancies and submit your first application."
-          action={{ label: 'Open AI Job Map', icon: Compass, to: '/seeker/job-map' }}
-        />
-      ) : (
-        <div className="grid gap-4 lg:grid-cols-2">
-          {applications.map((application) => (
-            <article key={application.apply_id} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex items-start gap-3">
-                  {application.job?.employer?.company_logo_url && (
-                    <img src={application.job.employer.company_logo_url} alt="Logo" className="h-10 w-10 shrink-0 rounded-lg border border-slate-200 bg-white object-cover p-1 shadow-sm" />
-                  )}
-                  <div>
-                    <h2 className="font-black text-slate-950">{application.job?.job_title || 'Vacancy unavailable'}</h2>
-                    <p className="mt-1 text-sm font-semibold text-slate-500">{application.job?.employer?.company_name || 'Employer'}</p>
+      <div className="space-y-6">
+        {error && (
+          <div className="flex items-center justify-between gap-4 rounded-2xl border border-red-200 bg-red-50 p-5 text-sm font-semibold text-red-700 shadow-sm">
+            <span>{error}</span>
+            <button type="button" onClick={loadApplications} className="font-extrabold hover:underline rounded-md px-3 py-1 bg-red-100">Try again</button>
+          </div>
+        )}
+
+        {loading ? (
+          <div className="grid gap-6 lg:grid-cols-2"><LoadingSkeleton variant="card" rows={4} /><LoadingSkeleton variant="card" rows={4} /></div>
+        ) : applications.length === 0 ? (
+          <div className="rounded-3xl border border-slate-200 bg-white p-12 shadow-sm">
+            <EmptyState
+              icon={BriefcaseBusiness}
+              title="No applications yet"
+              description="Explore nearby vacancies and submit your first application."
+              action={{ label: 'Open AI Job Map', icon: Compass, to: '/seeker/job-map' }}
+            />
+          </div>
+        ) : (
+          <div className="grid gap-6 lg:grid-cols-2">
+            {applications.map((application) => (
+              <article key={application.apply_id} className="group rounded-3xl border border-slate-200 bg-white p-6 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-blue-200 hover:shadow-xl hover:shadow-blue-900/10 flex flex-col h-full">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-start gap-4">
+                    {application.job?.employer?.company_logo_url && (
+                      <img src={application.job.employer.company_logo_url} alt="Logo" className="h-12 w-12 shrink-0 rounded-xl border border-slate-100 bg-white object-cover p-1 shadow-sm" />
+                    )}
+                    <div>
+                      <h2 className="text-xl font-black text-slate-900 group-hover:text-blue-900 transition-colors leading-tight">{application.job?.job_title || 'Vacancy unavailable'}</h2>
+                      <p className="mt-1 text-sm font-semibold text-slate-500">{application.job?.employer?.company_name || 'Employer'}</p>
+                    </div>
                   </div>
+                  <span className={`shrink-0 rounded-full border px-3 py-1 text-[10px] font-extrabold uppercase tracking-wider shadow-sm ${statusTone[application.status] || statusTone.pending}`}>{application.status_label || application.status}</span>
                 </div>
-                <span className={`shrink-0 rounded-full border px-2.5 py-1 text-[10px] font-black uppercase ${statusTone[application.status] || statusTone.pending}`}>{application.status_label || application.status}</span>
-              </div>
 
-              <div className="mt-4 grid gap-2 text-xs text-slate-600">
-                <span className="flex items-center gap-2"><MapPin className="h-3.5 w-3.5 text-slate-400" />{application.job?.location || 'Location not specified'}</span>
-                <span className="flex items-center gap-2"><CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />{Math.round(application.match_percentage || 0)}% match when applied</span>
-                <span className="flex items-center gap-2"><CalendarClock className="h-3.5 w-3.5 text-slate-400" />Applied {application.applied_at ? new Date(application.applied_at).toLocaleDateString('en-PH', { dateStyle: 'medium' }) : 'recently'}</span>
-              </div>
-
-              {nextSteps[application.status] && (
-                <p className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs leading-5 text-slate-600">
-                  <span className="font-bold text-slate-700">What’s next: </span>{nextSteps[application.status]}
-                </p>
-              )}
-
-              {application.interview && (
-                <div className="mt-3 rounded-xl bg-indigo-50 p-3 text-xs font-semibold text-indigo-800">
-                  Interview: {new Date(application.interview.schedule).toLocaleString('en-PH', { dateStyle: 'medium', timeStyle: 'short' })} · {application.interview.mode_of_interview}
+                <div className="mt-5 grid gap-2 text-xs font-semibold text-slate-500 bg-slate-50 rounded-2xl p-4 border border-slate-100">
+                  <span className="flex items-center gap-2"><MapPin className="h-4 w-4 text-rose-400 shrink-0" />{application.job?.location || 'Location not specified'}</span>
+                  <span className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />{Math.round(application.match_percentage || 0)}% match when applied</span>
+                  <span className="flex items-center gap-2"><CalendarClock className="h-4 w-4 text-indigo-400 shrink-0" />Applied {application.applied_at ? new Date(application.applied_at).toLocaleDateString('en-PH', { dateStyle: 'medium' }) : 'recently'}</span>
                 </div>
-              )}
 
-              {application.employer_remarks && (
-                <p className="mt-3 rounded-xl bg-slate-50 p-3 text-xs leading-5 text-slate-600">Employer note: {application.employer_remarks}</p>
-              )}
-
-              <div className="mt-5 flex flex-wrap gap-2">
-                <Button variant="outline" size="sm" onClick={() => openDetails(application)}>
-                  {detailLoading && activeApplication?.apply_id === application.apply_id ? 'Loading…' : 'View details'}
-                </Button>
-                {application.can_withdraw && (
-                  <Button variant="ghost" size="sm" className="text-red-600 hover:bg-red-50 hover:text-red-700" onClick={() => askWithdraw(application)}>
-                    Withdraw
-                  </Button>
+                {nextSteps[application.status] && (
+                  <div className="mt-4 rounded-2xl border border-blue-100 bg-blue-50/50 p-4 flex flex-col gap-1">
+                    <span className="font-extrabold uppercase tracking-wider text-[10px] text-blue-700">What’s next</span>
+                    <p className="text-xs font-semibold leading-relaxed text-blue-900">{nextSteps[application.status]}</p>
+                  </div>
                 )}
-              </div>
-            </article>
-          ))}
-        </div>
-      )}
+
+                {application.interview && (
+                  <div className="mt-4 rounded-2xl border border-indigo-200 bg-indigo-50 p-4">
+                     <p className="text-[10px] font-black uppercase tracking-widest text-indigo-700 mb-1">Interview Scheduled</p>
+                     <p className="text-sm font-bold text-indigo-900">{new Date(application.interview.schedule).toLocaleString('en-PH', { dateStyle: 'medium', timeStyle: 'short' })} · {application.interview.mode_of_interview}</p>
+                  </div>
+                )}
+
+                {application.employer_remarks && (
+                  <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                     <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1">Employer Note</p>
+                     <p className="text-sm font-semibold text-slate-700 leading-relaxed">{application.employer_remarks}</p>
+                  </div>
+                )}
+
+                <div className="mt-auto pt-6 flex flex-wrap gap-3">
+                  <button onClick={() => openDetails(application)} className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-3 text-sm font-extrabold text-white transition hover:bg-blue-900 shadow-md">
+                    {detailLoading && activeApplication?.apply_id === application.apply_id ? 'Loading…' : 'View full details'}
+                  </button>
+                  {application.can_withdraw && (
+                    <button onClick={() => askWithdraw(application)} className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-red-600 transition hover:border-red-200 hover:bg-red-50 hover:text-red-700 shadow-sm">
+                      Withdraw
+                    </button>
+                  )}
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
+      </div>
 
       {/* Application detail */}
       <Dialog open={!!activeApplication} onOpenChange={(open) => !open && setActiveApplication(null)}>
-        <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto">
-          <DialogHeader className="mb-2">
+        <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto sm:rounded-3xl border-0 shadow-2xl">
+          <DialogHeader className="mb-4">
             <div className="flex items-center gap-4">
               {activeApplication?.job?.employer?.company_logo_url && (
-                <img src={activeApplication.job.employer.company_logo_url} alt="Logo" className="h-12 w-12 shrink-0 rounded-lg border border-slate-200 bg-white object-cover p-1 shadow-sm" />
+                <img src={activeApplication.job.employer.company_logo_url} alt="Logo" className="h-14 w-14 shrink-0 rounded-2xl border border-slate-200 bg-white object-cover p-1 shadow-sm" />
               )}
               <div>
-                <DialogTitle>{activeApplication?.job?.job_title || 'Application'}</DialogTitle>
-                <DialogDescription className="mt-1">{activeApplication?.job?.employer?.company_name || 'Employer'}</DialogDescription>
+                <DialogTitle className="text-2xl font-black text-slate-900">{activeApplication?.job?.job_title || 'Application'}</DialogTitle>
+                <DialogDescription className="mt-1 text-base font-semibold text-slate-600">{activeApplication?.job?.employer?.company_name || 'Employer'}</DialogDescription>
               </div>
             </div>
           </DialogHeader>
 
           {activeApplication && (
-            <div className="space-y-5">
+            <div className="space-y-6">
               <div className="flex flex-wrap items-center gap-3">
-                <span className={`rounded-full border px-2.5 py-1 text-[10px] font-black uppercase ${statusTone[activeApplication.status] || statusTone.pending}`}>{activeApplication.status_label || activeApplication.status}</span>
-                <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-black uppercase text-slate-600">{Math.round(activeApplication.match_percentage || 0)}% match</span>
-                {!activeApplication.can_withdraw && <span className="rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-black uppercase text-amber-700">Final state locked</span>}
+                <span className={`rounded-full border px-3 py-1.5 text-xs font-black uppercase tracking-wider ${statusTone[activeApplication.status] || statusTone.pending}`}>{activeApplication.status_label || activeApplication.status}</span>
+                <span className="rounded-full bg-slate-100 px-3 py-1.5 text-xs font-black uppercase tracking-wider text-slate-600 border border-slate-200">{Math.round(activeApplication.match_percentage || 0)}% match</span>
+                {!activeApplication.can_withdraw && <span className="rounded-full bg-amber-50 border border-amber-200 px-3 py-1.5 text-xs font-black uppercase tracking-wider text-amber-700">Final state locked</span>}
               </div>
 
               {nextSteps[activeApplication.status] && (
-                <div className="rounded-2xl border border-blue-100 bg-blue-50/70 p-4">
-                  <p className="text-xs font-black uppercase tracking-wide text-blue-800">What happens next</p>
-                  <p className="mt-1 text-sm leading-6 text-slate-700">{nextSteps[activeApplication.status]}</p>
+                <div className="rounded-3xl border border-blue-200 bg-gradient-to-br from-blue-50 to-white p-6 shadow-sm">
+                  <p className="text-xs font-black uppercase tracking-widest text-blue-800">What happens next</p>
+                  <p className="mt-2 text-sm font-semibold leading-relaxed text-slate-700">{nextSteps[activeApplication.status]}</p>
                 </div>
               )}
 
-              <div className="grid gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700 sm:grid-cols-2">
-                <div><p className="text-xs font-black uppercase tracking-wide text-slate-400">Location</p><p className="mt-1 font-semibold">{activeApplication.job?.location || 'Location not specified'}</p></div>
-                <div><p className="text-xs font-black uppercase tracking-wide text-slate-400">Applied</p><p className="mt-1 font-semibold">{activeApplication.applied_at ? new Date(activeApplication.applied_at).toLocaleDateString('en-PH', { dateStyle: 'medium' }) : 'Recently'}</p></div>
-                <div><p className="text-xs font-black uppercase tracking-wide text-slate-400">Employer remarks</p><p className="mt-1 font-semibold">{activeApplication.employer_remarks || 'No remarks yet.'}</p></div>
-                <div><p className="text-xs font-black uppercase tracking-wide text-slate-400">Interview</p><p className="mt-1 font-semibold">{activeApplication.interview ? `${activeApplication.interview.mode_of_interview} · ${activeApplication.interview.venue_or_link || 'Venue to follow'}` : 'No interview scheduled yet.'}</p></div>
+              <div className="grid gap-4 rounded-3xl border border-slate-200 bg-slate-50 p-6 text-sm text-slate-700 sm:grid-cols-2">
+                <div><p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Location</p><p className="mt-1 font-bold text-slate-900">{activeApplication.job?.location || 'Location not specified'}</p></div>
+                <div><p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Applied</p><p className="mt-1 font-bold text-slate-900">{activeApplication.applied_at ? new Date(activeApplication.applied_at).toLocaleDateString('en-PH', { dateStyle: 'medium' }) : 'Recently'}</p></div>
+                <div><p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Employer remarks</p><p className="mt-1 font-bold text-slate-900">{activeApplication.employer_remarks || 'No remarks yet.'}</p></div>
+                <div><p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Interview</p><p className="mt-1 font-bold text-slate-900">{activeApplication.interview ? `${activeApplication.interview.mode_of_interview} · ${activeApplication.interview.venue_or_link || 'Venue to follow'}` : 'No interview scheduled yet.'}</p></div>
               </div>
 
               {activeApplication.interview && (
-                <div className="rounded-2xl border border-indigo-200 bg-indigo-50 p-4">
-                  <div className="flex items-center justify-between gap-3">
+                <div className="rounded-3xl border border-indigo-200 bg-indigo-50 p-6 shadow-sm shadow-indigo-900/5">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-indigo-100/50 pb-4 mb-4">
                     <div>
-                      <p className="text-xs font-black uppercase tracking-[0.18em] text-indigo-700">Interview scheduled</p>
-                      <p className="mt-1 text-sm font-black text-slate-950">{activeApplication.interview.schedule ? new Date(activeApplication.interview.schedule).toLocaleString('en-PH', { dateStyle: 'medium', timeStyle: 'short' }) : 'Schedule pending'}</p>
+                      <p className="text-[10px] font-black uppercase tracking-widest text-indigo-700">Interview scheduled</p>
+                      <p className="mt-1 text-lg font-black text-indigo-950">{activeApplication.interview.schedule ? new Date(activeApplication.interview.schedule).toLocaleString('en-PH', { dateStyle: 'medium', timeStyle: 'short' }) : 'Schedule pending'}</p>
                     </div>
-                    <span className="rounded-full border border-indigo-200 bg-white px-2.5 py-1 text-[10px] font-black uppercase text-indigo-700">{activeApplication.interview.mode_of_interview}</span>
+                    <span className="self-start sm:self-auto rounded-full border border-indigo-200 bg-white px-3 py-1.5 text-xs font-black uppercase tracking-wider text-indigo-700 shadow-sm">{activeApplication.interview.mode_of_interview}</span>
                   </div>
-                  <p className="mt-3 text-sm text-slate-700">{activeApplication.interview.venue_or_link || 'Meeting link or venue will be shared by the employer.'}</p>
-                  <p className="mt-3 text-sm text-slate-600">Prepare your resume, certificates, and valid ID before the interview.</p>
+                  <p className="text-sm font-semibold text-indigo-900 leading-relaxed">{activeApplication.interview.venue_or_link || 'Meeting link or venue will be shared by the employer.'}</p>
+                  <p className="mt-2 text-sm text-indigo-700/80">Prepare your resume, certificates, and valid ID before the interview.</p>
                 </div>
               )}
 
-              <div>
-                <h3 className="text-sm font-black text-slate-950">Application timeline</h3>
-                <div className="mt-3 space-y-3">
+              <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+                <h3 className="text-sm font-black uppercase tracking-widest text-slate-900 mb-6">Application timeline</h3>
+                <div className="space-y-6 relative before:absolute before:inset-0 before:ml-[5px] before:-translate-x-px before:h-full before:w-0.5 before:bg-gradient-to-b before:from-blue-200 before:to-transparent">
                   {(activeApplication.timeline || []).map((item, index) => (
-                    <div key={`${item.title}-${index}`} className="flex gap-3 rounded-2xl border border-slate-200 bg-white p-3">
-                      <div className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full bg-brand-navy" />
+                    <div key={`${item.title}-${index}`} className="relative flex gap-4">
+                      <div className="relative z-10 mt-1 flex h-3 w-3 shrink-0 items-center justify-center rounded-full border-2 border-white bg-blue-600 shadow-sm" />
                       <div>
                         <p className="text-sm font-black text-slate-900">{item.title}</p>
-                        <p className="mt-1 text-sm text-slate-600">{item.description}</p>
-                        <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-slate-400">{item.timestamp ? new Date(item.timestamp).toLocaleString('en-PH', { dateStyle: 'medium', timeStyle: 'short' }) : 'Pending'}</p>
+                        <p className="mt-1 text-sm font-semibold text-slate-600 leading-relaxed">{item.description}</p>
+                        <p className="mt-1 text-[10px] font-bold uppercase tracking-widest text-slate-400">{item.timestamp ? new Date(item.timestamp).toLocaleString('en-PH', { dateStyle: 'medium', timeStyle: 'short' }) : 'Pending'}</p>
                       </div>
                     </div>
                   ))}
                   {!(activeApplication.timeline || []).length && (
-                    <p className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-3 text-sm text-slate-500">No timeline events recorded yet.</p>
+                    <p className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-4 text-sm font-semibold text-slate-500">No timeline events recorded yet.</p>
                   )}
                 </div>
               </div>
 
               {activeApplication.placement && (
-                <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
-                  <p className="font-black">Placement confirmed</p>
-                  <p className="mt-1">Starts on {activeApplication.placement.start_date ? new Date(activeApplication.placement.start_date).toLocaleDateString('en-PH', { dateStyle: 'medium' }) : 'TBD'} at {Number(activeApplication.placement.salary || 0).toLocaleString('en-PH', { style: 'currency', currency: 'PHP', maximumFractionDigits: 0 })}.</p>
+                <div className="rounded-3xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-white p-6 shadow-sm shadow-emerald-900/5 text-emerald-900">
+                  <p className="text-lg font-black tracking-tight">Placement confirmed</p>
+                  <p className="mt-2 text-sm font-semibold leading-relaxed">Starts on {activeApplication.placement.start_date ? new Date(activeApplication.placement.start_date).toLocaleDateString('en-PH', { dateStyle: 'medium' }) : 'TBD'} at {Number(activeApplication.placement.salary || 0).toLocaleString('en-PH', { style: 'currency', currency: 'PHP', maximumFractionDigits: 0 })}.</p>
                 </div>
               )}
             </div>
           )}
 
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setActiveApplication(null)}>Close</Button>
+          <DialogFooter className="mt-4 pt-4 border-t border-slate-100">
+            <Button variant="ghost" onClick={() => setActiveApplication(null)} className="font-bold">Close</Button>
             {activeApplication?.can_withdraw && (
-              <Button variant="danger" onClick={() => askWithdraw(activeApplication)}>Withdraw application</Button>
+              <Button variant="danger" onClick={() => askWithdraw(activeApplication)} className="rounded-xl font-bold shadow-md">Withdraw application</Button>
             )}
           </DialogFooter>
         </DialogContent>
@@ -259,16 +272,16 @@ export default function MyApplications() {
 
       {/* Withdraw confirmation */}
       <Dialog open={!!pendingWithdraw} onOpenChange={(open) => !open && setPendingWithdraw(null)}>
-        <DialogContent>
+        <DialogContent className="sm:rounded-3xl border-0 shadow-2xl">
           <DialogHeader>
-            <DialogTitle>Withdraw this application?</DialogTitle>
-            <DialogDescription>
-              You’ll stop receiving employer updates for &ldquo;{pendingWithdraw?.job?.job_title || 'this vacancy'}&rdquo;. This can’t be undone, but you can apply to other vacancies anytime.
+            <DialogTitle className="text-xl font-black text-slate-900">Withdraw this application?</DialogTitle>
+            <DialogDescription className="mt-2 text-sm leading-relaxed text-slate-600">
+              You’ll stop receiving employer updates for &ldquo;<span className="font-bold text-slate-900">{pendingWithdraw?.job?.job_title || 'this vacancy'}</span>&rdquo;. This can’t be undone, but you can apply to other vacancies anytime.
             </DialogDescription>
           </DialogHeader>
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setPendingWithdraw(null)}>Keep application</Button>
-            <Button variant="danger" onClick={() => handleWithdraw(pendingWithdraw)} disabled={withdrawingId === pendingWithdraw?.apply_id}>
+          <DialogFooter className="mt-6">
+            <Button variant="ghost" onClick={() => setPendingWithdraw(null)} className="font-bold">Keep application</Button>
+            <Button variant="danger" onClick={() => handleWithdraw(pendingWithdraw)} disabled={withdrawingId === pendingWithdraw?.apply_id} className="rounded-xl font-bold shadow-md">
               {withdrawingId === pendingWithdraw?.apply_id ? 'Withdrawing…' : 'Withdraw application'}
             </Button>
           </DialogFooter>
