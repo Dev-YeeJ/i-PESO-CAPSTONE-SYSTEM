@@ -24,8 +24,8 @@ const styles = StyleSheet.create({
     marginTop: spacing.xl,
   },
   title: {
-    fontSize: typography.heading,
-    fontWeight: typography.bold,
-    color: colors.primary,
+    fontSize: typography.title,
+    fontFamily: typography.family.bold,
+    color: colors.textPrimary,
   },
 })

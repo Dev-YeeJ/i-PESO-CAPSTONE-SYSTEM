@@ -76,7 +76,7 @@ export default function NotificationsScreen() {
 
       {isLoading ? (
         <View style={styles.center}>
-          <ActivityIndicator color={colors.info} size="large" />
+          <ActivityIndicator color={colors.secondary} size="large" />
         </View>
       ) : (
         <FlatList
@@ -109,7 +109,7 @@ export default function NotificationsScreen() {
                           item.data?.action_type === 'job_fair' ? 'event' : 'notifications'
                         }
                         size={20}
-                        color={isUnread ? colors.info : colors.muted}
+                        color={isUnread ? colors.secondary : colors.muted}
                       />
                     </View>
                     <View style={styles.contentContainer}>
@@ -135,23 +135,23 @@ export default function NotificationsScreen() {
 const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: colors.background },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  markAllText: { color: colors.info, fontSize: typography.small, fontWeight: typography.semibold },
-  listContent: { padding: spacing.xl, gap: spacing.sm, paddingBottom: spacing.xxxl },
+  markAllText: { color: colors.secondary, fontSize: typography.small, fontFamily: typography.family.bold },
+  listContent: { padding: spacing.lg, gap: spacing.sm, paddingBottom: spacing.xxxl },
   notificationCard: { marginBottom: 0 },
-  unreadCard: { borderColor: colors.info, borderWidth: 1, backgroundColor: colors.infoBackground },
+  unreadCard: { borderColor: colors.secondary, borderWidth: 1, backgroundColor: colors.accentSoft },
   notificationHeader: { flexDirection: 'row', gap: spacing.md },
-  iconContainer: { 
-    width: 40, 
-    height: 40, 
-    borderRadius: 20, 
-    backgroundColor: colors.background, 
-    justifyContent: 'center', 
-    alignItems: 'center' 
+  iconContainer: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: colors.accentSoft,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   contentContainer: { flex: 1 },
   titleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 },
-  itemTitle: { fontSize: typography.title, color: colors.primary, fontWeight: typography.semibold, flex: 1, marginRight: spacing.sm },
-  unreadText: { fontWeight: typography.bold, color: colors.info },
-  timeText: { fontSize: 11, color: colors.muted, marginTop: 2 },
-  itemMessage: { fontSize: typography.body, color: colors.secondaryText, lineHeight: 20 },
+  itemTitle: { fontSize: typography.title, color: colors.textPrimary, fontFamily: typography.family.bold, flex: 1, marginRight: spacing.sm },
+  unreadText: { fontFamily: typography.family.bold, color: colors.secondary },
+  timeText: { fontSize: 11, color: colors.textSecondary, marginTop: 2 },
+  itemMessage: { fontSize: typography.body, color: colors.textSecondary, lineHeight: 20 },
 })

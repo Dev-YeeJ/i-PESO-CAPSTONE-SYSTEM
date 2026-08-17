@@ -254,4 +254,7 @@ const styles = StyleSheet.create({
     color: colors.secondary,
     fontFamily: typography.family.bold,
   },
+  submit: {
+    marginTop: spacing.md,
+  },
 })
