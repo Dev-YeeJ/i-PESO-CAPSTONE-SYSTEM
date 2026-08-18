@@ -27,7 +27,8 @@ jobs:
           ssh -p ${{ secrets.HOSTINGER_SSH_PORT }} ${{ secrets.HOSTINGER_SSH_USER }}@${{ secrets.HOSTINGER_SSH_HOST }} '
             cd ~/i-peso-capstone-system/i-peso-backend &&
             git pull origin main &&
-            composer install --no-dev --optimize-autoloader --no-interaction &&
+            composer install --no-dev --optimize-autoloader --no-interaction --no-scripts &&
+            php artisan package:discover --ansi &&
             php artisan migrate --force &&
             php artisan config:cache &&
             php artisan route:cache &&
