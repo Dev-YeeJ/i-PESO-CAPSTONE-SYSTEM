@@ -62,7 +62,7 @@ class EmployerRegistrationController extends Controller
                 'company_type' => $employer->company_type,
             ], 201);
         } catch (\Exception $e) {
-            return response()->json(['error' => $e->getMessage()], 500);
+            return response()->json(['error' => $this->safeErrorMessage($e, 'Unable to create your account. Please try again.')], 500);
         }
     }
 
@@ -149,7 +149,7 @@ class EmployerRegistrationController extends Controller
                 'company_name' => $employer->company_name,
             ], 200);
         } catch (\Exception $e) {
-            return response()->json(['error' => $e->getMessage()], 500);
+            return response()->json(['error' => $this->safeErrorMessage($e, 'Unable to save your company profile. Please try again.')], 500);
         }
     }
 
@@ -232,7 +232,7 @@ class EmployerRegistrationController extends Controller
                 'document_type' => $document->document_type,
             ], 201);
         } catch (\Exception $e) {
-            return response()->json(['error' => $e->getMessage()], 500);
+            return response()->json(['error' => $this->safeErrorMessage($e, 'Unable to upload this document. Please try again.')], 500);
         }
     }
 
@@ -258,7 +258,7 @@ class EmployerRegistrationController extends Controller
                 'all_uploaded' => $employer->hasAllRequiredDocuments(),
             ], 200);
         } catch (\Exception $e) {
-            return response()->json(['error' => $e->getMessage()], 404);
+            return response()->json(['error' => $this->safeErrorMessage($e, 'Unable to load required documents.')], 404);
         }
     }
 
@@ -361,7 +361,7 @@ class EmployerRegistrationController extends Controller
                 'verification_status' => $employer->verification_status,
             ], 200);
         } catch (\Exception $e) {
-            return response()->json(['error' => $e->getMessage()], 500);
+            return response()->json(['error' => $this->safeErrorMessage($e, 'Unable to submit your registration. Please try again.')], 500);
         }
     }
 
@@ -416,7 +416,7 @@ class EmployerRegistrationController extends Controller
                 'can_post_jobs' => $employer->canPostJobs(),
             ], 200);
         } catch (\Exception $e) {
-            return response()->json(['error' => $e->getMessage()], 404);
+            return response()->json(['error' => $this->safeErrorMessage($e, 'Unable to load your profile.')], 404);
         }
     }
 

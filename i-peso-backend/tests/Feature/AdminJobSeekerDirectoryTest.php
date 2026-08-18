@@ -132,7 +132,7 @@ class AdminJobSeekerDirectoryTest extends TestCase
             'email' => 'admin-directory@example.com',
             'mobile_number' => '09170000001',
             'password' => 'password',
-            'role' => 'admin',
+            'role' => 'administrator',
             'status' => 'active',
         ]);
 
@@ -186,7 +186,7 @@ class AdminJobSeekerDirectoryTest extends TestCase
             'email' => 'admin-detail@example.com',
             'mobile_number' => '09170000003',
             'password' => 'password',
-            'role' => 'admin',
+            'role' => 'administrator',
             'status' => 'active',
         ]);
 
@@ -219,7 +219,7 @@ class AdminJobSeekerDirectoryTest extends TestCase
             'email' => 'admin-summary@example.com',
             'mobile_number' => '09170000009',
             'password' => 'password',
-            'role' => 'admin',
+            'role' => 'administrator',
             'status' => 'active',
         ]);
         Sanctum::actingAs($admin);

@@ -18,6 +18,8 @@ import App            from '@/App'
 
 // --- LAZY LOADED PAGES ---
 const LandingPage        = lazy(() => import('@/pages/landing/LandingPage'))
+const PrivacyPolicyPage  = lazy(() => import('@/pages/legal/PrivacyPolicyPage'))
+const TermsOfServicePage = lazy(() => import('@/pages/legal/TermsOfServicePage'))
 const LoginPage          = lazy(() => import('@/pages/auth/LoginPage'))
 const AdminLoginPage     = lazy(() => import('@/pages/auth/AdminLoginPage'))
 const VerifyEmailPage    = lazy(() => import('@/pages/auth/VerifyEmailPage'))
@@ -114,6 +116,8 @@ export const router = createBrowserRouter([
         children: [
           { path: '/', element: S(LandingPage) },
           { path: '/verify-email', element: S(VerifyEmailPage) },
+          { path: '/privacy-policy', element: S(PrivacyPolicyPage) },
+          { path: '/terms-of-service', element: S(TermsOfServicePage) },
           {
             element: <GuestOnly />,
             children: [

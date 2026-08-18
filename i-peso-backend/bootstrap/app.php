@@ -18,6 +18,12 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->append(SecurityHeaders::class);
 
+        // Baseline rate limit for every API route that doesn't declare its own
+        // `throttle:` rule. Without this, the `api` middleware group carries
+        // no default limiter at all — not Laravel's usual 60/min, literally
+        // none — so routes with no explicit throttle are wide open.
+        $middleware->throttleApi();
+
         $middleware->alias([
             'admin' => EnsureAdministrator::class,
             'admin.permission' => EnsureAdminPermission::class,

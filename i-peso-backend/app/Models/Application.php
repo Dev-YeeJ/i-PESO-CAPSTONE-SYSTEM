@@ -28,6 +28,7 @@ class Application extends Model
         'employer_remarks',
         'placement_start_date',
         'placement_salary',
+        'placement_employment_type',
         'placement_captured_at',
         'submitted_documents',
     ];

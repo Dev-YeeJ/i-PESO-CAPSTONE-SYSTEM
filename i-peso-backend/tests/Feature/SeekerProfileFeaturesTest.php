@@ -153,7 +153,7 @@ class SeekerProfileFeaturesTest extends TestCase
             'email' => fake()->unique()->safeEmail(),
             'mobile_number' => '09170000001',
             'password' => 'password123',
-            'role' => 'admin',
+            'role' => 'administrator',
             'status' => 'active',
             'email_verified_at' => now(),
         ]);

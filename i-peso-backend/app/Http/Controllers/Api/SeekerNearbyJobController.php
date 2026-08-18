@@ -132,7 +132,13 @@ class SeekerNearbyJobController extends Controller
 
         $trainingPrograms = $compact ? collect() : $this->trainingPrograms();
 
-        $with = ['employer:employer_id,company_name,company_logo'];
+        // 'occupation' is loaded unconditionally (even in compact mode): the
+        // match-scoring path (JobMatchingService::vacancyBroadAnchor and
+        // EnhancedJobMatchingService) reads $vacancy->occupation directly, and
+        // that path runs whenever detailed matching is required — without
+        // this, every vacancy in the candidate pool lazy-loads it one at a
+        // time.
+        $with = ['employer:employer_id,company_name,company_logo', 'occupation'];
         if (! $compact && Schema::hasTable('job_vacancy_skills')) {
             $with[] = 'skillRequirements.skill.outgoingRelationships';
             $with[] = 'skillRequirements.skill.incomingRelationships';
@@ -227,7 +233,13 @@ class SeekerNearbyJobController extends Controller
             if (($validated['sort'] ?? 'distance') === 'distance') {
                 $query->orderBy('distance_km', 'asc');
             }
-        } elseif (($validated['sort'] ?? ($feedMode === 'recommended' ? 'match' : 'newest')) === 'newest') {
+        } else {
+            // Final display order (match/salary/newest) is fully re-sorted in
+            // PHP below, over whatever candidate pool this query hands back.
+            // Always pull the newest postings into that pool first — without
+            // this, an unordered LIMIT silently drops brand-new vacancies
+            // once active listings exceed $candidateLimit, so they'd never
+            // reach the PHP-side match scoring at all.
             $query->latest();
         }
 

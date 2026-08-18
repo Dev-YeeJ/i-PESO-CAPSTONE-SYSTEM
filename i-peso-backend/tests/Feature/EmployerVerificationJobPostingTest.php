@@ -565,7 +565,7 @@ class EmployerVerificationJobPostingTest extends TestCase
             'last_name' => 'Reviewer',
             'email' => 'reviewer@example.com',
             'password' => 'password123',
-            'role' => 'admin',
+            'role' => 'administrator',
             'status' => 'active',
             'email_verified_at' => now(),
         ]);
@@ -604,7 +604,7 @@ class EmployerVerificationJobPostingTest extends TestCase
             'last_name' => 'Downloader',
             'email' => 'downloader@example.com',
             'password' => 'password123',
-            'role' => 'admin',
+            'role' => 'administrator',
             'status' => 'active',
             'email_verified_at' => now(),
         ]);
@@ -650,7 +650,7 @@ class EmployerVerificationJobPostingTest extends TestCase
             'last_name' => 'Admin',
             'email' => $email,
             'password' => 'password123',
-            'role' => 'admin',
+            'role' => 'administrator',
             'status' => 'active',
             'email_verified_at' => now(),
         ]);
@@ -811,6 +811,7 @@ class EmployerVerificationJobPostingTest extends TestCase
                 $table->timestamp('uploaded_at');
                 $table->string('verification_status')->default('pending');
                 $table->text('admin_notes')->nullable();
+                $table->timestamp('viewed_at')->nullable();
                 $table->timestamps();
             });
         }

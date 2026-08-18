@@ -12,7 +12,6 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Throwable;
 
@@ -45,19 +44,18 @@ class EmployerPlacementReportController extends Controller
         $employer = $this->employer($request);
 
         $request->validate([
-            'file' => ['required', 'file', 'max:5120'],
+            // `txt` is included alongside `csv` because Laravel's `mimes` rule
+            // sniffs actual file content, and CSVs frequently sniff as
+            // text/plain rather than text/csv — without it, legitimate CSV
+            // uploads get rejected. This also replaces the old check, which
+            // trusted the client-supplied filename extension rather than the
+            // file's real content type.
+            'file' => ['required', 'file', 'mimes:xlsx,xls,csv,txt', 'max:5120'],
             'coverage_month' => ['nullable', 'integer', 'min:1', 'max:12'],
             'coverage_year' => ['nullable', 'integer', 'min:2020', 'max:2100'],
         ]);
 
         $file = $request->file('file');
-        $extension = Str::lower($file->getClientOriginalExtension());
-        if (! in_array($extension, ['xlsx', 'xls', 'csv'], true)) {
-            throw ValidationException::withMessages([
-                'file' => ['Upload an Excel (.xlsx, .xls) or CSV (.csv) file.'],
-            ]);
-        }
-
         $storedPath = $file->store("placement_reports/{$employer->employer_id}", 'local');
 
         try {

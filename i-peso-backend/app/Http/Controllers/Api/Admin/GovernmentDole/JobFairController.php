@@ -25,10 +25,15 @@ class JobFairController extends Controller
     public function index(Request $request, JobFairService $service): JsonResponse
     {
         $this->admin($request);
+        $filters = $request->validate([
+            'search' => ['nullable', 'string', 'max:255'],
+            'status' => ['nullable', Rule::in(['draft', 'published', 'accepting_employers', 'closed', 'completed', 'cancelled', 'upcoming', 'ongoing'])],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
+        ]);
         $query = JobFair::query();
-        if ($request->filled('search')) $query->where('title', 'like', '%'.$request->string('search').'%');
-        if ($request->filled('status')) $query->where('status', $request->string('status'));
-        $fairs = $query->orderByRaw('COALESCE(start_date, event_date) desc')->paginate($request->integer('per_page', 15));
+        if ($filters['search'] ?? null) $query->where('title', 'like', '%'.$filters['search'].'%');
+        if ($filters['status'] ?? null) $query->where('status', $filters['status']);
+        $fairs = $query->orderByRaw('COALESCE(start_date, event_date) desc')->paginate($filters['per_page'] ?? 15);
         $fairs->getCollection()->transform(fn (JobFair $fair) => $service->eventPayload($fair, null, true));
         return response()->json($fairs);
     }

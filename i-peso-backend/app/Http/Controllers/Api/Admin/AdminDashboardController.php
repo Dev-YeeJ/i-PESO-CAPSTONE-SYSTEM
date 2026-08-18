@@ -99,8 +99,12 @@ class AdminDashboardController extends Controller
             ],
 
             'attention' => $this->attentionItems($pendingEmployerVerifications),
-            'recent_registrations' => $this->recentRegistrations(),
-            'recent_applications' => $this->recentApplications(),
+            // Gated on top of the dashboard's own module-free access: these two
+            // carry seeker/employer/applicant PII, so an admin without the
+            // corresponding module grant gets an empty list rather than data
+            // they can't reach through the (permission-gated) list endpoints.
+            'recent_registrations' => $admin->hasModule('constituent_crm') ? $this->recentRegistrations() : [],
+            'recent_applications' => $admin->hasModule('employment_hub') ? $this->recentApplications() : [],
             'government_programs' => $programAnalytics->summary(),
         ]);
     }

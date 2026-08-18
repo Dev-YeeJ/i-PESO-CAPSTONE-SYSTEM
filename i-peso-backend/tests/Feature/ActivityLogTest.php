@@ -152,7 +152,7 @@ class ActivityLogTest extends TestCase
             'last_name' => 'Admin',
             'email' => $email,
             'password' => 'password123',
-            'role' => 'admin',
+            'role' => 'administrator',
             'status' => 'active',
             'email_verified_at' => now(),
         ]);

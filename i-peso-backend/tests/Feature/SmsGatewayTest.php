@@ -313,7 +313,7 @@ class SmsGatewayTest extends TestCase
     {
         return Administrator::firstOrCreate(['email' => 'sms-admin@example.com'], [
             'first_name' => 'SMS', 'last_name' => 'Administrator', 'password' => 'password',
-            'role' => 'admin', 'status' => 'active', 'mobile_number' => '09171234567',
+            'role' => 'administrator', 'status' => 'active', 'mobile_number' => '09171234567',
         ]);
     }
 

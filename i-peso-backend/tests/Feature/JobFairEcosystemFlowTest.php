@@ -21,7 +21,19 @@ class JobFairEcosystemFlowTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        config(['services.sms.log_only' => false]);
+        // This test verifies the safe *fallback* to log-only when live UniSMS
+        // credentials aren't configured — so those credentials must be cleared
+        // here rather than left to whatever happens to be in the environment.
+        // Without this, a developer machine with real UNISMS_SECRET_KEY /
+        // UNISMS_SENDER_ID set (e.g. for testing the SMS feature itself)
+        // makes the provider binding resolve to the live UniSmsProvider
+        // instead, which then fails outright since Http::fake() isn't set up
+        // to intercept it.
+        config([
+            'services.sms.log_only' => false,
+            'services.sms.secret_key' => null,
+            'services.sms.sender_id' => null,
+        ]);
         $this->createTables();
     }
 
@@ -30,7 +42,7 @@ class JobFairEcosystemFlowTest extends TestCase
         Storage::fake('local');
         $admin = Administrator::create([
             'first_name' => 'PESO', 'last_name' => 'Manager', 'email' => 'jobfair-admin@example.test',
-            'mobile_number' => '09170000001', 'password' => 'password123', 'role' => 'admin', 'status' => 'active', 'email_verified_at' => now(),
+            'mobile_number' => '09170000001', 'password' => 'password123', 'role' => 'administrator', 'status' => 'active', 'email_verified_at' => now(),
         ]);
         $employer = $this->employer('ecosystem-employer@example.test', 'Northstar Manufacturing');
         $otherEmployer = $this->employer('other-employer@example.test', 'Other Employer');

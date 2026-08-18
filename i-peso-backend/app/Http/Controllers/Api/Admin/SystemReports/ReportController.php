@@ -201,9 +201,8 @@ class ReportController extends Controller
     {
         $localVacancies = (int) JobVacancy::whereBetween('created_at', [$start, $end])->sum('vacancies_count');
 
-        $seekers = JobSeeker::whereBetween('created_at', [$start, $end])->get();
-        $registeredTotal = $seekers->count();
-        $registeredFemale = $seekers->filter(fn ($s) => strtolower((string) $s->sex) === 'female')->count();
+        $registeredTotal = JobSeeker::whereBetween('created_at', [$start, $end])->count();
+        $registeredFemale = JobSeeker::whereBetween('created_at', [$start, $end])->where('sex', 'female')->count();
 
         $referredTotal = Application::whereBetween('created_at', [$start, $end])->count();
         $referredFemale = Application::whereBetween('created_at', [$start, $end])

@@ -77,10 +77,12 @@ class HiringApplicationFlowTest extends TestCase
             'employer_remarks' => 'Accepted for onboarding.',
             'placement_start_date' => now()->addWeek()->toDateString(),
             'placement_salary' => 28000,
+            'employment_type' => 'regular',
         ])
             ->assertOk()
             ->assertJsonPath('application.status', 'hired')
-            ->assertJsonPath('application.placement.salary', '28000.00');
+            ->assertJsonPath('application.placement.salary', '28000.00')
+            ->assertJsonPath('application.placement.employment_type', 'regular');
 
         Sanctum::actingAs($admin);
         $this->getJson('/api/admin/applications')
@@ -242,7 +244,7 @@ class HiringApplicationFlowTest extends TestCase
             'last_name' => 'Admin',
             'email' => fake()->unique()->safeEmail(),
             'password' => 'password123',
-            'role' => 'admin',
+            'role' => 'administrator',
             'status' => 'active',
             'email_verified_at' => now(),
         ]);
@@ -466,6 +468,7 @@ class HiringApplicationFlowTest extends TestCase
                 $table->text('employer_remarks')->nullable();
                 $table->date('placement_start_date')->nullable();
                 $table->decimal('placement_salary', 12, 2)->nullable();
+                $table->string('placement_employment_type', 20)->nullable();
                 $table->timestamp('placement_captured_at')->nullable();
                 $table->json('submitted_documents')->nullable();
                 $table->timestamps();

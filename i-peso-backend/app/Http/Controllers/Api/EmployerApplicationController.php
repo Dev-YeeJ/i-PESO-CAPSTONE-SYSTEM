@@ -129,7 +129,7 @@ class EmployerApplicationController extends Controller
                 if ($e->getCode() === 403) {
                     return response()->json(['message' => $e->getMessage()], 403);
                 }
-                return response()->json(['message' => 'Failed to generate meeting link.', 'error' => $e->getMessage()], 500);
+                return response()->json(['message' => 'Failed to generate meeting link.', 'error' => $this->safeErrorMessage($e, 'Failed to generate meeting link.')], 500);
             }
         }
 
@@ -220,16 +220,20 @@ class EmployerApplicationController extends Controller
         return $request->validate([
             'status' => ['required', Rule::in(['reviewed', 'shortlisted', 'interview', 'hired', 'rejected'])],
             'employer_remarks' => ['nullable', 'string', 'max:5000'],
-            'employer_mismatch_reason_code' => ['nullable', Rule::in(array_keys(\App\Services\EstablishmentReportService::EMPLOYER_MISMATCH_REASONS))],
+            'employer_mismatch_reason_code' => ['required_if:status,rejected', 'nullable', Rule::in(array_keys(\App\Services\EstablishmentReportService::EMPLOYER_MISMATCH_REASONS))],
             'seeker_mismatch_reason_code' => ['nullable', Rule::in(array_keys(\App\Services\EstablishmentReportService::SEEKER_MISMATCH_REASONS))],
             'mismatch_reason_details' => ['nullable', 'string', 'max:5000'],
             'interview.mode_of_interview' => ['required_if:status,interview', 'nullable', Rule::in(['face_to_face', 'online', 'phone'])],
             'interview.schedule' => ['required_if:status,interview', 'nullable', 'date', 'after:now'],
-            'interview.venue_or_link' => ['nullable', 'string', 'max:500'],
+            'interview.venue_or_link' => [
+                Rule::requiredIf(fn () => $request->input('status') === 'interview' && ! $request->boolean('interview.auto_meet_link')),
+                'nullable', 'string', 'max:500',
+            ],
             'interview.auto_meet_link' => ['nullable', 'boolean'],
             'interview.instructions' => ['nullable', 'string', 'max:5000'],
             'placement_start_date' => ['required_if:status,hired', 'nullable', 'date'],
             'placement_salary' => ['required_if:status,hired', 'nullable', 'numeric', 'min:1'],
+            'employment_type' => ['required_if:status,hired', 'nullable', Rule::in(['regular', 'contractual', 'probationary', 'part_time'])],
         ]);
     }
 
@@ -257,6 +261,7 @@ class EmployerApplicationController extends Controller
             $application->forceFill([
                 'placement_start_date' => $validated['placement_start_date'],
                 'placement_salary' => $validated['placement_salary'],
+                'placement_employment_type' => $validated['employment_type'],
                 'placement_captured_at' => now(),
             ]);
         }

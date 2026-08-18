@@ -87,7 +87,10 @@ class GoogleCalendarService
             ]
         ]);
 
-        $calendarId = config('services.google.calendar_id', 'primary');
+        // Always the authorizing employer's own calendar — never a shared/fixed
+        // calendar ID, which would require every employer's Google account to
+        // have write access to someone else's calendar.
+        $calendarId = 'primary';
         $event = $service->events->insert($calendarId, $event, ['conferenceDataVersion' => 1]);
 
         $meetLink = null;
@@ -129,7 +132,7 @@ class GoogleCalendarService
         }
 
         $service = new Calendar($client);
-        $calendarId = config('services.google.calendar_id', 'primary');
+        $calendarId = 'primary';
         $optParams = array(
             'maxResults' => 100,
             'orderBy' => 'startTime',
