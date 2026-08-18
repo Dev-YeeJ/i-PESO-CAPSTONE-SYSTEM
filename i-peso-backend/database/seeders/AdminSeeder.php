@@ -20,7 +20,9 @@ class AdminSeeder extends Seeder
             'first_name' => 'Admin',
             'last_name' => 'User',
             'email' => 'admin@peso.com',
-            'password' => Hash::make('password123'),
+            // 'password123' only applies when SEED_ADMIN_PASSWORD is unset — fine for
+            // local dev, never acceptable in production (it's sitting in git history).
+            'password' => Hash::make(env('SEED_ADMIN_PASSWORD', 'password123')),
             'role' => 'administrator',
             'status' => 'active',
             'mobile_number' => '09123456789',
