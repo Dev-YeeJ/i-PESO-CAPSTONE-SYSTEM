@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { ActivityIndicator, Alert, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useQueryClient, useMutation, useQuery } from '@tanstack/react-query'
+import MaterialIcons from '@expo/vector-icons/MaterialIcons'
 import type { AxiosError } from 'axios'
 import type { LearningResources, NearbyJob, NearbyJobsResponse } from '@/services/seekerService'
 import { seekerService } from '@/services/seekerService'
@@ -20,6 +21,7 @@ import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { ScreenHeader } from '@/components/ui/ScreenHeader'
 import { MatchRing } from '@/components/ui/MatchRing'
+import { ReportEmployerModal } from '@/components/ReportEmployerModal'
 import { colors, radii, spacing, typography } from '@/theme'
 
 export default function JobDetailsScreen() {
@@ -32,6 +34,7 @@ export default function JobDetailsScreen() {
   const [resourcesSkill, setResourcesSkill] = useState<string | null>(null)
   const [resources, setResources] = useState<LearningResources | null>(null)
   const [resourcesLoading, setResourcesLoading] = useState(false)
+  const [reportOpen, setReportOpen] = useState(false)
 
   const openResources = async (skill: string) => {
     setResourcesSkill(skill)
@@ -148,7 +151,13 @@ export default function JobDetailsScreen() {
           <View style={styles.headerTop}>
             <View style={styles.jobTitleWrap}>
               <Text style={styles.jobTitle}>{textFrom(job.job_title, 'Untitled job')}</Text>
-              <Text style={styles.company}>{jobCompany(job)}</Text>
+              {job.employer?.employer_id ? (
+                <TouchableOpacity onPress={() => router.push(`/(seeker)/employers/${job.employer!.employer_id}`)}>
+                  <Text style={[styles.company, styles.companyLink]}>{jobCompany(job)}</Text>
+                </TouchableOpacity>
+              ) : (
+                <Text style={styles.company}>{jobCompany(job)}</Text>
+              )}
             </View>
             <MatchRing percentage={job.match_percentage ?? job.match?.percentage ?? 0} size={64} strokeWidth={5} label="Match" />
           </View>
@@ -230,6 +239,13 @@ export default function JobDetailsScreen() {
             </Text>
           </>
         ) : null}
+
+        {job.employer?.employer_id ? (
+          <TouchableOpacity style={styles.reportLink} onPress={() => setReportOpen(true)}>
+            <MaterialIcons name="flag" size={16} color={colors.error} />
+            <Text style={styles.reportLinkText}>Report this employer</Text>
+          </TouchableOpacity>
+        ) : null}
       </ScrollView>
 
         <View style={styles.footer}>
@@ -298,6 +314,13 @@ export default function JobDetailsScreen() {
           </View>
         </View>
       </Modal>
+
+      <ReportEmployerModal
+        visible={reportOpen}
+        employerId={job.employer?.employer_id ?? null}
+        employerName={jobCompany(job)}
+        onClose={() => setReportOpen(false)}
+      />
     </View>
   )
 }
@@ -336,8 +359,9 @@ function FactorBar({ label, percentage, last = false }: { label: string; percent
   jobTitleWrap: { flex: 1 },
   jobTitle: { color: colors.textPrimary, fontSize: typography.heading, lineHeight: 28, fontFamily: typography.family.medium },
   company: { color: colors.textSecondary, fontSize: typography.title, fontFamily: typography.family.medium, marginTop: spacing.xs },
+  companyLink: { color: colors.info, textDecorationLine: 'underline' },
   badgeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.md },
-  title: { color: colors.textPrimary, fontSize: typography.title, fontWeight: typography.bold },
+  title: { color: colors.textPrimary, fontSize: typography.title, fontFamily: typography.family.bold },
   infoCard: { marginBottom: spacing.lg },
   detailRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: spacing.xs, borderBottomWidth: 1, borderBottomColor: colors.border },
   detailLabel: { color: colors.textSecondary, fontSize: typography.small, fontFamily: typography.family.medium },
@@ -345,7 +369,7 @@ function FactorBar({ label, percentage, last = false }: { label: string; percent
   factorRow: { marginBottom: spacing.md },
   factorRowLast: { marginBottom: 0 },
   factorHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: spacing.xs },
-  factorLabel: { color: colors.secondaryText, fontSize: typography.small, fontWeight: typography.semibold },
+  factorLabel: { color: colors.secondaryText, fontSize: typography.small, fontFamily: typography.family.bold },
   factorValue: { fontSize: typography.small, fontFamily: typography.family.bold },
   factorTrack: { height: 6, borderRadius: radii.pill, backgroundColor: colors.border, overflow: 'hidden' },
   factorFill: { height: '100%', borderRadius: radii.pill },
@@ -357,6 +381,8 @@ function FactorBar({ label, percentage, last = false }: { label: string; percent
   tagMissing: { backgroundColor: colors.errorBackground, color: colors.error, borderRadius: radii.pill, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, fontSize: typography.small, fontFamily: typography.family.medium },
   tagMuted: { backgroundColor: colors.background, color: colors.muted, borderRadius: radii.pill, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, fontSize: typography.small, fontFamily: typography.family.medium },
   missingHint: { marginTop: spacing.sm, color: colors.textSecondary, fontSize: typography.small, lineHeight: 18 },
+  reportLink: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs, marginTop: spacing.xl, paddingVertical: spacing.md },
+  reportLinkText: { color: colors.error, fontSize: typography.small, fontFamily: typography.family.bold },
   footer: { flexDirection: 'row', padding: spacing.md, backgroundColor: colors.surface, borderTopWidth: 1, borderTopColor: colors.border, gap: spacing.md },
   saveBtn: { flex: 1, marginBottom: 0 },
   applyBtn: { flex: 2, marginBottom: 0 },
@@ -368,7 +394,7 @@ function FactorBar({ label, percentage, last = false }: { label: string; percent
   modalScroll: { maxHeight: 320 },
   modalEmptyText: { color: colors.textSecondary, fontSize: typography.body, marginVertical: spacing.lg },
   resourceBlock: { marginBottom: spacing.md },
-  resourceLabel: { color: colors.textPrimary, fontSize: typography.small, fontWeight: typography.bold, marginBottom: spacing.xs },
+  resourceLabel: { color: colors.textPrimary, fontSize: typography.small, fontFamily: typography.family.bold, marginBottom: spacing.xs },
   resourceText: { color: colors.secondaryText, fontSize: typography.small, lineHeight: 18 },
   resourceMeta: { color: colors.subtle, fontSize: typography.small, marginTop: spacing.xs },
   modalCloseBtn: { marginTop: spacing.lg, marginBottom: 0 },

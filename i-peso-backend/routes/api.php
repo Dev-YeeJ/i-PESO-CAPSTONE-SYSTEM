@@ -48,6 +48,15 @@ use App\Http\Controllers\Api\SeekerResumeController;
 use App\Http\Controllers\Api\SkillCatalogController;
 use Illuminate\Support\Facades\Route;
 
+// Unauthenticated connectivity check — used by the mobile app to distinguish
+// "backend unreachable" (network/firewall) from "backend reachable, route/data issue".
+Route::get('/health', function () {
+    return response()->json([
+        'status' => 'ok',
+        'message' => 'i-PESO API is reachable',
+    ]);
+});
+
 Route::get('/occupations', [OccupationController::class, 'index'])->middleware('throttle:60,1');
 Route::get('/skills', [SkillCatalogController::class, 'index'])->middleware('throttle:60,1');
 

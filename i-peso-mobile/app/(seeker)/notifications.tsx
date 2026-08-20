@@ -54,7 +54,7 @@ export default function NotificationsScreen() {
     if (notification.data?.application_id) {
       router.push('/(seeker)/applications')
     } else if (notification.data?.program_id) {
-      router.push(`/(seeker)/upskill-hub/${notification.data.program_id}`)
+      router.push(`/(seeker)/government-programs/${notification.data.program_id}`)
     } else if (notification.data?.job_fair_id) {
       router.push('/(seeker)/job-fairs')
     }

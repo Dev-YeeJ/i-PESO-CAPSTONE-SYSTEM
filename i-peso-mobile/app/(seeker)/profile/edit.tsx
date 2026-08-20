@@ -174,7 +174,7 @@ const styles = StyleSheet.create({
   tabRow: { paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, gap: spacing.sm },
   tab: { paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderRadius: radii.pill, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.background },
   tabActive: { borderColor: colors.info, backgroundColor: colors.infoBackground },
-  tabText: { fontSize: typography.small, fontWeight: typography.semibold, color: colors.muted },
+  tabText: { fontSize: typography.small, fontFamily: typography.family.bold, color: colors.muted },
   tabTextActive: { color: colors.info },
   container: { paddingHorizontal: spacing.xl, paddingTop: spacing.lg, paddingBottom: spacing.xxxl },
   alertBox: { marginBottom: spacing.lg },

@@ -12,6 +12,7 @@ import {
 import MaterialIcons from '@expo/vector-icons/MaterialIcons'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useRouter } from 'expo-router'
+import { Button } from '@/components/ui/Button'
 import type { AxiosError } from 'axios'
 import type { JobFilters, NearbyJob } from '@/services/seekerService'
 import { seekerService } from '@/services/seekerService'
@@ -209,6 +210,7 @@ export default function JobsScreen() {
             isLoading={isLoading}
             locationRequired={locationRequired}
             errorMessage={errorMessage}
+            onOpenMap={() => router.push('/(seeker)/job-map')}
           />
         )}
         ListEmptyComponent={!isLoading && !jobsError ? <EmptyJobs /> : null}
@@ -249,6 +251,7 @@ function JobsHeader({
   isLoading,
   locationRequired,
   errorMessage,
+  onOpenMap,
 }: {
   query: string
   setQuery: (value: string) => void
@@ -280,6 +283,7 @@ function JobsHeader({
   isLoading: boolean
   locationRequired: boolean
   errorMessage: string
+  onOpenMap: () => void
 }) {
   return (
     <View>
@@ -295,6 +299,7 @@ function JobsHeader({
           </View>
         </View>
         <Text style={styles.subtitle}>Smart matching ranks vacancies by merit, commute, salary, and profile fit.</Text>
+        <Button variant="outline" size="sm" onPress={onOpenMap} style={styles.mapBtn}>View on Job Map</Button>
       </View>
 
       <View style={styles.searchPanel}>
@@ -447,6 +452,11 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     fontSize: typography.body,
     lineHeight: 20,
+  },
+  mapBtn: {
+    marginTop: spacing.md,
+    marginBottom: 0,
+    alignSelf: 'flex-start',
   },
   resultPill: {
     minWidth: 64,

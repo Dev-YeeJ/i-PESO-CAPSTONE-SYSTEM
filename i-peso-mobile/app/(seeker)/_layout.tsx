@@ -66,7 +66,7 @@ export default function SeekerLayout() {
         }}
       />
       <Tabs.Screen
-        name="upskill-hub"
+        name="government-programs"
         options={{
           title: 'Programs',
           tabBarIcon: ({ color, focused }) => <TabIcon name="school" color={color} focused={focused} />,
@@ -85,7 +85,10 @@ export default function SeekerLayout() {
       <Tabs.Screen name="notifications" options={{ href: null }} />
       <Tabs.Screen name="job-fairs" options={{ href: null }} />
       <Tabs.Screen name="job-fairs/[id]" options={{ href: null }} />
-      <Tabs.Screen name="upskill-hub/[id]" options={{ href: null }} />
+      <Tabs.Screen name="government-programs/[id]" options={{ href: null }} />
+      <Tabs.Screen name="employers/[id]" options={{ href: null }} />
+      <Tabs.Screen name="assistant" options={{ href: null }} />
+      <Tabs.Screen name="job-map" options={{ href: null }} />
       <Tabs.Screen name="program-applications" options={{ href: null }} />
       <Tabs.Screen name="citizen-charter" options={{ href: null }} />
     </Tabs>

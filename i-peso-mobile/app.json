@@ -8,33 +8,33 @@
     "scheme": "ipesomobile",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
-
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.ipeso.mobile"
     },
-
     "android": {
+      "package": "com.ipeso.mobile",
       "usesCleartextTraffic": true,
-
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
-
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "config": {
+        "googleMaps": {
+          "apiKey": "REPLACE_WITH_ANDROID_GOOGLE_MAPS_API_KEY"
+        }
+      }
     },
-
     "web": {
       "output": "static",
       "favicon": "./assets/images/favicon.png"
     },
-
     "plugins": [
       "expo-router",
-
       [
         "expo-splash-screen",
         {
@@ -42,19 +42,30 @@
           "imageWidth": 200,
           "resizeMode": "contain",
           "backgroundColor": "#ffffff",
-
           "dark": {
             "backgroundColor": "#000000"
           }
         }
       ],
-
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "i-PESO uses your location to show nearby job vacancies on the map."
+        }
+      ]
     ],
-
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "EXPO_PUBLIC_API_URL": "https://api.ipeso.website/api",
+      "apiBaseUrl": "https://api.ipeso.website/api",
+      "router": {},
+      "eas": {
+        "projectId": "a6b6c23f-9e48-4765-950d-48521a8b6804"
+      }
     }
   }
 }

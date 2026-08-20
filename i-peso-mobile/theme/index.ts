@@ -63,20 +63,60 @@ export const radii = {
   pill: 999,
 };
 
+// Elevation scale — tinted with the brand navy instead of pure black so shadows read as
+// "premium/soft" rather than flat drop-shadows. `card`/`elevated` are kept as aliases of
+// `sm`/`lg` so every existing call site keeps working unchanged.
 export const shadows = {
-  card: {
+  xs: {
     shadowColor: '#0F172A',
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
+    shadowOpacity: 0.04,
     shadowRadius: 2,
     elevation: 1,
   },
-  elevated: {
+  sm: {
     shadowColor: '#0F172A',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.12,
-    shadowRadius: 12,
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  md: {
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    elevation: 3,
+  },
+  lg: {
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.14,
+    shadowRadius: 20,
+    elevation: 6,
+  },
+  // Colored "glow" shadow for primary CTAs — makes the accent button read as elevated/tappable
+  // instead of a flat rectangle, without going skeuomorphic.
+  accentGlow: {
+    shadowColor: '#F59E0B',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.28,
+    shadowRadius: 10,
     elevation: 4,
+  },
+  card: {
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  elevated: {
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.14,
+    shadowRadius: 20,
+    elevation: 6,
   },
 };
 
@@ -107,7 +147,28 @@ export const typography = {
   },
 };
 
+// Composed text styles — the *recommended* way to style text going forward. Each preset
+// bundles fontSize + lineHeight + the correct fontFamily variant in one object, so it's no
+// longer possible to accidentally set `fontWeight` without the matching custom fontFamily
+// (which silently falls back to the system font, since DM Sans is loaded as named weight
+// variants, not a variable font — that mismatch was the single biggest source of
+// inconsistent-looking text across the app).
+export const textStyles = {
+  display: { fontSize: typography.display, lineHeight: 34, fontFamily: typography.family.bold },
+  heading: { fontSize: typography.heading, lineHeight: 28, fontFamily: typography.family.bold },
+  title: { fontSize: typography.title, lineHeight: 24, fontFamily: typography.family.bold },
+  titleMedium: { fontSize: typography.title, lineHeight: 24, fontFamily: typography.family.medium },
+  body: { fontSize: typography.body, lineHeight: 20, fontFamily: typography.family.regular },
+  bodyMedium: { fontSize: typography.body, lineHeight: 20, fontFamily: typography.family.medium },
+  bodyBold: { fontSize: typography.body, lineHeight: 20, fontFamily: typography.family.bold },
+  small: { fontSize: typography.small, lineHeight: 16, fontFamily: typography.family.regular },
+  smallMedium: { fontSize: typography.small, lineHeight: 16, fontFamily: typography.family.medium },
+  smallBold: { fontSize: typography.small, lineHeight: 16, fontFamily: typography.family.bold },
+  label: { fontSize: typography.label, lineHeight: 14, fontFamily: typography.family.bold, letterSpacing: 0.4 },
+} as const;
+
 export type ThemeColor = keyof typeof colors;
 export type ThemeSpacing = keyof typeof spacing;
 export type ThemeRadius = keyof typeof radii;
 export type ThemeTypography = keyof typeof typography;
+export type ThemeTextStyle = keyof typeof textStyles;

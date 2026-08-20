@@ -93,8 +93,8 @@ export default function ForgotPasswordScreen() {
         error={emailError}
       />
 
-      <Button fullWidth onPress={handleSubmit} disabled={isLoading} style={styles.submit}>
-        {isLoading ? 'Sending code...' : 'Send Reset Code'}
+      <Button fullWidth onPress={handleSubmit} loading={isLoading} style={styles.submit}>
+        Send Reset Code
       </Button>
     </AuthShell>
   )

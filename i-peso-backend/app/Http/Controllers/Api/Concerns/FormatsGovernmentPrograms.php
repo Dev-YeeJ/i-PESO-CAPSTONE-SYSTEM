@@ -30,6 +30,7 @@ trait FormatsGovernmentPrograms
             'eligibility_requirements' => $program->eligibility_requirements ?? [],
             'eligibility_rules' => $program->eligibility_rules ?? [],
             'required_documents' => $program->required_documents ?? [],
+            'citizen_charter_steps' => $program->citizen_charter_steps ?? [],
             'target_industry' => $program->target_industry,
             'target_occupation' => $program->targetOccupation ? [
                 'id' => $program->targetOccupation->id,

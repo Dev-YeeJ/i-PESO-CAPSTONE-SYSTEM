@@ -646,20 +646,20 @@ export function Step7Experience({ value, onChange, errors }: { value: Step7Value
 }
 
 const styles = StyleSheet.create({
-  subLabel: { marginTop: spacing.sm, marginBottom: spacing.sm, color: colors.primary, fontSize: typography.title, fontWeight: typography.bold },
+  subLabel: { marginTop: spacing.sm, marginBottom: spacing.sm, color: colors.primary, fontSize: typography.title, fontFamily: typography.family.bold },
   choiceGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.md },
-  errorText: { marginTop: -spacing.sm, marginBottom: spacing.md, color: colors.danger, fontSize: typography.small, fontWeight: typography.medium },
+  errorText: { marginTop: -spacing.sm, marginBottom: spacing.md, color: colors.danger, fontSize: typography.small, fontFamily: typography.family.medium },
   aiToggle: { alignSelf: 'flex-start', borderWidth: 1, borderColor: colors.infoBorder, backgroundColor: colors.infoBackground, borderRadius: radii.pill, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, marginTop: spacing.xs, marginBottom: spacing.lg },
-  aiToggleText: { color: colors.info, fontSize: typography.small, fontWeight: typography.bold },
+  aiToggleText: { color: colors.info, fontSize: typography.small, fontFamily: typography.family.bold },
   aiPanel: { borderWidth: 1, borderColor: colors.infoBorder, backgroundColor: colors.infoBackground, borderRadius: radii.lg, padding: spacing.lg, marginBottom: spacing.lg },
   aiFetchBtn: { alignSelf: 'flex-start', backgroundColor: colors.info, borderRadius: radii.pill, paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, marginTop: spacing.xs },
-  aiFetchBtnText: { color: colors.white, fontSize: typography.small, fontWeight: typography.bold },
+  aiFetchBtnText: { color: colors.white, fontSize: typography.small, fontFamily: typography.family.bold },
   aiRefreshBtn: { alignSelf: 'flex-start', marginTop: spacing.sm },
   aiLoading: { marginTop: spacing.md },
   aiNotice: { marginTop: spacing.sm, color: colors.secondaryText, fontSize: typography.small, lineHeight: 18 },
   aiChipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.md },
   aiChip: { borderWidth: 1, borderColor: colors.info, backgroundColor: colors.surface, borderRadius: radii.pill, paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
   aiChipAdded: { borderColor: colors.successBorder, backgroundColor: colors.successBackground },
-  aiChipText: { color: colors.info, fontSize: typography.small, fontWeight: typography.semibold },
+  aiChipText: { color: colors.info, fontSize: typography.small, fontFamily: typography.family.bold },
   aiChipTextAdded: { color: colors.success },
 })

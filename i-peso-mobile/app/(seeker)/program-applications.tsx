@@ -58,8 +58,8 @@ export default function ProgramApplicationsScreen() {
           emptyIcon="assignment"
           emptyTitle="You haven't applied to any programs yet"
           emptyAction={
-            <Button variant="outline" onPress={() => router.push('/(seeker)/upskill-hub')} style={styles.emptyBtn}>
-              Browse Upskill Hub
+            <Button variant="outline" onPress={() => router.push('/(seeker)/government-programs')} style={styles.emptyBtn}>
+              Browse Government Programs
             </Button>
           }
         >

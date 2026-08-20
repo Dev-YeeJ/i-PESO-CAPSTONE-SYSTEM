@@ -11,8 +11,9 @@ import {
 } from 'react-native'
 import { router } from 'expo-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import type { SeekerApplication } from '@/services/seekerService'
+import type { SeekerApplication, SeekerApplicationsResponse } from '@/services/seekerService'
 import { seekerService } from '@/services/seekerService'
+import { apiErrorMessage } from '@/utils/apiError'
 import { formatDate, formatSalary, jobCompany, jobLocation, seekerName, textFrom, titleCase } from '@/utils/seekerView'
 import { AlertBox } from '@/components/ui/AlertBox'
 import { Badge } from '@/components/ui/Badge'
@@ -42,11 +43,22 @@ export default function ApplicationsScreen() {
 
   const withdrawMutation = useMutation({
     mutationFn: (id: number | string) => seekerService.withdrawApplication(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['applications'] })
+    onSuccess: ({ application: withdrawn }) => {
+      queryClient.setQueryData<SeekerApplicationsResponse>(['applications'], (current) =>
+        current
+          ? {
+              ...current,
+              applications: (current.applications ?? []).map((application) =>
+                application.apply_id === withdrawn.apply_id ? withdrawn : application
+              ),
+            }
+          : current
+      )
+      queryClient.setQueryData(['application', String(withdrawn.apply_id)], withdrawn)
       queryClient.invalidateQueries({ queryKey: ['jobs'] })
     },
-    onError: () => Alert.alert('Unable to withdraw', 'Please check your connection and try again.'),
+    onError: (caught: unknown) =>
+      Alert.alert('Unable to withdraw', apiErrorMessage(caught, 'Please check your connection and try again.')),
   })
 
   const confirmWithdraw = (application: SeekerApplication) => {

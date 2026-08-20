@@ -123,8 +123,8 @@ export default function LoginScreen() {
         }
       />
 
-      <Button fullWidth onPress={handleLogin} disabled={isLoading} style={styles.submit}>
-        {isLoading ? 'Signing in...' : 'Sign In'}
+      <Button fullWidth onPress={handleLogin} loading={isLoading} style={styles.submit}>
+        Sign In
       </Button>
     </AuthShell>
   )

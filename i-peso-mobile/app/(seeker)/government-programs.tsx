@@ -20,6 +20,8 @@ const CATEGORY_LABELS: Record<string, string> = {
   job_fair: 'Job Fair',
   spes: 'SPES',
   tupad: 'TUPAD',
+  gip: 'GIP',
+  ofw_assistance: 'OFW Assistance',
   livelihood_program: 'Livelihood',
   tech_voc_training: 'Tech-Voc Training',
   career_guidance: 'Career Guidance',
@@ -46,7 +48,7 @@ function slotsLabel(program: GovernmentProgram) {
   return `${available}/${program.total_slots} slots`
 }
 
-export default function UpskillHubScreen() {
+export default function GovernmentProgramsScreen() {
   const router = useRouter()
   const [search, setSearch] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
@@ -65,8 +67,8 @@ export default function UpskillHubScreen() {
   }, [debouncedSearch, category])
 
   const { data, isLoading, isFetching, error, refetch } = useQuery({
-    queryKey: ['upskillHub', debouncedSearch, category, page],
-    queryFn: () => seekerService.getUpskillHub({ search: debouncedSearch || undefined, category, page }),
+    queryKey: ['governmentPrograms', debouncedSearch, category, page],
+    queryFn: () => seekerService.getGovernmentPrograms({ search: debouncedSearch || undefined, category, page }),
   })
 
   useEffect(() => {
@@ -86,21 +88,19 @@ export default function UpskillHubScreen() {
     setRefreshing(false)
   }
 
-  const errorMessage = error ? apiErrorMessage(error, 'Unable to load the Upskill Hub. Please try again.') : ''
+  const errorMessage = error ? apiErrorMessage(error, 'Unable to load Government Programs. Please try again.') : ''
 
   const hasMore = data ? page < data.programs.last_page : false
-  const recommended = data?.recommended ?? []
-  const jobFairs = data?.job_fairs ?? []
 
   return (
     <View style={styles.flex}>
-    <ScreenHeader title="Upskill Hub" onBack={() => router.back()} />
+    <ScreenHeader title="Government Programs" onBack={() => router.back()} />
     <ScrollView
       contentContainerStyle={styles.content}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.info} />}
       showsVerticalScrollIndicator={false}
     >
-      <Text style={styles.kicker}>Government Programs</Text>
+      <Text style={styles.kicker}>PESO Programs Center</Text>
       <Text style={styles.subtitle}>
         Browse SPES, TUPAD, livelihood, and training programs available through PESO.
       </Text>
@@ -135,36 +135,12 @@ export default function UpskillHubScreen() {
         </AlertBox>
       ) : null}
 
-      {recommended.length > 0 && (
-        <>
-          <SectionHeader title="Recommended for you" />
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.recommendedRow}>
-            {recommended.map((program) => (
-              <TouchableOpacity
-                key={String(program.program_id)}
-                activeOpacity={0.9}
-                onPress={() => router.push(`/(seeker)/upskill-hub/${program.program_id}`)}
-                style={styles.recommendedCardWrap}
-              >
-                <Card padding="md" style={styles.recommendedCard}>
-                  <Badge variant="info">{categoryLabel(program.category)}</Badge>
-                  <Text style={styles.recommendedTitle} numberOfLines={2}>{textFrom(program.title, 'Untitled program')}</Text>
-                  {program.recommendation_reason ? (
-                    <Text style={styles.recommendedReason} numberOfLines={2}>{program.recommendation_reason}</Text>
-                  ) : null}
-                </Card>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </>
-      )}
-
       <Card padding="md" style={styles.bulletinCard}>
         <View style={styles.bulletinRow}>
           <MaterialIcons name="event" size={22} color={colors.info} />
           <View style={styles.bulletinText}>
             <Text style={styles.bulletinTitle}>Job Fair Bulletin</Text>
-            <Text style={styles.bulletinSub}>{jobFairs.length} job fair{jobFairs.length === 1 ? '' : 's'} posted by PESO</Text>
+            <Text style={styles.bulletinSub}>Browse upcoming PESO job fairs</Text>
           </View>
         </View>
         <Button variant="secondary" onPress={() => router.push('/(seeker)/job-fairs')} style={styles.bulletinBtn}>
@@ -198,7 +174,7 @@ export default function UpskillHubScreen() {
           <TouchableOpacity
             key={String(program.program_id)}
             activeOpacity={0.9}
-            onPress={() => router.push(`/(seeker)/upskill-hub/${program.program_id}`)}
+            onPress={() => router.push(`/(seeker)/government-programs/${program.program_id}`)}
           >
             <Card padding="md" style={styles.programCard}>
               <View style={styles.programHeader}>
@@ -254,11 +230,6 @@ const styles = StyleSheet.create({
   chipText: { color: colors.textSecondary, fontSize: typography.small, fontFamily: typography.family.bold },
   chipTextActive: { color: colors.white },
   alertBox: { marginBottom: spacing.lg },
-  recommendedRow: { gap: spacing.md, paddingBottom: spacing.sm },
-  recommendedCardWrap: { width: 220 },
-  recommendedCard: { minHeight: 110, gap: spacing.xs },
-  recommendedTitle: { color: colors.textPrimary, fontSize: typography.body, fontFamily: typography.family.bold, marginTop: spacing.xs },
-  recommendedReason: { color: colors.textSecondary, fontSize: typography.small, marginTop: spacing.xs },
   bulletinCard: { marginTop: spacing.xl, gap: spacing.md },
   bulletinRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   bulletinText: { flex: 1 },

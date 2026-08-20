@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { seekerService } from '@/services/seekerService'
+import { getCitizenCharterSteps, seekerService } from '@/services/seekerService'
 import { downloadAndShare } from '@/utils/fileTransfer'
 import { formatDate, textFrom, titleCase } from '@/utils/seekerView'
 import { AlertBox } from '@/components/ui/AlertBox'
@@ -17,6 +17,8 @@ const CATEGORY_LABELS: Record<string, string> = {
   job_fair: 'Job Fair',
   spes: 'SPES',
   tupad: 'TUPAD',
+  gip: 'GIP',
+  ofw_assistance: 'OFW Assistance',
   livelihood_program: 'Livelihood',
   tech_voc_training: 'Tech-Voc Training',
   career_guidance: 'Career Guidance',
@@ -63,13 +65,11 @@ export default function ProgramDetailScreen() {
     onSuccess: (data) => {
       setApplyError('')
       queryClient.invalidateQueries({ queryKey: ['governmentProgram', id] })
-      queryClient.invalidateQueries({ queryKey: ['upskillHub'] })
+      queryClient.invalidateQueries({ queryKey: ['governmentPrograms'] })
       Alert.alert('Application submitted', data.message || 'Your application has been submitted.')
     },
     onError: (caught: unknown) => {
-      const body = (caught as { response?: { data?: { message?: string; errors?: Record<string, string[]> } } }).response?.data
-      const firstError = body?.errors ? Object.values(body.errors)[0]?.[0] : ''
-      setApplyError(firstError || body?.message || 'Unable to submit your application. Please try again.')
+      setApplyError(apiErrorMessage(caught, 'Unable to submit your application. Please try again.'))
     },
   })
 
@@ -126,6 +126,7 @@ export default function ProgramDetailScreen() {
   const eligibility = Array.isArray(program.eligibility_requirements) ? program.eligibility_requirements : []
   const requiredDocs = Array.isArray(program.required_documents) ? program.required_documents : []
   const skills = Array.isArray(program.skills) ? program.skills : []
+  const charterSteps = getCitizenCharterSteps(program)
   const totalSlots = program.total_slots ?? 0
   const slotsText = totalSlots > 0 ? `${program.available_slots ?? 0}/${totalSlots} slots available` : 'Open slots (unlimited)'
 
@@ -176,6 +177,11 @@ export default function ProgramDetailScreen() {
             ))}
           </>
         )}
+
+        <Text style={styles.sectionTitle}>How to Apply (In-Person)</Text>
+        {charterSteps.map((step, index) => (
+          <BulletRow key={`${step}-${index}`} text={`${index + 1}. ${step}`} />
+        ))}
 
         {skills.length > 0 && (
           <>
@@ -266,22 +272,22 @@ const styles = StyleSheet.create({
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: spacing.md, padding: spacing.xl },
   content: { padding: spacing.xl, paddingBottom: spacing.xxxl },
   header: { marginBottom: spacing.lg },
-  programTitle: { color: colors.primary, fontSize: typography.heading, lineHeight: 30, fontWeight: typography.bold },
+  programTitle: { color: colors.primary, fontSize: typography.heading, lineHeight: 30, fontFamily: typography.family.bold },
   badgeRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md },
   description: { color: colors.secondaryText, fontSize: typography.body, lineHeight: 22, marginBottom: spacing.lg },
   infoCard: { marginBottom: spacing.lg },
   detailRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: spacing.xs, borderBottomWidth: 1, borderBottomColor: colors.border },
-  detailLabel: { color: colors.secondaryText, fontSize: typography.small, fontWeight: typography.semibold },
-  detailValue: { color: colors.primary, fontSize: typography.small, fontWeight: typography.semibold, textAlign: 'right', flex: 1, marginLeft: spacing.md },
-  sectionTitle: { color: colors.primary, fontSize: typography.title, fontWeight: typography.bold, marginTop: spacing.lg, marginBottom: spacing.md },
+  detailLabel: { color: colors.secondaryText, fontSize: typography.small, fontFamily: typography.family.bold },
+  detailValue: { color: colors.primary, fontSize: typography.small, fontFamily: typography.family.bold, textAlign: 'right', flex: 1, marginLeft: spacing.md },
+  sectionTitle: { color: colors.primary, fontSize: typography.title, fontFamily: typography.family.bold, marginTop: spacing.lg, marginBottom: spacing.md },
   bulletRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.xs },
   bulletDot: { color: colors.info, fontSize: typography.body },
   bulletText: { color: colors.secondaryText, fontSize: typography.body, lineHeight: 20, flex: 1 },
   tagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  tag: { backgroundColor: colors.infoBackground, color: colors.info, borderRadius: radii.pill, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, fontSize: typography.small, fontWeight: typography.semibold },
+  tag: { backgroundColor: colors.infoBackground, color: colors.info, borderRadius: radii.pill, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, fontSize: typography.small, fontFamily: typography.family.bold },
   attachmentBtn: { marginTop: spacing.lg },
   alertBox: { marginTop: spacing.lg },
   footer: { padding: spacing.md, backgroundColor: colors.surface, borderTopWidth: 1, borderTopColor: colors.border },
   appliedRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, paddingVertical: spacing.sm },
-  appliedText: { color: colors.primary, fontSize: typography.body, fontWeight: typography.semibold },
+  appliedText: { color: colors.primary, fontSize: typography.body, fontFamily: typography.family.bold },
 })

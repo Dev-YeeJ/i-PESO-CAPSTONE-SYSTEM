@@ -215,8 +215,8 @@ export default function RegisterScreen() {
       />
       {passwordsMatch ? <Text style={styles.matchText}>Passwords match</Text> : null}
 
-      <Button fullWidth onPress={handleSubmit} disabled={isLoading} style={styles.submit}>
-        {isLoading ? 'Creating account...' : 'Create Account'}
+      <Button fullWidth onPress={handleSubmit} loading={isLoading} style={styles.submit}>
+        Create Account
       </Button>
     </AuthShell>
   )
@@ -236,9 +236,6 @@ const styles = StyleSheet.create({
     fontFamily: typography.family.bold,
     marginTop: -spacing.sm,
     marginBottom: spacing.md,
-  },
-  submit: {
-    marginTop: spacing.xs,
   },
   footer: {
     flexDirection: 'row',

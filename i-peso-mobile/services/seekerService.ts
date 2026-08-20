@@ -117,6 +117,10 @@ export interface JobFilters {
   limit?: number
   compact?: boolean
   jobId?: number | string
+  /** Overrides the seeker's stored profile location for this search (e.g. "use current location"). */
+  lat?: number
+  lng?: number
+  coordinatesOnly?: boolean
 }
 
 export interface JobSkillGap {
@@ -188,6 +192,17 @@ export interface NearbyJobsResponse {
   message?: string
   code?: string
   location_available?: boolean
+  seeker_location?: { latitude?: number | null; longitude?: number | null; full_address?: string | null } | null
+  origin?: { latitude?: number | null; longitude?: number | null } | null
+  summary?: {
+    total_found?: number
+    high_match_count?: number
+    nearest_distance_km?: number | null
+    applied_count?: number
+    saved_count?: number
+    job_fair_count?: number
+    upskill_recommendation_count?: number
+  }
 }
 
 export interface SeekerApplication {
@@ -275,6 +290,15 @@ export interface JobFair {
   published_vacancies?: Array<{ post_id: number | string; job_title?: string | null; vacancies_count?: number }>
 }
 
+export interface ProgramEligibility {
+  score: number
+  status:
+    | 'highly_eligible' | 'eligible' | 'partially_eligible'
+    | 'low_match' | 'not_eligible' | 'unknown' | string
+  label: string
+  breakdown: Array<{ label: string; met: boolean; required: boolean; detail?: string | null }>
+}
+
 export interface GovernmentProgram {
   program_id: number | string
   title: string
@@ -285,6 +309,9 @@ export interface GovernmentProgram {
   target_beneficiaries?: string | null
   eligibility_requirements?: string[] | null
   required_documents?: string[] | null
+  /** In-person application steps set by PESO admin. Null/empty until an admin fills it in — callers must fall back, see getCitizenCharterSteps(). */
+  citizen_charter_steps?: string[] | null
+  eligibility?: ProgramEligibility | null
   target_industry?: string | null
   skills?: Array<{ id: number | string; name?: string; type?: string }>
   venue?: string | null
@@ -331,11 +358,22 @@ export interface GovernmentProgramApplication {
   program?: GovernmentProgram
 }
 
-export interface UpskillHubResponse {
+export interface GovernmentProgramsResponse {
   programs: { data: GovernmentProgram[]; current_page: number; last_page: number; total: number }
-  recommended: GovernmentProgram[]
-  job_fairs: Array<{ job_fair_id: number | string; title: string; venue?: string | null; start_date?: string | null; status?: string }>
   categories: Record<string, number>
+}
+
+/** Shown when a program has no admin-authored citizen_charter_steps yet. */
+export const CITIZEN_CHARTER_FALLBACK_STEPS: string[] = [
+  'Prepare Documents',
+  'Submit to PESO',
+  'Wait for Review',
+  'Claim Stub',
+]
+
+export function getCitizenCharterSteps(program: Pick<GovernmentProgram, 'citizen_charter_steps'>): string[] {
+  const steps = program.citizen_charter_steps
+  return Array.isArray(steps) && steps.length > 0 ? steps : CITIZEN_CHARTER_FALLBACK_STEPS
 }
 
 export interface OccupationOption {
@@ -432,6 +470,34 @@ export interface LearningResources {
   practice_sites?: { coding?: string; general?: string }
   estimated_learning_time?: string
 }
+
+export interface PublicEmployerProfile {
+  employer_id: number | string
+  company_name: string
+  trade_name?: string | null
+  industry?: string | null
+  company_size?: string | null
+  company_logo_url?: string | null
+  full_address?: string | null
+  company_description?: string | null
+  verification_status: string
+  created_at?: string | null
+}
+
+export interface EmployerVacancy {
+  post_id: number | string
+  job_title: string
+  location?: string | null
+  employment_type?: string | null
+  created_at?: string | null
+}
+
+export interface EmployerProfileResponse {
+  employer: PublicEmployerProfile
+  vacancies: EmployerVacancy[]
+}
+
+export type EmployerReportReason = 'fake_job' | 'misleading' | 'abusive' | 'discrimination' | 'illegal_fees' | 'other'
 
 function toFormData(fields: Record<string, unknown>, file?: { uri: string; name: string; type: string; fieldName: string }) {
   const formData = new FormData()
@@ -535,7 +601,10 @@ export const seekerService = {
     if (filters.upskillRecommendedOnly) params.upskill_recommended_only = 1
     if (filters.certificateMatchOnly) params.certificate_match_only = 1
     if (filters.canApplyOnly) params.can_apply_only = 1
+    if (filters.coordinatesOnly) params.coordinates_only = 1
     if (filters.maxMissingSkills !== undefined) params.max_missing_skills = filters.maxMissingSkills
+    if (filters.lat !== undefined) params.lat = filters.lat
+    if (filters.lng !== undefined) params.lng = filters.lng
     params.limit = filters.limit ?? 40
     if (filters.compact) params.compact = 1
 
@@ -556,6 +625,17 @@ export const seekerService = {
   async applyToJob(postId: number | string) {
     const res = await apiClient.post(`/seeker/jobs/${postId}/apply`)
     return res.data
+  },
+
+  // ── Employer profile (public view) ────────────────────────────────────
+  async getEmployerProfile(employerId: number | string): Promise<EmployerProfileResponse> {
+    const res = await apiClient.get(`/seeker/employers/${employerId}`)
+    return res.data
+  },
+
+  async reportEmployer(employerId: number | string, payload: { reason: EmployerReportReason; description: string }) {
+    const res = await apiClient.post(`/seeker/employers/${employerId}/report`, payload)
+    return res.data as { message: string; report: { id: number | string; reason: string; status: string; created_at: string } }
   },
 
   // ── Applications ───────────────────────────────────────────────────────
@@ -599,25 +679,18 @@ export const seekerService = {
     return res.data?.data ?? []
   },
 
-  // ── Upskill Hub / Government Programs ─────────────────────────────────
-  async getUpskillHub(params: { search?: string; category?: string; skill?: string; location?: string; deadline?: string; page?: number; perPage?: number } = {}): Promise<UpskillHubResponse> {
-    const res = await apiClient.get('/seeker/upskill-hub', {
+  // ── Government Programs ────────────────────────────────────────────────
+  async getGovernmentPrograms(params: { search?: string; category?: string; status?: string; page?: number; perPage?: number } = {}): Promise<GovernmentProgramsResponse> {
+    const res = await apiClient.get('/seeker/government-programs', {
       params: {
         search: params.search || undefined,
         category: params.category || undefined,
-        skill: params.skill || undefined,
-        location: params.location || undefined,
-        deadline: params.deadline || undefined,
+        status: params.status || undefined,
         page: params.page || undefined,
         per_page: params.perPage || 12,
       },
     })
     return res.data
-  },
-
-  async getRecommendedPrograms(limit = 20): Promise<GovernmentProgram[]> {
-    const res = await apiClient.get('/seeker/upskill-hub/recommended', { params: { limit } })
-    return res.data?.data ?? []
   },
 
   async getGovernmentProgram(id: number | string): Promise<GovernmentProgram> {

@@ -127,13 +127,26 @@ apiClient.interceptors.response.use(
   },
 
   async (error) => {
-    if (error.response) {
-      console.log('❌ API ERROR RESPONSE');
-      console.log('Status:', error.response.status);
-      console.log('URL:', error.config?.url);
-      console.log('Data:', error.response.data);
+    const fullUrl = `${error.config?.baseURL ?? ''}${error.config?.url ?? ''}`;
 
-      if (error.response.status === 401) {
+    if (error.response) {
+      const status = error.response.status;
+      const label =
+        status === 401 ? '401 UNAUTHORIZED' :
+        status === 403 ? '403 FORBIDDEN' :
+        status === 404 ? '404 NOT FOUND' :
+        status === 422 ? '422 VALIDATION ERROR' :
+        status >= 500 ? `${status} SERVER ERROR` :
+        `${status} ERROR`;
+
+      console.log(`❌ API ${label}`);
+      console.log('Full URL:', fullUrl);
+      console.log('Request Method:', error.config?.method);
+      console.log('Request Data:', error.config?.data);
+      console.log('Response Status:', status);
+      console.log('Response Data:', error.response.data);
+
+      if (status === 401) {
         await SecureStore.deleteItemAsync('ipeso_token');
 
         try {
@@ -147,13 +160,19 @@ apiClient.interceptors.response.use(
         }
       }
     } else if (error.request) {
-      console.log('❌ API NETWORK ERROR');
-      console.log('Request was sent but no response was received.');
-      console.log('URL:', error.config?.url);
-      console.log('Message:', error.message);
+      const label = error.code === 'ECONNABORTED' ? '❌ API TIMEOUT' : '❌ API NETWORK ERROR';
+      console.log(label);
+      console.log('API Base URL:', BASE_URL);
+      console.log('Request URL:', error.config?.url);
+      console.log('Full URL:', fullUrl);
+      console.log('Request Method:', error.config?.method);
+      console.log('Request Data:', error.config?.data);
+      console.log('Error Code:', error.code);
+      console.log('Error Message:', error.message);
+      console.log('Request was sent but no response was received — check that the backend is reachable at this address from the device.');
     } else {
       console.log('❌ API SETUP ERROR');
-      console.log('Message:', error.message);
+      console.log('Error Message:', error.message);
     }
 
     return Promise.reject(error);

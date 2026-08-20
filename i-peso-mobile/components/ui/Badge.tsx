@@ -1,5 +1,5 @@
 import { StyleSheet, Text, View, type TextStyle, type ViewStyle } from 'react-native'
-import { colors, radii, spacing, typography } from '@/theme'
+import { colors, radii, spacing, textStyles } from '@/theme'
 
 const badgeStyles = {
   neutral: {
@@ -72,7 +72,7 @@ const styles = StyleSheet.create({
     marginRight: spacing.xs,
   },
   label: {
-    fontSize: typography.small,
-    fontWeight: typography.semibold,
+    ...textStyles.smallBold,
+    lineHeight: undefined,
   },
 })

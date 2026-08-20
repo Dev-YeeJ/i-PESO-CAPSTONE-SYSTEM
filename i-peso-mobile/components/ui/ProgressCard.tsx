@@ -1,6 +1,6 @@
 import { StyleSheet, View, Text } from 'react-native'
 import { Card, CardHeader } from './Card'
-import { colors, spacing, typography, radii } from '@/theme'
+import { colors, spacing, textStyles, radii } from '@/theme'
 
 interface ProgressCardProps {
   title: string
@@ -44,8 +44,7 @@ const styles = StyleSheet.create({
     borderRadius: radii.pill,
   },
   percentage: {
-    fontSize: typography.body,
-    fontWeight: typography.semibold,
+    ...textStyles.bodyBold,
     color: colors.primary,
     width: 40,
     textAlign: 'right',

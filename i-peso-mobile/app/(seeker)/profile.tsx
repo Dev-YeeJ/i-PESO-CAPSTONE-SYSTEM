@@ -45,6 +45,7 @@ const CERTIFICATE_CATEGORIES = [
 
 export default function ProfileScreen() {
   const token = useAuthStore((state) => state.token)
+  const logout = useAuthStore((state) => state.logout)
   const queryClient = useQueryClient()
   const [refreshing, setRefreshing] = useState(false)
   const [photoBusy, setPhotoBusy] = useState(false)
@@ -55,6 +56,28 @@ export default function ProfileScreen() {
   const [aiSummaryBusy, setAiSummaryBusy] = useState(false)
   const [aiSummaryNotice, setAiSummaryNotice] = useState('')
   const [actionError, setActionError] = useState('')
+  const [signingOut, setSigningOut] = useState(false)
+
+  const confirmSignOut = () => {
+    Alert.alert('Sign out?', 'You will need to log in again to access your account.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Sign out',
+        style: 'destructive',
+        onPress: async () => {
+          setSigningOut(true)
+          try {
+            await logout()
+          } catch {
+            // clearAuth() already ran inside the store even if the network call failed —
+            // the seeker layout's auth guard will redirect to /login regardless.
+          } finally {
+            setSigningOut(false)
+          }
+        },
+      },
+    ])
+  }
 
   const { data: profile, isLoading, error, refetch } = useQuery({
     queryKey: ['seekerProfile'],
@@ -436,6 +459,10 @@ export default function ProfileScreen() {
         <Button variant="primary" fullWidth onPress={() => router.push('/(seeker)/profile/edit')} style={styles.editAllBtn}>
           Edit profile details
         </Button>
+
+        <Button variant="danger" fullWidth onPress={confirmSignOut} disabled={signingOut} style={styles.signOutBtn}>
+          {signingOut ? 'Signing out...' : 'Sign out'}
+        </Button>
       </ScrollView>
 
       <CertificateUploadModal
@@ -626,6 +653,7 @@ const styles = StyleSheet.create({
   checkTextDone: { color: colors.textPrimary, fontFamily: typography.family.medium },
   updateBtn: { marginTop: spacing.md },
   editAllBtn: { marginTop: spacing.xl },
+  signOutBtn: { marginTop: spacing.md, marginBottom: spacing.xl },
   editLinkText: { color: colors.secondary, fontSize: typography.small, fontFamily: typography.family.bold },
   infoRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.border },
   infoLabel: { color: colors.textSecondary, fontSize: typography.body },

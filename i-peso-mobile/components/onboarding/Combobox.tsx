@@ -118,7 +118,7 @@ export function Combobox<T>({
 
 const styles = StyleSheet.create({
   field: { marginBottom: spacing.lg },
-  label: { marginBottom: spacing.sm, color: colors.muted, fontSize: typography.small, fontWeight: typography.semibold },
+  label: { marginBottom: spacing.sm, color: colors.muted, fontSize: typography.small, fontFamily: typography.family.bold },
   required: { color: colors.danger },
   input: {
     borderWidth: 1,
@@ -131,14 +131,14 @@ const styles = StyleSheet.create({
     fontSize: typography.body,
   },
   inputError: { borderColor: colors.danger },
-  errorText: { marginTop: spacing.xs, color: colors.danger, fontSize: typography.small, fontWeight: typography.medium },
+  errorText: { marginTop: spacing.xs, color: colors.danger, fontSize: typography.small, fontFamily: typography.family.medium },
   dropdown: { marginTop: spacing.xs, borderWidth: 1, borderColor: colors.border, borderRadius: radii.md, backgroundColor: colors.surface, overflow: 'hidden' },
   loadingRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: spacing.md },
   loadingText: { color: colors.secondaryText, fontSize: typography.small },
   suggestionRow: { paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.border },
-  suggestionLabel: { color: colors.primary, fontSize: typography.body, fontWeight: typography.medium },
+  suggestionLabel: { color: colors.primary, fontSize: typography.body, fontFamily: typography.family.medium },
   suggestionSub: { color: colors.secondaryText, fontSize: typography.small, marginTop: 2 },
   noResultsText: { color: colors.secondaryText, fontSize: typography.small, fontStyle: 'italic' },
   closeRow: { paddingVertical: spacing.sm, alignItems: 'center', backgroundColor: colors.background },
-  closeText: { color: colors.info, fontSize: typography.small, fontWeight: typography.bold },
+  closeText: { color: colors.info, fontSize: typography.small, fontFamily: typography.family.bold },
 })
