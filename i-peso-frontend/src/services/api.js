@@ -11,6 +11,10 @@ const apiClient = axios.create({
     'Accept': 'application/json',
   },
   withCredentials: true, // Required for Laravel Sanctum CSRF
+  // Without this a stalled request (dropped connection, oversized upload
+  // rejected mid-transfer by the server) hangs the UI indefinitely instead
+  // of failing with a message the user can act on.
+  timeout: 30000,
 })
 
 // ── REQUEST INTERCEPTOR ──────────────────────────────────────

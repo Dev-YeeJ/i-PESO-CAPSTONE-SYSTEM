@@ -199,7 +199,14 @@ export default function SeekerProfileEdit() {
         ...patch,
       },
     }))
-    setErrors({})
+    // date_of_birth is checked immediately rather than only at submit — the
+    // native date picker's max attribute stops most out-of-range picks, but
+    // typing a date directly bypasses that.
+    setErrors(
+      'date_of_birth' in patch && patch.date_of_birth && calculateAge(patch.date_of_birth) < 15
+        ? { date_of_birth: 'You must be at least 15 years old.' }
+        : {}
+    )
   }
 
   const updateListItem = (section, key, index, patch) => {
@@ -470,7 +477,7 @@ export default function SeekerProfileEdit() {
                   )}
                   {form.employment.employment_status === 'unemployed' && (
                     <>
-                      <TextInput type="number" label="Months unemployed" value={form.employment.unemployment_months} error={errors.unemployment_months} onChange={(value) => updateSection('employment', { unemployment_months: value })} />
+                      <TextInput type="number" min="0" max="999" label="Months unemployed" value={form.employment.unemployment_months} error={errors.unemployment_months} onChange={(value) => updateSection('employment', { unemployment_months: value === '' ? '' : String(Math.max(0, Math.min(999, Number(value) || 0))) })} />
                       <SelectInput label="Reason for unemployment" value={form.employment.unemployment_reason} error={errors.unemployment_reason} onChange={(value) => updateSection('employment', { unemployment_reason: value })} options={[
                         { value: '', label: 'Select reason' },
                         { value: 'fresh_graduate', label: 'Fresh graduate' },
@@ -888,17 +895,18 @@ export default function SeekerProfileEdit() {
 function SectionCard({ icon, title, subtitle, children, onSave, saving }) {
   return (
     <section className={cardClass}>
-      <div className="mb-5 flex flex-wrap items-start justify-between gap-3 border-b border-slate-100 pb-5">
-        <div className="flex gap-3">
-          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-blue-50 text-blue-700">
-            {createElement(icon, { className: 'h-5 w-5' })}
-          </span>
-          <div>
-            <h2 className="text-lg font-black text-slate-950">{title}</h2>
-            <p className="mt-1 text-sm leading-6 text-slate-500">{subtitle}</p>
-          </div>
+      <div className="mb-5 flex gap-3 border-b border-slate-100 pb-5">
+        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-blue-50 text-blue-700">
+          {createElement(icon, { className: 'h-5 w-5' })}
+        </span>
+        <div>
+          <h2 className="text-lg font-black text-slate-950">{title}</h2>
+          <p className="mt-1 text-sm leading-6 text-slate-500">{subtitle}</p>
         </div>
-        {onSave && (
+      </div>
+      {children}
+      {onSave && (
+        <div className="mt-6 flex justify-end border-t border-slate-100 pt-5">
           <button
             type="button"
             onClick={onSave}
@@ -908,9 +916,8 @@ function SectionCard({ icon, title, subtitle, children, onSave, saving }) {
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
             {saving ? 'Saving...' : 'Save Section'}
           </button>
-        )}
-      </div>
-      {children}
+        </div>
+      )}
     </section>
   )
 }

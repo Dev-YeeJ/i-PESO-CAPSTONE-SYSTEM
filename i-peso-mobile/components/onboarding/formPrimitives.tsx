@@ -17,6 +17,22 @@ export function fieldError(errors: ServerErrors | undefined, path: string): stri
   return errors?.[path]?.[0]
 }
 
+/**
+ * Folds every error key matching one of the given prefixes (exact match, or
+ * "prefix.*") onto a single message — for backend rules that key errors by
+ * an array/nested path (e.g. occupation_preferences.0.occupation_id) but
+ * the UI only has one field to show them under.
+ */
+export function collapsedFieldError(errors: ServerErrors | undefined, prefixes: string[]): string | undefined {
+  if (!errors) return undefined
+  for (const key of Object.keys(errors)) {
+    if (prefixes.some((prefix) => key === prefix || key.startsWith(`${prefix}.`))) {
+      return errors[key]?.[0]
+    }
+  }
+  return undefined
+}
+
 export function firstServerError(errors: ServerErrors = {}) {
   const key = Object.keys(errors)[0]
   return key ? errors[key]?.[0] : ''

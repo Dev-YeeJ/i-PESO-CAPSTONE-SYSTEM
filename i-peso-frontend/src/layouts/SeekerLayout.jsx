@@ -1,5 +1,5 @@
 import { createElement, useState } from 'react'
-import { BookOpenCheck, CalendarDays, ChevronLeft, CircleCheck, ClipboardList, GraduationCap, LayoutDashboard, LogOut, Menu, UserRound, X, MapPin } from 'lucide-react'
+import { BookOpenCheck, CalendarDays, ChevronLeft, CircleCheck, ClipboardList, GraduationCap, LayoutDashboard, Menu, UserRound, X, MapPin } from 'lucide-react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '@/stores/authStore'
 import NotificationBell from '@/pages/seeker/components/NotificationBell'
@@ -29,17 +29,11 @@ const pageNames = {
 export default function SeekerLayout() {
   const navigate = useNavigate()
   const location = useLocation()
-  const logout = useAuthStore((state) => state.logout)
   const user = useAuthStore((state) => state.user)
   const [collapsed, setCollapsed] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
   const initials = user?.name?.split(' ').map((name) => name[0]).join('').slice(0, 2).toUpperCase() ?? 'JS'
   const pageName = pageNames[location.pathname] ?? 'Job Seeker Portal'
-
-  const handleLogout = async () => {
-    await logout()
-    navigate('/login', { replace: true })
-  }
 
   const sidebar = (
     <>
@@ -69,15 +63,17 @@ export default function SeekerLayout() {
         </div>
       </nav>
       <div className="border-t border-white/10 p-3">
-        <div className={`mb-2 flex items-center ${collapsed ? 'justify-center' : 'gap-3 px-2 py-2'}`}>
+        <NavLink
+          to="/seeker/profile"
+          title={collapsed ? 'My Profile' : undefined}
+          onClick={() => setMobileOpen(false)}
+          className={`mb-2 flex items-center rounded-lg transition hover:bg-white/5 ${collapsed ? 'justify-center' : 'gap-3 px-2 py-2'}`}
+        >
           <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-gold text-xs font-black text-brand-navy">{initials}</span>
-          {!collapsed && <div className="min-w-0"><p className="truncate text-sm font-bold text-white">{user?.name}</p><p className="text-xs text-blue-200">Job Seeker Account</p></div>}
-        </div>
+          {!collapsed && <div className="min-w-0"><p className="truncate text-sm font-bold text-white">{user?.name}</p><p className="text-xs text-blue-200">View my profile</p></div>}
+        </NavLink>
         <button onClick={() => setCollapsed(!collapsed)} className={`portal-sidebar-action hidden md:flex ${collapsed ? 'justify-center' : 'gap-3 px-3'}`}>
           <ChevronLeft className={`h-5 w-5 transition ${collapsed ? 'rotate-180' : ''}`} />{!collapsed && 'Collapse sidebar'}
-        </button>
-        <button onClick={handleLogout} className={`flex w-full items-center rounded-lg py-2.5 text-sm font-semibold text-red-200 hover:bg-red-500/10 hover:text-red-100 ${collapsed ? 'justify-center' : 'gap-3 px-3'}`}>
-          <LogOut className="h-4 w-4" />{!collapsed && 'Sign out'}
         </button>
       </div>
     </>
@@ -110,8 +106,15 @@ export default function SeekerLayout() {
             </span>
             <NotificationBell />
             <span className="hidden h-9 w-px bg-slate-200 sm:block" />
-            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-brand-navy text-xs font-black text-white shadow-sm">{initials}</span>
-            <div className="hidden lg:block"><p className="max-w-40 truncate text-sm font-bold text-slate-800">{user?.name}</p><p className="text-xs text-slate-500">Job Seeker</p></div>
+            <button
+              type="button"
+              onClick={() => navigate('/seeker/profile')}
+              className="flex items-center gap-3 rounded-lg px-1.5 py-1 transition hover:bg-slate-100"
+              title="Go to My Profile"
+            >
+              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-brand-navy text-xs font-black text-white shadow-sm">{initials}</span>
+              <div className="hidden lg:block text-left"><p className="max-w-40 truncate text-sm font-bold text-slate-800">{user?.name}</p><p className="text-xs text-slate-500">Job Seeker</p></div>
+            </button>
           </div>
         </header>
         <main className="px-3 pb-28 pt-4 sm:px-6 sm:py-6 lg:px-8 lg:py-8"><Outlet /></main>

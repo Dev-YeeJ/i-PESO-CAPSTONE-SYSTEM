@@ -12,6 +12,13 @@ export const generateAiProfessionalSummary = async (existingSummary = '') => {
   return response.data.data
 }
 
+export const saveProfessionalSummary = async (summary) => {
+  const response = await apiClient.put('/seeker/professional-summary', {
+    professional_summary: summary || null,
+  })
+  return response.data
+}
+
 export const getSeekerDashboardSummary = async () => {
   const response = await apiClient.get('/seeker/dashboard-summary')
   return response.data.user

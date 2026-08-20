@@ -6,6 +6,7 @@ import MaterialIcons from '@expo/vector-icons/MaterialIcons'
 import type { GovernmentProgram } from '@/services/seekerService'
 import { seekerService } from '@/services/seekerService'
 import { formatDate, textFrom, titleCase } from '@/utils/seekerView'
+import { EligibilityBadge } from '@/components/EligibilityBadge'
 import { AlertBox } from '@/components/ui/AlertBox'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
@@ -181,7 +182,10 @@ export default function GovernmentProgramsScreen() {
                 <Text style={styles.programTitle} numberOfLines={2}>{textFrom(program.title, 'Untitled program')}</Text>
                 <Badge variant={statusVariant(program.status)}>{titleCase(program.status, 'Open')}</Badge>
               </View>
-              <Badge variant="neutral" style={styles.categoryBadge}>{categoryLabel(program.category)}</Badge>
+              <View style={styles.badgeRow}>
+                <Badge variant="neutral" style={styles.categoryBadge}>{categoryLabel(program.category)}</Badge>
+                <EligibilityBadge eligibility={program.eligibility} />
+              </View>
               {program.short_description ? (
                 <Text style={styles.programDescription} numberOfLines={2}>{program.short_description}</Text>
               ) : null}
@@ -239,7 +243,8 @@ const styles = StyleSheet.create({
   programCard: { marginBottom: spacing.md },
   programHeader: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: spacing.md },
   programTitle: { flex: 1, color: colors.textPrimary, fontSize: typography.title, lineHeight: 22, fontFamily: typography.family.bold },
-  categoryBadge: { alignSelf: 'flex-start', marginTop: spacing.sm },
+  badgeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.sm },
+  categoryBadge: { alignSelf: 'flex-start' },
   programDescription: { color: colors.textSecondary, fontSize: typography.small, lineHeight: 18, marginTop: spacing.sm },
   programMetaRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: spacing.md },
   programMeta: { color: colors.textSecondary, fontSize: typography.small, fontFamily: typography.family.bold },

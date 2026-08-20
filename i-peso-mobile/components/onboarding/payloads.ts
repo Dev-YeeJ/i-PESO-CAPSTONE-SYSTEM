@@ -37,6 +37,22 @@ function textOrNull(value: string) {
   return trimmed || null
 }
 
+// Mirrors SeekerController::educationDuplicateKey exactly, so the client rejects
+// the same duplicate combinations the backend would.
+function educationDuplicateKey(e: EducationEntry): string {
+  const endYear = e.completion_status === 'graduated'
+    ? e.year_graduated
+    : e.completion_status === 'undergraduate'
+      ? e.undergrad_year_last_attended
+      : e.completion_status === 'currently_studying'
+        ? 'present'
+        : ''
+
+  return [e.institution_name, e.level, e.course_strand, e.year_started, endYear]
+    .map((part) => String(part ?? '').trim().toLowerCase().replace(/\s+/g, ' '))
+    .join('|')
+}
+
 // ── Payload builders (form value -> API request body) ─────────────────────
 
 export function buildStep1Payload(v: Step1Value) {
@@ -87,7 +103,7 @@ export function buildStep2Payload(v: Step2Value) {
 
 export function buildStep3Payload(v: Step3Value) {
   const preferences = v.occupation_preferences
-    .filter((p) => p.raw_job_title.trim() || p.occupation_id)
+    .filter((p) => p.raw_job_title.trim() || p.occupation_id || p.general_term)
     .slice(0, 3)
     .map((p) => ({
       occupation_id: p.occupation_id,
@@ -107,7 +123,7 @@ export function buildStep3Payload(v: Step3Value) {
 export function buildStep4Payload(v: Step4Value) {
   return {
     languages: v.languages
-      .filter((l) => l.language)
+      .filter((l) => l.language && (l.can_read || l.can_write || l.can_speak || l.can_understand))
       .map((l) => ({
         language: l.language,
         language_other: l.language === 'others' ? textOrNull(l.language_other) : null,
@@ -253,7 +269,7 @@ export function validateStep(step: number, form: OnboardingFormValue): string {
   if (step === 3) {
     const v = form.step3
     if (!v.preferred_locations_details.some((l) => l.trim())) return 'Add at least one preferred work location.'
-    if (!v.occupation_preferences.some((p) => p.raw_job_title.trim() || p.occupation_id)) return 'Add at least one preferred occupation.'
+    if (!v.occupation_preferences.some((p) => p.raw_job_title.trim() || p.occupation_id || p.general_term)) return 'Add at least one preferred occupation.'
     return ''
   }
   if (step === 4) {
@@ -265,6 +281,7 @@ export function validateStep(step: number, form: OnboardingFormValue): string {
     const v = form.step5
     const validEducations = v.educations.filter((e) => e.institution_name.trim())
     if (!validEducations.length) return 'Add at least one education record.'
+    const seenEducationKeys = new Set<string>()
     for (const e of validEducations) {
       if (['tertiary', 'senior_high_strand', 'vocational', 'graduate_studies'].includes(e.level) && !e.course_strand.trim()) {
         return 'Course, strand, or program is required for this education level.'
@@ -273,6 +290,9 @@ export function validateStep(step: number, form: OnboardingFormValue): string {
       if (e.completion_status === 'undergraduate' && (!e.undergrad_level_reached.trim() || !e.undergrad_year_last_attended.trim())) {
         return 'Level reached and year last attended are required for undergraduate entries.'
       }
+      const key = educationDuplicateKey(e)
+      if (seenEducationKeys.has(key)) return 'You have duplicate education records — remove or edit the repeated entry.'
+      seenEducationKeys.add(key)
     }
     return ''
   }

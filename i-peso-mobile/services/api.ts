@@ -151,7 +151,21 @@ apiClient.interceptors.response.use(
 
         try {
           const { useAuthStore } = await import('@/stores/authStore');
-          useAuthStore.getState().clearAuth();
+          // A 401 from the login endpoint itself just means wrong credentials,
+          // not an eviction. Every other authenticated call failing with 401 —
+          // including /auth/me during boot rehydration, which is exactly how a
+          // remotely-evicted session gets discovered — means this token was
+          // revoked server-side (most commonly: signed in on another device,
+          // since only one active session is allowed per account). Checking
+          // the request URL instead of in-memory isAuthenticated matters
+          // because boot-time rehydration hits this same 401 before
+          // isAuthenticated is ever set to true.
+          const isLoginAttempt = error.config?.url?.includes('/auth/login');
+          useAuthStore.getState().clearAuth(
+            isLoginAttempt
+              ? undefined
+              : 'You were signed out because this account was signed in on another device.',
+          );
         } catch (storeError) {
           console.log(
             '⚠️ Could not clear auth store:',

@@ -54,7 +54,7 @@ export function ReportEmployerModal({ visible, employerId, employerName, onClose
       <View style={styles.overlay}>
         <View style={styles.card}>
           <Text style={styles.title}>Report {employerName || 'this employer'}</Text>
-          <Text style={styles.subtitle}>PESO will review your report. This does not withdraw any application you've submitted.</Text>
+          <Text style={styles.subtitle}>PESO will review your report. This does not withdraw any application you&apos;ve submitted.</Text>
 
           <ScrollView style={styles.scroll}>
             <Text style={styles.label}>Reason</Text>

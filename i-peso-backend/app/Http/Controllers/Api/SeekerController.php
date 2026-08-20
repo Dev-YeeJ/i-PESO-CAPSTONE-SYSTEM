@@ -436,6 +436,7 @@ class SeekerController extends Controller
                     : null,
                 'has_profile_image' => filled($seeker->profile_image),
                 'has_resume' => filled($seeker->resume_path),
+                'professional_summary' => $seeker->professional_summary,
                 'dashboard_stats' => [
                     'active_applications' => Schema::hasTable('applications')
                         ? DB::table('applications')
@@ -448,6 +449,36 @@ class SeekerController extends Controller
                 ],
                 'profile_strength' => $this->profileStrength($seeker),
             ]),
+        ]);
+    }
+
+    /**
+     * PUT /api/seeker/professional-summary   [auth:sanctum]
+     *
+     * Persists the seeker's professional summary so it survives navigation —
+     * previously this only lived in frontend component state and was lost the
+     * moment the seeker left the profile page.
+     */
+    public function saveProfessionalSummary(Request $request): JsonResponse
+    {
+        $seeker = $this->getSeeker($request);
+        if ($seeker instanceof JsonResponse) {
+            return $seeker;
+        }
+
+        $validated = $request->validate([
+            'professional_summary' => ['nullable', 'string', 'max:1200'],
+        ]);
+
+        $seeker->forceFill([
+            'professional_summary' => filled($validated['professional_summary'] ?? null)
+                ? trim($validated['professional_summary'])
+                : null,
+        ])->save();
+
+        return response()->json([
+            'message' => 'Professional summary saved.',
+            'professional_summary' => $seeker->professional_summary,
         ]);
     }
 

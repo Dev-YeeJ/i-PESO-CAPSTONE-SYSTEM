@@ -91,6 +91,14 @@ const calculateAge = (birthDate) => {
   return age
 }
 
+// Latest selectable date that still makes someone at least 15 today — bounds
+// the native date picker itself, on top of the immediate validation below.
+const minimumBirthDate = () => {
+  const date = new Date()
+  date.setFullYear(date.getFullYear() - 15)
+  return date.toISOString().split('T')[0]
+}
+
 // Helper to capitalize proper names
 const capitalizeName = (str) => {
   if (!str) return ''
@@ -603,7 +611,7 @@ const Step1 = ({ form, errors, onChange, user, onGpsDetect, onAddressSelect, gps
         <FormField label="Date of Birth" error={errors.date_of_birth}>
           <input type="date" style={inputStyle(!!errors.date_of_birth)} name="date_of_birth"
             value={form.date_of_birth ?? ''} onChange={onChange}
-            max={new Date().toISOString().split('T')[0]} />
+            max={minimumBirthDate()} />
         </FormField>
         <FormField label="Sex" error={errors.sex}>
           <select style={selectStyle(!!errors.sex)} name="sex"
@@ -805,6 +813,8 @@ const Step2 = ({ form, errors, onChange }) => (
           <FormField label="Months Unemployed" error={errors.unemployment_months} help="Select the closest duration">
             <input
               type="number"
+              min="0"
+              max="999"
               style={inputStyle(!!errors.unemployment_months)}
               name="unemployment_months"
               value={form.unemployment_months ?? ''}
@@ -2535,7 +2545,14 @@ export default function SeekerOnboarding() {
     if ((name === 'first_name' || name === 'last_name' || name === 'middle_name') && typeof value === 'string') {
       value = capitalizeName(value)
     }
-    
+
+    // Months unemployed can't go negative — the number input's spinner respects
+    // min="0", but typing "-5" directly bypasses that, so clamp here too.
+    if (name === 'unemployment_months' && value !== '') {
+      const clamped = Math.max(0, Math.min(999, Number(value) || 0))
+      value = String(clamped)
+    }
+
     const manualAddressFields = [
       'address_province_code',
       'address_city_code',
@@ -2598,7 +2615,9 @@ export default function SeekerOnboarding() {
     })
     setErrors((err) => ({
       ...err,
-      [name]: undefined,
+      [name]: name === 'date_of_birth' && value && calculateAge(value) < 15
+        ? 'Must be at least 15 years old.'
+        : undefined,
       ...(['dole_skills', 'technical_skills', 'soft_skills'].includes(name) ? { skills: undefined } : {}),
     }))
     setApiError('')

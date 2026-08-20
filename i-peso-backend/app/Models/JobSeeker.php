@@ -47,6 +47,7 @@ class JobSeeker extends Authenticatable
         'educ_attainment',
         'skills',
         'resume_path',
+        'professional_summary',
         'profile_image',
         'email_verified_at',
         'is_verified',

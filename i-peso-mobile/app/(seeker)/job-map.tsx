@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { ActivityIndicator, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native'
 import { useRouter } from 'expo-router'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import MapView from 'react-native-map-clustering'
 import { Marker } from 'react-native-maps'
 import * as Location from 'expo-location'
@@ -9,6 +9,7 @@ import MaterialIcons from '@expo/vector-icons/MaterialIcons'
 import type { AxiosError } from 'axios'
 import type { JobFilters, NearbyJob } from '@/services/seekerService'
 import { seekerService } from '@/services/seekerService'
+import { useToggleSavedJob } from '@/hooks/use-toggle-saved-job'
 import { mergeParsedFilters } from '@/utils/mapQueryParser'
 import { AlertBox } from '@/components/ui/AlertBox'
 import { Button } from '@/components/ui/Button'
@@ -51,7 +52,6 @@ function matchColor(job: NearbyJob) {
 
 export default function JobMapScreen() {
   const router = useRouter()
-  const queryClient = useQueryClient()
 
   const [filters, setFilters] = useState<JobFilters>(DEFAULT_FILTERS)
   const [debouncedFilters, setDebouncedFilters] = useState<JobFilters>(DEFAULT_FILTERS)
@@ -95,8 +95,27 @@ export default function JobMapScreen() {
     },
   })
 
+  // Pins use compact payloads — a screen full of markers has no business pulling
+  // full match/certificate/job-fair/upskill internals for every one of them.
+  // Full detail is fetched lazily per-job when a pin is tapped (via the shared
+  // job detail screen, GET /seeker/job-map/{id}).
+  const { data: pinsData } = useQuery({
+    queryKey: ['jobMapPins', debouncedFilters],
+    queryFn: async () => {
+      try {
+        const res = await seekerService.searchJobs({ ...debouncedFilters, compact: true })
+        return res.jobs ?? []
+      } catch {
+        return []
+      }
+    },
+  })
+
   const jobs = data?.jobs ?? []
-  const jobsWithCoords = useMemo(() => jobs.filter((job) => job.latitude != null && job.longitude != null), [jobs])
+  const jobsWithCoords = useMemo(
+    () => (pinsData ?? []).filter((job) => job.latitude != null && job.longitude != null),
+    [pinsData]
+  )
   const locationRequired = data?.locationRequired ?? false
   const errorMessage = error && !locationRequired
     ? ((error as AxiosError<{ message?: string }>).response?.data?.message || 'Unable to load nearby jobs. Please try again.')
@@ -111,7 +130,7 @@ export default function JobMapScreen() {
     }
     // Only re-center when the result set actually changes, not on every render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data])
+  }, [pinsData, data?.seekerLocation])
 
   const updateFilters = (changes: Partial<JobFilters>) => setFilters((current) => ({ ...current, ...changes }))
 
@@ -154,25 +173,7 @@ export default function JobMapScreen() {
     updateFilters(merged)
   }
 
-  const toggleSavedMutation = useMutation({
-    mutationFn: (jobId: string) => seekerService.toggleSavedJob(jobId),
-    onMutate: async (jobId) => {
-      await queryClient.cancelQueries({ queryKey: ['jobMap'] })
-      const previous = queryClient.getQueriesData<typeof data>({ queryKey: ['jobMap'] })
-      previous.forEach(([key, value]) => {
-        if (!value?.jobs) return
-        queryClient.setQueryData(key, {
-          ...value,
-          jobs: value.jobs.map((job) => (String(job.post_id) === jobId ? { ...job, is_saved: !job.is_saved } : job)),
-        })
-      })
-      return { previous }
-    },
-    onError: (_err, _jobId, context) => {
-      context?.previous?.forEach(([key, value]) => queryClient.setQueryData(key, value))
-    },
-    onSettled: () => queryClient.invalidateQueries({ queryKey: ['jobMap'] }),
-  })
+  const toggleSavedMutation = useToggleSavedJob()
 
   const openJob = (job: NearbyJob) => router.push(`/(seeker)/jobs/${job.post_id}`)
 
@@ -316,6 +317,25 @@ export default function JobMapScreen() {
                 placeholder="e.g. 15000"
                 placeholderTextColor={colors.subtle}
                 keyboardType="number-pad"
+              />
+
+              <FilterLabel>Maximum Salary</FilterLabel>
+              <TextInput
+                style={styles.numberInput}
+                value={filters.salaryMax ? String(filters.salaryMax) : ''}
+                onChangeText={(v) => updateFilters({ salaryMax: v ? Number(v.replace(/\D/g, '')) : undefined })}
+                placeholder="e.g. 30000"
+                placeholderTextColor={colors.subtle}
+                keyboardType="number-pad"
+              />
+
+              <FilterLabel>Location Keyword</FilterLabel>
+              <TextInput
+                style={styles.numberInput}
+                value={filters.locationKeyword ?? ''}
+                onChangeText={(v) => updateFilters({ locationKeyword: v || undefined })}
+                placeholder="e.g. Urdaneta City"
+                placeholderTextColor={colors.subtle}
               />
 
               <FilterLabel>Max Missing Skills</FilterLabel>

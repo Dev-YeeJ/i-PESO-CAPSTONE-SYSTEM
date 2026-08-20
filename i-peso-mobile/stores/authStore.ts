@@ -21,11 +21,13 @@ interface AuthState {
   token: string | null
   isAuthenticated: boolean
   isInitialized: boolean
+  sessionMessage: string | null
   setAuth: (user: User, token: string) => Promise<void>
   updateUser: (user: Partial<User>) => void
   initializeAuth: () => Promise<void>
   logout: () => Promise<void>
-  clearAuth: () => Promise<void>
+  clearAuth: (message?: string) => Promise<void>
+  clearSessionMessage: () => void
 }
 
 export const useAuthStore = create<AuthState>((set, get) => ({
@@ -33,6 +35,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   token: null,
   isAuthenticated: false,
   isInitialized: false,
+  sessionMessage: null,
 
   setAuth: async (user, token) => {
     await SecureStore.setItemAsync(TOKEN_KEY, token)
@@ -55,8 +58,15 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         const user = await authService.getAuthenticatedUser()
         set({ user, isAuthenticated: true })
       }
-    } catch {
-      await get().clearAuth()
+    } catch (error: any) {
+      // A 401 here was already handled by the response interceptor (token
+      // deleted, sessionMessage set for remote eviction) — clearing again
+      // would race with that and could wipe the message before login reads
+      // it. Anything else (network failure, 5xx) still needs a manual clear
+      // since the interceptor only reacts to 401s.
+      if (error?.response?.status !== 401) {
+        await get().clearAuth()
+      }
     } finally {
       set({ isInitialized: true })
     }
@@ -71,8 +81,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     }
   },
 
-  clearAuth: async () => {
+  clearAuth: async (message) => {
     await SecureStore.deleteItemAsync(TOKEN_KEY)
-    set({ user: null, token: null, isAuthenticated: false })
+    set({ user: null, token: null, isAuthenticated: false, sessionMessage: message ?? null })
   },
+
+  clearSessionMessage: () => set({ sessionMessage: null }),
 }))

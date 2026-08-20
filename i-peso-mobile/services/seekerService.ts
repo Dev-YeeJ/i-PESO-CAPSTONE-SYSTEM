@@ -383,6 +383,26 @@ export interface OccupationOption {
   broad_category?: string | null
 }
 
+export interface OccupationClassificationSuggestion {
+  occupation_title: string
+  broad_field?: string | null
+  general_term?: string | null
+  role_function?: string | null
+  confidence: number
+  source: string
+  reason?: string | null
+  occupation_id?: number | null
+  psoc_code?: string | null
+}
+
+export interface OccupationClassificationResult {
+  raw_input: string
+  is_valid_job_input: boolean
+  needs_clarification: boolean
+  suggestions: OccupationClassificationSuggestion[]
+  invalid_reason?: string | null
+}
+
 export interface SkillOption {
   id: number
   name: string
@@ -739,6 +759,12 @@ export const seekerService = {
   async searchOccupations(search: string, limit = 15): Promise<OccupationOption[]> {
     const res = await apiClient.get('/occupations', { params: { search, limit } })
     return res.data?.data ?? []
+  },
+
+  /** 3-layer catalog-then-dictionary-then-AI occupation classification, backing the Step 3 job-title combobox. */
+  async classifyOccupation(title: string, limit = 5): Promise<OccupationClassificationResult> {
+    const res = await apiClient.post('/seeker/classify-occupation', { title, limit })
+    return res.data
   },
 
   async searchSkills(search: string, category: 'technical' | 'soft', limit = 15): Promise<SkillOption[]> {

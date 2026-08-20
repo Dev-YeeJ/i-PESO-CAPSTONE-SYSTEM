@@ -20,6 +20,11 @@ interface ApiErrorBody {
 // Mirrors AuthController::register — regex:/^[\pL\s.'-]+$/u, min:2, max:100
 const NAME_PATTERN = /^[\p{L}\s.'-]{2,100}$/u
 
+// Mirrors Password::min(8)->numbers()->symbols() (vendor/laravel/framework
+// .../Validation/Rules/Password.php) — numbers: \pN, symbols: \p{Z}|\p{S}|\p{P}
+const HAS_NUMBER = /\p{N}/u
+const HAS_SYMBOL = /\p{Z}|\p{S}|\p{P}/u
+
 const normalizeMobileNumber = (value: string) => {
   let digits = value.replace(/\D/g, '')
   if (digits.startsWith('639')) digits = `0${digits.slice(2)}`
@@ -76,6 +81,8 @@ export default function RegisterScreen() {
       nextErrors.password = 'Password is required.'
     } else if (form.password.length < 8) {
       nextErrors.password = 'Minimum 8 characters.'
+    } else if (!HAS_NUMBER.test(form.password) || !HAS_SYMBOL.test(form.password)) {
+      nextErrors.password = 'Password must include at least one number and one symbol.'
     }
 
     if (!form.password_confirmation) {

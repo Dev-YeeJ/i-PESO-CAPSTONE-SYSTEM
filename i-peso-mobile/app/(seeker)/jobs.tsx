@@ -10,12 +10,13 @@ import {
   View,
 } from 'react-native'
 import MaterialIcons from '@expo/vector-icons/MaterialIcons'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import { useRouter } from 'expo-router'
 import { Button } from '@/components/ui/Button'
 import type { AxiosError } from 'axios'
-import type { JobFilters, NearbyJob } from '@/services/seekerService'
+import type { JobFilters } from '@/services/seekerService'
 import { seekerService } from '@/services/seekerService'
+import { useToggleSavedJob } from '@/hooks/use-toggle-saved-job'
 import { AlertBox } from '@/components/ui/AlertBox'
 import { Card } from '@/components/ui/Card'
 import { SegmentedControl } from '@/components/ui/SegmentedControl'
@@ -48,7 +49,6 @@ const MIN_SALARY_OPTIONS = [15000, 20000, 25000, 30000]
 const JOBS_PER_BATCH = 8
 
 export default function JobsScreen() {
-  const queryClient = useQueryClient()
   const router = useRouter()
   const [query, setQuery] = useState('')
   const [locationKeyword, setLocationKeyword] = useState('')
@@ -129,27 +129,7 @@ export default function JobsScreen() {
     setJobFairOnly(Boolean(parsed.job_fair_only))
   }
 
-  const toggleSavedMutation = useMutation({
-    mutationFn: (jobId: string) => seekerService.toggleSavedJob(jobId),
-    onMutate: async (jobId) => {
-      await queryClient.cancelQueries({ queryKey: ['jobs'] })
-      const previousQueries = queryClient.getQueriesData<{ jobs?: NearbyJob[] }>({ queryKey: ['jobs'] })
-      previousQueries.forEach(([key, data]) => {
-        if (!data?.jobs) return
-        queryClient.setQueryData(key, {
-          ...data,
-          jobs: data.jobs.map((job) => (String(job.post_id) === jobId ? { ...job, is_saved: !job.is_saved } : job)),
-        })
-      })
-      return { previousQueries }
-    },
-    onError: (_err, _jobId, context) => {
-      context?.previousQueries?.forEach(([key, data]) => queryClient.setQueryData(key, data))
-    },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ['jobs'] })
-    },
-  })
+  const toggleSavedMutation = useToggleSavedJob()
 
   const onRefresh = useCallback(() => { refetch() }, [refetch])
   const loadMore = () => {

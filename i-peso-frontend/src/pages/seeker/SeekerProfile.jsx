@@ -35,6 +35,7 @@ import {
   getCertificateFile,
   getProfileImage,
   getSeekerProfile,
+  saveProfessionalSummary as persistProfessionalSummary,
 } from '@/services/seekerService'
 import { useAuthStore } from '@/stores/authStore'
 import { Button, LoadingSkeleton } from '@/components/ui'
@@ -56,17 +57,32 @@ export default function SeekerProfile() {
   const [photoVersion, setPhotoVersion] = useState(0)
   const [openingCertificate, setOpeningCertificate] = useState(null)
   const [pendingDeleteCert, setPendingDeleteCert] = useState(null)
+  const [signOutConfirmOpen, setSignOutConfirmOpen] = useState(false)
+  const [signingOut, setSigningOut] = useState(false)
   const [resumeStudioOpen, setResumeStudioOpen] = useState(false)
   const [generatingResume, setGeneratingResume] = useState(false)
   const [professionalSummary, setProfessionalSummary] = useState('')
   const [summaryDraft, setSummaryDraft] = useState('')
   const [summaryEditing, setSummaryEditing] = useState(false)
   const [summaryGenerating, setSummaryGenerating] = useState(false)
+  const [summarySaving, setSummarySaving] = useState(false)
   const [openExperienceEditors, setOpenExperienceEditors] = useState({})
   const [experienceDrafts, setExperienceDrafts] = useState({})
   const [experienceResponsibilities, setExperienceResponsibilities] = useState({})
   const updateUser = useAuthStore((state) => state.updateUser)
+  const logout = useAuthStore((state) => state.logout)
   const navigate = useNavigate()
+
+  const confirmSignOut = async () => {
+    setSigningOut(true)
+    try {
+      await logout()
+      navigate('/login', { replace: true })
+    } finally {
+      setSigningOut(false)
+      setSignOutConfirmOpen(false)
+    }
+  }
 
   useEffect(() => {
     getSeekerProfile()
@@ -244,10 +260,19 @@ export default function SeekerProfile() {
     }
   }
 
-  const saveProfessionalSummary = () => {
-    setProfessionalSummary(summaryDraft.trim())
-    setSummaryEditing(false)
-    toast.success('Professional summary saved for this resume polish session.')
+  const saveProfessionalSummary = async () => {
+    const trimmed = summaryDraft.trim()
+    setSummarySaving(true)
+    try {
+      await persistProfessionalSummary(trimmed)
+      setProfessionalSummary(trimmed)
+      setSummaryEditing(false)
+      toast.success('Professional summary saved.')
+    } catch (error) {
+      toast.error(error.response?.data?.message ?? 'Unable to save your professional summary.')
+    } finally {
+      setSummarySaving(false)
+    }
   }
 
   const enhanceResponsibilities = (key, experience) => {
@@ -446,10 +471,11 @@ export default function SeekerProfile() {
                     <button
                       type="button"
                       onClick={saveProfessionalSummary}
-                      disabled={!summaryDraft.trim()}
+                      disabled={!summaryDraft.trim() || summarySaving}
                       className="inline-flex items-center gap-1.5 rounded-xl bg-blue-700 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-50"
                     >
-                      <Save className="h-4 w-4" /> Save Summary
+                      {summarySaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                      {summarySaving ? 'Saving...' : 'Save Summary'}
                     </button>
                   </div>
                 </div>
@@ -725,7 +751,30 @@ export default function SeekerProfile() {
             </section>
           </aside>
         </div>
+
+        <div className="mt-8 flex justify-center border-t border-slate-200 pt-6">
+          <button
+            type="button"
+            onClick={() => setSignOutConfirmOpen(true)}
+            className="inline-flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-5 py-2.5 text-sm font-bold text-red-700 transition hover:bg-red-100"
+          >
+            Sign out
+          </button>
+        </div>
       </div>
+
+      <Dialog open={signOutConfirmOpen} onOpenChange={(open) => !signingOut && setSignOutConfirmOpen(open)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Sign out of i-PESO?</DialogTitle>
+            <DialogDescription>You will need to log in again to access your profile and applications.</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setSignOutConfirmOpen(false)} disabled={signingOut}>Cancel</Button>
+            <Button variant="danger" onClick={confirmSignOut} disabled={signingOut}>{signingOut ? 'Signing out...' : 'Sign out'}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <CertificateUploadModal
         open={uploadOpen}

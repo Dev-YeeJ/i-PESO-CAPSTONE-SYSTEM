@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { router } from 'expo-router'
 import { authService } from '@/services/authService'
@@ -11,6 +11,8 @@ import { colors, spacing, typography } from '@/theme'
 
 interface AuthState {
   setAuth: (user: any, token: string) => Promise<void>
+  sessionMessage: string | null
+  clearSessionMessage: () => void
 }
 
 const validate = (email: string, password: string) => {
@@ -24,6 +26,8 @@ const validate = (email: string, password: string) => {
 
 export default function LoginScreen() {
   const setAuth = useAuthStore((s: AuthState) => s.setAuth)
+  const sessionMessage = useAuthStore((s: AuthState) => s.sessionMessage)
+  const clearSessionMessage = useAuthStore((s: AuthState) => s.clearSessionMessage)
 
   const [email, setEmail]         = useState('')
   const [password, setPassword]   = useState('')
@@ -31,6 +35,16 @@ export default function LoginScreen() {
   const [errors, setErrors]       = useState<Record<string, string>>({})
   const [apiError, setApiError]   = useState('')
   const [touched, setTouched]     = useState<Record<string, boolean>>({})
+
+  // Landing here because a stored session was evicted (e.g. this account
+  // signed in on another device) shows that reason once, then clears it —
+  // a normal cold-start visit to /login has no sessionMessage set.
+  useEffect(() => {
+    if (sessionMessage) {
+      setApiError(sessionMessage)
+      clearSessionMessage()
+    }
+  }, [sessionMessage, clearSessionMessage])
 
   const getError = (field: string) => touched[field] ? errors[field] : ''
 
@@ -66,6 +80,14 @@ export default function LoginScreen() {
             email: err.response.data.email,
           },
         })
+        return
+      }
+      if (status === 429) {
+        // Covers both the 5-failed-attempts/15-min lockout and the plain
+        // 10/min route throttle — the backend's own message distinguishes
+        // them; this branch just keeps either from being shown as a
+        // "check your credentials" error, which would be misleading.
+        setApiError(err.response?.data?.message ?? 'Too many attempts. Please wait a moment before trying again.')
         return
       }
       setApiError(err.response?.data?.message ?? 'Login failed. Check your credentials.')

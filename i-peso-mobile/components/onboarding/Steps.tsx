@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { colors, radii, spacing, typography } from '@/theme'
-import { seekerService, type AiSuggestionItem, type OccupationOption, type SkillOption } from '@/services/seekerService'
+import { seekerService, type AiSuggestionItem, type OccupationClassificationSuggestion, type SkillOption } from '@/services/seekerService'
 import { Combobox } from './Combobox'
 import {
   Choice,
@@ -10,6 +10,7 @@ import {
   InfoNote,
   RepeatableSection,
   ToggleGroup,
+  collapsedFieldError,
   fieldError,
   type ServerErrors,
 } from './formPrimitives'
@@ -181,8 +182,39 @@ const WORK_EMPLOYMENT_STATUS_OPTIONS = [
   'temporary', 'seasonal', 'internship', 'ojt', 'freelance', 'self_employed',
 ].map((v) => ({ label: v.replace(/_/g, ' '), value: v }))
 
+// Mirrors the backend's regex:/^\d{2}-\d{2}-\d{2}-\d{3}-\d{5}$/ (14 digits, grouped 2-2-2-3-5)
+function formatHouseholdId4ps(raw: string) {
+  const digits = raw.replace(/\D/g, '').slice(0, 14)
+  const groupLengths = [2, 2, 2, 3, 5]
+  let formatted = ''
+  let cursor = 0
+  for (const length of groupLengths) {
+    if (cursor >= digits.length) break
+    formatted += (formatted ? '-' : '') + digits.slice(cursor, cursor + length)
+    cursor += length
+  }
+  return formatted
+}
+
 function SubLabel({ children }: { children: string }) {
   return <Text style={styles.subLabel}>{children}</Text>
+}
+
+// height_ft on the wire is decimal feet (backend: between:2.5,8.5) — the UI
+// collects it as a feet/inches pair and converts, per the NSRP form's units.
+const FEET_OPTIONS = [2, 3, 4, 5, 6, 7, 8].map((f) => ({ label: `${f} ft`, value: String(f) }))
+const INCH_OPTIONS = Array.from({ length: 12 }, (_, i) => ({ label: `${i} in`, value: String(i) }))
+
+function feetInchesFromDecimal(decimalFeet: string): { feet: number; inches: number } {
+  const parsed = Number(decimalFeet)
+  if (!Number.isFinite(parsed) || parsed <= 0) return { feet: 5, inches: 0 }
+  const feet = Math.floor(parsed)
+  const inches = Math.round((parsed - feet) * 12)
+  return inches >= 12 ? { feet: feet + 1, inches: 0 } : { feet, inches }
+}
+
+function decimalFromFeetInches(feet: number, inches: number): string {
+  return String(Math.round((feet + inches / 12) * 100) / 100)
 }
 
 // ── Step 1: Personal, Address, Disability ─────────────────────────────────
@@ -213,7 +245,17 @@ export function Step1Personal({ value, onChange, errors }: { value: Step1Value; 
       {value.religion === 'other' ? (
         <Field label="Specify Religion" required value={value.religion_other} onChangeText={(v) => set('religion_other', v)} error={fieldError(errors, 'religion_other')} />
       ) : null}
-      <Field label="Height (ft)" required placeholder="e.g. 5.4" keyboardType="decimal-pad" value={value.height_ft} onChangeText={(v) => set('height_ft', v)} error={fieldError(errors, 'height_ft')} />
+      {(() => {
+        const height = feetInchesFromDecimal(value.height_ft)
+        const setHeight = (feet: number, inches: number) => set('height_ft', decimalFromFeetInches(feet, inches))
+        return (
+          <>
+            <ChoiceGroup label="Height — Feet" required options={FEET_OPTIONS} value={String(height.feet)} onChange={(v) => setHeight(Number(v), height.inches)} />
+            <ChoiceGroup label="Height — Inches" required options={INCH_OPTIONS} value={String(height.inches)} onChange={(v) => setHeight(height.feet, Number(v))} />
+          </>
+        )
+      })()}
+      {fieldError(errors, 'height_ft') ? <Text style={styles.errorText}>{fieldError(errors, 'height_ft')}</Text> : null}
       <Field label="TIN (optional)" value={value.tin} onChangeText={(v) => set('tin', v)} keyboardType="number-pad" error={fieldError(errors, 'tin')} />
 
       <SubLabel>Present Address</SubLabel>
@@ -289,7 +331,15 @@ export function Step2Employment({ value, onChange, errors }: { value: Step2Value
       <SubLabel>4Ps Beneficiary</SubLabel>
       <ToggleGroup label="Are you a 4Ps beneficiary?" value={value.is_4ps_beneficiary} onChange={(v) => set('is_4ps_beneficiary', v)} />
       {value.is_4ps_beneficiary ? (
-        <Field label="4Ps Household ID" required placeholder="00-00-00-000-00000" value={value.household_id_4ps} onChangeText={(v) => set('household_id_4ps', v)} error={fieldError(errors, 'household_id_4ps')} />
+        <Field
+          label="4Ps Household ID"
+          required
+          placeholder="00-00-00-000-00000"
+          keyboardType="number-pad"
+          value={value.household_id_4ps}
+          onChangeText={(v) => set('household_id_4ps', formatHouseholdId4ps(v))}
+          error={fieldError(errors, 'household_id_4ps')}
+        />
       ) : null}
     </>
   )
@@ -337,7 +387,7 @@ export function Step3Preferences({ value, onChange, errors }: { value: Step3Valu
         onAdd={() => value.occupation_preferences.length < 3 && set('occupation_preferences', [...value.occupation_preferences, newOccupationPref()])}
         onRemove={(i) => set('occupation_preferences', value.occupation_preferences.filter((_, idx) => idx !== i))}
         renderItem={(i) => (
-          <Combobox<OccupationOption>
+          <Combobox<OccupationClassificationSuggestion>
             label={`Job Title ${i + 1}`}
             placeholder="e.g. Administrative Assistant"
             value={value.occupation_preferences[i].raw_job_title}
@@ -348,18 +398,23 @@ export function Step3Preferences({ value, onChange, errors }: { value: Step3Valu
             }}
             onSelect={(item) => {
               const next = [...value.occupation_preferences]
-              next[i] = { raw_job_title: item.title, occupation_id: item.id, general_term: item.general_term ?? null, source: 'catalog' }
+              next[i] = item.occupation_id
+                ? { raw_job_title: item.occupation_title, occupation_id: item.occupation_id, general_term: null, source: item.source }
+                : { raw_job_title: item.occupation_title, occupation_id: null, general_term: item.general_term ?? null, source: item.source }
               set('occupation_preferences', next)
             }}
-            search={(q) => seekerService.searchOccupations(q)}
-            renderLabel={(item) => item.title}
-            renderSubLabel={(item) => item.general_term || item.broad_category}
-            keyExtractor={(item) => String(item.id)}
-            error={fieldError(errors, `occupation_preferences.${i}.raw_job_title`)}
+            search={async (q) => (await seekerService.classifyOccupation(q)).suggestions}
+            renderLabel={(item) => item.occupation_title}
+            renderSubLabel={(item) => item.broad_field || item.role_function}
+            keyExtractor={(item) => `${item.source}:${item.occupation_id ?? item.occupation_title}`}
           />
         )}
       />
-      {fieldError(errors, 'occupation_preferences') ? <Text style={styles.errorText}>{fieldError(errors, 'occupation_preferences')}</Text> : null}
+      {/* Backend keys occupation errors by occupation_ids or occupation_preferences.<index>.<field> —
+          collapsed onto one message here rather than rendered per-index. */}
+      {collapsedFieldError(errors, ['occupation_ids', 'occupation_preferences']) ? (
+        <Text style={styles.errorText}>{collapsedFieldError(errors, ['occupation_ids', 'occupation_preferences'])}</Text>
+      ) : null}
 
       <OccupationAiSuggestions
         value={value}

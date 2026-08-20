@@ -3,6 +3,26 @@ import * as employerService from '@/services/employerService'
 import DocumentUploadZone from '../components/DocumentUploadZone'
 import RequiredDocumentsCheckbox from '../components/RequiredDocumentsCheckbox'
 
+// Surfaces the backend's actual validation message when there is one (a 422
+// carries the real reason — wrong file type, expired date, etc.) instead of
+// Axios's generic "Request failed with status code 422". When there's no
+// response at all (Axios's bare "Network Error"), that usually means the
+// upload never reached the server — most commonly the file tripped the
+// server's upload size limit before Laravel's own 10MB check ever ran — so
+// say that instead of the opaque default.
+function uploadErrorMessage(err) {
+  const data = err.response?.data
+  if (data?.errors) {
+    const firstError = Object.values(data.errors)[0]
+    if (firstError?.[0]) return firstError[0]
+  }
+  if (data?.message) return data.message
+  if (!err.response) {
+    return 'Upload failed — the file may be too large for the server, or your connection dropped. Try a smaller file or check your connection, then try again.'
+  }
+  return err.message
+}
+
 export default function Step3DocumentUpload({ companyType, onComplete }) {
   const [requiredDocuments, setRequiredDocuments] = useState([])
   const [optionalDocuments, setOptionalDocuments] = useState([])
@@ -40,7 +60,7 @@ export default function Step3DocumentUpload({ companyType, onComplete }) {
       })
       setError(null)
     } catch (err) {
-      setError(err.message)
+      setError(uploadErrorMessage(err))
     } finally {
       setUploading((prev) => ({ ...prev, [documentType]: false }))
     }

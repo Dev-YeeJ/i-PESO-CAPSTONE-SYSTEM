@@ -13,14 +13,10 @@ interface AuthState {
   setAuth: (user: any, token: string) => Promise<void>
 }
 
-interface VerifyEmailParams {
-  email?: string
-}
-
 const RESEND_COOLDOWN = 60
 
 export default function VerifyEmailScreen() {
-  const { email } = useLocalSearchParams<VerifyEmailParams>()
+  const { email } = useLocalSearchParams<{ email?: string }>()
   const setAuth   = useAuthStore((s: AuthState) => s.setAuth)
 
   const [digits, setDigits]           = useState(Array(6).fill(''))
@@ -74,7 +70,13 @@ export default function VerifyEmailScreen() {
       await setAuth(data.user, data.token)
       router.replace(data.user.profile_completed ? '/(seeker)' : '/onboarding')
     } catch (err: any) {
-      setApiError(err.response?.data?.message ?? 'Invalid code. Please try again.')
+      // 5 failed attempts trigger a 429 lockout server-side — same "too many
+      // attempts" messaging pattern as login's lockout, distinct from a
+      // plain wrong-code message.
+      const fallback = err.response?.status === 429
+        ? 'Too many attempts. Please wait a moment before trying again.'
+        : 'Invalid code. Please try again.'
+      setApiError(err.response?.data?.message ?? fallback)
       setDigits(Array(6).fill(''))
       setTimeout(() => otpRef.current?.focus(0), 100)
     } finally {

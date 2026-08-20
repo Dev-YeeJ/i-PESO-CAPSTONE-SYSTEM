@@ -46,7 +46,8 @@ class SeekerResumeController extends Controller
         // sensible default so a resume can be generated straight from the NSRP profile.
         $hasNsrpData = $seeker->educations->isNotEmpty()
             || $seeker->seekerSkills->isNotEmpty()
-            || $seeker->workExperiences->isNotEmpty();
+            || $seeker->workExperiences->isNotEmpty()
+            || filled($seeker->professional_summary);
 
         $validated = $request->validate([
             'professional_summary' => [$hasNsrpData ? 'nullable' : 'required', 'string', 'max:1200'],
@@ -61,7 +62,13 @@ class SeekerResumeController extends Controller
             ->filter()
             ->all();
 
+        // Prefer what was submitted with this request, then the seeker's saved
+        // summary (professional_summary is now a persisted column, not just
+        // frontend component state), then fall back to an auto-derived one.
         $professionalSummary = Str::squish(strip_tags((string) ($validated['professional_summary'] ?? '')));
+        if ($professionalSummary === '') {
+            $professionalSummary = Str::squish(strip_tags((string) ($seeker->professional_summary ?? '')));
+        }
         if ($professionalSummary === '') {
             $professionalSummary = $this->summaryFromProfile($seeker);
         }

@@ -12,6 +12,60 @@ const JOB_TYPE_MAP: Record<string, string> = {
   freelance: 'Freelance',
 }
 
+const ALLOWED_RADII = [5, 10, 15, 25, 50]
+const ALLOWED_MATCHES = [0, 50, 70, 80]
+const ALLOWED_SORTS: readonly NonNullable<JobFilters['sort']>[] = ['distance', 'match', 'newest', 'salary']
+const BOOLEAN_FILTER_KEYS = [
+  'hideApplied', 'savedOnly', 'jobFairOnly', 'upskillRecommendedOnly', 'certificateMatchOnly', 'canApplyOnly',
+] as const
+
+function nearestAllowed(value: number, allowed: number[]) {
+  return allowed.reduce((best, candidate) => (Math.abs(candidate - value) < Math.abs(best - value) ? candidate : best), allowed[0])
+}
+
+function asNumber(value: unknown): number | null {
+  const num = Number(value)
+  return Number.isFinite(num) ? num : null
+}
+
+/**
+ * Mirrors i-peso-frontend's validateMapFilters — clamps radius/min-match to the UI's
+ * preset options, checks sort/job-type against their enums, and truncates free-text
+ * fields to the backend's max lengths. Applied to BOTH the AI response and the regex
+ * fallback's output, same as web, since neither source is trusted as-is.
+ */
+function validateMapFilters(input: Partial<Record<keyof JobFilters, unknown>>): Partial<JobFilters> {
+  const filters: Partial<JobFilters> = {}
+
+  const radius = asNumber(input.radiusKm)
+  if (radius !== null) filters.radiusKm = nearestAllowed(radius, ALLOWED_RADII)
+
+  const minMatch = asNumber(input.minMatch)
+  if (minMatch !== null) filters.minMatch = nearestAllowed(minMatch, ALLOWED_MATCHES)
+
+  const sort = String(input.sort ?? '').toLowerCase()
+  if ((ALLOWED_SORTS as readonly string[]).includes(sort)) filters.sort = sort as JobFilters['sort']
+
+  const rawJobType = String(input.jobType ?? '').trim()
+  const jobType = JOB_TYPE_MAP[rawJobType.toLowerCase()] ?? (Object.values(JOB_TYPE_MAP).includes(rawJobType) ? rawJobType : '')
+  if (jobType) filters.jobType = jobType
+
+  for (const key of BOOLEAN_FILTER_KEYS) {
+    if (typeof input[key] === 'boolean') filters[key] = input[key] as boolean
+  }
+
+  const maxMissingSkills = asNumber(input.maxMissingSkills)
+  if (maxMissingSkills !== null) filters.maxMissingSkills = Math.max(0, Math.min(50, Math.round(maxMissingSkills)))
+
+  const keyword = String(input.keyword ?? '').trim().slice(0, 100)
+  if (keyword) filters.keyword = keyword
+
+  const locationKeyword = String(input.locationKeyword ?? '').trim().slice(0, 100)
+  if (locationKeyword) filters.locationKeyword = locationKeyword
+
+  return filters
+}
+
 /**
  * Client-side fallback for when POST /seeker/nearby-jobs/ai-parse is unavailable (503) or
  * returns nothing usable. Mirrors i-peso-frontend's parseRuleBasedMapQuery so both platforms
@@ -59,7 +113,7 @@ export function parseRuleBasedMapQuery(rawQuery: string): Partial<JobFilters> {
     .trim()
   if (cleaned.length >= 2) parsed.keyword = cleaned
 
-  return parsed
+  return validateMapFilters(parsed)
 }
 
 /** Merges the AI-parsed filters (server) with the rule-based fallback, preferring server values. */
@@ -67,18 +121,35 @@ export function mergeParsedFilters(aiParsed: AiParsedJobQuery | null, rawQuery: 
   const fallback = parseRuleBasedMapQuery(rawQuery)
   if (!aiParsed) return fallback
 
+  // The AI response is validated the same way as the regex fallback — it's model
+  // output, not a trusted structured value, so it gets the same clamping/enum checks.
+  const validatedAi = validateMapFilters({
+    radiusKm: aiParsed.radius_km,
+    minMatch: aiParsed.min_match,
+    keyword: aiParsed.keyword,
+    locationKeyword: aiParsed.location_keyword,
+    sort: aiParsed.sort,
+    hideApplied: aiParsed.hide_applied,
+    savedOnly: aiParsed.saved_only,
+    jobFairOnly: aiParsed.job_fair_only,
+    upskillRecommendedOnly: aiParsed.upskill_recommended_only,
+    certificateMatchOnly: aiParsed.certificate_match_only,
+    canApplyOnly: aiParsed.can_apply_only,
+    maxMissingSkills: aiParsed.max_missing_skills,
+  })
+
   return {
-    radiusKm: aiParsed.radius_km ?? fallback.radiusKm,
-    minMatch: aiParsed.min_match ?? fallback.minMatch,
-    keyword: aiParsed.keyword ?? fallback.keyword,
-    locationKeyword: aiParsed.location_keyword ?? fallback.locationKeyword,
-    sort: aiParsed.sort ?? fallback.sort,
-    hideApplied: aiParsed.hide_applied ?? fallback.hideApplied,
-    savedOnly: aiParsed.saved_only ?? fallback.savedOnly,
-    jobFairOnly: aiParsed.job_fair_only ?? fallback.jobFairOnly,
-    upskillRecommendedOnly: aiParsed.upskill_recommended_only ?? fallback.upskillRecommendedOnly,
-    certificateMatchOnly: aiParsed.certificate_match_only ?? fallback.certificateMatchOnly,
-    canApplyOnly: aiParsed.can_apply_only ?? fallback.canApplyOnly,
-    maxMissingSkills: aiParsed.max_missing_skills ?? fallback.maxMissingSkills,
+    radiusKm: validatedAi.radiusKm ?? fallback.radiusKm,
+    minMatch: validatedAi.minMatch ?? fallback.minMatch,
+    keyword: validatedAi.keyword ?? fallback.keyword,
+    locationKeyword: validatedAi.locationKeyword ?? fallback.locationKeyword,
+    sort: validatedAi.sort ?? fallback.sort,
+    hideApplied: validatedAi.hideApplied ?? fallback.hideApplied,
+    savedOnly: validatedAi.savedOnly ?? fallback.savedOnly,
+    jobFairOnly: validatedAi.jobFairOnly ?? fallback.jobFairOnly,
+    upskillRecommendedOnly: validatedAi.upskillRecommendedOnly ?? fallback.upskillRecommendedOnly,
+    certificateMatchOnly: validatedAi.certificateMatchOnly ?? fallback.certificateMatchOnly,
+    canApplyOnly: validatedAi.canApplyOnly ?? fallback.canApplyOnly,
+    maxMissingSkills: validatedAi.maxMissingSkills ?? fallback.maxMissingSkills,
   }
 }

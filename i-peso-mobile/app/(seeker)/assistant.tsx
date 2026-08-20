@@ -42,6 +42,7 @@ export default function AssistantScreen() {
   const [messages, setMessages] = useState<DisplayMessage[]>([])
   const [input, setInput] = useState('')
   const [sending, setSending] = useState(false)
+  const lastUserTextRef = useRef('')
 
   const sendMessage = async (text: string) => {
     const trimmed = text.trim()
@@ -49,6 +50,7 @@ export default function AssistantScreen() {
 
     const userMessage: DisplayMessage = { id: `${Date.now()}-user`, role: 'user', text: trimmed }
     const historyForRequest: ChatTurn[] = messages.map(({ role, text: t }) => ({ role, text: t }))
+    lastUserTextRef.current = trimmed
 
     setMessages((current) => [...current, userMessage])
     setInput('')
@@ -59,6 +61,8 @@ export default function AssistantScreen() {
     setMessages((current) => [...current, { id: `${Date.now()}-model`, role: 'model', text: reply, retryable }])
     setSending(false)
   }
+
+  const retryLastMessage = () => sendMessage(lastUserTextRef.current)
 
   return (
     <KeyboardAvoidingView
@@ -86,6 +90,12 @@ export default function AssistantScreen() {
             <View style={[styles.bubbleRow, item.role === 'user' && styles.bubbleRowUser]}>
               <View style={[styles.bubble, item.role === 'user' ? styles.userBubble : styles.modelBubble]}>
                 <Text style={item.role === 'user' ? styles.userText : styles.modelText}>{item.text}</Text>
+                {item.retryable ? (
+                  <TouchableOpacity onPress={retryLastMessage} disabled={sending} style={styles.retryBtn}>
+                    <MaterialIcons name="refresh" size={14} color={colors.info} />
+                    <Text style={styles.retryText}>Subukan ulit</Text>
+                  </TouchableOpacity>
+                ) : null}
               </View>
             </View>
           )}
@@ -147,6 +157,8 @@ const styles = StyleSheet.create({
   modelText: { color: colors.textPrimary, fontSize: typography.body, lineHeight: 20 },
   userText: { color: colors.white, fontSize: typography.body, lineHeight: 20 },
   typingBubble: { paddingVertical: spacing.md, paddingHorizontal: spacing.lg },
+  retryBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: spacing.xs, alignSelf: 'flex-start' },
+  retryText: { color: colors.info, fontSize: typography.small, fontFamily: typography.family.bold },
   chipGrid: { gap: spacing.sm, marginTop: spacing.md },
   chip: { borderWidth: 1, borderColor: colors.infoBorder, backgroundColor: colors.infoBackground, borderRadius: radii.md, paddingVertical: spacing.sm, paddingHorizontal: spacing.md },
   chipText: { color: colors.info, fontSize: typography.small, fontFamily: typography.family.medium },

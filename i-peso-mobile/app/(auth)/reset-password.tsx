@@ -5,6 +5,7 @@ import type { AxiosError } from 'axios'
 import MaterialIcons from '@expo/vector-icons/MaterialIcons'
 import { authService } from '@/services/authService'
 import { API_BASE_URL } from '@/services/api'
+import { useAuthStore } from '@/stores/authStore'
 import { AuthShell } from '@/components/ui/AuthShell'
 import { PasswordField } from '@/components/ui/PasswordField'
 import { PasswordStrengthMeter } from '@/components/ui/PasswordStrengthMeter'
@@ -26,9 +27,14 @@ const formatTime = (secs: number) => {
   return `${m}:${sec < 10 ? '0' : ''}${sec}`
 }
 
+interface AuthState {
+  setAuth: (user: any, token: string) => Promise<void>
+}
+
 export default function ResetPasswordScreen() {
+  const setAuth = useAuthStore((s: AuthState) => s.setAuth)
   const { email: rawEmail, freshSent: rawFreshSent } = useLocalSearchParams()
-  const email = rawEmail ?? ''
+  const email = (Array.isArray(rawEmail) ? rawEmail[0] : rawEmail) ?? ''
   const freshSent = Array.isArray(rawFreshSent) ? rawFreshSent[0] : rawFreshSent
 
   const [digits, setDigits] = useState(Array(6).fill(''))
@@ -108,6 +114,19 @@ export default function ResetPasswordScreen() {
     try {
       await authService.resetPassword(email, digits.join(''), password, confirmPassword)
       setSuccess(true)
+
+      // The reset response carries no token — it's a password change, not a
+      // session. Sign the seeker in for real with their new password so they
+      // aren't made to retype credentials they just entered; if this call
+      // fails for any reason, the success screen's "Back to Sign In" button
+      // below still covers manual sign-in.
+      try {
+        const data = await authService.login(email, password)
+        await setAuth(data.user, data.token)
+        router.replace(data.user.profile_completed ? '/(seeker)' : '/onboarding')
+      } catch {
+        // Stay on the success screen; manual sign-in remains available.
+      }
     } catch (error: unknown) {
       const err = error as AxiosError<ApiErrorBody>
       const response = err.response

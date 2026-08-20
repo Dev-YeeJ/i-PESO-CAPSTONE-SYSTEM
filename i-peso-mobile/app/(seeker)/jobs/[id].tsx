@@ -1,11 +1,12 @@
 import { useMemo, useState } from 'react'
 import { ActivityIndicator, Alert, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
-import { useQueryClient, useMutation, useQuery } from '@tanstack/react-query'
+import { useQueryClient, useQuery } from '@tanstack/react-query'
 import MaterialIcons from '@expo/vector-icons/MaterialIcons'
 import type { AxiosError } from 'axios'
 import type { LearningResources, NearbyJob, NearbyJobsResponse } from '@/services/seekerService'
 import { seekerService } from '@/services/seekerService'
+import { useToggleSavedJob } from '@/hooks/use-toggle-saved-job'
 import {
   formatDate,
   formatSalary,
@@ -67,11 +68,7 @@ export default function JobDetailsScreen() {
 
   const job = cachedJob ?? fetchedJob ?? null
 
-  const toggleSavedMutation = useMutation({
-    mutationFn: (jobId: string) => seekerService.toggleSavedJob(jobId),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['jobs'] }),
-    onError: () => Alert.alert('Error', 'Failed to update saved job status. Please try again.'),
-  })
+  const toggleSavedMutation = useToggleSavedJob()
 
   if (isLoading) {
     return (
@@ -216,7 +213,7 @@ export default function JobDetailsScreen() {
                 </TouchableOpacity>
               ))}
             </View>
-            <Text style={styles.missingHint}>Tap a missing skill to see learning resources, or explore related Upskill Hub programs to improve your match.</Text>
+            <Text style={styles.missingHint}>Tap a missing skill to see learning resources, or explore related Government Programs to improve your match.</Text>
           </>
         )}
 

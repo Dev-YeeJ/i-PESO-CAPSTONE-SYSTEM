@@ -86,6 +86,7 @@ export default function EmployerProfileScreen() {
             <Detail label="Company Size" value={textFrom(employer.company_size, 'Not specified')} />
           </View>
           <Detail label="Location" value={textFrom(employer.full_address, 'Not listed')} />
+          {employer.created_at ? <Detail label="On i-PESO Since" value={formatDate(employer.created_at)} /> : null}
         </Card>
 
         <View style={styles.trustBox}>

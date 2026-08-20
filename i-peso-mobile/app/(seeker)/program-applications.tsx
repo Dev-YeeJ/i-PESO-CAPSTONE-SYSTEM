@@ -16,6 +16,8 @@ import { ScreenHeader } from '@/components/ui/ScreenHeader'
 import { QueryState } from '@/components/ui/QueryState'
 import { colors, radii, spacing, typography } from '@/theme'
 
+const MAX_DOCUMENT_SIZE_BYTES = 5120 * 1024
+
 function statusVariant(status?: string | null): 'success' | 'danger' | 'info' | 'neutral' {
   const value = textFrom(status, '').toLowerCase()
   if (['completed', 'approved'].includes(value)) return 'success'
@@ -47,7 +49,7 @@ export default function ProgramApplicationsScreen() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.info} />}
         showsVerticalScrollIndicator={false}
       >
-        <Text style={styles.kicker}>Upskill Hub</Text>
+        <Text style={styles.kicker}>Government Programs</Text>
         <Text style={styles.subtitle}>Track the status of the government programs you&apos;ve applied to.</Text>
 
         <QueryState
@@ -110,9 +112,23 @@ function ApplicationCard({ application }: { application: GovernmentProgramApplic
   })
 
   const pickFile = async () => {
-    const result = await DocumentPicker.getDocumentAsync({ type: ['application/pdf', 'image/*'], copyToCacheDirectory: true })
+    // Mirrors the backend rule: mimes:pdf,jpg,jpeg,png,doc,docx, max:5120 (KB)
+    const result = await DocumentPicker.getDocumentAsync({
+      type: [
+        'application/pdf',
+        'image/*',
+        'application/msword',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      ],
+      copyToCacheDirectory: true,
+    })
     if (result.canceled || !result.assets?.length) return
     const asset = result.assets[0]
+    if (asset.size && asset.size > MAX_DOCUMENT_SIZE_BYTES) {
+      setFormError('This file is too large. Maximum size is 5 MB.')
+      return
+    }
+    setFormError('')
     setPickedFile({ uri: asset.uri, name: asset.name, mimeType: asset.mimeType || 'application/octet-stream' })
   }
 

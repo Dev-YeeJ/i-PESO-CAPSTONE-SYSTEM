@@ -142,6 +142,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::prefix('seeker')->group(function () {
         Route::get('/dashboard-summary', [SeekerController::class, 'dashboardSummary']);
         Route::get('/profile', [SeekerController::class, 'getProfile']);
+        Route::put('/professional-summary', [SeekerController::class, 'saveProfessionalSummary']);
         Route::get('/government-programs', [SeekerGovernmentProgramController::class, 'index']);
         Route::get('/citizen-charter', [SeekerGovernmentProgramController::class, 'citizenCharter']);
         Route::get('/government-programs/{governmentProgram}', [SeekerGovernmentProgramController::class, 'show']);

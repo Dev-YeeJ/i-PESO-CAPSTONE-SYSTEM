@@ -38,8 +38,16 @@ export default function ProfilePhotoUploadModal({ open, onClose, onUploaded }) {
     const image = new Image()
     image.onload = () => {
       URL.revokeObjectURL(image.src)
-      if (image.width !== image.height || image.width < 300) {
-        setError('Use a square photo that is at least 300 by 300 pixels.')
+      if (image.width < 300 || image.height < 300) {
+        setError('Use a photo that is at least 300 by 300 pixels.')
+        return
+      }
+      // Real-world "square" crops are rarely pixel-perfect (phone camera/editor
+      // rounding), so allow a small tolerance instead of requiring exact equality —
+      // matches the backend's ratioBetween(0.97, 1.03) check in SeekerProfileImageController.
+      const ratio = image.width / image.height
+      if (ratio < 0.97 || ratio > 1.03) {
+        setError('Use a square photo (equal width and height).')
         return
       }
       setFile(selected)

@@ -29,6 +29,13 @@ import {
   textFrom,
   titleCase,
 } from '@/utils/seekerView'
+import {
+  enhanceResponsibilities,
+  experienceKey,
+  responsibilityLines,
+  resumeResponsibilityPayload,
+} from '@/utils/resumeBullets'
+import MaterialIcons from '@expo/vector-icons/MaterialIcons'
 import { AlertBox } from '@/components/ui/AlertBox'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
@@ -57,6 +64,9 @@ export default function ProfileScreen() {
   const [aiSummaryNotice, setAiSummaryNotice] = useState('')
   const [actionError, setActionError] = useState('')
   const [signingOut, setSigningOut] = useState(false)
+  const [openExperienceEditors, setOpenExperienceEditors] = useState<Record<string, boolean>>({})
+  const [experienceDrafts, setExperienceDrafts] = useState<Record<string, string>>({})
+  const [experienceResponsibilities, setExperienceResponsibilities] = useState<Record<string, string>>({})
 
   const confirmSignOut = () => {
     Alert.alert('Sign out?', 'You will need to log in again to access your account.', [
@@ -212,7 +222,14 @@ export default function ProfileScreen() {
     setResumeBusy(true)
     setActionError('')
     try {
-      await postAndDownload('/seeker/resume/generate', { professional_summary: summary.trim() }, `iPESO_Resume_${profile?.last_name || 'seeker'}.pdf`)
+      await postAndDownload(
+        '/seeker/resume/generate',
+        {
+          professional_summary: summary.trim(),
+          responsibility_overrides: resumeResponsibilityPayload(workExperiences, experienceResponsibilities),
+        },
+        `iPESO_Resume_${profile?.last_name || 'seeker'}.pdf`
+      )
       setResumeModalOpen(false)
     } catch (caught) {
       setActionError(apiErrorMessage(caught, 'Unable to generate resume. Check your backend connection.'))
@@ -397,13 +414,81 @@ export default function ProfileScreen() {
 
         <SectionHeader title="Work Experience" action={<EditLink section={7} />} />
         <View style={styles.cardList}>
-          {workExperiences.length ? workExperiences.map((work, index) => (
-            <Card key={index} padding="md">
-              <Text style={styles.itemTitle}>{recordText(work, ['position'], 'Position not listed')}</Text>
-              <Text style={styles.itemMeta}>{recordText(work, ['company_name'], 'Company not listed')}</Text>
-              <Text style={styles.itemMeta}>{textFrom(work.number_of_months, 'Duration not listed')} months · {titleCase(recordText(work, ['employment_status']))}</Text>
-            </Card>
-          )) : <Card padding="md"><EmptyLine text="No work experience listed yet." /></Card>}
+          {workExperiences.length ? workExperiences.map((work, index) => {
+            const key = experienceKey(work, index)
+            const isOpen = Boolean(openExperienceEditors[key])
+            const savedResponsibilities = experienceResponsibilities[key] ?? (work.responsibilities as string | undefined) ?? ''
+            const position = recordText(work, ['position'], 'assigned')
+
+            const toggleEditor = () => {
+              setOpenExperienceEditors((current) => ({ ...current, [key]: !current[key] }))
+              setExperienceDrafts((current) => ({ ...current, [key]: current[key] ?? savedResponsibilities }))
+            }
+
+            return (
+              <Card key={key} padding="md">
+                <Text style={styles.itemTitle}>{recordText(work, ['position'], 'Position not listed')}</Text>
+                <Text style={styles.itemMeta}>{recordText(work, ['company_name'], 'Company not listed')}</Text>
+                <Text style={styles.itemMeta}>{textFrom(work.number_of_months, 'Duration not listed')} months · {titleCase(recordText(work, ['employment_status']))}</Text>
+
+                {savedResponsibilities && !isOpen ? (
+                  <View style={styles.bulletList}>
+                    {responsibilityLines(savedResponsibilities).map((line) => (
+                      <View key={line} style={styles.bulletRow}>
+                        <View style={styles.bulletDot} />
+                        <Text style={styles.bulletText}>{line}</Text>
+                      </View>
+                    ))}
+                  </View>
+                ) : null}
+
+                <TouchableOpacity onPress={toggleEditor} style={styles.dutiesToggle}>
+                  <MaterialIcons name="add" size={16} color={colors.secondary} />
+                  <Text style={styles.dutiesToggleText}>{savedResponsibilities ? 'Edit Job Duties / Responsibilities' : 'Add Job Duties / Responsibilities'}</Text>
+                </TouchableOpacity>
+
+                {isOpen ? (
+                  <View style={styles.dutiesPanel}>
+                    <View style={styles.dutiesPanelHeader}>
+                      <View style={styles.dutiesPanelHeaderText}>
+                        <Text style={styles.dutiesPanelTitle}>Resume bullet points</Text>
+                        <Text style={styles.dutiesPanelHint}>Type simple duties, then let AI polish them into stronger resume language.</Text>
+                      </View>
+                      <TouchableOpacity
+                        onPress={() => setExperienceDrafts((current) => ({ ...current, [key]: enhanceResponsibilities(current[key], position) }))}
+                        style={styles.aiEnhanceBtn}
+                      >
+                        <MaterialIcons name="auto-awesome" size={14} color={colors.info} />
+                        <Text style={styles.aiEnhanceBtnText}>AI Enhance Bullets</Text>
+                      </TouchableOpacity>
+                    </View>
+                    <TextInput
+                      style={styles.dutiesTextarea}
+                      value={experienceDrafts[key] ?? ''}
+                      onChangeText={(value) => setExperienceDrafts((current) => ({ ...current, [key]: value }))}
+                      placeholder="Example: encoded files"
+                      placeholderTextColor={colors.subtle}
+                      multiline
+                    />
+                    <View style={styles.modalActions}>
+                      <Button variant="outline" size="sm" onPress={() => setOpenExperienceEditors((current) => ({ ...current, [key]: false }))} style={styles.modalBtn}>Cancel</Button>
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        onPress={() => {
+                          setExperienceResponsibilities((current) => ({ ...current, [key]: experienceDrafts[key]?.trim() ?? '' }))
+                          setOpenExperienceEditors((current) => ({ ...current, [key]: false }))
+                        }}
+                        style={styles.modalBtn}
+                      >
+                        Save Bullets
+                      </Button>
+                    </View>
+                  </View>
+                ) : null}
+              </Card>
+            )
+          }) : <Card padding="md"><EmptyLine text="No work experience listed yet." /></Card>}
         </View>
 
         <SectionHeader title="Training & Eligibility" action={<EditLink section={6} />} />
@@ -665,6 +750,20 @@ const styles = StyleSheet.create({
   cardList: { gap: spacing.md },
   itemTitle: { color: colors.textPrimary, fontSize: typography.title, fontFamily: typography.family.bold, marginBottom: spacing.xs },
   itemMeta: { color: colors.textSecondary, fontSize: typography.body, lineHeight: 20 },
+  bulletList: { marginTop: spacing.md, backgroundColor: colors.background, borderRadius: radii.md, padding: spacing.md, gap: spacing.xs },
+  bulletRow: { flexDirection: 'row', gap: spacing.sm, alignItems: 'flex-start' },
+  bulletDot: { width: 5, height: 5, borderRadius: 3, backgroundColor: colors.secondary, marginTop: 7 },
+  bulletText: { flex: 1, color: colors.textPrimary, fontSize: typography.small, lineHeight: 18 },
+  dutiesToggle: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: spacing.md, alignSelf: 'flex-start', borderWidth: 1, borderColor: colors.border, borderRadius: radii.md, paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
+  dutiesToggleText: { color: colors.secondary, fontSize: typography.small, fontFamily: typography.family.bold },
+  dutiesPanel: { marginTop: spacing.md, borderWidth: 1, borderColor: colors.infoBorder, backgroundColor: colors.infoBackground, borderRadius: radii.md, padding: spacing.md },
+  dutiesPanelHeader: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: spacing.sm },
+  dutiesPanelHeaderText: { flex: 1, minWidth: 160 },
+  dutiesPanelTitle: { color: colors.textPrimary, fontSize: typography.small, fontFamily: typography.family.bold },
+  dutiesPanelHint: { color: colors.textSecondary, fontSize: 11, lineHeight: 15, marginTop: 2 },
+  aiEnhanceBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.infoBorder, borderRadius: radii.md, paddingHorizontal: spacing.sm, paddingVertical: spacing.xs },
+  aiEnhanceBtnText: { color: colors.info, fontSize: 11, fontFamily: typography.family.bold },
+  dutiesTextarea: { marginTop: spacing.sm, borderWidth: 1, borderColor: colors.border, borderRadius: radii.md, backgroundColor: colors.surface, padding: spacing.md, minHeight: 80, textAlignVertical: 'top', color: colors.textPrimary, fontSize: typography.small },
   certActions: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md },
   certActionBtn: { flex: 1, marginBottom: 0 },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(15,23,42,0.5)', justifyContent: 'center', padding: spacing.xl },

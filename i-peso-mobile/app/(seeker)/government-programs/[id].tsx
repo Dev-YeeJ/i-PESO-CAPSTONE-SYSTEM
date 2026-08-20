@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { getCitizenCharterSteps, seekerService } from '@/services/seekerService'
 import { downloadAndShare } from '@/utils/fileTransfer'
 import { formatDate, textFrom, titleCase } from '@/utils/seekerView'
+import { EligibilityBadge } from '@/components/EligibilityBadge'
 import { AlertBox } from '@/components/ui/AlertBox'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
@@ -139,6 +140,7 @@ export default function ProgramDetailScreen() {
           <View style={styles.badgeRow}>
             <Badge variant="info">{categoryLabel(program.category)}</Badge>
             <Badge variant={statusVariant(program.status)}>{titleCase(program.status, 'Open')}</Badge>
+            <EligibilityBadge eligibility={program.eligibility} />
           </View>
         </View>
 
@@ -159,6 +161,27 @@ export default function ProgramDetailScreen() {
             <Detail label="Target Industry" value={textFrom(program.target_industry, 'Not listed')} />
           ) : null}
         </Card>
+
+        {program.eligibility?.breakdown?.length ? (
+          <>
+            <Text style={styles.sectionTitle}>Your Eligibility</Text>
+            <Card padding="md" style={styles.infoCard}>
+              {program.eligibility.breakdown.map((item, index) => (
+                <View key={index} style={styles.eligRow}>
+                  <Text style={[styles.eligIcon, { color: item.met ? colors.success : colors.error }]}>
+                    {item.met ? '✓' : '✗'}
+                  </Text>
+                  <View style={styles.eligBody}>
+                    <Text style={styles.eligLabel}>
+                      {item.label}{item.required && !item.met ? '  (required)' : ''}
+                    </Text>
+                    {item.detail ? <Text style={styles.eligDetail}>{item.detail}</Text> : null}
+                  </View>
+                </View>
+              ))}
+            </Card>
+          </>
+        ) : null}
 
         {eligibility.length > 0 && (
           <>
@@ -221,6 +244,12 @@ export default function ProgramDetailScreen() {
           </>
         ) : null}
 
+        {program.eligibility?.status === 'not_eligible' && !program.my_application ? (
+          <AlertBox variant="warning" style={styles.alertBox}>
+            Your profile does not meet a required rule. You may still apply, but PESO may not approve it.
+          </AlertBox>
+        ) : null}
+
         {applyError ? (
           <AlertBox variant="danger" style={styles.alertBox}>{applyError}</AlertBox>
         ) : null}
@@ -280,6 +309,11 @@ const styles = StyleSheet.create({
   detailLabel: { color: colors.secondaryText, fontSize: typography.small, fontFamily: typography.family.bold },
   detailValue: { color: colors.primary, fontSize: typography.small, fontFamily: typography.family.bold, textAlign: 'right', flex: 1, marginLeft: spacing.md },
   sectionTitle: { color: colors.primary, fontSize: typography.title, fontFamily: typography.family.bold, marginTop: spacing.lg, marginBottom: spacing.md },
+  eligRow: { flexDirection: 'row', gap: spacing.sm, paddingVertical: spacing.xs },
+  eligIcon: { fontSize: typography.body, fontFamily: typography.family.bold, width: 18 },
+  eligBody: { flex: 1 },
+  eligLabel: { color: colors.primary, fontSize: typography.small, fontFamily: typography.family.bold },
+  eligDetail: { color: colors.secondaryText, fontSize: typography.small, marginTop: 2 },
   bulletRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.xs },
   bulletDot: { color: colors.info, fontSize: typography.body },
   bulletText: { color: colors.secondaryText, fontSize: typography.body, lineHeight: 20, flex: 1 },
