@@ -91,6 +91,7 @@ trait FormatsApplications
             'placement' => $application->placement_captured_at ? [
                 'start_date' => $application->placement_start_date?->toDateString(),
                 'salary' => $application->placement_salary,
+                'employment_type' => $application->placement_employment_type,
                 'captured_at' => $application->placement_captured_at?->toISOString(),
             ] : null,
         ];

@@ -33,7 +33,7 @@ class GovernmentProgramsFlowTest extends TestCase
             'last_name' => 'Admin',
             'email' => 'programs.admin@example.test',
             'password' => 'password123',
-            'role' => 'admin',
+            'role' => 'administrator',
             'status' => 'active',
             'email_verified_at' => now(),
         ]);
@@ -123,7 +123,7 @@ class GovernmentProgramsFlowTest extends TestCase
             'last_name' => 'Admin',
             'email' => 'rules.admin@example.test',
             'password' => 'password123',
-            'role' => 'admin',
+            'role' => 'administrator',
             'status' => 'active',
         ]);
         $seeker = JobSeeker::create([

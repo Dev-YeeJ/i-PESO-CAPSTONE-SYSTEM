@@ -111,7 +111,7 @@ class EstablishmentReportFlowTest extends TestCase
             'last_name' => 'Admin',
             'email' => 'reports-admin@example.test',
             'password' => 'password123',
-            'role' => 'admin',
+            'role' => 'administrator',
             'status' => 'active',
             'email_verified_at' => now(),
         ]);

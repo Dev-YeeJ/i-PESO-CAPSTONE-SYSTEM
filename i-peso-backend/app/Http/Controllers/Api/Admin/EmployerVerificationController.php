@@ -81,7 +81,7 @@ class EmployerVerificationController extends Controller
                 'summary' => $this->queueSummary(),
             ], 200);
         } catch (\Exception $e) {
-            return response()->json(['error' => $e->getMessage()], 500);
+            return response()->json(['error' => $this->safeErrorMessage($e, 'Unable to load the verification queue.')], 500);
         }
     }
 
@@ -242,7 +242,7 @@ class EmployerVerificationController extends Controller
                 'uploaded_documents' => $employer->documents->pluck('document_type')->toArray(),
             ], 200);
         } catch (\Exception $e) {
-            return response()->json(['error' => $e->getMessage()], 404);
+            return response()->json(['error' => $this->safeErrorMessage($e, 'Unable to load this employer.')], 404);
         }
     }
 
@@ -312,7 +312,7 @@ class EmployerVerificationController extends Controller
                 'notification_queued' => $notificationQueued,
             ], 200);
         } catch (\Exception $e) {
-            return response()->json(['error' => $e->getMessage()], 500);
+            return response()->json(['error' => $this->safeErrorMessage($e, 'Unable to approve this employer.')], 500);
         }
     }
 
@@ -367,7 +367,7 @@ class EmployerVerificationController extends Controller
                 'notification_queued' => $notificationQueued,
             ], 200);
         } catch (\Exception $e) {
-            return response()->json(['error' => $e->getMessage()], 500);
+            return response()->json(['error' => $this->safeErrorMessage($e, 'Unable to reject this employer.')], 500);
         }
     }
 
@@ -501,7 +501,7 @@ class EmployerVerificationController extends Controller
                 'notification_queued' => $notificationQueued,
             ], 200);
         } catch (\Exception $e) {
-            return response()->json(['error' => $e->getMessage()], 500);
+            return response()->json(['error' => $this->safeErrorMessage($e, 'Unable to finalize this employer verification.')], 500);
         }
     }
 
@@ -669,7 +669,7 @@ class EmployerVerificationController extends Controller
                 'notification_queued' => $notificationQueued,
             ], 200);
         } catch (\Exception $e) {
-            return response()->json(['error' => $e->getMessage()], 404);
+            return response()->json(['error' => $this->safeErrorMessage($e, 'Unable to record this document review.')], 404);
         }
     }
 
@@ -689,7 +689,7 @@ class EmployerVerificationController extends Controller
 
             return response()->json($stats, 200);
         } catch (\Exception $e) {
-            return response()->json(['error' => $e->getMessage()], 500);
+            return response()->json(['error' => $this->safeErrorMessage($e, 'Unable to load verification statistics.')], 500);
         }
     }
 

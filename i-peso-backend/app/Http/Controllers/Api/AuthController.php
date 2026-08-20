@@ -279,12 +279,24 @@ class AuthController extends Controller
             'password' => ['required', 'string'],
         ]);
 
-        $email    = $request->input('email');
+        $email    = mb_strtolower(trim($request->input('email')));
         $password = $request->input('password');
+
+        // Per-account lockout — separate from the per-IP `throttle:` middleware
+        // on this route, since an attacker with several IPs can otherwise
+        // brute-force a single account (including an admin — this is the one
+        // shared login endpoint for all three roles) indefinitely.
+        $lockKey = "ipeso_login_attempts_{$email}";
+        if ((int) Cache::get($lockKey, 0) >= 5) {
+            return response()->json([
+                'message' => 'Too many failed sign-in attempts. Please try again in 15 minutes.',
+            ], 429);
+        }
 
         $result = $this->findUserByEmail($email);
 
         if (! $result) {
+            Cache::put($lockKey, (int) Cache::get($lockKey, 0) + 1, now()->addMinutes(15));
             \Log::warning("Login attempt: User not found for email {$email}");
             ActivityLogger::logGuest('login_failed', "Failed sign-in attempt for unregistered email {$email}.");
 
@@ -297,6 +309,7 @@ class AuthController extends Controller
         $role = $result['role'];
 
         if (! Hash::check($password, $user->password)) {
+            Cache::put($lockKey, (int) Cache::get($lockKey, 0) + 1, now()->addMinutes(15));
             \Log::warning("Login attempt: Password mismatch for email {$email}");
             ActivityLogger::logAs($user, 'login_failed', "Incorrect password for {$role} account {$email}.");
 
@@ -304,6 +317,8 @@ class AuthController extends Controller
                 'message' => 'These credentials do not match our records.',
             ], 401);
         }
+
+        Cache::forget($lockKey);
 
         if (! $user->email_verified_at) {
             $otp = $this->generateAndSendOtp($email);
@@ -373,8 +388,9 @@ class AuthController extends Controller
     public function forgotPassword(Request $request): JsonResponse
     {
         $request->validate(['email' => ['required', 'email']]);
+        $email = mb_strtolower(trim($request->input('email')));
 
-        $result = $this->findUserByEmail($request->input('email'));
+        $result = $this->findUserByEmail($email);
 
         if (! $result) {
             return response()->json([
@@ -382,10 +398,19 @@ class AuthController extends Controller
             ], 200);
         }
 
-        $email = $request->input('email');
-        $otp   = str_pad(random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+        // Per-email cooldown so this endpoint can't be looped to email-bomb one
+        // account — mirrors resendOtp's cooldown below.
+        $cooldownKey = "ipeso_reset_resend_{$email}";
+        if (! Cache::add($cooldownKey, true, now()->addSeconds(60))) {
+            return response()->json([
+                'message' => 'Please wait before requesting another reset code.',
+            ], 429);
+        }
+
+        $otp = str_pad(random_int(0, 999999), 6, '0', STR_PAD_LEFT);
 
         Cache::put("ipeso_reset_{$email}", $otp, now()->addMinutes(10));
+        Cache::forget("ipeso_reset_attempts_{$email}");
         Mail::to($email)->send(new OtpMail($otp));
 
         return response()->json([
@@ -405,11 +430,20 @@ class AuthController extends Controller
             'password' => ['required', 'confirmed', Password::min(8)->numbers()->symbols()],
         ]);
 
-        $email     = $request->input('email');
-        $submitted = $request->input('otp');
-        $cached    = Cache::get("ipeso_reset_{$email}");
+        $email      = mb_strtolower(trim($request->input('email')));
+        $submitted  = $request->input('otp');
+        $cached     = Cache::get("ipeso_reset_{$email}");
+        $attemptKey = "ipeso_reset_attempts_{$email}";
+
+        if ((int) Cache::get($attemptKey, 0) >= 5) {
+            return response()->json([
+                'message' => 'Too many failed attempts. Request a new reset code.',
+            ], 429);
+        }
 
         if (! $cached || $cached !== $submitted) {
+            Cache::put($attemptKey, (int) Cache::get($attemptKey, 0) + 1, now()->addMinutes(10));
+
             return response()->json([
                 'message' => 'The reset code is invalid or has expired.',
             ], 422);
@@ -430,6 +464,7 @@ class AuthController extends Controller
         ActivityLogger::logAs($user, 'password_reset', "Password reset via emailed code for {$email}.");
 
         Cache::forget("ipeso_reset_{$email}");
+        Cache::forget($attemptKey);
 
         return response()->json([
             'message' => 'Password reset successfully. You can now log in.',

@@ -5,7 +5,10 @@ namespace App\Providers;
 use App\Services\Sms\LogOnlySmsProvider;
 use App\Services\Sms\SmsProviderInterface;
 use App\Services\Sms\UniSmsProvider;
+use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use App\Models\JobSeeker;
 use App\Observers\JobSeekerObserver;
@@ -46,5 +49,14 @@ class AppServiceProvider extends ServiceProvider
             \App\Events\ApplicationStatusChanged::class,
             \App\Listeners\SendApplicationStatusNotification::class
         );
+
+        // Baseline for `throttleApi()` (bootstrap/app.php) — every route
+        // without its own more specific `throttle:` rule falls back to this.
+        // Keyed by authenticated user (any of the three Sanctum-guarded
+        // models — getAuthIdentifier() is column-name-agnostic) so one
+        // account's usage can't exhaust another's, else by IP.
+        RateLimiter::for('api', function (Request $request) {
+            return Limit::perMinute(60)->by($request->user()?->getAuthIdentifier() ?: $request->ip());
+        });
     }
 }

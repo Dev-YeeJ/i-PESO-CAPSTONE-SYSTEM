@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\InterviewSchedule;
 use App\Services\GoogleCalendarService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -99,14 +100,19 @@ class GoogleCalendarController extends Controller
                 return response()->json(['message' => $e->getMessage()], 403);
             }
             Log::error('Failed to generate Google Meet link: ' . $e->getMessage());
-            return response()->json(['message' => 'Failed to generate meeting link.', 'error' => $e->getMessage()], 500);
+            return response()->json(['message' => 'Failed to generate meeting link.', 'error' => config('app.debug') ? $e->getMessage() : null], 500);
         }
     }
 
     /**
-     * Fetches events for the employer calendar view.
+     * Fetches the employer's scheduled interviews for the calendar view.
+     *
+     * Reads from i-PESO's own database rather than the Google Calendar API,
+     * so every employer sees their interviews immediately — connecting
+     * Google Calendar is only needed for auto-generated Meet links, not
+     * for seeing the schedule itself.
      */
-    public function events(Request $request)
+    public function events(Request $request): JsonResponse
     {
         $employer = $request->user();
 
@@ -115,19 +121,34 @@ class GoogleCalendarController extends Controller
             'end' => ['required', 'date'],
         ]);
 
-        try {
-            $events = $this->calendarService->getEvents(
-                $employer, 
-                $validated['start'], 
-                $validated['end']
-            );
-            return response()->json($events);
-        } catch (\Exception $e) {
-            if ($e->getCode() === 403) {
-                return response()->json(['message' => $e->getMessage()], 403);
-            }
-            Log::error('Failed to fetch Google Calendar events: ' . $e->getMessage());
-            return response()->json(['message' => 'Failed to fetch calendar events.', 'error' => $e->getMessage()], 500);
-        }
+        $interviews = InterviewSchedule::query()
+            ->with(['application.jobVacancy', 'application.jobSeeker'])
+            ->whereHas('application.jobVacancy', fn ($vacancy) => $vacancy->where('employer_id', $employer->employer_id))
+            ->where('status', 'scheduled')
+            ->whereBetween('schedule', [$validated['start'], $validated['end']])
+            ->orderBy('schedule')
+            ->get();
+
+        $events = $interviews->map(function (InterviewSchedule $interview) {
+            $jobTitle = $interview->application?->jobVacancy?->job_title ?? 'Interview';
+            $seeker = $interview->application?->jobSeeker;
+            $seekerName = trim(($seeker->first_name ?? '') . ' ' . ($seeker->last_name ?? ''));
+            $isMeetLink = $interview->mode_of_interview === 'online'
+                && $interview->venue_or_link
+                && str_starts_with($interview->venue_or_link, 'http');
+
+            return [
+                'id' => (string) $interview->interview_id,
+                'title' => $seekerName !== '' ? "{$seekerName} — {$jobTitle}" : $jobTitle,
+                'start' => $interview->schedule->toIso8601String(),
+                'end' => $interview->schedule->copy()->addMinutes(30)->toIso8601String(),
+                'url' => $isMeetLink ? $interview->venue_or_link : null,
+            ];
+        })->values();
+
+        return response()->json([
+            'events' => $events,
+            'google_connected' => filled($employer->google_refresh_token),
+        ]);
     }
 }

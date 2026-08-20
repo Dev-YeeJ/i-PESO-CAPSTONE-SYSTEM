@@ -45,6 +45,24 @@ class AdminEstablishmentReportController extends Controller
             $rules['format'] = ['nullable', Rule::in(['pdf', 'csv'])];
         }
 
-        return $request->validate($rules);
+        $validated = $request->validate($rules);
+
+        // Bound unscoped requests to a recent window by default. `applications`
+        // is an unbounded, ever-growing table; the frontend's initial preview
+        // call (before an admin picks any filter) sends none of employer_id /
+        // job_fair_id / vacancy_id / date range, which previously loaded every
+        // application ever submitted — three eager relations each — into
+        // memory. An admin can still request a wider or unbounded range by
+        // explicitly setting date_from/date_to.
+        $isScoped = ($validated['employer_id'] ?? null)
+            || ($validated['job_fair_id'] ?? null)
+            || ($validated['vacancy_id'] ?? null);
+
+        if (! $isScoped && empty($validated['date_from']) && empty($validated['date_to'])) {
+            $validated['date_from'] = now()->subDays(90)->toDateString();
+            $validated['date_to'] = now()->toDateString();
+        }
+
+        return $validated;
     }
 }

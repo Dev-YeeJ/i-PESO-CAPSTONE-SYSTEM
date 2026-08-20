@@ -221,6 +221,16 @@
   font-size: 0.7rem;
 }
 
+.registration-rail-foot-link {
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-color: var(--rj-ink-line);
+  text-underline-offset: 2px;
+  transition: color 0.2s ease;
+}
+
+.registration-rail-foot-link:hover { color: var(--rj-on-ink); }
+
 /* ── Main column ─────────────────────────────────────────────────────── */
 
 .registration-journey-main {

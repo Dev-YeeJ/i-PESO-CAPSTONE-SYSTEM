@@ -51,9 +51,17 @@ export default function AuthShell({
 
           {children}
 
-          <div className="mt-4 flex items-center justify-center gap-2 text-[11px] font-semibold text-slate-400">
+          <div className="mt-4 flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-[11px] font-semibold text-slate-400">
             <Sparkles className="h-3.5 w-3.5 text-amber-300" />
             Secure, accessible, and managed by Urdaneta City PESO
+            <span className="text-slate-600">·</span>
+            <Link to="/privacy-policy" className="underline decoration-slate-600 underline-offset-2 hover:text-slate-200">
+              Privacy Policy
+            </Link>
+            <span className="text-slate-600">·</span>
+            <Link to="/terms-of-service" className="underline decoration-slate-600 underline-offset-2 hover:text-slate-200">
+              Terms of Service
+            </Link>
           </div>
         </div>
       </div>

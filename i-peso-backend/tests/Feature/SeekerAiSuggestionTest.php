@@ -43,6 +43,11 @@ class SeekerAiSuggestionTest extends TestCase
         Config::set('services.vertex_ai.location', 'us-central1');
         Config::set('services.vertex_ai.model', 'gemini-test');
         Config::set('services.vertex_ai.access_token', 'test-token');
+        // Forces the Vertex AI (service-account) code path being tested here.
+        // Without this, a real GEMINI_API_KEY in the developer's local .env
+        // (needed for the separate chatbot feature) takes priority and routes
+        // to a different, unfaked URL.
+        Config::set('services.vertex_ai.gemini_api_key', '');
 
         Http::fake([
             'https://us-central1-aiplatform.googleapis.com/*' => Http::response([

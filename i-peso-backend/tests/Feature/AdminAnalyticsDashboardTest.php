@@ -30,7 +30,7 @@ class AdminAnalyticsDashboardTest extends TestCase
     {
         $admin = Administrator::create([
             'first_name' => 'PESO', 'last_name' => 'Admin', 'email' => 'analytics@example.com',
-            'password' => 'password', 'role' => 'admin', 'status' => 'active',
+            'password' => 'password', 'role' => 'administrator', 'status' => 'active',
         ]);
         Sanctum::actingAs($admin);
 
@@ -95,7 +95,7 @@ class AdminAnalyticsDashboardTest extends TestCase
     {
         $admin = Administrator::create([
             'first_name' => 'PESO', 'last_name' => 'Admin', 'email' => 'empty-analytics@example.com',
-            'password' => 'password', 'role' => 'admin', 'status' => 'active',
+            'password' => 'password', 'role' => 'administrator', 'status' => 'active',
         ]);
         Sanctum::actingAs($admin);
 

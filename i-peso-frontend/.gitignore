@@ -12,6 +12,10 @@ dist
 dist-ssr
 *.local
 
+# Real env files carry live API keys — only *.example templates are tracked.
+.env
+.env.production
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

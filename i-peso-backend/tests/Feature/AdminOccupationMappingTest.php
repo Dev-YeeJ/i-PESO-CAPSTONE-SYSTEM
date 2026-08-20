@@ -110,7 +110,7 @@ class AdminOccupationMappingTest extends TestCase
             'email' => 'occupation-admin@example.com',
             'mobile_number' => '09170000001',
             'password' => 'password',
-            'role' => 'admin',
+            'role' => 'administrator',
             'status' => 'active',
         ]);
         $seeker = JobSeeker::create([
@@ -161,7 +161,7 @@ class AdminOccupationMappingTest extends TestCase
             'email' => 'title-review-admin@example.com',
             'mobile_number' => '09170000003',
             'password' => 'password',
-            'role' => 'admin',
+            'role' => 'administrator',
             'status' => 'active',
         ]);
         $occupation = Occupation::create([

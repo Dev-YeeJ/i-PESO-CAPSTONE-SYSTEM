@@ -1,4 +1,4 @@
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { motion as Motion, useReducedMotion } from 'framer-motion';
 import {
   ArrowRight,
@@ -397,9 +397,14 @@ const LandingPage = () => {
           </div>
         </div>
 
-        <p className="max-w-6xl mx-auto mt-10 border-t border-white/5 pt-6 text-xs text-slate-600">
-          Urdaneta City PESO Employment Portal · Pangasinan, Philippines
-        </p>
+        <div className="max-w-6xl mx-auto mt-10 flex flex-col gap-3 border-t border-white/5 pt-6 text-xs text-slate-600 sm:flex-row sm:items-center sm:justify-between">
+          <p>Urdaneta City PESO Employment Portal · Pangasinan, Philippines</p>
+          <div className="flex items-center gap-3">
+            <Link to="/privacy-policy" className="hover:text-white transition-colors">Privacy Policy</Link>
+            <span aria-hidden="true" className="text-slate-700">·</span>
+            <Link to="/terms-of-service" className="hover:text-white transition-colors">Terms of Service</Link>
+          </div>
+        </div>
       </footer>
     </div>
   );

@@ -86,8 +86,12 @@ export default function RegistrationJourneyShell({
           </div>
 
           <div className="registration-rail-foot">
-            <Lock className="h-3.5 w-3.5" aria-hidden="true" />
-            Protected under the Data Privacy Act
+            <Lock className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+            <span>
+              <Link to="/privacy-policy" className="registration-rail-foot-link">Privacy Policy</Link>
+              {' · '}
+              <Link to="/terms-of-service" className="registration-rail-foot-link">Terms of Service</Link>
+            </span>
           </div>
         </aside>
 
