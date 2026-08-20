@@ -33,5 +33,8 @@ jobs:
             php artisan config:cache &&
             php artisan route:cache &&
             php artisan view:cache &&
-            php artisan event:cache
+            php artisan event:cache &&
+            API_DOCROOT=~/domains/ipeso.website/public_html/api &&
+            if [ -d "$API_DOCROOT" ] && [ ! -L "$API_DOCROOT" ]; then rm -rf "$API_DOCROOT"; fi &&
+            ln -sfn ~/i-peso-capstone-system/i-peso-backend/public "$API_DOCROOT"
           '
