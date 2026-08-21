@@ -32,6 +32,18 @@ const normalizeMobileNumber = (value: string) => {
   return digits.slice(0, 11)
 }
 
+// Mirrors i-peso-frontend's SeekerRegistration.jsx squish()/formatName() exactly —
+// collapse repeated whitespace, then title-case after each separator (space/hyphen/apostrophe).
+const squish = (value: string) => value.trim().replace(/\s+/g, ' ')
+
+const formatName = (value: string) =>
+  squish(value)
+    .toLowerCase()
+    .replace(/(^|[\s'-])([a-z])/g, (_match, separator: string, letter: string) => `${separator}${letter.toUpperCase()}`)
+
+// Mirrors i-peso-frontend's email regex exactly (stricter than a bare \S+@\S+\.\S+).
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/
+
 const firstServerError = (errors: Record<string, string[]> = {}) => {
   const firstKey = Object.keys(errors)[0]
   return firstKey ? errors[firstKey]?.[0] : ''
@@ -67,8 +79,8 @@ export default function RegisterScreen() {
 
     if (!form.email?.trim()) {
       nextErrors.email = 'Email is required.'
-    } else if (!/\S+@\S+\.\S+/.test(form.email)) {
-      nextErrors.email = 'Enter a valid email.'
+    } else if (!EMAIL_PATTERN.test(form.email.trim().toLowerCase())) {
+      nextErrors.email = 'Enter a valid email address.'
     }
 
     if (!form.mobile_number?.trim()) {
@@ -103,8 +115,8 @@ export default function RegisterScreen() {
 
     const payload: SeekerRegisterPayload = {
       role: 'seeker',
-      first_name: form.first_name.trim(),
-      last_name: form.last_name.trim(),
+      first_name: formatName(form.first_name),
+      last_name: formatName(form.last_name),
       email: form.email.trim().toLowerCase(),
       mobile_number: normalizeMobileNumber(form.mobile_number),
       password: form.password,
@@ -171,6 +183,7 @@ export default function RegisterScreen() {
             label="First Name"
             value={form.first_name ?? ''}
             onChangeText={(v) => handleChange('first_name', v)}
+            onBlur={() => setForm((current) => ({ ...current, first_name: formatName(current.first_name ?? '') }))}
             placeholder="Juan"
             error={errors.first_name}
           />
@@ -180,6 +193,7 @@ export default function RegisterScreen() {
             label="Last Name"
             value={form.last_name ?? ''}
             onChangeText={(v) => handleChange('last_name', v)}
+            onBlur={() => setForm((current) => ({ ...current, last_name: formatName(current.last_name ?? '') }))}
             placeholder="Dela Cruz"
             error={errors.last_name}
           />
@@ -190,6 +204,7 @@ export default function RegisterScreen() {
         label="Email Address"
         value={form.email ?? ''}
         onChangeText={(v) => handleChange('email', v)}
+        onBlur={() => setForm((current) => ({ ...current, email: (current.email ?? '').trim().toLowerCase() }))}
         placeholder="you@example.com"
         keyboardType="email-address"
         error={errors.email}

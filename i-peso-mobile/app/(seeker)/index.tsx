@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   ActivityIndicator,
+  Image,
   RefreshControl,
   ScrollView,
   StatusBar,
@@ -86,6 +87,7 @@ function pickNextBestAction(items?: ProfileStrengthItem[]) {
 
 export default function SeekerHomeScreen() {
   const user = useAuthStore((state) => state.user)
+  const token = useAuthStore((state) => state.token)
 
   const [profile, setProfile] = useState<SeekerProfile | null>(null)
   const [jobs, setJobs] = useState<NearbyJob[]>([])
@@ -160,6 +162,10 @@ export default function SeekerHomeScreen() {
   }, [loadDashboard, feedMode])
 
   const activeProfile = profile ?? user
+  const avatarSource = useMemo(() => {
+    if (!profile?.has_profile_image || !token) return null
+    return { uri: seekerService.profileImageUrl(profile.id), headers: { Authorization: `Bearer ${token}` } }
+  }, [profile?.has_profile_image, profile?.id, token])
   const strength = profile?.profile_strength?.percentage ?? 0
   const stats = profile?.dashboard_stats
   const topJobs = jobs.slice(0, 3)
@@ -184,7 +190,11 @@ export default function SeekerHomeScreen() {
           <View style={styles.heroTop}>
             <View style={styles.headerLeft}>
               <View style={styles.avatarCircle}>
-                <Text style={styles.avatarText}>{firstName(activeProfile).charAt(0).toUpperCase()}</Text>
+                {avatarSource ? (
+                  <Image source={avatarSource} style={styles.avatarImage} />
+                ) : (
+                  <Text style={styles.avatarText}>{firstName(activeProfile).charAt(0).toUpperCase()}</Text>
+                )}
               </View>
               <View style={styles.headerText}>
                 <Text style={styles.greetingText}>{greeting}</Text>
@@ -374,7 +384,8 @@ const styles = StyleSheet.create({
   bellBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.14)', alignItems: 'center', justifyContent: 'center' },
   bellBadge: { position: 'absolute', top: -4, right: -4, minWidth: 18, height: 18, borderRadius: 9, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4, borderWidth: 2, borderColor: colors.primary },
   bellBadgeText: { ...textStyles.smallBold, color: colors.primary, fontSize: 10, lineHeight: undefined },
-  avatarCircle: { width: 48, height: 48, borderRadius: 24, backgroundColor: 'rgba(255,255,255,0.14)', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.3)', justifyContent: 'center', alignItems: 'center' },
+  avatarCircle: { width: 48, height: 48, borderRadius: 24, backgroundColor: 'rgba(255,255,255,0.14)', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.3)', justifyContent: 'center', alignItems: 'center', overflow: 'hidden' },
+  avatarImage: { width: '100%', height: '100%' },
   avatarText: { ...textStyles.title, color: colors.white, fontSize: 20, lineHeight: undefined },
   greetingText: { ...textStyles.small, color: 'rgba(255,255,255,0.72)' },
   nameText: { ...textStyles.heading, color: colors.white, fontSize: 22, lineHeight: undefined },

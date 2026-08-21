@@ -294,6 +294,11 @@ export function validateStep(step: number, form: OnboardingFormValue): string {
       if (seenEducationKeys.has(key)) return 'You have duplicate education records — remove or edit the repeated entry.'
       seenEducationKeys.add(key)
     }
+    // Mirrors web's SeekerOnboarding.jsx: allSkillsCount = hard (dole + technical) + soft,
+    // must be > 0 — "Select at least one skill to continue."
+    const hardSkillsCount = v.hardSkills.filter((s) => s.name.trim()).length
+    const softSkillsCount = v.soft_skills.filter((s) => s.name.trim()).length
+    if (hardSkillsCount + softSkillsCount === 0) return 'Select at least one skill to continue.'
     return ''
   }
   return ''

@@ -3,12 +3,15 @@ import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'rea
 import { colors, radii, spacing, typography } from '@/theme'
 import { seekerService, type AiSuggestionItem, type OccupationClassificationSuggestion, type SkillOption } from '@/services/seekerService'
 import { Combobox } from './Combobox'
+import { AddressSearchField } from './AddressSearchField'
+import type { GeocodedLocation } from '@/services/seekerService'
 import {
   Choice,
   ChoiceGroup,
   Field,
   InfoNote,
   RepeatableSection,
+  SelectField,
   ToggleGroup,
   collapsedFieldError,
   fieldError,
@@ -148,24 +151,66 @@ function SkillAiSuggestions({ category, currentSkills, onAdd }: { category: 'tec
 }
 
 const SUFFIX_OPTIONS = ['', 'Jr.', 'Sr.', 'II', 'III', 'IV', 'V'].map((v) => ({ label: v || 'None', value: v }))
+
+// Mirrors i-peso-frontend's SeekerOnboarding.jsx RELIGION_OPTIONS exactly (label text, not
+// just the value slugs) — this is the constant the website's dropdown itself renders from.
 const RELIGION_OPTIONS = [
-  'roman_catholic', 'islam', 'iglesia_ni_cristo', 'aglipayan', 'evangelical',
-  'seventh_day_adventist', 'jehovah_witness', 'buddhist', 'hindu', 'jewish',
-  'agnostic_atheist', 'declined', 'other',
-].map((v) => ({ label: v.replace(/_/g, ' '), value: v }))
-const DISABILITY_OPTIONS = ['visual', 'hearing', 'speech', 'mental', 'physical', 'others', 'none']
+  { value: 'roman_catholic', label: 'Roman Catholic' },
+  { value: 'islam', label: 'Islam' },
+  { value: 'iglesia_ni_cristo', label: 'Iglesia ni Cristo' },
+  { value: 'aglipayan', label: 'Aglipayan (Philippine Independent Church)' },
+  { value: 'evangelical', label: 'Evangelical / Born Again' },
+  { value: 'seventh_day_adventist', label: 'Seventh-day Adventist' },
+  { value: 'jehovah_witness', label: "Jehovah's Witness" },
+  { value: 'buddhist', label: 'Buddhist' },
+  { value: 'hindu', label: 'Hindu' },
+  { value: 'jewish', label: 'Jewish' },
+  { value: 'agnostic_atheist', label: 'Agnostic / Atheist' },
+  { value: 'declined', label: 'Declined to answer' },
+  { value: 'other', label: 'Other (please specify)' },
+]
+
+// Mirrors web's DISABILITY_OPTIONS exactly.
+const DISABILITY_OPTIONS = [
+  { value: 'visual', label: 'Visual' },
+  { value: 'hearing', label: 'Hearing' },
+  { value: 'speech', label: 'Speech' },
+  { value: 'mental', label: 'Mental/Intellectual' },
+  { value: 'physical', label: 'Physical' },
+  { value: 'others', label: 'Others (specify)' },
+  { value: 'none', label: 'No Disability' },
+]
+
+// Mirrors web's SELF_EMPLOYED_TYPES exactly.
 const SELF_EMPLOYED_OPTIONS = [
-  'fisherman_fisherfolk', 'vendor_retailer', 'home_based_worker', 'transport',
-  'domestic_worker', 'freelancer', 'artisan_craft_worker', 'others',
-].map((v) => ({ label: v.replace(/_/g, ' '), value: v }))
+  { value: 'fisherman_fisherfolk', label: 'Fisherman/Fisherfolk' },
+  { value: 'vendor_retailer', label: 'Vendor/Retailer' },
+  { value: 'home_based_worker', label: 'Home-based Worker' },
+  { value: 'transport', label: 'Transport/Courier' },
+  { value: 'domestic_worker', label: 'Domestic Worker' },
+  { value: 'freelancer', label: 'Freelancer' },
+  { value: 'artisan_craft_worker', label: 'Artisan/Craft Worker' },
+  { value: 'others', label: 'Others (specify)' },
+]
+
+// Mirrors web's UNEMPLOYMENT_REASONS exactly.
 const UNEMPLOYMENT_REASON_OPTIONS = [
-  'fresh_graduate', 'finished_contract', 'resigned', 'retired',
-  'terminated_local', 'terminated_abroad', 'terminated_calamity', 'others',
-].map((v) => ({ label: v.replace(/_/g, ' '), value: v }))
+  { value: 'fresh_graduate', label: 'New Entrant / Fresh Graduate' },
+  { value: 'finished_contract', label: 'Finished Contract' },
+  { value: 'resigned', label: 'Resigned' },
+  { value: 'retired', label: 'Retired' },
+  { value: 'terminated_local', label: 'Terminated/Laid off (Local)' },
+  { value: 'terminated_abroad', label: 'Terminated/Laid off Abroad' },
+  { value: 'terminated_calamity', label: 'Terminated due to Calamity' },
+  { value: 'others', label: 'Others (specify)' },
+]
+
+// Mirrors web's LANGUAGES list exactly (display case). The backend lowercases the value
+// server-side regardless (SeekerController::saveStep4), so sending Title Case here is safe.
 const LANGUAGE_OPTIONS = [
-  'english', 'filipino', 'cebuano', 'ilocano', 'hiligaynon', 'bikol', 'waray',
-  'pangasinan', 'kapampangan', 'maranao', 'maguindanao', 'tausug', 'mandarin',
-  'spanish', 'japanese', 'korean', 'arabic', 'french', 'german', 'others',
+  'English', 'Filipino', 'Cebuano', 'Ilocano', 'Hiligaynon', 'Bikol', 'Waray',
+  'Pangasinan', 'Kapampangan', 'Maranao', 'Maguindanao', 'Tausug', 'Mandarin',
+  'Spanish', 'Japanese', 'Korean', 'Arabic', 'French', 'German', 'Others',
 ]
 const EDUCATION_LEVEL_OPTIONS = [
   { label: 'Elementary', value: 'elementary' },
@@ -177,10 +222,22 @@ const EDUCATION_LEVEL_OPTIONS = [
   { label: 'Graduate Studies', value: 'graduate_studies' },
 ]
 const COURSE_REQUIRED_LEVELS = ['tertiary', 'senior_high_strand', 'vocational', 'graduate_studies']
+
+// Mirrors web's EMPLOYMENT_STATUS_OPTIONS (per work-experience row) exactly.
 const WORK_EMPLOYMENT_STATUS_OPTIONS = [
-  'permanent', 'contractual', 'part_time', 'project_based', 'casual', 'probationary',
-  'temporary', 'seasonal', 'internship', 'ojt', 'freelance', 'self_employed',
-].map((v) => ({ label: v.replace(/_/g, ' '), value: v }))
+  { value: 'permanent', label: 'Permanent' },
+  { value: 'contractual', label: 'Contractual' },
+  { value: 'part_time', label: 'Part-time' },
+  { value: 'project_based', label: 'Project-based' },
+  { value: 'casual', label: 'Casual' },
+  { value: 'probationary', label: 'Probationary' },
+  { value: 'temporary', label: 'Temporary' },
+  { value: 'seasonal', label: 'Seasonal' },
+  { value: 'internship', label: 'Internship' },
+  { value: 'ojt', label: 'OJT / On-the-Job Training' },
+  { value: 'freelance', label: 'Freelance' },
+  { value: 'self_employed', label: 'Self-Employed' },
+]
 
 // Mirrors the backend's regex:/^\d{2}-\d{2}-\d{2}-\d{3}-\d{5}$/ (14 digits, grouped 2-2-2-3-5)
 function formatHouseholdId4ps(raw: string) {
@@ -217,6 +274,60 @@ function decimalFromFeetInches(feet: number, inches: number): string {
   return String(Math.round((feet + inches / 12) * 100) / 100)
 }
 
+// Web uses a native <input type="date"> — a select-only calendar widget, not free typing.
+// Mobile has no native date picker installed, so this mirrors that "select, don't type"
+// intent with the same Year/Month/Day dropdown pattern already used for Height (Feet/Inches),
+// avoiding a new native dependency (and the rebuild it would require) for one field.
+const DOB_MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
+const DOB_MONTH_OPTIONS = DOB_MONTH_NAMES.map((name, i) => ({ label: name, value: String(i + 1).padStart(2, '0') }))
+const DOB_DAY_OPTIONS = Array.from({ length: 31 }, (_, i) => String(i + 1).padStart(2, '0')).map((d) => ({ label: d, value: d }))
+// Newest-eligible-year first (must be ≥15 years old today) down to 100 years back.
+const DOB_YEAR_OPTIONS = Array.from({ length: 100 }, (_, i) => String(new Date().getFullYear() - 15 - i))
+  .map((y) => ({ label: y, value: y }))
+
+function dobPartsFromString(value: string): { year: string; month: string; day: string } {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value ?? '')
+  return match ? { year: match[1], month: match[2], day: match[3] } : { year: '', month: '', day: '' }
+}
+
+function dobStringFromParts(year: string, month: string, day: string): string {
+  return year && month && day ? `${year}-${month}-${day}` : ''
+}
+
+// Owns Year/Month/Day as local state, seeded once from `value` — NOT re-derived from
+// `value` on every render. Writing the combined date only happens once all three parts
+// are picked (dobStringFromParts returns '' otherwise), so deriving from `value` directly
+// made every single-part selection appear to immediately reset, since the still-incomplete
+// combined string parses back to all-empty. Local state keeps each dropdown's own
+// selection visible regardless of whether the other two are filled in yet.
+function DateOfBirthField({ value, onChange, error }: { value: string; onChange: (value: string) => void; error?: string }) {
+  const [parts, setParts] = useState(() => dobPartsFromString(value))
+
+  const update = (next: Partial<{ year: string; month: string; day: string }>) => {
+    const merged = { ...parts, ...next }
+    setParts(merged)
+    onChange(dobStringFromParts(merged.year, merged.month, merged.day))
+  }
+
+  return (
+    <>
+      <SubLabel>Date of Birth *</SubLabel>
+      <View style={styles.choiceRow}>
+        <View style={styles.choiceRowItem}>
+          <SelectField label="Year" required options={DOB_YEAR_OPTIONS} value={parts.year} onChange={(v) => update({ year: v })} />
+        </View>
+        <View style={styles.choiceRowItem}>
+          <SelectField label="Month" required options={DOB_MONTH_OPTIONS} value={parts.month} onChange={(v) => update({ month: v })} />
+        </View>
+        <View style={styles.choiceRowItem}>
+          <SelectField label="Day" required options={DOB_DAY_OPTIONS} value={parts.day} onChange={(v) => update({ day: v })} />
+        </View>
+      </View>
+      {error ? <Text style={styles.errorText}>{error}</Text> : null}
+    </>
+  )
+}
+
 // ── Step 1: Personal, Address, Disability ─────────────────────────────────
 
 export function Step1Personal({ value, onChange, errors }: { value: Step1Value; onChange: (v: Step1Value) => void; errors?: ServerErrors }) {
@@ -237,11 +348,11 @@ export function Step1Personal({ value, onChange, errors }: { value: Step1Value; 
       <Field label="First Name" required value={value.first_name} onChangeText={(v) => set('first_name', v)} error={fieldError(errors, 'first_name')} />
       <Field label="Middle Name" value={value.middle_name} onChangeText={(v) => set('middle_name', v)} error={fieldError(errors, 'middle_name')} />
       <Field label="Last Name" required value={value.last_name} onChangeText={(v) => set('last_name', v)} error={fieldError(errors, 'last_name')} />
-      <ChoiceGroup label="Suffix" options={SUFFIX_OPTIONS} value={value.suffix} onChange={(v) => set('suffix', v)} />
-      <Field label="Date of Birth" required placeholder="YYYY-MM-DD" value={value.date_of_birth} onChangeText={(v) => set('date_of_birth', v)} error={fieldError(errors, 'date_of_birth')} />
-      <ChoiceGroup label="Sex" required columns={false} options={[{ label: 'Male', value: 'male' }, { label: 'Female', value: 'female' }]} value={value.sex} onChange={(v) => set('sex', v)} />
-      <ChoiceGroup label="Civil Status" required options={['single', 'married', 'widowed', 'separated'].map((v) => ({ label: v, value: v }))} value={value.civil_status} onChange={(v) => set('civil_status', v)} />
-      <ChoiceGroup label="Religion" required options={RELIGION_OPTIONS} value={value.religion} onChange={(v) => set('religion', v)} />
+      <SelectField label="Suffix" options={SUFFIX_OPTIONS} value={value.suffix} onChange={(v) => set('suffix', v)} placeholder="None" />
+      <DateOfBirthField value={value.date_of_birth} onChange={(v) => set('date_of_birth', v)} error={fieldError(errors, 'date_of_birth')} />
+      <SelectField label="Sex" required placeholder="Select sex" options={[{ label: 'Male', value: 'male' }, { label: 'Female', value: 'female' }]} value={value.sex} onChange={(v) => set('sex', v)} />
+      <SelectField label="Civil Status" required placeholder="Select status" options={['Single', 'Married', 'Widowed', 'Separated'].map((v) => ({ label: v, value: v.toLowerCase() }))} value={value.civil_status} onChange={(v) => set('civil_status', v)} />
+      <SelectField label="Religion" required placeholder="Select religion" options={RELIGION_OPTIONS} value={value.religion} onChange={(v) => set('religion', v)} />
       {value.religion === 'other' ? (
         <Field label="Specify Religion" required value={value.religion_other} onChangeText={(v) => set('religion_other', v)} error={fieldError(errors, 'religion_other')} />
       ) : null}
@@ -250,15 +361,37 @@ export function Step1Personal({ value, onChange, errors }: { value: Step1Value; 
         const setHeight = (feet: number, inches: number) => set('height_ft', decimalFromFeetInches(feet, inches))
         return (
           <>
-            <ChoiceGroup label="Height — Feet" required options={FEET_OPTIONS} value={String(height.feet)} onChange={(v) => setHeight(Number(v), height.inches)} />
-            <ChoiceGroup label="Height — Inches" required options={INCH_OPTIONS} value={String(height.inches)} onChange={(v) => setHeight(height.feet, Number(v))} />
+            {/* Mirrors web's single "Height" FormField (help: "Select feet and inches")
+                wrapping both a Feet and an Inches selector, rather than two separate fields. */}
+            <SubLabel>Height *</SubLabel>
+            <View style={styles.choiceRow}>
+              <View style={styles.choiceRowItem}>
+                <SelectField label="Feet" required options={FEET_OPTIONS} value={String(height.feet)} onChange={(v) => setHeight(Number(v), height.inches)} />
+              </View>
+              <View style={styles.choiceRowItem}>
+                <SelectField label="Inches" required options={INCH_OPTIONS} value={String(height.inches)} onChange={(v) => setHeight(height.feet, Number(v))} />
+              </View>
+            </View>
+            <Text style={styles.helperText}>Select feet and inches</Text>
           </>
         )
       })()}
       {fieldError(errors, 'height_ft') ? <Text style={styles.errorText}>{fieldError(errors, 'height_ft')}</Text> : null}
-      <Field label="TIN (optional)" value={value.tin} onChangeText={(v) => set('tin', v)} keyboardType="number-pad" error={fieldError(errors, 'tin')} />
+      <Field label="TIN (Tax Identification No.)" value={value.tin} onChangeText={(v) => set('tin', v)} keyboardType="number-pad" error={fieldError(errors, 'tin')} />
 
       <SubLabel>Present Address</SubLabel>
+      <Text style={styles.addressHint}>Search and select your complete Philippine address, or use your current location.</Text>
+      <AddressSearchField
+        onAddressSelected={(place: GeocodedLocation) => {
+          onChange({
+            ...value,
+            address_province: place.province_name || value.address_province,
+            address_municipality_city: place.city_name || value.address_municipality_city,
+            address_barangay: place.barangay_name || value.address_barangay,
+            address_house_street: [place.house_number, place.street].filter(Boolean).join(' ').trim() || value.address_house_street,
+          })
+        }}
+      />
       <Field label="Province" required value={value.address_province} onChangeText={(v) => set('address_province', v)} error={fieldError(errors, 'address_province')} />
       <Field label="City / Municipality" required value={value.address_municipality_city} onChangeText={(v) => set('address_municipality_city', v)} error={fieldError(errors, 'address_municipality_city')} />
       <Field label="Barangay" required value={value.address_barangay} onChangeText={(v) => set('address_barangay', v)} error={fieldError(errors, 'address_barangay')} />
@@ -267,7 +400,7 @@ export function Step1Personal({ value, onChange, errors }: { value: Step1Value; 
       <SubLabel>Disability Disclosure</SubLabel>
       <View style={styles.choiceGrid}>
         {DISABILITY_OPTIONS.map((option) => (
-          <Choice key={option} label={option} active={value.disabilities.includes(option)} onPress={() => toggleDisability(option)} />
+          <Choice key={option.value} label={option.label} active={value.disabilities.includes(option.value)} onPress={() => toggleDisability(option.value)} />
         ))}
       </View>
       {value.disabilities.includes('others') ? (
@@ -295,7 +428,7 @@ export function Step2Employment({ value, onChange, errors }: { value: Step2Value
           <ChoiceGroup label="Employment Type" columns={false} options={[{ label: 'Wage employed', value: 'wage_employed' }, { label: 'Self-employed', value: 'self_employed' }]} value={value.employment_type} onChange={(v) => set('employment_type', v)} />
           {selfEmployed ? (
             <>
-              <ChoiceGroup label="Self-employed Type" options={SELF_EMPLOYED_OPTIONS} value={value.self_employed_type} onChange={(v) => set('self_employed_type', v)} error={fieldError(errors, 'self_employed_type')} />
+              <SelectField label="Self-employed Type" options={SELF_EMPLOYED_OPTIONS} value={value.self_employed_type} onChange={(v) => set('self_employed_type', v)} error={fieldError(errors, 'self_employed_type')} />
               {value.self_employed_type === 'others' ? (
                 <Field label="Specify" value={value.self_employed_type_others} onChangeText={(v) => set('self_employed_type_others', v)} error={fieldError(errors, 'self_employed_type_others')} />
               ) : null}
@@ -307,7 +440,7 @@ export function Step2Employment({ value, onChange, errors }: { value: Step2Value
       {unemployed ? (
         <>
           <Field label="Months Unemployed" keyboardType="number-pad" value={value.unemployment_months} onChangeText={(v) => set('unemployment_months', v)} error={fieldError(errors, 'unemployment_months')} />
-          <ChoiceGroup label="Reason" options={UNEMPLOYMENT_REASON_OPTIONS} value={value.unemployment_reason} onChange={(v) => set('unemployment_reason', v)} error={fieldError(errors, 'unemployment_reason')} />
+          <SelectField label="Reason" options={UNEMPLOYMENT_REASON_OPTIONS} value={value.unemployment_reason} onChange={(v) => set('unemployment_reason', v)} error={fieldError(errors, 'unemployment_reason')} />
           {value.unemployment_reason === 'others' ? (
             <Field label="Specify Reason" value={value.unemployment_reason_others} onChangeText={(v) => set('unemployment_reason_others', v)} error={fieldError(errors, 'unemployment_reason_others')} />
           ) : null}
@@ -703,6 +836,10 @@ export function Step7Experience({ value, onChange, errors }: { value: Step7Value
 const styles = StyleSheet.create({
   subLabel: { marginTop: spacing.sm, marginBottom: spacing.sm, color: colors.primary, fontSize: typography.title, fontFamily: typography.family.bold },
   choiceGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.md },
+  choiceRow: { flexDirection: 'row', gap: spacing.md },
+  choiceRowItem: { flex: 1 },
+  helperText: { marginTop: -spacing.sm, marginBottom: spacing.md, color: colors.subtle, fontSize: typography.small },
+  addressHint: { marginTop: -spacing.xs, marginBottom: spacing.sm, color: colors.subtle, fontSize: typography.small, lineHeight: 16 },
   errorText: { marginTop: -spacing.sm, marginBottom: spacing.md, color: colors.danger, fontSize: typography.small, fontFamily: typography.family.medium },
   aiToggle: { alignSelf: 'flex-start', borderWidth: 1, borderColor: colors.infoBorder, backgroundColor: colors.infoBackground, borderRadius: radii.pill, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, marginTop: spacing.xs, marginBottom: spacing.lg },
   aiToggleText: { color: colors.info, fontSize: typography.small, fontFamily: typography.family.bold },

@@ -413,6 +413,8 @@ export interface SkillOption {
 export interface GeocodedLocation {
   place_id?: string | null
   formatted?: string | null
+  address_line1?: string | null
+  address_line2?: string | null
   latitude: number | null
   longitude: number | null
   province_name?: string | null
@@ -775,6 +777,26 @@ export const seekerService = {
   // ── Geocoding (proxied through the backend, no client Maps SDK needed) ──
   async geocodeAddress(address: string): Promise<GeocodedLocation | null> {
     const res = await apiClient.get('/geo/geocode', { params: { address } })
+    return res.data?.location ?? null
+  },
+
+  /** Mirrors i-peso-frontend's geoService.autocompleteAddress — address-search suggestions. */
+  async autocompleteAddress(text: string, sessionToken?: string, coords?: { latitude?: number; longitude?: number }): Promise<GeocodedLocation[]> {
+    const res = await apiClient.get('/geo/autocomplete', {
+      params: { text, latitude: coords?.latitude, longitude: coords?.longitude, session_token: sessionToken },
+    })
+    return res.data?.suggestions ?? []
+  },
+
+  /** Mirrors i-peso-frontend's geoService.getPlaceAddress — resolves a suggestion into a full address. */
+  async getPlaceAddress(placeId: string, sessionToken?: string): Promise<GeocodedLocation | null> {
+    const res = await apiClient.get(`/geo/place/${encodeURIComponent(placeId)}`, { params: { session_token: sessionToken } })
+    return res.data?.location ?? null
+  },
+
+  /** Mirrors i-peso-frontend's geoService.reverseGeocode — "use my current location". */
+  async reverseGeocode(latitude: number, longitude: number): Promise<GeocodedLocation | null> {
+    const res = await apiClient.get('/geo/reverse', { params: { latitude, longitude } })
     return res.data?.location ?? null
   },
 
