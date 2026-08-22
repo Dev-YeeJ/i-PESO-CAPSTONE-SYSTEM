@@ -1,0 +1,17 @@
+# Deny direct web access to everything in this repo checkout by default.
+# This file only matters when the checkout is placed inside a public web root
+# (e.g. Hostinger's public_html, where subdomain document roots must live
+# inside public_html and get symlinked to the app's public/ folder). Without
+# this, files like i-peso-backend/.env, vendor/, and storage/ would be
+# directly downloadable over HTTP from the main domain, since a same-name
+# file always wins over any SPA/front-controller rewrite fallback.
+#
+# i-peso-backend/public/.htaccess explicitly re-grants access to itself,
+# which is the only path that should ever be served.
+<IfModule mod_authz_core.c>
+    Require all denied
+</IfModule>
+<IfModule !mod_authz_core.c>
+    Order deny,allow
+    Deny from all
+</IfModule>
