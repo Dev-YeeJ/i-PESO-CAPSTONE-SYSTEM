@@ -34,7 +34,22 @@ interface ApiErrorBody {
   errors?: ServerErrors
 }
 
-const steps = ['Personal', 'Employment', 'Preferences', 'Languages', 'Education', 'Training', 'Experience']
+// Mirrors i-peso-frontend's registrationJourneys.js seekerRegistrationSteps exactly —
+// the 7 NSRP step labels here are stages 3-9 of that same 9-stage journey.
+const steps = [
+  'Personal Information',
+  'Employment Status',
+  'Job Preference',
+  'Language Skills',
+  'Education & Skills',
+  'Training & Eligibility',
+  'Work Experience',
+]
+
+// The full 9-stage registration journey (Account Setup + Email Verification are already
+// behind the user by the time they reach this screen — shown here for overall context,
+// matching the website's registrationJourneys.js rail).
+const JOURNEY_STAGES = ['Account Setup', 'Email Verification', ...steps]
 
 export default function OnboardingScreen() {
   const user = useAuthStore((state) => state.user)
@@ -150,7 +165,10 @@ export default function OnboardingScreen() {
   return (
     <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
-        <Text style={styles.kicker}>Job Seeker Registration</Text>
+        <Text style={styles.kicker}>Job Seeker Registration · DOLE National Skills Registration Program</Text>
+        <Text style={styles.journeyText}>
+          Registration step {step + 2} of {JOURNEY_STAGES.length} · Account Setup and Email Verification complete
+        </Text>
         <Text style={styles.title}>Complete your NSRP profile</Text>
         <Text style={styles.subtitle}>Step {step} of {steps.length}: {steps[step - 1]}</Text>
 
@@ -201,6 +219,7 @@ const styles = StyleSheet.create({
   loadingText: { marginTop: 10, color: colors.secondaryText, fontSize: 13 },
   container: { paddingHorizontal: spacing.lg, paddingTop: spacing.xl, paddingBottom: spacing.xxxl },
   kicker: { color: colors.secondary, fontSize: typography.small, fontFamily: typography.family.bold, textTransform: 'uppercase', letterSpacing: 1.2 },
+  journeyText: { marginTop: spacing.xs, color: colors.subtle, fontSize: 11, fontFamily: typography.family.medium },
   title: { marginTop: spacing.sm, color: colors.textPrimary, fontSize: typography.heading, fontFamily: typography.family.medium },
   subtitle: { marginTop: spacing.xs, color: colors.textSecondary, fontSize: typography.body, lineHeight: 20 },
   stepRow: { flexDirection: 'row', gap: spacing.xs, marginTop: spacing.lg },

@@ -1,5 +1,7 @@
-import { ReactNode } from 'react'
+import { ReactNode, useState } from 'react'
 import {
+  FlatList,
+  Modal,
   StyleSheet,
   Text,
   TextInput,
@@ -7,6 +9,7 @@ import {
   View,
   type KeyboardTypeOptions,
 } from 'react-native'
+import MaterialIcons from '@expo/vector-icons/MaterialIcons'
 import { colors, radii, spacing, typography } from '@/theme'
 
 // ── Server error helpers ───────────────────────────────────────────────────
@@ -121,6 +124,84 @@ export function ChoiceGroup({
         ))}
       </View>
       {error ? <Text style={styles.errorText}>{error}</Text> : null}
+    </View>
+  )
+}
+
+// ── SelectField — modal dropdown (mirrors web's native <select>) ──────────
+// Same prop shape as ChoiceGroup so call sites can swap between the two freely.
+// Use this instead of ChoiceGroup wherever the website renders an actual <select>
+// dropdown (chevron, single tap-to-open list) rather than a button/chip group —
+// and always for long option lists, where inline chips don't scale.
+
+export function SelectField({
+  label,
+  options,
+  value,
+  onChange,
+  error,
+  required = false,
+  placeholder = 'Select',
+}: {
+  label: string
+  options: { label: string; value: string }[]
+  value: string
+  onChange: (value: string) => void
+  error?: string
+  required?: boolean
+  placeholder?: string
+}) {
+  const [open, setOpen] = useState(false)
+  const selected = options.find((option) => option.value === value)
+
+  return (
+    <View style={styles.field}>
+      <Text style={styles.label}>
+        {label}
+        {required ? <Text style={styles.required}> *</Text> : null}
+      </Text>
+      <TouchableOpacity
+        style={[styles.input, styles.selectInput, error && styles.inputError]}
+        onPress={() => setOpen(true)}
+        activeOpacity={0.8}
+        accessibilityRole="button"
+      >
+        <Text style={selected ? styles.selectValueText : styles.selectPlaceholderText} numberOfLines={1}>
+          {selected ? selected.label : placeholder}
+        </Text>
+        <MaterialIcons name="arrow-drop-down" size={22} color={colors.muted} />
+      </TouchableOpacity>
+      {error ? <Text style={styles.errorText}>{error}</Text> : null}
+
+      <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
+        <TouchableOpacity style={styles.selectOverlay} activeOpacity={1} onPress={() => setOpen(false)}>
+          <TouchableOpacity style={styles.selectSheet} activeOpacity={1} onPress={() => {}}>
+            <Text style={styles.selectSheetTitle}>{label}</Text>
+            <FlatList
+              data={options}
+              keyExtractor={(option) => option.value}
+              style={styles.selectList}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={styles.selectOption}
+                  onPress={() => {
+                    onChange(item.value)
+                    setOpen(false)
+                  }}
+                >
+                  <Text style={[styles.selectOptionText, item.value === value && styles.selectOptionTextActive]}>
+                    {item.label}
+                  </Text>
+                  {item.value === value ? <MaterialIcons name="check" size={18} color={colors.info} /> : null}
+                </TouchableOpacity>
+              )}
+            />
+            <TouchableOpacity style={styles.selectCloseBtn} onPress={() => setOpen(false)}>
+              <Text style={styles.selectCloseBtnText}>Cancel</Text>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
     </View>
   )
 }
@@ -275,4 +356,16 @@ const styles = StyleSheet.create({
   removeBtnText: { color: colors.danger, fontSize: typography.small, fontFamily: typography.family.bold },
   infoNote: { backgroundColor: colors.infoBackground, borderWidth: 1, borderColor: colors.infoBorder, borderRadius: radii.md, padding: spacing.md, marginBottom: spacing.lg },
   infoNoteText: { color: colors.info, fontSize: typography.small, lineHeight: 18 },
+  selectInput: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  selectValueText: { color: colors.primary, fontSize: typography.body, flex: 1 },
+  selectPlaceholderText: { color: colors.subtle, fontSize: typography.body, flex: 1 },
+  selectOverlay: { flex: 1, backgroundColor: 'rgba(15,23,42,0.5)', justifyContent: 'flex-end' },
+  selectSheet: { backgroundColor: colors.surface, borderTopLeftRadius: radii.xl, borderTopRightRadius: radii.xl, paddingTop: spacing.lg, paddingHorizontal: spacing.lg, paddingBottom: spacing.xl, maxHeight: '70%' },
+  selectSheetTitle: { color: colors.primary, fontSize: typography.title, fontFamily: typography.family.bold, marginBottom: spacing.md },
+  selectList: { flexGrow: 0 },
+  selectOption: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.border },
+  selectOptionText: { color: colors.primary, fontSize: typography.body, flex: 1 },
+  selectOptionTextActive: { color: colors.info, fontFamily: typography.family.bold },
+  selectCloseBtn: { marginTop: spacing.md, alignItems: 'center', paddingVertical: spacing.md },
+  selectCloseBtnText: { color: colors.muted, fontSize: typography.body, fontFamily: typography.family.bold },
 })
