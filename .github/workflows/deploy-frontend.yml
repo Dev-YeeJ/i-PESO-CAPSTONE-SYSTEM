@@ -41,5 +41,5 @@ jobs:
 
       - name: Upload build
         run: >
-          rsync -avz --delete -e "ssh -p ${{ secrets.HOSTINGER_SSH_PORT }}"
+          rsync -avz --delete --exclude=/api -e "ssh -p ${{ secrets.HOSTINGER_SSH_PORT }}"
           i-peso-frontend/dist/ ${{ secrets.HOSTINGER_SSH_USER }}@${{ secrets.HOSTINGER_SSH_HOST }}:~/domains/ipeso.website/public_html/
