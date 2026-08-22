@@ -38,7 +38,14 @@ export const authService = {
   },
 
   async getAuthenticatedUser() {
-    const res = await apiClient.get('/auth/me')
+    // Short timeout: this call gates every guest-only/protected route render
+    // (see authStore.initializeAuth + router/guards.jsx). If it hangs, the
+    // visitor is stuck on a blank spinner instead of the page they clicked
+    // into, with nothing in the console to explain why. Failing fast here
+    // just falls back to "treat as logged out" (handled by the existing
+    // catch in initializeAuth), which is safe since the API still enforces
+    // real auth on every actual protected request.
+    const res = await apiClient.get('/auth/me', { timeout: 8000 })
     return res.data.user
   },
 
