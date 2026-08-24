@@ -220,7 +220,8 @@ export default function VerificationQueuePage() {
                   const pending = Number(employer.pending_required_documents_count) || 0
                   const reviewable = approved + pending
                   const progress = required ? (reviewable / required) * 100 : 0
-                  const waiting = Number(employer.days_waiting) || 0
+                  const waitingDays = Number(employer.days_waiting) || 0
+                  const waitingHours = Number(employer.hours_waiting) || 0
 
                   return (
                     <Card key={employer.employer_id} interactive>
@@ -239,8 +240,8 @@ export default function VerificationQueuePage() {
                               <Badge variant={employer.all_required_approved ? 'reviewed' : 'pending'}>
                                 {employer.all_required_approved ? 'Ready for decision' : 'Document review'}
                               </Badge>
-                              {waiting >= 7 && (
-                                <Badge variant="warning">Waiting {waiting} days</Badge>
+                              {waitingDays >= 7 && (
+                                <Badge variant="warning">Waiting {waitingDays} day{waitingDays === 1 ? '' : 's'}</Badge>
                               )}
                             </div>
                           </div>
@@ -255,7 +256,7 @@ export default function VerificationQueuePage() {
                             <QueueFact
                               icon={ShieldCheck}
                               label="Waiting"
-                              value={waiting === 0 ? 'Submitted today' : `${waiting} day${waiting === 1 ? '' : 's'}`}
+                              value={formatWaiting(waitingDays, waitingHours)}
                             />
                           </div>
 
@@ -332,6 +333,14 @@ const inputClass = 'w-full rounded-lg border border-slate-200 bg-white px-3 py-2
 
 function count(value) {
   return Number(value || 0).toLocaleString()
+}
+
+function formatWaiting(days, hours) {
+  if (days === 0 && hours === 0) return 'Submitted today'
+  const parts = []
+  if (days > 0) parts.push(`${days} day${days === 1 ? '' : 's'}`)
+  if (hours > 0) parts.push(`${hours} hour${hours === 1 ? '' : 's'}`)
+  return parts.join(' ')
 }
 
 function QueueFact({ icon, label, value, progress }) {

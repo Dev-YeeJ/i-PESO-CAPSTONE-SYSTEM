@@ -155,6 +155,10 @@ class EmployerVerificationController extends Controller
         $allRequiredReady = count($requiredDocuments) > 0
             && $uploadedRequiredTypes->count() === count($requiredDocuments);
 
+        // Carbon 3's diffInX() helpers return floats, so floor to whole hours
+        // before splitting into days/hours for a clean, decimal-free display.
+        $hoursWaiting = $employer->created_at ? (int) floor($employer->created_at->diffInHours(now())) : 0;
+
         return [
             'employer_id'                       => $employer->employer_id,
             'email'                             => $employer->email,
@@ -163,7 +167,8 @@ class EmployerVerificationController extends Controller
             'company_size'                      => $employer->company_size,
             'representative_name'               => $employer->representative_name,
             'created_at'                        => $employer->created_at,
-            'days_waiting'                      => $employer->created_at?->diffInDays(now()) ?? 0,
+            'days_waiting'                      => intdiv($hoursWaiting, 24),
+            'hours_waiting'                     => $hoursWaiting % 24,
             'documents_count'                   => $employer->documents->count(),
             'rejected_documents_count'          => $employer->documents
                 ->where('verification_status', 'rejected')

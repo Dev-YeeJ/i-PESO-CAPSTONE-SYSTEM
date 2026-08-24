@@ -13,7 +13,7 @@ import {
   connectGoogleCalendar,
 } from '@/services/employerApplicationService'
 import { Button, EmptyState, ErrorState } from '@/components/ui'
-import { PIPELINE_TABS, SORT_OPTIONS, PAGE_SIZE_OPTIONS } from './ats/atsConstants'
+import { PIPELINE_TABS, SORT_OPTIONS, PAGE_SIZE_OPTIONS, TERMINAL_STATUSES } from './ats/atsConstants'
 import { formatDate, getInitials, getMatchTone, timeAgo } from './ats/atsFormatters'
 import useDebouncedValue from './ats/useDebouncedValue'
 import useApplicationStatusActions from './ats/useApplicationStatusActions'
@@ -159,6 +159,7 @@ export default function EmployerATSGrid() {
   }
 
   const singleTargetInterview = modalTargets.length === 1 ? modalTargets[0].interview : null
+  const isTerminalTab = TERMINAL_STATUSES.includes(activeTab)
 
   return (
     <div className="space-y-6">
@@ -245,9 +246,11 @@ export default function EmployerATSGrid() {
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50/80">
                 <th className="w-12 px-4 py-3 text-center">
-                  <button onClick={toggleSelectAll} className="text-slate-400 transition-colors hover:text-slate-600">
-                    {selectedIds.size === applications.length && applications.length > 0 ? <CheckSquare className="h-4.5 w-4.5 text-blue-600" /> : <Square className="h-4.5 w-4.5" />}
-                  </button>
+                  {!isTerminalTab && (
+                    <button onClick={toggleSelectAll} className="text-slate-400 transition-colors hover:text-slate-600">
+                      {selectedIds.size === applications.length && applications.length > 0 ? <CheckSquare className="h-4.5 w-4.5 text-blue-600" /> : <Square className="h-4.5 w-4.5" />}
+                    </button>
+                  )}
                 </th>
                 <th className="px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Candidate</th>
                 <th className="w-28 px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Match</th>
@@ -291,9 +294,11 @@ export default function EmployerATSGrid() {
                   return (
                     <tr key={app.apply_id} className={`group transition-colors ${isSelected ? 'bg-blue-50/50' : 'hover:bg-slate-50/80'}`}>
                       <td className="px-4 py-3.5 text-center">
-                        <button onClick={() => toggleSelect(app.apply_id)} className="text-slate-400 transition-colors hover:text-blue-600">
-                          {isSelected ? <CheckSquare className="h-4.5 w-4.5 text-blue-600" /> : <Square className="h-4.5 w-4.5" />}
-                        </button>
+                        {!isTerminalTab && (
+                          <button onClick={() => toggleSelect(app.apply_id)} className="text-slate-400 transition-colors hover:text-blue-600">
+                            {isSelected ? <CheckSquare className="h-4.5 w-4.5 text-blue-600" /> : <Square className="h-4.5 w-4.5" />}
+                          </button>
+                        )}
                       </td>
                       <td className="px-4 py-3.5">
                         <div className="flex items-center gap-3">
