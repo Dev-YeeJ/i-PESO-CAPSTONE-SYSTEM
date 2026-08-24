@@ -25,7 +25,7 @@ jobs:
       - name: Pull & build on server
         run: |
           ssh -p ${{ secrets.HOSTINGER_SSH_PORT }} ${{ secrets.HOSTINGER_SSH_USER }}@${{ secrets.HOSTINGER_SSH_HOST }} '
-            cd ~/i-peso-capstone-system/i-peso-backend &&
+            cd ~/domains/ipeso.website/public_html/backend-src/i-peso-backend &&
             git pull origin main &&
             composer install --no-dev --optimize-autoloader --no-interaction --no-scripts &&
             php artisan package:discover --ansi &&
@@ -36,5 +36,7 @@ jobs:
             php artisan event:cache &&
             API_DOCROOT=~/domains/ipeso.website/public_html/api &&
             if [ -d "$API_DOCROOT" ] && [ ! -L "$API_DOCROOT" ]; then rm -rf "$API_DOCROOT"; fi &&
-            ln -sfn ~/i-peso-capstone-system/i-peso-backend/public "$API_DOCROOT"
+            ln -sfn ~/domains/ipeso.website/public_html/backend-src/i-peso-backend/public "$API_DOCROOT" &&
+            ls -la "$API_DOCROOT" &&
+            readlink -f "$API_DOCROOT"
           '

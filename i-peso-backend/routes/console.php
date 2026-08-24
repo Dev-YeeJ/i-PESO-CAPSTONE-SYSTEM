@@ -23,4 +23,4 @@ Schedule::call(fn () => Artisan::call('queue:work', [
     '--stop-when-empty' => true,
     '--tries' => 3,
     '--max-time' => 50,
-]))->everyMinute()->withoutOverlapping();
+]))->everyMinute()->name('queue-worker')->withoutOverlapping();
