@@ -52,6 +52,24 @@ class PublicChatbotOfficeLocationTest extends TestCase
             ->assertJsonPath('office_location', null);
     }
 
+    public function test_address_mentioned_without_a_where_question_has_no_office_location(): void
+    {
+        config(['peso_knowledge.office.address' => 'XHG8+FV3, Alexander St, Urdaneta City, Pangasinan']);
+
+        // The office address can ride along in an answer to something else
+        // entirely (e.g. a citizen-charter service description). Only an
+        // actual "where" question should trigger the map.
+        Http::fake([
+            '*generateContent*' => Http::response($this->geminiTextResponse(
+                'Libre po ang lahat ng serbisyo ng PESO office sa XHG8+FV3, Alexander St, Urdaneta City, Pangasinan.'
+            )),
+        ]);
+
+        $this->postJson('/api/chat/public', ['message' => 'Libre ba ang PESO?'])
+            ->assertOk()
+            ->assertJsonPath('office_location', null);
+    }
+
     public function test_no_office_location_when_address_is_not_on_record(): void
     {
         config(['peso_knowledge.office.address' => null]);

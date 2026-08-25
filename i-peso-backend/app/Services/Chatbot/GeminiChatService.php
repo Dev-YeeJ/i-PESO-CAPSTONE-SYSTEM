@@ -33,6 +33,14 @@ class GeminiChatService
      */
     public function reply(array $history): array
     {
+        $lastQuestion = '';
+        foreach (array_reverse($history) as $turn) {
+            if ($turn['role'] !== 'model') {
+                $lastQuestion = $turn['text'];
+                break;
+            }
+        }
+
         $contents = array_map(fn (array $turn) => [
             'role' => $turn['role'] === 'model' ? 'model' : 'user',
             'parts' => [['text' => $turn['text']]],
@@ -52,7 +60,7 @@ class GeminiChatService
 
                 return [
                     'text' => $text,
-                    'office_location' => $this->officeLocationIfMentioned($text),
+                    'office_location' => $this->officeLocationIfAsked($text, $lastQuestion),
                 ];
             }
 
@@ -87,16 +95,19 @@ class GeminiChatService
     }
 
     /**
-     * Whether the reply just told the visitor the office's physical address —
-     * if so, the frontend can offer a map for it.
+     * Whether the visitor asked a "where" question and the reply just
+     * answered it with the office's on-record address — if both are true,
+     * the frontend can show a map for it.
      *
      * Deliberately not a Gemini tool: the office address is a REFERENCE fact
      * the model states directly (see knowledgeSection()), so a tool call is
      * not guaranteed to fire. Checking the model's own output for the exact
-     * on-record address is simpler and fails safe — no address on record,
-     * no match, no map offered.
+     * on-record address fails safe — no address on record, no match, no map
+     * offered. The question-side check on top of that keeps the map from
+     * appearing next to an address mentioned only in passing (e.g. as part
+     * of a citizen-charter answer about something else entirely).
      */
-    private function officeLocationIfMentioned(string $text): ?array
+    private function officeLocationIfAsked(string $text, string $question): ?array
     {
         $address = config('peso_knowledge.office.address');
 
@@ -104,7 +115,24 @@ class GeminiChatService
             return null;
         }
 
+        if (! $this->asksWhere($question)) {
+            return null;
+        }
+
         return ['address' => $address];
+    }
+
+    private function asksWhere(string $question): bool
+    {
+        $normalized = strtolower($question);
+
+        foreach (['saan', 'nasaan', 'asan', 'where', 'address', 'lokasyon', 'location'] as $keyword) {
+            if (str_contains($normalized, $keyword)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
