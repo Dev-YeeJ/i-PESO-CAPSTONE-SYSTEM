@@ -3,11 +3,14 @@
 namespace App\Notifications;
 
 use App\Models\GovernmentProgram;
+use App\Models\JobSeeker;
 use App\Models\ProgramApplication;
+use App\Notifications\Channels\ExpoPushChannel;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Notification;
 
-class GovernmentProgramNotification extends Notification
+class GovernmentProgramNotification extends Notification implements ShouldQueue
 {
     use Queueable;
 
@@ -20,7 +23,28 @@ class GovernmentProgramNotification extends Notification
 
     public function via(object $notifiable): array
     {
-        return ['database'];
+        $channels = ['database'];
+
+        if ($notifiable instanceof JobSeeker) {
+            $channels[] = ExpoPushChannel::class;
+        }
+
+        return $channels;
+    }
+
+    public function toExpoPush(object $notifiable): array
+    {
+        $data = $this->toArray($notifiable);
+
+        return [
+            'title' => $data['title'],
+            'body' => $data['message'],
+            'data' => [
+                'type' => 'government_program',
+                'program_id' => $data['program_id'],
+                'application_id' => $data['application_id'],
+            ],
+        ];
     }
 
     public function toArray(object $notifiable): array

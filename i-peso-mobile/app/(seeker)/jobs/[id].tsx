@@ -95,8 +95,11 @@ export default function JobDetailsScreen() {
   }
 
   const applied = Boolean(job.has_applied)
-  const requiredSkills = listFrom(job.required_skills)
-  const softSkills = listFrom(job.soft_skills)
+  // Deduped: a vacancy's skill lists can contain the same skill more than
+  // once (e.g. entered separately during posting), which otherwise renders
+  // the same tag twice and breaks React's key uniqueness for the tag list.
+  const requiredSkills = Array.from(new Set(listFrom(job.required_skills)))
+  const softSkills = Array.from(new Set(listFrom(job.soft_skills)))
   const matched = job.matched_skills ?? []
   const missing = job.missing_skills ?? []
   const breakdown = job.match_breakdown

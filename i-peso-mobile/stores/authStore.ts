@@ -74,6 +74,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   logout: async () => {
     try {
+      const { clearPushToken } = await import('@/services/pushNotifications')
+      await clearPushToken()
       const { authService } = await import('@/services/authService')
       await authService.logout()
     } finally {

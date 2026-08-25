@@ -37,6 +37,12 @@ return [
         'routes_enabled' => env('GOOGLE_MAPS_ROUTES_ENABLED', false),
     ],
 
+    'expo' => [
+        // Optional: only needed if Expo's "Enhanced Security" is enabled on
+        // the project. Push works without it for a standard EAS project.
+        'access_token' => env('EXPO_ACCESS_TOKEN'),
+    ],
+
     'vertex_ai' => [
         'enabled' => env('GOOGLE_VERTEX_AI_ENABLED', false),
         'project_id' => env('GOOGLE_CLOUD_PROJECT_ID'),

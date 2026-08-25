@@ -217,6 +217,11 @@ class JobSeeker extends Authenticatable
             ->withTimestamps();
     }
 
+    public function pushTokens(): \Illuminate\Database\Eloquent\Relations\MorphMany
+    {
+        return $this->morphMany(PushToken::class, 'tokenable');
+    }
+
     // ===== HELPER METHODS =====
 
     /**

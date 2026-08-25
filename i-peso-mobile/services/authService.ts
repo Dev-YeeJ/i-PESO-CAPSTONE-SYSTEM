@@ -55,7 +55,12 @@ export const authService = {
   },
 
   async getAuthenticatedUser() {
-    const res = await apiClient.get('/auth/me')
+    // Short timeout: this call gates app boot (authStore.initializeAuth) —
+    // if it hangs on the full 15s global default, the visitor is stuck on
+    // the splash/loading state instead of reaching the login screen. Failing
+    // fast just falls back to "treat as logged out", which is safe since the
+    // API still enforces real auth on every actual protected request.
+    const res = await apiClient.get('/auth/me', { timeout: 8000 })
     return res.data.user
   },
 

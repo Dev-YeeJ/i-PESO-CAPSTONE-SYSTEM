@@ -5,6 +5,7 @@ namespace App\Notifications;
 use App\Models\Application;
 use App\Models\Employer;
 use App\Models\JobSeeker;
+use App\Notifications\Channels\ExpoPushChannel;
 use App\Notifications\Channels\SmsChannel;
 use App\Services\Sms\SmsMessageTemplates;
 use Illuminate\Bus\Queueable;
@@ -26,6 +27,7 @@ abstract class InterviewBaseNotification extends Notification implements ShouldQ
 
         if ($notifiable instanceof JobSeeker) {
             $channels[] = SmsChannel::class;
+            $channels[] = ExpoPushChannel::class;
         }
 
         return $channels;
@@ -87,6 +89,21 @@ abstract class InterviewBaseNotification extends Notification implements ShouldQ
             'interview_schedule' => $scheduledAt,
             'interview_mode' => $mode,
             'interview_location' => $location,
+        ];
+    }
+
+    public function toExpoPush(object $notifiable): array
+    {
+        $data = $this->toArray($notifiable);
+
+        return [
+            'title' => $data['title'],
+            'body' => $data['message'],
+            'data' => [
+                'type' => 'interview',
+                'application_id' => $data['application_id'],
+                'interview_type' => $data['type'],
+            ],
         ];
     }
 

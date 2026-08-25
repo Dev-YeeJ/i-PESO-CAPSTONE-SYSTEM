@@ -200,6 +200,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/notifications/unread-count', [\App\Http\Controllers\Api\SeekerNotificationController::class, 'unreadCount']);
         Route::patch('/notifications/read-all', [\App\Http\Controllers\Api\SeekerNotificationController::class, 'markAllAsRead']);
         Route::patch('/notifications/{notification}/read', [\App\Http\Controllers\Api\SeekerNotificationController::class, 'markAsRead']);
+        Route::post('/push-tokens', [\App\Http\Controllers\Api\SeekerPushTokenController::class, 'store']);
+        Route::delete('/push-tokens', [\App\Http\Controllers\Api\SeekerPushTokenController::class, 'destroy']);
     });
 
     // Admin endpoints (protected by auth:sanctum + Administrator model check)

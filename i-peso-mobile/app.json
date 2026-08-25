@@ -53,6 +53,13 @@
         {
           "locationAlwaysAndWhenInUsePermission": "i-PESO uses your location to show nearby job vacancies on the map."
         }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/android-icon-monochrome.png",
+          "color": "#2563EB"
+        }
       ]
     ],
     "experiments": {

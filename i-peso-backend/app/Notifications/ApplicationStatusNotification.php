@@ -3,6 +3,7 @@
 namespace App\Notifications;
 
 use App\Models\Application;
+use App\Notifications\Channels\ExpoPushChannel;
 use App\Notifications\Channels\SmsChannel;
 use App\Services\Sms\SmsMessageTemplates;
 use Illuminate\Bus\Queueable;
@@ -38,6 +39,7 @@ class ApplicationStatusNotification extends Notification implements ShouldQueue
 
         if ($this->application->status !== 'interview' && ! $interviewWasCancelled) {
             $channels[] = SmsChannel::class;
+            $channels[] = ExpoPushChannel::class;
         }
 
         return $channels;
@@ -93,6 +95,21 @@ class ApplicationStatusNotification extends Notification implements ShouldQueue
             'message' => $messageMap[$status] ?? "There is an update on your application.",
             'application_id' => $this->application->apply_id,
             'action_url' => '/seeker/applications'
+        ];
+    }
+
+    public function toExpoPush(object $notifiable): array
+    {
+        $data = $this->toArray($notifiable);
+
+        return [
+            'title' => $data['title'],
+            'body' => $data['message'],
+            'data' => [
+                'type' => 'application_status',
+                'application_id' => $data['application_id'],
+                'status' => $data['status'],
+            ],
         ];
     }
 

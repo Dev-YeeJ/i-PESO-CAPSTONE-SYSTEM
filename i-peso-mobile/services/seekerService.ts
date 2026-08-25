@@ -695,6 +695,14 @@ export const seekerService = {
     await apiClient.patch(`/seeker/notifications/${id}/read`)
   },
 
+  async registerPushToken(token: string, platform?: 'ios' | 'android', deviceName?: string): Promise<void> {
+    await apiClient.post('/seeker/push-tokens', { token, platform, device_name: deviceName })
+  },
+
+  async unregisterPushToken(token: string): Promise<void> {
+    await apiClient.delete('/seeker/push-tokens', { data: { token } })
+  },
+
   // ── Job Fairs (read-only — backend has no seeker RSVP route) ─────────────
   async getJobFairs(): Promise<JobFair[]> {
     const res = await apiClient.get('/job-fairs')
