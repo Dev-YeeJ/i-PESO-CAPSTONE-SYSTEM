@@ -3,10 +3,13 @@
 namespace App\Services;
 
 use App\Models\Employer;
+use App\Models\EmployerDocument;
 use App\Models\JobFair;
 use App\Models\JobFairEmployer;
 use App\Models\JobFairRequirement;
+use App\Models\JobFairRequirementSubmission;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 
 class JobFairService
@@ -27,6 +30,16 @@ class JobFairService
         'posterized_vacancy' => 'Posterized Job Vacancy with Contact Details',
         'no_pending_case' => 'Certificate of No Pending Case from DOLE',
         'confirmation_slip' => 'Confirmation Slip',
+    ];
+
+    // Job Fair requirement codes that duplicate documents already collected
+    // during employer accreditation. An approved document of any of these
+    // types satisfies the matching Job Fair requirement automatically.
+    public const REQUIREMENT_DOCUMENT_TYPES = [
+        'business_permit' => ['mayors_permit'],
+        'business_registration' => ['dti_certificate', 'bir_certificate', 'sec_certificate'],
+        'philjobnet_registration' => ['philJobnet_proof'],
+        'no_pending_case' => ['no_pending_case_certificate'],
     ];
 
     public function seedRequirements(JobFair $fair): void
@@ -97,6 +110,7 @@ class JobFairService
 
         if ($participation) {
             $participation->loadMissing(['requirementSubmissions.requirement', 'confirmationSlip', 'resultReport.entries', 'resultReport.mismatchTallies']);
+            $this->reuseVerifiedDocuments($participation);
             $payload['participation'] = $this->participationPayload($participation);
         }
 
@@ -128,10 +142,91 @@ class JobFairService
                     'original_filename' => $item->original_filename,
                     'admin_remarks' => $item->admin_remarks,
                     'submitted_at' => $item->submitted_at?->toIso8601String(),
+                    'reused_from_verification' => (bool) $item->employer_document_id,
                 ])->values() : [],
             'confirmation_slip' => $participation->relationLoaded('confirmationSlip') ? $participation->confirmationSlip : null,
             'result_report' => $participation->relationLoaded('resultReport') ? $participation->resultReport : null,
         ];
+    }
+
+    // A verified employer has already submitted business_permit /
+    // business_registration / philjobnet_registration / no_pending_case
+    // documents during accreditation. Auto-satisfy the matching Job Fair
+    // requirement from that record instead of asking for a duplicate
+    // upload — skips any requirement already covered by a submission
+    // (manual or previously reused).
+    public function reuseVerifiedDocuments(JobFairEmployer $participation): void
+    {
+        // Callers (eventPayload) may have already eager-loaded a
+        // column-limited `employer` relation (e.g. employer_id,
+        // company_name, trade_name only) for display purposes — that
+        // cached instance won't have verification_status, so re-fetch the
+        // full record instead of trusting whatever is already attached.
+        if (! Schema::hasTable('employer_documents')) {
+            return;
+        }
+
+        $employer = Employer::find($participation->employer_id);
+
+        if (! $employer || ! $employer->canPostJobs()) {
+            return;
+        }
+
+        $requirements = $participation->jobFair->requirements
+            ->whereIn('code', array_keys(self::REQUIREMENT_DOCUMENT_TYPES));
+
+        $existingRequirementIds = $participation->requirementSubmissions->pluck('job_fair_requirement_id')->all();
+        $missingRequirements = $requirements->reject(
+            fn (JobFairRequirement $requirement) => in_array($requirement->id, $existingRequirementIds, true)
+        );
+
+        if ($missingRequirements->isEmpty()) {
+            return;
+        }
+
+        $documentsByType = EmployerDocument::query()
+            ->where('employer_id', $employer->employer_id)
+            ->where('verification_status', 'approved')
+            ->get()
+            ->keyBy('document_type');
+
+        $created = false;
+        foreach ($missingRequirements as $requirement) {
+            $document = collect(self::REQUIREMENT_DOCUMENT_TYPES[$requirement->code] ?? [])
+                ->map(fn ($type) => $documentsByType->get($type))
+                ->filter()
+                ->first();
+
+            if (! $document) {
+                continue;
+            }
+
+            JobFairRequirementSubmission::create([
+                'job_fair_requirement_id' => $requirement->id,
+                'job_fair_employer_id' => $participation->id,
+                'employer_id' => $employer->employer_id,
+                'employer_document_id' => $document->document_id,
+                'document_path' => $document->document_path,
+                'original_filename' => $document->original_filename,
+                'file_size' => $document->file_size,
+                'mime_type' => $document->mime_type,
+                'status' => 'approved',
+                'submitted_at' => $document->uploaded_at ?? now(),
+            ]);
+            $created = true;
+        }
+
+        if ($created) {
+            $participation->load('requirementSubmissions.requirement');
+            $this->syncRequirementStatus($participation);
+        }
+    }
+
+    private function syncRequirementStatus(JobFairEmployer $participation): void
+    {
+        $required = $participation->jobFair->requirements()->where('is_required', true)->count();
+        $submitted = $participation->requirementSubmissions()->whereIn('status', ['submitted', 'approved'])->count();
+        $participation->update(['participation_status' => $submitted >= $required ? 'requirements_submitted' : 'requirements_pending']);
     }
 
     public function dashboard(JobFair $fair): array

@@ -143,8 +143,13 @@ class JobFairController extends Controller
     public function viewRequirement(Request $request, JobFairRequirementSubmission $submission): StreamedResponse
     {
         $this->admin($request);
-        abort_unless(filled($submission->document_path) && Storage::disk('local')->exists($submission->document_path), 404);
-        return Storage::disk('local')->response($submission->document_path, $submission->original_filename, [
+        // A requirement reused from employer accreditation lives on
+        // whichever disk verification documents are configured for.
+        $disk = $submission->employer_document_id
+            ? (string) config('filesystems.employer_documents_disk', 'local')
+            : 'local';
+        abort_unless(filled($submission->document_path) && Storage::disk($disk)->exists($submission->document_path), 404);
+        return Storage::disk($disk)->response($submission->document_path, $submission->original_filename, [
             'Content-Type' => $submission->mime_type, 'Cache-Control' => 'private, no-store, no-cache, must-revalidate',
         ]);
     }

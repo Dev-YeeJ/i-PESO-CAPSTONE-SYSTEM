@@ -402,6 +402,33 @@ class EmployerVerificationJobPostingTest extends TestCase
             ->assertJsonPath('jobs.0.job_title', 'Latest Active Vacancy');
     }
 
+    public function test_hired_application_is_excluded_from_the_seeker_dashboard_feed(): void
+    {
+        $employer = $this->createEmployer();
+        $seeker = $this->createSeeker(['latitude' => 15.9761, 'longitude' => 120.5711]);
+        $payload = [
+            'employer_id' => $employer->employer_id,
+            'location' => 'Urdaneta City, Pangasinan',
+            ...$this->vacancyPayload(),
+        ];
+
+        $hiredJob = JobVacancy::create([...$payload, 'job_title' => 'Already Hired Job', 'latitude' => 15.9761, 'longitude' => 120.5711]);
+        JobVacancy::create([...$payload, 'job_title' => 'Still Open Job', 'latitude' => 15.9770, 'longitude' => 120.5720]);
+
+        DB::table('applications')->insert([
+            'post_id' => $hiredJob->post_id, 'seeker_id' => $seeker->seeker_id, 'status' => 'hired',
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        Sanctum::actingAs($seeker);
+
+        $this->getJson('/api/seeker/nearby-jobs?radius_km=5')
+            ->assertOk()
+            ->assertJsonPath('count', 1)
+            ->assertJsonPath('jobs.0.job_title', 'Still Open Job')
+            ->assertJsonMissing(['job_title' => 'Already Hired Job']);
+    }
+
     public function test_employer_cannot_access_seeker_nearby_jobs(): void
     {
         Sanctum::actingAs($this->createEmployer());
@@ -854,6 +881,17 @@ class EmployerVerificationJobPostingTest extends TestCase
                 $table->boolean('spes_tupad_eligible')->default(false);
                 $table->string('status')->default('active');
                 $table->timestamps();
+            });
+        }
+
+        if (! Schema::hasTable('applications')) {
+            Schema::create('applications', function (Blueprint $table) {
+                $table->id('apply_id');
+                $table->unsignedBigInteger('post_id');
+                $table->unsignedBigInteger('seeker_id');
+                $table->string('status')->default('pending');
+                $table->timestamps();
+                $table->unique(['post_id', 'seeker_id']);
             });
         }
 

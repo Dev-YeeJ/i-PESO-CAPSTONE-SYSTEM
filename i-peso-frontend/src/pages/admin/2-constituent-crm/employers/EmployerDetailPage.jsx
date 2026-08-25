@@ -1,6 +1,6 @@
 import { createElement, useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { AlertTriangle, ArrowLeft, Building2, CheckCircle2, Download, Eye, FileText, MapPin, ShieldAlert, ShieldCheck, XCircle, Mail, Phone, User, Clock, BriefcaseBusiness } from 'lucide-react'
+import { AlertTriangle, ArrowLeft, Building2, CheckCircle2, ChevronDown, Download, Eye, FileText, MapPin, ShieldAlert, ShieldCheck, XCircle, Mail, Phone, User, Clock, BriefcaseBusiness } from 'lucide-react'
 import { Badge, Button, Card, CardHeader } from '@/components/ui'
 import { adminService } from '@/services/adminService'
 
@@ -57,6 +57,9 @@ export default function EmployerDetailPage() {
   const [confirmDialog, setConfirmDialog] = useState(null)
   // Track documents viewed during this session so UI updates immediately
   const [viewedDocumentIds, setViewedDocumentIds] = useState(new Set())
+  // Verification documents accordion — expanded by default so the review
+  // workflow (approve/reject) stays visible without an extra click.
+  const [documentsExpanded, setDocumentsExpanded] = useState(true)
 
   const loadEmployer = useCallback(async () => {
     setLoading(true)
@@ -373,19 +376,27 @@ export default function EmployerDetailPage() {
                 </div>
               )}
 
-              <Card>
-                <div className="flex items-center justify-between p-6 pb-2">
+              <Card padding="none">
+                <button
+                  type="button"
+                  onClick={() => setDocumentsExpanded((current) => !current)}
+                  aria-expanded={documentsExpanded}
+                  className="flex w-full items-center justify-between gap-3 p-5 pb-3 text-left transition hover:bg-slate-50 sm:p-6 sm:pb-4"
+                >
                   <div>
                     <h2 className="text-lg font-black text-slate-950">Verification documents</h2>
                     {verificationStatus === 'pending' && (
                       <p className="mt-1 text-sm text-slate-500">Review each document. Documents will be approved unless you flag them for rejection before finalizing.</p>
                     )}
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex shrink-0 items-center gap-2">
                     <Badge status={totalUploaded ? 'active' : 'warning'}>{totalUploaded ? `${totalUploaded} uploaded` : 'No documents'}</Badge>
+                    <ChevronDown className={`h-5 w-5 text-slate-400 transition-transform ${documentsExpanded ? 'rotate-180' : ''}`} />
                   </div>
-                </div>
+                </button>
 
+                {documentsExpanded && (
+                  <>
                 {/* Approval progress bar */}
                 {verificationStatus === 'pending' && requiredCount > 0 && (
                   <div className="px-6 mt-4">
@@ -524,6 +535,8 @@ export default function EmployerDetailPage() {
                       <Button onClick={handleFinalize} icon={CheckCircle2} disabled={actionLoading}>{actionLoading ? 'Loading...' : 'Complete Review'}</Button>
                     )}
                   </div>
+                )}
+                  </>
                 )}
               </Card>
             </main>

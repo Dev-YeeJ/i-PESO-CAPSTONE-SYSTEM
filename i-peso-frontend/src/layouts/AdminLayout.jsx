@@ -1,7 +1,9 @@
 import { useState } from 'react'
 import { Outlet, NavLink, useNavigate } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
 import { ChevronLeft, LogOut, Menu, X } from 'lucide-react'
 import { useAuthStore } from '@/stores/authStore'
+import { adminService } from '@/services/adminService'
 import IPesoLogo from '@/components/branding/IPesoLogo'
 
 const navGroups = [
@@ -25,7 +27,6 @@ const navGroups = [
         to: '/admin/verification-queue',
         label: 'Employer Verification',
         icon: <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
-        badge: 'pending',
       },
       {
         to: '/admin/job-seekers',
@@ -156,6 +157,18 @@ const AdminLayout = () => {
   const [collapsed, setCollapsed] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
 
+  // Drives the "Employer Verification" sidebar badge — pulled from the same
+  // summary the verification queue's own stat cards use, so the nav never
+  // shows "pending" when the queue is actually empty.
+  const { data: employerSummary } = useQuery({
+    queryKey: ['admin', 'employerSummary'],
+    queryFn: adminService.getEmployerSummary,
+    staleTime: 60_000,
+    refetchInterval: 60_000,
+    retry: 1,
+  })
+  const pendingEmployerCount = employerSummary?.pending ?? 0
+
   const handleLogout = async () => {
     await logout()
     navigate('/login', { replace: true })
@@ -184,30 +197,34 @@ const AdminLayout = () => {
                 </p>
               )}
               <div className="space-y-1">
-                {group.items.map(({ to, label, icon, badge }) => (
-                  <NavLink
-                    key={to}
-                    to={to}
-                    end={to === '/admin/dashboard'}
-                    title={collapsed ? label : undefined}
-                    onClick={() => setMobileOpen(false)}
-                    className={({ isActive }) =>
-                      `relative flex min-h-11 items-center rounded-xl px-3 py-2.5 text-sm font-bold transition-colors ${
-                        isActive
-                          ? 'portal-sidebar-link-active'
-                          : 'portal-sidebar-link'
-                      } ${collapsed ? 'justify-center' : 'gap-3'}`
-                    }
-                  >
-                    <span className="flex-shrink-0">{icon}</span>
-                    {!collapsed && label}
-                    {badge && !collapsed && (
-                      <span className="ml-auto inline-block px-2 py-0.5 text-xs font-bold bg-amber-100 text-amber-800 rounded-full">
-                        {badge}
-                      </span>
-                    )}
-                  </NavLink>
-                ))}
+                {group.items.map(({ to, label, icon }) => {
+                  const badgeCount = to === '/admin/verification-queue' ? pendingEmployerCount : 0
+
+                  return (
+                    <NavLink
+                      key={to}
+                      to={to}
+                      end={to === '/admin/dashboard'}
+                      title={collapsed ? label : undefined}
+                      onClick={() => setMobileOpen(false)}
+                      className={({ isActive }) =>
+                        `relative flex min-h-11 items-center rounded-xl px-3 py-2.5 text-sm font-bold transition-colors ${
+                          isActive
+                            ? 'portal-sidebar-link-active'
+                            : 'portal-sidebar-link'
+                        } ${collapsed ? 'justify-center' : 'gap-3'}`
+                      }
+                    >
+                      <span className="flex-shrink-0">{icon}</span>
+                      {!collapsed && label}
+                      {badgeCount > 0 && !collapsed && (
+                        <span className="ml-auto inline-block px-2 py-0.5 text-xs font-bold bg-amber-100 text-amber-800 rounded-full">
+                          {badgeCount}
+                        </span>
+                      )}
+                    </NavLink>
+                  )
+                })}
               </div>
             </div>
           ))}

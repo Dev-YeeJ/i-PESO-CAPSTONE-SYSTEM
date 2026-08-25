@@ -123,6 +123,57 @@ class JobFairEcosystemFlowTest extends TestCase
         $this->assertSame(0, \DB::table('sms_notifications')->where('provider', '!=', 'log_only')->count());
     }
 
+    public function test_verified_employer_reuses_accreditation_documents_for_job_fair_requirements(): void
+    {
+        Storage::fake('local');
+        $admin = Administrator::create([
+            'first_name' => 'PESO', 'last_name' => 'Manager', 'email' => 'reuse-admin@example.test',
+            'mobile_number' => '09170000002', 'password' => 'password123', 'role' => 'administrator', 'status' => 'active', 'email_verified_at' => now(),
+        ]);
+        $employer = $this->employer('reuse-employer@example.test', 'Verified Reuse Corp');
+
+        Storage::disk('local')->put('employer_documents/permit-on-file.pdf', '%PDF-1.4 fake permit content');
+        \DB::table('employer_documents')->insert([
+            'employer_id' => $employer->employer_id, 'document_type' => 'mayors_permit',
+            'document_path' => 'employer_documents/permit-on-file.pdf', 'original_filename' => 'business-permit-2026.pdf',
+            'file_size' => 2048, 'mime_type' => 'application/pdf', 'uploaded_at' => now(),
+            'verification_status' => 'approved', 'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        Sanctum::actingAs($admin);
+        $fairId = $this->postJson('/api/admin/job-fairs', [
+            'title' => 'Reuse Verified Documents Job Fair', 'description' => 'Checks accreditation document reuse.',
+            'start_date' => '2026-06-01', 'end_date' => '2026-06-01', 'start_time' => '08:00', 'end_time' => '16:00',
+            'venue' => 'PESO Urdaneta Hall', 'sector' => 'local', 'target_sector' => 'Multi-sector',
+            'partner_agencies' => ['DOLE'], 'submission_deadline' => '2026-05-15 17:00:00',
+            'contact_email' => 'peso@example.test', 'maximum_representatives' => 2, 'status' => 'draft',
+        ])->assertCreated()->json('job_fair.job_fair_id');
+        $this->postJson("/api/admin/job-fairs/{$fairId}/publish", ['status' => 'accepting_employers'])->assertOk();
+        $this->postJson("/api/admin/job-fairs/{$fairId}/invite", ['employer_id' => $employer->employer_id])->assertCreated();
+
+        Sanctum::actingAs($employer);
+        $this->postJson("/api/employer/job-fairs/{$fairId}/respond", ['response' => 'accepted'])->assertOk();
+
+        // No manual upload happens for business_permit — the approved
+        // accreditation document should already satisfy it.
+        $event = $this->getJson('/api/employer/job-fairs')->assertOk()->json('data.0');
+        $businessPermit = collect($event['participation']['requirements'])->firstWhere('label', 'Business Permit');
+
+        $this->assertNotNull($businessPermit, 'Business Permit requirement should be auto-satisfied.');
+        $this->assertTrue($businessPermit['reused_from_verification']);
+        $this->assertSame('business-permit-2026.pdf', $businessPermit['original_filename']);
+        $this->assertSame('approved', $businessPermit['status']);
+
+        // The employer can still view/download the reused document.
+        $this->get("/api/employer/job-fair-requirements/{$businessPermit['id']}/view")
+            ->assertOk()->assertHeader('content-type', 'application/pdf');
+
+        // A requirement with no matching accreditation document type
+        // (job_vacancy_count) still needs a manual submission.
+        $jobVacancyCount = collect($event['participation']['requirements'])->firstWhere('label', 'Job Vacancy Count');
+        $this->assertNull($jobVacancyCount);
+    }
+
     private function employer(string $email, string $company): Employer
     {
         return Employer::create([
@@ -136,6 +187,7 @@ class JobFairEcosystemFlowTest extends TestCase
     {
         Schema::create('administrators', function (Blueprint $t) { $t->id('admin_id'); $t->string('first_name'); $t->string('last_name'); $t->string('email')->unique(); $t->string('mobile_number')->nullable(); $t->string('password'); $t->string('role')->nullable(); $t->string('status')->nullable(); $t->timestamp('email_verified_at')->nullable(); $t->rememberToken(); $t->timestamps(); });
         Schema::create('employers', function (Blueprint $t) { $t->id('employer_id'); $t->string('email')->unique(); $t->string('password'); $t->string('company_type')->nullable(); $t->string('company_name')->nullable(); $t->string('trade_name')->nullable(); $t->string('mobile_number')->nullable(); $t->string('representative_contact_number')->nullable(); $t->string('verification_status')->nullable(); $t->timestamp('verified_at')->nullable(); $t->timestamp('email_verified_at')->nullable(); $t->softDeletes(); $t->rememberToken(); $t->timestamps(); });
+        Schema::create('employer_documents', function (Blueprint $t) { $t->id('document_id'); $t->unsignedBigInteger('employer_id'); $t->string('document_type'); $t->string('document_path'); $t->string('original_filename'); $t->integer('file_size'); $t->string('mime_type'); $t->timestamp('uploaded_at')->nullable(); $t->string('verification_status')->default('pending'); $t->text('admin_notes')->nullable(); $t->date('expiration_date')->nullable(); $t->timestamp('viewed_at')->nullable(); $t->timestamps(); });
         Schema::create('job_seekers', function (Blueprint $t) { $t->id('seeker_id'); $t->string('email')->nullable(); $t->string('password')->nullable(); $t->string('sex')->nullable(); $t->string('gender')->nullable(); $t->timestamps(); });
         Schema::create('job_vacancies', function (Blueprint $t) { $t->id('post_id'); $t->unsignedBigInteger('employer_id'); $t->unsignedInteger('vacancies_count')->default(0); $t->boolean('spes_tupad_eligible')->default(false); $t->string('status')->default('active'); $t->timestamps(); });
         Schema::create('applications', function (Blueprint $t) { $t->id('apply_id'); $t->unsignedBigInteger('post_id'); $t->unsignedBigInteger('seeker_id'); $t->string('status')->default('pending'); $t->timestamp('status_changed_at')->nullable(); $t->timestamps(); });

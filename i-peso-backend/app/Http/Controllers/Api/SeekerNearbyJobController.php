@@ -378,6 +378,10 @@ class SeekerNearbyJobController extends Controller
                 }
                 return true;
             })
+            // A seeker already hired for a vacancy has no further use for it
+            // as a recommendation — the application itself still lives in
+            // their application history regardless of this feed filter.
+            ->reject(fn (array $job) => ($job['application_status'] ?? null) === 'hired')
             ->when(
                 ! empty($validated['hide_applied']),
                 fn ($collection) => $collection->reject(fn (array $job) => $job['has_applied'])
