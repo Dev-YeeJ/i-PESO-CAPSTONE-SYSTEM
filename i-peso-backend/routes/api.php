@@ -29,7 +29,7 @@ use App\Http\Controllers\Api\EmployerJobFairController;
 use App\Http\Controllers\Api\EmployerNotificationController;
 use App\Http\Controllers\Api\EmployerPlacementReportController;
 use App\Http\Controllers\Api\EmployerRegistrationController;
-use App\Http\Controllers\Api\GoogleCalendarController;
+use App\Http\Controllers\Api\InterviewCalendarController;
 use App\Http\Controllers\Api\GoogleMapsController;
 use App\Http\Controllers\Api\JobFairController;
 use App\Http\Controllers\Api\OccupationController;
@@ -73,9 +73,6 @@ Route::prefix('auth')->group(function () {
     Route::post('/forgot-password', [AuthController::class, 'forgotPassword'])->middleware('throttle:5,1');
     Route::post('/reset-password', [AuthController::class, 'resetPassword'])->middleware('throttle:5,1');
 });
-
-// Public callback for Google Calendar (Google browser redirect does not have Bearer token)
-Route::get('/employer/calendar/callback', [GoogleCalendarController::class, 'callback']);
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/auth/me', [AuthController::class, 'me']);
@@ -130,11 +127,7 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::patch('/applications/bulk-status', [EmployerApplicationController::class, 'updateStatusBulk'])->middleware('throttle:20,1');
             Route::patch('/applications/{application}/status', [EmployerApplicationController::class, 'updateStatus'])->middleware('throttle:30,1');
 
-            // Google Calendar — throttled since these call the live Google
-            // Calendar API against a shared project quota.
-            Route::get('/calendar/connect', [GoogleCalendarController::class, 'connect'])->middleware('throttle:10,1');
-            Route::post('/calendar/generate-meet-link', [GoogleCalendarController::class, 'generateMeetLink'])->middleware('throttle:10,1');
-            Route::get('/calendar/events', [GoogleCalendarController::class, 'events'])->middleware('throttle:20,1');
+            Route::get('/calendar/events', [InterviewCalendarController::class, 'events'])->middleware('throttle:20,1');
         });
     });
 

@@ -27,16 +27,6 @@ export const updateEmployerApplicationStatusBulk = async (payload) => {
   return response.data
 }
 
-export const generateGoogleMeetLink = async (payload) => {
-  const response = await apiClient.post('/employer/calendar/generate-meet-link', payload)
-  return response.data
-}
-
-export const connectGoogleCalendar = async () => {
-  const response = await apiClient.get('/employer/calendar/connect')
-  return response.data
-}
-
 export const getEmployerCalendarEvents = async (params) => {
   const response = await apiClient.get('/employer/calendar/events', { params })
   return response.data

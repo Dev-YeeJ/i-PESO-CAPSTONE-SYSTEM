@@ -1,9 +1,8 @@
 import { useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { CalendarPlus, CalendarCheck, Clock3, ExternalLink } from 'lucide-react'
-import toast from 'react-hot-toast'
+import { CalendarCheck, Clock3, ExternalLink } from 'lucide-react'
 import { Button, Card, CardHeader, EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui'
-import { connectGoogleCalendar, getEmployerCalendarEvents } from '@/services/employerApplicationService'
+import { getEmployerCalendarEvents } from '@/services/employerApplicationService'
 
 const RANGE_DAYS = 60
 
@@ -37,16 +36,6 @@ export default function InterviewCalendarPage() {
   })
 
   const events = eventsQuery.data?.events ?? []
-  const googleConnected = eventsQuery.data?.google_connected ?? false
-
-  const handleConnect = async () => {
-    try {
-      const { url } = await connectGoogleCalendar()
-      window.location.href = url
-    } catch {
-      toast.error('Failed to initiate Google Calendar connection.')
-    }
-  }
 
   return (
     <div className="portal-page">
@@ -55,23 +44,6 @@ export default function InterviewCalendarPage() {
         <h1 className="portal-title mt-1">Interview Calendar</h1>
         <p className="portal-subtitle">Interviews scheduled from the Applicants board, straight from your i-PESO account.</p>
       </div>
-
-      {!eventsQuery.isLoading && !googleConnected && (
-        <Card padding="none">
-          <div className="flex flex-wrap items-center justify-between gap-3 p-4 sm:p-5">
-            <div className="flex items-center gap-3">
-              <CalendarPlus className="h-5 w-5 shrink-0 text-slate-400" />
-              <div>
-                <p className="text-sm font-bold text-slate-900">Connect Google Calendar for Meet links</p>
-                <p className="text-xs text-slate-500">Optional — your interviews below already work without it. Connecting lets i-PESO generate a Google Meet link automatically for online interviews.</p>
-              </div>
-            </div>
-            <Button variant="outline" size="sm" icon={CalendarPlus} onClick={handleConnect}>
-              Connect
-            </Button>
-          </div>
-        </Card>
-      )}
 
       <Card padding="none">
         <div className="p-5 sm:p-6">
@@ -112,7 +84,7 @@ export default function InterviewCalendarPage() {
                         icon={ExternalLink}
                         onClick={() => window.open(event.url, '_blank', 'noopener,noreferrer')}
                       >
-                        Join Meet
+                        Join call
                       </Button>
                     )}
                   </li>

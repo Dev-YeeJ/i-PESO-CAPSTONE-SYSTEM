@@ -75,18 +75,6 @@ export const markAllNotificationsRead = async () => {
   return response.data
 }
 
-export const connectGoogleCalendar = async () => {
-  const response = await apiClient.get('/employer/calendar/connect')
-  return response.data
-}
-
-export const getCalendarEvents = async (start, end) => {
-  const response = await apiClient.get('/employer/calendar/events', {
-    params: { start, end }
-  })
-  return response.data
-}
-
 export const reuploadDocument = async (documentType, file, expirationDate = null) => {
   const formData = new FormData()
   formData.append('document_type', documentType)

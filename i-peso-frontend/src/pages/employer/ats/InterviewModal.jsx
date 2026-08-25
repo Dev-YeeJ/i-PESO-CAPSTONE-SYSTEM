@@ -100,9 +100,9 @@ export default function InterviewModal({ open, onClose, targets = [], initialInt
                 <label className="flex cursor-pointer items-center">
                   <input type="checkbox" {...register('autoMeet')} className="peer sr-only" />
                   <div className="relative h-6 w-11 rounded-full bg-slate-300 transition-all after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:bg-white after:transition-all after:content-[''] peer-checked:bg-blue-600 peer-checked:after:translate-x-full peer-focus:ring-4 peer-focus:ring-blue-300" />
-                  <span className="ml-3 text-sm font-semibold text-slate-900">Auto-generate Google Meet link</span>
+                  <span className="ml-3 text-sm font-semibold text-slate-900">Auto-generate video meeting link</span>
                 </label>
-                <p className="mt-1 text-xs text-slate-600">Creates a meeting on your connected Google Calendar and fills in the link automatically.</p>
+                <p className="mt-1 text-xs text-slate-600">Creates an instant video call link and fills it in automatically — no account connection needed.</p>
               </div>
             </div>
           )}
