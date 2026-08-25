@@ -10,7 +10,6 @@ import toast from 'react-hot-toast'
 import {
   getEmployerApplications,
   getEmployerApplicationDetail,
-  connectGoogleCalendar,
 } from '@/services/employerApplicationService'
 import { Button, EmptyState, ErrorState } from '@/components/ui'
 import { PIPELINE_TABS, SORT_OPTIONS, PAGE_SIZE_OPTIONS, TERMINAL_STATUSES } from './ats/atsConstants'
@@ -137,15 +136,6 @@ export default function EmployerATSGrid() {
     }
   }
 
-  const handleConnectCalendar = async () => {
-    try {
-      const { url } = await connectGoogleCalendar()
-      window.location.href = url
-    } catch {
-      toast.error('Failed to initiate Google Calendar connection.')
-    }
-  }
-
   const goToPage = (page) => {
     setCurrentPage(Math.max(1, Math.min(page, totalPages)))
     setSelectedIds(new Set())
@@ -235,7 +225,7 @@ export default function EmployerATSGrid() {
             <button onClick={refresh} className="rounded-lg p-2 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700" title="Refresh data">
               <RefreshCw className={`h-4 w-4 ${applicationsQuery.isFetching ? 'animate-spin' : ''}`} />
             </button>
-            <Button variant="outline" size="sm" icon={CalendarIcon} onClick={handleConnectCalendar}>
+            <Button to="/employer/calendar" variant="outline" size="sm" icon={CalendarIcon}>
               <span className="hidden sm:inline">Calendar</span>
             </Button>
           </div>

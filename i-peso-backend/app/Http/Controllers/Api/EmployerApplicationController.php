@@ -105,7 +105,7 @@ class EmployerApplicationController extends Controller
         ]);
     }
 
-    public function updateStatus(Request $request, Application $application, \App\Services\GoogleCalendarService $calendarService): JsonResponse
+    public function updateStatus(Request $request, Application $application, \App\Services\JitsiMeetingService $meetingService): JsonResponse
     {
         $employer = $this->employer($request);
         $this->ensureOwnership($request, $application);
@@ -119,18 +119,7 @@ class EmployerApplicationController extends Controller
         $validated = $this->validateStatusPayload($request);
 
         if (($validated['status'] ?? null) === 'interview' && ($validated['interview']['auto_meet_link'] ?? false)) {
-            try {
-                $seekerName = $application->jobSeeker->name ?? 'Applicant';
-                $jobTitle = $application->jobVacancy->job_title ?? 'Position';
-                $summary = "Interview: $seekerName - $jobTitle";
-                $result = $calendarService->createMeetEvent($employer, $validated['interview']['schedule'], $summary);
-                $validated['interview']['venue_or_link'] = $result['meet_link'];
-            } catch (\Exception $e) {
-                if ($e->getCode() === 403) {
-                    return response()->json(['message' => $e->getMessage()], 403);
-                }
-                return response()->json(['message' => 'Failed to generate meeting link.', 'error' => $this->safeErrorMessage($e, 'Failed to generate meeting link.')], 500);
-            }
+            $validated['interview']['venue_or_link'] = $meetingService->createRoom()['meet_link'];
         }
 
         $sweptApplications = [];
@@ -151,7 +140,7 @@ class EmployerApplicationController extends Controller
         ]);
     }
 
-    public function updateStatusBulk(Request $request, \App\Services\GoogleCalendarService $calendarService): JsonResponse
+    public function updateStatusBulk(Request $request, \App\Services\JitsiMeetingService $meetingService): JsonResponse
     {
         $employer = $this->employer($request);
 
@@ -174,7 +163,7 @@ class EmployerApplicationController extends Controller
         $sweptApplications = [];
         $processedApplications = [];
 
-        DB::transaction(function () use ($applications, $employer, $validated, $calendarService, &$sweptApplications, &$processedApplications) {
+        DB::transaction(function () use ($applications, $employer, $validated, $meetingService, &$sweptApplications, &$processedApplications) {
             foreach ($applications as $application) {
                 if (in_array($application->status, ['hired', 'rejected', 'withdrawn'], true)) {
                     continue;
@@ -183,17 +172,7 @@ class EmployerApplicationController extends Controller
                 $appValidated = $validated;
 
                 if (($appValidated['status'] ?? null) === 'interview' && ($appValidated['interview']['auto_meet_link'] ?? false)) {
-                    try {
-                        $seekerName = $application->jobSeeker->name ?? 'Applicant';
-                        $jobTitle = $application->jobVacancy->job_title ?? 'Position';
-                        $summary = "Interview: $seekerName - $jobTitle";
-                        $result = $calendarService->createMeetEvent($employer, $appValidated['interview']['schedule'], $summary);
-                        $appValidated['interview']['venue_or_link'] = $result['meet_link'];
-                    } catch (\Exception $e) {
-                        if ($e->getCode() === 403) {
-                            abort(403, $e->getMessage());
-                        }
-                    }
+                    $appValidated['interview']['venue_or_link'] = $meetingService->createRoom()['meet_link'];
                 }
 
                 $this->processStatusUpdate($application, $employer, $appValidated, $sweptApplications);

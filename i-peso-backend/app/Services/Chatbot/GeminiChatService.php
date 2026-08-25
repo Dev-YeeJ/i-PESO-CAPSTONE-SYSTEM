@@ -29,9 +29,18 @@ class GeminiChatService
     /**
      * @param  array<int, array{role: string, text: string}>  $history
      *         Oldest first, ending with the visitor's current message.
+     * @return array{text: string, office_location: ?array{address: string}}
      */
-    public function reply(array $history): string
+    public function reply(array $history): array
     {
+        $lastQuestion = '';
+        foreach (array_reverse($history) as $turn) {
+            if ($turn['role'] !== 'model') {
+                $lastQuestion = $turn['text'];
+                break;
+            }
+        }
+
         $contents = array_map(fn (array $turn) => [
             'role' => $turn['role'] === 'model' ? 'model' : 'user',
             'parts' => [['text' => $turn['text']]],
@@ -47,7 +56,12 @@ class GeminiChatService
 
             // No tool requested — this is the actual answer.
             if ($calls === []) {
-                return $this->extractText($parts);
+                $text = $this->extractText($parts);
+
+                return [
+                    'text' => $text,
+                    'office_location' => $this->officeLocationIfAsked($text, $lastQuestion),
+                ];
             }
 
             // Echo the model's turn back, then answer every call it made in a
@@ -73,8 +87,52 @@ class GeminiChatService
 
         Log::warning('[chatbot] tool loop hit MAX_TOOL_ROUNDS without a final answer.');
 
-        return 'Pasensya po, hindi ko po masagot iyan ngayon. Maaari po kayong magtanong sa '
-            . 'PESO office ng Urdaneta City. (Sorry — I could not resolve that one.)';
+        return [
+            'text' => 'Pasensya po, hindi ko po masagot iyan ngayon. Maaari po kayong magtanong sa '
+                . 'PESO office ng Urdaneta City. (Sorry — I could not resolve that one.)',
+            'office_location' => null,
+        ];
+    }
+
+    /**
+     * Whether the visitor asked a "where" question and the reply just
+     * answered it with the office's on-record address — if both are true,
+     * the frontend can show a map for it.
+     *
+     * Deliberately not a Gemini tool: the office address is a REFERENCE fact
+     * the model states directly (see knowledgeSection()), so a tool call is
+     * not guaranteed to fire. Checking the model's own output for the exact
+     * on-record address fails safe — no address on record, no match, no map
+     * offered. The question-side check on top of that keeps the map from
+     * appearing next to an address mentioned only in passing (e.g. as part
+     * of a citizen-charter answer about something else entirely).
+     */
+    private function officeLocationIfAsked(string $text, string $question): ?array
+    {
+        $address = config('peso_knowledge.office.address');
+
+        if (blank($address) || ! str_contains($text, (string) $address)) {
+            return null;
+        }
+
+        if (! $this->asksWhere($question)) {
+            return null;
+        }
+
+        return ['address' => $address];
+    }
+
+    private function asksWhere(string $question): bool
+    {
+        $normalized = strtolower($question);
+
+        foreach (['saan', 'nasaan', 'asan', 'where', 'address', 'lokasyon', 'location'] as $keyword) {
+            if (str_contains($normalized, $keyword)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

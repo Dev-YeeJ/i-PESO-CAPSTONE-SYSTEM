@@ -134,6 +134,66 @@
   background: var(--chat-navy);
 }
 
+.ipeso-chat-inline-link {
+  color: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.ipeso-chat-inline-link:hover { opacity: 0.8; }
+.ipeso-chat-inline-link:focus-visible { outline: 2px solid var(--chat-gold-ink); outline-offset: 1px; }
+
+/* ── Inline office map (shown right in the log when a "where" question
+   is answered with the on-record office address) ── */
+
+.ipeso-chat-map-card {
+  overflow: hidden;
+  margin-top: 0.4rem;
+  border: 1px solid var(--chat-rule);
+  border-radius: 0.85rem;
+  background: var(--chat-surface);
+  animation: ipeso-chat-in 0.2s ease-out;
+}
+
+.ipeso-chat-map-card-label {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.5rem 0.7rem;
+  color: var(--chat-navy);
+  font-size: 0.74rem;
+  font-weight: 700;
+}
+
+.ipeso-chat-map-card-iframe {
+  height: 11rem;
+  width: 100%;
+  border: 0;
+  border-top: 1px solid var(--chat-rule);
+}
+
+.ipeso-chat-map-card-fallback {
+  padding: 1rem 0.7rem;
+  color: var(--chat-text-2);
+  font-size: 0.78rem;
+  border-top: 1px solid var(--chat-rule);
+}
+
+.ipeso-chat-map-card-link {
+  display: block;
+  padding: 0.5rem 0.7rem;
+  border-top: 1px solid var(--chat-rule);
+  color: var(--chat-navy);
+  background: var(--chat-surface-2);
+  font-size: 0.74rem;
+  font-weight: 700;
+  text-align: center;
+}
+
+.ipeso-chat-map-card-link:hover { background: #FDF6E9; }
+.ipeso-chat-map-card-link:focus-visible { outline: 2px solid var(--chat-gold-ink); outline-offset: -2px; }
+
 /* ── Typing indicator ── */
 
 .ipeso-chat-bubble.is-typing {

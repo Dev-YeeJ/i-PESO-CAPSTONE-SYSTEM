@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
-import { connectGoogleCalendar, updateEmployerApplicationStatusBulk } from '@/services/employerApplicationService'
+import { updateEmployerApplicationStatusBulk } from '@/services/employerApplicationService'
 
 const STATUS_LABELS = {
   reviewed: 'Reviewed',
@@ -51,19 +51,9 @@ export default function useApplicationStatusActions({ invalidateKeys = [] } = {}
       return { success: processed > 0, processed }
     } catch (err) {
       const message = err.response?.data?.message
-      if (err.response?.status === 403 && (message?.includes('Google Calendar not connected') || message?.includes('token expired'))) {
-        toast('Redirecting to connect Google Calendar...', { icon: '🗓️' })
-        try {
-          const { url } = await connectGoogleCalendar()
-          window.location.href = url
-        } catch {
-          toast.error('Failed to initiate Google Calendar connection.')
-        }
-      } else {
-        const errors = err.response?.data?.errors
-        const firstError = errors ? Object.values(errors)[0]?.[0] : null
-        toast.error(firstError || message || 'Action failed.')
-      }
+      const errors = err.response?.data?.errors
+      const firstError = errors ? Object.values(errors)[0]?.[0] : null
+      toast.error(firstError || message || 'Action failed.')
       return { success: false, processed: 0 }
     } finally {
       setIsSubmitting(false)

@@ -33,11 +33,11 @@ return [
      | and keeps deferring to the office while it is null.
      */
     'office' => [
-        'address' => null,          // e.g. '2nd Floor, Urdaneta City Hall, Poblacion, Urdaneta City, Pangasinan'
+        'address' => 'XHG8+FV3, Alexander St, Urdaneta City, Pangasinan',
         'hours' => null,            // e.g. 'Monday to Friday, 8:00 AM - 5:00 PM (closed on holidays)'
-        'phone' => null,            // landline / mobile the public may call
-        'email' => null,            // official PESO email address
-        'facebook' => null,         // official page, if the office maintains one
+        'phone' => '0923 810 2011',
+        'email' => 'pesourdanetacity@gmail.com',
+        'facebook' => 'https://www.facebook.com/profile.php?id=100069233858883',
         'fees_policy' => null,      // e.g. 'All PESO services are free of charge.'
         'employer_approval_time' => null, // e.g. '3 to 5 working days after complete documents'
     ],

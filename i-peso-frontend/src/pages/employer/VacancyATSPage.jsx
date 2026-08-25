@@ -10,7 +10,6 @@ import toast from 'react-hot-toast'
 import {
   getVacancyApplications,
   getEmployerApplicationDetail,
-  connectGoogleCalendar,
 } from '@/services/employerApplicationService'
 import { getVacancy } from '@/services/employerService'
 import { Badge, Button, EmptyState, ErrorState } from '@/components/ui'
@@ -152,15 +151,6 @@ export default function VacancyATSPage() {
     }
   }
 
-  const handleConnectCalendar = async () => {
-    try {
-      const { url } = await connectGoogleCalendar()
-      window.location.href = url
-    } catch {
-      toast.error('Failed to initiate Google Calendar connection.')
-    }
-  }
-
   const goToPage = (page) => {
     setCurrentPage(Math.max(1, Math.min(page, totalPages)))
     setSelectedIds(new Set())
@@ -297,7 +287,7 @@ export default function VacancyATSPage() {
                 {PAGE_SIZE_OPTIONS.map((size) => <option key={size} value={size}>{size}</option>)}
               </select>
             </div>
-            <Button variant="outline" size="sm" icon={CalendarIcon} onClick={handleConnectCalendar}>
+            <Button to="/employer/calendar" variant="outline" size="sm" icon={CalendarIcon}>
               <span className="hidden sm:inline">Calendar</span>
             </Button>
           </div>

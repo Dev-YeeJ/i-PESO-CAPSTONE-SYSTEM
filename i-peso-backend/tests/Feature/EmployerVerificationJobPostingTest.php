@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Administrator;
+use App\Models\Application;
 use App\Models\Employer;
 use App\Models\EmployerDocument;
 use App\Models\JobSeeker;
@@ -10,6 +11,7 @@ use App\Models\JobVacancy;
 use App\Models\Occupation;
 use App\Notifications\EmployerVerificationProgressUpdated;
 use App\Notifications\EmployerVerificationStatusChanged;
+use App\Notifications\InterviewScheduledNotification;
 use App\Services\EnhancedJobMatchingService;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
@@ -427,6 +429,43 @@ class EmployerVerificationJobPostingTest extends TestCase
             ->assertJsonPath('count', 1)
             ->assertJsonPath('jobs.0.job_title', 'Still Open Job')
             ->assertJsonMissing(['job_title' => 'Already Hired Job']);
+    }
+
+    public function test_scheduling_an_online_interview_generates_a_jitsi_link_without_google(): void
+    {
+        Notification::fake();
+        $employer = $this->createEmployer();
+        $employer->update(['verification_status' => 'verified']);
+        $seeker = $this->createSeeker();
+        $vacancy = JobVacancy::create([
+            ...$this->vacancyPayload(),
+            'employer_id' => $employer->employer_id,
+            'location' => 'Urdaneta City, Pangasinan',
+        ]);
+        $application = Application::create([
+            'post_id' => $vacancy->post_id,
+            'seeker_id' => $seeker->seeker_id,
+            'status' => 'pending',
+        ]);
+
+        Sanctum::actingAs($employer->fresh());
+
+        $this->patchJson("/api/employer/applications/{$application->apply_id}/status", [
+            'status' => 'interview',
+            'interview' => [
+                'mode_of_interview' => 'online',
+                'schedule' => now()->addDay()->format('Y-m-d H:i:s'),
+                'auto_meet_link' => true,
+            ],
+        ])->assertOk();
+
+        $link = DB::table('interview_schedules')->where('apply_id', $application->apply_id)->value('venue_or_link');
+
+        $this->assertNotNull($link, 'Expected a Jitsi link to be generated without any Google connection.');
+        $this->assertStringStartsWith('https://meet.jit.si/iPESO-', $link);
+
+        Notification::assertSentTo($seeker, InterviewScheduledNotification::class);
+        Notification::assertSentTo($employer->fresh(), InterviewScheduledNotification::class);
     }
 
     public function test_employer_cannot_access_seeker_nearby_jobs(): void
@@ -890,8 +929,68 @@ class EmployerVerificationJobPostingTest extends TestCase
                 $table->unsignedBigInteger('post_id');
                 $table->unsignedBigInteger('seeker_id');
                 $table->string('status')->default('pending');
+                $table->timestamp('status_changed_at')->nullable();
+                $table->unsignedBigInteger('status_changed_by')->nullable();
+                $table->text('employer_remarks')->nullable();
+                $table->string('employer_mismatch_reason_code')->nullable();
+                $table->string('seeker_mismatch_reason_code')->nullable();
+                $table->text('mismatch_reason_details')->nullable();
+                $table->date('placement_start_date')->nullable();
+                $table->decimal('placement_salary', 10, 2)->nullable();
+                $table->string('placement_employment_type')->nullable();
+                $table->timestamp('placement_captured_at')->nullable();
                 $table->timestamps();
                 $table->unique(['post_id', 'seeker_id']);
+            });
+        }
+
+        if (! Schema::hasTable('seeker_skills')) {
+            Schema::create('seeker_skills', function (Blueprint $table) {
+                $table->id();
+                $table->unsignedBigInteger('seeker_id');
+                $table->string('skill_name')->nullable();
+                $table->timestamps();
+            });
+        }
+
+        if (! Schema::hasTable('seeker_educations')) {
+            Schema::create('seeker_educations', function (Blueprint $table) {
+                $table->id();
+                $table->unsignedBigInteger('seeker_id');
+                $table->timestamps();
+            });
+        }
+
+        if (! Schema::hasTable('seeker_work_experiences')) {
+            Schema::create('seeker_work_experiences', function (Blueprint $table) {
+                $table->id();
+                $table->unsignedBigInteger('seeker_id');
+                $table->timestamps();
+            });
+        }
+
+        if (! Schema::hasTable('seeker_occupations')) {
+            Schema::create('seeker_occupations', function (Blueprint $table) {
+                $table->id();
+                $table->unsignedBigInteger('seeker_id');
+                $table->unsignedInteger('preference_order')->default(0);
+                $table->timestamps();
+            });
+        }
+
+        if (! Schema::hasTable('interview_schedules')) {
+            Schema::create('interview_schedules', function (Blueprint $table) {
+                $table->id('interview_id');
+                $table->unsignedBigInteger('apply_id')->unique();
+                $table->string('mode_of_interview');
+                $table->dateTime('schedule');
+                $table->string('venue_or_link', 500)->nullable();
+                $table->text('instructions')->nullable();
+                $table->string('status')->default('scheduled');
+                $table->timestamp('interview_reminder_24h_sent_at')->nullable();
+                $table->timestamp('interview_reminder_1h_sent_at')->nullable();
+                $table->timestamp('interview_reminder_15m_sent_at')->nullable();
+                $table->timestamps();
             });
         }
 

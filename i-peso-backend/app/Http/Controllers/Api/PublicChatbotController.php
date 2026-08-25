@@ -37,8 +37,11 @@ class PublicChatbotController extends Controller
         $history[] = ['role' => 'user', 'text' => $data['message']];
 
         try {
+            $result = $chat->reply($history);
+
             return response()->json([
-                'reply' => $chat->reply($history),
+                'reply' => $result['text'],
+                'office_location' => $result['office_location'],
             ]);
         } catch (ChatbotUnavailableException $exception) {
             // The exception already carries a visitor-safe message; the
@@ -46,6 +49,7 @@ class PublicChatbotController extends Controller
             return response()->json([
                 'reply' => $exception->userMessage,
                 'retryable' => $exception->status === 429,
+                'office_location' => null,
             ], $exception->status);
         }
     }

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { MessageCircle, Send, X } from 'lucide-react'
+import { MapPin, MessageCircle, Send, X } from 'lucide-react'
 import { chatbotService } from '@/services/chatbotService'
 
 /**
@@ -25,6 +25,44 @@ const STARTERS = [
 const GREETING =
   'Kumusta po! Ako ang i-PESO assistant ng Urdaneta City PESO. Maaari po kayong magtanong ' +
   'tungkol sa registration, trabaho, job fairs, at government programs.'
+
+/** Matches a bare URL or email address inside otherwise plain chat text. */
+const URL_OR_EMAIL = /(https?:\/\/[^\s]+|[\w.+-]+@[\w-]+\.[\w.-]+)/g
+
+/**
+ * Turns bare URLs and email addresses in the assistant's plain-text reply
+ * into clickable links, without pulling in a markdown renderer the model was
+ * never asked to produce output for.
+ */
+function linkifyText(text) {
+  return text.split(URL_OR_EMAIL).map((part, index) => {
+    if (!part) return null
+
+    const isUrl = /^https?:\/\//.test(part)
+    const isEmail = !isUrl && /^[\w.+-]+@[\w-]+\.[\w.-]+$/.test(part)
+    if (!isUrl && !isEmail) return part
+
+    // The model often leaves the match butted up against sentence
+    // punctuation, e.g. "...facebook.com/page. Maaari" — that trailing
+    // punctuation is not part of the link.
+    const trailing = part.match(/[.,)\]]+$/)?.[0] ?? ''
+    const clean = trailing ? part.slice(0, part.length - trailing.length) : part
+
+    return (
+      <span key={index}>
+        <a
+          href={isUrl ? clean : `mailto:${clean}`}
+          target={isUrl ? '_blank' : undefined}
+          rel={isUrl ? 'noreferrer' : undefined}
+          className="ipeso-chat-inline-link"
+        >
+          {clean}
+        </a>
+        {trailing}
+      </span>
+    )
+  })
+}
 
 export default function PublicChatWidget() {
   const [open, setOpen] = useState(false)
@@ -71,9 +109,9 @@ export default function PublicChatWidget() {
     setInput('')
     setBusy(true)
 
-    const { reply } = await chatbotService.askPublic(question, history)
+    const { reply, officeLocation } = await chatbotService.askPublic(question, history)
 
-    setMessages((current) => [...current, { role: 'model', text: reply }])
+    setMessages((current) => [...current, { role: 'model', text: reply, officeLocation }])
     setBusy(false)
   }
 
@@ -100,12 +138,12 @@ export default function PublicChatWidget() {
             <p className="ipeso-chat-bubble is-model">{GREETING}</p>
 
             {messages.map((message, index) => (
-              <p
-                key={`${message.role}-${index}`}
-                className={`ipeso-chat-bubble ${message.role === 'user' ? 'is-user' : 'is-model'}`}
-              >
-                {message.text}
-              </p>
+              <div key={`${message.role}-${index}`}>
+                <p className={`ipeso-chat-bubble ${message.role === 'user' ? 'is-user' : 'is-model'}`}>
+                  {linkifyText(message.text)}
+                </p>
+                {message.officeLocation && <InlineOfficeMap address={message.officeLocation.address} />}
+              </div>
             ))}
 
             {busy && (
@@ -158,6 +196,43 @@ export default function PublicChatWidget() {
       >
         {open ? <X size={22} aria-hidden="true" /> : <MessageCircle size={22} aria-hidden="true" />}
       </button>
+    </div>
+  )
+}
+
+/**
+ * Map shown right in the chat log when the visitor asked a "where" question
+ * and the reply gave the office's on-record address. The embed accepts a
+ * free-text address directly — no geocoding needed on our side.
+ */
+function InlineOfficeMap({ address }) {
+  const mapKey = import.meta.env.VITE_GOOGLE_MAPS_EMBED_API_KEY
+  const mapUrl = `https://www.google.com/maps/embed/v1/place?key=${encodeURIComponent(mapKey)}&q=${encodeURIComponent(address)}`
+  const directionsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`
+
+  return (
+    <div className="ipeso-chat-map-card">
+      <p className="ipeso-chat-map-card-label">
+        <MapPin size={13} aria-hidden="true" />
+        PESO Urdaneta City
+      </p>
+
+      {mapKey ? (
+        <iframe
+          title="PESO office location"
+          src={mapUrl}
+          className="ipeso-chat-map-card-iframe"
+          loading="lazy"
+          allowFullScreen
+          referrerPolicy="no-referrer-when-downgrade"
+        />
+      ) : (
+        <p className="ipeso-chat-map-card-fallback">{address}</p>
+      )}
+
+      <a href={directionsUrl} target="_blank" rel="noreferrer" className="ipeso-chat-map-card-link">
+        Buksan sa Google Maps
+      </a>
     </div>
   )
 }

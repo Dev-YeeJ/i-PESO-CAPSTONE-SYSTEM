@@ -4,7 +4,9 @@ import LegalPageLayout, { ConfirmNote, PolicySection } from './LegalPageLayout';
 // Effective date of this policy text. Bump this whenever the content below
 // changes materially — it is the only date on the page that is not a
 // [PESO TO CONFIRM] placeholder.
-const EFFECTIVE_DATE = 'August 18, 2026';
+const EFFECTIVE_DATE = 'August 26, 2026';
+
+const inlineLinkClass = 'font-semibold text-[#0A192F] underline decoration-[#B45309]/50 decoration-2 underline-offset-2 hover:decoration-[#B45309]';
 
 const SECTIONS = [
   { id: 'introduction', label: 'Introduction & Scope' },
@@ -50,15 +52,24 @@ export default function PrivacyPolicyPage() {
           The Public Employment Service Office (PESO) of Urdaneta City is the personal information
           controller responsible for the data described in this policy.
         </p>
-        <ConfirmNote>
-          Office address, official phone number, and email address have not yet been supplied by PESO and
-          will be published here once confirmed. These are the same contact details tracked internally for
-          the i-PESO assistant (see <code>config/peso_knowledge.php</code>).
-        </ConfirmNote>
+        <p>
+          Office address: XHG8+FV3, Alexander St, Urdaneta City, Pangasinan. Phone: 0923 810 2011. Email:{' '}
+          <a href="mailto:pesourdanetacity@gmail.com" className={inlineLinkClass}>
+            pesourdanetacity@gmail.com
+          </a>. Facebook:{' '}
+          <a
+            href="https://www.facebook.com/profile.php?id=100069233858883"
+            target="_blank"
+            rel="noreferrer"
+            className={inlineLinkClass}
+          >
+            PESO — Urdaneta City
+          </a>.
+        </p>
         <ConfirmNote>
           Data Protection Officer (DPO): name/position and direct contact details to be confirmed by PESO.
-          Until then, privacy concerns may be raised through the office contact details above once
-          published, or through your PESO administrator.
+          Until then, privacy concerns may be raised through the office contact details above, or through
+          your PESO administrator.
         </ConfirmNote>
       </PolicySection>
 
