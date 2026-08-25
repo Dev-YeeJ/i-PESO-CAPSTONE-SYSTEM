@@ -26,6 +26,44 @@ const GREETING =
   'Kumusta po! Ako ang i-PESO assistant ng Urdaneta City PESO. Maaari po kayong magtanong ' +
   'tungkol sa registration, trabaho, job fairs, at government programs.'
 
+/** Matches a bare URL or email address inside otherwise plain chat text. */
+const URL_OR_EMAIL = /(https?:\/\/[^\s]+|[\w.+-]+@[\w-]+\.[\w.-]+)/g
+
+/**
+ * Turns bare URLs and email addresses in the assistant's plain-text reply
+ * into clickable links, without pulling in a markdown renderer the model was
+ * never asked to produce output for.
+ */
+function linkifyText(text) {
+  return text.split(URL_OR_EMAIL).map((part, index) => {
+    if (!part) return null
+
+    const isUrl = /^https?:\/\//.test(part)
+    const isEmail = !isUrl && /^[\w.+-]+@[\w-]+\.[\w.-]+$/.test(part)
+    if (!isUrl && !isEmail) return part
+
+    // The model often leaves the match butted up against sentence
+    // punctuation, e.g. "...facebook.com/page. Maaari" — that trailing
+    // punctuation is not part of the link.
+    const trailing = part.match(/[.,)\]]+$/)?.[0] ?? ''
+    const clean = trailing ? part.slice(0, part.length - trailing.length) : part
+
+    return (
+      <span key={index}>
+        <a
+          href={isUrl ? clean : `mailto:${clean}`}
+          target={isUrl ? '_blank' : undefined}
+          rel={isUrl ? 'noreferrer' : undefined}
+          className="ipeso-chat-inline-link"
+        >
+          {clean}
+        </a>
+        {trailing}
+      </span>
+    )
+  })
+}
+
 export default function PublicChatWidget() {
   const [open, setOpen] = useState(false)
   const [messages, setMessages] = useState([])
@@ -108,7 +146,7 @@ export default function PublicChatWidget() {
             {messages.map((message, index) => (
               <div key={`${message.role}-${index}`}>
                 <p className={`ipeso-chat-bubble ${message.role === 'user' ? 'is-user' : 'is-model'}`}>
-                  {message.text}
+                  {linkifyText(message.text)}
                 </p>
                 {message.officeLocation && (
                   <button

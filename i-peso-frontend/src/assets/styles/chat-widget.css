@@ -134,6 +134,16 @@
   background: var(--chat-navy);
 }
 
+.ipeso-chat-inline-link {
+  color: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.ipeso-chat-inline-link:hover { opacity: 0.8; }
+.ipeso-chat-inline-link:focus-visible { outline: 2px solid var(--chat-gold-ink); outline-offset: 1px; }
+
 /* ── Map link (shown under a reply that mentions the office address) ── */
 
 .ipeso-chat-map-link {
