@@ -19,7 +19,7 @@ export const chatbotService = {
    *
    * @param {string} message  The visitor's new message.
    * @param {Array<{role: 'user'|'model', text: string}>} history  Oldest first.
-   * @returns {Promise<{ reply: string, retryable: boolean }>}
+   * @returns {Promise<{ reply: string, retryable: boolean, officeLocation: {address: string}|null }>}
    */
   async askPublic(message, history = []) {
     try {
@@ -28,13 +28,13 @@ export const chatbotService = {
         history: history.slice(-MAX_HISTORY_TURNS),
       })
 
-      return { reply: data.reply, retryable: false }
+      return { reply: data.reply, retryable: false, officeLocation: data.office_location ?? null }
     } catch (error) {
       // The API returns a visitor-safe `reply` even on 429/503, so prefer it
       // over inventing our own wording here.
       const reply = error.response?.data?.reply
       if (reply) {
-        return { reply, retryable: Boolean(error.response?.data?.retryable) }
+        return { reply, retryable: Boolean(error.response?.data?.retryable), officeLocation: null }
       }
 
       // Network failure, timeout, or CORS — no response body to read.
@@ -43,6 +43,7 @@ export const chatbotService = {
           'Hindi po ako maka-connect ngayon. Pakicheck po ang inyong internet at subukan ulit. ' +
           '(Could not reach the assistant — please check your connection.)',
         retryable: true,
+        officeLocation: null,
       }
     }
   },

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { MessageCircle, Send, X } from 'lucide-react'
+import { MapPin, MessageCircle, Send, X } from 'lucide-react'
 import { chatbotService } from '@/services/chatbotService'
 
 /**
@@ -31,22 +31,28 @@ export default function PublicChatWidget() {
   const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
+  const [mapAddress, setMapAddress] = useState(null)
 
   const launcherRef = useRef(null)
   const inputRef = useRef(null)
   const logEndRef = useRef(null)
 
-  // Escape closes the panel from anywhere inside it.
+  // Escape closes whichever layer is on top — the map first, then the panel.
   useEffect(() => {
     if (!open) return undefined
 
     const onKeyDown = (event) => {
-      if (event.key === 'Escape') setOpen(false)
+      if (event.key !== 'Escape') return
+      if (mapAddress) {
+        setMapAddress(null)
+        return
+      }
+      setOpen(false)
     }
 
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [open])
+  }, [open, mapAddress])
 
   // Move focus into the panel on open, and back to the launcher on close, so
   // keyboard users are never stranded.
@@ -71,9 +77,9 @@ export default function PublicChatWidget() {
     setInput('')
     setBusy(true)
 
-    const { reply } = await chatbotService.askPublic(question, history)
+    const { reply, officeLocation } = await chatbotService.askPublic(question, history)
 
-    setMessages((current) => [...current, { role: 'model', text: reply }])
+    setMessages((current) => [...current, { role: 'model', text: reply, officeLocation }])
     setBusy(false)
   }
 
@@ -100,12 +106,21 @@ export default function PublicChatWidget() {
             <p className="ipeso-chat-bubble is-model">{GREETING}</p>
 
             {messages.map((message, index) => (
-              <p
-                key={`${message.role}-${index}`}
-                className={`ipeso-chat-bubble ${message.role === 'user' ? 'is-user' : 'is-model'}`}
-              >
-                {message.text}
-              </p>
+              <div key={`${message.role}-${index}`}>
+                <p className={`ipeso-chat-bubble ${message.role === 'user' ? 'is-user' : 'is-model'}`}>
+                  {message.text}
+                </p>
+                {message.officeLocation && (
+                  <button
+                    type="button"
+                    className="ipeso-chat-map-link"
+                    onClick={() => setMapAddress(message.officeLocation.address)}
+                  >
+                    <MapPin size={14} aria-hidden="true" />
+                    Tingnan sa mapa
+                  </button>
+                )}
+              </div>
             ))}
 
             {busy && (
@@ -158,6 +173,50 @@ export default function PublicChatWidget() {
       >
         {open ? <X size={22} aria-hidden="true" /> : <MessageCircle size={22} aria-hidden="true" />}
       </button>
+
+      {mapAddress && <OfficeMapModal address={mapAddress} onClose={() => setMapAddress(null)} />}
+    </div>
+  )
+}
+
+/**
+ * Popup showing the PESO office on a map, triggered from a chat reply that
+ * mentioned the office address. The embed accepts a free-text address
+ * directly — no geocoding needed on our side.
+ */
+function OfficeMapModal({ address, onClose }) {
+  const mapKey = import.meta.env.VITE_GOOGLE_MAPS_EMBED_API_KEY
+  const mapUrl = `https://www.google.com/maps/embed/v1/place?key=${encodeURIComponent(mapKey)}&q=${encodeURIComponent(address)}`
+  const directionsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`
+
+  return (
+    <div className="ipeso-chat-map-modal" role="dialog" aria-label="PESO office location">
+      <button type="button" className="ipeso-chat-map-modal-backdrop" onClick={onClose} aria-label="Close map" />
+      <div className="ipeso-chat-map-modal-panel">
+        <header className="ipeso-chat-map-modal-header">
+          <p className="ipeso-chat-map-modal-title">PESO Urdaneta City</p>
+          <button type="button" onClick={onClose} className="ipeso-chat-close" aria-label="Close map">
+            <X size={18} aria-hidden="true" />
+          </button>
+        </header>
+
+        {mapKey ? (
+          <iframe
+            title="PESO office location"
+            src={mapUrl}
+            className="ipeso-chat-map-modal-iframe"
+            loading="lazy"
+            allowFullScreen
+            referrerPolicy="no-referrer-when-downgrade"
+          />
+        ) : (
+          <p className="ipeso-chat-map-modal-fallback">{address}</p>
+        )}
+
+        <a href={directionsUrl} target="_blank" rel="noreferrer" className="ipeso-chat-map-modal-link">
+          Buksan sa Google Maps
+        </a>
+      </div>
     </div>
   )
 }

@@ -134,6 +134,94 @@
   background: var(--chat-navy);
 }
 
+/* ── Map link (shown under a reply that mentions the office address) ── */
+
+.ipeso-chat-map-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin: 0.3rem 0 0.15rem;
+  border: 1px solid var(--chat-rule);
+  border-radius: 9999px;
+  padding: 0.3rem 0.65rem;
+  color: var(--chat-navy);
+  background: var(--chat-surface);
+  font-size: 0.72rem;
+  font-weight: 700;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.ipeso-chat-map-link:hover { border-color: var(--chat-gold-ink); background: #FDF6E9; }
+.ipeso-chat-map-link:focus-visible { outline: 2px solid var(--chat-gold-ink); outline-offset: 1px; }
+
+/* ── Map popup ── */
+
+.ipeso-chat-map-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.25rem;
+}
+
+.ipeso-chat-map-modal-backdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: rgba(13, 39, 73, 0.55);
+  cursor: pointer;
+}
+
+.ipeso-chat-map-modal-panel {
+  position: relative;
+  display: flex;
+  width: min(28rem, 100%);
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: 1rem;
+  background: var(--chat-surface);
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.32);
+  animation: ipeso-chat-in 0.2s ease-out;
+}
+
+.ipeso-chat-map-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.85rem 1rem;
+  color: #fff;
+  background: var(--chat-navy);
+}
+
+.ipeso-chat-map-modal-title { font-size: 0.9rem; font-weight: 700; }
+
+.ipeso-chat-map-modal-iframe {
+  height: 18rem;
+  width: 100%;
+  border: 0;
+}
+
+.ipeso-chat-map-modal-fallback {
+  padding: 2rem 1.25rem;
+  color: var(--chat-text);
+  font-size: 0.85rem;
+  text-align: center;
+}
+
+.ipeso-chat-map-modal-link {
+  padding: 0.7rem 1rem;
+  border-top: 1px solid var(--chat-rule);
+  color: var(--chat-navy);
+  background: var(--chat-surface);
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-align: center;
+}
+
+.ipeso-chat-map-modal-link:hover { background: var(--chat-surface-2); }
+
 /* ── Typing indicator ── */
 
 .ipeso-chat-bubble.is-typing {

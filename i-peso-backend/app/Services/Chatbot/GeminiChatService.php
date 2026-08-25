@@ -29,8 +29,9 @@ class GeminiChatService
     /**
      * @param  array<int, array{role: string, text: string}>  $history
      *         Oldest first, ending with the visitor's current message.
+     * @return array{text: string, office_location: ?array{address: string}}
      */
-    public function reply(array $history): string
+    public function reply(array $history): array
     {
         $contents = array_map(fn (array $turn) => [
             'role' => $turn['role'] === 'model' ? 'model' : 'user',
@@ -47,7 +48,12 @@ class GeminiChatService
 
             // No tool requested — this is the actual answer.
             if ($calls === []) {
-                return $this->extractText($parts);
+                $text = $this->extractText($parts);
+
+                return [
+                    'text' => $text,
+                    'office_location' => $this->officeLocationIfMentioned($text),
+                ];
             }
 
             // Echo the model's turn back, then answer every call it made in a
@@ -73,8 +79,32 @@ class GeminiChatService
 
         Log::warning('[chatbot] tool loop hit MAX_TOOL_ROUNDS without a final answer.');
 
-        return 'Pasensya po, hindi ko po masagot iyan ngayon. Maaari po kayong magtanong sa '
-            . 'PESO office ng Urdaneta City. (Sorry — I could not resolve that one.)';
+        return [
+            'text' => 'Pasensya po, hindi ko po masagot iyan ngayon. Maaari po kayong magtanong sa '
+                . 'PESO office ng Urdaneta City. (Sorry — I could not resolve that one.)',
+            'office_location' => null,
+        ];
+    }
+
+    /**
+     * Whether the reply just told the visitor the office's physical address —
+     * if so, the frontend can offer a map for it.
+     *
+     * Deliberately not a Gemini tool: the office address is a REFERENCE fact
+     * the model states directly (see knowledgeSection()), so a tool call is
+     * not guaranteed to fire. Checking the model's own output for the exact
+     * on-record address is simpler and fails safe — no address on record,
+     * no match, no map offered.
+     */
+    private function officeLocationIfMentioned(string $text): ?array
+    {
+        $address = config('peso_knowledge.office.address');
+
+        if (blank($address) || ! str_contains($text, (string) $address)) {
+            return null;
+        }
+
+        return ['address' => $address];
     }
 
     /**
