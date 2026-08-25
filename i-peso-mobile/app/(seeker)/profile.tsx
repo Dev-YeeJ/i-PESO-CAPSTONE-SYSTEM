@@ -42,6 +42,7 @@ import { Card } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
 import { SectionHeader } from '@/components/ui/SectionHeader'
 import { MatchRing } from '@/components/ui/MatchRing'
+import { ScreenSkeleton } from '@/components/ui/ScreenSkeleton'
 import { colors, radii, spacing, typography } from '@/theme'
 
 const CERTIFICATE_CATEGORIES = [
@@ -252,10 +253,7 @@ export default function ProfileScreen() {
         </Text>
 
         {isLoading ? (
-          <Card style={[styles.statusCard, styles.statusMessageCard]} padding="md">
-            <ActivityIndicator color={colors.secondary} />
-            <Text style={styles.loadingText}>Loading profile...</Text>
-          </Card>
+          <ScreenSkeleton label="Loading profile" />
         ) : null}
 
         {error ? (
@@ -778,7 +776,7 @@ const styles = StyleSheet.create({
   modalInput: { borderWidth: 1, borderColor: colors.border, borderRadius: radii.md, padding: spacing.md, color: colors.textPrimary, fontSize: typography.body, marginBottom: spacing.md },
   label: { marginBottom: spacing.xs, color: colors.textSecondary, fontSize: typography.small, fontFamily: typography.family.bold },
   categoryChip: { borderWidth: 1, borderColor: colors.border, borderRadius: radii.pill, paddingHorizontal: spacing.md, paddingVertical: spacing.xs, marginBottom: spacing.sm },
-  categoryChipActive: { borderColor: colors.secondary, backgroundColor: colors.accentSoft },
+  categoryChipActive: { borderColor: colors.blue600, backgroundColor: colors.blue50 },
   categoryChipText: { fontSize: 11, color: colors.textSecondary, textTransform: 'capitalize' },
   categoryChipTextActive: { color: colors.secondary, fontFamily: typography.family.bold },
 })

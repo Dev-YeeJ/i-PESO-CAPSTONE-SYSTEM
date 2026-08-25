@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { SeekerApplicationsResponse } from '@/services/seekerService'
@@ -11,6 +11,7 @@ import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { ScreenHeader } from '@/components/ui/ScreenHeader'
+import { ScreenSkeleton } from '@/components/ui/ScreenSkeleton'
 import { colors, spacing, typography } from '@/theme'
 
 export default function ApplicationDetailScreen() {
@@ -58,9 +59,7 @@ export default function ApplicationDetailScreen() {
     return (
       <View style={styles.flex}>
         <ScreenHeader title="Application Details" onBack={() => router.back()} />
-        <View style={styles.center}>
-          <ActivityIndicator color={colors.info} />
-        </View>
+        <ScreenSkeleton label="Loading application details" />
       </View>
     )
   }

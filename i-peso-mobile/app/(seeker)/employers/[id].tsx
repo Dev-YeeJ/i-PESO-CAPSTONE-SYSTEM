@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ActivityIndicator, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import { Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useQuery } from '@tanstack/react-query'
 import MaterialIcons from '@expo/vector-icons/MaterialIcons'
@@ -11,6 +11,7 @@ import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { ScreenHeader } from '@/components/ui/ScreenHeader'
+import { ScreenSkeleton } from '@/components/ui/ScreenSkeleton'
 import { ReportEmployerModal } from '@/components/ReportEmployerModal'
 import { colors, radii, spacing, typography } from '@/theme'
 
@@ -29,9 +30,7 @@ export default function EmployerProfileScreen() {
     return (
       <View style={styles.flex}>
         <ScreenHeader title="Employer Profile" onBack={() => router.back()} />
-        <View style={styles.center}>
-          <ActivityIndicator color={colors.info} size="large" />
-        </View>
+        <ScreenSkeleton label="Loading employer profile" />
       </View>
     )
   }

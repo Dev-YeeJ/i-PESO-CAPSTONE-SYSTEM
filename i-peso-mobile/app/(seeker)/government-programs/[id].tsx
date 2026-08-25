@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { getCitizenCharterSteps, seekerService } from '@/services/seekerService'
@@ -11,6 +11,8 @@ import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { ScreenHeader } from '@/components/ui/ScreenHeader'
+import { ScreenSkeleton } from '@/components/ui/ScreenSkeleton'
+import { SuccessSheet } from '@/components/ui/SuccessSheet'
 import { apiErrorMessage } from '@/utils/apiError'
 import { colors, radii, spacing, typography } from '@/theme'
 
@@ -54,6 +56,7 @@ export default function ProgramDetailScreen() {
   const [applyError, setApplyError] = useState('')
   const [attachmentBusy, setAttachmentBusy] = useState(false)
   const [attachmentError, setAttachmentError] = useState('')
+  const [successMessage, setSuccessMessage] = useState('')
 
   const { data: program, isLoading, error } = useQuery({
     queryKey: ['governmentProgram', id],
@@ -67,7 +70,7 @@ export default function ProgramDetailScreen() {
       setApplyError('')
       queryClient.invalidateQueries({ queryKey: ['governmentProgram', id] })
       queryClient.invalidateQueries({ queryKey: ['governmentPrograms'] })
-      Alert.alert('Application submitted', data.message || 'Your application has been submitted.')
+      setSuccessMessage(data.message || 'PESO staff will review your application and get back to you.')
     },
     onError: (caught: unknown) => {
       setApplyError(apiErrorMessage(caught, 'Unable to submit your application. Please try again.'))
@@ -103,9 +106,7 @@ export default function ProgramDetailScreen() {
     return (
       <View style={styles.flex}>
         <ScreenHeader title="Program Details" onBack={() => router.back()} />
-        <View style={styles.center}>
-          <ActivityIndicator color={colors.info} size="large" />
-        </View>
+        <ScreenSkeleton label="Loading program details" />
       </View>
     )
   }
@@ -274,6 +275,19 @@ export default function ProgramDetailScreen() {
           </Button>
         )}
       </View>
+
+      <SuccessSheet
+        visible={Boolean(successMessage)}
+        title="Application submitted"
+        message={successMessage}
+        primaryLabel="Track it"
+        onPrimary={() => {
+          setSuccessMessage('')
+          router.push('/(seeker)/program-applications')
+        }}
+        secondaryLabel="Close"
+        onSecondary={() => setSuccessMessage('')}
+      />
     </View>
   )
 }

@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
-  ActivityIndicator,
   Image,
   RefreshControl,
   ScrollView,
@@ -13,9 +12,13 @@ import {
 import { router } from 'expo-router'
 import { useQuery } from '@tanstack/react-query'
 import MaterialIcons from '@expo/vector-icons/MaterialIcons'
+import { LinearGradient } from 'expo-linear-gradient'
+import Animated, { FadeInUp } from 'react-native-reanimated'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import type { NearbyJob, ProfileStrengthItem, SeekerProfile } from '@/services/seekerService'
 import { seekerService } from '@/services/seekerService'
 import { useAuthStore } from '@/stores/authStore'
+import { useMotion } from '@/hooks/useMotion'
 import {
   firstName,
   formatSalary,
@@ -28,34 +31,36 @@ import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
 import { AlertBox } from '@/components/ui/AlertBox'
+import { PressableScale } from '@/components/ui/PressableScale'
 import { StatCard } from '@/components/ui/StatCard'
 import { SectionHeader } from '@/components/ui/SectionHeader'
 import { MatchRing } from '@/components/ui/MatchRing'
+import { Skeleton, SkeletonGroup } from '@/components/ui/Skeleton'
 import { SegmentedControl } from '@/components/ui/SegmentedControl'
-import { colors, radii, shadows, spacing, textStyles } from '@/theme'
+import { colors, gradients, radii, shadows, spacing, textStyles } from '@/theme'
 
 type QuickActionIcon = React.ComponentProps<typeof MaterialIcons>['name']
 type FeedMode = 'recommended' | 'nearby' | 'latest'
 
-const FEED_MODE_OPTIONS: Array<{ label: string; value: FeedMode }> = [
+const FEED_MODE_OPTIONS: { label: string; value: FeedMode }[] = [
   { label: 'Recommended', value: 'recommended' },
   { label: 'Nearby', value: 'nearby' },
   { label: 'Latest', value: 'latest' },
 ]
 
 const FEED_MODE_TITLES: Record<FeedMode, string> = {
-  recommended: 'Recommended Jobs',
-  nearby: 'Nearby Matches',
-  latest: 'Latest Vacancies',
+  recommended: 'Recommended for you',
+  nearby: 'Nearby matches',
+  latest: 'Latest vacancies',
 }
 
-const PRIMARY_ACTIONS: Array<{ icon: QuickActionIcon; label: string; path: string }> = [
+const PRIMARY_ACTIONS: { icon: QuickActionIcon; label: string; path: string }[] = [
   { icon: 'work', label: 'Browse Jobs', path: '/(seeker)/jobs' },
   { icon: 'map', label: 'Job Map', path: '/(seeker)/job-map' },
   { icon: 'assignment', label: 'Applications', path: '/(seeker)/applications' },
 ]
 
-const MORE_ACTIONS: Array<{ icon: QuickActionIcon; label: string; path: string }> = [
+const MORE_ACTIONS: { icon: QuickActionIcon; label: string; path: string }[] = [
   { icon: 'event', label: 'Job Fairs', path: '/(seeker)/job-fairs' },
   { icon: 'chat', label: 'Ask i-PESO', path: '/(seeker)/assistant' },
   { icon: 'school', label: 'Gov. Programs', path: '/(seeker)/government-programs' },
@@ -86,6 +91,8 @@ function pickNextBestAction(items?: ProfileStrengthItem[]) {
 }
 
 export default function SeekerHomeScreen() {
+  const insets = useSafeAreaInsets()
+  const m = useMotion()
   const user = useAuthStore((state) => state.user)
   const token = useAuthStore((state) => state.token)
 
@@ -176,16 +183,21 @@ export default function SeekerHomeScreen() {
 
   return (
     <View style={styles.flex}>
-      <StatusBar barStyle="light-content" backgroundColor={colors.primary} />
+      <StatusBar barStyle="light-content" backgroundColor={colors.blue800} />
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.content}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.accent} progressViewOffset={140} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.blue600} progressViewOffset={140} />}
         showsVerticalScrollIndicator={false}
       >
-        {/* Hero — brand-navy header, gives the screen an immediate focal point instead
-            of an all-white page. Profile Strength floats over its bottom edge. */}
-        <View style={styles.hero}>
+        {/* Gradient hero. The Profile Strength card overlaps its bottom edge, which ties the
+            two together and gives the screen a single focal point on open. */}
+        <LinearGradient
+          colors={[...gradients.hero]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={[styles.hero, { paddingTop: insets.top + spacing.lg }]}
+        >
           <View style={styles.heroDecor} pointerEvents="none" />
           <View style={styles.heroTop}>
             <View style={styles.headerLeft}>
@@ -201,7 +213,13 @@ export default function SeekerHomeScreen() {
                 <Text style={styles.nameText} numberOfLines={1}>{firstName(activeProfile)}</Text>
               </View>
             </View>
-            <TouchableOpacity onPress={() => router.push('/(seeker)/notifications')} style={styles.bellBtn} hitSlop={8}>
+            <TouchableOpacity
+              onPress={() => router.push('/(seeker)/notifications')}
+              style={styles.bellBtn}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel={unreadCount > 0 ? `Notifications, ${unreadCount} unread` : 'Notifications'}
+            >
               <MaterialIcons name="notifications" size={22} color={colors.white} />
               {unreadCount > 0 ? (
                 <View style={styles.bellBadge}>
@@ -210,14 +228,14 @@ export default function SeekerHomeScreen() {
               ) : null}
             </TouchableOpacity>
           </View>
-        </View>
+        </LinearGradient>
 
         <Card padding="md" style={styles.strengthCard}>
           <View style={styles.strengthRow}>
             <MatchRing percentage={strength} size={72} strokeWidth={6} />
             <View style={styles.strengthText}>
               <View style={styles.strengthTitleRow}>
-                <Text style={styles.strengthTitle}>Profile Strength</Text>
+                <Text style={styles.strengthTitle}>Profile strength</Text>
                 <Badge variant={readinessVariant}>{readinessStatus}</Badge>
               </View>
               <Text style={styles.strengthSub} numberOfLines={2}>
@@ -225,7 +243,7 @@ export default function SeekerHomeScreen() {
                   ? nextAction.message
                   : strength < 100
                   ? 'Complete your profile to get better matches.'
-                  : 'Your profile is fully updated! Check your top matches below.'}
+                  : 'Your profile is fully updated. Check your top matches below.'}
               </Text>
             </View>
           </View>
@@ -244,16 +262,9 @@ export default function SeekerHomeScreen() {
             style={styles.strengthCta}
             textStyle={styles.strengthCtaText}
           >
-            {(nextAction ? `Update ${nextAction.label}` : strength < 100 ? 'Complete Profile' : 'Browse Jobs') + '  →'}
+            {(nextAction ? `Update ${nextAction.label}` : strength < 100 ? 'Complete profile' : 'Browse jobs') + '  →'}
           </Button>
         </Card>
-
-        {loading ? (
-          <Card style={styles.loadingCard} padding="md">
-            <ActivityIndicator color={colors.info} />
-            <Text style={styles.loadingText}>Loading your job seeker dashboard...</Text>
-          </Card>
-        ) : null}
 
         {error ? (
           <AlertBox variant="danger" style={styles.alertBox}>
@@ -261,8 +272,7 @@ export default function SeekerHomeScreen() {
           </AlertBox>
         ) : null}
 
-        {/* Quick Statistics */}
-        <SectionHeader title="Quick Statistics" />
+        <SectionHeader title="At a glance" />
         <View style={styles.statsRow}>
           <StatCard title="Applications" value={stats?.active_applications ?? 0} />
           <StatCard title="Matches" value={jobs.length} />
@@ -274,23 +284,31 @@ export default function SeekerHomeScreen() {
 
         {/* Quick Actions — the 3 most-used flows get full-weight cards; the rest sit in a
             denser secondary row so the hierarchy actually says something about priority. */}
-        <SectionHeader title="Quick Actions" />
+        <SectionHeader title="Quick actions" />
         <View style={styles.primaryActionsGrid}>
-          {PRIMARY_ACTIONS.map((action) => (
-            <QuickAction key={action.label} {...action} onPress={() => router.push(action.path as never)} />
+          {PRIMARY_ACTIONS.map((action, index) => (
+            <QuickAction
+              key={action.label}
+              {...action}
+              index={index}
+              onPress={() => router.push(action.path as never)}
+            />
           ))}
         </View>
         <View style={styles.secondaryActionsRow}>
           {MORE_ACTIONS.map((action) => (
-            <TouchableOpacity
+            <PressableScale
               key={action.label}
+              scaleTo="buttonPress"
+              ripple={null}
               style={styles.secondaryAction}
               onPress={() => router.push(action.path as never)}
-              activeOpacity={0.8}
+              accessibilityRole="button"
+              accessibilityLabel={action.label}
             >
-              <MaterialIcons name={action.icon} size={16} color={colors.secondary} />
+              <MaterialIcons name={action.icon} size={16} color={colors.blue700} />
               <Text style={styles.secondaryActionLabel} numberOfLines={1}>{action.label}</Text>
-            </TouchableOpacity>
+            </PressableScale>
           ))}
         </View>
 
@@ -299,7 +317,7 @@ export default function SeekerHomeScreen() {
         <SectionHeader
           title={FEED_MODE_TITLES[feedMode]}
           action={
-            <TouchableOpacity onPress={() => router.push('/(seeker)/jobs')} hitSlop={8}>
+            <TouchableOpacity onPress={() => router.push('/(seeker)/jobs')} hitSlop={8} accessibilityRole="button">
               <Text style={styles.viewAllText}>View all →</Text>
             </TouchableOpacity>
           }
@@ -311,13 +329,34 @@ export default function SeekerHomeScreen() {
           </AlertBox>
         ) : null}
 
-        {topJobs.length ? topJobs.map((job) => (
-          <TouchableOpacity
+        {loading ? (
+          <SkeletonGroup label="Loading your matches" style={styles.jobSkeletons}>
+            {[0, 1, 2].map((row) => (
+              <View key={row} style={styles.jobSkeletonCard}>
+                <View style={styles.jobSkeletonTop}>
+                  <Skeleton width={40} height={40} radius={radii.md} />
+                  <View style={styles.flexOne}>
+                    <Skeleton width="80%" height={14} />
+                    <Skeleton width="50%" height={11} style={styles.skeletonGap} />
+                  </View>
+                  <Skeleton width={40} height={40} radius={20} />
+                </View>
+                <Skeleton width="70%" height={11} style={styles.skeletonRow} />
+                <Skeleton width={96} height={22} style={styles.skeletonRow} />
+              </View>
+            ))}
+          </SkeletonGroup>
+        ) : topJobs.length ? topJobs.map((job, index) => (
+          <Animated.View
             key={String(job.post_id)}
-            activeOpacity={0.9}
-            onPress={() => router.push(`/(seeker)/jobs/${job.post_id}`)}
+            entering={m.enabled ? FadeInUp.delay(m.stagger(index)).duration(260) : undefined}
           >
-            <Card padding="md" style={styles.jobCard}>
+            <PressableScale
+              onPress={() => router.push(`/(seeker)/jobs/${job.post_id}`)}
+              style={styles.jobCard}
+              accessibilityRole="button"
+              accessibilityLabel={`Open ${textFrom(job.job_title, 'job')} at ${jobCompany(job)}`}
+            >
               <View style={styles.jobCardHeaderRow}>
                 <View style={styles.jobLogo}>
                   <Text style={styles.jobLogoText}>{jobCompany(job).charAt(0).toUpperCase()}</Text>
@@ -326,24 +365,23 @@ export default function SeekerHomeScreen() {
                   <Text style={styles.jobTitle} numberOfLines={2}>{textFrom(job.job_title, 'Untitled job')}</Text>
                   <Text style={styles.jobCompany} numberOfLines={1}>{jobCompany(job)}</Text>
                 </View>
-                <MatchRing percentage={job.match?.percentage ?? 0} size={40} strokeWidth={4} />
+                <MatchRing percentage={job.match?.percentage ?? 0} size={44} strokeWidth={4} />
               </View>
+              <Text style={styles.jobSalary} numberOfLines={1}>{formatSalary(job)}</Text>
               <View style={styles.jobMetaContainer}>
-                <MaterialIcons name="place" size={13} color={colors.textSecondary} />
+                <MaterialIcons name="place" size={13} color={colors.subtle} />
                 <Text style={styles.jobMeta} numberOfLines={1}>{jobLocation(job)}</Text>
-                <Text style={styles.jobMetaDot}>•</Text>
-                <Text style={styles.jobMeta} numberOfLines={1}>{formatSalary(job)}</Text>
               </View>
               <Badge variant="neutral" style={styles.employmentBadge}>
                 {titleCase(job.employment_type, 'Employment type not listed')}
               </Badge>
-            </Card>
-          </TouchableOpacity>
+            </PressableScale>
+          </Animated.View>
         )) : (
           <Card padding="md" style={styles.emptyCard}>
             <Text style={styles.emptyTitle}>No nearby jobs yet</Text>
             <Text style={styles.emptySub}>
-              Jobs will appear here when employers post active vacancies near your saved address.
+              Jobs appear here when employers post active vacancies near your saved address.
             </Text>
           </Card>
         )}
@@ -355,39 +393,59 @@ export default function SeekerHomeScreen() {
 function QuickAction({
   icon,
   label,
+  index,
   onPress,
 }: {
   icon: QuickActionIcon
   label: string
+  index: number
   onPress: () => void
 }) {
+  const m = useMotion()
+
   return (
-    <TouchableOpacity style={styles.actionCard} onPress={onPress} activeOpacity={0.85}>
-      <View style={styles.actionIconCircle}>
-        <MaterialIcons name={icon} size={22} color={colors.accent} />
-      </View>
-      <Text style={styles.actionLabel} numberOfLines={1}>{label}</Text>
-    </TouchableOpacity>
+    <Animated.View
+      style={styles.flexOne}
+      entering={m.enabled ? FadeInUp.delay(m.stagger(index)).duration(240) : undefined}
+    >
+      <PressableScale
+        scaleTo="buttonPress"
+        style={styles.actionCard}
+        onPress={onPress}
+        accessibilityRole="button"
+        accessibilityLabel={label}
+      >
+        <View style={styles.actionIconCircle}>
+          <MaterialIcons name={icon} size={22} color={colors.blue700} />
+        </View>
+        <Text style={styles.actionLabel} numberOfLines={1}>{label}</Text>
+      </PressableScale>
+    </Animated.View>
   )
 }
 
 const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: colors.background },
+  flexOne: { flex: 1 },
   scroll: { flex: 1 },
   content: { paddingBottom: spacing.xxxl },
 
-  hero: { backgroundColor: colors.primary, paddingHorizontal: spacing.lg, paddingTop: spacing.xxl, paddingBottom: spacing.xxxl + spacing.lg, overflow: 'hidden' },
-  heroDecor: { position: 'absolute', top: -60, right: -40, width: 180, height: 180, borderRadius: 90, backgroundColor: colors.accent, opacity: 0.12 },
+  hero: {
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.xxxl + spacing.lg,
+    overflow: 'hidden',
+  },
+  heroDecor: { position: 'absolute', top: -60, right: -40, width: 180, height: 180, borderRadius: 90, backgroundColor: colors.white, opacity: 0.08 },
   heroTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   headerLeft: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, flex: 1 },
   headerText: { flex: 1 },
-  bellBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.14)', alignItems: 'center', justifyContent: 'center' },
-  bellBadge: { position: 'absolute', top: -4, right: -4, minWidth: 18, height: 18, borderRadius: 9, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4, borderWidth: 2, borderColor: colors.primary },
-  bellBadgeText: { ...textStyles.smallBold, color: colors.primary, fontSize: 10, lineHeight: undefined },
-  avatarCircle: { width: 48, height: 48, borderRadius: 24, backgroundColor: 'rgba(255,255,255,0.14)', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.3)', justifyContent: 'center', alignItems: 'center', overflow: 'hidden' },
+  bellBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.16)', alignItems: 'center', justifyContent: 'center' },
+  bellBadge: { position: 'absolute', top: -4, right: -4, minWidth: 18, height: 18, borderRadius: 9, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4, borderWidth: 2, borderColor: colors.blue700 },
+  bellBadgeText: { ...textStyles.smallBold, color: colors.accentText, fontSize: 10, lineHeight: undefined },
+  avatarCircle: { width: 48, height: 48, borderRadius: 24, backgroundColor: 'rgba(255,255,255,0.16)', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.32)', justifyContent: 'center', alignItems: 'center', overflow: 'hidden' },
   avatarImage: { width: '100%', height: '100%' },
   avatarText: { ...textStyles.title, color: colors.white, fontSize: 20, lineHeight: undefined },
-  greetingText: { ...textStyles.small, color: 'rgba(255,255,255,0.72)' },
+  greetingText: { ...textStyles.small, color: colors.blue200 },
   nameText: { ...textStyles.heading, color: colors.white, fontSize: 22, lineHeight: undefined },
 
   strengthCard: { marginHorizontal: spacing.lg, marginTop: -spacing.xxl, marginBottom: spacing.lg, ...shadows.lg },
@@ -397,38 +455,57 @@ const styles = StyleSheet.create({
   strengthTitle: { ...textStyles.title, color: colors.textPrimary },
   strengthSub: { ...textStyles.small, color: colors.textSecondary, lineHeight: 17 },
   strengthCta: { marginTop: spacing.md, marginBottom: 0, alignSelf: 'flex-start', paddingHorizontal: 0 },
-  strengthCtaText: { color: colors.info, ...textStyles.smallBold, lineHeight: undefined },
+  strengthCtaText: { color: colors.blue600, ...textStyles.smallBold, lineHeight: undefined },
 
-  loadingCard: { marginHorizontal: spacing.lg, marginBottom: spacing.lg, alignItems: 'center', justifyContent: 'center', gap: spacing.sm },
-  loadingText: { ...textStyles.smallMedium, color: colors.textSecondary, marginTop: spacing.xs },
   alertBox: { marginHorizontal: spacing.lg, marginBottom: spacing.lg },
 
   statsRow: { flexDirection: 'row', gap: spacing.sm, paddingHorizontal: spacing.lg },
   primaryActionsGrid: { flexDirection: 'row', gap: spacing.sm, paddingHorizontal: spacing.lg },
-  actionCard: { flex: 1, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radii.lg, paddingVertical: spacing.md, paddingHorizontal: spacing.xs, alignItems: 'center', justifyContent: 'center', gap: spacing.sm, ...shadows.xs },
-  actionIconCircle: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.accentSoft, alignItems: 'center', justifyContent: 'center' },
+  actionCard: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radii.lg, paddingVertical: spacing.lg, paddingHorizontal: spacing.xs, alignItems: 'center', justifyContent: 'center', gap: spacing.sm, ...shadows.xs },
+  actionIconCircle: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.blue50, alignItems: 'center', justifyContent: 'center' },
   actionLabel: { color: colors.textPrimary, ...textStyles.smallBold, lineHeight: undefined, textAlign: 'center' },
 
   secondaryActionsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, paddingHorizontal: spacing.lg, marginTop: spacing.sm },
-  secondaryAction: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, backgroundColor: colors.infoBackground, borderRadius: radii.pill, paddingVertical: spacing.sm, paddingHorizontal: spacing.md },
-  secondaryActionLabel: { color: colors.secondary, ...textStyles.smallMedium, lineHeight: undefined },
+  secondaryAction: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, backgroundColor: colors.blue50, borderRadius: radii.pill, paddingVertical: spacing.sm, paddingHorizontal: spacing.md },
+  secondaryActionLabel: { color: colors.blue700, ...textStyles.smallMedium, lineHeight: undefined },
 
   feedModeControl: { marginTop: spacing.xl, marginHorizontal: spacing.lg },
-  viewAllText: { color: colors.secondary, ...textStyles.smallBold, lineHeight: undefined },
+  viewAllText: { color: colors.blue600, ...textStyles.smallBold, lineHeight: undefined },
 
-  jobCard: { marginHorizontal: spacing.lg, marginBottom: spacing.md },
+  jobCard: {
+    marginHorizontal: spacing.lg,
+    marginBottom: spacing.md,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radii.lg,
+    padding: spacing.lg,
+    ...shadows.card,
+  },
   jobCardHeaderRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md },
-  jobLogo: { width: 40, height: 40, borderRadius: radii.md, backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' },
-  jobLogoText: { color: colors.primary, ...textStyles.bodyBold, lineHeight: undefined },
+  jobLogo: { width: 40, height: 40, borderRadius: radii.md, backgroundColor: colors.blue50, alignItems: 'center', justifyContent: 'center' },
+  jobLogoText: { color: colors.blue700, ...textStyles.bodyBold, lineHeight: undefined },
   jobTitleWrap: { flex: 1 },
   jobTitle: { color: colors.textPrimary, ...textStyles.titleMedium, fontFamily: 'DMSans_700Bold', lineHeight: 21 },
   jobCompany: { color: colors.textSecondary, ...textStyles.smallMedium, marginTop: 2 },
-  jobMetaContainer: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: spacing.md, marginBottom: spacing.sm },
+  jobSalary: { marginTop: spacing.md, ...textStyles.bodyBold, color: colors.blue800 },
+  jobMetaContainer: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: spacing.xs, marginBottom: spacing.md },
   jobMeta: { color: colors.textSecondary, ...textStyles.small, flexShrink: 1 },
-  jobMetaDot: { color: colors.subtle, fontSize: 12 },
   employmentBadge: { alignSelf: 'flex-start' },
 
+  jobSkeletons: { paddingHorizontal: spacing.lg, gap: spacing.md },
+  jobSkeletonCard: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radii.lg,
+    padding: spacing.lg,
+  },
+  jobSkeletonTop: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md },
+  skeletonGap: { marginTop: spacing.sm },
+  skeletonRow: { marginTop: spacing.md },
+
   emptyCard: { marginHorizontal: spacing.lg, marginBottom: spacing.lg },
-  emptyTitle: { color: colors.primary, ...textStyles.title, marginBottom: spacing.sm },
-  emptySub: { color: colors.secondaryText, ...textStyles.body, textAlign: 'center' },
+  emptyTitle: { color: colors.textPrimary, ...textStyles.title, marginBottom: spacing.sm },
+  emptySub: { color: colors.textSecondary, ...textStyles.body, textAlign: 'center' },
 })

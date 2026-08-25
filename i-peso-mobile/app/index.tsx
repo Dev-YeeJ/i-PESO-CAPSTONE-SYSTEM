@@ -2,7 +2,9 @@ import { useEffect } from 'react'
 import { View, ActivityIndicator, StyleSheet } from 'react-native'
 import { colors } from '@/theme'
 import { router } from 'expo-router'
+import * as SecureStore from 'expo-secure-store'
 import { useAuthStore } from '@/stores/authStore'
+import { WELCOME_SEEN_KEY } from './welcome'
 
 
 interface AuthState {
@@ -19,10 +21,31 @@ export default function IndexScreen() {
   useEffect(() => {
     if (!isInitialized) return
 
-    if (isAuthenticated && user?.role === 'seeker') {
-      router.replace(user.profile_completed ? '/(seeker)' : '/onboarding')
-    } else {
-      router.replace('/(auth)/login')
+    let cancelled = false
+
+    const route = async () => {
+      if (isAuthenticated && user?.role === 'seeker') {
+        router.replace(user.profile_completed ? '/(seeker)' : '/onboarding')
+        return
+      }
+
+      // First launch on this device gets the intro carousel; afterwards it goes straight to
+      // sign-in. A read failure falls through to login rather than trapping the user.
+      let seen = 'true'
+      try {
+        seen = (await SecureStore.getItemAsync(WELCOME_SEEN_KEY)) ?? 'false'
+      } catch {
+        seen = 'true'
+      }
+
+      if (cancelled) return
+      router.replace(seen === 'true' ? '/(auth)/login' : '/welcome')
+    }
+
+    route()
+
+    return () => {
+      cancelled = true
     }
   }, [isInitialized, isAuthenticated, user])
 
@@ -38,6 +61,6 @@ const styles = StyleSheet.create({
     flex            : 1,
     justifyContent  : 'center',
     alignItems      : 'center',
-    backgroundColor : '#f8fafc',
+    backgroundColor : colors.surface,
   },
 })

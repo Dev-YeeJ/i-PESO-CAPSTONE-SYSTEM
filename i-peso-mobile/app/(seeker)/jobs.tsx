@@ -12,34 +12,37 @@ import {
 import MaterialIcons from '@expo/vector-icons/MaterialIcons'
 import { useQuery } from '@tanstack/react-query'
 import { useRouter } from 'expo-router'
+import { LinearGradient } from 'expo-linear-gradient'
 import { Button } from '@/components/ui/Button'
 import type { AxiosError } from 'axios'
 import type { JobFilters } from '@/services/seekerService'
 import { seekerService } from '@/services/seekerService'
 import { useToggleSavedJob } from '@/hooks/use-toggle-saved-job'
 import { AlertBox } from '@/components/ui/AlertBox'
+import { BottomSheet } from '@/components/ui/BottomSheet'
 import { Card } from '@/components/ui/Card'
+import { PressableScale } from '@/components/ui/PressableScale'
 import { SegmentedControl } from '@/components/ui/SegmentedControl'
 import { JobFeedCard } from '@/components/seeker/JobFeedCard'
 import { JobFeedSkeleton } from '@/components/seeker/JobFeedSkeleton'
-import { colors, radii, shadows, spacing, typography } from '@/theme'
+import { colors, gradients, radii, shadows, spacing, textStyles, typography } from '@/theme'
 
 type FeedMode = NonNullable<JobFilters['feedMode']>
 
-const SORT_OPTIONS: Array<{ label: string; value: NonNullable<JobFilters['sort']> }> = [
+const SORT_OPTIONS: { label: string; value: NonNullable<JobFilters['sort']> }[] = [
   { label: 'Match', value: 'match' },
   { label: 'Distance', value: 'distance' },
   { label: 'Newest', value: 'newest' },
   { label: 'Salary', value: 'salary' },
 ]
-const FEED_MODE_OPTIONS: Array<{ label: string; value: FeedMode }> = [
+const FEED_MODE_OPTIONS: { label: string; value: FeedMode }[] = [
   { label: 'Recommended', value: 'recommended' },
   { label: 'Nearby', value: 'nearby' },
   { label: 'Latest', value: 'latest' },
 ]
 const MIN_MATCH_OPTIONS = [0, 50, 70, 80]
 const RADIUS_OPTIONS = [5, 10, 15, 25, 50]
-const JOB_TYPE_OPTIONS: Array<{ label: string; value: string }> = [
+const JOB_TYPE_OPTIONS: { label: string; value: string }[] = [
   { label: 'Permanent', value: 'Permanent/Regular' },
   { label: 'Contractual', value: 'Contractual' },
   { label: 'Part-time', value: 'Part-Time' },
@@ -48,13 +51,15 @@ const JOB_TYPE_OPTIONS: Array<{ label: string; value: string }> = [
 const MIN_SALARY_OPTIONS = [15000, 20000, 25000, 30000]
 const JOBS_PER_BATCH = 8
 
+const DEFAULT_RADIUS = 15
+
 export default function JobsScreen() {
   const router = useRouter()
   const [query, setQuery] = useState('')
   const [locationKeyword, setLocationKeyword] = useState('')
   const [feedMode, setFeedMode] = useState<FeedMode>('recommended')
   const [sort, setSort] = useState<NonNullable<JobFilters['sort']>>('match')
-  const [radiusKm, setRadiusKm] = useState(15)
+  const [radiusKm, setRadiusKm] = useState(DEFAULT_RADIUS)
   const [minMatch, setMinMatch] = useState(0)
   const [savedOnly, setSavedOnly] = useState(false)
   const [hideApplied, setHideApplied] = useState(false)
@@ -65,6 +70,7 @@ export default function JobsScreen() {
   const [aiLoading, setAiLoading] = useState(false)
   const [aiNotice, setAiNotice] = useState('')
   const [visibleCount, setVisibleCount] = useState(JOBS_PER_BATCH)
+  const [filtersOpen, setFiltersOpen] = useState(false)
 
   const filters: JobFilters = useMemo(() => ({
     keyword: query.trim() || undefined,
@@ -81,6 +87,34 @@ export default function JobsScreen() {
     salaryMin,
     limit: 40,
   }), [certificateMatchOnly, feedMode, hideApplied, jobFairOnly, jobType, locationKeyword, minMatch, query, radiusKm, salaryMin, savedOnly, sort])
+
+  // Counts only filters the seeker changed from the default, so the badge answers "how much
+  // am I narrowing this?" rather than "how many controls exist?".
+  const activeFilterCount = useMemo(() => {
+    let count = 0
+    if (sort !== 'match') count += 1
+    if (radiusKm !== DEFAULT_RADIUS) count += 1
+    if (minMatch !== 0) count += 1
+    if (jobType) count += 1
+    if (salaryMin) count += 1
+    if (savedOnly) count += 1
+    if (hideApplied) count += 1
+    if (certificateMatchOnly) count += 1
+    if (jobFairOnly) count += 1
+    return count
+  }, [certificateMatchOnly, hideApplied, jobFairOnly, jobType, minMatch, radiusKm, salaryMin, savedOnly, sort])
+
+  const resetFilters = () => {
+    setSort('match')
+    setRadiusKm(DEFAULT_RADIUS)
+    setMinMatch(0)
+    setJobType(undefined)
+    setSalaryMin(undefined)
+    setSavedOnly(false)
+    setHideApplied(false)
+    setCertificateMatchOnly(false)
+    setJobFairOnly(false)
+  }
 
   const {
     data: jobsData,
@@ -168,34 +202,83 @@ export default function JobsScreen() {
             onAiSearch={runAiSearch}
             feedMode={feedMode}
             setFeedMode={setFeedMode}
-            sort={sort}
-            setSort={setSort}
-            radiusKm={radiusKm}
-            setRadiusKm={setRadiusKm}
-            minMatch={minMatch}
-            setMinMatch={setMinMatch}
-            savedOnly={savedOnly}
-            setSavedOnly={setSavedOnly}
-            hideApplied={hideApplied}
-            setHideApplied={setHideApplied}
-            certificateMatchOnly={certificateMatchOnly}
-            setCertificateMatchOnly={setCertificateMatchOnly}
-            jobFairOnly={jobFairOnly}
-            setJobFairOnly={setJobFairOnly}
-            jobType={jobType}
-            setJobType={setJobType}
-            salaryMin={salaryMin}
-            setSalaryMin={setSalaryMin}
             resultCount={jobs.length}
             isLoading={isLoading}
             locationRequired={locationRequired}
             errorMessage={errorMessage}
             onOpenMap={() => router.push('/(seeker)/job-map')}
+            onOpenFilters={() => setFiltersOpen(true)}
+            activeFilterCount={activeFilterCount}
+            onClearFilters={resetFilters}
           />
         )}
-        ListEmptyComponent={!isLoading && !jobsError ? <EmptyJobs /> : null}
+        ListEmptyComponent={!isLoading && !jobsError ? <EmptyJobs onClearFilters={resetFilters} hasFilters={activeFilterCount > 0} /> : null}
         ListFooterComponent={isLoading ? <JobFeedSkeleton /> : visibleCount < jobs.length ? <JobFeedSkeleton rows={1} /> : <View style={styles.footerSpace} />}
       />
+
+      <BottomSheet
+        visible={filtersOpen}
+        onClose={() => setFiltersOpen(false)}
+        title="Filters"
+        heightRatio={0.82}
+        footer={(
+          <View style={styles.sheetFooter}>
+            <Button variant="outline" size="lg" onPress={resetFilters} style={styles.resetBtn}>
+              Reset
+            </Button>
+            <Button size="lg" onPress={() => setFiltersOpen(false)} style={styles.applyBtn}>
+              {isLoading ? 'Show jobs' : `Show ${jobs.length} ${jobs.length === 1 ? 'job' : 'jobs'}`}
+            </Button>
+          </View>
+        )}
+      >
+        <ScrollView contentContainerStyle={styles.sheetBody} showsVerticalScrollIndicator={false}>
+          <FilterLabel>Sort by</FilterLabel>
+          <FilterSection>
+            {SORT_OPTIONS.map((item) => (
+              <Chip key={item.value} label={item.label} active={sort === item.value} onPress={() => setSort(item.value)} />
+            ))}
+          </FilterSection>
+
+          <FilterLabel>Show only</FilterLabel>
+          <FilterSection>
+            <Chip label="Saved" active={savedOnly} onPress={() => setSavedOnly(!savedOnly)} />
+            <Chip label="Hide applied" active={hideApplied} onPress={() => setHideApplied(!hideApplied)} />
+            <Chip label="Certificate match" active={certificateMatchOnly} onPress={() => setCertificateMatchOnly(!certificateMatchOnly)} />
+            <Chip label="Job fair" active={jobFairOnly} onPress={() => setJobFairOnly(!jobFairOnly)} />
+          </FilterSection>
+
+          <FilterLabel>Distance</FilterLabel>
+          <FilterSection>
+            {RADIUS_OPTIONS.map((value) => (
+              <Chip key={value} label={`${value} km`} active={radiusKm === value} onPress={() => setRadiusKm(value)} />
+            ))}
+          </FilterSection>
+
+          <FilterLabel>Minimum match</FilterLabel>
+          <FilterSection>
+            {MIN_MATCH_OPTIONS.map((value) => (
+              <Chip key={value} label={value === 0 ? 'Any' : `${value}%+`} active={minMatch === value} onPress={() => setMinMatch(value)} />
+            ))}
+          </FilterSection>
+
+          <FilterLabel>Employment type</FilterLabel>
+          <FilterSection>
+            <Chip label="All" active={!jobType} onPress={() => setJobType(undefined)} />
+            {JOB_TYPE_OPTIONS.map((item) => (
+              <Chip key={item.value} label={item.label} active={jobType === item.value} onPress={() => setJobType(item.value)} />
+            ))}
+          </FilterSection>
+
+          <FilterLabel>Minimum salary</FilterLabel>
+          <FilterSection>
+            <Chip label="Any" active={!salaryMin} onPress={() => setSalaryMin(undefined)} />
+            {MIN_SALARY_OPTIONS.map((value) => (
+              <Chip key={value} label={`PHP ${(value / 1000).toFixed(0)}k+`} active={salaryMin === value} onPress={() => setSalaryMin(value)} />
+            ))}
+          </FilterSection>
+        </ScrollView>
+      </BottomSheet>
     </View>
   )
 }
@@ -209,29 +292,14 @@ function JobsHeader({
   onAiSearch,
   feedMode,
   setFeedMode,
-  sort,
-  setSort,
-  radiusKm,
-  setRadiusKm,
-  minMatch,
-  setMinMatch,
-  savedOnly,
-  setSavedOnly,
-  hideApplied,
-  setHideApplied,
-  certificateMatchOnly,
-  setCertificateMatchOnly,
-  jobFairOnly,
-  setJobFairOnly,
-  jobType,
-  setJobType,
-  salaryMin,
-  setSalaryMin,
   resultCount,
   isLoading,
   locationRequired,
   errorMessage,
   onOpenMap,
+  onOpenFilters,
+  activeFilterCount,
+  onClearFilters,
 }: {
   query: string
   setQuery: (value: string) => void
@@ -241,51 +309,42 @@ function JobsHeader({
   onAiSearch: () => void
   feedMode: FeedMode
   setFeedMode: (value: FeedMode) => void
-  sort: NonNullable<JobFilters['sort']>
-  setSort: (value: NonNullable<JobFilters['sort']>) => void
-  radiusKm: number
-  setRadiusKm: (value: number) => void
-  minMatch: number
-  setMinMatch: (value: number) => void
-  savedOnly: boolean
-  setSavedOnly: (value: boolean) => void
-  hideApplied: boolean
-  setHideApplied: (value: boolean) => void
-  certificateMatchOnly: boolean
-  setCertificateMatchOnly: (value: boolean) => void
-  jobFairOnly: boolean
-  setJobFairOnly: (value: boolean) => void
-  jobType?: string
-  setJobType: (value?: string) => void
-  salaryMin?: number
-  setSalaryMin: (value?: number) => void
   resultCount: number
   isLoading: boolean
   locationRequired: boolean
   errorMessage: string
   onOpenMap: () => void
+  onOpenFilters: () => void
+  activeFilterCount: number
+  onClearFilters: () => void
 }) {
   return (
     <View>
-      <View style={styles.hero}>
+      {/* Gradient hero: the one place on this screen that carries brand weight, so the white
+          list below stays quiet and the cards do the talking. */}
+      <LinearGradient
+        colors={[...gradients.brand]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.hero}
+      >
         <View style={styles.heroTop}>
-          <View>
-            <Text style={styles.kicker}>i-PESO Jobs</Text>
+          <View style={styles.heroText}>
+            <Text style={styles.kicker}>I-PESO JOBS</Text>
             <Text style={styles.title}>Find work that fits</Text>
+            <Text style={styles.subtitle}>
+              Ranked by how well each vacancy matches your skills, commute, and salary.
+            </Text>
           </View>
           <View style={styles.resultPill}>
-            <Text style={styles.resultValue}>{isLoading ? '--' : resultCount}</Text>
-            <Text style={styles.resultLabel}>jobs</Text>
+            <Text style={styles.resultValue}>{isLoading ? '—' : resultCount}</Text>
+            <Text style={styles.resultLabel}>{resultCount === 1 ? 'JOB' : 'JOBS'}</Text>
           </View>
         </View>
-        <Text style={styles.subtitle}>Smart matching ranks vacancies by merit, commute, salary, and profile fit.</Text>
-        <Button variant="outline" size="sm" onPress={onOpenMap} style={styles.mapBtn}>View on Job Map</Button>
-      </View>
 
-      <View style={styles.searchPanel}>
         <View style={styles.searchRow}>
           <View style={styles.searchBox}>
-            <MaterialIcons name="search" size={20} color={colors.textSecondary} />
+            <MaterialIcons name="search" size={20} color={colors.subtle} />
             <TextInput
               style={styles.searchInput}
               value={query}
@@ -296,68 +355,78 @@ function JobsHeader({
               onSubmitEditing={onAiSearch}
             />
           </View>
-          <TouchableOpacity onPress={onAiSearch} disabled={aiLoading || !query.trim()} style={[styles.aiSearchBtn, (!query.trim() || aiLoading) && styles.aiSearchBtnDisabled]}>
-            <MaterialIcons name="auto-awesome" size={16} color={colors.white} />
-            <Text style={styles.aiSearchBtnText}>{aiLoading ? '...' : 'AI'}</Text>
+          <TouchableOpacity
+            onPress={onAiSearch}
+            disabled={aiLoading || !query.trim()}
+            style={[styles.aiSearchBtn, (!query.trim() || aiLoading) && styles.aiSearchBtnDisabled]}
+            accessibilityRole="button"
+            accessibilityLabel="Search with AI"
+          >
+            <MaterialIcons name="auto-awesome" size={16} color={colors.blue700} />
+            <Text style={styles.aiSearchBtnText}>{aiLoading ? '…' : 'AI'}</Text>
           </TouchableOpacity>
         </View>
+      </LinearGradient>
+
+      <View style={styles.controls}>
+        <SegmentedControl options={FEED_MODE_OPTIONS} value={feedMode} onChange={setFeedMode} />
+
+        <View style={styles.actionRow}>
+          <PressableScale
+            onPress={onOpenFilters}
+            scaleTo="buttonPress"
+            ripple={null}
+            style={[styles.filterTrigger, activeFilterCount > 0 && styles.filterTriggerActive]}
+            accessibilityRole="button"
+            accessibilityLabel={
+              activeFilterCount > 0 ? `Filters, ${activeFilterCount} applied` : 'Filters'
+            }
+          >
+            <MaterialIcons
+              name="tune"
+              size={18}
+              color={activeFilterCount > 0 ? colors.white : colors.blue700}
+            />
+            <Text style={[styles.filterTriggerText, activeFilterCount > 0 && styles.filterTriggerTextActive]}>
+              Filters
+            </Text>
+            {activeFilterCount > 0 ? (
+              <View style={styles.filterCount}>
+                <Text style={styles.filterCountText}>{activeFilterCount}</Text>
+              </View>
+            ) : null}
+          </PressableScale>
+
+          <PressableScale
+            onPress={onOpenMap}
+            scaleTo="buttonPress"
+            ripple={null}
+            style={styles.mapTrigger}
+            accessibilityRole="button"
+            accessibilityLabel="View jobs on the map"
+          >
+            <MaterialIcons name="map" size={18} color={colors.blue700} />
+            <Text style={styles.mapTriggerText}>Map</Text>
+          </PressableScale>
+
+          {activeFilterCount > 0 ? (
+            <TouchableOpacity onPress={onClearFilters} hitSlop={8} accessibilityRole="button">
+              <Text style={styles.clearText}>Clear</Text>
+            </TouchableOpacity>
+          ) : null}
+        </View>
+
         {aiNotice ? <Text style={styles.noticeText}>{aiNotice}</Text> : null}
         {locationKeyword ? <Text style={styles.appliedText}>Location filter: {locationKeyword}</Text> : null}
+
+        {locationRequired ? (
+          <AlertBox variant="warning" style={styles.alertBox}>
+            Update your address in Profile &gt; Edit &gt; Personal to see jobs near you.
+          </AlertBox>
+        ) : null}
+
+        {errorMessage ? <AlertBox variant="warning" style={styles.alertBox}>{errorMessage}</AlertBox> : null}
       </View>
-
-      <SegmentedControl options={FEED_MODE_OPTIONS} value={feedMode} onChange={setFeedMode} style={styles.segmented} />
-
-      <FilterSection>
-        <Chip label="Saved" active={savedOnly} onPress={() => setSavedOnly(!savedOnly)} />
-        <Chip label="Hide applied" active={hideApplied} onPress={() => setHideApplied(!hideApplied)} />
-        <Chip label="Certificate match" active={certificateMatchOnly} onPress={() => setCertificateMatchOnly(!certificateMatchOnly)} />
-        <Chip label="Job fair" active={jobFairOnly} onPress={() => setJobFairOnly(!jobFairOnly)} />
-      </FilterSection>
-
-      <FilterLabel>Sort by</FilterLabel>
-      <FilterSection>
-        {SORT_OPTIONS.map((item) => (
-          <Chip key={item.value} label={item.label} active={sort === item.value} onPress={() => setSort(item.value)} />
-        ))}
-      </FilterSection>
-
-      <FilterLabel>Radius</FilterLabel>
-      <FilterSection>
-        {RADIUS_OPTIONS.map((value) => (
-          <Chip key={value} label={`${value} km`} active={radiusKm === value} onPress={() => setRadiusKm(value)} />
-        ))}
-      </FilterSection>
-
-      <FilterLabel>Minimum Match</FilterLabel>
-      <FilterSection>
-        {MIN_MATCH_OPTIONS.map((value) => (
-          <Chip key={value} label={value === 0 ? 'Any' : `${value}%+`} active={minMatch === value} onPress={() => setMinMatch(value)} />
-        ))}
-      </FilterSection>
-
-      <FilterLabel>Employment Type</FilterLabel>
-      <FilterSection>
-        <Chip label="All" active={!jobType} onPress={() => setJobType(undefined)} />
-        {JOB_TYPE_OPTIONS.map((item) => (
-          <Chip key={item.value} label={item.label} active={jobType === item.value} onPress={() => setJobType(item.value)} />
-        ))}
-      </FilterSection>
-
-      <FilterLabel>Minimum Salary</FilterLabel>
-      <FilterSection>
-        <Chip label="Any" active={!salaryMin} onPress={() => setSalaryMin(undefined)} />
-        {MIN_SALARY_OPTIONS.map((value) => (
-          <Chip key={value} label={`PHP ${(value / 1000).toFixed(0)}k+`} active={salaryMin === value} onPress={() => setSalaryMin(value)} />
-        ))}
-      </FilterSection>
-
-      {locationRequired ? (
-        <AlertBox variant="warning" style={styles.alertBox}>
-          Update your address in Profile &gt; Edit &gt; Personal to see jobs near you.
-        </AlertBox>
-      ) : null}
-
-      {errorMessage ? <AlertBox variant="warning" style={styles.alertBox}>{errorMessage}</AlertBox> : null}
     </View>
   )
 }
@@ -376,20 +445,36 @@ function FilterSection({ children }: { children: React.ReactNode }) {
 
 function Chip({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
   return (
-    <TouchableOpacity style={[styles.filterBtn, active && styles.filterBtnActive]} onPress={onPress} activeOpacity={0.84}>
+    <PressableScale
+      scaleTo="buttonPress"
+      ripple={null}
+      style={[styles.filterBtn, active && styles.filterBtnActive]}
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityState={{ selected: active }}
+    >
       <Text style={[styles.filterText, active && styles.filterTextActive]}>{label}</Text>
-    </TouchableOpacity>
+    </PressableScale>
   )
 }
 
-function EmptyJobs() {
+function EmptyJobs({ onClearFilters, hasFilters }: { onClearFilters: () => void; hasFilters: boolean }) {
   return (
     <Card style={styles.emptyCard} padding="md">
       <View style={styles.emptyIcon}>
-        <MaterialIcons name="work-outline" size={28} color={colors.secondary} />
+        <MaterialIcons name="work-outline" size={28} color={colors.blue600} />
       </View>
-      <Text style={styles.emptyTitle}>No jobs found</Text>
-      <Text style={styles.emptySub}>Try another search term, widen your radius, or switch to Latest.</Text>
+      <Text style={styles.emptyTitle}>No jobs match this search</Text>
+      <Text style={styles.emptySub}>
+        {hasFilters
+          ? 'Clear your filters, widen the distance, or switch to Latest to see more.'
+          : 'Try another search term, or switch to Latest to see the newest postings.'}
+      </Text>
+      {hasFilters ? (
+        <Button variant="outline" size="sm" onPress={onClearFilters} style={styles.emptyAction}>
+          Clear filters
+        </Button>
+      ) : null}
     </Card>
   )
 }
@@ -401,11 +486,14 @@ const styles = StyleSheet.create({
   },
   content: {
     paddingHorizontal: spacing.lg,
-    paddingTop: spacing.xl,
+    paddingTop: spacing.lg,
     paddingBottom: spacing.xxxl + spacing.xl,
   },
   hero: {
+    borderRadius: radii.xl,
+    padding: spacing.xl,
     marginBottom: spacing.lg,
+    ...shadows.md,
   },
   heroTop: {
     flexDirection: 'row',
@@ -413,59 +501,45 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: spacing.md,
   },
+  heroText: {
+    flex: 1,
+  },
   kicker: {
-    color: colors.secondary,
-    fontSize: typography.label,
-    fontFamily: typography.family.bold,
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
+    ...textStyles.label,
+    color: colors.blue200,
+    letterSpacing: 1.2,
     marginBottom: spacing.xs,
   },
   title: {
-    color: colors.textPrimary,
-    fontSize: typography.display,
+    ...textStyles.display,
+    color: colors.white,
     lineHeight: 32,
-    fontFamily: typography.family.bold,
   },
   subtitle: {
     marginTop: spacing.sm,
-    color: colors.textSecondary,
-    fontSize: typography.body,
-    lineHeight: 20,
-  },
-  mapBtn: {
-    marginTop: spacing.md,
-    marginBottom: 0,
-    alignSelf: 'flex-start',
+    ...textStyles.small,
+    lineHeight: 18,
+    color: colors.blue200,
   },
   resultPill: {
-    minWidth: 64,
+    minWidth: 62,
     borderRadius: radii.md,
-    backgroundColor: colors.secondary,
+    backgroundColor: 'rgba(255,255,255,0.16)',
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     alignItems: 'center',
   },
   resultValue: {
+    ...textStyles.figureSmall,
     color: colors.white,
-    fontSize: typography.title,
-    fontFamily: typography.family.bold,
   },
   resultLabel: {
-    color: colors.accentSoft,
-    fontSize: typography.label,
-    fontFamily: typography.family.bold,
-  },
-  searchPanel: {
-    marginBottom: spacing.lg,
-    padding: spacing.md,
-    borderRadius: radii.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
-    ...shadows.card,
+    ...textStyles.label,
+    fontSize: 9,
+    color: colors.blue200,
   },
   searchRow: {
+    marginTop: spacing.lg,
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
@@ -476,10 +550,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
-    borderRadius: radii.sm,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.background,
+    borderRadius: radii.md,
+    backgroundColor: colors.surface,
     paddingHorizontal: spacing.md,
   },
   searchInput: {
@@ -493,68 +565,138 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.xs,
-    borderRadius: radii.sm,
-    backgroundColor: colors.secondary,
+    borderRadius: radii.md,
+    backgroundColor: colors.white,
     paddingHorizontal: spacing.md,
   },
   aiSearchBtnDisabled: {
     opacity: 0.55,
   },
   aiSearchBtnText: {
+    ...textStyles.smallBold,
+    color: colors.blue700,
+  },
+  controls: {
+    gap: spacing.md,
+    marginBottom: spacing.lg,
+  },
+  actionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  filterTrigger: {
+    minHeight: 42,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+    borderColor: colors.blue200,
+    backgroundColor: colors.blue50,
+    paddingHorizontal: spacing.lg,
+  },
+  filterTriggerActive: {
+    backgroundColor: colors.blue600,
+    borderColor: colors.blue600,
+  },
+  filterTriggerText: {
+    ...textStyles.smallBold,
+    color: colors.blue700,
+  },
+  filterTriggerTextActive: {
     color: colors.white,
-    fontSize: typography.small,
-    fontFamily: typography.family.bold,
+  },
+  filterCount: {
+    minWidth: 20,
+    height: 20,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.white,
+    paddingHorizontal: 5,
+  },
+  filterCountText: {
+    ...textStyles.label,
+    fontSize: 10,
+    color: colors.blue700,
+  },
+  mapTrigger: {
+    minHeight: 42,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+    paddingHorizontal: spacing.lg,
+  },
+  mapTriggerText: {
+    ...textStyles.smallBold,
+    color: colors.blue700,
+  },
+  clearText: {
+    ...textStyles.smallBold,
+    color: colors.textSecondary,
+    paddingHorizontal: spacing.sm,
   },
   noticeText: {
-    marginTop: spacing.sm,
-    color: colors.textSecondary,
-    fontSize: typography.small,
+    ...textStyles.small,
     lineHeight: 18,
+    color: colors.textSecondary,
   },
   appliedText: {
-    marginTop: spacing.sm,
-    color: colors.secondary,
-    fontSize: typography.small,
-    fontFamily: typography.family.bold,
+    ...textStyles.smallBold,
+    color: colors.blue700,
   },
-  segmented: {
-    marginBottom: spacing.md,
+  sheetBody: {
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.xl,
+  },
+  sheetFooter: {
+    flexDirection: 'row',
+    gap: spacing.md,
+  },
+  resetBtn: {
+    flex: 1,
+  },
+  applyBtn: {
+    flex: 2,
   },
   filterLabel: {
-    color: colors.muted,
-    fontSize: typography.small,
-    fontFamily: typography.family.bold,
-    marginTop: spacing.sm,
-    marginBottom: spacing.xs,
+    ...textStyles.label,
+    color: colors.textSecondary,
+    marginTop: spacing.md,
+    marginBottom: spacing.sm,
   },
   chipRow: {
     gap: spacing.sm,
-    paddingBottom: spacing.sm,
+    paddingBottom: spacing.xs,
   },
   filterBtn: {
-    minHeight: 38,
+    minHeight: 40,
     justifyContent: 'center',
     borderWidth: 1,
     borderColor: colors.border,
     backgroundColor: colors.surface,
     borderRadius: radii.pill,
-    paddingHorizontal: spacing.md,
+    paddingHorizontal: spacing.lg,
   },
   filterBtnActive: {
-    backgroundColor: colors.secondary,
-    borderColor: colors.secondary,
+    backgroundColor: colors.blue600,
+    borderColor: colors.blue600,
   },
   filterText: {
+    ...textStyles.smallBold,
     color: colors.textSecondary,
-    fontSize: typography.small,
-    fontFamily: typography.family.bold,
   },
   filterTextActive: {
     color: colors.white,
   },
   alertBox: {
-    marginTop: spacing.sm,
-    marginBottom: spacing.md,
+    marginTop: spacing.xs,
   },
   emptyCard: {
     alignItems: 'center',
@@ -566,20 +708,22 @@ const styles = StyleSheet.create({
     borderRadius: 32,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.accentSoft,
+    backgroundColor: colors.blue50,
     marginBottom: spacing.md,
   },
   emptyTitle: {
+    ...textStyles.title,
     color: colors.textPrimary,
-    fontSize: typography.title,
-    fontFamily: typography.family.bold,
     marginBottom: spacing.xs,
+    textAlign: 'center',
   },
   emptySub: {
+    ...textStyles.body,
     color: colors.textSecondary,
-    fontSize: typography.body,
-    lineHeight: 20,
     textAlign: 'center',
+  },
+  emptyAction: {
+    marginTop: spacing.lg,
   },
   footerSpace: {
     height: spacing.xxl,

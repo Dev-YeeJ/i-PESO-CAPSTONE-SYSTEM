@@ -1,21 +1,33 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
-  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
   StyleSheet,
   Text,
-  TouchableOpacity,
   View,
 } from 'react-native'
+import Animated, {
+  FadeInLeft,
+  FadeInRight,
+  FadeOutLeft,
+  FadeOutRight,
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+} from 'react-native-reanimated'
+import { LinearGradient } from 'expo-linear-gradient'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import type { AxiosError } from 'axios'
 import { router } from 'expo-router'
 import { seekerService } from '@/services/seekerService'
 import { resolvePsgcCodes } from '@/services/psgcService'
 import { useAuthStore } from '@/stores/authStore'
-import { colors, radii, spacing, typography } from '@/theme'
+import { useMotion } from '@/hooks/useMotion'
+import { colors, gradients, radii, shadows, spacing, textStyles } from '@/theme'
 import { AlertBox } from '@/components/ui/AlertBox'
+import { Button } from '@/components/ui/Button'
+import { Skeleton, SkeletonGroup } from '@/components/ui/Skeleton'
 import { firstServerError, type ServerErrors } from '@/components/onboarding/formPrimitives'
 import { buildAddressString, buildStepPayload, mapProfileToForm, validateStep } from '@/components/onboarding/payloads'
 import { emptyOnboardingForm, type OnboardingFormValue } from '@/components/onboarding/types'
@@ -52,6 +64,8 @@ const steps = [
 const JOURNEY_STAGES = ['Account Setup', 'Email Verification', ...steps]
 
 export default function OnboardingScreen() {
+  const insets = useSafeAreaInsets()
+  const m = useMotion()
   const user = useAuthStore((state) => state.user)
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated)
   const isInitialized = useAuthStore((state) => state.isInitialized)
@@ -70,6 +84,9 @@ export default function OnboardingScreen() {
   const [initialLoading, setInitialLoading] = useState(true)
   const [error, setError] = useState('')
   const [errors, setErrors] = useState<ServerErrors>({})
+  // Drives which direction the step animates in from, so going Back reads as going back.
+  const [goingBack, setGoingBack] = useState(false)
+  const scrollRef = useRef<ScrollView>(null)
 
   useEffect(() => {
     if (!isInitialized) return
@@ -101,6 +118,12 @@ export default function OnboardingScreen() {
       active = false
     }
   }, [])
+
+  // Every step change returns the seeker to the top of the form — otherwise step 5 opens
+  // scrolled halfway down where step 4's fields happened to end.
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ y: 0, animated: m.enabled })
+  }, [step, m.enabled])
 
   const submit = async () => {
     const validationError = validateStep(step, form)
@@ -138,6 +161,7 @@ export default function OnboardingScreen() {
       if (data.user) updateUser(data.user)
 
       if (step < steps.length) {
+        setGoingBack(false)
         setStep((current) => current + 1)
       } else {
         updateUser({ profile_completed: true })
@@ -153,36 +177,64 @@ export default function OnboardingScreen() {
     }
   }
 
+  const goBack = () => {
+    setErrors({})
+    setError('')
+    setGoingBack(true)
+    setStep((current) => Math.max(1, current - 1))
+  }
+
   if (initialLoading) {
     return (
-      <View style={styles.loading}>
-        <ActivityIndicator color={colors.info} />
-        <Text style={styles.loadingText}>Preparing your profile...</Text>
+      <View style={[styles.flex, { paddingTop: insets.top + spacing.xl }]}>
+        <SkeletonGroup label="Preparing your profile" style={styles.loadingWrap}>
+          <Skeleton width="55%" height={12} />
+          <Skeleton width="80%" height={26} style={styles.loadingGap} />
+          <Skeleton width="100%" height={8} style={styles.loadingBlock} />
+          <Skeleton width="100%" height={320} radius={radii.xl} style={styles.loadingBlock} />
+        </SkeletonGroup>
       </View>
     )
   }
 
+  const isLastStep = step === steps.length
+
   return (
     <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
-        <Text style={styles.kicker}>Job Seeker Registration · DOLE National Skills Registration Program</Text>
+      {/* Fixed header: the seeker's position in a seven-step government form is the one thing
+          that must never scroll out of view. */}
+      <LinearGradient
+        colors={[...gradients.brand]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={[styles.header, { paddingTop: insets.top + spacing.lg }]}
+      >
+        <Text style={styles.kicker}>DOLE NATIONAL SKILLS REGISTRATION</Text>
+        <Text style={styles.title}>{steps[step - 1]}</Text>
         <Text style={styles.journeyText}>
-          Registration step {step + 2} of {JOURNEY_STAGES.length} · Account Setup and Email Verification complete
+          Step {step + 2} of {JOURNEY_STAGES.length} · Account and email already verified
         </Text>
-        <Text style={styles.title}>Complete your NSRP profile</Text>
-        <Text style={styles.subtitle}>Step {step} of {steps.length}: {steps[step - 1]}</Text>
 
-        <View style={styles.stepRow}>
-          {steps.map((label, index) => (
-            <View key={label} style={[styles.stepSegment, index + 1 <= step ? styles.stepSegmentDone : null]} />
-          ))}
-        </View>
+        <StepRail current={step} total={steps.length} />
+      </LinearGradient>
 
+      <ScrollView
+        ref={scrollRef}
+        contentContainerStyle={styles.container}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
         {error ? (
           <AlertBox variant="danger" style={styles.errorBox}>{error}</AlertBox>
         ) : null}
 
-        <View style={styles.card}>
+        <Animated.View
+          // Keyed on step so Reanimated treats each step as a new element to animate in.
+          key={step}
+          entering={m.enabled ? (goingBack ? FadeInLeft.duration(260) : FadeInRight.duration(260)) : undefined}
+          exiting={m.enabled ? (goingBack ? FadeOutRight.duration(160) : FadeOutLeft.duration(160)) : undefined}
+          style={styles.card}
+        >
           {step === 1 && <Step1Personal value={form.step1} onChange={(step1) => setForm((f) => ({ ...f, step1 }))} errors={errors} />}
           {step === 2 && <Step2Employment value={form.step2} onChange={(step2) => setForm((f) => ({ ...f, step2 }))} errors={errors} />}
           {step === 3 && <Step3Preferences value={form.step3} onChange={(step3) => setForm((f) => ({ ...f, step3 }))} errors={errors} />}
@@ -190,47 +242,123 @@ export default function OnboardingScreen() {
           {step === 5 && <Step5Education value={form.step5} onChange={(step5) => setForm((f) => ({ ...f, step5 }))} errors={errors} />}
           {step === 6 && <Step6Training value={form.step6} onChange={(step6) => setForm((f) => ({ ...f, step6 }))} errors={errors} />}
           {step === 7 && <Step7Experience value={form.step7} onChange={(step7) => setForm((f) => ({ ...f, step7 }))} errors={errors} />}
-        </View>
-
-        <View style={styles.footer}>
-          <TouchableOpacity
-            style={[styles.secondaryButton, step === 1 && styles.disabledButton]}
-            onPress={() => { setErrors({}); setError(''); setStep((current) => Math.max(1, current - 1)) }}
-            disabled={step === 1 || loading}
-          >
-            <Text style={styles.secondaryButtonText}>Back</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.primaryButton} onPress={submit} disabled={loading} activeOpacity={0.85}>
-            {loading ? (
-              <ActivityIndicator color={colors.white} size="small" />
-            ) : (
-              <Text style={styles.primaryButtonText}>{step === steps.length ? 'Finish' : 'Save and Continue'}</Text>
-            )}
-          </TouchableOpacity>
-        </View>
+        </Animated.View>
       </ScrollView>
+
+      <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, spacing.md) }]}>
+        <Button
+          variant="outline"
+          size="lg"
+          onPress={goBack}
+          disabled={step === 1 || loading}
+          style={styles.backButton}
+        >
+          Back
+        </Button>
+        <Button size="lg" onPress={submit} loading={loading} style={styles.nextButton}>
+          {isLastStep ? 'Finish' : 'Save and continue'}
+        </Button>
+      </View>
     </KeyboardAvoidingView>
   )
 }
 
+/**
+ * Seven segments, one per NSRP step. Completed segments stay filled so the rail reads as
+ * ground covered rather than a single moving dot — it's a long form, and seeing the distance
+ * already travelled is what keeps people in it.
+ */
+function StepRail({ current, total }: { current: number; total: number }) {
+  return (
+    <View style={styles.stepRow} accessibilityRole="progressbar" accessibilityValue={{ min: 1, max: total, now: current }}>
+      {Array.from({ length: total }).map((_, index) => (
+        <RailSegment key={index} filled={index + 1 <= current} index={index} />
+      ))}
+    </View>
+  )
+}
+
+function RailSegment({ filled, index }: { filled: boolean; index: number }) {
+  const m = useMotion()
+  const progress = useSharedValue(filled ? 1 : 0)
+
+  useEffect(() => {
+    progress.value = withSpring(filled ? 1 : 0, m.spring('snappy'))
+  }, [filled, progress, m])
+
+  const style = useAnimatedStyle(() => ({
+    opacity: 0.25 + progress.value * 0.75,
+    transform: [{ scaleY: 0.6 + progress.value * 0.4 }],
+  }))
+
+  return <Animated.View key={index} style={[styles.stepSegment, style]} />
+}
+
 const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: colors.background },
-  loading: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background },
-  loadingText: { marginTop: 10, color: colors.secondaryText, fontSize: 13 },
-  container: { paddingHorizontal: spacing.lg, paddingTop: spacing.xl, paddingBottom: spacing.xxxl },
-  kicker: { color: colors.secondary, fontSize: typography.small, fontFamily: typography.family.bold, textTransform: 'uppercase', letterSpacing: 1.2 },
-  journeyText: { marginTop: spacing.xs, color: colors.subtle, fontSize: 11, fontFamily: typography.family.medium },
-  title: { marginTop: spacing.sm, color: colors.textPrimary, fontSize: typography.heading, fontFamily: typography.family.medium },
-  subtitle: { marginTop: spacing.xs, color: colors.textSecondary, fontSize: typography.body, lineHeight: 20 },
-  stepRow: { flexDirection: 'row', gap: spacing.xs, marginTop: spacing.lg },
-  stepSegment: { flex: 1, height: 6, borderRadius: radii.pill, backgroundColor: colors.border },
-  stepSegmentDone: { backgroundColor: colors.secondary },
-  errorBox: { marginTop: spacing.lg },
-  card: { marginTop: spacing.lg, borderRadius: radii.xl, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, padding: spacing.lg },
-  footer: { flexDirection: 'row', gap: spacing.md, marginTop: spacing.lg },
-  secondaryButton: { flex: 0.8, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, borderRadius: radii.lg, paddingVertical: spacing.lg, alignItems: 'center' },
-  disabledButton: { opacity: 0.45 },
-  secondaryButtonText: { color: colors.textSecondary, fontSize: typography.body, fontFamily: typography.family.bold },
-  primaryButton: { flex: 1.4, backgroundColor: colors.primary, borderRadius: radii.lg, paddingVertical: spacing.lg, alignItems: 'center' },
-  primaryButtonText: { color: colors.white, fontSize: typography.body, fontFamily: typography.family.bold },
+  loadingWrap: { paddingHorizontal: spacing.lg },
+  loadingGap: { marginTop: spacing.sm },
+  loadingBlock: { marginTop: spacing.xl },
+
+  header: {
+    paddingHorizontal: spacing.xl,
+    paddingBottom: spacing.xl,
+    borderBottomLeftRadius: radii.xl,
+    borderBottomRightRadius: radii.xl,
+    ...shadows.md,
+  },
+  kicker: {
+    ...textStyles.label,
+    fontSize: 10,
+    color: colors.blue200,
+    letterSpacing: 1.3,
+  },
+  title: {
+    marginTop: spacing.sm,
+    ...textStyles.heading,
+    color: colors.white,
+  },
+  journeyText: {
+    marginTop: spacing.xs,
+    ...textStyles.small,
+    color: colors.blue200,
+  },
+  stepRow: {
+    flexDirection: 'row',
+    gap: spacing.xs,
+    marginTop: spacing.lg,
+  },
+  stepSegment: {
+    flex: 1,
+    height: 6,
+    borderRadius: radii.pill,
+    backgroundColor: colors.white,
+  },
+
+  container: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.xxxl,
+  },
+  errorBox: { marginBottom: spacing.lg },
+  card: {
+    borderRadius: radii.xl,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+    padding: spacing.lg,
+    ...shadows.card,
+  },
+
+  footer: {
+    flexDirection: 'row',
+    gap: spacing.md,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.md,
+    backgroundColor: colors.surface,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  backButton: { flex: 1 },
+  nextButton: { flex: 2 },
 })

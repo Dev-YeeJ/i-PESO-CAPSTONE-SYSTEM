@@ -1,9 +1,7 @@
 import { useEffect } from 'react'
 import { Tabs, router } from 'expo-router'
-import MaterialIcons from '@expo/vector-icons/MaterialIcons'
-import { StyleSheet, View } from 'react-native'
 import { useAuthStore } from '@/stores/authStore'
-import { colors, radii, shadows, spacing, typography } from '@/theme'
+import { AnimatedTabBar } from '@/components/ui/AnimatedTabBar'
 
 export default function SeekerLayout() {
   const isAuthenticated = useAuthStore((s: AuthState) => s.isAuthenticated)
@@ -23,62 +21,19 @@ export default function SeekerLayout() {
 
   return (
     <Tabs
+      // Icons, colours, and the sliding pill all live in AnimatedTabBar — the navigator only
+      // supplies titles and which routes are destinations.
+      tabBar={(props) => <AnimatedTabBar {...props} />}
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: colors.secondary,
-        tabBarInactiveTintColor: colors.subtle,
         tabBarHideOnKeyboard: true,
-        tabBarStyle: {
-          backgroundColor: colors.surface,
-          borderTopWidth: 0,
-          height: 82,
-          paddingTop: spacing.sm,
-          paddingBottom: spacing.md,
-          paddingHorizontal: spacing.sm,
-          ...shadows.elevated,
-        },
-        tabBarLabelStyle: {
-          fontSize: typography.label,
-          fontFamily: typography.family.bold,
-          marginTop: 2,
-        },
       }}
     >
-      <Tabs.Screen
-        name="index"
-        options={{
-          title: 'Home',
-          tabBarIcon: ({ color, focused }) => <TabIcon name="home" color={color} focused={focused} />,
-        }}
-      />
-      <Tabs.Screen
-        name="jobs"
-        options={{
-          title: 'Jobs',
-          tabBarIcon: ({ color, focused }) => <TabIcon name="search" color={color} focused={focused} />,
-        }}
-      />
-      <Tabs.Screen
-        name="applications"
-        options={{
-          title: 'Applied',
-          tabBarIcon: ({ color, focused }) => <TabIcon name="task" color={color} focused={focused} />,
-        }}
-      />
-      <Tabs.Screen
-        name="government-programs"
-        options={{
-          title: 'Programs',
-          tabBarIcon: ({ color, focused }) => <TabIcon name="school" color={color} focused={focused} />,
-        }}
-      />
-      <Tabs.Screen
-        name="profile"
-        options={{
-          title: 'Profile',
-          tabBarIcon: ({ color, focused }) => <TabIcon name="person" color={color} focused={focused} />,
-        }}
-      />
+      <Tabs.Screen name="index" options={{ title: 'Home' }} />
+      <Tabs.Screen name="jobs" options={{ title: 'Jobs' }} />
+      <Tabs.Screen name="applications" options={{ title: 'Applied' }} />
+      <Tabs.Screen name="government-programs" options={{ title: 'Programs' }} />
+      <Tabs.Screen name="profile" options={{ title: 'Profile' }} />
       <Tabs.Screen name="jobs/[id]" options={{ href: null }} />
       <Tabs.Screen name="applications/[id]" options={{ href: null }} />
       <Tabs.Screen name="profile/edit" options={{ href: null }} />
@@ -95,29 +50,8 @@ export default function SeekerLayout() {
   )
 }
 
-function TabIcon({ name, color, focused }: { name: React.ComponentProps<typeof MaterialIcons>['name']; color: string; focused: boolean }) {
-  return (
-    <View style={[styles.iconWrap, focused && styles.iconWrapActive]}>
-      <MaterialIcons name={name} size={22} color={color} />
-    </View>
-  )
-}
-
 interface AuthState {
   isAuthenticated: boolean
   isInitialized: boolean
   user: { role?: string; profile_completed?: boolean } | null
 }
-
-const styles = StyleSheet.create({
-  iconWrap: {
-    width: 38,
-    height: 30,
-    borderRadius: radii.pill,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  iconWrapActive: {
-    backgroundColor: colors.infoBackground,
-  },
-})

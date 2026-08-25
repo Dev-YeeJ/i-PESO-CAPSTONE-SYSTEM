@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ActivityIndicator, FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import { FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useRouter } from 'expo-router'
 import MaterialIcons from '@expo/vector-icons/MaterialIcons'
@@ -8,6 +8,7 @@ import { seekerService } from '@/services/seekerService'
 import { Card } from '@/components/ui/Card'
 import { ScreenHeader } from '@/components/ui/ScreenHeader'
 import { EmptyState } from '@/components/ui/EmptyState'
+import { ScreenSkeleton } from '@/components/ui/ScreenSkeleton'
 import { colors, spacing, typography } from '@/theme'
 import { formatDistanceToNow } from 'date-fns'
 
@@ -75,9 +76,7 @@ export default function NotificationsScreen() {
       />
 
       {isLoading ? (
-        <View style={styles.center}>
-          <ActivityIndicator color={colors.secondary} size="large" />
-        </View>
+        <ScreenSkeleton label="Loading notifications" />
       ) : (
         <FlatList
           data={notifications}
@@ -138,13 +137,13 @@ const styles = StyleSheet.create({
   markAllText: { color: colors.secondary, fontSize: typography.small, fontFamily: typography.family.bold },
   listContent: { padding: spacing.lg, gap: spacing.sm, paddingBottom: spacing.xxxl },
   notificationCard: { marginBottom: 0 },
-  unreadCard: { borderColor: colors.secondary, borderWidth: 1, backgroundColor: colors.accentSoft },
+  unreadCard: { borderColor: colors.blue200, borderWidth: 1, backgroundColor: colors.blue50 },
   notificationHeader: { flexDirection: 'row', gap: spacing.md },
   iconContainer: {
     width: 42,
     height: 42,
     borderRadius: 21,
-    backgroundColor: colors.accentSoft,
+    backgroundColor: colors.blue50,
     justifyContent: 'center',
     alignItems: 'center',
   },

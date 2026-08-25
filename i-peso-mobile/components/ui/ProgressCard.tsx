@@ -9,7 +9,7 @@ interface ProgressCardProps {
   color?: string
 }
 
-export function ProgressCard({ title, subtitle, progress, color = colors.accent }: ProgressCardProps) {
+export function ProgressCard({ title, subtitle, progress, color = colors.blue600 }: ProgressCardProps) {
   const clampedProgress = Math.min(Math.max(progress, 0), 100)
 
   return (

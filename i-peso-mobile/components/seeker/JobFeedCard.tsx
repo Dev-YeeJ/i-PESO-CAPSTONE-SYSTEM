@@ -1,11 +1,25 @@
+import { useEffect, useRef } from 'react'
 import MaterialIcons from '@expo/vector-icons/MaterialIcons'
 import * as Haptics from 'expo-haptics'
-import { Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
-import Animated, { FadeInUp } from 'react-native-reanimated'
+import { StyleSheet, Text, View } from 'react-native'
+import { Gesture, GestureDetector } from 'react-native-gesture-handler'
+import Animated, {
+  Extrapolation,
+  FadeInUp,
+  interpolate,
+  runOnJS,
+  useAnimatedStyle,
+  useSharedValue,
+  withSequence,
+  withSpring,
+} from 'react-native-reanimated'
+import { LinearGradient } from 'expo-linear-gradient'
 import type { NearbyJob } from '@/services/seekerService'
 import { Badge } from '@/components/ui/Badge'
 import { MatchRing } from '@/components/ui/MatchRing'
-import { colors, radii, shadows, spacing, typography } from '@/theme'
+import { PressableScale } from '@/components/ui/PressableScale'
+import { useMotion } from '@/hooks/useMotion'
+import { colors, gradients, radii, shadows, spacing, textStyles } from '@/theme'
 import { formatSalary, jobCompany, jobLocation, listFrom, textFrom, titleCase } from '@/utils/seekerView'
 
 interface JobFeedCardProps {
@@ -16,79 +30,172 @@ interface JobFeedCardProps {
   onToggleSave: () => void
 }
 
+/** Drag distance at which the swipe commits. Roughly the width of the action panel behind. */
+const SWIPE_THRESHOLD = 72
+const SWIPE_MAX = 104
+
 export function JobFeedCard({ job, index = 0, saving = false, onPress, onToggleSave }: JobFeedCardProps) {
+  const m = useMotion()
   const requiredSkills = listFrom(job.required_skills).slice(0, 3)
   const missing = job.missing_skills?.slice(0, 2) ?? []
   const match = Math.round(Number(job.match_percentage ?? job.match?.percentage ?? 0))
   const distance = job.distance_km ? `${Number(job.distance_km).toFixed(Number(job.distance_km) >= 10 ? 0 : 1)} km away` : ''
 
-  const handleSave = () => {
-    Haptics.selectionAsync()
+  const translateX = useSharedValue(0)
+  // Drives the bookmark's reward pop. Kept separate from the drag so a tap-save animates too.
+  const bookmarkScale = useSharedValue(1)
+
+  const fireSave = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium)
     onToggleSave()
   }
 
+  // Pops the bookmark whenever the saved state actually flips, so the feedback confirms the
+  // server result rather than the gesture. The ref skips the mount pass — without it every
+  // card in the feed would pop its bookmark on first render.
+  const wasSaved = useRef(job.is_saved)
+  useEffect(() => {
+    if (wasSaved.current === job.is_saved) return
+    wasSaved.current = job.is_saved
+
+    if (!m.enabled) return
+    bookmarkScale.value = withSequence(
+      withSpring(1.18, m.spring('bouncy')),
+      withSpring(1, m.spring('bouncy')),
+    )
+  }, [job.is_saved, bookmarkScale, m])
+
+  // Horizontal-only activation: without the offset guards the card would steal every vertical
+  // scroll in the feed.
+  const swipe = Gesture.Pan()
+    .activeOffsetX([-16, 16])
+    .failOffsetY([-14, 14])
+    .onChange((event) => {
+      // Left drag only — there is no action on the right, and a two-way rubber band reads
+      // as an unfinished feature.
+      translateX.value = Math.min(0, Math.max(-SWIPE_MAX, translateX.value + event.changeX))
+    })
+    .onEnd(() => {
+      if (translateX.value < -SWIPE_THRESHOLD) {
+        runOnJS(fireSave)()
+      }
+      translateX.value = withSpring(0, m.spring('gentle'))
+    })
+
+  const cardStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: translateX.value }],
+  }))
+
+  const actionStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(translateX.value, [-SWIPE_THRESHOLD, -20, 0], [1, 0.4, 0], Extrapolation.CLAMP),
+    transform: [
+      {
+        scale: interpolate(translateX.value, [-SWIPE_MAX, -SWIPE_THRESHOLD, 0], [1.1, 1, 0.7], Extrapolation.CLAMP),
+      },
+    ],
+  }))
+
+  const bookmarkStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: bookmarkScale.value }],
+  }))
+
   return (
-    <Animated.View entering={FadeInUp.delay(Math.min(index, 8) * 45).duration(260)} style={styles.wrap}>
-      <Pressable
-        onPress={onPress}
-        android_ripple={{ color: colors.infoBackground }}
-        style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
-        accessibilityRole="button"
-        accessibilityLabel={`Open ${textFrom(job.job_title, 'job')} at ${jobCompany(job)}`}
-      >
-        <View style={styles.topRow}>
-          <View style={styles.logo}>
-            <Text style={styles.logoText}>{companyInitials(jobCompany(job))}</Text>
-          </View>
-          <View style={styles.titleWrap}>
-            <Text style={styles.title} numberOfLines={2}>{textFrom(job.job_title, 'Untitled job')}</Text>
-            <Text style={styles.company} numberOfLines={1}>{jobCompany(job)}</Text>
-          </View>
-          <MatchRing percentage={match} size={48} strokeWidth={4} />
-        </View>
+    <Animated.View
+      entering={m.enabled ? FadeInUp.delay(m.stagger(index)).duration(260) : undefined}
+      style={styles.wrap}
+    >
+      {/* Revealed behind the card as it slides left. */}
+      <View style={styles.actionLayer} pointerEvents="none">
+        <LinearGradient
+          colors={[...gradients.cta]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={StyleSheet.absoluteFill}
+        />
+        <Animated.View style={actionStyle}>
+          <MaterialIcons name={job.is_saved ? 'bookmark-remove' : 'bookmark-add'} size={26} color={colors.white} />
+          <Text style={styles.actionText}>{job.is_saved ? 'Unsave' : 'Save'}</Text>
+        </Animated.View>
+      </View>
 
-        <View style={styles.metaStack}>
-          <Meta icon="place" text={[jobLocation(job), distance].filter(Boolean).join(' - ')} />
-          <Meta icon="payments" text={formatSalary(job)} />
-          <Meta icon="business-center" text={titleCase(job.employment_type, 'Employment type not listed')} />
-        </View>
-
-        <View style={styles.badgeRow}>
-          {job.has_applied ? <Badge variant="info">{titleCase(job.application_status, 'Applied')}</Badge> : null}
-          {job.job_fair?.is_available_at_job_fair ? <Badge variant="warning">Job Fair</Badge> : null}
-          {job.certificate_match?.matched ? <Badge variant="success">Certificate Match</Badge> : null}
-          {match >= 80 ? <Badge variant="success">Strong Match</Badge> : null}
-        </View>
-
-        {requiredSkills.length ? (
-          <View style={styles.skillRow}>
-            {requiredSkills.map((skill) => (
-              <Text key={skill} style={styles.skill}>{skill}</Text>
-            ))}
-          </View>
-        ) : null}
-
-        {missing.length ? (
-          <Text style={styles.gapText}>Missing: {missing.map((gap) => gap.skill).join(', ')}</Text>
-        ) : null}
-
-        <View style={styles.footer}>
-          <TouchableOpacity
-            onPress={handleSave}
-            disabled={saving}
-            hitSlop={8}
-            style={[styles.saveButton, job.is_saved && styles.saveButtonActive]}
+      <GestureDetector gesture={swipe}>
+        <Animated.View style={cardStyle}>
+          <PressableScale
+            onPress={onPress}
+            style={styles.card}
             accessibilityRole="button"
+            accessibilityLabel={`Open ${textFrom(job.job_title, 'job')} at ${jobCompany(job)}`}
+            accessibilityHint="Swipe left on this card to save it"
           >
-            <MaterialIcons name={job.is_saved ? 'bookmark' : 'bookmark-border'} size={18} color={job.is_saved ? colors.warning : colors.textSecondary} />
-            <Text style={[styles.saveText, job.is_saved && styles.saveTextActive]}>{job.is_saved ? 'Saved' : 'Save'}</Text>
-          </TouchableOpacity>
-          <View style={styles.detailsButton}>
-            <Text style={styles.detailsText}>View details</Text>
-            <MaterialIcons name="arrow-forward" size={16} color={colors.white} />
-          </View>
-        </View>
-      </Pressable>
+            <View style={styles.topRow}>
+              <View style={styles.logo}>
+                <Text style={styles.logoText}>{companyInitials(jobCompany(job))}</Text>
+              </View>
+              <View style={styles.titleWrap}>
+                <Text style={styles.title} numberOfLines={2}>{textFrom(job.job_title, 'Untitled job')}</Text>
+                <Text style={styles.company} numberOfLines={1}>{jobCompany(job)}</Text>
+              </View>
+              <MatchRing percentage={match} size={52} strokeWidth={5} />
+            </View>
+
+            <Text style={styles.salary} numberOfLines={1}>{formatSalary(job)}</Text>
+
+            <View style={styles.metaStack}>
+              <Meta icon="place" text={[jobLocation(job), distance].filter(Boolean).join(' · ')} />
+              <Meta icon="business-center" text={titleCase(job.employment_type, 'Employment type not listed')} />
+            </View>
+
+            <View style={styles.badgeRow}>
+              {job.has_applied ? <Badge variant="info">{titleCase(job.application_status, 'Applied')}</Badge> : null}
+              {job.job_fair?.is_available_at_job_fair ? <Badge variant="warning">Job Fair</Badge> : null}
+              {job.certificate_match?.matched ? <Badge variant="success">Certificate Match</Badge> : null}
+              {match >= 80 ? <Badge variant="success">Strong Match</Badge> : null}
+            </View>
+
+            {requiredSkills.length ? (
+              <View style={styles.skillRow}>
+                {requiredSkills.map((skill) => (
+                  <Text key={skill} style={styles.skill}>{skill}</Text>
+                ))}
+              </View>
+            ) : null}
+
+            {missing.length ? (
+              <Text style={styles.gapText}>Missing: {missing.map((gap) => gap.skill).join(', ')}</Text>
+            ) : null}
+
+            <View style={styles.footer}>
+              <PressableScale
+                onPress={fireSave}
+                disabled={saving}
+                scaleTo="buttonPress"
+                ripple={null}
+                hitSlop={8}
+                style={[styles.saveButton, job.is_saved && styles.saveButtonActive]}
+                accessibilityRole="button"
+                accessibilityLabel={job.is_saved ? 'Remove from saved jobs' : 'Save this job'}
+                accessibilityState={{ selected: job.is_saved, busy: saving }}
+              >
+                <Animated.View style={bookmarkStyle}>
+                  <MaterialIcons
+                    name={job.is_saved ? 'bookmark' : 'bookmark-border'}
+                    size={18}
+                    color={job.is_saved ? colors.blue700 : colors.textSecondary}
+                  />
+                </Animated.View>
+                <Text style={[styles.saveText, job.is_saved && styles.saveTextActive]}>
+                  {job.is_saved ? 'Saved' : 'Save'}
+                </Text>
+              </PressableScale>
+
+              <View style={styles.detailsButton}>
+                <Text style={styles.detailsText}>View details</Text>
+                <MaterialIcons name="arrow-forward" size={16} color={colors.blue700} />
+              </View>
+            </View>
+          </PressableScale>
+        </Animated.View>
+      </GestureDetector>
     </Animated.View>
   )
 }
@@ -96,7 +203,7 @@ export function JobFeedCard({ job, index = 0, saving = false, onPress, onToggleS
 function Meta({ icon, text }: { icon: React.ComponentProps<typeof MaterialIcons>['name']; text: string }) {
   return (
     <View style={styles.metaRow}>
-      <MaterialIcons name={icon} size={15} color={colors.textSecondary} />
+      <MaterialIcons name={icon} size={15} color={colors.subtle} />
       <Text style={styles.metaText} numberOfLines={1}>{text}</Text>
     </View>
   )
@@ -115,17 +222,27 @@ const styles = StyleSheet.create({
   wrap: {
     marginBottom: spacing.md,
   },
+  actionLayer: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: radii.lg,
+    overflow: 'hidden',
+    alignItems: 'flex-end',
+    justifyContent: 'center',
+    paddingRight: spacing.xl,
+  },
+  actionText: {
+    ...textStyles.label,
+    color: colors.white,
+    marginTop: 2,
+    textAlign: 'center',
+  },
   card: {
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: radii.md,
+    borderRadius: radii.lg,
     padding: spacing.lg,
     ...shadows.card,
-  },
-  cardPressed: {
-    transform: [{ scale: 0.99 }],
-    borderColor: colors.infoBorder,
   },
   topRow: {
     flexDirection: 'row',
@@ -135,35 +252,37 @@ const styles = StyleSheet.create({
   logo: {
     width: 48,
     height: 48,
-    borderRadius: radii.sm,
+    borderRadius: radii.md,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.background,
-    borderWidth: 1,
-    borderColor: colors.border,
+    backgroundColor: colors.blue50,
   },
   logoText: {
-    color: colors.primary,
-    fontSize: typography.small,
-    fontFamily: typography.family.bold,
+    ...textStyles.smallBold,
+    color: colors.blue700,
   },
   titleWrap: {
     flex: 1,
   },
   title: {
-    color: colors.textPrimary,
-    fontSize: typography.title,
+    ...textStyles.title,
     lineHeight: 22,
-    fontFamily: typography.family.bold,
+    color: colors.textPrimary,
   },
   company: {
     marginTop: spacing.xs,
+    ...textStyles.smallMedium,
     color: colors.textSecondary,
-    fontSize: typography.small,
-    fontFamily: typography.family.medium,
+  },
+  // Salary sits directly under the title, above the other meta: after the match score it is
+  // the thing seekers decide on, and burying it in a metadata list hid it.
+  salary: {
+    marginTop: spacing.md,
+    ...textStyles.bodyBold,
+    color: colors.blue800,
   },
   metaStack: {
-    marginTop: spacing.md,
+    marginTop: spacing.sm,
     gap: spacing.xs,
   },
   metaRow: {
@@ -173,9 +292,9 @@ const styles = StyleSheet.create({
   },
   metaText: {
     flex: 1,
-    color: colors.textSecondary,
-    fontSize: typography.small,
+    ...textStyles.small,
     lineHeight: 18,
+    color: colors.textSecondary,
   },
   badgeRow: {
     marginTop: spacing.md,
@@ -190,19 +309,17 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   skill: {
-    backgroundColor: colors.infoBackground,
-    color: colors.info,
+    backgroundColor: colors.blue50,
+    color: colors.blue700,
     borderRadius: radii.pill,
-    paddingHorizontal: spacing.sm,
+    paddingHorizontal: spacing.md,
     paddingVertical: spacing.xs,
-    fontSize: typography.small,
-    fontFamily: typography.family.medium,
+    ...textStyles.smallMedium,
   },
   gapText: {
     marginTop: spacing.sm,
+    ...textStyles.smallMedium,
     color: colors.error,
-    fontSize: typography.small,
-    fontFamily: typography.family.medium,
   },
   footer: {
     marginTop: spacing.lg,
@@ -226,29 +343,25 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
   },
   saveButtonActive: {
-    backgroundColor: colors.warningBackground,
-    borderColor: colors.warningBorder,
+    backgroundColor: colors.blue50,
+    borderColor: colors.blue200,
   },
   saveText: {
+    ...textStyles.smallBold,
     color: colors.textSecondary,
-    fontSize: typography.small,
-    fontFamily: typography.family.bold,
   },
   saveTextActive: {
-    color: colors.warning,
+    color: colors.blue700,
   },
   detailsButton: {
     minHeight: 40,
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.xs,
-    borderRadius: radii.pill,
-    paddingHorizontal: spacing.lg,
-    backgroundColor: colors.secondary,
+    paddingHorizontal: spacing.md,
   },
   detailsText: {
-    color: colors.white,
-    fontSize: typography.small,
-    fontFamily: typography.family.bold,
+    ...textStyles.smallBold,
+    color: colors.blue700,
   },
 })

@@ -1,7 +1,5 @@
 import { useCallback } from 'react'
-import {
-  ActivityIndicator,
-  Alert,
+import {  Alert,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -21,6 +19,7 @@ import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { StatCard } from '@/components/ui/StatCard'
 import { SectionHeader } from '@/components/ui/SectionHeader'
+import { ScreenSkeleton } from '@/components/ui/ScreenSkeleton'
 import { colors, radii, spacing, typography } from '@/theme'
 
 type StatusBadgeVariant = 'neutral' | 'info' | 'success' | 'warning' | 'danger'
@@ -91,10 +90,7 @@ export default function ApplicationsScreen() {
         </Text>
 
         {isLoading ? (
-          <Card style={[styles.statusCard, styles.statusMessageCard]} padding="md">
-            <ActivityIndicator color={colors.info} />
-            <Text style={styles.loadingText}>Loading activity...</Text>
-          </Card>
+          <ScreenSkeleton label="Loading activity" />
         ) : null}
 
         {error ? (
