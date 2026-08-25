@@ -3,21 +3,59 @@ import {
   ActivityIndicator,
   FlatList,
   KeyboardAvoidingView,
+  Linking,
   Platform,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
+  type TextStyle,
 } from 'react-native'
 import { useRouter } from 'expo-router'
 import { useHeaderHeight } from '@react-navigation/elements'
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs'
 import MaterialIcons from '@expo/vector-icons/MaterialIcons'
-import type { ChatTurn } from '@/services/chatbotService'
+import type { ChatTurn, OfficeLocation } from '@/services/chatbotService'
 import { chatbotService } from '@/services/chatbotService'
 import { ScreenHeader } from '@/components/ui/ScreenHeader'
 import { colors, radii, spacing, typography } from '@/theme'
+
+/** Matches a bare URL or email address inside otherwise plain chat text. */
+const URL_OR_EMAIL = /(https?:\/\/[^\s]+|[\w.+-]+@[\w-]+\.[\w.-]+)/g
+
+/**
+ * Turns bare URLs and email addresses in the assistant's plain-text reply
+ * into tappable links, mirroring the website's linkifyText() — React Native
+ * has no HTML rendering, so nested <Text onPress> is the equivalent here.
+ */
+function renderLinkedText(text: string, baseStyle: TextStyle) {
+  return text.split(URL_OR_EMAIL).map((part, index) => {
+    if (!part) return null
+
+    const isUrl = /^https?:\/\//.test(part)
+    const isEmail = !isUrl && /^[\w.+-]+@[\w-]+\.[\w.-]+$/.test(part)
+    if (!isUrl && !isEmail) {
+      return part
+    }
+
+    // The model often leaves the match butted up against sentence
+    // punctuation, e.g. "...facebook.com/page. Maaari" — that trailing
+    // punctuation is not part of the link.
+    const trailing = part.match(/[.,)\]]+$/)?.[0] ?? ''
+    const clean = trailing ? part.slice(0, part.length - trailing.length) : part
+    const href = isUrl ? clean : `mailto:${clean}`
+
+    return (
+      <Text key={index}>
+        <Text style={[baseStyle, styles.inlineLink]} onPress={() => Linking.openURL(href)}>
+          {clean}
+        </Text>
+        {trailing}
+      </Text>
+    )
+  })
+}
 
 const GREETING = 'Kumusta po! Ako ang i-PESO assistant ng Urdaneta City PESO. Maaari po kayong magtanong tungkol sa registration, trabaho, job fairs, at government programs.'
 
@@ -31,6 +69,7 @@ const STARTER_CHIPS = [
 interface DisplayMessage extends ChatTurn {
   id: string
   retryable?: boolean
+  officeLocation?: OfficeLocation | null
 }
 
 export default function AssistantScreen() {
@@ -56,9 +95,9 @@ export default function AssistantScreen() {
     setInput('')
     setSending(true)
 
-    const { reply, retryable } = await chatbotService.askAssistant(trimmed, historyForRequest)
+    const { reply, retryable, officeLocation } = await chatbotService.askAssistant(trimmed, historyForRequest)
 
-    setMessages((current) => [...current, { id: `${Date.now()}-model`, role: 'model', text: reply, retryable }])
+    setMessages((current) => [...current, { id: `${Date.now()}-model`, role: 'model', text: reply, retryable, officeLocation }])
     setSending(false)
   }
 
@@ -81,24 +120,32 @@ export default function AssistantScreen() {
           onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: true })}
           ListHeaderComponent={
             <View style={styles.bubbleRow}>
-              <View style={[styles.bubble, styles.modelBubble]}>
-                <Text style={styles.modelText}>{GREETING}</Text>
+              <View style={styles.bubbleColumn}>
+                <View style={[styles.bubble, styles.modelBubble]}>
+                  <Text style={styles.modelText}>{GREETING}</Text>
+                </View>
               </View>
             </View>
           }
-          renderItem={({ item }) => (
-            <View style={[styles.bubbleRow, item.role === 'user' && styles.bubbleRowUser]}>
-              <View style={[styles.bubble, item.role === 'user' ? styles.userBubble : styles.modelBubble]}>
-                <Text style={item.role === 'user' ? styles.userText : styles.modelText}>{item.text}</Text>
-                {item.retryable ? (
-                  <TouchableOpacity onPress={retryLastMessage} disabled={sending} style={styles.retryBtn}>
-                    <MaterialIcons name="refresh" size={14} color={colors.info} />
-                    <Text style={styles.retryText}>Subukan ulit</Text>
-                  </TouchableOpacity>
-                ) : null}
+          renderItem={({ item }) => {
+            const textStyle = item.role === 'user' ? styles.userText : styles.modelText
+            return (
+              <View style={[styles.bubbleRow, item.role === 'user' && styles.bubbleRowUser]}>
+                <View style={styles.bubbleColumn}>
+                  <View style={[styles.bubble, item.role === 'user' ? styles.userBubble : styles.modelBubble]}>
+                    <Text style={textStyle}>{renderLinkedText(item.text, textStyle)}</Text>
+                    {item.retryable ? (
+                      <TouchableOpacity onPress={retryLastMessage} disabled={sending} style={styles.retryBtn}>
+                        <MaterialIcons name="refresh" size={14} color={colors.info} />
+                        <Text style={styles.retryText}>Subukan ulit</Text>
+                      </TouchableOpacity>
+                    ) : null}
+                  </View>
+                  {item.officeLocation ? <OfficeLocationCard address={item.officeLocation.address} /> : null}
+                </View>
               </View>
-            </View>
-          )}
+            )
+          }}
           ListFooterComponent={
             <>
               {sending ? (
@@ -146,19 +193,52 @@ export default function AssistantScreen() {
   )
 }
 
+/**
+ * Shown right in the chat log when the visitor asked a "where" question and
+ * the reply gave the office's on-record address (see office_location on the
+ * API response). React Native has no <iframe>, so instead of an embedded
+ * map this hands off to the device's Maps app — the standard mobile pattern
+ * for a single static address, and it needs no geocoding on our side.
+ */
+function OfficeLocationCard({ address }: { address: string }) {
+  const directionsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`
+
+  return (
+    <View style={styles.mapCard}>
+      <View style={styles.mapCardHeader}>
+        <MaterialIcons name="place" size={14} color={colors.info} />
+        <Text style={styles.mapCardLabel}>PESO Urdaneta City</Text>
+      </View>
+      <Text style={styles.mapCardAddress}>{address}</Text>
+      <TouchableOpacity style={styles.mapCardButton} onPress={() => Linking.openURL(directionsUrl)}>
+        <MaterialIcons name="map" size={15} color={colors.white} />
+        <Text style={styles.mapCardButtonText}>Buksan sa Google Maps</Text>
+      </TouchableOpacity>
+    </View>
+  )
+}
+
 const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: colors.background },
   messageList: { padding: spacing.lg, paddingBottom: spacing.md, flexGrow: 1 },
   bubbleRow: { flexDirection: 'row', marginBottom: spacing.sm },
   bubbleRowUser: { justifyContent: 'flex-end' },
-  bubble: { maxWidth: '85%', borderRadius: radii.lg, paddingVertical: spacing.sm, paddingHorizontal: spacing.md },
+  bubbleColumn: { maxWidth: '85%' },
+  bubble: { borderRadius: radii.lg, paddingVertical: spacing.sm, paddingHorizontal: spacing.md },
   modelBubble: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderBottomLeftRadius: radii.sm },
   userBubble: { backgroundColor: colors.secondary, borderBottomRightRadius: radii.sm },
   modelText: { color: colors.textPrimary, fontSize: typography.body, lineHeight: 20 },
   userText: { color: colors.white, fontSize: typography.body, lineHeight: 20 },
+  inlineLink: { fontFamily: typography.family.bold, textDecorationLine: 'underline' },
   typingBubble: { paddingVertical: spacing.md, paddingHorizontal: spacing.lg },
   retryBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: spacing.xs, alignSelf: 'flex-start' },
   retryText: { color: colors.info, fontSize: typography.small, fontFamily: typography.family.bold },
+  mapCard: { marginTop: spacing.xs, borderRadius: radii.md, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, overflow: 'hidden' },
+  mapCardHeader: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingTop: spacing.sm, paddingHorizontal: spacing.md },
+  mapCardLabel: { color: colors.info, fontSize: typography.small, fontFamily: typography.family.bold },
+  mapCardAddress: { color: colors.textSecondary, fontSize: typography.small, lineHeight: 16, paddingHorizontal: spacing.md, paddingTop: 2, paddingBottom: spacing.sm },
+  mapCardButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: colors.secondary, paddingVertical: spacing.sm },
+  mapCardButtonText: { color: colors.white, fontSize: typography.small, fontFamily: typography.family.bold },
   chipGrid: { gap: spacing.sm, marginTop: spacing.md },
   chip: { borderWidth: 1, borderColor: colors.infoBorder, backgroundColor: colors.infoBackground, borderRadius: radii.md, paddingVertical: spacing.sm, paddingHorizontal: spacing.md },
   chipText: { color: colors.info, fontSize: typography.small, fontFamily: typography.family.medium },
