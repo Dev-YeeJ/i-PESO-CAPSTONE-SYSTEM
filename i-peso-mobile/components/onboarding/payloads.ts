@@ -253,6 +253,10 @@ export function validateStep(step: number, form: OnboardingFormValue): string {
       || !v.address_province.trim() || !v.address_municipality_city.trim() || !v.address_barangay.trim() || !v.address_house_street.trim()) {
       return 'Please complete the required personal information and address fields.'
     }
+    if (!v.sex) return 'Select your sex.'
+    if (!v.civil_status) return 'Select your civil status.'
+    if (!v.religion) return 'Select your religion.'
+    if (!v.disabilities.length) return 'Select a disability disclosure option.'
     if (v.religion === 'other' && !v.religion_other.trim()) return 'Please specify your religion.'
     if (v.disabilities.includes('others') && !v.disability_specification.trim()) return 'Please specify your disability.'
     return ''
@@ -260,6 +264,8 @@ export function validateStep(step: number, form: OnboardingFormValue): string {
   if (step === 2) {
     const v = form.step2
     if (!v.employment_status) return 'Select your current employment status.'
+    if (v.employment_status === 'employed' && !v.employment_type) return 'Select your employment type.'
+    if (v.employment_status === 'unemployed' && !v.unemployment_reason) return 'Select a reason for unemployment.'
     if (v.is_ofw && !v.ofw_country.trim()) return 'Specify the country where you work as an OFW.'
     if (v.is_4ps_beneficiary && !/^\d{2}-\d{2}-\d{2}-\d{3}-\d{5}$/.test(v.household_id_4ps.trim())) {
       return 'Enter a valid 4Ps Household ID (00-00-00-000-00000).'
@@ -268,8 +274,10 @@ export function validateStep(step: number, form: OnboardingFormValue): string {
   }
   if (step === 3) {
     const v = form.step3
-    if (!v.preferred_locations_details.some((l) => l.trim())) return 'Add at least one preferred work location.'
     if (!v.occupation_preferences.some((p) => p.raw_job_title.trim() || p.occupation_id || p.general_term)) return 'Add at least one preferred occupation.'
+    if (!v.work_type_preference) return 'Select your preferred type of work.'
+    if (!v.preferred_work_location) return 'Select your preferred work location.'
+    if (!v.preferred_locations_details.some((l) => l.trim())) return 'Add at least one preferred location.'
     return ''
   }
   if (step === 4) {
@@ -283,6 +291,9 @@ export function validateStep(step: number, form: OnboardingFormValue): string {
     if (!validEducations.length) return 'Add at least one education record.'
     const seenEducationKeys = new Set<string>()
     for (const e of validEducations) {
+      if (!e.level) return 'Select an education level.'
+      if (!e.completion_status) return 'Select a completion status.'
+      if (!e.year_started.trim()) return 'Year started is required.'
       if (['tertiary', 'senior_high_strand', 'vocational', 'graduate_studies'].includes(e.level) && !e.course_strand.trim()) {
         return 'Course, strand, or program is required for this education level.'
       }
@@ -309,7 +320,7 @@ export function validateStep(step: number, form: OnboardingFormValue): string {
 export function mapProfileToForm(profile: SeekerProfile): OnboardingFormValue {
   const disabilityList = Array.isArray(profile.disabilities) && profile.disabilities.length
     ? profile.disabilities.map((d) => String(d.disability_type))
-    : ['none']
+    : []
 
   const step1: OnboardingFormValue['step1'] = {
     ...emptyOnboardingForm.step1,
@@ -318,13 +329,13 @@ export function mapProfileToForm(profile: SeekerProfile): OnboardingFormValue {
     last_name: profile.last_name ?? '',
     suffix: profile.suffix ?? '',
     date_of_birth: profile.date_of_birth ?? '',
-    sex: profile.sex ?? 'male',
-    civil_status: profile.civil_status ?? 'single',
-    religion: profile.religion ?? 'roman_catholic',
+    sex: profile.sex ?? '',
+    civil_status: profile.civil_status ?? '',
+    religion: profile.religion ?? '',
     height_ft: profile.height_ft != null ? String(profile.height_ft) : '',
     tin: profile.tin ?? '',
-    address_province: profile.address_province ?? emptyOnboardingForm.step1.address_province,
-    address_municipality_city: profile.address_municipality_city ?? emptyOnboardingForm.step1.address_municipality_city,
+    address_province: profile.address_province ?? '',
+    address_municipality_city: profile.address_municipality_city ?? '',
     address_barangay: profile.address_barangay ?? '',
     address_house_street: profile.address_house_street ?? '',
     disabilities: disabilityList,
@@ -333,12 +344,12 @@ export function mapProfileToForm(profile: SeekerProfile): OnboardingFormValue {
 
   const step2: OnboardingFormValue['step2'] = {
     ...emptyOnboardingForm.step2,
-    employment_status: profile.employment_status ?? 'unemployed',
-    employment_type: profile.employment_type ?? 'wage_employed',
+    employment_status: profile.employment_status ?? '',
+    employment_type: profile.employment_type ?? '',
     self_employed_type: profile.self_employed_type ?? '',
     self_employed_type_others: profile.self_employed_type_others ?? '',
-    unemployment_months: profile.unemployment_months != null ? String(profile.unemployment_months) : '0',
-    unemployment_reason: profile.unemployment_reason ?? 'fresh_graduate',
+    unemployment_months: profile.unemployment_months != null ? String(profile.unemployment_months) : '',
+    unemployment_reason: profile.unemployment_reason ?? '',
     unemployment_reason_others: profile.unemployment_reason_others ?? '',
     unemployment_terminated_country: profile.unemployment_terminated_country ?? '',
     is_ofw: Boolean(profile.is_ofw),
@@ -352,8 +363,8 @@ export function mapProfileToForm(profile: SeekerProfile): OnboardingFormValue {
 
   const occupations = Array.isArray(profile.occupations) ? profile.occupations : []
   const step3: OnboardingFormValue['step3'] = {
-    work_type_preference: profile.work_type_preference ?? 'full_time',
-    preferred_work_location: profile.preferred_work_location ?? 'local',
+    work_type_preference: profile.work_type_preference ?? '',
+    preferred_work_location: profile.preferred_work_location ?? '',
     preferred_locations_details: Array.isArray(profile.preferred_locations_details) && profile.preferred_locations_details.length
       ? profile.preferred_locations_details
       : emptyOnboardingForm.step3.preferred_locations_details,
@@ -387,10 +398,10 @@ export function mapProfileToForm(profile: SeekerProfile): OnboardingFormValue {
   const step5: OnboardingFormValue['step5'] = {
     educations: educations.length
       ? educations.map((e): EducationEntry => ({
-          level: String(e.level ?? 'tertiary'),
+          level: String(e.level ?? ''),
           institution_name: String(e.institution_name ?? ''),
           course_strand: String(e.course_strand ?? ''),
-          completion_status: String(e.completion_status ?? 'graduated'),
+          completion_status: String(e.completion_status ?? ''),
           year_started: e.year_started != null ? String(e.year_started) : '',
           year_graduated: e.year_graduated != null ? String(e.year_graduated) : '',
           undergrad_level_reached: String(e.undergrad_level_reached ?? ''),

@@ -22,11 +22,13 @@ export function useMotion() {
 
     /** Duration in ms, collapsed to 0 when motion is reduced. */
     duration(key: keyof typeof motion.duration) {
+      'worklet'
       return reduced ? 0 : motion.duration[key]
     },
 
     /** Per-item entrance delay, collapsed to 0 when motion is reduced. */
     stagger(index: number) {
+      'worklet'
       if (reduced) return 0
       return Math.min(index, motion.staggerMax) * motion.stagger
     },
@@ -36,11 +38,13 @@ export function useMotion() {
      * in roughly a frame — visually instant, but still a spring, so worklet code stays uniform.
      */
     spring(key: keyof typeof motion.spring) {
+      'worklet'
       return reduced ? { damping: 100, stiffness: 1000, mass: 0.1 } : motion.spring[key]
     },
 
     /** Target scale for a press effect — 1 (no movement) when motion is reduced. */
     pressScale(key: keyof typeof motion.scale) {
+      'worklet'
       return reduced ? 1 : motion.scale[key]
     },
   }

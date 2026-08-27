@@ -132,7 +132,18 @@ export default function ProfileEditScreen() {
     <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScreenHeader title="Edit Profile" onBack={() => router.back()} backLabel="Close" />
 
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabRow} style={styles.tabScroll}>
+      {/* Android-only: forces this row to composite as one hardware texture instead of
+          repeatedly blending several closely-packed rounded/bordered views, which otherwise
+          shows up as intermittent ghosting/doubling on some GPUs when the step content below
+          re-renders (Personal/Preferences/Languages/Education all mount several SelectField
+          modals; Employment doesn't and never showed the glitch). */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.tabRow}
+        style={styles.tabScroll}
+        renderToHardwareTextureAndroid
+      >
         {SECTIONS.map((section) => (
           <TouchableOpacity
             key={section.step}

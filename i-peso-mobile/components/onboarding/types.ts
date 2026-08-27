@@ -132,27 +132,27 @@ export const emptyStep1: Step1Value = {
   last_name: '',
   suffix: '',
   date_of_birth: '',
-  sex: 'male',
-  civil_status: 'single',
-  religion: 'roman_catholic',
+  sex: '',
+  civil_status: '',
+  religion: '',
   religion_other: '',
   height_ft: '',
   tin: '',
-  address_province: 'Pangasinan',
-  address_municipality_city: 'Urdaneta City',
+  address_province: '',
+  address_municipality_city: '',
   address_barangay: '',
   address_house_street: '',
-  disabilities: ['none'],
+  disabilities: [],
   disability_specification: '',
 }
 
 export const emptyStep2: Step2Value = {
-  employment_status: 'unemployed',
-  employment_type: 'wage_employed',
+  employment_status: '',
+  employment_type: '',
   self_employed_type: '',
   self_employed_type_others: '',
-  unemployment_months: '0',
-  unemployment_reason: 'fresh_graduate',
+  unemployment_months: '',
+  unemployment_reason: '',
   unemployment_reason_others: '',
   unemployment_terminated_country: '',
   is_ofw: false,
@@ -169,9 +169,9 @@ export function newOccupationPref(): OccupationPrefEntry {
 }
 
 export const emptyStep3: Step3Value = {
-  work_type_preference: 'full_time',
-  preferred_work_location: 'local',
-  preferred_locations_details: ['Urdaneta City, Pangasinan'],
+  work_type_preference: '',
+  preferred_work_location: '',
+  preferred_locations_details: [''],
   occupation_preferences: [newOccupationPref()],
 }
 
@@ -183,16 +183,14 @@ export const emptyStep4: Step4Value = {
   languages: [newLanguage('filipino'), newLanguage('english')],
 }
 
-const currentYear = new Date().getFullYear()
-
 export function newEducation(): EducationEntry {
   return {
-    level: 'tertiary',
+    level: '',
     institution_name: '',
     course_strand: '',
-    completion_status: 'graduated',
-    year_started: String(currentYear - 4),
-    year_graduated: String(currentYear),
+    completion_status: '',
+    year_started: '',
+    year_graduated: '',
     undergrad_level_reached: '',
     undergrad_year_last_attended: '',
     expected_year_graduated: '',

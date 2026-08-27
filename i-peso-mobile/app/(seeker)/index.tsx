@@ -97,6 +97,7 @@ export default function SeekerHomeScreen() {
   const token = useAuthStore((state) => state.token)
 
   const [profile, setProfile] = useState<SeekerProfile | null>(null)
+  const [profileFetchedAt, setProfileFetchedAt] = useState(0)
   const [jobs, setJobs] = useState<NearbyJob[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -128,6 +129,7 @@ export default function SeekerHomeScreen() {
 
     if (profileResult.status === 'fulfilled') {
       setProfile(profileResult.value)
+      setProfileFetchedAt(Date.now())
     } else {
       setError('Unable to load your profile. Check the backend connection.')
     }
@@ -169,10 +171,14 @@ export default function SeekerHomeScreen() {
   }, [loadDashboard, feedMode])
 
   const activeProfile = profile ?? user
+  // profileFetchedAt (set on every successful fetch) rides along as the cache-bust value —
+  // profile.id alone never changes for the same account, so after a photo upload from the
+  // Profile screen, revisiting the dashboard would otherwise still show whatever React
+  // Native's native image loader had already cached for that unchanged URL.
   const avatarSource = useMemo(() => {
     if (!profile?.has_profile_image || !token) return null
-    return { uri: seekerService.profileImageUrl(profile.id), headers: { Authorization: `Bearer ${token}` } }
-  }, [profile?.has_profile_image, profile?.id, token])
+    return { uri: seekerService.profileImageUrl(`${profile.id}-${profileFetchedAt}`), headers: { Authorization: `Bearer ${token}` } }
+  }, [profile?.has_profile_image, profile?.id, token, profileFetchedAt])
   const strength = profile?.profile_strength?.percentage ?? 0
   const stats = profile?.dashboard_stats
   const topJobs = jobs.slice(0, 3)

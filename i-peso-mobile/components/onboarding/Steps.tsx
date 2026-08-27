@@ -1,10 +1,11 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { colors, radii, spacing, typography } from '@/theme'
 import { seekerService, type AiSuggestionItem, type OccupationClassificationSuggestion, type SkillOption } from '@/services/seekerService'
 import { Combobox } from './Combobox'
 import { AddressSearchField } from './AddressSearchField'
 import type { GeocodedLocation } from '@/services/seekerService'
+import { getProvinces, getCitiesByProvince } from '@/services/psgcService'
 import {
   Choice,
   ChoiceGroup,
@@ -36,6 +37,93 @@ import type {
   Step6Value,
   Step7Value,
 } from './types'
+
+// Mirrors i-peso-frontend's EducationBackgroundEditor.jsx suggestion lists exactly —
+// same source of truth as the web app, not a separately-maintained guess. Free text is
+// still accepted for anything not listed (Combobox falls back to whatever the user typed).
+const SCHOOL_SUGGESTIONS = [
+  'University of Pangasinan',
+  'Pangasinan State University',
+  'Urdaneta City University',
+  'Lyceum-Northwestern University',
+  'Colegio de Dagupan',
+  'TESDA Provincial Training Center',
+  'Polytechnic University of the Philippines',
+  'University of the Philippines',
+  'Technological University of the Philippines',
+  'Rizal Technological University',
+  'Taguig City University',
+  'University of Makati',
+  'Pamantasan ng Lungsod ng Maynila',
+  'Philippine Normal University',
+  'Bulacan State University',
+  'Cavite State University',
+  'Laguna State Polytechnic University',
+  'TESDA Training Center',
+]
+
+// Course/degree/TESDA-qualification suggestions for every level except Senior High
+// (which uses SHS_STRAND_SUGGESTIONS instead — see web's `isShs` branch).
+const PROGRAM_SUGGESTIONS = [
+  'Automotive Servicing NC II',
+  'Bookkeeping NC III',
+  'Bread and Pastry Production NC II',
+  'Caregiving NC II',
+  'Computer Systems Servicing NC II',
+  'Contact Center Services NC II',
+  'Cookery NC II',
+  'Electrical Installation and Maintenance NC II',
+  'Food and Beverage Services NC II',
+  'Shielded Metal Arc Welding NC II',
+  'Bachelor of Elementary Education',
+  'Bachelor of Secondary Education',
+  'Bachelor of Science in Accountancy',
+  'Bachelor of Science in Business Administration',
+  'Bachelor of Science in Computer Science',
+  'Bachelor of Science in Criminology',
+  'Bachelor of Science in Hospitality Management',
+  'Bachelor of Science in Information Technology',
+  'Bachelor of Science in Nursing',
+  'Master in Business Administration',
+  'Master in Public Administration',
+  'Master of Arts in Education',
+  'Doctor of Education',
+  'Doctor of Philosophy',
+  'Juris Doctor',
+]
+
+const SHS_STRAND_SUGGESTIONS = [
+  'ABM - Accountancy, Business and Management',
+  'HUMSS - Humanities and Social Sciences',
+  'STEM - Science, Technology, Engineering and Mathematics',
+  'GAS - General Academic Strand',
+  'PBM - Pre-Baccalaureate Maritime',
+  'Sports Track',
+  'Arts and Design Track',
+  'TVL-ICT - Information and Communications Technology',
+  'TVL-HE - Home Economics',
+  'TVL-IA - Industrial Arts',
+  'TVL-AFA - Agri-Fishery Arts',
+  'TVL - Cookery',
+  'TVL - Bread and Pastry Production',
+  'TVL - Food and Beverage Services',
+  'TVL - Beauty Care and Wellness',
+  'TVL - Electrical Installation and Maintenance',
+  'TVL - Computer Hardware Servicing',
+  'TVL - Computer Systems Servicing',
+  'TVL - Programming',
+  'TVL - Automotive Servicing',
+  'TVL - Caregiving',
+  'TVL - Bookkeeping',
+  'TVL - Agricultural Crop Production',
+  'TVL - Animal Production',
+  'TVL - Shielded Metal Arc Welding',
+]
+
+async function searchStaticList(list: string[], query: string): Promise<string[]> {
+  const q = query.trim().toLowerCase()
+  return list.filter((item) => item.toLowerCase().includes(q))
+}
 
 const ALLOWED_SKILL_SOURCES = ['dole', 'esco', 'user_added', 'occupation_recommended', 'system']
 
@@ -425,7 +513,7 @@ export function Step2Employment({ value, onChange, errors }: { value: Step2Value
 
       {employed ? (
         <>
-          <ChoiceGroup label="Employment Type" columns={false} options={[{ label: 'Wage employed', value: 'wage_employed' }, { label: 'Self-employed', value: 'self_employed' }]} value={value.employment_type} onChange={(v) => set('employment_type', v)} />
+          <ChoiceGroup label="Employment Type" required columns={false} options={[{ label: 'Wage employed', value: 'wage_employed' }, { label: 'Self-employed', value: 'self_employed' }]} value={value.employment_type} onChange={(v) => set('employment_type', v)} />
           {selfEmployed ? (
             <>
               <SelectField label="Self-employed Type" options={SELF_EMPLOYED_OPTIONS} value={value.self_employed_type} onChange={(v) => set('self_employed_type', v)} error={fieldError(errors, 'self_employed_type')} />
@@ -440,7 +528,7 @@ export function Step2Employment({ value, onChange, errors }: { value: Step2Value
       {unemployed ? (
         <>
           <Field label="Months Unemployed" keyboardType="number-pad" value={value.unemployment_months} onChangeText={(v) => set('unemployment_months', v)} error={fieldError(errors, 'unemployment_months')} />
-          <SelectField label="Reason" options={UNEMPLOYMENT_REASON_OPTIONS} value={value.unemployment_reason} onChange={(v) => set('unemployment_reason', v)} error={fieldError(errors, 'unemployment_reason')} />
+          <SelectField label="Reason" required placeholder="Select reason" options={UNEMPLOYMENT_REASON_OPTIONS} value={value.unemployment_reason} onChange={(v) => set('unemployment_reason', v)} error={fieldError(errors, 'unemployment_reason')} />
           {value.unemployment_reason === 'others' ? (
             <Field label="Specify Reason" value={value.unemployment_reason_others} onChangeText={(v) => set('unemployment_reason_others', v)} error={fieldError(errors, 'unemployment_reason_others')} />
           ) : null}
@@ -478,6 +566,89 @@ export function Step2Employment({ value, onChange, errors }: { value: Step2Value
   )
 }
 
+// ── Preferred Location: cascading Province → City picker for "Local", plain
+// text for "Overseas" (PSGC only covers Philippine geography). Stores the
+// same "City, Province" string the field already used, so nothing about the
+// underlying payload/backend field changes.
+function PreferredLocationPicker({
+  value,
+  onChange,
+  isOverseas,
+}: {
+  value: string
+  onChange: (v: string) => void
+  isOverseas: boolean
+}) {
+  const [provinces, setProvinces] = useState<{ code: string; name: string }[]>([])
+  const [cities, setCities] = useState<{ code: string; name: string }[]>([])
+  const [provinceCode, setProvinceCode] = useState('')
+  const [provinceName, setProvinceName] = useState('')
+  const [cityName, setCityName] = useState('')
+  const [loadingCities, setLoadingCities] = useState(false)
+
+  useEffect(() => {
+    if (isOverseas) return
+    getProvinces().then(setProvinces).catch(() => setProvinces([]))
+  }, [isOverseas])
+
+  // Best-effort parse of an existing "City, Province" value (e.g. loaded from a saved
+  // profile) so re-opening this step shows the same selection instead of resetting it.
+  useEffect(() => {
+    if (isOverseas || !value || provinceName) return
+    const [cityPart, provincePart] = value.split(',').map((s) => s.trim())
+    const match = provinces.find((p) => p.name === provincePart)
+    if (match) {
+      setProvinceCode(match.code)
+      setProvinceName(match.name)
+      setCityName(cityPart ?? '')
+    }
+  }, [provinces, value, isOverseas, provinceName])
+
+  useEffect(() => {
+    if (!provinceCode) {
+      setCities([])
+      return
+    }
+    setLoadingCities(true)
+    getCitiesByProvince(provinceCode)
+      .then(setCities)
+      .catch(() => setCities([]))
+      .finally(() => setLoadingCities(false))
+  }, [provinceCode])
+
+  if (isOverseas) {
+    return <Field label="Country" value={value} onChangeText={onChange} placeholder="e.g. Saudi Arabia" />
+  }
+
+  return (
+    <>
+      <SelectField
+        label="Province"
+        placeholder="Select province"
+        options={provinces.map((p) => ({ label: p.name, value: p.code }))}
+        value={provinceCode}
+        onChange={(code) => {
+          const province = provinces.find((p) => p.code === code)
+          setProvinceCode(code)
+          setProvinceName(province?.name ?? '')
+          setCityName('')
+          onChange('')
+        }}
+      />
+      <SelectField
+        label="City / Municipality"
+        placeholder={loadingCities ? 'Loading...' : 'Select city or municipality'}
+        options={cities.map((c) => ({ label: c.name, value: c.name }))}
+        value={cityName}
+        onChange={(name) => {
+          setCityName(name)
+          onChange(provinceName ? `${name}, ${provinceName}` : name)
+        }}
+      />
+    </>
+  )
+}
+
 // ── Step 3: Preferences and Occupations ───────────────────────────────────
 
 export function Step3Preferences({ value, onChange, errors }: { value: Step3Value; onChange: (v: Step3Value) => void; errors?: ServerErrors }) {
@@ -485,32 +656,6 @@ export function Step3Preferences({ value, onChange, errors }: { value: Step3Valu
 
   return (
     <>
-      <ChoiceGroup label="Preferred Work Type" required columns={false} options={[{ label: 'Full-time', value: 'full_time' }, { label: 'Part-time', value: 'part_time' }]} value={value.work_type_preference} onChange={(v) => set('work_type_preference', v)} />
-      <ChoiceGroup label="Preferred Work Location" required columns={false} options={[{ label: 'Local', value: 'local' }, { label: 'Overseas', value: 'overseas' }]} value={value.preferred_work_location} onChange={(v) => set('preferred_work_location', v)} />
-
-      <RepeatableSection
-        title="Preferred Locations"
-        hint="Add up to 3 preferred cities or provinces."
-        items={value.preferred_locations_details}
-        minItems={1}
-        addLabel="Add location"
-        onAdd={() => value.preferred_locations_details.length < 3 && set('preferred_locations_details', [...value.preferred_locations_details, ''])}
-        onRemove={(i) => set('preferred_locations_details', value.preferred_locations_details.filter((_, idx) => idx !== i))}
-        renderItem={(i) => (
-          <Field
-            label={`Location ${i + 1}`}
-            value={value.preferred_locations_details[i]}
-            onChangeText={(v) => {
-              const next = [...value.preferred_locations_details]
-              next[i] = v
-              set('preferred_locations_details', next)
-            }}
-            error={fieldError(errors, `preferred_locations_details.${i}`)}
-          />
-        )}
-      />
-      {fieldError(errors, 'preferred_locations_details') ? <Text style={styles.errorText}>{fieldError(errors, 'preferred_locations_details')}</Text> : null}
-
       <RepeatableSection
         title="Preferred Occupations"
         hint="Add up to 3 desired job titles."
@@ -563,6 +708,37 @@ export function Step3Preferences({ value, onChange, errors }: { value: Step3Valu
           }
         }}
       />
+
+      <SelectField label="Preferred Type of Work" required placeholder="Select type of work" options={[{ label: 'Full-time', value: 'full_time' }, { label: 'Part-time', value: 'part_time' }]} value={value.work_type_preference} onChange={(v) => set('work_type_preference', v)} />
+      <SelectField label="Preferred Work Location" required placeholder="Select work location" options={[{ label: 'Local', value: 'local' }, { label: 'Overseas', value: 'overseas' }]} value={value.preferred_work_location} onChange={(v) => set('preferred_work_location', v)} />
+
+      <RepeatableSection
+        title="Preferred Locations"
+        hint="Add up to 3 preferred cities or provinces."
+        items={value.preferred_locations_details}
+        minItems={1}
+        addLabel="Add location"
+        onAdd={() => value.preferred_locations_details.length < 3 && set('preferred_locations_details', [...value.preferred_locations_details, ''])}
+        onRemove={(i) => set('preferred_locations_details', value.preferred_locations_details.filter((_, idx) => idx !== i))}
+        renderItem={(i) => (
+          <>
+            <SubLabel>{`Location ${i + 1}`}</SubLabel>
+            <PreferredLocationPicker
+              value={value.preferred_locations_details[i]}
+              isOverseas={value.preferred_work_location === 'overseas'}
+              onChange={(v) => {
+                const next = [...value.preferred_locations_details]
+                next[i] = v
+                set('preferred_locations_details', next)
+              }}
+            />
+            {fieldError(errors, `preferred_locations_details.${i}`) ? (
+              <Text style={styles.errorText}>{fieldError(errors, `preferred_locations_details.${i}`)}</Text>
+            ) : null}
+          </>
+        )}
+      />
+      {fieldError(errors, 'preferred_locations_details') ? <Text style={styles.errorText}>{fieldError(errors, 'preferred_locations_details')}</Text> : null}
     </>
   )
 }
@@ -696,9 +872,33 @@ export function Step5Education({ value, onChange, errors }: { value: Step5Value;
           return (
             <>
               <ChoiceGroup label="Level" required options={EDUCATION_LEVEL_OPTIONS} value={edu.level} onChange={(v) => update({ level: v })} error={fieldError(errors, `educations.${i}.level`)} />
-              <Field label="Institution" required value={edu.institution_name} onChangeText={(v) => update({ institution_name: v })} error={fieldError(errors, `educations.${i}.institution_name`)} />
+              <Combobox<string>
+                label="Institution"
+                required
+                placeholder="e.g. Pangasinan State University"
+                minChars={1}
+                value={edu.institution_name}
+                onChangeText={(v) => update({ institution_name: v })}
+                onSelect={(v) => update({ institution_name: v })}
+                search={(q) => searchStaticList(SCHOOL_SUGGESTIONS, q)}
+                renderLabel={(item) => item}
+                keyExtractor={(item) => item}
+                error={fieldError(errors, `educations.${i}.institution_name`)}
+              />
               {requiresCourse ? (
-                <Field label="Course / Strand / Program" required value={edu.course_strand} onChangeText={(v) => update({ course_strand: v })} error={fieldError(errors, `educations.${i}.course_strand`)} />
+                <Combobox<string>
+                  label={edu.level === 'senior_high_strand' ? 'Strand / Track' : 'Course / Degree / Program'}
+                  required
+                  placeholder={edu.level === 'senior_high_strand' ? 'Search SHS strand or TVL track' : 'Search course, degree, or TESDA qualification'}
+                  minChars={1}
+                  value={edu.course_strand}
+                  onChangeText={(v) => update({ course_strand: v })}
+                  onSelect={(v) => update({ course_strand: v })}
+                  search={(q) => searchStaticList(edu.level === 'senior_high_strand' ? SHS_STRAND_SUGGESTIONS : PROGRAM_SUGGESTIONS, q)}
+                  renderLabel={(item) => item}
+                  keyExtractor={(item) => item}
+                  error={fieldError(errors, `educations.${i}.course_strand`)}
+                />
               ) : null}
               <ChoiceGroup label="Completion Status" required columns={false} options={[{ label: 'Graduated', value: 'graduated' }, { label: 'Undergraduate', value: 'undergraduate' }, { label: 'Currently studying', value: 'currently_studying' }]} value={edu.completion_status} onChange={(v) => update({ completion_status: v })} />
               <Field label="Year Started" required keyboardType="number-pad" value={edu.year_started} onChangeText={(v) => update({ year_started: v })} error={fieldError(errors, `educations.${i}.year_started`)} />

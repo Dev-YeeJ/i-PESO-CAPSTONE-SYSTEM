@@ -38,10 +38,14 @@ export function AnimatedTabBar({ state, descriptors, navigation }: BottomTabBarP
   const [barWidth, setBarWidth] = useState(0)
 
   // Routes registered with `href: null` are detail screens that live in this navigator but
-  // must not appear as destinations.
-  const visibleRoutes = state.routes.filter(
-    (route) => (descriptors[route.key]?.options as { href?: string | null })?.href !== null,
-  )
+  // must not appear as destinations. Expo Router's Tabs wrapper strips `href` off `options`
+  // before it reaches a custom tab bar and converts it into `tabBarItemStyle: { display: 'none' }`
+  // instead (see expo-router/build/layouts/TabsClient.js) — options.href is always undefined
+  // here regardless of what was declared, so that has to be checked instead.
+  const visibleRoutes = state.routes.filter((route) => {
+    const style = descriptors[route.key]?.options.tabBarItemStyle as { display?: string } | undefined
+    return style?.display !== 'none'
+  })
 
   const activeIndex = visibleRoutes.findIndex((route) => route.key === state.routes[state.index]?.key)
   const tabWidth = barWidth > 0 ? barWidth / visibleRoutes.length : 0

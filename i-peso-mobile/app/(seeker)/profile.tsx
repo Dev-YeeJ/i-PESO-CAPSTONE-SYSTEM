@@ -57,6 +57,7 @@ export default function ProfileScreen() {
   const queryClient = useQueryClient()
   const [refreshing, setRefreshing] = useState(false)
   const [photoBusy, setPhotoBusy] = useState(false)
+  const [photoVersion, setPhotoVersion] = useState(0)
   const [certModalOpen, setCertModalOpen] = useState(false)
   const [resumeModalOpen, setResumeModalOpen] = useState(false)
   const [summary, setSummary] = useState('')
@@ -118,10 +119,14 @@ export default function ProfileScreen() {
   const occupations = arrayFrom<Record<string, unknown>>(profile?.occupations)
   const certificates: SeekerCertificate[] = profile?.certificates ?? []
 
+  // photoVersion (bumped after every successful upload/delete) is included alongside
+  // profile.id in the cache-busting query param — profile.id alone doesn't change on a
+  // same-account re-upload, so React Native's native image loader (which caches purely by
+  // URL string) had no signal to refetch and kept showing whatever was cached before.
   const imageSource = useMemo(() => {
     if (!profile?.has_profile_image || !token) return null
-    return { uri: seekerService.profileImageUrl(profile.id), headers: { Authorization: `Bearer ${token}` } }
-  }, [profile?.has_profile_image, profile?.id, token])
+    return { uri: seekerService.profileImageUrl(`${profile.id}-${photoVersion}`), headers: { Authorization: `Bearer ${token}` } }
+  }, [profile?.has_profile_image, profile?.id, token, photoVersion])
 
   const invalidateProfile = () => queryClient.invalidateQueries({ queryKey: ['seekerProfile'] })
 
@@ -144,6 +149,7 @@ export default function ProfileScreen() {
     setPhotoBusy(true)
     try {
       await seekerService.uploadProfileImage(asset.uri, asset.mimeType || 'image/jpeg')
+      setPhotoVersion((v) => v + 1)
       await invalidateProfile()
     } catch (caught) {
       setActionError(apiErrorMessage(caught, 'Unable to upload photo. Use a square JPG/PNG at least 300x300px, under 2MB.'))
@@ -162,6 +168,7 @@ export default function ProfileScreen() {
           setPhotoBusy(true)
           try {
             await seekerService.deleteProfileImage()
+            setPhotoVersion((v) => v + 1)
             await invalidateProfile()
           } catch (caught) {
             setActionError(apiErrorMessage(caught, 'Unable to remove photo.'))
