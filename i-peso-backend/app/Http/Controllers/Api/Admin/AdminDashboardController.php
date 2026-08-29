@@ -45,7 +45,9 @@ class AdminDashboardController extends Controller
             : Carbon::now()->endOfMonth();
 
         // Immediately preceding window of the same length, for period-over-period change.
-        $lengthInDays = max(1, $from->diffInDays($to) + 1);
+        // Carbon returns a float here (the end-of-day 23:59:59.999999 makes it 28.999…), so
+        // compare date-only and cast to int — the dashboard prints this value verbatim.
+        $lengthInDays = max(1, (int) $from->copy()->startOfDay()->diffInDays($to->copy()->startOfDay()) + 1);
         $previousTo = (clone $from)->subSecond();
         $previousFrom = (clone $from)->subDays($lengthInDays)->startOfDay();
 

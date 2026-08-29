@@ -106,9 +106,6 @@ export default function GovernmentProgramsScreen() {
         Browse SPES, TUPAD, livelihood, and training programs available through PESO.
       </Text>
 
-      <Button variant="outline" onPress={() => router.push('/(seeker)/program-applications')} style={styles.myAppsBtn}>
-        My Applications
-      </Button>
 
       <TextInput
         style={styles.search}
@@ -226,7 +223,6 @@ const styles = StyleSheet.create({
   content: { paddingHorizontal: spacing.lg, paddingTop: spacing.xl, paddingBottom: spacing.xxxl },
   kicker: { color: colors.secondary, fontSize: typography.small, fontFamily: typography.family.bold, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: spacing.xs },
   subtitle: { color: colors.textSecondary, fontSize: typography.body, lineHeight: 20, marginBottom: spacing.lg },
-  myAppsBtn: { marginBottom: spacing.lg },
   search: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radii.md, paddingHorizontal: spacing.md, paddingVertical: spacing.md, color: colors.textPrimary, fontSize: typography.body, marginBottom: spacing.md },
   chipRow: { gap: spacing.sm, paddingBottom: spacing.lg },
   chip: { borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, borderRadius: radii.pill, paddingVertical: spacing.sm, paddingHorizontal: spacing.md },

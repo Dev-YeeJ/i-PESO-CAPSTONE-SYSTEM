@@ -51,12 +51,7 @@ class AdminGovernmentProgramController extends Controller
     public function index(Request $request): JsonResponse
     {
         $query = GovernmentProgram::query()
-            ->with(['skills.skill', 'targetOccupation'])
-            ->withCount([
-                'applications',
-                'applications as approved_count' => fn ($query) => $query->where('application_status', 'approved'),
-                'applications as completed_count' => fn ($query) => $query->where('application_status', 'completed'),
-            ]);
+            ->with(['skills.skill', 'targetOccupation']);
 
         $query->when($request->string('search')->toString(), function ($query, $search) {
             $query->where(function ($nested) use ($search) {
@@ -118,12 +113,7 @@ class AdminGovernmentProgramController extends Controller
 
     public function show(GovernmentProgram $governmentProgram): JsonResponse
     {
-        $governmentProgram->load(['skills.skill', 'targetOccupation'])
-            ->loadCount([
-                'applications',
-                'applications as approved_count' => fn ($query) => $query->where('application_status', 'approved'),
-                'applications as completed_count' => fn ($query) => $query->where('application_status', 'completed'),
-            ]);
+        $governmentProgram->load(['skills.skill', 'targetOccupation']);
 
         return response()->json(['program' => $this->formatProgram($governmentProgram)]);
     }
@@ -151,9 +141,9 @@ class AdminGovernmentProgramController extends Controller
             }
 
             if (isset($data['total_slots'])) {
-                $used = $governmentProgram->applications()
-                    ->whereIn('application_status', ['approved', 'completed'])->count();
-                $data['available_slots'] = max(0, (int) $data['total_slots'] - $used);
+                // Programs are announcements only -- nothing is booked through the
+                // portal, so every slot stays available.
+                $data['available_slots'] = (int) $data['total_slots'];
             }
 
             $governmentProgram->update($data);

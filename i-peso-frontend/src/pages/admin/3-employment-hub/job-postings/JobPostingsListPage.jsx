@@ -63,8 +63,8 @@ export default function JobPostingsListPage() {
       label: 'Employer',
       render: (_, row) => (
         <div>
-          <div className="font-medium text-slate-900">{row.employer?.company_profile?.company_name || 'N/A'}</div>
-          <div className="text-xs text-slate-500">{row.employer?.company_profile?.trade_name || ''}</div>
+          <div className="font-medium text-slate-900">{row.employer?.company_name || 'N/A'}</div>
+          <div className="text-xs text-slate-500">{row.employer?.trade_name || ''}</div>
         </div>
       )
     },

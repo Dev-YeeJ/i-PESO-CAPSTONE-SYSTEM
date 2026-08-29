@@ -1,10 +1,11 @@
 import { createElement, useState } from 'react'
-import { BookOpenCheck, CalendarDays, ChevronLeft, CircleCheck, ClipboardList, GraduationCap, LayoutDashboard, Menu, UserRound, X, MapPin } from 'lucide-react'
+import { BookOpenCheck, CalendarDays, ChevronLeft, CircleCheck, ClipboardList, GraduationCap, LayoutDashboard, LogOut, Menu, UserRound, X, MapPin } from 'lucide-react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '@/stores/authStore'
 import NotificationBell from '@/pages/seeker/components/NotificationBell'
 import IPesoLogo from '@/components/branding/IPesoLogo'
 import MobileBottomNav from '@/pages/seeker/components/MobileBottomNav'
+import SignOutConfirmDialog from '@/components/common/SignOutConfirmDialog'
 
 const navLinks = [
   { to: '/seeker/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -32,6 +33,7 @@ export default function SeekerLayout() {
   const user = useAuthStore((state) => state.user)
   const [collapsed, setCollapsed] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
+  const [signOutOpen, setSignOutOpen] = useState(false)
   const initials = user?.name?.split(' ').map((name) => name[0]).join('').slice(0, 2).toUpperCase() ?? 'JS'
   const pageName = pageNames[location.pathname] ?? 'Job Seeker Portal'
 
@@ -74,6 +76,9 @@ export default function SeekerLayout() {
         </NavLink>
         <button onClick={() => setCollapsed(!collapsed)} className={`portal-sidebar-action hidden md:flex ${collapsed ? 'justify-center' : 'gap-3 px-3'}`}>
           <ChevronLeft className={`h-5 w-5 transition ${collapsed ? 'rotate-180' : ''}`} />{!collapsed && 'Collapse sidebar'}
+        </button>
+        <button onClick={() => { setMobileOpen(false); setSignOutOpen(true) }} className={`flex w-full items-center rounded-lg py-2.5 text-sm font-semibold text-red-200 hover:bg-red-500/10 hover:text-red-100 ${collapsed ? 'justify-center' : 'gap-3 px-3'}`}>
+          <LogOut className="h-4 w-4" />{!collapsed && 'Sign out'}
         </button>
       </div>
     </>
@@ -120,6 +125,7 @@ export default function SeekerLayout() {
         <main className="px-3 pb-28 pt-4 sm:px-6 sm:py-6 lg:px-8 lg:py-8"><Outlet /></main>
       </div>
       <MobileBottomNav links={navLinks} />
+      <SignOutConfirmDialog open={signOutOpen} onOpenChange={setSignOutOpen} />
     </div>
   )
 }

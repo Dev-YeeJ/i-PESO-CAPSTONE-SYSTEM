@@ -2,8 +2,7 @@ import { ArrowLeft, CalendarDays, CheckCircle2, Clock3, Download, MapPin, Phone,
 import { createElement, useCallback, useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import toast from 'react-hot-toast'
-import { Button, ErrorState, LoadingSkeleton } from '@/components/ui'
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { ErrorState, LoadingSkeleton } from '@/components/ui'
 import { categoryLabel, statusLabel } from '@/components/government-programs/programConstants'
 import EligibilityBadge from '@/components/government-programs/EligibilityBadge'
 import EligibilityBreakdown from '@/components/government-programs/EligibilityBreakdown'
@@ -15,8 +14,6 @@ export default function ProgramDetailsPage() {
   const { id } = useParams()
   const navigate = useNavigate()
   const [program, setProgram] = useState(null)
-  const [confirming, setConfirming] = useState(false)
-  const [applying, setApplying] = useState(false)
   const [error, setError] = useState('')
 
   const downloadAttachment = async () => {
@@ -30,13 +27,6 @@ export default function ProgramDetailsPage() {
 
   const load = useCallback(() => governmentProgramService.seekerProgram(id).then(setProgram).catch((requestError) => setError(requestError.response?.data?.message ?? 'Unable to load the program.')), [id])
   useEffect(() => { load() }, [load])
-
-  const apply = async () => {
-    setApplying(true)
-    try { await governmentProgramService.applyToProgram(id); toast.success('Application submitted to PESO.'); setConfirming(false); await load() }
-    catch (requestError) { toast.error(requestError.response?.data?.errors?.program?.[0] ?? requestError.response?.data?.message ?? 'Unable to submit the application.') }
-    finally { setApplying(false) }
-  }
 
   if (error) return <ErrorState description={error} onRetry={() => { setError(''); load() }} />
   if (!program) return <div className="mx-auto max-w-6xl space-y-6"><LoadingSkeleton variant="text" rows={2} className="max-w-md" /><LoadingSkeleton variant="card" rows={3} /></div>
@@ -133,20 +123,6 @@ export default function ProgramDetailsPage() {
         </aside>
       </div>
 
-      {confirming && (
-        <Dialog open onOpenChange={(open) => !open && setConfirming(false)}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Submit your application?</DialogTitle>
-              <DialogDescription>i-PESO will send your profile snapshot to PESO for {program.title}. You can only apply once.</DialogDescription>
-            </DialogHeader>
-            <DialogFooter>
-              <Button variant="ghost" onClick={() => setConfirming(false)}>Cancel</Button>
-              <Button variant="primary" onClick={apply} disabled={applying}>{applying ? 'Submitting…' : 'Confirm application'}</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      )}
     </div>
   )
 }

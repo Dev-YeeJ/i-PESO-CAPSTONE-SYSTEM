@@ -40,8 +40,6 @@ export const governmentProgramService = {
   updateProgram: async (id, payload) => (await api.post(`/admin/government-programs/${id}`, programFormData(payload))).data,
   archiveProgram: async (id) => (await api.delete(`/admin/government-programs/${id}`)).data,
   adminProgramAttachment: async (id) => (await api.get(`/admin/government-programs/${id}/attachment`, { responseType: 'blob' })).data,
-  programApplications: async (id, params = {}) => (await api.get(`/admin/government-programs/${id}/applications`, { params })).data,
-  updateApplicationStatus: async (id, payload) => (await api.post(`/admin/government-program-applications/${id}/status`, payload)).data,
 
   citizenCharter: async () => (await api.get('/admin/citizen-charter')).data.data,
   createCitizenCharter: async (payload) => (await api.post('/admin/citizen-charter', payload)).data,
@@ -51,15 +49,6 @@ export const governmentProgramService = {
   listSeekerPrograms: async (params = {}) => (await api.get('/seeker/government-programs', { params })).data,
   seekerProgram: async (id) => (await api.get(`/seeker/government-programs/${id}`)).data.program,
   seekerProgramAttachment: async (id) => (await api.get(`/seeker/government-programs/${id}/attachment`, { responseType: 'blob' })).data,
-  applyToProgram: async (id) => (await api.post(`/seeker/government-programs/${id}/apply`)).data,
-  seekerApplications: async () => (await api.get('/seeker/government-program-applications')).data.data,
-  uploadApplicationDocument: async (id, payload) => {
-    const form = new FormData()
-    form.append('document_type', payload.document_type)
-    form.append('document_name', payload.document_name)
-    form.append('file', payload.file)
-    return (await api.post(`/seeker/government-program-applications/${id}/documents`, form)).data
-  },
   publicCitizenCharter: async () => (await api.get('/seeker/citizen-charter')).data.data,
 }
 

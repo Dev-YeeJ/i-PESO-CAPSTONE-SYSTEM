@@ -185,45 +185,6 @@ export const adminService = {
     return data
   },
 
-  getProgramApplicants: async (programId, params = {}) => {
-    const { data } = await api.get(`/admin/programs/${programId}/applicants`, { params: cleanParams(params) })
-    return data
-  },
-
-  reviewProgramApplicant: async (programId, applicantId, action, remarks = null) => {
-    const { data } = await api.post(
-      `/admin/programs/${programId}/applicants/${applicantId}/review`,
-      { action, remarks }
-    )
-    return data
-  },
-
-  bulkReviewApplicants: async (programId, ids, action, remarks = null) => {
-    const { data } = await api.post(
-      `/admin/programs/${programId}/applicants/bulk-review`,
-      { ids, action, remarks }
-    )
-    return data
-  },
-
-  // Full status vocabulary (under_review, qualified, for_interview, completed, …),
-  // unlike the approve/reject-only review endpoints above.
-  updateProgramApplicationStatus: async (applicationId, status, remarks = null) => {
-    const { data } = await api.post(
-      `/admin/government-program-applications/${applicationId}/status`,
-      { status, remarks }
-    )
-    return data
-  },
-
-  getProgramApplicationDocument: async (applicationId, documentId) => {
-    const { data } = await api.get(
-      `/admin/government-program-applications/${applicationId}/documents/${documentId}`,
-      { responseType: 'blob' },
-    )
-    return data
-  },
-
   // ── JOB FAIRS ──────────────────────────────────────────────────
   getJobFairsList: async (params = {}) => {
     const { data } = await api.get('/admin/job-fairs', { params: cleanParams(params) })

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import { getCitizenCharterSteps, seekerService } from '@/services/seekerService'
 import { downloadAndShare } from '@/utils/fileTransfer'
 import { formatDate, textFrom, titleCase } from '@/utils/seekerView'
@@ -12,7 +12,6 @@ import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { ScreenHeader } from '@/components/ui/ScreenHeader'
 import { ScreenSkeleton } from '@/components/ui/ScreenSkeleton'
-import { SuccessSheet } from '@/components/ui/SuccessSheet'
 import { apiErrorMessage } from '@/utils/apiError'
 import { colors, radii, spacing, typography } from '@/theme'
 
@@ -41,53 +40,17 @@ function statusVariant(status?: string | null): 'success' | 'info' | 'neutral' {
   return 'neutral'
 }
 
-function applicationStatusVariant(status?: string | null): 'success' | 'danger' | 'info' | 'neutral' {
-  const value = textFrom(status, '').toLowerCase()
-  if (['completed', 'approved', 'qualified'].includes(value)) return 'success'
-  if (['rejected', 'cancelled'].includes(value)) return 'danger'
-  if (['pending', 'under_review', 'for_interview'].includes(value)) return 'info'
-  return 'neutral'
-}
-
 export default function ProgramDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>()
   const router = useRouter()
-  const queryClient = useQueryClient()
-  const [applyError, setApplyError] = useState('')
   const [attachmentBusy, setAttachmentBusy] = useState(false)
   const [attachmentError, setAttachmentError] = useState('')
-  const [successMessage, setSuccessMessage] = useState('')
 
   const { data: program, isLoading, error } = useQuery({
     queryKey: ['governmentProgram', id],
     queryFn: () => seekerService.getGovernmentProgram(id),
     enabled: !!id,
   })
-
-  const applyMutation = useMutation({
-    mutationFn: () => seekerService.applyToProgram(id),
-    onSuccess: (data) => {
-      setApplyError('')
-      queryClient.invalidateQueries({ queryKey: ['governmentProgram', id] })
-      queryClient.invalidateQueries({ queryKey: ['governmentPrograms'] })
-      setSuccessMessage(data.message || 'PESO staff will review your application and get back to you.')
-    },
-    onError: (caught: unknown) => {
-      setApplyError(apiErrorMessage(caught, 'Unable to submit your application. Please try again.'))
-    },
-  })
-
-  const confirmApply = () => {
-    setApplyError('')
-    Alert.alert(
-      'Confirm Application',
-      'You can only apply once. Continue?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Apply', style: 'default', onPress: () => applyMutation.mutate() },
-      ]
-    )
-  }
 
   const viewAttachment = async () => {
     if (!program) return
@@ -245,49 +208,12 @@ export default function ProgramDetailScreen() {
           </>
         ) : null}
 
-        {program.eligibility?.status === 'not_eligible' && !program.my_application ? (
+        {program.eligibility?.status === 'not_eligible' ? (
           <AlertBox variant="warning" style={styles.alertBox}>
-            Your profile does not meet a required rule. You may still apply, but PESO may not approve it.
+            Your profile does not meet a required rule for this program. Check the requirements above before visiting the PESO office.
           </AlertBox>
         ) : null}
-
-        {applyError ? (
-          <AlertBox variant="danger" style={styles.alertBox}>{applyError}</AlertBox>
-        ) : null}
       </ScrollView>
-
-      <View style={styles.footer}>
-        {program.my_application ? (
-          <View style={styles.appliedRow}>
-            <Text style={styles.appliedText}>You applied</Text>
-            <Badge variant={applicationStatusVariant(program.my_application.status)}>
-              {titleCase(program.my_application.status, 'Pending')}
-            </Badge>
-          </View>
-        ) : (
-          <Button
-            variant="success"
-            fullWidth
-            onPress={confirmApply}
-            disabled={!program.can_apply || applyMutation.isPending}
-          >
-            {applyMutation.isPending ? 'Submitting...' : 'Apply Now'}
-          </Button>
-        )}
-      </View>
-
-      <SuccessSheet
-        visible={Boolean(successMessage)}
-        title="Application submitted"
-        message={successMessage}
-        primaryLabel="Track it"
-        onPrimary={() => {
-          setSuccessMessage('')
-          router.push('/(seeker)/program-applications')
-        }}
-        secondaryLabel="Close"
-        onSecondary={() => setSuccessMessage('')}
-      />
     </View>
   )
 }
@@ -335,7 +261,4 @@ const styles = StyleSheet.create({
   tag: { backgroundColor: colors.infoBackground, color: colors.info, borderRadius: radii.pill, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, fontSize: typography.small, fontFamily: typography.family.bold },
   attachmentBtn: { marginTop: spacing.lg },
   alertBox: { marginTop: spacing.lg },
-  footer: { padding: spacing.md, backgroundColor: colors.surface, borderTopWidth: 1, borderTopColor: colors.border },
-  appliedRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, paddingVertical: spacing.sm },
-  appliedText: { color: colors.primary, fontSize: typography.body, fontFamily: typography.family.bold },
 })

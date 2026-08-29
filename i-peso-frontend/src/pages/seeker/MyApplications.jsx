@@ -32,6 +32,7 @@ export default function MyApplications() {
   const [detailLoading, setDetailLoading] = useState(false)
   const [withdrawingId, setWithdrawingId] = useState(null)
   const [pendingWithdraw, setPendingWithdraw] = useState(null)
+  const [queuedWithdraw, setQueuedWithdraw] = useState(null)
 
   const loadApplications = async () => {
     setError('')
@@ -82,9 +83,23 @@ export default function MyApplications() {
     }
   }
 
+  // Two Radix modals must never overlap: closing the details dialog and opening
+  // the confirm in the same tick leaves pointer-events:none stuck on <body>, so
+  // the confirm renders but its buttons stop responding. Queue it instead, and
+  // open it from the details dialog's onCloseAutoFocus once Radix has cleaned up.
   const askWithdraw = (application) => {
+    if (!activeApplication) {
+      setPendingWithdraw(application)
+      return
+    }
+    setQueuedWithdraw(application)
     setActiveApplication(null)
-    setPendingWithdraw(application)
+  }
+
+  const flushQueuedWithdraw = () => {
+    if (!queuedWithdraw) return
+    setPendingWithdraw(queuedWithdraw)
+    setQueuedWithdraw(null)
   }
 
   return (
@@ -184,7 +199,7 @@ export default function MyApplications() {
 
       {/* Application detail */}
       <Dialog open={!!activeApplication} onOpenChange={(open) => !open && setActiveApplication(null)}>
-        <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto sm:rounded-3xl border-0 shadow-2xl">
+        <DialogContent onCloseAutoFocus={flushQueuedWithdraw} className="max-h-[85vh] max-w-2xl overflow-y-auto sm:rounded-3xl border-0 shadow-2xl">
           <DialogHeader className="mb-4">
             <div className="flex items-center gap-4">
               {activeApplication?.job?.employer?.company_logo_url && (

@@ -327,35 +327,8 @@ export interface GovernmentProgram {
   contact_email?: string | null
   contact_phone?: string | null
   has_attachment?: boolean
-  applications_count?: number
-  can_apply?: boolean
-  my_application?: GovernmentProgramApplication | null
   recommendation_score?: number | null
   recommendation_reason?: string | null
-}
-
-export interface ProgramDocument {
-  document_id: number | string
-  document_type: 'requirement' | 'certificate'
-  document_name: string
-  original_filename?: string | null
-  mime_type?: string | null
-  size?: number | null
-  created_at?: string | null
-}
-
-export interface GovernmentProgramApplication {
-  application_id: number | string
-  program_id?: number | string
-  status: string
-  remarks?: string | null
-  eligibility_score?: number | null
-  applied_at?: string | null
-  reviewed_at?: string | null
-  completed_at?: string | null
-  documents?: ProgramDocument[]
-  certificate?: { certificate_id: number | string; title: string; issued_at?: string | null } | null
-  program?: GovernmentProgram
 }
 
 export interface GovernmentProgramsResponse {
@@ -730,39 +703,6 @@ export const seekerService = {
 
   programAttachmentUrl(id: number | string) {
     return `${API_BASE_URL}/seeker/government-programs/${id}/attachment`
-  },
-
-  async applyToProgram(id: number | string) {
-    const res = await apiClient.post(`/seeker/government-programs/${id}/apply`)
-    return res.data as { message: string; application: GovernmentProgramApplication }
-  },
-
-  async getProgramApplications(): Promise<GovernmentProgramApplication[]> {
-    const res = await apiClient.get('/seeker/government-program-applications')
-    return res.data?.data ?? []
-  },
-
-  async uploadProgramDocument(
-    applicationId: number | string,
-    uri: string,
-    mimeType: string,
-    fileName: string,
-    meta: { document_type: 'requirement' | 'certificate'; document_name: string }
-  ) {
-    const formData = toFormData(meta as Record<string, unknown>, {
-      uri,
-      name: fileName,
-      type: mimeType,
-      fieldName: 'file',
-    })
-    const res = await apiClient.post(`/seeker/government-program-applications/${applicationId}/documents`, formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    })
-    return res.data as { message: string; document: ProgramDocument }
-  },
-
-  programDocumentUrl(applicationId: number | string, documentId: number | string) {
-    return `${API_BASE_URL}/seeker/government-program-applications/${applicationId}/documents/${documentId}`
   },
 
   // ── Catalogs (public, used for onboarding typeahead) ──────────────────

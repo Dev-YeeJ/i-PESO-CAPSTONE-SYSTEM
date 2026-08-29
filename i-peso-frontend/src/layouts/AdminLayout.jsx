@@ -1,10 +1,11 @@
 import { useState } from 'react'
-import { Outlet, NavLink, useNavigate } from 'react-router-dom'
+import { Outlet, NavLink } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { ChevronLeft, LogOut, Menu, X } from 'lucide-react'
 import { useAuthStore } from '@/stores/authStore'
 import { adminService } from '@/services/adminService'
 import IPesoLogo from '@/components/branding/IPesoLogo'
+import SignOutConfirmDialog from '@/components/common/SignOutConfirmDialog'
 
 const navGroups = [
   // ========== CATEGORY 1: OVERVIEW ==========
@@ -151,11 +152,10 @@ const navGroups = [
 ]
 
 const AdminLayout = () => {
-  const navigate  = useNavigate()
-  const logout    = useAuthStore((s) => s.logout)
   const user      = useAuthStore((s) => s.user)
   const [collapsed, setCollapsed] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
+  const [signOutOpen, setSignOutOpen] = useState(false)
 
   // Drives the "Employer Verification" sidebar badge — pulled from the same
   // summary the verification queue's own stat cards use, so the nav never
@@ -168,11 +168,6 @@ const AdminLayout = () => {
     retry: 1,
   })
   const pendingEmployerCount = employerSummary?.pending ?? 0
-
-  const handleLogout = async () => {
-    await logout()
-    navigate('/login', { replace: true })
-  }
 
   const initials = user?.name?.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase() ?? 'AD'
 
@@ -241,7 +236,7 @@ const AdminLayout = () => {
           >
             <ChevronLeft className={`h-5 w-5 transition ${collapsed ? 'rotate-180' : ''}`} />{!collapsed && 'Collapse sidebar'}
           </button>
-          <button onClick={handleLogout} className={`flex w-full items-center rounded-lg py-2.5 text-sm font-semibold text-red-200 hover:bg-red-500/10 hover:text-red-100 ${collapsed ? 'justify-center' : 'gap-3 px-3'}`}>
+          <button onClick={() => { setMobileOpen(false); setSignOutOpen(true) }} className={`flex w-full items-center rounded-lg py-2.5 text-sm font-semibold text-red-200 hover:bg-red-500/10 hover:text-red-100 ${collapsed ? 'justify-center' : 'gap-3 px-3'}`}>
             <LogOut className="h-4 w-4" />{!collapsed && 'Sign out'}
           </button>
         </div>
@@ -295,6 +290,7 @@ const AdminLayout = () => {
           <Outlet />
         </main>
       </div>
+      <SignOutConfirmDialog open={signOutOpen} onOpenChange={setSignOutOpen} />
     </div>
   )
 }

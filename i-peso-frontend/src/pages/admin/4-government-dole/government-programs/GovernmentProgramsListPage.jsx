@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
-import { Pencil, Trash2, Users } from 'lucide-react'
+import { Pencil, Trash2 } from 'lucide-react'
 import { Button, Card } from '@/components/ui'
 import { ConfirmModal, PageHeader, StatusBadge } from '@/pages/admin/_components'
 import DataTable from '@/pages/admin/_components/DataTable'
@@ -70,14 +70,6 @@ export default function ProgramsListPage() {
                   <Button
                     size="sm"
                     variant="outline"
-                    icon={Users}
-                    onClick={() => navigate(`/admin/government-programs/${row.program_id}/applicants`)}
-                  >
-                    Applicants
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
                     icon={Pencil}
                     onClick={() => navigate(`/admin/government-programs/${row.program_id}/edit`)}
                   >
@@ -109,7 +101,7 @@ export default function ProgramsListPage() {
         isOpen={Boolean(pendingDelete)}
         isDangerous
         title="Delete this program?"
-        message={`"${pendingDelete?.program_name ?? 'This program'}" and its applicant records will no longer be available in the portal. This cannot be undone.`}
+        message={`"${pendingDelete?.program_name ?? 'This program'}" will no longer be available in the portal. This cannot be undone.`}
         confirmText="Delete program"
         loading={removeProgram.isPending}
         onCancel={() => setPendingDelete(null)}

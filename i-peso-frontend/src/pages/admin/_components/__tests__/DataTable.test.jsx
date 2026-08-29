@@ -62,6 +62,26 @@ describe('DataTable', () => {
     expect(screen.getByText('Job seekers directory.')).toBeInTheDocument()
   })
 
+  // Regression: long tables used to opt into virtualisation, which positioned
+  // every <tr> absolutely at a fixed 56px estimate. Rows taller than that (a name
+  // over an email over a badge) overlapped each other and drifted out of
+  // alignment with their headers. Passing the legacy prop must stay inert.
+  it('lays long tables out in normal flow even if virtualize is passed', () => {
+    const many = Array.from({ length: 15 }, (_, index) => ({
+      name: `Seeker ${index}`,
+      email: `seeker${index}@example.com`,
+    }))
+
+    render(<DataTable columns={columns} data={many} virtualize />)
+
+    const body = screen.getAllByRole('rowgroup')[1]
+    expect(body).not.toHaveStyle({ position: 'relative' })
+
+    const bodyRows = screen.getAllByRole('row').slice(1)
+    expect(bodyRows).toHaveLength(15)
+    bodyRows.forEach((row) => expect(row).not.toHaveStyle({ position: 'absolute' }))
+  })
+
   it('calls onRowClick with the original row', async () => {
     const onRowClick = vi.fn()
     render(<DataTable columns={columns} data={rows} onRowClick={onRowClick} />)

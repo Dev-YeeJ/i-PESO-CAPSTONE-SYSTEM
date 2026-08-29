@@ -74,7 +74,6 @@ const AdminMatchResults = lazy(() => import('@/pages/admin/3-employment-hub/smar
 // Admin Pages - CATEGORY 4: GOVERNMENT & DOLE
 const AdminGovernmentProgramsList = lazy(() => import('@/pages/admin/4-government-dole/government-programs/GovernmentProgramsListPage'))
 const AdminGovernmentProgramForm = lazy(() => import('@/pages/admin/4-government-dole/government-programs/GovernmentProgramFormPage'))
-const AdminProgramApplicants    = lazy(() => import('@/pages/admin/4-government-dole/government-programs/ProgramApplicantsPage'))
 const AdminJobFairsList         = lazy(() => import('@/pages/admin/4-government-dole/government-programs/JobFairsListPage'))
 const AdminJobFairForm          = lazy(() => import('@/pages/admin/4-government-dole/government-programs/JobFairFormPage'))
 const AdminJobFairDetail        = lazy(() => import('@/pages/admin/4-government-dole/government-programs/JobFairDetailPage'))
@@ -207,7 +206,6 @@ export const router = createBrowserRouter([
                       { path: 'government-programs', element: S(AdminGovernmentProgramsList) },
                       { path: 'government-programs/create', element: S(AdminGovernmentProgramForm) },
                       { path: 'government-programs/:id/edit', element: S(AdminGovernmentProgramForm) },
-                      { path: 'government-programs/:id/applicants', element: S(AdminProgramApplicants) },
                       { path: 'job-fairs', element: S(AdminJobFairsList) },
                       { path: 'job-fairs/create', element: S(AdminJobFairForm) },
                       { path: 'job-fairs/:id', element: S(AdminJobFairDetail) },

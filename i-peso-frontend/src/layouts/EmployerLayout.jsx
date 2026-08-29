@@ -14,10 +14,11 @@ import {
   UsersRound,
   X,
 } from 'lucide-react'
-import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import NotificationBell from '@/pages/employer/components/NotificationBell'
 import { useAuthStore } from '@/stores/authStore'
 import IPesoLogo from '@/components/branding/IPesoLogo'
+import SignOutConfirmDialog from '@/components/common/SignOutConfirmDialog'
 
 const navItems = [
   { to: '/employer/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -42,13 +43,12 @@ const pageNames = {
 }
 
 export default function EmployerLayout() {
-  const navigate = useNavigate()
   const location = useLocation()
-  const logout = useAuthStore((state) => state.logout)
   const user = useAuthStore((state) => state.user)
   const updateUser = useAuthStore((state) => state.updateUser)
   const [collapsed, setCollapsed] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
+  const [signOutOpen, setSignOutOpen] = useState(false)
   const approved = user?.verification_status === 'verified'
   const visibleItems = navItems.filter((item) => !item.protected || approved)
   
@@ -80,11 +80,6 @@ export default function EmployerLayout() {
       }
     }
   }, [approved, updateUser])
-
-  const handleLogout = async () => {
-    await logout()
-    navigate('/login', { replace: true })
-  }
 
   const sidebar = (
     <>
@@ -141,7 +136,7 @@ export default function EmployerLayout() {
         <button onClick={() => setCollapsed(!collapsed)} className={`hidden w-full items-center rounded-lg py-2.5 text-sm font-semibold text-blue-200 hover:bg-white/10 hover:text-white md:flex ${collapsed ? 'justify-center' : 'gap-3 px-3'}`}>
           <ChevronLeft className={`h-5 w-5 transition ${collapsed ? 'rotate-180' : ''}`} />{!collapsed && 'Collapse sidebar'}
         </button>
-        <button onClick={handleLogout} className={`flex w-full items-center rounded-lg py-2.5 text-sm font-semibold text-red-200 hover:bg-red-500/10 hover:text-red-100 ${collapsed ? 'justify-center' : 'gap-3 px-3'}`}>
+        <button onClick={() => { setMobileOpen(false); setSignOutOpen(true) }} className={`flex w-full items-center rounded-lg py-2.5 text-sm font-semibold text-red-200 hover:bg-red-500/10 hover:text-red-100 ${collapsed ? 'justify-center' : 'gap-3 px-3'}`}>
           <LogOut className="h-4 w-4" />{!collapsed && 'Sign out'}
         </button>
       </div>
@@ -188,6 +183,7 @@ export default function EmployerLayout() {
         </header>
         <main className="px-4 py-6 sm:px-6 lg:px-8 lg:py-8"><Outlet /></main>
       </div>
+      <SignOutConfirmDialog open={signOutOpen} onOpenChange={setSignOutOpen} />
     </div>
   )
 }

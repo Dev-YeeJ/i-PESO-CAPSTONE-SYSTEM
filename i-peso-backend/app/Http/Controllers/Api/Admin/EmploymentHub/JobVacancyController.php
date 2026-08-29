@@ -21,13 +21,13 @@ class JobVacancyController extends Controller
             'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
         ]);
 
-        $query = JobVacancy::with(['employer.companyProfile', 'occupation']);
+        $query = JobVacancy::with(['employer', 'occupation']);
 
         // Search by job title or employer name
         if ($search = $filters['search'] ?? null) {
             $query->where(function ($q) use ($search) {
                 $q->where('job_title', 'like', "%{$search}%")
-                  ->orWhereHas('employer.companyProfile', function ($q) use ($search) {
+                  ->orWhereHas('employer', function ($q) use ($search) {
                       $q->where('company_name', 'like', "%{$search}%")
                         ->orWhere('trade_name', 'like', "%{$search}%");
                   });
@@ -50,8 +50,7 @@ class JobVacancyController extends Controller
     public function show(JobVacancy $vacancy): JsonResponse
     {
         $vacancy->load([
-            'employer.companyProfile',
-            'employer.user',
+            'employer',
             'occupation',
             'skillRequirements.skill',
             'certificationRequirements'

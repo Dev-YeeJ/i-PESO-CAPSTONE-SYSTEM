@@ -52,7 +52,7 @@ export default function JobPostingDetailPage() {
     return <div className="flex min-h-[400px] items-center justify-center text-slate-500">Job vacancy not found.</div>
   }
 
-  const companyName = vacancy.employer?.company_profile?.company_name || 'N/A'
+  const companyName = vacancy.employer?.company_name || 'N/A'
   
   return (
     <div className="portal-page">

@@ -6,7 +6,6 @@ use App\Models\Administrator;
 use App\Models\Employer;
 use App\Models\GovernmentProgram;
 use App\Models\JobSeeker;
-use App\Models\ProgramApplication;
 use App\Models\Skill;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
@@ -26,7 +25,7 @@ class GovernmentProgramsFlowTest extends TestCase
         $this->createTables();
     }
 
-    public function test_admin_and_seeker_can_complete_the_government_program_flow(): void
+    public function test_admin_can_publish_a_program_and_seekers_can_read_the_posting(): void
     {
         $admin = Administrator::create([
             'first_name' => 'PESO',
@@ -85,30 +84,12 @@ class GovernmentProgramsFlowTest extends TestCase
         $programId = $programResponse->json('program.program_id');
 
         Sanctum::actingAs($seeker);
-        $applicationResponse = $this->postJson("/api/seeker/government-programs/{$programId}/apply")
-            ->assertCreated()
-            ->assertJsonPath('application.status', 'pending');
 
-        $this->postJson("/api/seeker/government-programs/{$programId}/apply")
-            ->assertUnprocessable()
-            ->assertJsonValidationErrors('program');
-
-        $applicationId = $applicationResponse->json('application.application_id');
-        Sanctum::actingAs($admin);
-        $this->postJson("/api/admin/government-program-applications/{$applicationId}/status", [
-            'status' => 'approved',
-            'remarks' => 'Qualified for the next training batch.',
-        ])->assertOk()
-            ->assertJsonPath('application.status', 'approved');
-
-        $this->assertSame(1, GovernmentProgram::findOrFail($programId)->available_slots);
-        $this->assertSame('approved', ProgramApplication::findOrFail($applicationId)->application_status);
-
-        Sanctum::actingAs($seeker);
-        $this->getJson('/api/seeker/government-program-applications')
+        // Government programs are postings only: the seeker reads the announcement
+        // and its eligibility hint, then applies in person at the PESO office.
+        $this->getJson("/api/seeker/government-programs/{$programId}")
             ->assertOk()
-            ->assertJsonPath('data.0.status', 'approved')
-            ->assertJsonPath('data.0.remarks', 'Qualified for the next training batch.');
+            ->assertJsonPath('program.title', 'SMAW NC II Training Test');
 
         // Seeker programs list returns the program with an eligibility payload.
         $this->getJson('/api/seeker/government-programs')
@@ -116,56 +97,21 @@ class GovernmentProgramsFlowTest extends TestCase
             ->assertJsonPath('programs.data.0.eligibility.status', fn ($status) => is_string($status));
     }
 
-    public function test_closed_full_and_expired_programs_reject_applications(): void
+    public function test_government_programs_expose_no_application_routes(): void
     {
-        $admin = Administrator::create([
-            'first_name' => 'PESO',
-            'last_name' => 'Admin',
-            'email' => 'rules.admin@example.test',
-            'password' => 'password123',
-            'role' => 'administrator',
-            'status' => 'active',
-        ]);
-        $seeker = JobSeeker::create([
-            'first_name' => 'Maria',
-            'last_name' => 'Santos',
-            'mobile_number' => '09179876543',
-            'email' => 'rules.seeker@example.test',
-            'password' => 'password123',
-            'profile_completed' => true,
-        ]);
+        // Programs are postings and announcements only — there is no in-app
+        // transaction, so none of the old apply/review endpoints may come back.
+        $uris = collect(Route::getRoutes()->getRoutes())->map(fn ($route) => $route->uri());
 
-        $program = GovernmentProgram::create([
-            'admin_id' => $admin->admin_id,
-            'program_name' => 'Closed Training',
-            'category' => 'tech_voc_training',
-            'description' => 'Closed training test.',
-            'total_slots' => 1,
-            'available_slots' => 1,
-            'program_status' => 'closed',
-            'visibility' => 'public',
-        ]);
-
-        Sanctum::actingAs($seeker);
-        $this->postJson("/api/seeker/government-programs/{$program->program_id}/apply")
-            ->assertUnprocessable()
-            ->assertJsonValidationErrors('program');
-
-        $program->update([
-            'program_status' => 'open',
-            'application_deadline' => now()->subDay()->toDateString(),
-        ]);
-        $this->postJson("/api/seeker/government-programs/{$program->program_id}/apply")
-            ->assertUnprocessable()
-            ->assertJsonValidationErrors('program');
-
-        $program->update([
-            'application_deadline' => now()->addDay()->toDateString(),
-            'available_slots' => 0,
-        ]);
-        $this->postJson("/api/seeker/government-programs/{$program->program_id}/apply")
-            ->assertUnprocessable()
-            ->assertJsonValidationErrors('program');
+        foreach ([
+            'api/seeker/government-programs/{governmentProgram}/apply',
+            'api/seeker/government-program-applications',
+            'api/admin/government-programs/{governmentProgram}/applications',
+            'api/admin/government-program-applications/{programApplication}/status',
+            'api/admin/programs/{governmentProgram}/applicants',
+        ] as $uri) {
+            $this->assertFalse($uris->contains($uri), "Unexpected program application route: {$uri}");
+        }
     }
 
     public function test_zero_interference_job_fair_routes_are_registered_without_qr_workflow(): void

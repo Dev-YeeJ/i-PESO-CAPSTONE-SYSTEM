@@ -409,7 +409,6 @@ export default function JobSeekersListPage() {
           emptyTitle={filtersActive ? 'No job seekers match your filters' : 'No job seekers registered yet'}
           emptyDescription={filtersActive ? 'Try clearing or broadening the filters above.' : 'Registered job seekers will appear here.'}
           caption="Job seekers directory. Each row opens the seeker's profile."
-          virtualize
         />
       </div>
 

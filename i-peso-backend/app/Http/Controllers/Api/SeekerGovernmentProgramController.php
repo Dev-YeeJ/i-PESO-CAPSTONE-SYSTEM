@@ -29,9 +29,7 @@ class SeekerGovernmentProgramController extends Controller
             ->with([
                 'skills.skill',
                 'targetOccupation',
-                'applications' => fn ($query) => $query->where('seeker_id', $seeker->seeker_id)->with('documents', 'certificate'),
             ])
-            ->withCount('applications')
             ->where('visibility', 'public')
             ->whereNotIn('program_status', ['draft', 'archived']);
 
@@ -64,8 +62,7 @@ class SeekerGovernmentProgramController extends Controller
         $governmentProgram->load([
             'skills.skill',
             'targetOccupation',
-            'applications' => fn ($query) => $query->where('seeker_id', $seeker->seeker_id)->with('documents', 'certificate'),
-        ])->loadCount('applications');
+        ]);
 
         return response()->json(['program' => $this->formatProgram($governmentProgram, $seeker)]);
     }
