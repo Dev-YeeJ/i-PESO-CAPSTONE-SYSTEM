@@ -524,6 +524,47 @@ class EmployerVerificationJobPostingTest extends TestCase
             ->assertJsonPath('employer.rejection_reason', $employer->rejection_reason);
     }
 
+    public function test_reuploading_a_document_clears_the_admin_viewed_flag(): void
+    {
+        Storage::fake('local');
+        $employer = $this->createEmployer();
+        $this->uploadRequiredDocuments($employer, 'rejected');
+
+        $document = $employer->documents()->where('document_type', 'mayors_permit')->firstOrFail();
+        $document->update(['viewed_at' => now()->subDay()]);
+
+        Sanctum::actingAs($employer);
+        $this->postJson('/api/employer/register/step-3', [
+            'document_type' => 'mayors_permit',
+            'document_file' => UploadedFile::fake()->create('renewed-permit.pdf', 200, 'application/pdf'),
+            'expiration_date' => now()->addYear()->toDateString(),
+        ])->assertCreated();
+
+        $document->refresh();
+        // finalizeVerification() only lets an admin decide once every required document has
+        // been opened. A stale viewed_at would let a brand new file skip that check.
+        $this->assertNull($document->viewed_at);
+        $this->assertSame('pending', $document->verification_status);
+    }
+
+    public function test_employer_profile_exposes_document_expiration_date(): void
+    {
+        $employer = $this->createEmployer();
+        $this->uploadRequiredDocuments($employer, 'approved');
+        $expiresOn = now()->addMonth()->toDateString();
+        $employer->documents()
+            ->where('document_type', 'mayors_permit')
+            ->update(['expiration_date' => $expiresOn]);
+
+        Sanctum::actingAs($employer);
+        $documents = $this->getJson('/api/employer/profile')->assertOk()->json('documents');
+
+        // The dashboard derives the "expired, please renew" state from this field, so it has
+        // to reach the employer's own payload and not just the admin one.
+        $permit = collect($documents)->firstWhere('document_type', 'mayors_permit');
+        $this->assertSame($expiresOn, $permit['expiration_date']);
+    }
+
     public function test_rejected_document_notifies_employer_with_admin_notes(): void
     {
         Notification::fake();
@@ -904,6 +945,7 @@ class EmployerVerificationJobPostingTest extends TestCase
                 $table->timestamp('uploaded_at');
                 $table->string('verification_status')->default('pending');
                 $table->text('admin_notes')->nullable();
+                $table->date('expiration_date')->nullable();
                 $table->timestamp('viewed_at')->nullable();
                 $table->timestamps();
             });

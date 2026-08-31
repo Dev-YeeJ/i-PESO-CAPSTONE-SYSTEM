@@ -18,6 +18,15 @@ const STATUS_CONFIG = {
   approved: { icon: CheckCircle2, color: 'text-emerald-600', bg: 'bg-emerald-50 border-emerald-200', label: 'Approved' },
   rejected: { icon: XCircle, color: 'text-red-600', bg: 'bg-red-50 border-red-200', label: 'Rejected' },
   pending: { icon: Clock3, color: 'text-amber-600', bg: 'bg-amber-50 border-amber-200', label: 'Under Review' },
+  expired: { icon: XCircle, color: 'text-red-600', bg: 'bg-red-50 border-red-200', label: 'Expired' },
+}
+
+// Expiry is tracked by `expiration_date`, not by verification_status — the column is an
+// enum of pending/approved/rejected only. A lapsed document therefore stays "approved"
+// or "pending" in the database and has to be derived here.
+function isExpiredDocument(doc) {
+  if (!doc?.expiration_date) return false
+  return doc.expiration_date < new Date().toISOString().slice(0, 10)
 }
 
 function DocumentStatusRow({ doc, accountStatus, onReupload, reuploadingType }) {
@@ -25,11 +34,15 @@ function DocumentStatusRow({ doc, accountStatus, onReupload, reuploadingType }) 
   const [showDateInput, setShowDateInput] = useState(false)
   const [expirationDate, setExpirationDate] = useState('')
 
-  const config = STATUS_CONFIG[doc.verification_status] || STATUS_CONFIG.pending
-  // Allow re-upload when doc is rejected, OR when account is rejected and doc is pending
-  // (so the employer can replace any doc they want during resubmission)
+  const isExpired = isExpiredDocument(doc)
+  const config = isExpired
+    ? STATUS_CONFIG.expired
+    : STATUS_CONFIG[doc.verification_status] || STATUS_CONFIG.pending
+  // Allow re-upload when doc is rejected or has lapsed, OR when account is rejected and
+  // doc is pending (so the employer can replace any doc they want during resubmission)
   const canReupload = onReupload && (
     doc.verification_status === 'rejected' ||
+    isExpired ||
     (doc.verification_status === 'pending' && accountStatus === 'rejected')
   )
   const isMayorsPermit = doc.document_type === 'mayors_permit'
@@ -136,21 +149,45 @@ export default function PendingVerificationBanner({ status, rejectionReason, doc
   const totalRequired = Math.max(requiredDocuments.length, verifiableDocs.length) || 1
   const progressPercent = Math.min(100, Math.round((approvedCount / totalRequired) * 100))
   const hasDocuments = verifiableDocs.length > 0
+  // A document can lapse long after it was approved, so expiry is surfaced on every
+  // account status — including verified accounts, which otherwise render no document rows.
+  const expiredDocs = verifiableDocs.filter(isExpiredDocument)
+
+  // `withRows` is only for branches that render no document list of their own — otherwise
+  // the lapsed document would appear twice, each copy with its own re-upload button.
+  const expiredNotice = (withRows) => expiredDocs.length > 0 && (
+    <AlertBox variant="danger" title={`${expiredDocs.length === 1 ? DOCUMENT_LABELS[expiredDocs[0].document_type] ?? 'A document' : `${expiredDocs.length} documents`} expired`}>
+      <div className="space-y-2">
+        <span>Upload a renewed copy to keep your account active.</span>
+        {withRows && (
+          <div className="space-y-1.5">
+            {expiredDocs.map((doc) => (
+              <DocumentStatusRow key={doc.document_id} doc={doc} accountStatus={status} onReupload={onReupload} reuploadingType={reuploadingType} />
+            ))}
+          </div>
+        )}
+      </div>
+    </AlertBox>
+  )
 
   if (status === 'verified') {
     return (
-      <AlertBox variant="success" title="Employer account verified">
-        <div className="flex items-center gap-2">
-          <ShieldCheck className="h-4 w-4 shrink-0 text-emerald-600" />
-          <span>PESO has approved your company requirements. Job posting and vacancy management are enabled.</span>
-        </div>
-      </AlertBox>
+      <div className="space-y-3">
+        {expiredNotice(true)}
+        <AlertBox variant="success" title="Employer account verified">
+          <div className="flex items-center gap-2">
+            <ShieldCheck className="h-4 w-4 shrink-0 text-emerald-600" />
+            <span>PESO has approved your company requirements. Job posting and vacancy management are enabled.</span>
+          </div>
+        </AlertBox>
+      </div>
     )
   }
 
   if (status === 'pending') {
     return (
       <div className="space-y-3">
+        {expiredNotice(false)}
         <AlertBox title="Your accreditation is under PESO review">
           Urdaneta City PESO is reviewing your employer information and legal documents. You will receive an email and dashboard notification when the status changes.
         </AlertBox>

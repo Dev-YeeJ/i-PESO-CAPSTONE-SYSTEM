@@ -198,6 +198,10 @@ class EmployerRegistrationController extends Controller
                 'mime_type' => $file->getMimeType(),
                 'uploaded_at' => now(),
                 'verification_status' => 'pending',
+                // A replacement file has never been seen by an admin. Without clearing this,
+                // the stale timestamp satisfies the "view every required document before
+                // finalizing" guard and the new upload could be decided on unopened.
+                'viewed_at' => null,
                 'expiration_date' => $request->document_type === 'mayors_permit'
                     ? $request->input('expiration_date')
                     : null,
@@ -409,6 +413,11 @@ class EmployerRegistrationController extends Controller
                     'document_type' => $doc->document_type,
                     'verification_status' => $doc->verification_status,
                     'uploaded_at' => $doc->uploaded_at,
+                    'viewed_at' => $doc->viewed_at,
+                    // Time-sensitive documents (Mayor's Permit) expire independently of
+                    // the approval status, so the dashboard needs the date to offer a
+                    // renewal re-upload once it has lapsed.
+                    'expiration_date' => optional($doc->expiration_date)->toDateString(),
                 ]),
                 'required_documents' => $employer->getRequiredDocuments(),
                 'optional_documents' => $employer->getOptionalDocuments(),

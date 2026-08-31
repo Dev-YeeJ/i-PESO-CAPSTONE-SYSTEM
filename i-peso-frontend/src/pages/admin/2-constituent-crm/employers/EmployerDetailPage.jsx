@@ -521,18 +521,32 @@ export default function EmployerDetailPage() {
                   <div className="mt-2 mx-6 mb-6 flex flex-col items-center justify-between gap-4 border-t border-slate-100 pt-5 md:flex-row">
                     <Button variant="ghost" onClick={() => navigate('/admin/employers')} icon={ArrowLeft}>Back to Queue</Button>
                     
-                    {missingDocuments.length > 0 ? (
+                    {/* The viewed-gate is checked first: the backend rejects finalize with a
+                        422 unless every uploaded required document has been opened, so a
+                        missing document must not hand the admin an enabled button. */}
+                    {!allRequiredViewed ? (
+                      <div className="flex items-center gap-3">
+                        <span className="text-sm font-semibold text-amber-600">
+                          Open {unviewedRequiredDocs.map((type) => DOCUMENT_LABELS[type] ?? type).join(', ')} before completing the review
+                        </span>
+                        <Button icon={CheckCircle2} disabled>{missingDocuments.length > 0 ? 'Reject Accreditation' : 'Complete Review'}</Button>
+                      </div>
+                    ) : missingDocuments.length > 0 ? (
                       <div className="flex items-center gap-3">
                         <span className="text-sm font-semibold text-red-600">Missing {missingDocuments.length} required document(s)</span>
                         <Button onClick={handleFinalize} icon={XCircle} disabled={actionLoading}>{actionLoading ? 'Loading...' : 'Reject Accreditation'}</Button>
                       </div>
-                    ) : !allRequiredViewed ? (
-                      <div className="flex items-center gap-3">
-                        <span className="text-sm font-semibold text-amber-600">View all required documents first</span>
-                        <Button onClick={() => {}} icon={CheckCircle2} disabled>Complete Review</Button>
-                      </div>
                     ) : (
-                      <Button onClick={handleFinalize} icon={CheckCircle2} disabled={actionLoading}>{actionLoading ? 'Loading...' : 'Complete Review'}</Button>
+                      <div className="flex items-center gap-3">
+                        {/* Flagging a row only stores a local decision — nothing reaches the
+                            server until the admin completes the review. */}
+                        {rejectedCount > 0 && (
+                          <span className="text-sm font-semibold text-amber-600">
+                            {rejectedCount} document(s) flagged &mdash; not saved until you complete the review
+                          </span>
+                        )}
+                        <Button onClick={handleFinalize} icon={willReject ? XCircle : CheckCircle2} disabled={actionLoading}>{actionLoading ? 'Loading...' : 'Complete Review'}</Button>
+                      </div>
                     )}
                   </div>
                 )}
