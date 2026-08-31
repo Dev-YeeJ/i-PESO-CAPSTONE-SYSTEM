@@ -223,6 +223,7 @@ export default function PendingVerificationBanner({ status, rejectionReason, doc
   if (status === 'rejected') {
     return (
       <div className="space-y-3">
+        {expiredNotice(false)}
         <AlertBox variant="danger" title="Your accreditation needs attention">
           {rejectionReason || 'Review the administrator feedback, correct your employer requirements, and submit them again.'}
         </AlertBox>
