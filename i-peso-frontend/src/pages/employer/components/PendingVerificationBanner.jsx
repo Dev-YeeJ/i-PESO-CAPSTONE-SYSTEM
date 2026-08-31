@@ -24,9 +24,15 @@ const STATUS_CONFIG = {
 // Expiry is tracked by `expiration_date`, not by verification_status — the column is an
 // enum of pending/approved/rejected only. A lapsed document therefore stays "approved"
 // or "pending" in the database and has to be derived here.
+//
+// The comparison is inclusive and local on purpose. NotifyExpiringMayorsPermits treats
+// `daysLeft <= 0` as expired, so a permit dated today has lapsed; and toISOString() is
+// UTC, which would leave UTC+8 users reading yesterday's date until 8am.
 function isExpiredDocument(doc) {
   if (!doc?.expiration_date) return false
-  return doc.expiration_date < new Date().toISOString().slice(0, 10)
+  const now = new Date()
+  const today = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 10)
+  return doc.expiration_date <= today
 }
 
 function DocumentStatusRow({ doc, accountStatus, onReupload, reuploadingType }) {
