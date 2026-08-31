@@ -565,6 +565,68 @@ class EmployerVerificationJobPostingTest extends TestCase
         $this->assertSame($expiresOn, $permit['expiration_date']);
     }
 
+    public function test_finalize_is_refused_until_every_required_document_is_viewed(): void
+    {
+        Notification::fake();
+        $employer = $this->createEmployer();
+        $this->uploadRequiredDocuments($employer, 'pending');
+        $document = $employer->documents()->where('document_type', 'mayors_permit')->firstOrFail();
+        $admin = $this->createAdmin('unviewed-finalize-admin@example.com');
+
+        Sanctum::actingAs($admin);
+        $this->postJson("/api/admin/employers/{$employer->employer_id}/finalize", [
+            'rejected_documents' => [[
+                'document_id' => $document->document_id,
+                'reason' => 'The permit has lapsed and must be renewed before accreditation.',
+            ]],
+        ])
+            ->assertStatus(422)
+            ->assertJsonPath('error', 'You must view all required documents before completing the review.');
+
+        // The guard returns before the transaction opens, so a refused review must leave
+        // both the employer and the document exactly as they were.
+        $employer->refresh();
+        $document->refresh();
+        $this->assertSame('pending', $employer->verification_status);
+        $this->assertSame('pending', $document->verification_status);
+    }
+
+    public function test_rejecting_a_viewed_document_puts_the_employer_into_resubmission(): void
+    {
+        Notification::fake();
+        $employer = $this->createEmployer();
+        $this->uploadRequiredDocuments($employer, 'pending');
+        $employer->documents()->update(['viewed_at' => now()]);
+        $document = $employer->documents()->where('document_type', 'mayors_permit')->firstOrFail();
+        $admin = $this->createAdmin('finalize-reject-admin@example.com');
+        $reason = 'The permit has lapsed and must be renewed before accreditation.';
+
+        Sanctum::actingAs($admin);
+        $this->postJson("/api/admin/employers/{$employer->employer_id}/finalize", [
+            'rejected_documents' => [[
+                'document_id' => $document->document_id,
+                'reason' => $reason,
+            ]],
+        ])->assertOk();
+
+        $employer->refresh();
+        $document->refresh();
+        $this->assertSame('rejected', $employer->verification_status);
+        $this->assertSame('rejected', $document->verification_status);
+        $this->assertStringContainsString($reason, $employer->rejection_reason);
+
+        // Exactly what the employer dashboard reads to decide it should render the
+        // resubmission banner with a re-upload button on the rejected document.
+        Sanctum::actingAs($employer);
+        $documents = $this->getJson('/api/employer/profile')
+            ->assertOk()
+            ->assertJsonPath('employer.verification_status', 'rejected')
+            ->json('documents');
+
+        $permit = collect($documents)->firstWhere('document_type', 'mayors_permit');
+        $this->assertSame('rejected', $permit['verification_status']);
+    }
+
     public function test_rejected_document_notifies_employer_with_admin_notes(): void
     {
         Notification::fake();
