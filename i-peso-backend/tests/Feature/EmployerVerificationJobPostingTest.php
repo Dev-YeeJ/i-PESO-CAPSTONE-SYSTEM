@@ -497,6 +497,33 @@ class EmployerVerificationJobPostingTest extends TestCase
         });
     }
 
+    public function test_rejected_document_marks_employer_for_resubmission(): void
+    {
+        Notification::fake();
+        $employer = $this->createEmployer();
+        $this->uploadRequiredDocuments($employer, 'pending');
+        $document = $employer->documents()->where('document_type', 'mayors_permit')->firstOrFail();
+        $admin = $this->createAdmin('resubmission-admin@example.com');
+        $notes = 'The permit has expired. Upload the renewed permit with a visible validity date.';
+
+        Sanctum::actingAs($admin);
+        $this->postJson("/api/admin/documents/{$document->document_id}/review", [
+            'verification_status' => 'rejected',
+            'admin_notes' => $notes,
+        ])
+            ->assertOk();
+
+        $employer->refresh();
+        $this->assertSame('rejected', $employer->verification_status);
+        $this->assertStringContainsString('expired', $employer->rejection_reason);
+
+        Sanctum::actingAs($employer);
+        $this->getJson('/api/employer/profile')
+            ->assertOk()
+            ->assertJsonPath('employer.verification_status', 'rejected')
+            ->assertJsonPath('employer.rejection_reason', $employer->rejection_reason);
+    }
+
     public function test_rejected_document_notifies_employer_with_admin_notes(): void
     {
         Notification::fake();

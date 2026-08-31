@@ -629,11 +629,44 @@ class EmployerVerificationController extends Controller
         try {
             $document = EmployerDocument::with('employer')->findOrFail($document_id);
             $previousStatus = $document->verification_status;
+            $employer = $document->employer;
 
             $document->update([
                 'verification_status' => $request->verification_status,
                 'admin_notes' => $request->admin_notes,
             ]);
+
+            $rejectedRequiredDocuments = $employer->documents()
+                ->whereIn('document_type', $employer->getRequiredDocuments())
+                ->where('verification_status', 'rejected')
+                ->get();
+
+            $rejectionReason = $rejectedRequiredDocuments->isNotEmpty()
+                ? $rejectedRequiredDocuments
+                    ->map(fn ($rejectedDocument) => $this->documentLabel($rejectedDocument->document_type).': '.($rejectedDocument->admin_notes ?? 'Document requires correction.'))
+                    ->implode(' | ')
+                : null;
+
+            if ($request->verification_status === 'rejected' && in_array($document->document_type, $employer->getRequiredDocuments(), true)) {
+                $employer->update([
+                    'verification_status' => 'rejected',
+                    'verified_at' => null,
+                    'rejection_reason' => $rejectionReason,
+                    'verified_by_admin_id' => $request->user()->getKey(),
+                ]);
+            } elseif ($request->verification_status === 'approved') {
+                $stillRejected = $employer->documents()
+                    ->whereIn('document_type', $employer->getRequiredDocuments())
+                    ->where('verification_status', 'rejected')
+                    ->exists();
+
+                $employer->update([
+                    'verification_status' => $stillRejected ? 'rejected' : 'pending',
+                    'verified_at' => null,
+                    'rejection_reason' => $stillRejected ? $rejectionReason : null,
+                    'verified_by_admin_id' => $stillRejected ? $request->user()->getKey() : null,
+                ]);
+            }
 
             ActivityLogger::logAs($request->user(), 'reviewed_employer_document', sprintf(
                 'Marked employer document #%d (%s) as %s for employer #%d.%s',

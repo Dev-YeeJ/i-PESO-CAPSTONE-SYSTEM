@@ -78,6 +78,8 @@ export default function EmployerDashboard() {
   const status = profile?.employer?.verification_status ?? user?.verification_status ?? 'pending'
   const company = profile?.employer?.company_name ?? user?.company_name ?? user?.name ?? 'Employer'
   const documents = profile?.documents ?? []
+  const hasRejectedDocuments = documents.some((doc) => doc.verification_status === 'rejected')
+  const effectiveStatus = status === 'pending' && hasRejectedDocuments ? 'rejected' : status
   
   const requiredDocuments = useMemo(() => {
     const base = profile?.required_documents ?? []
@@ -138,8 +140,8 @@ export default function EmployerDashboard() {
               </div>
             </div>
             <div className="mt-4 flex flex-col gap-3 sm:mt-0 sm:mb-4 sm:flex-row sm:items-center">
-              <Badge status={status === 'approved' ? 'approved' : status === 'rejected' ? 'rejected' : 'pending'}>{status === 'verified' ? 'Verified' : status}</Badge>
-              {status === 'verified' && <Button to="/employer/post-job" icon={Plus}>Post New Vacancy</Button>}
+              <Badge status={effectiveStatus === 'verified' ? 'approved' : effectiveStatus === 'rejected' ? 'rejected' : 'pending'}>{effectiveStatus === 'verified' ? 'Verified' : effectiveStatus}</Badge>
+              {effectiveStatus === 'verified' && <Button to="/employer/post-job" icon={Plus}>Post New Vacancy</Button>}
             </div>
           </div>
         </div>
@@ -148,9 +150,9 @@ export default function EmployerDashboard() {
       {error && <AlertBox variant="danger" title="Employer workspace unavailable">{error}</AlertBox>}
       {reuploadError && <AlertBox variant="danger" title="Document re-upload failed">{reuploadError}</AlertBox>}
       {reuploadNotice && <AlertBox variant="success" title="Document re-uploaded">{reuploadNotice}</AlertBox>}
-      <PendingVerificationBanner status={status} rejectionReason={profile?.employer?.rejection_reason} documents={documents} requiredDocuments={requiredDocuments} onReupload={handleReupload} reuploadingType={reuploadingType} />
+      <PendingVerificationBanner status={effectiveStatus} rejectionReason={profile?.employer?.rejection_reason} documents={documents} requiredDocuments={requiredDocuments} onReupload={handleReupload} reuploadingType={reuploadingType} />
 
-      {status === 'verified' && (
+      {effectiveStatus === 'verified' && (
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <StatCard icon={BriefcaseBusiness} color="blue" label="Active Vacancies" value={counts.active} subtitle={`${counts.openings} total opening${counts.openings === 1 ? '' : 's'}`} hint="Published vacancies currently visible to job seekers." />
           <StatCard icon={FilePenLine} color="amber" label="Draft Vacancies" value={counts.draft} subtitle="Not visible to seekers" hint="Saved postings you have not published yet." />
@@ -159,7 +161,7 @@ export default function EmployerDashboard() {
         </div>
       )}
 
-      {status === 'verified' ? (
+      {effectiveStatus === 'verified' ? (
         <div className="grid gap-6 xl:grid-cols-[1.35fr_0.85fr]">
           <Card>
             <CardHeader
