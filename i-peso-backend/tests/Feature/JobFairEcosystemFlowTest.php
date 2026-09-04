@@ -50,11 +50,11 @@ class JobFairEcosystemFlowTest extends TestCase
         Sanctum::actingAs($admin);
         $fairId = $this->postJson('/api/admin/job-fairs', [
             'title' => 'Labor Day Job Fair and One-Stop Shop', 'description' => 'PESO employment bulletin.',
-            'start_date' => '2026-05-01', 'end_date' => '2026-05-01', 'start_time' => '08:00', 'end_time' => '16:00',
+            'start_date' => '2026-11-01', 'end_date' => '2026-11-01', 'start_time' => '08:00', 'end_time' => '16:00',
             'venue' => '3rd Level, CB Mall Event Center, Urdaneta City',
             'province' => 'Pangasinan', 'city_municipality' => 'Urdaneta City', 'barangay' => 'Nancayasan',
             'sector' => 'local', 'target_sector' => 'Multi-sector',
-            'partner_agencies' => ['DOLE', 'CB Mall Urdaneta City'], 'submission_deadline' => '2026-04-15 17:00:00',
+            'partner_agencies' => ['DOLE', 'CB Mall Urdaneta City'], 'submission_deadline' => '2026-10-15 17:00:00',
             'contact_email' => 'peso@example.test', 'maximum_representatives' => 2, 'status' => 'draft',
         ])->assertCreated()->assertJsonPath('job_fair.status', 'draft')->json('job_fair.job_fair_id');
 
@@ -113,7 +113,7 @@ class JobFairEcosystemFlowTest extends TestCase
             ->assertJsonPath('metrics.total_applicants', 2)->assertJsonPath('metrics.total_hots', 1);
         $this->get("/api/admin/job-fairs/{$fairId}/export-sprs")->assertOk()->assertHeader('content-type', 'application/pdf');
         $this->putJson("/api/admin/job-fairs/{$fairId}", ['status' => 'completed'])->assertOk();
-        $this->postJson('/api/admin/reports/generate-sprs', ['month' => 5, 'year' => 2026])->assertOk()
+        $this->postJson('/api/admin/reports/generate-sprs', ['month' => 11, 'year' => 2026])->assertOk()
             ->assertJsonPath('data.1_6_job_fairs.fairs_conducted', 1)
             ->assertJsonPath('data.1_6_job_fairs.participating_companies', 2)
             ->assertJsonPath('data.1_6_job_fairs.hots', 1);
@@ -145,11 +145,11 @@ class JobFairEcosystemFlowTest extends TestCase
         Sanctum::actingAs($admin);
         $fairId = $this->postJson('/api/admin/job-fairs', [
             'title' => 'Reuse Verified Documents Job Fair', 'description' => 'Checks accreditation document reuse.',
-            'start_date' => '2026-06-01', 'end_date' => '2026-06-01', 'start_time' => '08:00', 'end_time' => '16:00',
+            'start_date' => '2026-11-15', 'end_date' => '2026-11-15', 'start_time' => '08:00', 'end_time' => '16:00',
             'venue' => 'PESO Urdaneta Hall',
             'province' => 'Pangasinan', 'city_municipality' => 'Urdaneta City', 'barangay' => 'Nancayasan',
             'sector' => 'local', 'target_sector' => 'Multi-sector',
-            'partner_agencies' => ['DOLE'], 'submission_deadline' => '2026-05-15 17:00:00',
+            'partner_agencies' => ['DOLE'], 'submission_deadline' => '2026-10-30 17:00:00',
             'contact_email' => 'peso@example.test', 'maximum_representatives' => 2, 'status' => 'draft',
         ])->assertCreated()->json('job_fair.job_fair_id');
         $this->postJson("/api/admin/job-fairs/{$fairId}/publish", ['status' => 'accepting_employers'])->assertOk();

@@ -164,13 +164,21 @@ class JobFairLocationTest extends TestCase
             ->assertJsonPath('job_fair.map_eligible', false);
 
         // Published but no coordinates on file: still not map-eligible — a pin
-        // needs somewhere to sit.
-        $noPin = $this->payload(['status' => 'published']);
+        // needs somewhere to sit. Every new fair now starts as a draft
+        // regardless of the status field (creation no longer accepts it), so
+        // publishing is a separate step, same as the real admin flow.
+        $noPin = $this->payload();
         unset($noPin['latitude'], $noPin['longitude'], $noPin['google_place_id']);
         Http::fake(['https://maps.googleapis.test/*' => Http::response(['error' => 'quota exceeded'], 500)]);
 
-        $this->postJson('/api/admin/job-fairs', $noPin)
+        $secondFairId = $this->postJson('/api/admin/job-fairs', $noPin)
             ->assertCreated()
+            ->assertJsonPath('job_fair.is_public', false)
+            ->assertJsonPath('job_fair.latitude', null)
+            ->json('job_fair.job_fair_id');
+
+        $this->postJson("/api/admin/job-fairs/{$secondFairId}/publish")
+            ->assertOk()
             ->assertJsonPath('job_fair.is_public', true)
             ->assertJsonPath('job_fair.latitude', null)
             ->assertJsonPath('job_fair.map_eligible', false);
@@ -205,6 +213,7 @@ class JobFairLocationTest extends TestCase
             'end_date' => '2026-10-10',
             'start_time' => '08:00',
             'end_time' => '17:00',
+            'submission_deadline' => '2026-09-25',
             'status' => 'draft',
             'latitude' => 15.9762,
             'longitude' => 120.5721,
@@ -214,6 +223,21 @@ class JobFairLocationTest extends TestCase
 
     private function createTables(): void
     {
+        // Queried by publish()'s employer invitation broadcast even though
+        // this suite is only exercising location/geocoding behavior.
+        Schema::create('employers', function (Blueprint $t) {
+            $t->id('employer_id');
+            $t->string('email')->unique();
+            $t->string('password');
+            $t->string('company_name')->nullable();
+            $t->string('trade_name')->nullable();
+            $t->string('company_type')->nullable();
+            $t->string('verification_status')->default('pending');
+            $t->timestamp('email_verified_at')->nullable();
+            $t->timestamps();
+            $t->softDeletes();
+        });
+
         Schema::create('administrators', function (Blueprint $t) {
             $t->id('admin_id');
             $t->string('first_name');
