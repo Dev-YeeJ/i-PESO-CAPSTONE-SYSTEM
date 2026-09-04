@@ -7,6 +7,18 @@ import { Expand, Layers3, List, LocateFixed, RotateCcw, Sparkles } from 'lucide-
 const DEFAULT_CENTER = { lat: 15.9758, lng: 120.567 }
 const LeafletFallbackMap = lazy(() => import('./LeafletFallbackMap'))
 
+// Inline data-URI pin so a job fair marker needs no external asset and reads
+// as visually distinct from the green/amber/slate match-colored job pins.
+const JOB_FAIR_PIN_SVG = 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(
+  '<svg xmlns="http://www.w3.org/2000/svg" width="34" height="34" viewBox="0 0 34 34">'
+  + '<path d="M17 2c-7.2 0-13 5.8-13 13 0 9.5 13 17 13 17s13-7.5 13-17c0-7.2-5.8-13-13-13z" fill="#7c3aed" stroke="#4c1d95" stroke-width="2"/>'
+  + '<rect x="10.5" y="11" width="13" height="10" rx="1.5" fill="#fff"/>'
+  + '<rect x="10.5" y="11" width="13" height="3" fill="#4c1d95"/>'
+  + '<rect x="13" y="9" width="1.6" height="4" fill="#4c1d95"/>'
+  + '<rect x="19.4" y="9" width="1.6" height="4" fill="#4c1d95"/>'
+  + '</svg>',
+)
+
 const formatSalary = (job) => {
   if (job.hide_salary || (!job.salary_min && !job.salary_max)) return null
   const format = (amount) => `₱${Number(amount).toLocaleString()}`
@@ -48,7 +60,9 @@ function MapControls({ onRecenter, onListToggle, onFullscreen, onReset, clusters
   )
 }
 
-function MapLegend({ fallback = false }) {
+function MapLegend({ fallback = false, showJobFairs = false }) {
+  const entries = [['bg-emerald-600', 'High'], ['bg-amber-400', 'Medium'], ['bg-slate-400', 'Low'], ['bg-blue-600', 'Your location']]
+  if (showJobFairs) entries.push(['bg-violet-600', 'PESO Job Fair'])
   return (
     <div className="absolute bottom-3 left-3 z-[500] rounded-xl border border-slate-200 bg-white/95 px-3 py-2 shadow-md backdrop-blur">
       <div className="flex items-center justify-between gap-3">
@@ -56,7 +70,7 @@ function MapLegend({ fallback = false }) {
         {fallback && <span className="text-[9px] font-bold text-blue-700">OpenStreetMap</span>}
       </div>
       <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[10px] font-semibold text-slate-600">
-        {[['bg-emerald-600', 'High'], ['bg-amber-400', 'Medium'], ['bg-slate-400', 'Low'], ['bg-blue-600', 'Your location']].map(([color, label]) => <span key={label} className="flex items-center gap-1"><i className={`h-2.5 w-2.5 rounded-full ${color}`} />{label}</span>)}
+        {entries.map(([color, label]) => <span key={label} className="flex items-center gap-1"><i className={`h-2.5 w-2.5 rounded-full ${color}`} />{label}</span>)}
       </div>
     </div>
   )
@@ -122,7 +136,30 @@ function GoogleJobMarker({ job, selected, onSelect, registerMarker }) {
   )
 }
 
-export default function JobVacancyMap({ jobs, seekerLocation, selectedJobId, popupJobId, onMarkerSelect, onPopupClose, onViewJob, detailsOpen, onListToggle, onReset, highOnly, onHighToggle }) {
+function GoogleJobFairMarker({ fair, onSelect }) {
+  // google.maps.Size/Point must be real instances (not plain objects) — safe
+  // to construct here since this only ever mounts inside an already-loaded
+  // <APIProvider><GoogleMap>, same guarantee GoogleClusterManager relies on.
+  const icon = window.google?.maps
+    ? {
+      url: JOB_FAIR_PIN_SVG,
+      scaledSize: new window.google.maps.Size(34, 34),
+      anchor: new window.google.maps.Point(17, 32),
+    }
+    : undefined
+
+  return (
+    <GoogleMarker
+      position={{ lat: Number(fair.latitude), lng: Number(fair.longitude) }}
+      onClick={onSelect}
+      zIndex={20}
+      icon={icon}
+      title={`PESO Job Fair: ${fair.title} · ${fair.venue}`}
+    />
+  )
+}
+
+export default function JobVacancyMap({ jobs, jobFairs = [], onJobFairSelect, seekerLocation, selectedJobId, popupJobId, onMarkerSelect, onPopupClose, onViewJob, detailsOpen, onListToggle, onReset, highOnly, onHighToggle }) {
   const containerRef = useRef(null)
   const [markers, setMarkers] = useState({})
   const markerRegistry = useRef({})
@@ -141,6 +178,10 @@ export default function JobVacancyMap({ jobs, seekerLocation, selectedJobId, pop
     const position = toMapPosition(job.latitude, job.longitude)
     return position ? [{ ...job, latitude: position.lat, longitude: position.lng }] : []
   }), [jobs])
+  const mappedFairs = useMemo(() => (Array.isArray(jobFairs) ? jobFairs : []).flatMap((fair) => {
+    const position = toMapPosition(fair.latitude, fair.longitude)
+    return position ? [{ ...fair, latitude: position.lat, longitude: position.lng }] : []
+  }), [jobFairs])
   const selectedJob = mappedJobs.find((job) => job.post_id === selectedJobId) || null
   const popupJob = mappedJobs.find((job) => job.post_id === popupJobId) || null
   const activeJobId = selectedJobId || popupJobId
@@ -186,7 +227,7 @@ export default function JobVacancyMap({ jobs, seekerLocation, selectedJobId, pop
     <div ref={containerRef} className="relative h-full min-h-[320px] w-full overflow-hidden bg-slate-100">
       {useLeaflet ? (
         <Suspense fallback={<div className="h-full w-full animate-pulse bg-slate-200" />}>
-          <LeafletFallbackMap center={center} jobs={mappedJobs} seekerLocation={seekerLocation} selectedJob={selectedJob} popupJob={popupJob} activeJobId={activeJobId} onMarkerSelect={onMarkerSelect} onPopupClose={onPopupClose} onViewJob={onViewJob} recenterRequest={recenterRequest} clustersEnabled={clustersEnabled} />
+          <LeafletFallbackMap center={center} jobs={mappedJobs} jobFairs={mappedFairs} onJobFairSelect={onJobFairSelect} seekerLocation={seekerLocation} selectedJob={selectedJob} popupJob={popupJob} activeJobId={activeJobId} onMarkerSelect={onMarkerSelect} onPopupClose={onPopupClose} onViewJob={onViewJob} recenterRequest={recenterRequest} clustersEnabled={clustersEnabled} />
         </Suspense>
       ) : (
         <APIProvider version="quarterly" apiKey={googleKey} onError={() => setGoogleFailed(true)}>
@@ -197,13 +238,14 @@ export default function JobVacancyMap({ jobs, seekerLocation, selectedJobId, pop
           <GoogleMarker position={center} zIndex={100} title="Your location" />
         }
             {mappedJobs.map((job) => <GoogleJobMarker key={job.post_id} job={job} selected={activeJobId === job.post_id} onSelect={onMarkerSelect} registerMarker={registerMarker} />)}
+            {mappedFairs.map((fair) => <GoogleJobFairMarker key={fair.job_fair_id} fair={fair} onSelect={onJobFairSelect} />)}
             {popupJob && <InfoWindow position={{ lat: Number(popupJob.latitude), lng: Number(popupJob.longitude) }} onCloseClick={() => onPopupClose(popupJob.post_id)} headerDisabled><CompactJobPopup job={popupJob} onViewJob={onViewJob} /></InfoWindow>}
           </GoogleMap>
         </APIProvider>
       )}
 
       <MapControls onRecenter={() => setRecenterRequest((value) => value + 1)} onListToggle={onListToggle} onFullscreen={toggleFullscreen} onReset={onReset} clustersEnabled={clustersEnabled} onClustersToggle={() => setClustersEnabled((enabled) => !enabled)} highOnly={highOnly} onHighToggle={onHighToggle} detailsOpen={detailsOpen} />
-      <MapLegend fallback={useLeaflet} />
+      <MapLegend fallback={useLeaflet} showJobFairs={mappedFairs.length > 0} />
     </div>
   )
 }

@@ -39,6 +39,15 @@ const leafletUserIcon = L.divIcon({
   html: '<span style="display:block;width:24px;height:24px;border-radius:999px;background:#2563eb;border:4px solid #fff;box-shadow:0 0 0 2px #1e3a8a,0 3px 10px rgba(15,23,42,.3)"></span>',
 })
 
+// Violet teardrop with a small calendar glyph — visually distinct from the
+// match-colored job pins and the blue "your location" marker.
+const leafletJobFairIcon = L.divIcon({
+  className: '',
+  iconSize: [34, 34],
+  iconAnchor: [17, 34],
+  html: '<span style="display:block;width:34px;height:34px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:#7c3aed;border:3px solid #4c1d95;box-shadow:0 3px 8px rgba(15,23,42,.3)"><i style="display:block;width:10px;height:8px;margin:12px auto 0;background:#fff;border-radius:1px;transform:rotate(45deg)"></i></span>',
+})
+
 function CompactJobPopup({ job, onViewJob }) {
   const hasMatch = job.match_percentage !== null && job.match_percentage !== undefined
   return (
@@ -85,13 +94,23 @@ function ClusterLayer({ jobs, activeJobId, onMarkerSelect, clustersEnabled }) {
   return null
 }
 
-export default function LeafletFallbackMap({ center, jobs, seekerLocation, selectedJob, popupJob, activeJobId, onMarkerSelect, onPopupClose, onViewJob, recenterRequest, clustersEnabled }) {
+export default function LeafletFallbackMap({ center, jobs, jobFairs = [], onJobFairSelect, seekerLocation, selectedJob, popupJob, activeJobId, onMarkerSelect, onPopupClose, onViewJob, recenterRequest, clustersEnabled }) {
   return (
     <MapContainer center={[center.lat, center.lng]} zoom={13} zoomControl={false} className="h-full w-full" attributionControl>
       <TileLayer attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
       <MapUpdater center={center} jobs={jobs} selectedJob={selectedJob} recenterRequest={recenterRequest} />
       <ClusterLayer jobs={jobs} activeJobId={activeJobId} onMarkerSelect={onMarkerSelect} clustersEnabled={clustersEnabled} />
       {seekerLocation?.latitude != null && seekerLocation?.longitude != null && <Marker position={[center.lat, center.lng]} icon={leafletUserIcon} zIndexOffset={1000} />}
+      {jobFairs.map((fair) => (
+        <Marker
+          key={fair.job_fair_id}
+          position={[fair.latitude, fair.longitude]}
+          icon={leafletJobFairIcon}
+          zIndexOffset={500}
+          eventHandlers={{ click: () => onJobFairSelect?.(fair) }}
+          title={`PESO Job Fair: ${fair.title} · ${fair.venue}`}
+        />
+      ))}
       {popupJob && <Popup position={[popupJob.latitude, popupJob.longitude]} eventHandlers={{ remove: () => onPopupClose(popupJob.post_id) }} closeButton><CompactJobPopup job={popupJob} onViewJob={onViewJob} /></Popup>}
     </MapContainer>
   )

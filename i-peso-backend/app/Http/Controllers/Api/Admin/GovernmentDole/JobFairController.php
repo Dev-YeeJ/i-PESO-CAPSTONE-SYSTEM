@@ -10,7 +10,10 @@ use App\Models\JobFairEmployer;
 use App\Models\JobFairConfirmationSlip;
 use App\Models\JobFairRequirementSubmission;
 use App\Models\JobFairResultReport;
+use App\Models\JobSeeker;
 use App\Notifications\JobFairNotification;
+use App\Notifications\JobFairPublished;
+use App\Services\GoogleMapsService;
 use App\Services\JobFairReportService;
 use App\Services\JobFairService;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -38,13 +41,17 @@ class JobFairController extends Controller
         return response()->json($fairs);
     }
 
-    public function store(Request $request, JobFairService $service): JsonResponse
+    public function store(Request $request, JobFairService $service, GoogleMapsService $maps): JsonResponse
     {
         $admin = $this->admin($request);
         $validated = $request->validate($this->eventRules());
-        $public = in_array($validated['status'], ['published', 'accepting_employers'], true);
+        $validated = $this->applyLocationFallback($validated, null, $maps);
+        // Status is no longer collected on the create form — every new fair
+        // starts as an unpublished draft; PESO publishes it explicitly
+        // afterward (the moment that also fires the employer invitation blast).
+        $validated['status'] = 'draft';
         $fair = JobFair::create([...$validated, 'admin_id' => $admin->admin_id, 'created_by' => $admin->admin_id,
-            'event_date' => $validated['start_date'], 'is_public' => $public, 'published_at' => $public ? now() : null, 'published_by' => $public ? $admin->admin_id : null]);
+            'event_date' => $validated['start_date'], 'is_public' => false, 'published_at' => null, 'published_by' => null]);
         $service->seedRequirements($fair);
         return response()->json(['message' => 'Job Fair created as a draft.', 'job_fair' => $service->eventPayload($fair, null, true)], 201);
     }
@@ -63,11 +70,12 @@ class JobFairController extends Controller
         return response()->json($payload);
     }
 
-    public function update(Request $request, int $id, JobFairService $service): JsonResponse
+    public function update(Request $request, int $id, JobFairService $service, GoogleMapsService $maps): JsonResponse
     {
         $this->admin($request);
         $fair = JobFair::findOrFail($id);
         $validated = $request->validate($this->eventRules(true));
+        $validated = $this->applyLocationFallback($validated, $fair, $maps);
         if (isset($validated['start_date'])) $validated['event_date'] = $validated['start_date'];
         if (isset($validated['status']) && in_array($validated['status'], ['published', 'accepting_employers'], true)) {
             $validated['is_public'] = true; $validated['published_at'] = $fair->published_at ?: now(); $validated['published_by'] = $request->user()->admin_id;
@@ -86,15 +94,34 @@ class JobFairController extends Controller
         return response()->json(['message' => 'Unused draft Job Fair deleted.']);
     }
 
-    public function publish(Request $request, JobFair $jobFair): JsonResponse
+    public function publish(Request $request, JobFair $jobFair, JobFairService $service): JsonResponse
     {
         $admin = $this->admin($request);
         $validated = $request->validate(['status' => ['nullable', Rule::in(['published', 'accepting_employers'])]]);
+        $service->seedRequirements($jobFair);
+
+        // Only the first publish fires the invitation blast — re-publishing
+        // after a later status change must not re-email every employer.
+        $isFirstPublish = $jobFair->published_at === null;
+
         $jobFair->update(['status' => $validated['status'] ?? 'published', 'is_public' => true, 'published_at' => now(), 'published_by' => $admin->admin_id]);
-        return response()->json(['message' => 'Job Fair announcement published.', 'job_fair' => $jobFair->fresh()]);
+
+        $invited = 0;
+        $seekersNotified = 0;
+        if ($isFirstPublish) {
+            $invited = $this->broadcastInvitations($jobFair, $service);
+            $seekersNotified = $this->broadcastToSeekers($jobFair);
+        }
+
+        return response()->json([
+            'message' => $isFirstPublish
+                ? "Job Fair announcement published. {$invited} verified employer(s) notified by email, {$seekersNotified} job seeker(s) notified."
+                : 'Job Fair announcement published.',
+            'job_fair' => $service->eventPayload($jobFair->fresh(), null, true),
+        ]);
     }
 
-    public function invite(Request $request, JobFair $jobFair): JsonResponse
+    public function invite(Request $request, JobFair $jobFair, JobFairService $service): JsonResponse
     {
         $this->admin($request);
         $validated = $request->validate(['employer_id' => ['required', 'integer', 'exists:employers,employer_id'], 'remarks' => ['nullable', 'string', 'max:2000']]);
@@ -104,8 +131,63 @@ class JobFairController extends Controller
             ['job_fair_id' => $jobFair->job_fair_id, 'employer_id' => $employer->employer_id],
             ['participation_status' => 'invited', 'source' => 'admin_invitation', 'confirmation_channel' => 'digital', 'invited_at' => now(), 'remarks' => $validated['remarks'] ?? null],
         );
-        $employer->notify(new JobFairNotification($jobFair, 'invited', $participation));
+        $employer->notify(new JobFairNotification($jobFair, 'invited', $participation, $service->outstandingRequirementsFor($jobFair, $employer)));
         return response()->json(['message' => 'Employer invited.', 'participation' => $participation], 201);
+    }
+
+    /**
+     * Broadcasts the formal invitation letter to every verified employer not
+     * already tracked on this fair, the digital equivalent of PESO mailing
+     * the same letter to every company on file. Each employer only sees the
+     * documentary requirements still outstanding for their company type and
+     * accreditation record — see JobFairService::outstandingRequirementsFor().
+     */
+    private function broadcastInvitations(JobFair $jobFair, JobFairService $service): int
+    {
+        $alreadyTracked = JobFairEmployer::where('job_fair_id', $jobFair->job_fair_id)->pluck('employer_id');
+        $invited = 0;
+
+        Employer::query()
+            ->where('verification_status', 'verified')
+            ->whereNotIn('employer_id', $alreadyTracked)
+            ->chunkById(50, function ($employers) use ($jobFair, $service, &$invited) {
+                foreach ($employers as $employer) {
+                    $participation = JobFairEmployer::create([
+                        'job_fair_id' => $jobFair->job_fair_id,
+                        'employer_id' => $employer->employer_id,
+                        'participation_status' => 'invited',
+                        'source' => 'peso_broadcast',
+                        'confirmation_channel' => 'digital',
+                        'invited_at' => now(),
+                    ]);
+                    $employer->notify(new JobFairNotification($jobFair, 'invited', $participation, $service->outstandingRequirementsFor($jobFair, $employer)));
+                    $invited++;
+                }
+            }, 'employer_id');
+
+        return $invited;
+    }
+
+    /**
+     * Tells every registered job seeker a fair just went public — the
+     * seeker-side mirror of broadcastInvitations() above, same trigger,
+     * same one-shot-on-first-publish guard. In-app + push only (see
+     * JobFairPublished), not email — this is an FYI nudge, not a business
+     * letter, so it uses the same channel pair GovernmentProgramNotification
+     * already uses for "something new to see" announcements.
+     */
+    private function broadcastToSeekers(JobFair $jobFair): int
+    {
+        $notified = 0;
+
+        JobSeeker::query()->chunkById(200, function ($seekers) use ($jobFair, &$notified) {
+            foreach ($seekers as $seeker) {
+                $seeker->notify(new JobFairPublished($jobFair));
+                $notified++;
+            }
+        }, 'seeker_id');
+
+        return $notified;
     }
 
     public function participationStatus(Request $request, JobFair $jobFair, JobFairEmployer $participation): JsonResponse
@@ -218,14 +300,78 @@ class JobFairController extends Controller
         $required = $partial ? 'sometimes' : 'required';
         return [
             'title' => [$required, 'string', 'max:255'], 'description' => ['nullable', 'string'],
-            'start_date' => [$required, 'date'], 'end_date' => [$required, 'date', 'after_or_equal:start_date'],
+            // A new event can't start in the past; editing an existing
+            // (possibly historical) record isn't held to that.
+            'start_date' => $partial ? [$required, 'date'] : [$required, 'date', 'after_or_equal:today'],
+            'end_date' => [$required, 'date', 'after_or_equal:start_date'],
             'venue' => [$required, 'string', 'max:500'], 'sector' => [$required, Rule::in(['local', 'overseas', 'both'])],
+            // Structured PSGC location, mirroring how job vacancy posting captures
+            // its work address — same field names so the same map picker UI applies.
+            'province' => [$required, 'string', 'max:100'], 'province_code' => ['nullable', 'string', 'max:20'],
+            'city_municipality' => [$required, 'string', 'max:150'], 'city_code' => ['nullable', 'string', 'max:20'],
+            'barangay' => [$required, 'string', 'max:150'], 'barangay_code' => ['nullable', 'string', 'max:20'],
+            'specific_address' => ['nullable', 'string', 'max:255'],
+            'latitude' => ['nullable', 'numeric', 'between:-90,90'], 'longitude' => ['nullable', 'numeric', 'between:-180,180'],
+            'google_place_id' => ['nullable', 'string', 'max:255'],
             'target_sector' => ['nullable', 'string', 'max:255'], 'partner_agencies' => ['nullable', 'array'], 'partner_agencies.*' => ['string', 'max:255'],
             'start_time' => [$required, 'date_format:H:i'], 'end_time' => [$required, 'date_format:H:i'],
-            'submission_deadline' => ['nullable', 'date'], 'contact_email' => ['nullable', 'email', 'max:255'],
+            // Requirements need to be in PESO's hands before the event, so the
+            // deadline is required, can't already be in the past, and can't
+            // land after the fair has already started.
+            'submission_deadline' => $partial
+                ? ['nullable', 'date']
+                : [$required, 'date', 'after_or_equal:today', 'before_or_equal:start_date'],
+            'contact_email' => ['nullable', 'email', 'max:255'],
             'maximum_representatives' => ['nullable', 'integer', 'min:1', 'max:10'],
-            'status' => [$required, Rule::in(['draft', 'published', 'accepting_employers', 'closed', 'completed', 'cancelled', 'upcoming', 'ongoing'])],
+            // No longer collected from the create/edit form — status changes
+            // go through the dedicated publish/cancel actions instead.
+            'status' => ['nullable', Rule::in(['draft', 'published', 'accepting_employers', 'closed', 'completed', 'cancelled', 'upcoming', 'ongoing'])],
         ];
+    }
+
+    /**
+     * Fill in coordinates from the PSGC address when the admin didn't drop a
+     * map pin, the same fallback EmployerJobVacancyController uses for job
+     * postings. Only runs when a location field actually changed, so unrelated
+     * edits (e.g. flipping status) never trigger a geocode lookup.
+     */
+    private function applyLocationFallback(array $validated, ?JobFair $existing, GoogleMapsService $maps): array
+    {
+        $locationFields = ['venue', 'province', 'city_municipality', 'barangay', 'specific_address'];
+        if (! collect($locationFields)->contains(fn (string $field) => array_key_exists($field, $validated))) {
+            return $validated;
+        }
+
+        if (isset($validated['latitude'], $validated['longitude'])) {
+            return $validated;
+        }
+
+        $province = $validated['province'] ?? $existing?->province;
+        $city = $validated['city_municipality'] ?? $existing?->city_municipality;
+        if (! $province || ! $city) {
+            return $validated;
+        }
+
+        $addressLine = collect([
+            $validated['venue'] ?? $existing?->venue,
+            $validated['specific_address'] ?? $existing?->specific_address,
+            $validated['barangay'] ?? $existing?->barangay,
+            $city,
+            $province,
+        ])->filter()->unique()->join(', ');
+
+        try {
+            $location = $maps->geocode($addressLine.', Philippines');
+            if ($location) {
+                $validated['latitude'] = $location['latitude'];
+                $validated['longitude'] = $location['longitude'];
+                $validated['google_place_id'] = $location['place_id'];
+            }
+        } catch (\Throwable) {
+            // Preserve the job fair save when optional coordinate lookup is unavailable.
+        }
+
+        return $validated;
     }
 
     private function admin(Request $request): Administrator

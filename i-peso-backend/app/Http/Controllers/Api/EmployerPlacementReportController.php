@@ -10,6 +10,7 @@ use App\Models\PlacementReportUpload;
 use App\Services\PlacementImportService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
@@ -17,8 +18,9 @@ use Throwable;
 
 class EmployerPlacementReportController extends Controller
 {
-    public function __construct(private readonly PlacementImportService $imports)
-    {
+    public function __construct(
+        private readonly PlacementImportService $imports,
+    ) {
     }
 
     public function index(Request $request): JsonResponse
@@ -32,7 +34,10 @@ class EmployerPlacementReportController extends Controller
             ->get()
             ->map(fn (PlacementReportUpload $upload) => $this->summary($upload));
 
-        return response()->json(['data' => $uploads]);
+        return response()->json([
+            'data' => $uploads,
+            'deadline_day' => (int) config('placement_reports.deadline_day', 10),
+        ]);
     }
 
     /**
@@ -43,7 +48,7 @@ class EmployerPlacementReportController extends Controller
     {
         $employer = $this->employer($request);
 
-        $request->validate([
+        $validated = $request->validate([
             // `txt` is included alongside `csv` because Laravel's `mimes` rule
             // sniffs actual file content, and CSVs frequently sniff as
             // text/plain rather than text/csv — without it, legitimate CSV
@@ -51,16 +56,25 @@ class EmployerPlacementReportController extends Controller
             // trusted the client-supplied filename extension rather than the
             // file's real content type.
             'file' => ['required', 'file', 'mimes:xlsx,xls,csv,txt', 'max:5120'],
-            'coverage_month' => ['nullable', 'integer', 'min:1', 'max:12'],
-            'coverage_year' => ['nullable', 'integer', 'min:2020', 'max:2100'],
+            // Coverage is required rather than optional: compliance tracking and
+            // the duplicate guard both key off the period a report covers.
+            'coverage_month' => ['required', 'integer', 'min:1', 'max:12'],
+            'coverage_year' => ['required', 'integer', 'min:2020', 'max:2100'],
+            'sheet' => ['nullable', 'string', 'max:255'],
         ]);
+
+        $this->assertCoverageNotInFuture($validated['coverage_month'], $validated['coverage_year']);
+        $this->assertNoSettledReportFor($employer, $validated['coverage_month'], $validated['coverage_year']);
 
         $file = $request->file('file');
         $storedPath = $file->store("placement_reports/{$employer->employer_id}", 'local');
+        $absolutePath = Storage::disk('local')->path($storedPath);
 
         try {
-            $parsed = $this->imports->parse(Storage::disk('local')->path($storedPath));
-        } catch (Throwable $exception) {
+            $sheetNames = $this->imports->listSheets($absolutePath);
+            $selectedSheet = $this->imports->resolveSheet($sheetNames, $validated['sheet'] ?? null, $validated['coverage_month']);
+            $parsed = $this->imports->parse($absolutePath, $selectedSheet);
+        } catch (Throwable) {
             Storage::disk('local')->delete($storedPath);
             throw ValidationException::withMessages([
                 'file' => ['This file could not be read. Make sure it is a valid Excel or CSV spreadsheet.'],
@@ -70,7 +84,9 @@ class EmployerPlacementReportController extends Controller
         if ($parsed['headers'] === []) {
             Storage::disk('local')->delete($storedPath);
             throw ValidationException::withMessages([
-                'file' => ['No column headers were found in this file.'],
+                'file' => [$sheetNames !== [] && count($sheetNames) > 1
+                    ? "No column headers were found in the \"{$selectedSheet}\" sheet. Pick a different sheet and try again."
+                    : 'No column headers were found in this file.'],
             ]);
         }
 
@@ -82,20 +98,59 @@ class EmployerPlacementReportController extends Controller
             'file_size' => $file->getSize(),
             'detected_headers' => $parsed['headers'],
             'sample_rows' => array_slice($parsed['rows'], 0, 5),
+            'sheet_names' => $sheetNames,
+            'selected_sheet' => $selectedSheet,
             'row_count' => $parsed['row_count'],
             'status' => PlacementReportUpload::STATUS_PENDING_MAPPING,
-            'coverage_month' => $request->integer('coverage_month') ?: null,
-            'coverage_year' => $request->integer('coverage_year') ?: null,
+            'coverage_month' => $validated['coverage_month'],
+            'coverage_year' => $validated['coverage_year'],
         ]);
 
-        $suggested = $this->suggestedMapping($employer, $parsed['headers']);
-        foreach ($suggested as $sourceColumn => $targetField) {
-            $upload->mappings()->create(['source_column' => $sourceColumn, 'target_field' => $targetField]);
-        }
+        $this->rememberSuggestedMapping($upload, $employer, $parsed['headers']);
 
         return response()->json([
-            'message' => 'File uploaded. Review the column mapping before submitting.',
+            'message' => count($sheetNames) > 1
+                ? "File uploaded. Reading the \"{$selectedSheet}\" sheet — switch sheets below if that is not the right month."
+                : 'File uploaded. Review the column mapping before submitting.',
             'data' => $this->detail($upload->fresh(['mappings'])),
+        ], 201);
+    }
+
+    /**
+     * Declare that no one was hired in a coverage period.
+     *
+     * Without this, PESO cannot tell "hired nobody" apart from "never
+     * submitted", which is exactly what the compliance view needs to know.
+     */
+    public function storeNil(Request $request): JsonResponse
+    {
+        $employer = $this->employer($request);
+
+        $validated = $request->validate([
+            'coverage_month' => ['required', 'integer', 'min:1', 'max:12'],
+            'coverage_year' => ['required', 'integer', 'min:2020', 'max:2100'],
+            'employer_remarks' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        $this->assertCoverageNotInFuture($validated['coverage_month'], $validated['coverage_year']);
+        $this->assertNoSettledReportFor($employer, $validated['coverage_month'], $validated['coverage_year']);
+
+        $upload = PlacementReportUpload::create([
+            'employer_id' => $employer->employer_id,
+            'original_filename' => 'No hires declared',
+            'stored_path' => null,
+            'row_count' => 0,
+            'status' => PlacementReportUpload::STATUS_PENDING_REVIEW,
+            'is_nil_report' => true,
+            'coverage_month' => $validated['coverage_month'],
+            'coverage_year' => $validated['coverage_year'],
+            'employer_remarks' => $validated['employer_remarks'] ?? null,
+            'submitted_at' => now(),
+        ]);
+
+        return response()->json([
+            'message' => 'Recorded: no hires to report for this period.',
+            'data' => $this->summary($upload->fresh()->loadCount('records')),
         ], 201);
     }
 
@@ -104,6 +159,60 @@ class EmployerPlacementReportController extends Controller
         $this->authorizeOwner($request, $placementReport);
 
         return response()->json(['data' => $this->detail($placementReport->load('mappings'))]);
+    }
+
+    /**
+     * Switch which worksheet the report is built from.
+     *
+     * Employers routinely keep one workbook with a tab per month, so the wrong
+     * tab landing in a submission is the likeliest data error in this flow.
+     */
+    public function selectSheet(Request $request, PlacementReportUpload $placementReport): JsonResponse
+    {
+        $this->authorizeOwner($request, $placementReport);
+        $this->assertEditable($placementReport);
+
+        $validated = $request->validate(['sheet' => ['required', 'string', 'max:255']]);
+
+        if ($placementReport->stored_path === null) {
+            throw ValidationException::withMessages(['sheet' => ['This report has no spreadsheet attached.']]);
+        }
+
+        $sheetNames = $placementReport->sheet_names ?? [];
+        if (! in_array($validated['sheet'], $sheetNames, true)) {
+            throw ValidationException::withMessages(['sheet' => ['That sheet is not part of this workbook.']]);
+        }
+
+        $absolutePath = Storage::disk('local')->path($placementReport->stored_path);
+
+        try {
+            $parsed = $this->imports->parse($absolutePath, $validated['sheet']);
+        } catch (Throwable) {
+            throw ValidationException::withMessages(['sheet' => ['That sheet could not be read.']]);
+        }
+
+        if ($parsed['headers'] === []) {
+            throw ValidationException::withMessages([
+                'sheet' => ["No column headers were found in the \"{$validated['sheet']}\" sheet."],
+            ]);
+        }
+
+        $placementReport->update([
+            'selected_sheet' => $validated['sheet'],
+            'detected_headers' => $parsed['headers'],
+            'sample_rows' => array_slice($parsed['rows'], 0, 5),
+            'row_count' => $parsed['row_count'],
+        ]);
+
+        // Columns differ between sheets, so the old mapping no longer applies.
+        $placementReport->records()->delete();
+        $placementReport->mappings()->delete();
+        $this->rememberSuggestedMapping($placementReport, $this->employer($request), $parsed['headers']);
+
+        return response()->json([
+            'message' => "Now reading the \"{$validated['sheet']}\" sheet ({$parsed['row_count']} row(s)). Review the column mapping.",
+            'data' => $this->detail($placementReport->fresh(['mappings'])),
+        ]);
     }
 
     /**
@@ -132,10 +241,24 @@ class EmployerPlacementReportController extends Controller
      */
     public function submit(Request $request, PlacementReportUpload $placementReport): JsonResponse
     {
+        $employer = $this->employer($request);
         $this->authorizeOwner($request, $placementReport);
         $this->assertEditable($placementReport);
 
         $request->validate(['employer_remarks' => ['nullable', 'string', 'max:1000']]);
+
+        if (! $placementReport->coverage_month || ! $placementReport->coverage_year) {
+            throw ValidationException::withMessages([
+                'coverage_month' => ['Set the coverage month and year before submitting this report.'],
+            ]);
+        }
+
+        $this->assertNoSettledReportFor(
+            $employer,
+            $placementReport->coverage_month,
+            $placementReport->coverage_year,
+            $placementReport->id,
+        );
 
         $mapping = $placementReport->mappings->pluck('target_field', 'source_column')->filter()->all();
         $this->assertRequiredMapped($mapping);
@@ -170,13 +293,62 @@ class EmployerPlacementReportController extends Controller
             ]);
         }
 
-        Storage::disk('local')->delete($placementReport->stored_path);
+        if ($placementReport->stored_path !== null) {
+            Storage::disk('local')->delete($placementReport->stored_path);
+        }
         $placementReport->delete();
 
         return response()->json(['message' => 'Placement report deleted.']);
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────
+
+    /**
+     * Reject a second report for a period the employer has already settled.
+     *
+     * Two approved reports covering the same month would each contribute their
+     * rows to the SPRS placement totals, silently inflating the figure PESO
+     * submits to DOLE. A rejected report is not settled — resubmission is the
+     * whole point of rejecting one.
+     */
+    private function assertNoSettledReportFor(Employer $employer, int $month, int $year, ?int $exceptUploadId = null): void
+    {
+        $existing = PlacementReportUpload::query()
+            ->where('employer_id', $employer->employer_id)
+            ->where('coverage_month', $month)
+            ->where('coverage_year', $year)
+            ->whereIn('status', [PlacementReportUpload::STATUS_PENDING_REVIEW, PlacementReportUpload::STATUS_APPROVED])
+            ->when($exceptUploadId, fn ($query, $id) => $query->whereKeyNot($id))
+            ->first();
+
+        if (! $existing) {
+            return;
+        }
+
+        $period = Carbon::create($year, $month, 1)->format('F Y');
+        $state = $existing->status === PlacementReportUpload::STATUS_APPROVED ? 'already approved' : 'awaiting PESO review';
+
+        throw ValidationException::withMessages([
+            'coverage_month' => ["You already have a report for {$period} that is {$state}. Delete or wait for that one instead of sending a second."],
+        ]);
+    }
+
+    private function assertCoverageNotInFuture(int $month, int $year): void
+    {
+        if (Carbon::create($year, $month, 1)->startOfMonth()->greaterThan(Carbon::now()->startOfMonth())) {
+            throw ValidationException::withMessages([
+                'coverage_month' => ['A placement report cannot cover a month that has not started yet.'],
+            ]);
+        }
+    }
+
+    /** Store the auto-suggested mapping rows for a freshly detected header set. */
+    private function rememberSuggestedMapping(PlacementReportUpload $upload, Employer $employer, array $headers): void
+    {
+        foreach ($this->suggestedMapping($employer, $headers) as $sourceColumn => $targetField) {
+            $upload->mappings()->create(['source_column' => $sourceColumn, 'target_field' => $targetField]);
+        }
+    }
 
     private function suggestedMapping(Employer $employer, array $headers): array
     {
@@ -266,10 +438,13 @@ class EmployerPlacementReportController extends Controller
             'id' => $upload->id,
             'original_filename' => $upload->original_filename,
             'status' => $upload->status,
+            'is_nil_report' => (bool) $upload->is_nil_report,
             'row_count' => $upload->row_count,
             'record_count' => $upload->records_count ?? $upload->records()->count(),
             'coverage_month' => $upload->coverage_month,
             'coverage_year' => $upload->coverage_year,
+            'sheet_names' => $upload->sheet_names ?? [],
+            'selected_sheet' => $upload->selected_sheet,
             'employer_remarks' => $upload->employer_remarks,
             'review_remarks' => $upload->review_remarks,
             'submitted_at' => $upload->submitted_at,
@@ -296,7 +471,11 @@ class EmployerPlacementReportController extends Controller
             ->limit(10)
             ->get()
             ->map(fn (PlacementRecord $record) => collect($record->only(array_keys(PlacementRecord::MAPPABLE_FIELDS)))
-                ->merge(['id' => $record->id, 'linked_seeker_id' => $record->seeker_id])
+                ->merge([
+                    'id' => $record->id,
+                    'linked_seeker_id' => $record->seeker_id,
+                    'seeker_match_confidence' => $record->seeker_match_confidence,
+                ])
                 ->all())
             ->all();
     }

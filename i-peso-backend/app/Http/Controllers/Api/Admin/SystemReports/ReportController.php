@@ -214,15 +214,34 @@ class ReportController extends Controller
         $placedGovernment = Application::where('status', 'hired')->whereBetween('status_changed_at', [$start, $end])
             ->whereHas('jobVacancy.employer', fn ($q) => $q->where('company_type', 'like', '%Government%')->orWhere('company_type', 'like', '%LGU%'))->count();
 
+        // Employers report every new hire, not only PESO referrals, so approved
+        // reports are a second source of placements alongside platform hires.
+        // Anyone counted from both sides — hired through i-PESO *and* listed on
+        // their employer's monthly sheet — must only be counted once, or the
+        // figure submitted to DOLE overstates placements.
         $employerReportedPlaced = 0;
         $employerReportedFemale = 0;
         if (Schema::hasTable('placement_records')) {
             $approvedUploadIds = PlacementReportUpload::where('status', PlacementReportUpload::STATUS_APPROVED)->pluck('id');
-            $employerReportedPlaced = PlacementRecord::whereIn('upload_id', $approvedUploadIds)
-                ->whereBetween('date_hired', [$start->toDateString(), $end->toDateString()])->count();
-            $employerReportedFemale = PlacementRecord::whereIn('upload_id', $approvedUploadIds)
+
+            $alreadyCountedSeekerIds = Application::where('status', 'hired')
+                ->whereBetween('status_changed_at', [$start, $end])
+                ->pluck('seeker_id')
+                ->filter()
+                ->unique()
+                ->values();
+
+            $employerReported = PlacementRecord::whereIn('upload_id', $approvedUploadIds)
                 ->whereBetween('date_hired', [$start->toDateString(), $end->toDateString()])
-                ->whereRaw('LOWER(gender) LIKE ?', ['f%'])->count();
+                // Unlinked rows are the norm (walk-ins with no i-PESO account)
+                // and still count; only a row linked to a seeker already tallied
+                // as a platform hire is skipped.
+                ->where(fn ($query) => $query
+                    ->whereNull('seeker_id')
+                    ->orWhereNotIn('seeker_id', $alreadyCountedSeekerIds));
+
+            $employerReportedPlaced = (clone $employerReported)->count();
+            $employerReportedFemale = (clone $employerReported)->whereRaw('LOWER(gender) LIKE ?', ['f%'])->count();
         }
 
         $spesPlaced = Application::where('status', 'hired')->whereBetween('status_changed_at', [$start, $end])

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Bell, CheckCheck, Clock3, Search, CalendarHeart, XCircle, Handshake, MailCheck, BriefcaseBusiness } from 'lucide-react'
+import { Bell, CheckCheck, Clock3, Search, CalendarHeart, XCircle, Handshake, MailCheck, BriefcaseBusiness, CalendarDays } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import {
@@ -188,6 +188,10 @@ export default function NotificationBell() {
 }
 
 function notificationAppearance(data) {
+  if (data?.type === 'job_fair') {
+    return { icon: CalendarDays, classes: 'bg-violet-100 text-violet-700' }
+  }
+
   switch (data?.status) {
     case 'pending':
       return { icon: MailCheck, classes: 'bg-blue-100 text-blue-700' }

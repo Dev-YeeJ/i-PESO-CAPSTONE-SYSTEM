@@ -16,6 +16,14 @@ class JobFairService
 {
     public const PUBLIC_STATUSES = ['published', 'accepting_employers', 'closed', 'completed', 'upcoming', 'ongoing'];
 
+    /**
+     * Statuses eligible for a live map pin — a stricter subset of
+     * PUBLIC_STATUSES. The job fair bulletin keeps closed/completed events
+     * visible as a record, but a "find it on the map right now" pin for an
+     * event that already happened is just confusing clutter.
+     */
+    public const MAP_STATUSES = ['published', 'accepting_employers', 'upcoming', 'ongoing'];
+
     public const PARTICIPATION_STATUSES = [
         'invited', 'interested', 'called_peso', 'pending_response', 'accepted', 'declined',
         'requirements_pending', 'requirements_submitted', 'under_review', 'approved', 'rejected',
@@ -83,11 +91,33 @@ class JobFairService
             'start_time' => $fair->start_time,
             'end_time' => $fair->end_time,
             'venue' => $fair->venue,
+            'province' => $fair->province,
+            'province_code' => $fair->province_code,
+            'city_municipality' => $fair->city_municipality,
+            'city_code' => $fair->city_code,
+            'barangay' => $fair->barangay,
+            'barangay_code' => $fair->barangay_code,
+            'specific_address' => $fair->specific_address,
+            'latitude' => $fair->latitude,
+            'longitude' => $fair->longitude,
+            'google_place_id' => $fair->google_place_id,
+            // Convenience string for map/display components (LocationPreviewCard,
+            // "Open in Google Maps" links) so callers don't each re-join the parts.
+            'full_address' => collect([$fair->venue, $fair->specific_address, $fair->barangay, $fair->city_municipality, $fair->province])
+                ->filter()->unique()->join(', '),
+            // Single source of truth for "does this fair get a pin on the
+            // public Job Map" — computed here so the frontend never has to
+            // duplicate the status list to decide it.
+            'map_eligible' => (bool) $fair->is_public
+                && in_array($fair->status, self::MAP_STATUSES, true)
+                && $fair->latitude !== null && $fair->longitude !== null,
             'sector' => $fair->sector,
             'target_sector' => $fair->target_sector,
             'partner_agencies' => $fair->partner_agencies ?? [],
             'submission_deadline' => $fair->submission_deadline?->toIso8601String(),
-            'contact_email' => $fair->contact_email,
+            // Per-fair override still supported, but the field is no longer
+            // asked for at creation — PESO's office email is constant.
+            'contact_email' => $fair->contact_email ?: config('peso_knowledge.office.email'),
             'maximum_representatives' => $fair->maximum_representatives ?? 2,
             'status' => $fair->status,
             'is_public' => (bool) $fair->is_public,
@@ -110,7 +140,7 @@ class JobFairService
 
         if ($participation) {
             $participation->loadMissing(['requirementSubmissions.requirement', 'confirmationSlip', 'resultReport.entries', 'resultReport.mismatchTallies']);
-            $this->reuseVerifiedDocuments($participation);
+            $this->reuseVerifiedDocuments($fair, $participation);
             $payload['participation'] = $this->participationPayload($participation);
         }
 
@@ -155,7 +185,7 @@ class JobFairService
     // requirement from that record instead of asking for a duplicate
     // upload — skips any requirement already covered by a submission
     // (manual or previously reused).
-    public function reuseVerifiedDocuments(JobFairEmployer $participation): void
+    public function reuseVerifiedDocuments(JobFair $fair, JobFairEmployer $participation): void
     {
         // Callers (eventPayload) may have already eager-loaded a
         // column-limited `employer` relation (e.g. employer_id,
@@ -172,7 +202,11 @@ class JobFairService
             return;
         }
 
-        $requirements = $participation->jobFair->requirements
+        // Takes $fair directly rather than $participation->jobFair — that
+        // reverse relation is never eager-loaded by callers that pull
+        // participation out of an already-loaded JobFair (e.g. eventPayload's
+        // $fair->employerJoins->firstWhere(...)), and lazy loading is disabled.
+        $requirements = $fair->requirements
             ->whereIn('code', array_keys(self::REQUIREMENT_DOCUMENT_TYPES));
 
         $existingRequirementIds = $participation->requirementSubmissions->pluck('job_fair_requirement_id')->all();
@@ -220,6 +254,70 @@ class JobFairService
             $participation->load('requirementSubmissions.requirement');
             $this->syncRequirementStatus($participation);
         }
+    }
+
+    /**
+     * What an employer still needs to submit for a job fair, before they've
+     * even joined — used for the invitation email so PESO isn't asking a
+     * company for paperwork it has already approved on file, or a document
+     * type that never applies to its company type (e.g. a SEC certificate
+     * for a sole proprietorship).
+     *
+     * @return Collection<int, array{code: string, label: string}>
+     */
+    public function outstandingRequirementsFor(JobFair $fair, Employer $employer): Collection
+    {
+        $fair->loadMissing('requirements');
+
+        // Document types this employer's company type actually needs, per
+        // the same rule general accreditation already uses.
+        $applicableTypes = array_unique(array_merge(
+            $employer->getRequiredDocuments(),
+            $employer->getOptionalDocuments(),
+        ));
+
+        $approvedTypes = Schema::hasTable('employer_documents')
+            ? EmployerDocument::query()
+                ->where('employer_id', $employer->employer_id)
+                ->where('verification_status', 'approved')
+                ->pluck('document_type')
+                ->all()
+            : [];
+
+        return $fair->requirements
+            ->reject(function (JobFairRequirement $requirement) use ($applicableTypes, $approvedTypes) {
+                $mappedTypes = self::REQUIREMENT_DOCUMENT_TYPES[$requirement->code] ?? null;
+
+                // Not backed by an accreditation document (job vacancy count,
+                // posterized vacancy, confirmation slip) — always still needed.
+                if ($mappedTypes === null) {
+                    return false;
+                }
+
+                // Narrow to the sub-types relevant to this company type (e.g.
+                // DTI for a sole proprietorship, SEC for a corporation) —
+                // requirements with no company-type mapping (no pending case)
+                // fall back to the full set instead of being skipped outright.
+                $relevant = array_intersect($mappedTypes, $applicableTypes) ?: $mappedTypes;
+
+                return collect($relevant)->intersect($approvedTypes)->isNotEmpty();
+            })
+            ->map(fn (JobFairRequirement $requirement) => [
+                'code' => $requirement->code,
+                'label' => $requirement->code === 'business_registration'
+                    ? $this->businessRegistrationLabel($employer)
+                    : $requirement->label,
+            ])
+            ->values();
+    }
+
+    /** DTI applies to sole proprietors, SEC to everyone else that needs it. */
+    private function businessRegistrationLabel(Employer $employer): string
+    {
+        return match ($employer->company_type) {
+            'sole_proprietorship' => 'BIR Certificate of Registration + DTI Business Name Registration',
+            default => 'BIR Certificate of Registration + SEC Registration',
+        };
     }
 
     private function syncRequirementStatus(JobFairEmployer $participation): void
