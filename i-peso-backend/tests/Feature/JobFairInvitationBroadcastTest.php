@@ -8,7 +8,9 @@ use App\Models\EmployerDocument;
 use App\Models\JobFair;
 use App\Models\JobFairEmployer;
 use App\Models\JobFairRequirement;
+use App\Models\JobSeeker;
 use App\Notifications\JobFairNotification;
+use App\Notifications\JobFairPublished;
 use App\Services\JobFairService;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
@@ -40,6 +42,8 @@ class JobFairInvitationBroadcastTest extends TestCase
         $verifiedOne = $this->employer('verified-one@example.test', 'sole_proprietorship');
         $verifiedTwo = $this->employer('verified-two@example.test', 'corporation_partnership');
         $unverified = $this->employer('unverified@example.test', 'sole_proprietorship', 'pending');
+        $seekerOne = $this->seeker('seeker-one@example.test');
+        $seekerTwo = $this->seeker('seeker-two@example.test');
 
         $admin = $this->admin();
         Sanctum::actingAs($admin);
@@ -47,11 +51,13 @@ class JobFairInvitationBroadcastTest extends TestCase
 
         $this->postJson("/api/admin/job-fairs/{$fair->job_fair_id}/publish")
             ->assertOk()
-            ->assertJsonPath('message', 'Job Fair announcement published. 2 verified employer(s) notified by email.');
+            ->assertJsonPath('message', 'Job Fair announcement published. 2 verified employer(s) notified by email, 2 job seeker(s) notified.');
 
         Notification::assertSentTo($verifiedOne, JobFairNotification::class);
         Notification::assertSentTo($verifiedTwo, JobFairNotification::class);
         Notification::assertNotSentTo($unverified, JobFairNotification::class);
+        Notification::assertSentTo($seekerOne, JobFairPublished::class);
+        Notification::assertSentTo($seekerTwo, JobFairPublished::class);
 
         $this->assertDatabaseHas('job_fair_employers', [
             'job_fair_id' => $fair->job_fair_id, 'employer_id' => $verifiedOne->employer_id,
@@ -64,20 +70,24 @@ class JobFairInvitationBroadcastTest extends TestCase
     {
         Notification::fake();
         $employer = $this->employer('repeat@example.test', 'sole_proprietorship');
+        $seeker = $this->seeker('repeat-seeker@example.test');
         $admin = $this->admin();
         Sanctum::actingAs($admin);
         $fair = $this->createFair($admin);
 
         $this->postJson("/api/admin/job-fairs/{$fair->job_fair_id}/publish")->assertOk();
         Notification::assertSentToTimes($employer, JobFairNotification::class, 1);
+        Notification::assertSentToTimes($seeker, JobFairPublished::class, 1);
 
         // Re-publishing (e.g. after moving from accepting_employers back to
-        // published) must not re-email everyone who was already invited.
+        // published) must not re-email everyone who was already invited, nor
+        // re-notify every seeker.
         $this->postJson("/api/admin/job-fairs/{$fair->job_fair_id}/publish")
             ->assertOk()
             ->assertJsonPath('message', 'Job Fair announcement published.');
 
         Notification::assertSentToTimes($employer, JobFairNotification::class, 1);
+        Notification::assertSentToTimes($seeker, JobFairPublished::class, 1);
         $this->assertSame(1, JobFairEmployer::where('job_fair_id', $fair->job_fair_id)->count());
     }
 
@@ -187,6 +197,28 @@ class JobFairInvitationBroadcastTest extends TestCase
         $this->assertStringContainsString('December 1 to December 3, 2026', $multiDayRendered);
     }
 
+    public function test_the_seeker_announcement_carries_the_fair_details_via_database_and_push(): void
+    {
+        $fair = $this->createFair();
+        $seeker = $this->seeker('array-check@example.test');
+
+        $notification = new JobFairPublished($fair);
+
+        $this->assertSame(['database', \App\Notifications\Channels\ExpoPushChannel::class], $notification->via($seeker));
+
+        $data = $notification->toArray($seeker);
+        $this->assertSame($fair->job_fair_id, $data['job_fair_id']);
+        $this->assertStringContainsString('Broadcast Test Job Fair', $data['message']);
+        $this->assertStringContainsString('December 1, 2026', $data['message']);
+        $this->assertStringContainsString('PESO Urdaneta Hall', $data['message']);
+        $this->assertSame('/seeker/job-fairs', $data['action_url']);
+
+        $push = $notification->toExpoPush($seeker);
+        $this->assertSame($data['title'], $push['title']);
+        $this->assertSame($data['message'], $push['body']);
+        $this->assertSame('job_fair', $push['data']['type']);
+    }
+
     // ── Fixtures ─────────────────────────────────────────────────────────
 
     private function admin(): Administrator
@@ -202,6 +234,14 @@ class JobFairInvitationBroadcastTest extends TestCase
         return Employer::create([
             'email' => $email, 'password' => 'password123', 'company_name' => ucfirst(explode('@', $email)[0]),
             'company_type' => $companyType, 'verification_status' => $verificationStatus, 'email_verified_at' => now(),
+        ]);
+    }
+
+    private function seeker(string $email): JobSeeker
+    {
+        return JobSeeker::create([
+            'first_name' => ucfirst(explode('@', $email)[0]), 'last_name' => 'Seeker',
+            'email' => $email, 'password' => 'password123',
         ]);
     }
 
@@ -239,6 +279,11 @@ class JobFairInvitationBroadcastTest extends TestCase
             $t->string('company_type')->nullable(); $t->string('mobile_number')->nullable();
             $t->string('verification_status')->default('pending'); $t->timestamp('email_verified_at')->nullable();
             $t->timestamps(); $t->softDeletes();
+        });
+
+        Schema::create('job_seekers', function (Blueprint $t) {
+            $t->id('seeker_id'); $t->string('first_name')->nullable(); $t->string('last_name')->nullable();
+            $t->string('email')->unique(); $t->string('password'); $t->timestamps();
         });
 
         Schema::create('employer_documents', function (Blueprint $t) {

@@ -10,7 +10,9 @@ use App\Models\JobFairEmployer;
 use App\Models\JobFairConfirmationSlip;
 use App\Models\JobFairRequirementSubmission;
 use App\Models\JobFairResultReport;
+use App\Models\JobSeeker;
 use App\Notifications\JobFairNotification;
+use App\Notifications\JobFairPublished;
 use App\Services\GoogleMapsService;
 use App\Services\JobFairReportService;
 use App\Services\JobFairService;
@@ -105,13 +107,15 @@ class JobFairController extends Controller
         $jobFair->update(['status' => $validated['status'] ?? 'published', 'is_public' => true, 'published_at' => now(), 'published_by' => $admin->admin_id]);
 
         $invited = 0;
+        $seekersNotified = 0;
         if ($isFirstPublish) {
             $invited = $this->broadcastInvitations($jobFair, $service);
+            $seekersNotified = $this->broadcastToSeekers($jobFair);
         }
 
         return response()->json([
             'message' => $isFirstPublish
-                ? "Job Fair announcement published. {$invited} verified employer(s) notified by email."
+                ? "Job Fair announcement published. {$invited} verified employer(s) notified by email, {$seekersNotified} job seeker(s) notified."
                 : 'Job Fair announcement published.',
             'job_fair' => $service->eventPayload($jobFair->fresh(), null, true),
         ]);
@@ -162,6 +166,28 @@ class JobFairController extends Controller
             }, 'employer_id');
 
         return $invited;
+    }
+
+    /**
+     * Tells every registered job seeker a fair just went public — the
+     * seeker-side mirror of broadcastInvitations() above, same trigger,
+     * same one-shot-on-first-publish guard. In-app + push only (see
+     * JobFairPublished), not email — this is an FYI nudge, not a business
+     * letter, so it uses the same channel pair GovernmentProgramNotification
+     * already uses for "something new to see" announcements.
+     */
+    private function broadcastToSeekers(JobFair $jobFair): int
+    {
+        $notified = 0;
+
+        JobSeeker::query()->chunkById(200, function ($seekers) use ($jobFair, &$notified) {
+            foreach ($seekers as $seeker) {
+                $seeker->notify(new JobFairPublished($jobFair));
+                $notified++;
+            }
+        }, 'seeker_id');
+
+        return $notified;
     }
 
     public function participationStatus(Request $request, JobFair $jobFair, JobFairEmployer $participation): JsonResponse

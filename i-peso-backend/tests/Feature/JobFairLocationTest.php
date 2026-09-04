@@ -255,6 +255,17 @@ class JobFairLocationTest extends TestCase
             $t->softDeletes();
         });
 
+        // Queried by publish()'s seeker-announcement broadcast, same reason
+        // employers is here — this suite only cares about location/geocoding.
+        Schema::create('job_seekers', function (Blueprint $t) {
+            $t->id('seeker_id');
+            $t->string('first_name')->nullable();
+            $t->string('last_name')->nullable();
+            $t->string('email')->unique();
+            $t->string('password');
+            $t->timestamps();
+        });
+
         Schema::create('administrators', function (Blueprint $t) {
             $t->id('admin_id');
             $t->string('first_name');
