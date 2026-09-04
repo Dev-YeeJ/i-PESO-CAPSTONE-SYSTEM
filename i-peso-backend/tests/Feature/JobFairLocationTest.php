@@ -98,6 +98,23 @@ class JobFairLocationTest extends TestCase
             ->assertJsonValidationErrors(['province', 'city_municipality', 'barangay']);
     }
 
+    public function test_submission_deadline_cannot_be_in_the_past_or_after_the_start_date(): void
+    {
+        Sanctum::actingAs($this->admin());
+
+        $this->postJson('/api/admin/job-fairs', $this->payload(['submission_deadline' => '2020-01-01']))
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['submission_deadline']);
+
+        // start_date in payload() is 2026-10-10 — a deadline after that is invalid too.
+        $this->postJson('/api/admin/job-fairs', $this->payload(['submission_deadline' => '2026-10-11']))
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['submission_deadline']);
+
+        $this->postJson('/api/admin/job-fairs', $this->payload(['submission_deadline' => '2026-10-10']))
+            ->assertCreated();
+    }
+
     public function test_a_geocoding_failure_does_not_block_saving_the_job_fair(): void
     {
         Sanctum::actingAs($this->admin());

@@ -290,8 +290,11 @@ class JobFairController extends Controller
             'target_sector' => ['nullable', 'string', 'max:255'], 'partner_agencies' => ['nullable', 'array'], 'partner_agencies.*' => ['string', 'max:255'],
             'start_time' => [$required, 'date_format:H:i'], 'end_time' => [$required, 'date_format:H:i'],
             // Requirements need to be in PESO's hands before the event, so the
-            // deadline is required and can't land after the fair has started.
-            'submission_deadline' => $partial ? ['nullable', 'date'] : [$required, 'date', 'before_or_equal:start_date'],
+            // deadline is required, can't already be in the past, and can't
+            // land after the fair has already started.
+            'submission_deadline' => $partial
+                ? ['nullable', 'date']
+                : [$required, 'date', 'after_or_equal:today', 'before_or_equal:start_date'],
             'contact_email' => ['nullable', 'email', 'max:255'],
             'maximum_representatives' => ['nullable', 'integer', 'min:1', 'max:10'],
             // No longer collected from the create/edit form — status changes

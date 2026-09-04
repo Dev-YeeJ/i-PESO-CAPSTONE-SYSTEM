@@ -165,6 +165,8 @@ export default function JobFairFormPage() {
     }
   }, [])
 
+  const today = useMemo(() => new Date().toISOString().slice(0, 10), [])
+
   const dateError = useMemo(() => {
     if (!singleDay && form.start_date && form.end_date && form.end_date < form.start_date) {
       return 'End date cannot be before the start date.'
@@ -172,8 +174,15 @@ export default function JobFairFormPage() {
     if (form.submission_deadline && form.start_date && form.submission_deadline > form.start_date) {
       return 'The submission deadline must be on or before the start date — employers need time to prepare.'
     }
+    // Editing an existing (possibly historical) fair isn't held to "not in
+    // the past" — only new deadlines being set right now are.
+    if (!id && form.submission_deadline && form.submission_deadline < today) {
+      return 'The submission deadline cannot be in the past.'
+    }
     return ''
-  }, [singleDay, form.start_date, form.end_date, form.submission_deadline])
+  }, [id, today, singleDay, form.start_date, form.end_date, form.submission_deadline])
+
+  const [publishAfterSave, setPublishAfterSave] = useState(false)
 
   const handleSubmit = useCallback(async (event) => {
     event.preventDefault()
@@ -181,6 +190,8 @@ export default function JobFairFormPage() {
       setError(dateError)
       return
     }
+    const publishNow = event.nativeEvent.submitter?.name === 'publish'
+    setPublishAfterSave(publishNow)
     setSubmitting(true)
     setError('')
 
@@ -196,7 +207,10 @@ export default function JobFairFormPage() {
       if (id) {
         await adminService.updateJobFair(id, payload)
       } else {
-        await adminService.createJobFair(payload)
+        const { job_fair: created } = await adminService.createJobFair(payload)
+        if (publishNow) {
+          await adminService.publishJobFair(created.job_fair_id)
+        }
       }
       navigate('/admin/job-fairs')
     } catch (requestError) {
@@ -346,10 +360,28 @@ export default function JobFairFormPage() {
                 </select>
               </div>
 
-              <div className="flex flex-wrap gap-3 border-t border-slate-200 pt-5">
-                <Button type="submit" icon={Save} disabled={submitting}>{submitting ? 'Saving...' : 'Save Job Fair'}</Button>
+              <div className="flex flex-wrap items-center gap-3 border-t border-slate-200 pt-5">
+                {id ? (
+                  <Button type="submit" icon={Save} disabled={submitting}>{submitting ? 'Saving...' : 'Save Changes'}</Button>
+                ) : (
+                  <>
+                    <Button type="submit" name="draft" variant="outline" icon={Save} disabled={submitting}>
+                      {submitting && !publishAfterSave ? 'Saving...' : 'Save as Draft'}
+                    </Button>
+                    <Button type="submit" name="publish" icon={Save} disabled={submitting}>
+                      {submitting && publishAfterSave ? 'Publishing...' : 'Save & Publish'}
+                    </Button>
+                  </>
+                )}
                 <Button variant="outline" icon={ArrowLeft} onClick={() => navigate('/admin/job-fairs')}>Cancel</Button>
               </div>
+              {!id && (
+                <p className="text-xs text-slate-500">
+                  <strong>Save as Draft</strong> keeps this private while you finish setting it up.{' '}
+                  <strong>Save &amp; Publish</strong> makes it visible to job seekers immediately and emails every
+                  verified employer an invitation.
+                </p>
+              )}
             </form>
           )}
         </Card>
