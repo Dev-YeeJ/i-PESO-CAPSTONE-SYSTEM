@@ -308,7 +308,16 @@ export default function SeekerHomeScreen() {
               scaleTo="buttonPress"
               ripple={null}
               style={styles.secondaryAction}
-              onPress={() => router.push(action.path as never)}
+              onPress={() => {
+                // "Complete Profile" points at /onboarding, but that screen redirects
+                // straight back here the instant profile_completed is already true —
+                // which looks exactly like the tap did nothing. Send an already-complete
+                // profile to the edit screen instead, so the button always goes somewhere.
+                const target = action.path === '/onboarding' && user?.profile_completed
+                  ? '/(seeker)/profile/edit'
+                  : action.path
+                router.push(target as never)
+              }}
               accessibilityRole="button"
               accessibilityLabel={action.label}
             >

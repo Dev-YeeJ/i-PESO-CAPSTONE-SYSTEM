@@ -2,8 +2,6 @@ import { useEffect, useMemo, useState } from 'react'
 import { ActivityIndicator, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native'
 import { useRouter } from 'expo-router'
 import { useQuery } from '@tanstack/react-query'
-import MapView from 'react-native-map-clustering'
-import { Marker } from 'react-native-maps'
 import * as Location from 'expo-location'
 import MaterialIcons from '@expo/vector-icons/MaterialIcons'
 import type { AxiosError } from 'axios'
@@ -15,6 +13,7 @@ import { AlertBox } from '@/components/ui/AlertBox'
 import { Button } from '@/components/ui/Button'
 import { ScreenHeader } from '@/components/ui/ScreenHeader'
 import { JobFeedCard } from '@/components/seeker/JobFeedCard'
+import { LeafletMap } from '@/components/seeker/LeafletMap'
 import { colors, radii, spacing, typography } from '@/theme'
 
 // Urdaneta City, Pangasinan — sensible default center when no device/profile location is available yet.
@@ -216,21 +215,19 @@ export default function JobMapScreen() {
       {data?.notice ? <Text style={styles.noticeText}>{data.notice}</Text> : null}
 
       <View style={styles.mapWrap}>
-        <MapView
-          style={styles.map}
+        <LeafletMap
           region={region}
-          onRegionChangeComplete={setRegion}
-          radius={50}
-        >
-          {jobsWithCoords.map((job) => (
-            <Marker
-              key={String(job.post_id)}
-              coordinate={{ latitude: Number(job.latitude), longitude: Number(job.longitude) }}
-              pinColor={matchColor(job)}
-              onPress={() => openJob(job)}
-            />
-          ))}
-        </MapView>
+          markers={jobsWithCoords.map((job) => ({
+            postId: String(job.post_id),
+            lat: Number(job.latitude),
+            lng: Number(job.longitude),
+            color: matchColor(job),
+          }))}
+          onMarkerPress={(postId) => {
+            const job = jobsWithCoords.find((j) => String(j.post_id) === postId)
+            if (job) openJob(job)
+          }}
+        />
         {isLoading ? (
           <View style={styles.mapLoading}>
             <ActivityIndicator color={colors.info} />
@@ -394,7 +391,6 @@ const styles = StyleSheet.create({
   filterDot: { position: 'absolute', top: 6, right: 6, width: 8, height: 8, borderRadius: 4, backgroundColor: colors.error },
   noticeText: { color: colors.textSecondary, fontSize: typography.small, paddingHorizontal: spacing.lg, marginTop: spacing.xs },
   mapWrap: { height: 220, marginTop: spacing.md, marginHorizontal: spacing.lg, borderRadius: radii.md, overflow: 'hidden' },
-  map: { flex: 1 },
   mapLoading: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.4)' },
   summaryBar: { paddingHorizontal: spacing.lg, paddingTop: spacing.sm },
   summaryText: { color: colors.textSecondary, fontSize: typography.small },

@@ -28,7 +28,9 @@ export default function CitizenCharterScreen() {
 
   return (
     <View style={styles.flex}>
-      <ScreenHeader title="Citizen Charter" onBack={() => router.back()} />
+      {/* router.replace, not back(): same flat-Tabs-sibling issue as job-fairs.tsx —
+          this screen's only entry point is Government Programs' bulletin card. */}
+      <ScreenHeader title="Citizen Charter" onBack={() => router.replace('/(seeker)/government-programs')} />
 
       <ScrollView
         contentContainerStyle={styles.content}
