@@ -13,6 +13,7 @@ Artisan::command('inspire', function () {
 // with Artisan::call() runs the command in-process instead, avoiding it.
 Schedule::call(fn () => Artisan::call('interviews:send-reminders'))->everyFifteenMinutes();
 Schedule::call(fn () => Artisan::call('permits:notify-expiring'))->dailyAt('08:00');
+Schedule::call(fn () => Artisan::call('placements:notify-missing'))->dailyAt('08:30');
 
 // There is no persistent queue worker on this host (no Supervisor on shared
 // hosting), so queued notifications (application status, interview, employer

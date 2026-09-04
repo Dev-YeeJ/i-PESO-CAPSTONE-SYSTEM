@@ -114,7 +114,9 @@ Route::middleware('auth:sanctum')->group(function () {
             // Placement Report — flexible spreadsheet import (upload -> map -> preview -> submit)
             Route::get('/placement-reports', [EmployerPlacementReportController::class, 'index']);
             Route::post('/placement-reports', [EmployerPlacementReportController::class, 'store'])->middleware('throttle:20,1');
+            Route::post('/placement-reports/nil', [EmployerPlacementReportController::class, 'storeNil']);
             Route::get('/placement-reports/{placementReport}', [EmployerPlacementReportController::class, 'show']);
+            Route::post('/placement-reports/{placementReport}/sheet', [EmployerPlacementReportController::class, 'selectSheet']);
             Route::post('/placement-reports/{placementReport}/preview', [EmployerPlacementReportController::class, 'preview']);
             Route::post('/placement-reports/{placementReport}/submit', [EmployerPlacementReportController::class, 'submit']);
             Route::delete('/placement-reports/{placementReport}', [EmployerPlacementReportController::class, 'destroy']);
@@ -300,7 +302,10 @@ Route::middleware('auth:sanctum')->group(function () {
 
             // Placement Report review + approval (employer-submitted spreadsheet imports)
             Route::get('/placement-reports', [AdminPlacementReportController::class, 'index']);
+            Route::get('/placement-reports/compliance', [AdminPlacementReportController::class, 'compliance']);
             Route::get('/placement-reports/{placementReport}', [AdminPlacementReportController::class, 'show']);
+            Route::get('/placement-reports/{placementReport}/records/{record}/candidates', [AdminPlacementReportController::class, 'recordCandidates']);
+            Route::post('/placement-reports/{placementReport}/records/{record}/link', [AdminPlacementReportController::class, 'linkRecord']);
             Route::get('/placement-reports/{placementReport}/export', [AdminPlacementReportController::class, 'exportCsv']);
             Route::post('/placement-reports/{placementReport}/approve', [AdminPlacementReportController::class, 'approve']);
             Route::post('/placement-reports/{placementReport}/reject', [AdminPlacementReportController::class, 'reject']);
