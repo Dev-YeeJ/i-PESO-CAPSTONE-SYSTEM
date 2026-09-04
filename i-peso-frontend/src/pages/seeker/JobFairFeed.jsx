@@ -1,6 +1,7 @@
 import { createElement, useEffect, useState } from 'react'
 import { BriefcaseBusiness, CalendarDays, CheckCircle2, MapPin, UsersRound, CalendarClock } from 'lucide-react'
 import { AlertBox, Card, CardHeader, EmptyState, LoadingSkeleton } from '@/components/ui'
+import LocationPreviewCard from '@/components/maps/LocationPreviewCard'
 import { listJobFairs } from '@/services/jobFairService'
 
 const reminders = ['Bring multiple copies of your résumé', 'Bring a valid ID', 'Dress appropriately', 'Arrive early']
@@ -68,6 +69,15 @@ export default function JobFairFeed() {
                 <Info icon={MapPin} label="Venue" value={fair.venue} />
                 <Info icon={UsersRound} label="Partners" value={(fair.partner_agencies ?? []).join(', ') || 'PESO / LGU'} />
               </div>
+
+              {fair.latitude && fair.longitude && (
+                <section className="mt-8 border-t border-slate-100 pt-6">
+                  <h3 className="text-sm font-black uppercase tracking-widest text-slate-900">Find the venue</h3>
+                  <div className="mt-3">
+                    <LocationPreviewCard title={fair.venue || 'Venue'} fullAddress={fair.full_address || fair.venue} latitude={fair.latitude} longitude={fair.longitude} />
+                  </div>
+                </section>
+              )}
 
               {!!fair.participating_employers?.length && (
                 <section className="mt-8 border-t border-slate-100 pt-6">

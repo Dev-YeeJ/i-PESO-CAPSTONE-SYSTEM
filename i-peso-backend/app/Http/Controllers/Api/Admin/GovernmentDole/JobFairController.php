@@ -11,6 +11,7 @@ use App\Models\JobFairConfirmationSlip;
 use App\Models\JobFairRequirementSubmission;
 use App\Models\JobFairResultReport;
 use App\Notifications\JobFairNotification;
+use App\Services\GoogleMapsService;
 use App\Services\JobFairReportService;
 use App\Services\JobFairService;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -38,10 +39,11 @@ class JobFairController extends Controller
         return response()->json($fairs);
     }
 
-    public function store(Request $request, JobFairService $service): JsonResponse
+    public function store(Request $request, JobFairService $service, GoogleMapsService $maps): JsonResponse
     {
         $admin = $this->admin($request);
         $validated = $request->validate($this->eventRules());
+        $validated = $this->applyLocationFallback($validated, null, $maps);
         $public = in_array($validated['status'], ['published', 'accepting_employers'], true);
         $fair = JobFair::create([...$validated, 'admin_id' => $admin->admin_id, 'created_by' => $admin->admin_id,
             'event_date' => $validated['start_date'], 'is_public' => $public, 'published_at' => $public ? now() : null, 'published_by' => $public ? $admin->admin_id : null]);
@@ -63,11 +65,12 @@ class JobFairController extends Controller
         return response()->json($payload);
     }
 
-    public function update(Request $request, int $id, JobFairService $service): JsonResponse
+    public function update(Request $request, int $id, JobFairService $service, GoogleMapsService $maps): JsonResponse
     {
         $this->admin($request);
         $fair = JobFair::findOrFail($id);
         $validated = $request->validate($this->eventRules(true));
+        $validated = $this->applyLocationFallback($validated, $fair, $maps);
         if (isset($validated['start_date'])) $validated['event_date'] = $validated['start_date'];
         if (isset($validated['status']) && in_array($validated['status'], ['published', 'accepting_employers'], true)) {
             $validated['is_public'] = true; $validated['published_at'] = $fair->published_at ?: now(); $validated['published_by'] = $request->user()->admin_id;
@@ -220,12 +223,65 @@ class JobFairController extends Controller
             'title' => [$required, 'string', 'max:255'], 'description' => ['nullable', 'string'],
             'start_date' => [$required, 'date'], 'end_date' => [$required, 'date', 'after_or_equal:start_date'],
             'venue' => [$required, 'string', 'max:500'], 'sector' => [$required, Rule::in(['local', 'overseas', 'both'])],
+            // Structured PSGC location, mirroring how job vacancy posting captures
+            // its work address — same field names so the same map picker UI applies.
+            'province' => [$required, 'string', 'max:100'], 'province_code' => ['nullable', 'string', 'max:20'],
+            'city_municipality' => [$required, 'string', 'max:150'], 'city_code' => ['nullable', 'string', 'max:20'],
+            'barangay' => [$required, 'string', 'max:150'], 'barangay_code' => ['nullable', 'string', 'max:20'],
+            'specific_address' => ['nullable', 'string', 'max:255'],
+            'latitude' => ['nullable', 'numeric', 'between:-90,90'], 'longitude' => ['nullable', 'numeric', 'between:-180,180'],
+            'google_place_id' => ['nullable', 'string', 'max:255'],
             'target_sector' => ['nullable', 'string', 'max:255'], 'partner_agencies' => ['nullable', 'array'], 'partner_agencies.*' => ['string', 'max:255'],
             'start_time' => [$required, 'date_format:H:i'], 'end_time' => [$required, 'date_format:H:i'],
             'submission_deadline' => ['nullable', 'date'], 'contact_email' => ['nullable', 'email', 'max:255'],
             'maximum_representatives' => ['nullable', 'integer', 'min:1', 'max:10'],
             'status' => [$required, Rule::in(['draft', 'published', 'accepting_employers', 'closed', 'completed', 'cancelled', 'upcoming', 'ongoing'])],
         ];
+    }
+
+    /**
+     * Fill in coordinates from the PSGC address when the admin didn't drop a
+     * map pin, the same fallback EmployerJobVacancyController uses for job
+     * postings. Only runs when a location field actually changed, so unrelated
+     * edits (e.g. flipping status) never trigger a geocode lookup.
+     */
+    private function applyLocationFallback(array $validated, ?JobFair $existing, GoogleMapsService $maps): array
+    {
+        $locationFields = ['venue', 'province', 'city_municipality', 'barangay', 'specific_address'];
+        if (! collect($locationFields)->contains(fn (string $field) => array_key_exists($field, $validated))) {
+            return $validated;
+        }
+
+        if (isset($validated['latitude'], $validated['longitude'])) {
+            return $validated;
+        }
+
+        $province = $validated['province'] ?? $existing?->province;
+        $city = $validated['city_municipality'] ?? $existing?->city_municipality;
+        if (! $province || ! $city) {
+            return $validated;
+        }
+
+        $addressLine = collect([
+            $validated['venue'] ?? $existing?->venue,
+            $validated['specific_address'] ?? $existing?->specific_address,
+            $validated['barangay'] ?? $existing?->barangay,
+            $city,
+            $province,
+        ])->filter()->unique()->join(', ');
+
+        try {
+            $location = $maps->geocode($addressLine.', Philippines');
+            if ($location) {
+                $validated['latitude'] = $location['latitude'];
+                $validated['longitude'] = $location['longitude'];
+                $validated['google_place_id'] = $location['place_id'];
+            }
+        } catch (\Throwable) {
+            // Preserve the job fair save when optional coordinate lookup is unavailable.
+        }
+
+        return $validated;
     }
 
     private function admin(Request $request): Administrator

@@ -1,14 +1,27 @@
 import { useCallback, useEffect, useState } from 'react'
-import { ArrowLeft, Save } from 'lucide-react'
+import { ArrowLeft, Loader2, Save } from 'lucide-react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Button, Card, CardHeader, LoadingSkeleton } from '@/components/ui'
 import PageHeader from '@/pages/admin/_components/PageHeader'
+import AddressPicker from '@/components/maps/AddressPicker'
+import MapPinPicker from '@/components/maps/MapPinPicker'
 import { adminService } from '@/services/adminService'
+import { resolveCoordinatesAddress } from '@/services/geoService'
 
 const emptyForm = {
   title: '',
   description: '',
   venue: '',
+  province: '',
+  province_code: '',
+  city_municipality: '',
+  city_code: '',
+  barangay: '',
+  barangay_code: '',
+  specific_address: '',
+  latitude: null,
+  longitude: null,
+  google_place_id: null,
   start_date: '',
   end_date: '',
   start_time: '08:00',
@@ -43,6 +56,16 @@ export default function JobFairFormPage() {
           title: fair.title ?? '',
           description: fair.description ?? '',
           venue: fair.venue ?? '',
+          province: fair.province ?? '',
+          province_code: fair.province_code ?? '',
+          city_municipality: fair.city_municipality ?? '',
+          city_code: fair.city_code ?? '',
+          barangay: fair.barangay ?? '',
+          barangay_code: fair.barangay_code ?? '',
+          specific_address: fair.specific_address ?? '',
+          latitude: fair.latitude ?? null,
+          longitude: fair.longitude ?? null,
+          google_place_id: fair.google_place_id ?? null,
           start_date: fair.start_date ?? fair.event_date ?? '',
           end_date: fair.end_date ?? fair.start_date ?? fair.event_date ?? '',
           start_time: (fair.start_time ?? '08:00').slice(0, 5),
@@ -70,6 +93,53 @@ export default function JobFairFormPage() {
   const handleChange = useCallback((event) => {
     const { name, value } = event.target
     setForm((current) => ({ ...current, [name]: value }))
+  }, [])
+
+  const [resolvingPin, setResolvingPin] = useState(false)
+  const [pinMessage, setPinMessage] = useState('')
+
+  const setLocation = useCallback((location) => {
+    setForm((current) => ({
+      ...current,
+      province: location.province ?? current.province,
+      province_code: location.province_code ?? current.province_code,
+      city_municipality: location.city ?? current.city_municipality,
+      city_code: location.city_code ?? current.city_code,
+      barangay: location.barangay ?? current.barangay,
+      barangay_code: location.barangay_code ?? current.barangay_code,
+      specific_address: location.street ?? current.specific_address,
+      latitude: location.latitude ?? current.latitude,
+      longitude: location.longitude ?? current.longitude,
+      google_place_id: location.google_place_id ?? current.google_place_id,
+    }))
+  }, [])
+
+  const handlePinChange = useCallback(async (coords) => {
+    setForm((current) => ({ ...current, latitude: coords.latitude, longitude: coords.longitude }))
+    setResolvingPin(true)
+    setPinMessage('Finding the PSGC address for this pin...')
+
+    try {
+      const result = await resolveCoordinatesAddress(coords.latitude, coords.longitude)
+      setForm((current) => ({
+        ...current,
+        province: result.province?.name ?? current.province,
+        province_code: result.province?.code ?? current.province_code,
+        city_municipality: result.city?.name ?? current.city_municipality,
+        city_code: result.city?.code ?? current.city_code,
+        barangay: result.barangay?.name ?? current.barangay,
+        barangay_code: result.barangay?.code ?? current.barangay_code,
+        specific_address: result.houseStreet || current.specific_address,
+        google_place_id: result.placeId ?? current.google_place_id,
+      }))
+      setPinMessage(result.isComplete
+        ? 'Province, city, and barangay were filled from the pin.'
+        : `Pin located. Please verify${result.missingFields.length ? ` or complete: ${result.missingFields.join(', ')}` : ' the address fields'}.`)
+    } catch (pinError) {
+      setPinMessage(pinError.message ?? 'Pin saved, but its address could not be filled automatically.')
+    } finally {
+      setResolvingPin(false)
+    }
   }, [])
 
   const handleSubmit = useCallback(async (event) => {
@@ -130,7 +200,43 @@ export default function JobFairFormPage() {
 
               <div>
                 <label className="block text-sm font-bold text-slate-700">Venue</label>
-                <input name="venue" value={form.venue} onChange={handleChange} required className="mt-2 w-full rounded-lg border border-slate-300 px-4 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100" />
+                <input name="venue" value={form.venue} onChange={handleChange} required placeholder="e.g. SM City Urdaneta - Events Center, 2nd Floor" className="mt-2 w-full rounded-lg border border-slate-300 px-4 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100" />
+              </div>
+
+              <div className="space-y-4">
+                <AddressPicker
+                  title="Venue Location / PSGC"
+                  province={form.province}
+                  provinceCode={form.province_code}
+                  city={form.city_municipality}
+                  cityCode={form.city_code}
+                  barangay={form.barangay}
+                  barangayCode={form.barangay_code}
+                  street={form.specific_address}
+                  latitude={form.latitude}
+                  longitude={form.longitude}
+                  google_place_id={form.google_place_id}
+                  onChange={setLocation}
+                />
+
+                <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4">
+                  <div className="mb-2 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800">
+                    <strong>Why this matters:</strong> job seekers see this pin the same way they see a job vacancy&apos;s
+                    work location, so they can find the venue and get directions.
+                  </div>
+                  <MapPinPicker
+                    latitude={form.latitude}
+                    longitude={form.longitude}
+                    addressLine={`${form.venue || ''} ${form.barangay || ''} ${form.city_municipality || ''}`.trim()}
+                    onChange={handlePinChange}
+                  />
+                  {(resolvingPin || pinMessage) && (
+                    <p className="mt-2 text-xs font-semibold text-blue-800">
+                      {resolvingPin && <Loader2 className="mr-1.5 inline h-3.5 w-3.5 animate-spin" />}
+                      {pinMessage}
+                    </p>
+                  )}
+                </div>
               </div>
 
               <div className="grid gap-4 md:grid-cols-2">

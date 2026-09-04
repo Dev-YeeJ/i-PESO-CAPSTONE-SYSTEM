@@ -16,6 +16,14 @@ class JobFairService
 {
     public const PUBLIC_STATUSES = ['published', 'accepting_employers', 'closed', 'completed', 'upcoming', 'ongoing'];
 
+    /**
+     * Statuses eligible for a live map pin — a stricter subset of
+     * PUBLIC_STATUSES. The job fair bulletin keeps closed/completed events
+     * visible as a record, but a "find it on the map right now" pin for an
+     * event that already happened is just confusing clutter.
+     */
+    public const MAP_STATUSES = ['published', 'accepting_employers', 'upcoming', 'ongoing'];
+
     public const PARTICIPATION_STATUSES = [
         'invited', 'interested', 'called_peso', 'pending_response', 'accepted', 'declined',
         'requirements_pending', 'requirements_submitted', 'under_review', 'approved', 'rejected',
@@ -83,6 +91,26 @@ class JobFairService
             'start_time' => $fair->start_time,
             'end_time' => $fair->end_time,
             'venue' => $fair->venue,
+            'province' => $fair->province,
+            'province_code' => $fair->province_code,
+            'city_municipality' => $fair->city_municipality,
+            'city_code' => $fair->city_code,
+            'barangay' => $fair->barangay,
+            'barangay_code' => $fair->barangay_code,
+            'specific_address' => $fair->specific_address,
+            'latitude' => $fair->latitude,
+            'longitude' => $fair->longitude,
+            'google_place_id' => $fair->google_place_id,
+            // Convenience string for map/display components (LocationPreviewCard,
+            // "Open in Google Maps" links) so callers don't each re-join the parts.
+            'full_address' => collect([$fair->venue, $fair->specific_address, $fair->barangay, $fair->city_municipality, $fair->province])
+                ->filter()->unique()->join(', '),
+            // Single source of truth for "does this fair get a pin on the
+            // public Job Map" — computed here so the frontend never has to
+            // duplicate the status list to decide it.
+            'map_eligible' => (bool) $fair->is_public
+                && in_array($fair->status, self::MAP_STATUSES, true)
+                && $fair->latitude !== null && $fair->longitude !== null,
             'sector' => $fair->sector,
             'target_sector' => $fair->target_sector,
             'partner_agencies' => $fair->partner_agencies ?? [],

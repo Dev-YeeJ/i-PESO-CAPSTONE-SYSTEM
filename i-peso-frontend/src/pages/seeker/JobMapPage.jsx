@@ -9,6 +9,7 @@ import JobMapDetailsPanel from '../../components/maps/JobMapDetailsPanel'
 import ReportEmployerModal from '../../components/ReportEmployerModal'
 import { getMapJobDetail, getMapJobs } from '../../services/jobMapService'
 import { applyToJob, toggleSavedJob } from '../../services/seekerService'
+import { listJobFairs } from '../../services/jobFairService'
 
 const DEFAULT_FILTERS = {
   radius_km: 15,
@@ -89,6 +90,7 @@ function ApplyConfirmation({ job, onCancel, onConfirm, applying }) {
 export default function JobMapPage() {
   const navigate = useNavigate()
   const [jobs, setJobs] = useState([])
+  const [jobFairs, setJobFairs] = useState([])
   // Seeker profile is still loaded (for other views), but applying no longer gates on it.
   const [, setSeeker] = useState(null)
   const [summary, setSummary] = useState(null)
@@ -173,6 +175,15 @@ export default function JobMapPage() {
     }
   }, [fetchJobs])
 
+  // Independent of filters/location — PESO job fairs are a small, fixed set
+  // of events, not something to re-fetch every time the seeker adjusts a
+  // vacancy search. A failure here shouldn't block the primary job map.
+  useEffect(() => {
+    listJobFairs()
+      .then((fairs) => setJobFairs(fairs.filter((fair) => fair.map_eligible)))
+      .catch(() => {})
+  }, [])
+
   const updateFilters = (changes) => {
     setFilters((current) => ({ ...current, ...changes }))
     setSelectedJobId(null)
@@ -237,6 +248,10 @@ export default function JobMapPage() {
     if (!fair?.job_fair_id) return
     navigate('/seeker/job-fairs')
   }
+
+  // Tapping a standalone PESO Job Fair pin on the map goes to the same place
+  // "View event details" already sends a seeker from a linked vacancy card.
+  const handleJobFairPin = () => navigate('/seeker/job-fairs')
 
   const viewTraining = (job) => {
     const skill = job.upskill?.programs?.[0]?.matched_skills?.[0] || job.missing_skills?.[0]?.skill || ''
@@ -333,7 +348,7 @@ export default function JobMapPage() {
       {/* Background Map Canvas */}
       <main className="absolute inset-0 z-0">
         <Suspense fallback={<div className="h-full w-full animate-pulse bg-slate-200" />}>
-          <JobVacancyMap jobs={hasLocation ? jobs : []} seekerLocation={seekerLocation} selectedJobId={selectedJobId} popupJobId={popupJobId} onMarkerSelect={previewMarkerJob} onPopupClose={(id) => setPopupJobId((current) => current === id ? null : current)} onViewJob={openDetails} detailsOpen={Boolean(detailsJob)} onListToggle={() => setPanelOpen((open) => !open)} onReset={resetFilters} highOnly={Number(filters.min_match) >= 80} onHighToggle={() => updateFilters({ min_match: Number(filters.min_match) >= 80 ? 0 : 80 })} />
+          <JobVacancyMap jobs={hasLocation ? jobs : []} jobFairs={jobFairs} onJobFairSelect={handleJobFairPin} seekerLocation={seekerLocation} selectedJobId={selectedJobId} popupJobId={popupJobId} onMarkerSelect={previewMarkerJob} onPopupClose={(id) => setPopupJobId((current) => current === id ? null : current)} onViewJob={openDetails} detailsOpen={Boolean(detailsJob)} onListToggle={() => setPanelOpen((open) => !open)} onReset={resetFilters} highOnly={Number(filters.min_match) >= 80} onHighToggle={() => updateFilters({ min_match: Number(filters.min_match) >= 80 ? 0 : 80 })} />
         </Suspense>
         {!hasLocation && !isLoading && (
           <div className="pointer-events-none absolute inset-x-4 top-16 z-10 mx-auto max-w-md rounded-xl border border-amber-200 bg-white/95 p-3 text-center text-xs font-semibold leading-5 text-amber-800 shadow-lg backdrop-blur">Update your address or use your current location to view nearby job pins.</div>
