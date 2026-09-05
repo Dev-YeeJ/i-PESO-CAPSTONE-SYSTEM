@@ -1,7 +1,17 @@
-import React from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { APIProvider, Map, Marker } from '@vis.gl/react-google-maps'
+import { MapContainer, Marker as LeafletMarker, TileLayer } from 'react-leaflet'
+import L from 'leaflet'
+import 'leaflet/dist/leaflet.css'
 import { MapPin, Map as MapIcon, ExternalLink, AlertTriangle } from 'lucide-react'
 import { GOOGLE_MAP_ID, toMapPosition } from '@/utils/mapCoordinates'
+
+const leafletPinIcon = L.divIcon({
+  className: '',
+  iconSize: [26, 26],
+  iconAnchor: [13, 26],
+  html: '<span style="display:block;width:26px;height:26px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:#2563eb;border:3px solid #fff;box-shadow:0 2px 6px rgba(15,23,42,.3)"></span>',
+})
 
 export default function LocationPreviewCard({
   title = "Saved Location",
@@ -12,11 +22,46 @@ export default function LocationPreviewCard({
   isAdmin = false,
   verified = false,
 }) {
+  const containerRef = useRef(null)
+  const [googleFailed, setGoogleFailed] = useState(false)
   const position = toMapPosition(latitude, longitude)
   const hasCoordinates = position !== null
-  const mapUrl = hasCoordinates 
-    ? `https://www.google.com/maps/search/?api=1&query=${latitude},${longitude}` 
+  const googleKey = import.meta.env.VITE_GOOGLE_MAPS_EMBED_API_KEY
+  const preferredProvider = import.meta.env.VITE_JOB_MAP_PROVIDER?.toLowerCase()
+  const useLeaflet = preferredProvider === 'leaflet' || !googleKey || googleFailed
+  const mapUrl = hasCoordinates
+    ? `https://www.google.com/maps/search/?api=1&query=${latitude},${longitude}`
     : (fullAddress ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(fullAddress)}` : null)
+
+  // Same resilience MapPinPicker/JobVacancyMap already have: a misconfigured
+  // or referrer-restricted key renders Google's own error UI inside the map
+  // container rather than throwing, so it has to be caught by watching for it.
+  useEffect(() => {
+    if (useLeaflet) return undefined
+
+    const previousAuthFailure = window.gm_authFailure
+    const handleAuthFailure = () => {
+      setGoogleFailed(true)
+      if (typeof previousAuthFailure === 'function') previousAuthFailure()
+    }
+
+    window.gm_authFailure = handleAuthFailure
+    return () => {
+      if (window.gm_authFailure === handleAuthFailure) window.gm_authFailure = previousAuthFailure
+    }
+  }, [useLeaflet])
+
+  useEffect(() => {
+    if (useLeaflet || !containerRef.current) return undefined
+
+    const detectGoogleError = () => {
+      if (containerRef.current?.querySelector('.gm-err-container, .gm-err-message')) setGoogleFailed(true)
+    }
+    const observer = new MutationObserver(detectGoogleError)
+    observer.observe(containerRef.current, { childList: true, subtree: true })
+    detectGoogleError()
+    return () => observer.disconnect()
+  }, [useLeaflet])
 
   return (
     <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden">
@@ -63,11 +108,11 @@ export default function LocationPreviewCard({
               <p className="text-xs font-mono text-slate-700">Verified: {verified ? 'Yes' : 'No'}</p>
             </div>
           )}
-          
+
           {mapUrl && (
-            <a 
-              href={mapUrl} 
-              target="_blank" 
+            <a
+              href={mapUrl}
+              target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-1.5 text-sm font-bold text-blue-600 hover:text-blue-800"
             >
@@ -78,18 +123,25 @@ export default function LocationPreviewCard({
         </div>
 
         {hasCoordinates && (
-          <div className="w-full md:w-64 h-48 rounded-xl overflow-hidden border border-slate-200 relative z-0">
-            <APIProvider version="quarterly" apiKey={import.meta.env.VITE_GOOGLE_MAPS_EMBED_API_KEY}>
-              <Map
-                defaultZoom={14}
-                defaultCenter={position}
-                disableDefaultUI={true}
-                gestureHandling="none"
-                mapId={GOOGLE_MAP_ID}
-              >
-                <Marker position={position} title={title} />
-              </Map>
-            </APIProvider>
+          <div ref={containerRef} className="w-full md:w-64 h-48 rounded-xl overflow-hidden border border-slate-200 relative z-0">
+            {useLeaflet ? (
+              <MapContainer center={[position.lat, position.lng]} zoom={14} zoomControl={false} dragging={false} scrollWheelZoom={false} doubleClickZoom={false} className="h-full w-full" attributionControl={false}>
+                <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+                <LeafletMarker position={[position.lat, position.lng]} icon={leafletPinIcon} />
+              </MapContainer>
+            ) : (
+              <APIProvider version="quarterly" apiKey={googleKey} onError={() => setGoogleFailed(true)}>
+                <Map
+                  defaultZoom={14}
+                  defaultCenter={position}
+                  disableDefaultUI={true}
+                  gestureHandling="none"
+                  mapId={GOOGLE_MAP_ID}
+                >
+                  <Marker position={position} title={title} />
+                </Map>
+              </APIProvider>
+            )}
           </div>
         )}
       </div>
