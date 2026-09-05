@@ -316,6 +316,7 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::get('/reports', [AdminReportController::class, 'index']);
             Route::post('/reports/generate', [AdminReportController::class, 'generate']);
             Route::post('/reports/generate-sprs', [AdminReportController::class, 'generateSPRS']);
+            Route::put('/reports/{id}/sprs', [AdminReportController::class, 'updateSprs']);
             Route::get('/reports/{id}/export-sprs-pdf', [AdminReportController::class, 'exportSprsPdf']);
             Route::get('/reports/{id}', [AdminReportController::class, 'show']);
             Route::delete('/reports/{id}', [AdminReportController::class, 'destroy']);

@@ -385,6 +385,7 @@ class SeekerController extends Controller
                 'disabilities' => $seeker->disabilities,
                 'is_4ps_beneficiary' => $seeker->is_4ps_beneficiary,
                 'household_id_4ps' => $seeker->household_id_4ps,
+                'is_first_time_jobseeker' => $seeker->is_first_time_jobseeker,
                 'employment_status' => $seeker->employment_status,
                 'employment_type' => $seeker->employment_type,
                 'self_employed_type' => $seeker->self_employed_type,
@@ -712,6 +713,10 @@ class SeekerController extends Controller
                 'string',
                 'regex:/^\d{2}-\d{2}-\d{2}-\d{3}-\d{5}$/',
             ],
+            // First-Time Jobseeker Act (RA 11261) — self-declared; the
+            // supporting barangay certificate is uploaded separately via
+            // SeekerCertificateController.
+            'is_first_time_jobseeker' => ['nullable', 'boolean'],
         ], [
             'household_id_4ps.required_if' => 'The 4Ps Household ID is required for beneficiaries.',
             'household_id_4ps.regex' => 'The 4Ps Household ID must contain 14 digits in the format 00-00-00-000-00000.',
@@ -747,6 +752,7 @@ class SeekerController extends Controller
             'former_ofw_return_date' => $validated['is_former_ofw'] ? ($validated['former_ofw_return_date'] ?? null) : null,
             'is_4ps_beneficiary' => $validated['is_4ps_beneficiary'],
             'household_id_4ps' => $validated['is_4ps_beneficiary'] ? ($validated['household_id_4ps'] ?? null) : null,
+            'is_first_time_jobseeker' => $validated['is_first_time_jobseeker'] ?? false,
         ])->save();
 
         $this->markStepComplete($seeker, 'step2');

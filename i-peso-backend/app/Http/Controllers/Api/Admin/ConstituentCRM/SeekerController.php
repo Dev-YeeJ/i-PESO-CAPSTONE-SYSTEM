@@ -167,6 +167,7 @@ class SeekerController extends Controller
                 'longitude',
                 'is_4ps_beneficiary',
                 'household_id_4ps',
+                'is_first_time_jobseeker',
                 'employment_status',
                 'employment_type',
                 'self_employed_type',

@@ -962,6 +962,33 @@ const Step2 = ({ form, errors, onChange }) => (
         </p>
       </FormField>
     )}
+
+    {/* First-Time Jobseeker Act */}
+    <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '20px', marginTop: '8px' }}>
+      <SectionHeader title="FIRST-TIME JOBSEEKER ACT" subtitle="Republic Act No. 11261" />
+    </div>
+
+    <FormField label="Are you claiming First-Time Jobseeker benefits under RA 11261?" error={errors.is_first_time_jobseeker}>
+      <div style={{ display: 'flex', gap: '10px' }}>
+        {[{ v: true, l: '✓ Yes, this is my first time seeking employment' }, { v: false, l: '✗ No' }].map(({ v, l }) => {
+          const active = form.is_first_time_jobseeker === v || form.is_first_time_jobseeker === String(v)
+          return (
+            <label key={l} style={{ flex: v ? 2 : 1, display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 12px', borderRadius: '10px', border: `1px solid ${active ? '#bfdbfe' : '#e2e8f0'}`, backgroundColor: active ? '#eff6ff' : '#fafafa', cursor: 'pointer', fontSize: '12px', fontWeight: active ? '700' : '400', color: active ? '#1d4ed8' : '#374151' }}>
+              <input type="radio" name="is_first_time_jobseeker" value={String(v)} checked={form.is_first_time_jobseeker === v || form.is_first_time_jobseeker === String(v)}
+                onChange={(e) => onChange({ target: { name: 'is_first_time_jobseeker', value: e.target.value === 'true' } })}
+                style={{ accentColor: '#1d4ed8' }} />
+              {l}
+            </label>
+          )
+        })}
+      </div>
+    </FormField>
+
+    {(form.is_first_time_jobseeker === true || form.is_first_time_jobseeker === 'true') && (
+      <p style={{ margin: '-8px 0 0', color: '#64748b', fontSize: '11px' }}>
+        You can upload your barangay-issued Certificate of First-Time Jobseeker later from your profile's certificates section.
+      </p>
+    )}
   </div>
 )
 
@@ -2507,6 +2534,7 @@ export default function SeekerOnboarding() {
     former_ofw_return_date: '',
     is_4ps_beneficiary: false,
     household_id_4ps: '',
+    is_first_time_jobseeker: false,
     // Step 3
     preferred_occupations: [],
     work_type_preference: '',
@@ -3051,6 +3079,7 @@ export default function SeekerOnboarding() {
     former_ofw_return_date          : form.former_ofw_return_date || null,
     is_4ps_beneficiary              : form.is_4ps_beneficiary === true || form.is_4ps_beneficiary === 'true',
     household_id_4ps                : form.household_id_4ps || null,
+    is_first_time_jobseeker         : form.is_first_time_jobseeker === true || form.is_first_time_jobseeker === 'true',
   })
 
   const buildStep3Payload = () => ({

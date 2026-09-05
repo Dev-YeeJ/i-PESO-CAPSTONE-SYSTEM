@@ -249,6 +249,11 @@ export const adminService = {
     return data
   },
 
+  updateSprs: async (id, payload) => {
+    const { data } = await api.put(`/admin/reports/${id}/sprs`, payload)
+    return data
+  },
+
   getReportDetail: async (id) => {
     const { data } = await api.get(`/admin/reports/${id}`)
     return data

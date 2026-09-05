@@ -11,6 +11,7 @@ const categories = [
   ['workshop_certificate', 'Workshop Certificate'],
   ['employment_certificate', 'Employment Certificate'],
   ['academic_certificate', 'Academic Certificate'],
+  ['first_time_jobseeker_certificate', 'First-Time Jobseeker Certificate (RA 11261)'],
   ['other', 'Other'],
 ]
 

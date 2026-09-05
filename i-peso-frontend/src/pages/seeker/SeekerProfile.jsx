@@ -679,6 +679,23 @@ export default function SeekerProfile() {
                 <EmptyState icon={Award} text="No NSRP training records saved yet. Certificates can still be added as standalone credentials." action="Add Training Record" onClick={() => openProfileEditor('training')} />
               )}
 
+              {profile.is_first_time_jobseeker && !certificates.some((c) => c.category === 'first_time_jobseeker_certificate') && (
+                <div className="mt-5 flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+                  <ShieldCheck className="h-5 w-5 flex-shrink-0 text-amber-600" />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-bold text-amber-900">Upload your First-Time Jobseeker certificate</p>
+                    <p className="mt-0.5 text-sm text-amber-700">You told us you're claiming First-Time Jobseeker Act (RA 11261) benefits. Upload your barangay-issued certificate as proof.</p>
+                    <button
+                      type="button"
+                      onClick={() => setUploadOpen(true)}
+                      className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-amber-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-amber-700"
+                    >
+                      <Plus className="h-4 w-4" /> Upload Certificate
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {certificates.length > 0 && (
                 <div className="mt-5 border-t border-slate-100 pt-5">
                   <p className="mb-3 text-xs font-bold uppercase tracking-wide text-slate-400">Certificate records</p>
@@ -1531,6 +1548,7 @@ function certificateCategory(category) {
     workshop_certificate: 'Workshop Certificate',
     employment_certificate: 'Employment Certificate',
     academic_certificate: 'Academic Certificate',
+    first_time_jobseeker_certificate: 'First-Time Jobseeker Certificate (RA 11261)',
     other: 'Other',
   })[category] ?? 'Legacy Certificate'
 }

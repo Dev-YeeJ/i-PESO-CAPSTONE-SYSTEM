@@ -112,6 +112,7 @@ class ReportController extends Controller
             'signatories' => 'nullable|array',
             'signatories.*.name' => 'nullable|string|max:255',
             'signatories.*.position' => 'nullable|string|max:255',
+            'issues_concerns' => 'nullable|string|max:5000',
         ]);
 
         $month = \Carbon\Carbon::createFromDate($validated['year'], $validated['month'], 1);
@@ -166,6 +167,22 @@ class ReportController extends Controller
                 'applicants' => $current['registered_total'],
                 'cumulative_establishments' => $cumulative['employers_registered'],
             ],
+            // "Other Accomplishments" — First-Time Jobseeker Act (RA 11261).
+            // Self-declared at registration; with_attachment counts those who
+            // also uploaded the barangay certificate as proof.
+            'other_accomplishments' => [
+                'ftja_total' => $current['ftja_total'],
+                'ftja_with_attachment' => $current['ftja_with_attachment'],
+                'previous_ftja_total' => $previous['ftja_total'],
+                'cumulative_ftja_total' => $cumulative['ftja_total'],
+            ],
+            // Free-text field matching the paper form's "ISSUES / CONCERNS" box —
+            // filled in by whoever prepares the report, not computed from data.
+            'issues_concerns' => $validated['issues_concerns'] ?? null,
+            // Full form-order row list backing the editable on-screen grid and
+            // the PDF. See buildSprsRows() for which rows are system-computed
+            // vs. left blank for manual entry.
+            'rows' => $this->buildSprsRows($current, $previous, $cumulative),
         ];
 
         $report = AnalyticsReport::create([
@@ -194,6 +211,79 @@ class ReportController extends Controller
     }
 
     /**
+     * Save hand-entered edits to a generated SPRS report — the whole row grid
+     * (system-computed values a preparer corrected, plus the LMI/Career
+     * Guidance/AIR-TIP and local/overseas rows the system can't compute at
+     * all), the Other Accomplishments block, the Issues/Concerns text, and
+     * signatories. This is what makes the report a genuinely fillable form
+     * rather than a read-only computed snapshot.
+     */
+    public function updateSprs(Request $request, int $id): JsonResponse
+    {
+        $admin = auth()->user();
+        if (! $admin instanceof Administrator) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        $report = AnalyticsReport::findOrFail($id);
+
+        $validated = $request->validate([
+            'rows' => ['nullable', 'array'],
+            'rows.*.key' => ['required_with:rows', 'string'],
+            'rows.*.target' => ['nullable', 'numeric'],
+            'rows.*.prev_total' => ['nullable', 'numeric'],
+            'rows.*.prev_female' => ['nullable', 'numeric'],
+            'rows.*.curr_total' => ['nullable', 'numeric'],
+            'rows.*.curr_female' => ['nullable', 'numeric'],
+            'rows.*.cum_total' => ['nullable', 'numeric'],
+            'rows.*.cum_female' => ['nullable', 'numeric'],
+            'other_accomplishments' => ['nullable', 'array'],
+            'other_accomplishments.ftja_total' => ['nullable', 'numeric'],
+            'other_accomplishments.ftja_with_attachment' => ['nullable', 'numeric'],
+            'issues_concerns' => ['nullable', 'string', 'max:5000'],
+            'signatories' => ['nullable', 'array'],
+            'signatories.*.name' => ['nullable', 'string', 'max:255'],
+            'signatories.*.position' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $data = $report->data_summary ?? [];
+
+        if (array_key_exists('rows', $validated)) {
+            // Rows are keyed, so a save only needs to carry the rows the
+            // editor actually renders; merge by key rather than requiring
+            // every row on every save.
+            $existingByKey = collect($data['rows'] ?? [])->keyBy('key');
+            foreach ($validated['rows'] as $editedRow) {
+                $existingByKey[$editedRow['key']] = array_merge(
+                    $existingByKey[$editedRow['key']] ?? ['key' => $editedRow['key'], 'section' => false],
+                    $editedRow,
+                );
+            }
+            $data['rows'] = $existingByKey->values()->all();
+        }
+
+        if (array_key_exists('other_accomplishments', $validated)) {
+            $data['other_accomplishments'] = array_merge($data['other_accomplishments'] ?? [], $validated['other_accomplishments']);
+        }
+
+        if (array_key_exists('issues_concerns', $validated)) {
+            $data['issues_concerns'] = $validated['issues_concerns'];
+        }
+
+        if (!empty($validated['signatories'])) {
+            $data['signatories'] = $this->persistSignatories($report->report_id, $validated['signatories']);
+        }
+
+        $report->update(['data_summary' => $data]);
+
+        return response()->json([
+            'message' => 'SPRS report updated',
+            'data' => $data,
+            'report' => $report->fresh(),
+        ]);
+    }
+
+    /**
      * Compute the core SPRS indicator figures for a date range. Called once per
      * column group (current month, previous month, year-to-date cumulative).
      */
@@ -213,6 +303,9 @@ class ReportController extends Controller
             ->whereHas('jobSeeker', fn ($q) => $q->where('sex', 'female'))->count();
         $placedGovernment = Application::where('status', 'hired')->whereBetween('status_changed_at', [$start, $end])
             ->whereHas('jobVacancy.employer', fn ($q) => $q->where('company_type', 'like', '%Government%')->orWhere('company_type', 'like', '%LGU%'))->count();
+        $placedGovernmentFemale = Application::where('status', 'hired')->whereBetween('status_changed_at', [$start, $end])
+            ->whereHas('jobVacancy.employer', fn ($q) => $q->where('company_type', 'like', '%Government%')->orWhere('company_type', 'like', '%LGU%'))
+            ->whereHas('jobSeeker', fn ($q) => $q->where('sex', 'female'))->count();
 
         // Employers report every new hire, not only PESO referrals, so approved
         // reports are a second source of placements alongside platform hires.
@@ -221,6 +314,8 @@ class ReportController extends Controller
         // figure submitted to DOLE overstates placements.
         $employerReportedPlaced = 0;
         $employerReportedFemale = 0;
+        $employerReportedGovernment = 0;
+        $employerReportedGovernmentFemale = 0;
         if (Schema::hasTable('placement_records')) {
             $approvedUploadIds = PlacementReportUpload::where('status', PlacementReportUpload::STATUS_APPROVED)->pluck('id');
 
@@ -242,6 +337,15 @@ class ReportController extends Controller
 
             $employerReportedPlaced = (clone $employerReported)->count();
             $employerReportedFemale = (clone $employerReported)->whereRaw('LOWER(gender) LIKE ?', ['f%'])->count();
+            // Classify employer-reported placements as private/government too,
+            // via the reporting employer's company_type, so 1.4.1 + 1.4.2 adds
+            // back up to the 1.4 total instead of only covering platform hires.
+            $employerReportedGovernment = (clone $employerReported)
+                ->whereHas('employer', fn ($q) => $q->where('company_type', 'like', '%Government%')->orWhere('company_type', 'like', '%LGU%'))
+                ->count();
+            $employerReportedGovernmentFemale = (clone $employerReported)
+                ->whereHas('employer', fn ($q) => $q->where('company_type', 'like', '%Government%')->orWhere('company_type', 'like', '%LGU%'))
+                ->whereRaw('LOWER(gender) LIKE ?', ['f%'])->count();
         }
 
         $spesPlaced = Application::where('status', 'hired')->whereBetween('status_changed_at', [$start, $end])
@@ -252,14 +356,38 @@ class ReportController extends Controller
 
         $employersRegistered = \App\Models\Employer::whereBetween('created_at', [$start, $end])->count();
 
+        // Other Accomplishments — First-Time Jobseeker Act (RA 11261). Self-
+        // declared at registration; "attached" means the seeker also uploaded
+        // the barangay certificate as a seeker_certificates row.
+        $ftjaSeekerIds = JobSeeker::whereBetween('created_at', [$start, $end])
+            ->where('is_first_time_jobseeker', true)
+            ->pluck('seeker_id');
+        $ftjaTotal = $ftjaSeekerIds->count();
+        $ftjaFemale = JobSeeker::whereBetween('created_at', [$start, $end])
+            ->where('is_first_time_jobseeker', true)->where('sex', 'female')->count();
+        $ftjaWithAttachment = $ftjaTotal > 0 && Schema::hasTable('seeker_certificates')
+            ? \App\Models\SeekerCertificate::whereIn('seeker_id', $ftjaSeekerIds)
+                ->where('category', 'first_time_jobseeker_certificate')
+                ->distinct('seeker_id')
+                ->count('seeker_id')
+            : 0;
+
         $jobFairs = \App\Models\JobFair::query()
             ->whereBetween(DB::raw('COALESCE(start_date, event_date)'), [$start->toDateString(), $end->toDateString()])
             ->whereIn('status', ['completed', 'closed'])->get();
+        // job_fairs.sector ('local'/'overseas'/'both') already exists and is
+        // used in the per-event 1.6 PDF — reuse it here for the 1.6.1/1.6.2/
+        // 1.6.3 monthly split instead of leaving it unsplit.
         $jobFairSection = [
             'fairs_conducted' => $jobFairs->count(), 'participating_companies' => 0,
             'vacancies_solicited' => 0, 'applicants' => 0, 'hots' => 0,
             'near_hired' => 0, 'rejected' => 0, 'self_service_reports' => 0, 'admin_proxy_reports' => 0,
+            'fairs_local' => 0, 'fairs_overseas' => 0, 'fairs_both' => 0,
         ];
+        foreach ($jobFairs as $jobFair) {
+            $sector = in_array($jobFair->sector, ['local', 'overseas', 'both'], true) ? $jobFair->sector : 'local';
+            $jobFairSection['fairs_' . $sector]++;
+        }
         foreach ($jobFairs as $jobFair) {
             $summary = $jobFairReports->sprs($jobFair);
             $jobFairSection['participating_companies'] += $summary['1.6.4_establishments_participated'];
@@ -282,14 +410,164 @@ class ReportController extends Controller
             'referred_female' => $referredFemale,
             'placed_total' => $placedOnPlatform + $employerReportedPlaced,
             'placed_female' => $placedFemale + $employerReportedFemale,
-            'placed_private' => $placedOnPlatform - $placedGovernment,
-            'placed_government' => $placedGovernment,
+            // Government total now includes employer-reported government hires,
+            // and private is the remainder, so 1.4.1 + 1.4.2 == 1.4 always —
+            // previously private/government only accounted for platform hires,
+            // so the two subtotals undercounted the total whenever an approved
+            // employer report included a placement.
+            'placed_government' => $placedGovernment + $employerReportedGovernment,
+            'placed_government_female' => $placedGovernmentFemale + $employerReportedGovernmentFemale,
+            'placed_private' => ($placedOnPlatform + $employerReportedPlaced) - ($placedGovernment + $employerReportedGovernment),
+            'placed_private_female' => ($placedFemale + $employerReportedFemale) - ($placedGovernmentFemale + $employerReportedGovernmentFemale),
             'placed_on_platform' => $placedOnPlatform,
             'placed_employer_reported' => $employerReportedPlaced,
             'spes_total' => $spesPlaced,
             'spes_female' => $spesFemale,
             'employers_registered' => $employersRegistered,
             'job_fairs' => $jobFairSection,
+            'ftja_total' => $ftjaTotal,
+            'ftja_female' => $ftjaFemale,
+            'ftja_with_attachment' => $ftjaWithAttachment,
+        ];
+    }
+
+    /**
+     * Build the full DOLE SPRS Form 2018 row list, in form order, for the
+     * editable on-screen grid and the PDF. Every row carries a value for
+     * whichever of {target, prev, curr, cum} × {total, female} the system can
+     * genuinely compute; everything else is left null so the UI renders an
+     * empty, editable cell rather than a fabricated zero. `auto` marks rows
+     * that started out system-computed, purely as a UI hint for preparers —
+     * every cell stays editable regardless.
+     */
+    private function buildSprsRows(array $current, array $previous, array $cumulative): array
+    {
+        $row = function (string $key, string $label, int $indent, bool $auto, array $values = []) {
+            return array_merge([
+                'key' => $key,
+                'label' => $label,
+                'indent' => $indent,
+                'section' => false,
+                'auto' => $auto,
+                'target' => null,
+                'prev_total' => null, 'prev_female' => null,
+                'curr_total' => null, 'curr_female' => null,
+                'cum_total' => null, 'cum_female' => null,
+            ], $values);
+        };
+        $section = fn (string $key, string $label) => [
+            'key' => $key, 'label' => $label, 'indent' => 0, 'section' => true, 'auto' => false,
+            'target' => null,
+            'prev_total' => null, 'prev_female' => null, 'curr_total' => null, 'curr_female' => null,
+            'cum_total' => null, 'cum_female' => null,
+        ];
+
+        $jf = fn (array $set, string $field) => $set['job_fairs'][$field] ?? null;
+
+        return [
+            $section('sec_pes', 'A. PUBLIC EMPLOYMENT SERVICES (PES)'),
+            $row('1_1', '1.1 Job vacancies solicited/reported', 1, true, [
+                'curr_total' => $current['vacancies_total'], 'prev_total' => $previous['vacancies_total'], 'cum_total' => $cumulative['vacancies_total'],
+            ]),
+            $row('1_1_1', '1.1.1 Local', 2, false),
+            $row('1_1_2', '1.1.2 Overseas', 2, false),
+            $row('1_2', '1.2 Job applicants registered', 1, true, [
+                'curr_total' => $current['registered_total'], 'curr_female' => $current['registered_female'],
+                'prev_total' => $previous['registered_total'], 'prev_female' => $previous['registered_female'],
+                'cum_total' => $cumulative['registered_total'], 'cum_female' => $cumulative['registered_female'],
+            ]),
+            $row('1_3', '1.3 Job applicants referred for', 1, true, [
+                'curr_total' => $current['referred_total'], 'curr_female' => $current['referred_female'],
+                'prev_total' => $previous['referred_total'], 'prev_female' => $previous['referred_female'],
+                'cum_total' => $cumulative['referred_total'], 'cum_female' => $cumulative['referred_female'],
+            ]),
+            $row('1_3_1', '1.3.1 Job placement', 2, false),
+            $row('1_3_1_local', '1.3.1 Local', 3, false),
+            $row('1_3_1_overseas', '1.3.2 Overseas', 3, false),
+            $row('1_3_2', '1.3.2 Training/employability enhancement', 2, false),
+            $row('1_4', '1.4 Job applicants placed', 1, true, [
+                'curr_total' => $current['placed_total'], 'curr_female' => $current['placed_female'],
+                'prev_total' => $previous['placed_total'], 'prev_female' => $previous['placed_female'],
+                'cum_total' => $cumulative['placed_total'], 'cum_female' => $cumulative['placed_female'],
+            ]),
+            $row('1_4_1', '1.4.1 Private sector (direct employers)', 2, true, [
+                'curr_total' => $current['placed_private'], 'curr_female' => $current['placed_private_female'],
+                'prev_total' => $previous['placed_private'], 'prev_female' => $previous['placed_private_female'],
+                'cum_total' => $cumulative['placed_private'], 'cum_female' => $cumulative['placed_private_female'],
+            ]),
+            $row('1_4_2', '1.4.2 Government sector', 2, true, [
+                'curr_total' => $current['placed_government'], 'curr_female' => $current['placed_government_female'],
+                'prev_total' => $previous['placed_government'], 'prev_female' => $previous['placed_government_female'],
+                'cum_total' => $cumulative['placed_government'], 'cum_female' => $cumulative['placed_government_female'],
+            ]),
+            $row('1_4_2_1', '1.4.2.1 Infrastructure related', 3, false),
+            $row('1_4_3', '1.4.3 Overseas', 2, false),
+            $row('1_5', '1.5 Special Program for Employment of Students (SPES)', 1, true, [
+                'curr_total' => $current['spes_total'], 'curr_female' => $current['spes_female'],
+                'prev_total' => $previous['spes_total'], 'cum_total' => $cumulative['spes_total'],
+            ]),
+            $row('1_5_1', '1.5.1 Youth beneficiaries placed', 2, true, [
+                'curr_total' => $current['spes_total'], 'curr_female' => $current['spes_female'],
+                'prev_total' => $previous['spes_total'], 'cum_total' => $cumulative['spes_total'],
+            ]),
+            $row('1_6', '1.6 Job Fairs conducted', 1, true, [
+                'curr_total' => $jf($current, 'fairs_conducted'), 'prev_total' => $jf($previous, 'fairs_conducted'), 'cum_total' => $jf($cumulative, 'fairs_conducted'),
+            ]),
+            $row('1_6_1', '1.6.1 Local', 2, true, [
+                'curr_total' => $jf($current, 'fairs_local'), 'prev_total' => $jf($previous, 'fairs_local'), 'cum_total' => $jf($cumulative, 'fairs_local'),
+            ]),
+            $row('1_6_2', '1.6.2 Overseas', 2, true, [
+                'curr_total' => $jf($current, 'fairs_overseas'), 'prev_total' => $jf($previous, 'fairs_overseas'), 'cum_total' => $jf($cumulative, 'fairs_overseas'),
+            ]),
+            $row('1_6_3', '1.6.3 Local & Overseas', 2, true, [
+                'curr_total' => $jf($current, 'fairs_both'), 'prev_total' => $jf($previous, 'fairs_both'), 'cum_total' => $jf($cumulative, 'fairs_both'),
+            ]),
+            $row('1_6_4', '1.6.4 Establishments/Employers Participated', 2, true, [
+                'curr_total' => $jf($current, 'participating_companies'), 'prev_total' => $jf($previous, 'participating_companies'), 'cum_total' => $jf($cumulative, 'participating_companies'),
+            ]),
+            $row('1_6_4_1', '1.6.4.1 Local', 3, false),
+            $row('1_6_4_2', '1.6.4.2 Overseas', 3, false),
+            $row('1_6_5', '1.6.5 Job Vacancies solicited/reported', 2, true, [
+                'curr_total' => $jf($current, 'vacancies_solicited'), 'prev_total' => $jf($previous, 'vacancies_solicited'), 'cum_total' => $jf($cumulative, 'vacancies_solicited'),
+            ]),
+            $row('1_6_5_1', '1.6.5.1 Local', 3, false),
+            $row('1_6_5_2', '1.6.5.2 Overseas', 3, false),
+            $row('1_6_6', '1.6.6 Job applicants registered', 2, true, [
+                'curr_total' => $jf($current, 'applicants'), 'prev_total' => $jf($previous, 'applicants'), 'cum_total' => $jf($cumulative, 'applicants'),
+            ]),
+            $row('1_6_7', '1.6.7 Total applicants placed/Hired-on-the-Spot (HOTS)', 2, true, [
+                'curr_total' => $jf($current, 'hots'), 'prev_total' => $jf($previous, 'hots'), 'cum_total' => $jf($cumulative, 'hots'),
+            ]),
+            $row('1_6_7_1', '1.6.7.1 Local', 3, false),
+            $row('1_6_7_2', '1.6.7.2 Overseas', 3, false),
+
+            $section('sec_lmi', 'B. LABOR MARKET INFORMATION (LMI) PROGRAM'),
+            $row('lmi_1', '1. Individuals/institutions provided with labor market information', 1, false),
+            $row('lmi_1_1', '1.1 Individuals reached', 2, false),
+            $row('lmi_1_1_1', '1.1.1 Students', 3, false),
+            $row('lmi_1_1_2', '1.1.2 Parents', 3, false),
+            $row('lmi_1_1_3', '1.1.3 Researchers', 3, false),
+            $row('lmi_1_1_4', '1.1.4 Jobseekers', 3, false),
+            $row('lmi_1_2', '1.2 Institutions reached', 2, false),
+            $row('lmi_1_2_1', '1.2.1 Schools', 3, false),
+            $row('lmi_1_2_2', '1.2.2 Organizations/NGOs', 3, false),
+
+            $section('sec_cg', 'C. CAREER GUIDANCE ADVOCACY PROGRAM'),
+            $row('cg_1', '1. Career Guidance Advocacies conducted', 1, false),
+            $row('cg_1_1', '1.1 Students/Parents covered', 2, false),
+            $row('cg_1_2', '1.2 Schools/Colleges/Universities covered', 2, false),
+            $row('cg_2', '2. Employment coaching conducted on job applicants', 1, false),
+            $row('cg_2_1', '2.1 Job applicants coached', 2, false),
+
+            $section('sec_airtip', 'D. AIR-TIP'),
+            $row('airtip_1', '1. Anti-Illegal Recruitment/Trafficking in Person campaign activities', 1, false),
+            $row('airtip_1_1', '1.1 Participants', 2, false),
+
+            $section('sec_peis', 'E. PHILJOBNET/PEIS'),
+            $row('peis_1', '1. Number of establishments registered', 1, true, [
+                'curr_total' => $current['employers_registered'], 'prev_total' => $previous['employers_registered'], 'cum_total' => $cumulative['employers_registered'],
+            ]),
+            $row('peis_2', '2. Number of registered applicants', 1, false),
         ];
     }
 

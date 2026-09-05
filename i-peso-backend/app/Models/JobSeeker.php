@@ -75,6 +75,7 @@ class JobSeeker extends Authenticatable
         // === STEP 2: EDUCATION & DEMOGRAPHICS ===
         'is_4ps_beneficiary',
         'household_id_4ps',
+        'is_first_time_jobseeker',
         // === STEP 3: EMPLOYMENT STATUS ===
         'employment_status',
         'employment_type',
@@ -117,6 +118,7 @@ class JobSeeker extends Authenticatable
         'password' => 'hashed',
         'skills' => 'array',
         'is_4ps_beneficiary' => 'boolean',
+        'is_first_time_jobseeker' => 'boolean',
         'is_ofw' => 'boolean',
         'is_former_ofw' => 'boolean',
         'profile_completed' => 'boolean',
