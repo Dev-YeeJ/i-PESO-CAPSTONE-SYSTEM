@@ -4,7 +4,6 @@ import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useQueryClient } from '@tanstack/react-query'
 import type { JobFair } from '@/services/seekerService'
 import { formatDate, textFrom, titleCase } from '@/utils/seekerView'
-import { AlertBox } from '@/components/ui/AlertBox'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
@@ -51,12 +50,11 @@ export default function JobFairDetailScreen() {
 
   return (
     <View style={styles.flex}>
-      <ScreenHeader title="Job Fair" onBack={() => router.back()} />
+      {/* Same router.replace fix as the not-found branch above and as job-fairs.tsx's
+          own header — this screen is also a flat Tabs-navigator sibling, so back()
+          jumps to Home instead of the Job Fairs list it was actually opened from. */}
+      <ScreenHeader title="Job Fair" onBack={() => router.replace('/(seeker)/job-fairs')} />
       <ScrollView contentContainerStyle={styles.content}>
-      <AlertBox variant="info" style={styles.rsvpNotice}>
-        This job fair is walk-in only. No digital RSVP, QR pass, or app check-in is required — just show up during the event dates below.
-      </AlertBox>
-
       <View style={styles.header}>
         <Text style={styles.title}>{textFrom(fair.title, 'Untitled job fair')}</Text>
         <Badge variant={statusVariant(fair.status)} style={styles.statusBadge}>
@@ -137,7 +135,6 @@ const styles = StyleSheet.create({
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: spacing.md, padding: spacing.xl, backgroundColor: colors.background },
   notFoundTitle: { color: colors.primary, fontSize: typography.title, fontFamily: typography.family.bold },
   notFoundSub: { color: colors.secondaryText, fontSize: typography.body, textAlign: 'center', lineHeight: 20, marginBottom: spacing.md },
-  rsvpNotice: { marginBottom: spacing.lg },
   header: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: spacing.md, marginBottom: spacing.sm },
   title: { flex: 1, color: colors.primary, fontSize: typography.heading, lineHeight: 30, fontFamily: typography.family.bold },
   statusBadge: { marginTop: spacing.xs },

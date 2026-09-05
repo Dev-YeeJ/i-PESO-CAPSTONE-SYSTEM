@@ -36,7 +36,11 @@ export default function JobFairsScreen() {
 
   return (
     <View style={styles.flex}>
-      <ScreenHeader title="Job Fairs" onBack={() => router.back()} />
+      {/* router.replace, not router.back(): job-fairs is a flat sibling in the
+          Tabs navigator (not nested under Government Programs' own stack), so
+          back() has nowhere real to return to and falls through to the first
+          tab (Home) instead of wherever this screen was actually opened from. */}
+      <ScreenHeader title="Job Fairs" onBack={() => router.replace('/(seeker)/government-programs')} />
       <ScrollView
         contentContainerStyle={styles.content}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.info} />}

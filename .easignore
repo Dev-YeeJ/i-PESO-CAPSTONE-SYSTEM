@@ -1,0 +1,19 @@
+# This repository contains multiple applications. EAS builds only the mobile app.
+/*
+!/i-peso-mobile
+
+/i-peso-mobile/node_modules
+/i-peso-mobile/.expo
+/i-peso-mobile/.expo-export-test
+/i-peso-mobile/android
+/i-peso-mobile/ios
+/i-peso-mobile/dist
+/i-peso-mobile/web-build
+/i-peso-mobile/.vscode
+
+/i-peso-mobile/*.jks
+/i-peso-mobile/*.p8
+/i-peso-mobile/*.p12
+/i-peso-mobile/*.key
+/i-peso-mobile/*.mobileprovision
+/i-peso-mobile/.env*.local
