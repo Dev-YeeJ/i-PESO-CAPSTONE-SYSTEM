@@ -40,6 +40,7 @@ class SeekerHouseholdIdValidationTest extends TestCase
                 $table->date('former_ofw_return_date')->nullable();
                 $table->boolean('is_4ps_beneficiary')->default(false);
                 $table->string('household_id_4ps')->nullable();
+                $table->boolean('is_first_time_jobseeker')->default(false);
                 $table->boolean('profile_completed')->default(false);
                 $table->json('form_validation_state')->nullable();
                 $table->timestamp('email_verified_at')->nullable();

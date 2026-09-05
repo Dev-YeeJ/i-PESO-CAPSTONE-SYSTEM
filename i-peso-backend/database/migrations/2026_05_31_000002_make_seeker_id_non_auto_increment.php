@@ -11,8 +11,12 @@ return new class extends Migration
     {
         // Remove AUTO_INCREMENT attribute if present. Raw SQL is used because
         // Laravel's schema builder does not expose removing AUTO_INCREMENT directly.
-        // This works for MySQL (ensure your connection uses MySQL / MariaDB).
-        DB::statement('ALTER TABLE `job_seekers` MODIFY `seeker_id` BIGINT UNSIGNED NOT NULL;');
+        // This is MySQL-specific syntax; SQLite (used by the test suite) has no
+        // AUTO_INCREMENT to remove, so it's a no-op there rather than a fatal
+        // "near MODIFY: syntax error" that would block every migration after it.
+        if (DB::getDriverName() === 'mysql') {
+            DB::statement('ALTER TABLE `job_seekers` MODIFY `seeker_id` BIGINT UNSIGNED NOT NULL;');
+        }
 
         // Ensure complete_address is nullable (no-op if already nullable)
         if (Schema::hasColumn('job_seekers', 'complete_address')) {
@@ -27,6 +31,8 @@ return new class extends Migration
         // Re-create AUTO_INCREMENT behavior. This will only succeed if the
         // current maximum seeker_id is less than the next auto-increment value
         // MySQL will set the AUTO_INCREMENT to (MAX(seeker_id) + 1) automatically.
-        DB::statement('ALTER TABLE `job_seekers` MODIFY `seeker_id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT;');
+        if (DB::getDriverName() === 'mysql') {
+            DB::statement('ALTER TABLE `job_seekers` MODIFY `seeker_id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT;');
+        }
     }
 };
