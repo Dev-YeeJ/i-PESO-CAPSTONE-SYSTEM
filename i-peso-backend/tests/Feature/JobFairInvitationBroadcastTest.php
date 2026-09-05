@@ -197,6 +197,72 @@ class JobFairInvitationBroadcastTest extends TestCase
         $this->assertStringContainsString('December 1 to December 3, 2026', $multiDayRendered);
     }
 
+    public function test_job_vacancy_count_is_auto_satisfied_once_the_employer_has_an_active_posting(): void
+    {
+        $fair = $this->createFair();
+        app(JobFairService::class)->seedRequirements($fair);
+        $fair->refresh();
+
+        $employer = $this->employer('has-posting@example.test', 'sole_proprietorship');
+        $participation = JobFairEmployer::create([
+            'job_fair_id' => $fair->job_fair_id, 'employer_id' => $employer->employer_id,
+            'participation_status' => 'requirements_pending', 'source' => 'peso_broadcast', 'invited_at' => now(),
+        ]);
+
+        // No active posting yet — the requirement stays outstanding, and
+        // there is nothing to auto-create.
+        app(JobFairService::class)->autoSatisfyVacancyCount($fair, $participation->fresh());
+        $this->assertSame(0, $participation->requirementSubmissions()->count());
+
+        \DB::table('job_vacancies')->insert([
+            'employer_id' => $employer->employer_id, 'vacancies_count' => 3, 'status' => 'active',
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        app(JobFairService::class)->autoSatisfyVacancyCount($fair, $participation->fresh()->load('requirementSubmissions'));
+
+        $this->assertDatabaseHas('job_fair_requirement_submissions', [
+            'job_fair_employer_id' => $participation->id,
+            'original_filename' => JobFairService::AUTO_SATISFIED_VACANCY_LABEL,
+            'status' => 'approved',
+        ]);
+
+        // Running it again must not create a second submission.
+        app(JobFairService::class)->autoSatisfyVacancyCount($fair, $participation->fresh()->load('requirementSubmissions'));
+        $this->assertSame(1, $participation->requirementSubmissions()->count());
+    }
+
+    public function test_the_registered_representative_is_addressed_in_the_invitation_email(): void
+    {
+        $fair = $this->createFair();
+
+        $employer = Employer::create([
+            'email' => 'has-rep@example.test', 'password' => 'password123', 'company_name' => 'Has Rep Corp',
+            'company_type' => 'corporation_partnership', 'verification_status' => 'verified', 'email_verified_at' => now(),
+            'representative_first_name' => 'Maria', 'representative_last_name' => 'Santos',
+            'representative_designation' => 'HR Manager',
+        ]);
+        $participation = JobFairEmployer::create([
+            'job_fair_id' => $fair->job_fair_id, 'employer_id' => $employer->employer_id,
+            'participation_status' => 'invited', 'source' => 'peso_broadcast', 'invited_at' => now(),
+        ]);
+
+        $rendered = (new JobFairNotification($fair, 'invited', $participation))->toMail($employer)->render();
+        $this->assertStringContainsString('Maria Santos', $rendered);
+        $this->assertStringContainsString('HR Manager', $rendered);
+        $this->assertStringContainsString('Dear Maria Santos', $rendered);
+
+        // No representative on file — falls back to the generic letter form.
+        $noRepEmployer = $this->employer('no-rep@example.test', 'sole_proprietorship');
+        $noRepParticipation = JobFairEmployer::create([
+            'job_fair_id' => $fair->job_fair_id, 'employer_id' => $noRepEmployer->employer_id,
+            'participation_status' => 'invited', 'source' => 'peso_broadcast', 'invited_at' => now(),
+        ]);
+        $fallbackRendered = (new JobFairNotification($fair, 'invited', $noRepParticipation))->toMail($noRepEmployer)->render();
+        $this->assertStringContainsString('The HR Manager', $fallbackRendered);
+        $this->assertStringContainsString('Dear Sir/Madam', $fallbackRendered);
+    }
+
     public function test_the_seeker_announcement_carries_the_fair_details_via_database_and_push(): void
     {
         $fair = $this->createFair();
@@ -277,6 +343,10 @@ class JobFairInvitationBroadcastTest extends TestCase
             $t->id('employer_id'); $t->string('email')->unique(); $t->string('password');
             $t->string('company_name')->nullable(); $t->string('trade_name')->nullable();
             $t->string('company_type')->nullable(); $t->string('mobile_number')->nullable();
+            $t->string('full_address')->nullable(); $t->string('complete_address')->nullable();
+            $t->string('representative_name')->nullable(); $t->string('representative_first_name')->nullable();
+            $t->string('representative_middle_name')->nullable(); $t->string('representative_last_name')->nullable();
+            $t->string('representative_designation')->nullable(); $t->string('representative_contact_number')->nullable();
             $t->string('verification_status')->default('pending'); $t->timestamp('email_verified_at')->nullable();
             $t->timestamps(); $t->softDeletes();
         });
@@ -292,6 +362,15 @@ class JobFairInvitationBroadcastTest extends TestCase
             $t->string('mime_type'); $t->timestamp('uploaded_at')->nullable();
             $t->string('verification_status')->default('pending'); $t->text('admin_notes')->nullable();
             $t->date('expiration_date')->nullable(); $t->timestamp('viewed_at')->nullable(); $t->timestamps();
+        });
+
+        // Queried by autoSatisfyVacancyCount()/outstandingRequirementsFor()
+        // to skip the "Job Vacancy Count" requirement when it's already
+        // derivable from the employer's own active postings.
+        Schema::create('job_vacancies', function (Blueprint $t) {
+            $t->id('post_id'); $t->unsignedBigInteger('employer_id');
+            $t->unsignedInteger('vacancies_count')->default(0); $t->string('status')->default('active');
+            $t->timestamps();
         });
 
         Schema::create('job_fairs', function (Blueprint $t) {

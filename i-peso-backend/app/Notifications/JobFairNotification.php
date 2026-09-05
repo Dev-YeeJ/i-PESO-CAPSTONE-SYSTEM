@@ -35,45 +35,38 @@ class JobFairNotification extends Notification implements ShouldQueue
 
     public function toMail(object $notifiable): MailMessage
     {
-        $companyName = $notifiable->company_name ?: $notifiable->trade_name ?: 'Sir/Madam';
+        $companyName = $notifiable->company_name ?: $notifiable->trade_name ?: 'Your Company';
         $venue = collect([$this->fair->venue, $this->fair->specific_address, $this->fair->barangay, $this->fair->city_municipality, $this->fair->province])
             ->filter()->unique()->join(', ');
-        $contactEmail = $this->fair->contact_email ?: config('peso_knowledge.office.email');
-        $deadline = $this->fair->submission_deadline?->format('F j, Y');
-        $maxReps = $this->fair->maximum_representatives ?? 2;
 
-        $requirementLines = ($this->outstandingRequirements ?? collect())->pluck('label');
+        // The registered representative's name/designation are on file from
+        // employer registration — use them instead of a blank "HR Manager"
+        // line whenever the employer actually named one.
+        $representativeName = trim(collect([
+            $notifiable->representative_first_name, $notifiable->representative_middle_name, $notifiable->representative_last_name,
+        ])->filter()->join(' ')) ?: $notifiable->representative_name;
+        $recipientName = $representativeName ?: 'The HR Manager';
+        $greetingName = $representativeName ?: 'Sir/Madam';
 
-        $mail = (new MailMessage)
+        return (new MailMessage)
             ->subject("Invitation: {$this->fair->title}")
-            ->greeting("Dear {$companyName},")
-            ->line('The City Government of Urdaneta thru the Public Employment Services Office (PESO), in partnership '
-                .'with the Department of Labor and Employment (DOLE)'.$this->partnerAgenciesClause().', will be holding '
-                ."\"{$this->fair->title}\" on {$this->eventDateLine()} from ".$this->formatTime($this->fair->start_time)
-                .' to '.$this->formatTime($this->fair->end_time)." at {$venue}.")
-            ->line('In line with this, we would like to invite your company to participate and conduct recruitment '
-                .'activities and on-the-spot interviews during the event. To confirm your participation, kindly '
-                .'coordinate with our PESO representative through the i-PESO employer portal.');
-
-        if ($requirementLines->isNotEmpty()) {
-            $mail->line('Please prepare and submit the following documentary requirements'
-                .($deadline ? " on or before {$deadline}" : '').':');
-            foreach ($requirementLines as $line) {
-                $mail->line("- {$line}");
-            }
-        } else {
-            $mail->line('Your accreditation documents already on file with PESO cover every requirement for this '
-                .'event — nothing further to submit.');
-        }
-
-        $mail->line('Additionally, we request that you bring two (2) printed copies of your job vacancy listings on '
-                .'the day of the job fair for posting in the job shopping area. Please note that snacks and lunch '
-                .'will be provided for a maximum of '.$maxReps.' company representative'.($maxReps == 1 ? '' : 's').'.')
-            ->action('Respond in i-PESO', rtrim(config('app.frontend_url', config('app.url')), '/').'/employer/job-fairs')
-            ->line("We would greatly appreciate your participation. Thank you and more power.")
-            ->salutation("Very truly yours,\nPESO Urdaneta City ({$contactEmail})");
-
-        return $mail;
+            ->view('emails.job_fairs.invitation', [
+                'fair' => $this->fair,
+                'companyName' => $companyName,
+                'recipientName' => $recipientName,
+                'recipientDesignation' => $notifiable->representative_designation,
+                'greetingName' => $greetingName,
+                'venue' => $venue,
+                'dateLine' => $this->eventDateLine(),
+                'startTime' => $this->formatTime($this->fair->start_time),
+                'endTime' => $this->formatTime($this->fair->end_time),
+                'partnerAgenciesClause' => $this->partnerAgenciesClause(),
+                'requirementLines' => ($this->outstandingRequirements ?? collect())->pluck('label'),
+                'deadline' => $this->fair->submission_deadline?->format('F j, Y'),
+                'maxReps' => $this->fair->maximum_representatives ?? 2,
+                'contactEmail' => $this->fair->contact_email ?: config('peso_knowledge.office.email'),
+                'actionUrl' => rtrim(config('app.frontend_url', config('app.url')), '/').'/employer/job-fairs',
+            ]);
     }
 
     public function toArray(object $notifiable): array

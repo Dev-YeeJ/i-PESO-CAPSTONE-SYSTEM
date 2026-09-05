@@ -10,7 +10,7 @@ export default function JobFairBulletin({ fairs = [] }) {
         <div>
           <p className="text-xs font-black uppercase tracking-wider text-blue-700">PESO Job Fair Bulletin</p>
           <h2 className="mt-1 text-lg font-black text-blue-950">Upcoming employment events</h2>
-          <p className="mt-1 text-sm text-blue-800">Informational only. No RSVP, QR pass, or digital check-in required.</p>
+          <p className="mt-1 text-sm text-blue-800">Register for a digital QR pass, or simply walk in on the day.</p>
         </div>
         <Link to="/seeker/job-fairs" className="rounded-lg bg-blue-950 px-4 py-2 text-sm font-bold text-white transition hover:bg-blue-900">
           View details

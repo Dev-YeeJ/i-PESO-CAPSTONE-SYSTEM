@@ -77,6 +77,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/auth/logout', [AuthController::class, 'logout']);
 
     Route::get('/job-fairs', [JobFairController::class, 'index']);
+    Route::post('/job-fairs/{id}/rsvp', [JobFairController::class, 'rsvp']);
+    Route::get('/job-fairs/posters', [JobFairController::class, 'posters']);
+    Route::get('/job-fair-posters/{submission}/view', [JobFairController::class, 'viewPoster']);
 
     Route::prefix('geo')->group(function () {
         Route::get('/autocomplete', [GoogleMapsController::class, 'autocomplete'])->middleware('throttle:30,1');

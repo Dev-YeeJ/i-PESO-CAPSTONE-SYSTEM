@@ -1,6 +1,9 @@
 import api from './api'
 
 export const listJobFairs = async () => (await api.get('/job-fairs')).data.data ?? []
+export const rsvpToJobFair = async (jobFairId) => (await api.post(`/job-fairs/${jobFairId}/rsvp`)).data
+export const listJobFairPosters = async () => (await api.get('/job-fairs/posters')).data.data ?? []
+export const viewJobFairPoster = async (submissionId) => (await api.get(`/job-fair-posters/${submissionId}/view`, { responseType: 'blob' })).data
 export const listEmployerJobFairs = async () => (await api.get('/employer/job-fairs')).data.data ?? []
 export const expressJobFairInterest = async (jobFairId) => (await api.post(`/employer/job-fairs/${jobFairId}/interest`)).data
 export const respondToJobFairInvitation = async (jobFairId, response, remarks = '') => (await api.post(`/employer/job-fairs/${jobFairId}/respond`, { response, remarks })).data

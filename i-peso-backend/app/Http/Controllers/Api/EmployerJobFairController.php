@@ -172,6 +172,11 @@ class EmployerJobFairController extends Controller
     {
         $employer = $this->employer($request);
         $validated = $request->validate($this->resultRules(true));
+        // Office location and who to contact are already on file from
+        // employer registration — no need to make them retype it here.
+        $validated['office_location'] = $employer->full_address ?: $employer->complete_address;
+        $validated['contact_person'] = $employer->representative_name ?: null;
+        $validated['contact_number'] = $employer->representative_contact_number ?: null;
         $report = $reports->saveEmployer($jobFair, $employer, $validated);
         Notification::send(Administrator::query()->where('status', 'active')->get(), new JobFairNotification($jobFair, 'results_submitted', $report->participation));
 
@@ -188,8 +193,6 @@ class EmployerJobFairController extends Controller
     private function resultRules(bool $entries): array
     {
         $rules = [
-            'office_location' => ['nullable', 'string', 'max:255'],
-            'contact_person' => ['nullable', 'string', 'max:255'], 'contact_number' => ['nullable', 'string', 'max:40'],
             'total_male' => ['required', 'integer', 'min:0'], 'total_female' => ['required', 'integer', 'min:0'],
             'total_applicants' => ['required', 'integer', 'min:0'], 'total_hots' => ['required', 'integer', 'min:0'],
             'total_near_hired' => ['required', 'integer', 'min:0'], 'total_rejected' => ['required', 'integer', 'min:0'],

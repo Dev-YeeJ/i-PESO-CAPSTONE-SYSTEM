@@ -114,14 +114,16 @@ class GovernmentProgramsFlowTest extends TestCase
         }
     }
 
-    public function test_zero_interference_job_fair_routes_are_registered_without_qr_workflow(): void
+    public function test_job_fair_core_routes_are_registered(): void
     {
         $uris = collect(Route::getRoutes()->getRoutes())->map(fn ($route) => $route->uri());
 
         $this->assertTrue($uris->contains('api/job-fairs'));
+        $this->assertTrue($uris->contains('api/job-fairs/{id}/rsvp'));
         $this->assertTrue($uris->contains('api/employer/job-fairs/{jobFair}/results'));
         $this->assertTrue($uris->contains('api/admin/job-fairs/{jobFair}/proxy-results'));
-        $this->assertFalse($uris->contains('api/job-fairs/{id}/rsvp'));
+        // Seekers get a QR pass on RSVP, but employer booth-side scanning
+        // remains a paper/manual process — that endpoint stays unrouted.
         $this->assertFalse($uris->contains('api/job-fairs/scan-qr'));
     }
 

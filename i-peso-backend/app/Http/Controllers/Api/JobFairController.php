@@ -9,6 +9,7 @@ use App\Models\Employer;
 use App\Models\JobFair;
 use App\Models\JobFairAttendee;
 use App\Models\JobFairEmployer;
+use App\Models\JobFairRequirementSubmission;
 use App\Models\JobFairVacancy;
 use App\Models\JobSeeker;
 use App\Models\JobVacancy;
@@ -19,14 +20,17 @@ use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class JobFairController extends Controller
 {
     public function index(Request $request, JobFairService $service): JsonResponse
     {
+        $user = $request->user();
         $fairs = JobFair::query()
             ->where('is_public', true)
             ->whereIn('status', JobFairService::PUBLIC_STATUSES)
@@ -39,10 +43,64 @@ class JobFairController extends Controller
                 'employerJoins.employer:employer_id,company_name,trade_name',
                 'vacancyLinks.vacancy:post_id,job_title,vacancies_count,status',
             ])
+            // Same idea for a seeker's own RSVP flag — preload it here so
+            // eventPayload() doesn't fire one more query per fair in the list.
+            ->when($user instanceof JobSeeker, fn ($query) => $query->with([
+                'attendees' => fn ($attendees) => $attendees->where('seeker_id', $user->seeker_id),
+            ]))
             ->get()
-            ->map(fn (JobFair $fair) => $service->eventPayload($fair, $request->user()));
+            ->map(fn (JobFair $fair) => $service->eventPayload($fair, $user));
 
         return response()->json(['data' => $fairs]);
+    }
+
+    /**
+     * The Facebook-style feed: every PESO-approved "Posterized Job Vacancy
+     * with Contact Details" across all job fairs, newest first. One combined
+     * feed rather than one per fair — PESO only ever runs one fair at a time
+     * in practice, so scoping would just add a filter nobody uses.
+     */
+    public function posters(): JsonResponse
+    {
+        $posters = JobFairRequirementSubmission::query()
+            ->where('status', 'approved')
+            ->whereHas('requirement', fn ($query) => $query->where('code', 'posterized_vacancy'))
+            ->with([
+                'employer:employer_id,company_name,trade_name',
+                'participation.jobFair:job_fair_id,title,venue,status',
+            ])
+            ->orderByDesc('reviewed_at')
+            ->get()
+            ->map(fn (JobFairRequirementSubmission $submission) => [
+                'id' => $submission->id,
+                'company_name' => $submission->employer?->company_name ?: $submission->employer?->trade_name,
+                'job_fair_id' => $submission->participation?->job_fair_id,
+                'job_fair_title' => $submission->participation?->jobFair?->title,
+                'venue' => $submission->participation?->jobFair?->venue,
+                'mime_type' => $submission->mime_type,
+                'original_filename' => $submission->original_filename,
+                'posted_at' => ($submission->reviewed_at ?? $submission->submitted_at)?->toIso8601String(),
+            ])
+            ->values();
+
+        return response()->json(['data' => $posters]);
+    }
+
+    public function viewPoster(JobFairRequirementSubmission $submission): StreamedResponse
+    {
+        $submission->loadMissing('requirement');
+        abort_unless(
+            $submission->status === 'approved'
+                && $submission->requirement?->code === 'posterized_vacancy'
+                && filled($submission->document_path),
+            404,
+        );
+        abort_unless(Storage::disk('local')->exists($submission->document_path), 404);
+
+        return Storage::disk('local')->response($submission->document_path, $submission->original_filename, [
+            'Content-Type' => $submission->mime_type,
+            'Cache-Control' => 'private, max-age=3600',
+        ]);
     }
 
     public function rsvp(Request $request, int $id): JsonResponse
@@ -50,7 +108,7 @@ class JobFairController extends Controller
         $seeker = $this->seeker($request);
         $fair = JobFair::findOrFail($id);
 
-        if (! in_array($fair->status, ['upcoming', 'ongoing', 'active'], true)) {
+        if (! in_array($fair->status, JobFairService::MAP_STATUSES, true)) {
             throw ValidationException::withMessages([
                 'job_fair' => ['This job fair is no longer accepting RSVPs.'],
             ]);
