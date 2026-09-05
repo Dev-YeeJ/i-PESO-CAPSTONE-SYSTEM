@@ -1,14 +1,22 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { ScrollView, StyleSheet, Text, View } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useQueryClient } from '@tanstack/react-query'
-import type { JobFair } from '@/services/seekerService'
+import type { JobFair, JobFairPass } from '@/services/seekerService'
+import { seekerService } from '@/services/seekerService'
+import { apiErrorMessage } from '@/utils/apiError'
 import { formatDate, textFrom, titleCase } from '@/utils/seekerView'
+import { AlertBox } from '@/components/ui/AlertBox'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { ScreenHeader } from '@/components/ui/ScreenHeader'
+import { DigitalQrPass } from '@/components/seeker/DigitalQrPass'
 import { colors, radii, spacing, typography } from '@/theme'
+
+// Mirrors JobFairService::MAP_STATUSES on the backend — the set of statuses
+// where the fair is still upcoming or in progress, so RSVP still makes sense.
+const registrableStatuses = ['published', 'accepting_employers', 'upcoming', 'ongoing']
 
 function statusVariant(status?: string | null): 'info' | 'success' | 'neutral' {
   const value = textFrom(status, '').toLowerCase()
@@ -21,11 +29,28 @@ export default function JobFairDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>()
   const router = useRouter()
   const queryClient = useQueryClient()
+  const [pass, setPass] = useState<JobFairPass | null>(null)
+  const [registering, setRegistering] = useState(false)
+  const [registerError, setRegisterError] = useState('')
 
   // There is no single-fetch endpoint for job fairs (backend only exposes
   // GET /job-fairs), so the detail screen reads from the list's cache.
   const jobFairs = queryClient.getQueryData<JobFair[]>(['jobFairs'])
   const fair = useMemo(() => jobFairs?.find((f) => String(f.job_fair_id) === id), [jobFairs, id])
+
+  const register = async () => {
+    if (!fair) return
+    setRegistering(true)
+    setRegisterError('')
+    try {
+      const { pass: issuedPass } = await seekerService.rsvpToJobFair(fair.job_fair_id)
+      setPass(issuedPass)
+    } catch (e) {
+      setRegisterError(apiErrorMessage(e, 'Unable to register right now.'))
+    } finally {
+      setRegistering(false)
+    }
+  }
 
   if (!fair) {
     return (
@@ -76,6 +101,23 @@ export default function JobFairDetailScreen() {
           <Detail label="Target Sector" value={titleCase(fair.target_sector || fair.sector, 'Not listed')} />
         ) : null}
       </Card>
+
+      {pass ? (
+        <View style={styles.passWrap}>
+          <DigitalQrPass pass={pass} />
+        </View>
+      ) : registrableStatuses.includes(textFrom(fair.status, '').toLowerCase()) ? (
+        <Card padding="md" style={styles.registerCard}>
+          <Text style={styles.registerTitle}>{fair.is_rsvped ? 'You’re registered' : 'Reserve your spot'}</Text>
+          <Text style={styles.registerSubtitle}>
+            {fair.is_rsvped ? 'Get your digital QR pass to show at the venue.' : 'Register to get a digital QR pass — walk-ins are still welcome too.'}
+          </Text>
+          {registerError ? <AlertBox variant="danger" style={styles.registerAlert}>{registerError}</AlertBox> : null}
+          <Button onPress={register} loading={registering} style={styles.registerButton}>
+            {fair.is_rsvped ? 'View my QR pass' : 'Register for this job fair'}
+          </Button>
+        </Card>
+      ) : null}
 
       {partnerAgencies.length > 0 && (
         <>
@@ -135,6 +177,12 @@ const styles = StyleSheet.create({
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: spacing.md, padding: spacing.xl, backgroundColor: colors.background },
   notFoundTitle: { color: colors.primary, fontSize: typography.title, fontFamily: typography.family.bold },
   notFoundSub: { color: colors.secondaryText, fontSize: typography.body, textAlign: 'center', lineHeight: 20, marginBottom: spacing.md },
+  passWrap: { marginBottom: spacing.lg },
+  registerCard: { marginBottom: spacing.lg, backgroundColor: colors.infoBackground, borderColor: colors.infoBorder },
+  registerTitle: { color: colors.primary, fontSize: typography.title, fontFamily: typography.family.bold },
+  registerSubtitle: { marginTop: spacing.xs, color: colors.secondaryText, fontSize: typography.small, lineHeight: 18 },
+  registerAlert: { marginTop: spacing.md },
+  registerButton: { marginTop: spacing.md },
   header: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: spacing.md, marginBottom: spacing.sm },
   title: { flex: 1, color: colors.primary, fontSize: typography.heading, lineHeight: 30, fontFamily: typography.family.bold },
   statusBadge: { marginTop: spacing.xs },

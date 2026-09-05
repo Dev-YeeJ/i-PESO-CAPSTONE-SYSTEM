@@ -286,8 +286,31 @@ export interface JobFair {
   partner_agencies?: string[] | null
   status: string
   is_public?: boolean
+  is_rsvped?: boolean
   participating_employers?: Array<{ employer_id?: number | string; company_name?: string | null; status?: string }>
   published_vacancies?: Array<{ post_id: number | string; job_title?: string | null; vacancies_count?: number }>
+}
+
+export interface JobFairPass {
+  job_fair_id: number | string
+  event_name?: string | null
+  venue?: string | null
+  start_date?: string | null
+  name: string
+  seeker_id: number | string
+  qr_code_uuid: string
+  skills?: string[]
+}
+
+export interface JobFairPoster {
+  id: number | string
+  company_name?: string | null
+  job_fair_id?: number | string | null
+  job_fair_title?: string | null
+  venue?: string | null
+  mime_type?: string | null
+  original_filename?: string | null
+  posted_at?: string | null
 }
 
 export interface ProgramEligibility {
@@ -676,10 +699,24 @@ export const seekerService = {
     await apiClient.delete('/seeker/push-tokens', { data: { token } })
   },
 
-  // ── Job Fairs (read-only — backend has no seeker RSVP route) ─────────────
+  // ── Job Fairs ─────────────────────────────────────────────────────────
   async getJobFairs(): Promise<JobFair[]> {
     const res = await apiClient.get('/job-fairs')
     return res.data?.data ?? []
+  },
+
+  async rsvpToJobFair(jobFairId: number | string): Promise<{ message: string; pass: JobFairPass }> {
+    const res = await apiClient.post(`/job-fairs/${jobFairId}/rsvp`)
+    return res.data
+  },
+
+  async getJobFairPosters(): Promise<JobFairPoster[]> {
+    const res = await apiClient.get('/job-fairs/posters')
+    return res.data?.data ?? []
+  },
+
+  jobFairPosterUrl(submissionId: number | string) {
+    return `${API_BASE_URL}/job-fair-posters/${submissionId}/view`
   },
 
   // ── Government Programs ────────────────────────────────────────────────

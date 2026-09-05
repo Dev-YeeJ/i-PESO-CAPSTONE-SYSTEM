@@ -7,6 +7,7 @@ use App\Models\GovernmentProgram;
 use App\Models\JobSeeker;
 use App\Models\JobVacancy;
 use App\Services\EnhancedJobMatchingService;
+use App\Services\JobFairService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -678,7 +679,7 @@ class SeekerNearbyJobController extends Controller
     {
         $link = $job->relationLoaded('jobFairLinks')
             ? $job->jobFairLinks
-                ->filter(fn ($item) => $item->jobFair && in_array($item->jobFair->status, ['upcoming', 'ongoing', 'active'], true))
+                ->filter(fn ($item) => $item->jobFair && in_array($item->jobFair->status, JobFairService::MAP_STATUSES, true))
                 ->sortBy(fn ($item) => ($item->jobFair->start_date ?? $item->jobFair->event_date)?->timestamp ?? PHP_INT_MAX)
                 ->first()
             : null;
@@ -692,7 +693,6 @@ class SeekerNearbyJobController extends Controller
             'date' => ($fair?->start_date ?? $fair?->event_date)?->toDateString(),
             'venue' => $fair?->venue,
             'has_rsvp' => (bool) $attendee,
-            'qr_pass_url' => $attendee ? '/seeker/job-fairs' : null,
         ];
     }
 
