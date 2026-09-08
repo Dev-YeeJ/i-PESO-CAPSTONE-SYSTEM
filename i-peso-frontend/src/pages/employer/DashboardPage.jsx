@@ -83,14 +83,17 @@ export default function EmployerDashboard() {
   const hasRejectedDocuments = documents.some((doc) => doc.verification_status === 'rejected')
   const effectiveStatus = status === 'pending' && hasRejectedDocuments ? 'rejected' : status
   
+  // Government ID is always collected at the representative step but isn't
+  // part of getRequiredDocuments() (see Employer.php), so it's added here.
+  // Authorization Letter is no longer part of registration at all — every
+  // employer now only uploads a single Government ID / Company ID — so it
+  // must not be counted here either, or "X of Y approved" could never reach
+  // 100% for any employer (there'd always be one phantom document nobody
+  // can upload or approve).
   const requiredDocuments = useMemo(() => {
     const base = profile?.required_documents ?? []
     if (base.length === 0) return base
-    const augmented = [...base, 'government_id']
-    if (profile?.employer?.representative_is_owner === 0 || profile?.employer?.representative_is_owner === false) {
-      augmented.push('authorization_letter')
-    }
-    return augmented
+    return [...base, 'government_id']
   }, [profile])
   
   const counts = useMemo(() => ({
