@@ -70,6 +70,18 @@ export default function Step2CompanyProfile({ initialData = {}, onComplete }) {
 
   const getError = (name) => (touched[name] ? errors[name] : undefined)
 
+  const toggleIndustry = (value) => {
+    setForm((f) => {
+      const current = Array.isArray(f.industry) ? f.industry : []
+      const next = current.includes(value)
+        ? current.filter((item) => item !== value)
+        : [...current, value]
+      return { ...f, industry: next }
+    })
+    setApiError('')
+    setErrors((err) => ({ ...err, industry: undefined }))
+  }
+
   const handleLogoChange = (e) => {
     const file = e.target.files[0]
     if (file) {
@@ -119,7 +131,9 @@ export default function Step2CompanyProfile({ initialData = {}, onComplete }) {
       formDataToSend.append('company_name', form.company_name)
       formDataToSend.append('tin', form.tin)
       formDataToSend.append('trade_name', form.trade_name || '')
-      formDataToSend.append('industry', form.industry)
+      ;(Array.isArray(form.industry) ? form.industry : []).forEach((ind) => {
+        formDataToSend.append('industry[]', ind)
+      })
       formDataToSend.append('company_size', form.company_size)
       formDataToSend.append('province', form.province)
       formDataToSend.append('province_code', form.province_code || '')
@@ -209,26 +223,36 @@ export default function Step2CompanyProfile({ initialData = {}, onComplete }) {
       {/* Industry */}
       <div>
         <label className="block text-sm font-medium text-slate-700 mb-1.5">
-          Industry (Optional)
+          Industry <span className="text-red-500">*</span>
+          <span className="ml-1 font-normal text-slate-400">(select all that apply)</span>
         </label>
-        <select
-          name="industry"
-          value={form.industry ?? ''}
-          onChange={handleChange}
+        <div
           onBlur={handleBlur}
-          className={`w-full px-3.5 py-2.5 text-sm rounded-xl border bg-white transition-all focus:outline-none focus:ring-2 focus:ring-blue-500/20 ${
-            getError('industry')
-              ? 'border-red-400 focus:border-red-400'
-              : 'border-slate-300 focus:border-blue-400'
+          className={`grid grid-cols-1 gap-2 rounded-xl border bg-white p-3 sm:grid-cols-2 ${
+            getError('industry') ? 'border-red-400' : 'border-slate-300'
           }`}
         >
-          <option value="">Select Industry</option>
-          {INDUSTRY_OPTIONS.map((ind) => (
-            <option key={ind} value={ind}>
-              {ind}
-            </option>
-          ))}
-        </select>
+          {INDUSTRY_OPTIONS.map((ind) => {
+            const checked = Array.isArray(form.industry) && form.industry.includes(ind)
+            return (
+              <label
+                key={ind}
+                className={`flex cursor-pointer items-center gap-2 rounded-lg border p-2 text-sm ${
+                  checked ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-slate-200 text-slate-700'
+                }`}
+              >
+                <input
+                  type="checkbox"
+                  name="industry"
+                  checked={checked}
+                  onChange={() => toggleIndustry(ind)}
+                  className="h-4 w-4 accent-blue-700"
+                />
+                {ind}
+              </label>
+            )
+          })}
+        </div>
         {getError('industry') && (
           <p className="mt-1.5 text-xs text-red-600 flex items-center gap-1">
             <svg className="w-3 h-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">

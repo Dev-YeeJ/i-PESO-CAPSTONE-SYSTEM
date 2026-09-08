@@ -8,6 +8,8 @@ export default function RequiredDocumentsCheckbox({ requiredDocuments, uploadedD
       'sec_certificate': 'SEC Certificate of Registration',
       'prpa_license': 'DOLE PRPA License',
       'dme_poea_license': 'DMW / POEA License',
+      'affidavit_of_undertaking': 'Affidavit of Undertaking',
+      'no_pending_case_certificate': 'Certificate of No Pending Case (DOLE)',
     }
     return labels[type] || type
   }

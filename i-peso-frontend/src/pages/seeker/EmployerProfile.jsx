@@ -82,7 +82,7 @@ export default function EmployerProfile() {
                     <Badge status="success" icon={ShieldCheck}>Verified</Badge>
                   )}
                 </div>
-                <p className="text-sm font-semibold text-slate-500 mt-1">{employer.industry}</p>
+                <p className="text-sm font-semibold text-slate-500 mt-1">{Array.isArray(employer.industry) ? employer.industry.join(', ') : employer.industry}</p>
               </div>
             </div>
           </div>
@@ -103,7 +103,7 @@ export default function EmployerProfile() {
                 <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Industry</p>
                 <p className="mt-1 flex items-center gap-1.5 text-sm font-semibold text-slate-800">
                   <Target className="h-4 w-4 text-slate-400" />
-                  {employer.industry}
+                  {Array.isArray(employer.industry) ? employer.industry.join(', ') : employer.industry}
                 </p>
               </div>
               <div>

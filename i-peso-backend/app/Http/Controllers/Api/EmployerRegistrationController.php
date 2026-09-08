@@ -43,7 +43,7 @@ class EmployerRegistrationController extends Controller
 
                 // 👇 THE FIX: Pacifying MySQL's strict NOT NULL rules for future steps
                 'company_name' => '',
-                'industry' => '',
+                'industry' => [],
                 'company_size' => 'micro', // Enum requires a valid default value
                 'province' => '',
                 'city_municipality' => '',
@@ -76,7 +76,8 @@ class EmployerRegistrationController extends Controller
             'company_name' => 'required|string|max:255',
             'tin' => ['required', 'regex:/^\d{3}-\d{3}-\d{3}-\d{3}$/'],
             'trade_name' => 'nullable|string|max:255',
-            'industry' => 'required|string|max:100',
+            'industry' => ['required', 'array', 'min:1'],
+            'industry.*' => ['string', \Illuminate\Validation\Rule::in(Employer::INDUSTRIES)],
             'company_size' => 'required|in:micro,small,medium,large',
             'province' => 'required|string|max:100',
             'city_municipality' => 'required|string|max:100',
@@ -278,9 +279,7 @@ class EmployerRegistrationController extends Controller
             'representative_last_name' => 'required|string|max:100',
             'representative_designation' => 'required|string|max:100',
             'representative_contact_number' => ['required', 'regex:/^09\d{9}$/'],
-            'representative_is_owner' => 'required|boolean',
             'government_id' => 'required|file|mimes:jpg,jpeg,png|max:5120',
-            'authorization_letter' => 'required_if:representative_is_owner,0|nullable|file|mimes:pdf,jpg,jpeg,png|max:10240',
         ]);
 
         if ($validator->fails()) {
@@ -304,7 +303,6 @@ class EmployerRegistrationController extends Controller
                 'representative_last_name' => $request->representative_last_name,
                 'representative_designation' => $request->representative_designation,
                 'representative_contact_number' => $request->representative_contact_number,
-                'representative_is_owner' => $request->boolean('representative_is_owner'),
                 'representative_name' => "{$request->representative_first_name} {$request->representative_last_name}",
                 'mobile_number' => $request->representative_contact_number,
                 'verification_status' => 'pending',
@@ -326,24 +324,6 @@ class EmployerRegistrationController extends Controller
                     'original_filename' => $idFile->getClientOriginalName(),
                     'file_size' => $idFile->getSize(),
                     'mime_type' => $idFile->getMimeType(),
-                    'uploaded_at' => now(),
-                    'verification_status' => 'pending',
-                ]);
-            }
-
-            // Upload authorization letter if provided
-            if ($request->hasFile('authorization_letter')) {
-                $letterFile = $request->file('authorization_letter');
-                $letterPath = $letterFile->store('employer_documents', $this->documentDisk());
-
-                EmployerDocument::updateOrCreate([
-                    'employer_id' => $employer->employer_id,
-                    'document_type' => 'authorization_letter',
-                ], [
-                    'document_path' => $letterPath,
-                    'original_filename' => $letterFile->getClientOriginalName(),
-                    'file_size' => $letterFile->getSize(),
-                    'mime_type' => $letterFile->getMimeType(),
                     'uploaded_at' => now(),
                     'verification_status' => 'pending',
                 ]);

@@ -1,25 +1,21 @@
 import { createElement, useMemo, useState } from 'react'
-import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
-import toast from 'react-hot-toast'
 import { AlarmClock, Building2, CheckCircle2, FileSearch, FileWarning, ShieldCheck } from 'lucide-react'
 import { Badge, Button, Card, ErrorState, LoadingSkeleton, StatCard } from '@/components/ui'
-import { ConfirmModal, PageHeader } from '@/pages/admin/_components'
+import { PageHeader } from '@/pages/admin/_components'
 import { adminService } from '@/services/adminService'
 
 const PER_PAGE = 12
 
 export default function VerificationQueuePage() {
   const navigate = useNavigate()
-  const queryClient = useQueryClient()
 
   const [search, setSearch] = useState('')
   const [appliedSearch, setAppliedSearch] = useState('')
   const [readiness, setReadiness] = useState('')
   const [sort, setSort] = useState('oldest')
   const [page, setPage] = useState(1)
-  const [selected, setSelected] = useState([])
-  const [confirming, setConfirming] = useState(false)
 
   const { data, isFetching, isError, error, refetch } = useQuery({
     queryKey: ['admin', 'pendingEmployers', appliedSearch, readiness, sort, page],
@@ -45,40 +41,12 @@ export default function VerificationQueuePage() {
   const summary = data?.summary ?? {}
   const pagination = data?.pagination ?? {}
 
-  const readyIds = useMemo(
-    () => employers.filter((employer) => employer.all_required_approved).map((e) => e.employer_id),
-    [employers],
-  )
-  const allReadySelected = readyIds.length > 0 && readyIds.every((id) => selected.includes(id))
-
-  const bulkApprove = useMutation({
-    mutationFn: (remarks) => adminService.bulkApproveEmployers(selected, remarks),
-    onSuccess: (result) => {
-      const failed = result?.failed ?? []
-      if (failed.length) {
-        toast.error(result.message ?? `${failed.length} employer(s) could not be approved.`)
-      } else {
-        toast.success(result?.message ?? 'Employers approved.')
-      }
-      setConfirming(false)
-      setSelected([])
-      queryClient.invalidateQueries({ queryKey: ['admin', 'pendingEmployers'] })
-    },
-    onError: (caught) => toast.error(
-      caught?.response?.data?.message ?? caught?.response?.data?.error ?? 'Bulk approval failed.',
-    ),
-  })
-
   const applyFilters = (nextReadiness = readiness, nextSort = sort, nextSearch = search) => {
     setAppliedSearch(nextSearch)
     setReadiness(nextReadiness)
     setSort(nextSort)
     setPage(1)
-    setSelected([])
   }
-
-  const toggle = (id) =>
-    setSelected((current) => (current.includes(id) ? current.filter((item) => item !== id) : [...current, id]))
 
   const errorMessage = error?.response?.data?.message
     ?? error?.response?.data?.error
@@ -162,26 +130,6 @@ export default function VerificationQueuePage() {
           </div>
         </div>
 
-        {selected.length > 0 && (
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-brand-100 bg-brand-50/60 px-5 py-3 sm:px-6">
-            <p className="text-sm font-bold text-slate-800">{selected.length} selected for accreditation</p>
-            <div className="flex flex-wrap gap-2">
-              <Button
-                size="sm"
-                variant="success"
-                icon={CheckCircle2}
-                disabled={bulkApprove.isPending}
-                onClick={() => setConfirming(true)}
-              >
-                Approve selected
-              </Button>
-              <Button size="sm" variant="ghost" onClick={() => setSelected([])} disabled={bulkApprove.isPending}>
-                Clear
-              </Button>
-            </div>
-          </div>
-        )}
-
         <div className="p-5 sm:p-6">
           {isFetching && !data ? (
             <LoadingSkeleton variant="card" rows={4} />
@@ -201,18 +149,6 @@ export default function VerificationQueuePage() {
             </div>
           ) : (
             <>
-              {readyIds.length > 0 && (
-                <label className="mb-4 inline-flex items-center gap-2 text-sm font-semibold text-slate-700">
-                  <input
-                    type="checkbox"
-                    checked={allReadySelected}
-                    onChange={() => setSelected(allReadySelected ? [] : readyIds)}
-                    className="h-4 w-4 rounded border-slate-300"
-                  />
-                  Select all {readyIds.length} ready for approval on this page
-                </label>
-              )}
-
               <div className="grid gap-5 lg:grid-cols-2">
                 {employers.map((employer) => {
                   const required = Number(employer.required_documents_count) || 0
@@ -267,18 +203,6 @@ export default function VerificationQueuePage() {
                           )}
 
                           <div className="mt-5 flex flex-wrap items-center gap-3">
-                            {employer.all_required_approved && (
-                              <label className="inline-flex items-center gap-2 text-xs font-bold text-slate-600">
-                                <input
-                                  type="checkbox"
-                                  checked={selected.includes(employer.employer_id)}
-                                  onChange={() => toggle(employer.employer_id)}
-                                  aria-label={`Select ${employer.company_name} for bulk approval`}
-                                  className="h-4 w-4 rounded border-slate-300"
-                                />
-                                Select
-                              </label>
-                            )}
                             <Button
                               onClick={() => navigate(`/admin/employers/${employer.employer_id}`)}
                               variant={employer.all_required_approved ? 'primary' : 'secondary'}
@@ -313,18 +237,6 @@ export default function VerificationQueuePage() {
           </div>
         )}
       </Card>
-
-      <ConfirmModal
-        isOpen={confirming}
-        title={`Accredit ${selected.length} employer(s)?`}
-        message="Each selected employer will be marked verified, notified by email, and unlocked for job posting. Any that fail a final document check are reported back individually."
-        confirmText="Yes, accredit"
-        requiresReason
-        reasonLabel="Remarks (optional — included in the approval notice)"
-        loading={bulkApprove.isPending}
-        onCancel={() => setConfirming(false)}
-        onConfirm={(remarks) => bulkApprove.mutate(remarks || null)}
-      />
     </div>
   )
 }

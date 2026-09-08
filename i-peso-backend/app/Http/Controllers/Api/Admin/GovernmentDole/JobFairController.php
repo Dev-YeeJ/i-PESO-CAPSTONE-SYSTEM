@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Administrator;
 use App\Models\Employer;
 use App\Models\JobFair;
+use App\Models\JobFairAttendee;
 use App\Models\JobFairEmployer;
 use App\Models\JobFairConfirmationSlip;
 use App\Models\JobFairRequirementSubmission;
@@ -20,6 +21,7 @@ use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -119,6 +121,125 @@ class JobFairController extends Controller
                 : 'Job Fair announcement published.',
             'job_fair' => $service->eventPayload($jobFair->fresh(), null, true),
         ]);
+    }
+
+    /**
+     * Info-desk scan: staff points their phone camera at a seeker's digital
+     * QR pass (or types a seeker in via the manual-search fallback) and gets
+     * their pre-registration back, marking attendance on first scan. Scanning
+     * the same pass twice is not an error — it just reports the original
+     * check-in time instead of overwriting it.
+     */
+    public function checkIn(Request $request, JobFair $jobFair, JobFairService $service): JsonResponse
+    {
+        $this->admin($request);
+        $validated = $request->validate([
+            'qr_code_uuid' => ['required_without_all:seeker_id,attendee_id', 'uuid'],
+            'seeker_id' => ['required_without_all:qr_code_uuid,attendee_id', 'integer', 'exists:job_seekers,seeker_id'],
+            // Lets the manual-search fallback re-select a result row directly —
+            // the only option for a guest walk-in, which has no seeker_id or QR.
+            'attendee_id' => ['required_without_all:qr_code_uuid,seeker_id', 'integer', 'exists:job_fair_attendees,id'],
+        ]);
+
+        $attendee = JobFairAttendee::query()
+            ->with(['seeker.seekerSkills', 'seeker.educations', 'seeker.workExperiences', 'seeker.occupations'])
+            ->where('job_fair_id', $jobFair->job_fair_id)
+            ->when($validated['qr_code_uuid'] ?? null, fn ($query, $uuid) => $query->where('qr_code_uuid', $uuid))
+            ->when($validated['seeker_id'] ?? null, fn ($query, $seekerId) => $query->where('seeker_id', $seekerId))
+            ->when($validated['attendee_id'] ?? null, fn ($query, $attendeeId) => $query->where('id', $attendeeId))
+            ->first();
+
+        if (! $attendee) {
+            return response()->json(['message' => 'No pre-registration found for this job fair.'], 404);
+        }
+
+        if ($attendee->is_attended) {
+            return response()->json([
+                'message' => 'Already checked in.',
+                'status' => 'already_checked_in',
+                'attendee' => $service->attendeeProfile($attendee),
+            ]);
+        }
+
+        $attendee->forceFill(['scanned_at' => now(), 'is_attended' => true])->save();
+
+        return response()->json([
+            'message' => 'Checked in.',
+            'status' => 'checked_in',
+            'attendee' => $service->attendeeProfile($attendee),
+        ]);
+    }
+
+    /**
+     * Manual fallback for when the camera can't read a pass — glare, a
+     * cracked screen, low battery brightness, all normal at a mall event.
+     * Covers both app-registered attendees and previously-encoded guests.
+     */
+    public function attendees(Request $request, JobFair $jobFair): JsonResponse
+    {
+        $this->admin($request);
+        $validated = $request->validate(['search' => ['nullable', 'string', 'max:255']]);
+        $search = $validated['search'] ?? null;
+
+        $attendees = JobFairAttendee::query()
+            ->with('seeker:seeker_id,first_name,last_name,mobile_number')
+            ->where('job_fair_id', $jobFair->job_fair_id)
+            ->when($search, fn ($query) => $query->where(function ($outer) use ($search) {
+                $outer->whereHas('seeker', function ($seekerQuery) use ($search) {
+                    $seekerQuery->where('first_name', 'like', "%{$search}%")
+                        ->orWhere('last_name', 'like', "%{$search}%")
+                        ->orWhere('mobile_number', 'like', "%{$search}%");
+                })
+                    ->orWhere('guest_name', 'like', "%{$search}%")
+                    ->orWhere('guest_mobile_number', 'like', "%{$search}%");
+            }))
+            ->orderBy('id', 'desc')
+            ->limit(20)
+            ->get()
+            ->map(fn (JobFairAttendee $attendee) => [
+                'id' => $attendee->id,
+                'seeker_id' => $attendee->seeker_id,
+                'name' => $attendee->seeker ? trim("{$attendee->seeker->first_name} {$attendee->seeker->last_name}") : $attendee->guest_name,
+                'mobile_number' => $attendee->seeker?->mobile_number ?? $attendee->guest_mobile_number,
+                'is_guest' => $attendee->seeker_id === null,
+                'is_attended' => (bool) $attendee->is_attended,
+                'scanned_at' => $attendee->scanned_at?->toISOString(),
+            ])
+            ->values();
+
+        return response()->json(['data' => $attendees]);
+    }
+
+    /**
+     * For attendees with no i-peso account at all — only the physical/Google
+     * Form pre-registration exists for them. Staff types what the form would
+     * have captured and this both checks them in and makes them count
+     * correctly in the SPRS "job applicants registered" tally.
+     */
+    public function encodeWalkIn(Request $request, JobFair $jobFair, JobFairService $service): JsonResponse
+    {
+        $this->admin($request);
+        $validated = $request->validate([
+            'guest_name' => ['required', 'string', 'max:255'],
+            'guest_mobile_number' => ['nullable', 'string', 'max:40'],
+            'guest_email' => ['nullable', 'email', 'max:255'],
+            'guest_educ_attainment' => ['nullable', 'string', 'max:100'],
+            'guest_preferred_job' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $attendee = JobFairAttendee::create([
+            'job_fair_id' => $jobFair->job_fair_id,
+            'qr_code_uuid' => (string) Str::uuid(),
+            'scanned_at' => now(),
+            'is_attended' => true,
+            ...$validated,
+        ]);
+
+        return response()->json([
+            'message' => 'Walk-in registration encoded and checked in.',
+            'status' => 'checked_in',
+            'attendee' => $service->attendeeProfile($attendee),
+        ], 201);
     }
 
     public function invite(Request $request, JobFair $jobFair, JobFairService $service): JsonResponse

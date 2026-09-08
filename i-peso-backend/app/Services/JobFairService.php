@@ -53,6 +53,35 @@ class JobFairService
         'no_pending_case' => ['no_pending_case_certificate'],
     ];
 
+    /**
+     * Shared "who is this seeker" payload for anything that looks a job-fair
+     * attendee up by QR/seeker_id — currently the admin info-desk check-in;
+     * the employer-facing scanQr() this was lifted from stays unrouted.
+     */
+    public function attendeeProfile(JobFairAttendee $attendee): array
+    {
+        $seeker = $attendee->seeker;
+
+        return [
+            'job_fair_id' => $attendee->job_fair_id,
+            'seeker_id' => $attendee->seeker_id,
+            'is_guest' => $seeker === null,
+            'qr_code_uuid' => $attendee->qr_code_uuid,
+            'is_attended' => (bool) $attendee->is_attended,
+            'scanned_at' => $attendee->scanned_at?->toISOString(),
+            'name' => $seeker ? trim("{$seeker->first_name} {$seeker->last_name}") : $attendee->guest_name,
+            'email' => $seeker?->email ?? $attendee->guest_email,
+            'mobile_number' => $seeker?->mobile_number ?? $attendee->guest_mobile_number,
+            'educ_attainment' => $seeker?->educ_attainment ?? $attendee->guest_educ_attainment,
+            'employment_status' => $seeker?->employment_status,
+            'preferred_job' => $attendee->guest_preferred_job,
+            'skills' => $seeker?->seekerSkills->pluck('skill_name')->filter()->values()->all() ?? [],
+            'occupations' => $seeker?->occupations ?? [],
+            'educations' => $seeker?->educations ?? [],
+            'work_experiences' => $seeker?->workExperiences ?? [],
+        ];
+    }
+
     public function seedRequirements(JobFair $fair): void
     {
         foreach (self::REQUIREMENTS as $order => $label) {

@@ -502,16 +502,24 @@ class EmployerVerificationJobPostingTest extends TestCase
         Notification::fake();
         $employer = $this->createEmployer();
         $this->uploadRequiredDocuments($employer, 'pending');
+        $employer->documents()->update(['viewed_at' => now()]);
         $document = $employer->documents()->where('document_type', 'mayors_permit')->firstOrFail();
         $admin = $this->createAdmin('resubmission-admin@example.com');
         $notes = 'The permit has expired. Upload the renewed permit with a visible validity date.';
 
         Sanctum::actingAs($admin);
+        // Rejecting a document persists immediately, but the employer's overall
+        // verdict is only decided once — at finalize() — from that persisted state.
         $this->postJson("/api/admin/documents/{$document->document_id}/review", [
             'verification_status' => 'rejected',
             'admin_notes' => $notes,
         ])
             ->assertOk();
+
+        $employer->refresh();
+        $this->assertSame('pending', $employer->verification_status);
+
+        $this->postJson("/api/admin/employers/{$employer->employer_id}/finalize")->assertOk();
 
         $employer->refresh();
         $this->assertSame('rejected', $employer->verification_status);
@@ -602,12 +610,12 @@ class EmployerVerificationJobPostingTest extends TestCase
         $reason = 'The permit has lapsed and must be renewed before accreditation.';
 
         Sanctum::actingAs($admin);
-        $this->postJson("/api/admin/employers/{$employer->employer_id}/finalize", [
-            'rejected_documents' => [[
-                'document_id' => $document->document_id,
-                'reason' => $reason,
-            ]],
+        $this->postJson("/api/admin/documents/{$document->document_id}/review", [
+            'verification_status' => 'rejected',
+            'admin_notes' => $reason,
         ])->assertOk();
+
+        $this->postJson("/api/admin/employers/{$employer->employer_id}/finalize")->assertOk();
 
         $employer->refresh();
         $document->refresh();
@@ -629,9 +637,14 @@ class EmployerVerificationJobPostingTest extends TestCase
 
     public function test_rejected_document_notifies_employer_with_admin_notes(): void
     {
+        // The granular per-document notice is reserved for a standalone
+        // correction on an employer who was already fully decided — during
+        // normal intake (employer still 'pending') it's suppressed in favor
+        // of the one consolidated notice finalize() sends.
         Notification::fake();
         $employer = $this->createEmployer();
-        $this->uploadRequiredDocuments($employer, 'pending');
+        $this->uploadRequiredDocuments($employer, 'approved');
+        $employer->update(['verification_status' => 'verified', 'verified_at' => now()]);
         $document = $employer->documents()->where('document_type', 'mayors_permit')->firstOrFail();
         $admin = $this->createAdmin('document-rejection-admin@example.com');
         $notes = 'The permit has expired. Upload the renewed permit with a visible validity date.';
@@ -656,7 +669,7 @@ class EmployerVerificationJobPostingTest extends TestCase
         );
     }
 
-    public function test_document_approval_uses_in_app_only_until_all_requirements_are_approved(): void
+    public function test_document_approval_during_intake_does_not_notify_until_finalize(): void
     {
         Notification::fake();
         $employer = $this->createEmployer();
@@ -666,28 +679,18 @@ class EmployerVerificationJobPostingTest extends TestCase
 
         Sanctum::actingAs($admin);
 
-        foreach ($documents as $index => $document) {
+        // During intake review (employer still 'pending'), approving documents
+        // one at a time must not spam a notification per document — the single
+        // consolidated notice from finalize() covers the whole review instead.
+        foreach ($documents as $document) {
             $this->postJson("/api/admin/documents/{$document->document_id}/review", [
                 'verification_status' => 'approved',
-            ])->assertOk();
-
-            $expectedEvent = $index === $documents->count() - 1
-                ? 'all_required_documents_approved'
-                : 'document_approved';
-
-            Notification::assertSentTo(
-                $employer,
-                EmployerVerificationProgressUpdated::class,
-                function ($notification, $channels) use ($expectedEvent) {
-                    $expectedChannels = $expectedEvent === 'all_required_documents_approved'
-                        ? ['database', 'mail']
-                        : ['database'];
-
-                    return $notification->event === $expectedEvent
-                        && $channels === $expectedChannels;
-                }
-            );
+            ])
+                ->assertOk()
+                ->assertJsonPath('notification_queued', false);
         }
+
+        Notification::assertNothingSent();
     }
 
     public function test_employer_can_list_and_read_only_their_notifications(): void

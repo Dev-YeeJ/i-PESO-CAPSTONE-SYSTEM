@@ -13,6 +13,11 @@ class JobFairAttendee extends Model
         'qr_code_uuid',
         'scanned_at',
         'is_attended',
+        'guest_name',
+        'guest_mobile_number',
+        'guest_email',
+        'guest_educ_attainment',
+        'guest_preferred_job',
     ];
 
     protected $casts = [

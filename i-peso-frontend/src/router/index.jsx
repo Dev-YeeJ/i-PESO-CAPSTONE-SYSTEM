@@ -77,10 +77,10 @@ const AdminGovernmentProgramForm = lazy(() => import('@/pages/admin/4-government
 const AdminJobFairsList         = lazy(() => import('@/pages/admin/4-government-dole/government-programs/JobFairsListPage'))
 const AdminJobFairForm          = lazy(() => import('@/pages/admin/4-government-dole/government-programs/JobFairFormPage'))
 const AdminJobFairDetail        = lazy(() => import('@/pages/admin/4-government-dole/government-programs/JobFairDetailPage'))
+const AdminJobFairCheckIn       = lazy(() => import('@/pages/admin/4-government-dole/government-programs/JobFairCheckInPage'))
 const AdminEstablishmentReport  = lazy(() => import('@/pages/admin/4-government-dole/dole-reporting/AdminEstablishmentReportPage'))
 const AdminPlacementReport      = lazy(() => import('@/pages/admin/4-government-dole/dole-reporting/AdminPlacementReportPage'))
 const AdminDOLEReporting       = lazy(() => import('@/pages/admin/4-government-dole/dole-reporting/DOLEReportingPage'))
-const AdminPEISExport          = lazy(() => import('@/pages/admin/4-government-dole/dole-reporting/PEISExportPage'))
 
 // Admin Pages - CATEGORY 5: SYSTEM & REPORTS
 const AdminLaborAnalytics = lazy(() => import('@/pages/admin/5-system-reports/labor-analytics/LaborAnalyticsPage'))
@@ -210,10 +210,10 @@ export const router = createBrowserRouter([
                       { path: 'job-fairs/create', element: S(AdminJobFairForm) },
                       { path: 'job-fairs/:id', element: S(AdminJobFairDetail) },
                       { path: 'job-fairs/:id/edit', element: S(AdminJobFairForm) },
+                      { path: 'job-fairs/:id/check-in', element: S(AdminJobFairCheckIn) },
                       { path: 'dole-reporting', element: S(AdminDOLEReporting) },
                       { path: 'establishment-report', element: S(AdminEstablishmentReport) },
                       { path: 'placement-report', element: S(AdminPlacementReport) },
-                      { path: 'peis-export', element: S(AdminPEISExport) },
                       
                       // CATEGORY 5: SYSTEM & REPORTS
                       { path: 'labor-analytics', element: S(AdminLaborAnalytics) },

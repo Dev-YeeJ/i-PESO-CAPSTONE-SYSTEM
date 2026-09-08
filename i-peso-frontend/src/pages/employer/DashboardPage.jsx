@@ -13,6 +13,8 @@ const DOCUMENT_LABELS = {
   prpa_license: 'PRPA License',
   dme_poea_license: 'DMW/POEA License',
   philJobnet_proof: 'PhilJobNet Proof',
+  affidavit_of_undertaking: 'Affidavit of Undertaking',
+  no_pending_case_certificate: 'Certificate of No Pending Case (DOLE)',
   government_id: 'Government ID',
   authorization_letter: 'Authorization Letter',
 }

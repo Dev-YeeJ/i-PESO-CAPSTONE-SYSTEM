@@ -108,7 +108,10 @@ class EmployerController extends Controller
                 $employer->city_municipality,
                 $employer->province,
             ])));
-            $employer->industry_business_type = $employer->industry ?: $employer->industry_type;
+            $industries = is_array($employer->industry) && count($employer->industry) > 0
+                ? $employer->industry
+                : array_filter([$employer->industry_type]);
+            $employer->industry_business_type = implode(', ', $industries);
             $employer->missing_documents = (int) ($employer->documents_count ?? 0) === 0;
             $employer->missing_gps = empty($employer->latitude) || empty($employer->longitude);
             $employer->account_status = $employer->verification_status ?: ($employer->email_verified_at ? 'verified' : 'pending');
@@ -329,7 +332,7 @@ class EmployerController extends Controller
                         $employer->trade_name,
                         $employer->email,
                         $employer->company_type,
-                        $employer->industry,
+                        implode(', ', $employer->industry ?? []),
                         $employer->company_size,
                         $employer->verification_status,
                         optional($employer->created_at)->toDateTimeString(),
@@ -396,10 +399,10 @@ class EmployerController extends Controller
         }
 
         if ($request->filled('industry')) {
-            $industry = $request->input('industry').'%';
+            $industry = $request->input('industry');
             $query->where(function ($industryQuery) use ($industry) {
-                $industryQuery->where('industry', 'like', $industry)
-                    ->orWhere('industry_type', 'like', $industry);
+                $industryQuery->whereJsonContains('industry', $industry)
+                    ->orWhere('industry_type', 'like', $industry.'%');
             });
         }
 

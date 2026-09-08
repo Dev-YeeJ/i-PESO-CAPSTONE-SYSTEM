@@ -63,14 +63,6 @@ export const adminService = {
     return data
   },
 
-  bulkApproveEmployers: async (employerIds, remarks = null) => {
-    const { data } = await api.post('/admin/employers/bulk-approve', {
-      employer_ids: employerIds,
-      remarks,
-    })
-    return data
-  },
-
   getEmployerDetail: async (id) => {
     const { data } = await api.get(`/admin/employers/${id}`)
     return data
@@ -114,13 +106,11 @@ export const adminService = {
     return data
   },
 
-  // Unified review: docs are approved by default; only `rejected_documents`
-  // ([{ document_id, reason }]) are rejected. The backend decides approve vs reject.
-  finalizeEmployerVerification: async (id, { rejectedDocuments = [], remarks = null } = {}) => {
-    const { data } = await api.post(`/admin/employers/${id}/finalize`, {
-      rejected_documents: rejectedDocuments,
-      remarks,
-    })
+  // Unified review: each document's approve/reject decision is already saved
+  // (via reviewEmployerDocument below) by the time this is called — this just
+  // decides the employer's overall verdict from that persisted state.
+  finalizeEmployerVerification: async (id, { remarks = null } = {}) => {
+    const { data } = await api.post(`/admin/employers/${id}/finalize`, { remarks })
     return data
   },
 
@@ -221,6 +211,9 @@ export const adminService = {
   publishJobFair: async (id, status = 'published') => (await api.post(`/admin/job-fairs/${id}/publish`, { status })).data,
   inviteJobFairEmployer: async (id, payload) => (await api.post(`/admin/job-fairs/${id}/invite`, payload)).data,
   updateJobFairParticipation: async (fairId, participationId, payload) => (await api.patch(`/admin/job-fairs/${fairId}/participants/${participationId}`, payload)).data,
+  checkInJobFairAttendee: async (fairId, payload) => (await api.post(`/admin/job-fairs/${fairId}/check-in`, payload)).data,
+  searchJobFairAttendees: async (fairId, search) => (await api.get(`/admin/job-fairs/${fairId}/attendees`, { params: { search } })).data,
+  encodeJobFairWalkIn: async (fairId, payload) => (await api.post(`/admin/job-fairs/${fairId}/walk-ins`, payload)).data,
   reviewJobFairRequirement: async (submissionId, payload) => (await api.patch(`/admin/job-fair-requirements/${submissionId}/review`, payload)).data,
   viewJobFairRequirement: async (submissionId) => (await api.get(`/admin/job-fair-requirements/${submissionId}/view`, { responseType: 'blob' })).data,
   submitJobFairProxyResults: async (fairId, payload) => (await api.post(`/admin/job-fairs/${fairId}/proxy-results`, payload)).data,

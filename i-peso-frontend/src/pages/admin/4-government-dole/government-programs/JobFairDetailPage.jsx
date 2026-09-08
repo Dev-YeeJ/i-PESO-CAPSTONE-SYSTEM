@@ -28,17 +28,27 @@ export default function JobFairDetailPage() {
   const [proxy, setProxy] = useState(zeroProxy)
   const [proxyConfirmation, setProxyConfirmation] = useState(zeroProxyConfirmation)
 
-  const load = useCallback(async () => {
-    setLoading(true); setError('')
+  const load = useCallback(async ({ silent = false } = {}) => {
+    if (!silent) { setLoading(true); setError('') }
     try {
       setFair(await adminService.getJobFairDetail(id))
     } catch (e) {
-      setError(e.response?.data?.message ?? 'Unable to load event.')
+      if (!silent) setError(e.response?.data?.message ?? 'Unable to load event.')
     } finally {
-      setLoading(false)
+      if (!silent) setLoading(false)
     }
   }, [id])
   useEffect(() => { load() }, [load])
+
+  // Keeps the metrics grid current while staff are checking people in from a
+  // separate phone at the venue — a plain poll rather than a websocket push,
+  // since this project has no Reverb server actually running anywhere.
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (document.visibilityState === 'visible') load({ silent: true })
+    }, 8000)
+    return () => clearInterval(interval)
+  }, [load])
 
   const metrics = fair?.metrics ?? {}
   const reports = useMemo(() => fair?.result_reports ?? [], [fair])
@@ -85,6 +95,7 @@ export default function JobFairDetailPage() {
         actions={[
           { label: 'Back', onClick: () => navigate('/admin/job-fairs'), variant: 'secondary' },
           { label: 'Edit', onClick: () => navigate(`/admin/job-fairs/${id}/edit`), variant: 'secondary' },
+          { label: 'Check-In', onClick: () => navigate(`/admin/job-fairs/${id}/check-in`) },
         ]}
       />
 
