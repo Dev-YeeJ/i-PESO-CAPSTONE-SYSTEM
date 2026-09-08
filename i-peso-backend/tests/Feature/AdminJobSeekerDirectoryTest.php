@@ -97,6 +97,7 @@ class AdminJobSeekerDirectoryTest extends TestCase
             $table->string('email')->unique();
             $table->string('password');
             $table->string('verification_status')->default('pending');
+            $table->timestamp('registration_submitted_at')->nullable();
             $table->softDeletes();
             $table->timestamps();
         });
@@ -235,8 +236,8 @@ class AdminJobSeekerDirectoryTest extends TestCase
         $complete->applications()->create(['status' => 'hired']);
 
         DB::table('employers')->insert([
-            ['employer_id' => 1, 'company_name' => 'Verified Co', 'email' => 'verified@example.com', 'password' => 'password', 'verification_status' => 'verified', 'created_at' => now(), 'updated_at' => now()],
-            ['employer_id' => 2, 'company_name' => 'Pending Co', 'email' => 'pending@example.com', 'password' => 'password', 'verification_status' => 'pending', 'created_at' => now(), 'updated_at' => now()],
+            ['employer_id' => 1, 'company_name' => 'Verified Co', 'email' => 'verified@example.com', 'password' => 'password', 'verification_status' => 'verified', 'registration_submitted_at' => now(), 'created_at' => now(), 'updated_at' => now()],
+            ['employer_id' => 2, 'company_name' => 'Pending Co', 'email' => 'pending@example.com', 'password' => 'password', 'verification_status' => 'pending', 'registration_submitted_at' => now(), 'created_at' => now(), 'updated_at' => now()],
         ]);
         DB::table('job_vacancies')->insert([
             ['employer_id' => 1, 'status' => 'active', 'created_at' => now(), 'updated_at' => now()],
