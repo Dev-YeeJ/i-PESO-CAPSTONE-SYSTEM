@@ -1,13 +1,13 @@
 import { Link } from 'react-router-dom';
 import { Scale } from 'lucide-react';
-import LegalPageLayout, { ConfirmNote, PolicySection } from './LegalPageLayout';
+import LegalPageLayout, { PolicySection } from './LegalPageLayout';
 
 const inlineLinkClass = 'font-semibold text-[#0A192F] underline decoration-[#B45309]/50 decoration-2 underline-offset-2 hover:decoration-[#B45309]';
 
 // Effective date of this policy text. Bump this whenever the content below
 // changes materially — it is the only date on the page that is not a
 // [PESO/LEGAL TO CONFIRM] placeholder.
-const EFFECTIVE_DATE = 'August 18, 2026';
+const EFFECTIVE_DATE = 'September 9, 2026';
 
 const SECTIONS = [
   { id: 'acceptance', label: 'Acceptance of Terms' },
@@ -154,23 +154,37 @@ export default function TermsOfServicePage() {
       </PolicySection>
 
       <PolicySection id="liability" number={10} title="Limitation of Liability">
-        <ConfirmNote>
-          The specific liability limits and exclusions appropriate for a local government service like PESO
-          should be reviewed by a legal adviser before this section is finalized. As a general principle in the
-          meantime: PESO's liability for any claim arising from use of the Portal is limited to what is
-          required or permitted under applicable Philippine law, and PESO is not liable for indirect,
-          incidental, or consequential damages arising from employer-job seeker interactions facilitated
-          through the Portal.
-        </ConfirmNote>
+        <p>
+          PESO's liability for any claim arising from or related to your use of the Portal, to the extent
+          permitted by Philippine law, does not extend beyond PESO's own direct fault or negligence in
+          operating the Portal. PESO is not liable for indirect, incidental, consequential, or exemplary
+          damages, or for any loss arising from the acts, omissions, representations, or conduct of another
+          user — including an employer's hiring decision or a job seeker's application — made through the
+          Portal.
+        </p>
+        <p>
+          PESO is an instrumentality of the City Government of Urdaneta operating the Portal as part of its
+          public employment-facilitation mandate under the Public Employment Service Office Act of 1999
+          (Republic Act No. 8759). Its liability is further limited and qualified by the laws governing the
+          liability of local government units and their instrumentalities for acts performed in a governmental
+          capacity.
+        </p>
       </PolicySection>
 
       <PolicySection id="governing-law" number={11} title="Governing Law & Dispute Resolution">
-        <ConfirmNote>
-          These Terms are intended to be governed by the laws of the Republic of the Philippines. The specific
-          venue for disputes (e.g., courts of Urdaneta City) and any preferred resolution process (e.g.,
-          barangay conciliation before filing suit, where applicable) should be confirmed with PESO's legal
-          counsel and specified here.
-        </ConfirmNote>
+        <p>These Terms are governed by the laws of the Republic of the Philippines.</p>
+        <p>
+          Where both parties to a dispute — for example, a job seeker and an employer — reside or operate
+          within the same city or municipality, the dispute must first be referred to barangay conciliation
+          under the Katarungang Pambarangay system (Sections 399–422, Local Government Code of 1991) before
+          any court action is filed, except as otherwise allowed by law. This requirement does not apply to a
+          dispute involving PESO itself, since it is a government instrumentality, or to parties who do not
+          reside or operate in the same city or municipality.
+        </p>
+        <p>
+          Subject to the foregoing, any dispute relating to the Portal shall be brought before the proper
+          courts of Urdaneta City, Pangasinan.
+        </p>
       </PolicySection>
 
       <PolicySection id="changes" number={12} title="Changes to These Terms">
