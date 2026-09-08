@@ -111,6 +111,12 @@ class JobFairController extends Controller
         $invited = 0;
         $seekersNotified = 0;
         if ($isFirstPublish) {
+            // Notifications send synchronously (no queue worker runs on this
+            // shared-hosting deployment — see the Notification classes), so
+            // broadcasting to every verified employer and every job seeker
+            // can take a while; don't let PHP's default execution-time limit
+            // cut this off partway through and leave some recipients unnotified.
+            set_time_limit(0);
             $invited = $this->broadcastInvitations($jobFair, $service);
             $seekersNotified = $this->broadcastToSeekers($jobFair);
         }

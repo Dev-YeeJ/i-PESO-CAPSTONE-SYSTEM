@@ -6,12 +6,16 @@ use App\Models\JobFair;
 use App\Models\JobFairEmployer;
 use App\Notifications\Channels\SmsChannel;
 use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 use Illuminate\Support\Collection;
 
-class JobFairNotification extends Notification implements ShouldQueue
+// Not ShouldQueue: this shared-hosting deployment has no persistent queue
+// worker process, so a queued notification would sit unsent in the `jobs`
+// table forever. Sending synchronously guarantees delivery is attempted;
+// callers already wrap ->notify() in try/catch so a transport failure
+// (e.g. mail) logs and degrades gracefully instead of breaking the request.
+class JobFairNotification extends Notification
 {
     use Queueable;
 

@@ -5,7 +5,6 @@ namespace App\Notifications;
 use App\Models\JobFair;
 use App\Notifications\Channels\ExpoPushChannel;
 use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Notification;
 
 /**
@@ -15,8 +14,14 @@ use Illuminate\Notifications\Notification;
  * the employer letter (a business workflow employers check email for), this
  * is exactly the kind of "something new to see" nudge GovernmentProgramNotification
  * already uses this same channel pair for.
+ *
+ * Not ShouldQueue: this shared-hosting deployment has no persistent queue
+ * worker process, so a queued notification would sit unsent in the `jobs`
+ * table forever. Sent synchronously instead — see broadcastToSeekers()'s
+ * set_time_limit(0) for how the one broadcast call site avoids a PHP
+ * execution-time cutoff partway through a large seeker list.
  */
-class JobFairPublished extends Notification implements ShouldQueue
+class JobFairPublished extends Notification
 {
     use Queueable;
 
