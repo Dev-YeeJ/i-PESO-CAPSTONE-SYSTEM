@@ -113,6 +113,8 @@ class ReportController extends Controller
             'signatories.*.name' => 'nullable|string|max:255',
             'signatories.*.position' => 'nullable|string|max:255',
             'issues_concerns' => 'nullable|string|max:5000',
+            'lgu_name' => 'nullable|string|max:255',
+            'province' => 'nullable|string|max:255',
         ]);
 
         $month = \Carbon\Carbon::createFromDate($validated['year'], $validated['month'], 1);
@@ -128,7 +130,13 @@ class ReportController extends Controller
         $cumulative = $this->computeSprsFigures($yearStart, $end, $jobFairReports);
 
         $data = [
+            // Single-city PESO deployment — defaults match every other seeded
+            // record in this system, editable in the on-screen grid same as
+            // issues_concerns below in case PESO ever needs to correct them.
+            'lgu_name' => $validated['lgu_name'] ?? 'Urdaneta City',
+            'province' => $validated['province'] ?? 'Pangasinan',
             'period' => $month->format('F Y'),
+            'period_short' => $month->format('M-y'),
             'previous_period' => $prevMonth->format('F Y'),
             'cumulative_period' => $yearStart->format('F') . '–' . $month->format('F Y'),
             // Current-month keys kept flat for backward compatibility with the
@@ -244,6 +252,8 @@ class ReportController extends Controller
             'signatories' => ['nullable', 'array'],
             'signatories.*.name' => ['nullable', 'string', 'max:255'],
             'signatories.*.position' => ['nullable', 'string', 'max:255'],
+            'lgu_name' => ['nullable', 'string', 'max:255'],
+            'province' => ['nullable', 'string', 'max:255'],
         ]);
 
         $data = $report->data_summary ?? [];
@@ -270,6 +280,14 @@ class ReportController extends Controller
             $data['issues_concerns'] = $validated['issues_concerns'];
         }
 
+        if (array_key_exists('lgu_name', $validated)) {
+            $data['lgu_name'] = $validated['lgu_name'];
+        }
+
+        if (array_key_exists('province', $validated)) {
+            $data['province'] = $validated['province'];
+        }
+
         if (!empty($validated['signatories'])) {
             $data['signatories'] = $this->persistSignatories($report->report_id, $validated['signatories']);
         }
@@ -289,7 +307,14 @@ class ReportController extends Controller
      */
     private function computeSprsFigures(Carbon $start, Carbon $end, JobFairReportService $jobFairReports): array
     {
-        $localVacancies = (int) JobVacancy::whereBetween('created_at', [$start, $end])->sum('vacancies_count');
+        // An overseas recruitment agency's vacancies genuinely represent
+        // overseas-bound employment — split local/overseas by the posting
+        // employer's company_type, same idea as the private/government split
+        // on placements below, instead of leaving 1.1.2 permanently at 0.
+        $overseasVacancies = (int) JobVacancy::whereBetween('created_at', [$start, $end])
+            ->whereHas('employer', fn ($q) => $q->where('company_type', 'overseas_recruitment_agency'))
+            ->sum('vacancies_count');
+        $localVacancies = (int) JobVacancy::whereBetween('created_at', [$start, $end])->sum('vacancies_count') - $overseasVacancies;
 
         $registeredTotal = JobSeeker::whereBetween('created_at', [$start, $end])->count();
         $registeredFemale = JobSeeker::whereBetween('created_at', [$start, $end])->where('sex', 'female')->count();
@@ -297,14 +322,34 @@ class ReportController extends Controller
         $referredTotal = Application::whereBetween('created_at', [$start, $end])->count();
         $referredFemale = Application::whereBetween('created_at', [$start, $end])
             ->whereHas('jobSeeker', fn ($q) => $q->where('sex', 'female'))->count();
+        // i-PESO only tracks referrals for job placement (there's no separate
+        // "training/employability enhancement" referral type on this
+        // platform), so all of 1.3 is 1.3.1 — its own local/overseas split
+        // mirrors the vacancy split above.
+        $referredOverseas = Application::whereBetween('created_at', [$start, $end])
+            ->whereHas('jobVacancy.employer', fn ($q) => $q->where('company_type', 'overseas_recruitment_agency'))->count();
+        $referredOverseasFemale = Application::whereBetween('created_at', [$start, $end])
+            ->whereHas('jobVacancy.employer', fn ($q) => $q->where('company_type', 'overseas_recruitment_agency'))
+            ->whereHas('jobSeeker', fn ($q) => $q->where('sex', 'female'))->count();
+        $referredLocal = $referredTotal - $referredOverseas;
+        $referredLocalFemale = $referredFemale - $referredOverseasFemale;
 
         $placedOnPlatform = Application::where('status', 'hired')->whereBetween('status_changed_at', [$start, $end])->count();
         $placedFemale = Application::where('status', 'hired')->whereBetween('status_changed_at', [$start, $end])
             ->whereHas('jobSeeker', fn ($q) => $q->where('sex', 'female'))->count();
+        // 'government_agency' is a real, selectable company_type (see
+        // Employer::getRequiredDocuments()) — previously this matched
+        // 'Government'/'LGU' substrings that no registration path could ever
+        // actually produce, so this indicator was silently always 0.
         $placedGovernment = Application::where('status', 'hired')->whereBetween('status_changed_at', [$start, $end])
-            ->whereHas('jobVacancy.employer', fn ($q) => $q->where('company_type', 'like', '%Government%')->orWhere('company_type', 'like', '%LGU%'))->count();
+            ->whereHas('jobVacancy.employer', fn ($q) => $q->where('company_type', 'government_agency'))->count();
         $placedGovernmentFemale = Application::where('status', 'hired')->whereBetween('status_changed_at', [$start, $end])
-            ->whereHas('jobVacancy.employer', fn ($q) => $q->where('company_type', 'like', '%Government%')->orWhere('company_type', 'like', '%LGU%'))
+            ->whereHas('jobVacancy.employer', fn ($q) => $q->where('company_type', 'government_agency'))
+            ->whereHas('jobSeeker', fn ($q) => $q->where('sex', 'female'))->count();
+        $placedOverseas = Application::where('status', 'hired')->whereBetween('status_changed_at', [$start, $end])
+            ->whereHas('jobVacancy.employer', fn ($q) => $q->where('company_type', 'overseas_recruitment_agency'))->count();
+        $placedOverseasFemale = Application::where('status', 'hired')->whereBetween('status_changed_at', [$start, $end])
+            ->whereHas('jobVacancy.employer', fn ($q) => $q->where('company_type', 'overseas_recruitment_agency'))
             ->whereHas('jobSeeker', fn ($q) => $q->where('sex', 'female'))->count();
 
         // Employers report every new hire, not only PESO referrals, so approved
@@ -316,6 +361,8 @@ class ReportController extends Controller
         $employerReportedFemale = 0;
         $employerReportedGovernment = 0;
         $employerReportedGovernmentFemale = 0;
+        $employerReportedOverseas = 0;
+        $employerReportedOverseasFemale = 0;
         if (Schema::hasTable('placement_records')) {
             $approvedUploadIds = PlacementReportUpload::where('status', PlacementReportUpload::STATUS_APPROVED)->pluck('id');
 
@@ -337,14 +384,21 @@ class ReportController extends Controller
 
             $employerReportedPlaced = (clone $employerReported)->count();
             $employerReportedFemale = (clone $employerReported)->whereRaw('LOWER(gender) LIKE ?', ['f%'])->count();
-            // Classify employer-reported placements as private/government too,
-            // via the reporting employer's company_type, so 1.4.1 + 1.4.2 adds
-            // back up to the 1.4 total instead of only covering platform hires.
+            // Classify employer-reported placements as private/government/
+            // overseas too, via the reporting employer's company_type, so
+            // 1.4.1 + 1.4.2 + 1.4.3 adds back up to the 1.4 total instead of
+            // only covering platform hires.
             $employerReportedGovernment = (clone $employerReported)
-                ->whereHas('employer', fn ($q) => $q->where('company_type', 'like', '%Government%')->orWhere('company_type', 'like', '%LGU%'))
+                ->whereHas('employer', fn ($q) => $q->where('company_type', 'government_agency'))
                 ->count();
             $employerReportedGovernmentFemale = (clone $employerReported)
-                ->whereHas('employer', fn ($q) => $q->where('company_type', 'like', '%Government%')->orWhere('company_type', 'like', '%LGU%'))
+                ->whereHas('employer', fn ($q) => $q->where('company_type', 'government_agency'))
+                ->whereRaw('LOWER(gender) LIKE ?', ['f%'])->count();
+            $employerReportedOverseas = (clone $employerReported)
+                ->whereHas('employer', fn ($q) => $q->where('company_type', 'overseas_recruitment_agency'))
+                ->count();
+            $employerReportedOverseasFemale = (clone $employerReported)
+                ->whereHas('employer', fn ($q) => $q->where('company_type', 'overseas_recruitment_agency'))
                 ->whereRaw('LOWER(gender) LIKE ?', ['f%'])->count();
         }
 
@@ -400,25 +454,39 @@ class ReportController extends Controller
             $jobFairSection['admin_proxy_reports'] += $summary['admin_proxy_reports'];
         }
 
+        $placedTotalAll = $placedOnPlatform + $employerReportedPlaced;
+        $placedFemaleAll = $placedFemale + $employerReportedFemale;
+        $placedGovernmentAll = $placedGovernment + $employerReportedGovernment;
+        $placedGovernmentFemaleAll = $placedGovernmentFemale + $employerReportedGovernmentFemale;
+        $placedOverseasAll = $placedOverseas + $employerReportedOverseas;
+        $placedOverseasFemaleAll = $placedOverseasFemale + $employerReportedOverseasFemale;
+
         return [
-            'vacancies_total' => $localVacancies,
+            'vacancies_total' => $localVacancies + $overseasVacancies,
             'vacancies_local' => $localVacancies,
-            'vacancies_overseas' => 0,
+            'vacancies_overseas' => $overseasVacancies,
             'registered_total' => $registeredTotal,
             'registered_female' => $registeredFemale,
             'referred_total' => $referredTotal,
             'referred_female' => $referredFemale,
-            'placed_total' => $placedOnPlatform + $employerReportedPlaced,
-            'placed_female' => $placedFemale + $employerReportedFemale,
-            // Government total now includes employer-reported government hires,
-            // and private is the remainder, so 1.4.1 + 1.4.2 == 1.4 always —
-            // previously private/government only accounted for platform hires,
-            // so the two subtotals undercounted the total whenever an approved
-            // employer report included a placement.
-            'placed_government' => $placedGovernment + $employerReportedGovernment,
-            'placed_government_female' => $placedGovernmentFemale + $employerReportedGovernmentFemale,
-            'placed_private' => ($placedOnPlatform + $employerReportedPlaced) - ($placedGovernment + $employerReportedGovernment),
-            'placed_private_female' => ($placedFemale + $employerReportedFemale) - ($placedGovernmentFemale + $employerReportedGovernmentFemale),
+            'referred_local' => $referredLocal,
+            'referred_local_female' => $referredLocalFemale,
+            'referred_overseas' => $referredOverseas,
+            'referred_overseas_female' => $referredOverseasFemale,
+            'placed_total' => $placedTotalAll,
+            'placed_female' => $placedFemaleAll,
+            // Government and overseas totals now include employer-reported
+            // hires, and private is the remainder, so
+            // 1.4.1 + 1.4.2 + 1.4.3 == 1.4 always — previously
+            // private/government only accounted for platform hires, so the
+            // subtotals undercounted the total whenever an approved employer
+            // report included a placement.
+            'placed_government' => $placedGovernmentAll,
+            'placed_government_female' => $placedGovernmentFemaleAll,
+            'placed_overseas' => $placedOverseasAll,
+            'placed_overseas_female' => $placedOverseasFemaleAll,
+            'placed_private' => $placedTotalAll - $placedGovernmentAll - $placedOverseasAll,
+            'placed_private_female' => $placedFemaleAll - $placedGovernmentFemaleAll - $placedOverseasFemaleAll,
             'placed_on_platform' => $placedOnPlatform,
             'placed_employer_reported' => $employerReportedPlaced,
             'spes_total' => $spesPlaced,
@@ -465,12 +533,18 @@ class ReportController extends Controller
         $jf = fn (array $set, string $field) => $set['job_fairs'][$field] ?? null;
 
         return [
+            $section('sec_efcbs', 'EMPLOYMENT FACILITATION AND CAPABILITY BUILDING SERVICES'),
+            $section('sec_jsap', 'I. JOB SEARCH ASSISTANCE PROGRAM'),
             $section('sec_pes', 'A. PUBLIC EMPLOYMENT SERVICES (PES)'),
             $row('1_1', '1.1 Job vacancies solicited/reported', 1, true, [
                 'curr_total' => $current['vacancies_total'], 'prev_total' => $previous['vacancies_total'], 'cum_total' => $cumulative['vacancies_total'],
             ]),
-            $row('1_1_1', '1.1.1 Local', 2, false),
-            $row('1_1_2', '1.1.2 Overseas', 2, false),
+            $row('1_1_1', '1.1.1 Local', 2, true, [
+                'curr_total' => $current['vacancies_local'], 'prev_total' => $previous['vacancies_local'], 'cum_total' => $cumulative['vacancies_local'],
+            ]),
+            $row('1_1_2', '1.1.2 Overseas', 2, true, [
+                'curr_total' => $current['vacancies_overseas'], 'prev_total' => $previous['vacancies_overseas'], 'cum_total' => $cumulative['vacancies_overseas'],
+            ]),
             $row('1_2', '1.2 Job applicants registered', 1, true, [
                 'curr_total' => $current['registered_total'], 'curr_female' => $current['registered_female'],
                 'prev_total' => $previous['registered_total'], 'prev_female' => $previous['registered_female'],
@@ -481,9 +555,23 @@ class ReportController extends Controller
                 'prev_total' => $previous['referred_total'], 'prev_female' => $previous['referred_female'],
                 'cum_total' => $cumulative['referred_total'], 'cum_female' => $cumulative['referred_female'],
             ]),
-            $row('1_3_1', '1.3.1 Job placement', 2, false),
-            $row('1_3_1_local', '1.3.1 Local', 3, false),
-            $row('1_3_1_overseas', '1.3.2 Overseas', 3, false),
+            // i-PESO only tracks referrals for job placement, so 1.3.1 mirrors
+            // 1.3 exactly — see the comment in computeSprsFigures().
+            $row('1_3_1', '1.3.1 Job placement', 2, true, [
+                'curr_total' => $current['referred_total'], 'curr_female' => $current['referred_female'],
+                'prev_total' => $previous['referred_total'], 'prev_female' => $previous['referred_female'],
+                'cum_total' => $cumulative['referred_total'], 'cum_female' => $cumulative['referred_female'],
+            ]),
+            $row('1_3_1_local', '1.3.1 Local', 3, true, [
+                'curr_total' => $current['referred_local'], 'curr_female' => $current['referred_local_female'],
+                'prev_total' => $previous['referred_local'], 'prev_female' => $previous['referred_local_female'],
+                'cum_total' => $cumulative['referred_local'], 'cum_female' => $cumulative['referred_local_female'],
+            ]),
+            $row('1_3_1_overseas', '1.3.2 Overseas', 3, true, [
+                'curr_total' => $current['referred_overseas'], 'curr_female' => $current['referred_overseas_female'],
+                'prev_total' => $previous['referred_overseas'], 'prev_female' => $previous['referred_overseas_female'],
+                'cum_total' => $cumulative['referred_overseas'], 'cum_female' => $cumulative['referred_overseas_female'],
+            ]),
             $row('1_3_2', '1.3.2 Training/employability enhancement', 2, false),
             $row('1_4', '1.4 Job applicants placed', 1, true, [
                 'curr_total' => $current['placed_total'], 'curr_female' => $current['placed_female'],
@@ -501,7 +589,11 @@ class ReportController extends Controller
                 'cum_total' => $cumulative['placed_government'], 'cum_female' => $cumulative['placed_government_female'],
             ]),
             $row('1_4_2_1', '1.4.2.1 Infrastructure related', 3, false),
-            $row('1_4_3', '1.4.3 Overseas', 2, false),
+            $row('1_4_3', '1.4.3 Overseas', 2, true, [
+                'curr_total' => $current['placed_overseas'], 'curr_female' => $current['placed_overseas_female'],
+                'prev_total' => $previous['placed_overseas'], 'prev_female' => $previous['placed_overseas_female'],
+                'cum_total' => $cumulative['placed_overseas'], 'cum_female' => $cumulative['placed_overseas_female'],
+            ]),
             $row('1_5', '1.5 Special Program for Employment of Students (SPES)', 1, true, [
                 'curr_total' => $current['spes_total'], 'curr_female' => $current['spes_female'],
                 'prev_total' => $previous['spes_total'], 'cum_total' => $cumulative['spes_total'],
@@ -567,7 +659,13 @@ class ReportController extends Controller
             $row('peis_1', '1. Number of establishments registered', 1, true, [
                 'curr_total' => $current['employers_registered'], 'prev_total' => $previous['employers_registered'], 'cum_total' => $cumulative['employers_registered'],
             ]),
-            $row('peis_2', '2. Number of registered applicants', 1, false),
+            // i-PESO is this office's PhilJobNet/PEIS front-end, so its
+            // registered-applicant count is the same figure as 1.2.
+            $row('peis_2', '2. Number of registered applicants', 1, true, [
+                'curr_total' => $current['registered_total'], 'curr_female' => $current['registered_female'],
+                'prev_total' => $previous['registered_total'], 'prev_female' => $previous['registered_female'],
+                'cum_total' => $cumulative['registered_total'], 'cum_female' => $cumulative['registered_female'],
+            ]),
         ];
     }
 

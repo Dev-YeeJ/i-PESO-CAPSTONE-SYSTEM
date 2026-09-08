@@ -185,6 +185,11 @@ class Employer extends Authenticatable
                 $required[] = 'affidavit_of_undertaking';
                 $required[] = 'no_pending_case_certificate';
                 break;
+            case 'government_agency':
+                // Not a DTI/SEC-registered business and not a recruitment
+                // agency — no extra accreditation document beyond the two
+                // base requirements every employer type already carries.
+                break;
         }
 
         return $required;

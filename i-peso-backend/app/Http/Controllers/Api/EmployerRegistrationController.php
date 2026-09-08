@@ -27,7 +27,7 @@ class EmployerRegistrationController extends Controller
         $validator = Validator::make($request->all(), [
             'email' => ['required', 'email', \Illuminate\Validation\Rule::unique('employers')->whereNull('deleted_at')],
             'password' => ['required', 'confirmed', Password::min(8)->numbers()->symbols()],
-            'company_type' => 'required|in:sole_proprietorship,corporation_partnership,local_recruitment_agency,overseas_recruitment_agency',
+            'company_type' => 'required|in:sole_proprietorship,corporation_partnership,local_recruitment_agency,overseas_recruitment_agency,government_agency',
         ]);
 
         if ($validator->fails()) {

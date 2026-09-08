@@ -175,6 +175,7 @@ class AuthController extends Controller
                 'corporation_partnership',
                 'local_recruitment_agency',
                 'overseas_recruitment_agency',
+                'government_agency',
             ])];
         }
 

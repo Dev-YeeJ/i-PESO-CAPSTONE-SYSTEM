@@ -13,6 +13,7 @@ const COMPANY_TYPES = [
   { value: 'corporation_partnership', label: 'Corporation / Partnership' },
   { value: 'local_recruitment_agency', label: 'Local Recruitment Agency' },
   { value: 'overseas_recruitment_agency', label: 'Overseas Recruitment Agency' },
+  { value: 'government_agency', label: 'Government Agency / LGU' },
 ]
 
 export default function Step1AccountSetup({ onComplete }) {
