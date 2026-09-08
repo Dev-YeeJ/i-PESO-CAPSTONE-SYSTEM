@@ -28,7 +28,7 @@ class EmployerJobFairController extends Controller
     {
         $employer = $this->employer($request);
         $fairs = JobFair::query()
-            ->where(fn ($query) => $query->where(fn ($public) => $public->where('is_public', true)->whereIn('status', JobFairService::PUBLIC_STATUSES))
+            ->where(fn ($query) => $query->where(fn ($public) => $public->where('is_public', true)->whereIn('status', JobFairService::PUBLIC_STATUSES)->has('employerJoins'))
                 ->orWhereHas('employerJoins', fn ($joins) => $joins->where('employer_id', $employer->employer_id)))
             ->orderByRaw('COALESCE(start_date, event_date) asc')
             // Same relations eventPayload() requests via loadMissing() — see

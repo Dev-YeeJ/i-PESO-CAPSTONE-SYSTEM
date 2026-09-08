@@ -77,7 +77,7 @@ class EmployerRegistrationController extends Controller
             'tin' => ['required', 'regex:/^\d{3}-\d{3}-\d{3}-\d{3}$/'],
             'trade_name' => 'nullable|string|max:255',
             'industry' => ['required', 'array', 'min:1'],
-            'industry.*' => ['string', \Illuminate\Validation\Rule::in(Employer::INDUSTRIES)],
+            'industry.*' => ['string', 'max:255'],
             'company_size' => 'required|in:micro,small,medium,large',
             'province' => 'required|string|max:100',
             'city_municipality' => 'required|string|max:100',

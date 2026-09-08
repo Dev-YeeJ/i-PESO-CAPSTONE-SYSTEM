@@ -175,7 +175,7 @@ export default function Step4Representative({ onComplete }) {
       <Field
         label="Direct Contact Number"
         name="contact_number"
-        placeholder="09123456789"
+        placeholder="e.g. 09XXXXXXXXX"
         value={form.contact_number ?? ''}
         onChange={handleChange}
         onBlur={handleBlur}
