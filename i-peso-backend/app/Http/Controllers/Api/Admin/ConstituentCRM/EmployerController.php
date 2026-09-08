@@ -28,7 +28,7 @@ class EmployerController extends Controller
         $summary = Employer::query()->selectRaw(
             'COUNT(*) AS total'
             .", SUM(CASE WHEN verification_status = 'verified' THEN 1 ELSE 0 END) AS verified"
-            .", SUM(CASE WHEN verification_status = 'pending' THEN 1 ELSE 0 END) AS pending"
+            .", SUM(CASE WHEN verification_status = 'pending' AND registration_submitted_at IS NOT NULL THEN 1 ELSE 0 END) AS pending"
             .", SUM(CASE WHEN verification_status = 'rejected' THEN 1 ELSE 0 END) AS rejected"
             .', SUM(CASE WHEN created_at >= ? THEN 1 ELSE 0 END) AS new_this_month'
             .$vacancyColumn,
@@ -353,7 +353,13 @@ class EmployerController extends Controller
      */
     private function filteredQuery(Request $request): Builder
     {
-        $query = Employer::query()->select([
+        $query = Employer::query()
+            // Excludes registrations still in progress — verification_status
+            // is 'pending' from the moment the account is created (Step 1 of
+            // the onboarding wizard), long before there's a real application
+            // for PESO to see.
+            ->whereNotNull('registration_submitted_at')
+            ->select([
             'employer_id',
             'company_name',
             'company_type',

@@ -306,6 +306,7 @@ class EmployerRegistrationController extends Controller
                 'representative_name' => "{$request->representative_first_name} {$request->representative_last_name}",
                 'mobile_number' => $request->representative_contact_number,
                 'verification_status' => 'pending',
+                'registration_submitted_at' => now(),
                 'verified_at' => null,
                 'rejection_reason' => null,
                 'verified_by_admin_id' => null,

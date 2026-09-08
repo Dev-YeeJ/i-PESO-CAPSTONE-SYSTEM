@@ -34,6 +34,11 @@ class EmployerVerificationController extends Controller
         try {
             $query = Employer::query()
                 ->where('verification_status', 'pending')
+                // Excludes registrations still in progress (Steps 1-4 of the
+                // onboarding wizard) — verification_status is 'pending' from
+                // the moment the account is created, long before there's
+                // anything for an admin to actually review.
+                ->whereNotNull('registration_submitted_at')
                 ->with('documents')
                 ->when($filters['search'] ?? null, function ($builder, $search) {
                     $needle = '%'.addcslashes(trim($search), '%_\\').'%';

@@ -989,6 +989,7 @@ class EmployerVerificationJobPostingTest extends TestCase
                 $table->string('mobile_number')->nullable();
                 $table->boolean('representative_is_owner')->default(false);
                 $table->string('verification_status')->default('pending');
+                $table->timestamp('registration_submitted_at')->nullable();
                 $table->timestamp('verified_at')->nullable();
                 $table->text('rejection_reason')->nullable();
                 $table->unsignedBigInteger('verified_by_admin_id')->nullable();

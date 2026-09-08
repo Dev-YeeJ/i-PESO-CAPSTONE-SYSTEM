@@ -99,6 +99,7 @@ class Employer extends Authenticatable
 
         // Verification & Admin
         'verification_status',
+        'registration_submitted_at',
         'verified_at',
         'rejection_reason',
         'verified_by_admin_id',
@@ -113,6 +114,7 @@ class Employer extends Authenticatable
     protected $casts = [
         'email_verified_at' => 'datetime',
         'verified_at' => 'datetime',
+        'registration_submitted_at' => 'datetime',
         'password' => 'hashed',
         'representative_is_owner' => 'boolean',
         'industry' => 'array',
