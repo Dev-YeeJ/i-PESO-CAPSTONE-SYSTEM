@@ -67,9 +67,11 @@ export default function PrivacyPolicyPage() {
           </a>.
         </p>
         <ConfirmNote>
-          Data Protection Officer (DPO): name/position and direct contact details to be confirmed by PESO.
-          Until then, privacy concerns may be raised through the office contact details above, or through
-          your PESO administrator.
+          Privacy inquiries and data subject requests (access, correction, and similar concerns) are handled
+          directly by the PESO Urdaneta City office through the contact details above. Complaints that cannot
+          be resolved at the office level are escalated to the Department of Labor and Employment (DOLE).
+          PESO has not designated a separately named Data Protection Officer; this section will be updated if
+          one is appointed.
         </ConfirmNote>
       </PolicySection>
 
@@ -165,9 +167,11 @@ export default function PrivacyPolicyPage() {
           <li>File a complaint with the National Privacy Commission (NPC).</li>
         </ul>
         <ConfirmNote>
-          Requests to exercise these rights may be filed at the office contact details in Section 2 once
-          published. PESO's National Privacy Commission registration number, if applicable, will also be
-          published here.
+          Requests to exercise these rights may be filed at the office contact details in Section 2. National
+          Privacy Commission registration and the Public Employment Information System (PEIS) are
+          administered by the Department of Labor and Employment (DOLE) at the national level rather than
+          registered separately by this local PESO office; inquiries about national-level registration may be
+          directed to DOLE.
         </ConfirmNote>
       </PolicySection>
 
