@@ -1,8 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { CalendarDays, CheckCircle2, Clock3, Download, FileText, FileUp, MapPin, Plus, Save, ShieldCheck, Trash2 } from 'lucide-react'
+import { CalendarDays, CheckCircle2, Clock3, Download, Eye, FileText, FileUp, MapPin, Save, ShieldCheck } from 'lucide-react'
 import { AlertBox, Badge, Button, Card, CardHeader } from '@/components/ui'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import EstablishmentReportPreview from '@/components/reports/EstablishmentReportPreview'
+import JobFairResultEntryEditor from '@/components/reports/JobFairResultEntryEditor'
+import { blankResultEntry } from '@/components/reports/jobFairResultVocab'
 import {
   downloadJobFairResult,
   expressJobFairInterest,
@@ -18,24 +21,19 @@ const blankConfirmation = {
   representative_1_name: '', representative_1_contact: '', representative_2_name: '', representative_2_contact: '',
   email: '', number_of_job_vacancies: 0, will_conduct_onsite_interview: false, logistics_requests: '',
 }
-const blankEntry = () => ({
-  applicant_name: '', gender: 'male', city_municipality: '', contact_number: '', age_group: '',
-  highest_education: '', position_applied_for: '', status: 'near_hired', mismatch_code: '', remarks: '',
-})
-const ageGroups = [['A', '15–24'], ['B', '25–34'], ['C', '35–44'], ['D', '45–54'], ['E', '55–64'], ['F', '65+']]
-const educationLevels = ['elementary', 'high_school', 'senior_high', 'vocational', 'college', 'post_graduate']
-const mismatchCodes = ['skills_mismatch', 'qualification_mismatch', 'experience_mismatch', 'education_mismatch', 'salary_expectation_mismatch', 'location_mismatch', 'availability_mismatch', 'incomplete_documents', 'failed_interview', 'other']
+const MISMATCH_STATUSES = ['employer_mismatch', 'seeker_mismatch']
 
 const inputClass = 'w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-brand-navy focus:outline-none focus:ring-2 focus:ring-brand-navy/10'
-const cellInputClass = 'w-full min-w-[7rem] rounded-md border border-transparent bg-transparent px-2 py-1.5 text-sm hover:border-slate-200 focus:border-brand-navy focus:bg-white focus:outline-none focus:ring-1 focus:ring-brand-navy/20'
 
 export default function EmployerJobFairDashboard() {
   const [fairs, setFairs] = useState([])
   const [selectedId, setSelectedId] = useState('')
   const [confirmation, setConfirmation] = useState(blankConfirmation)
-  const [entries, setEntries] = useState([blankEntry()])
+  const [entries, setEntries] = useState([blankResultEntry()])
   const [vacancies, setVacancies] = useState({ solicited: 0, offered: 0 })
   const [remarks, setRemarks] = useState('')
+  const [clearanceNo, setClearanceNo] = useState('')
+  const [viewingReport, setViewingReport] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
@@ -67,18 +65,15 @@ export default function EmployerJobFairDashboard() {
     }
   }
 
-  const updateEntry = (index, key, value) => setEntries((rows) => rows.map((row, i) => i === index
-    ? { ...row, [key]: value, ...(key === 'status' && value !== 'rejected' ? { mismatch_code: '' } : {}) }
-    : row))
-
   const validEntries = entries.filter((e) => e.applicant_name && e.position_applied_for)
   const totals = {
     total_male: validEntries.filter((e) => e.gender === 'male').length,
     total_female: validEntries.filter((e) => e.gender === 'female').length,
     total_applicants: validEntries.length,
+    total_qualified: validEntries.filter((e) => e.status === 'qualified').length,
     total_hots: validEntries.filter((e) => e.status === 'hots').length,
     total_near_hired: validEntries.filter((e) => e.status === 'near_hired').length,
-    total_rejected: validEntries.filter((e) => e.status === 'rejected').length,
+    total_rejected: validEntries.filter((e) => MISMATCH_STATUSES.includes(e.status)).length,
   }
 
   const download = async () => {
@@ -255,9 +250,10 @@ export default function EmployerJobFairDashboard() {
                           ['Applicants', totals.total_applicants, 'bg-slate-100 text-slate-700'],
                           ['Male', totals.total_male, 'bg-slate-100 text-slate-700'],
                           ['Female', totals.total_female, 'bg-slate-100 text-slate-700'],
+                          ['Qualified', totals.total_qualified, 'bg-blue-50 text-blue-700'],
                           ['HOTS', totals.total_hots, 'bg-emerald-50 text-emerald-700'],
                           ['Near Hired', totals.total_near_hired, 'bg-blue-50 text-blue-700'],
-                          ['Rejected', totals.total_rejected, 'bg-rose-50 text-rose-700'],
+                          ['Mismatched', totals.total_rejected, 'bg-rose-50 text-rose-700'],
                         ].map(([label, value, tone]) => (
                           <span key={label} className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold ${tone}`}>
                             <span className="text-sm font-black">{value}</span>{label}
@@ -265,69 +261,14 @@ export default function EmployerJobFairDashboard() {
                         ))}
                       </div>
 
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Applicant</TableHead>
-                            <TableHead>Gender</TableHead>
-                            <TableHead>City / Municipality</TableHead>
-                            <TableHead>Contact no.</TableHead>
-                            <TableHead>Age group</TableHead>
-                            <TableHead>Highest educ.</TableHead>
-                            <TableHead>Position</TableHead>
-                            <TableHead>Status</TableHead>
-                            <TableHead>Mismatch reason</TableHead>
-                            <TableHead />
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {entries.map((entry, index) => (
-                            <TableRow key={index}>
-                              <TableCell><input value={entry.applicant_name} onChange={(e) => updateEntry(index, 'applicant_name', e.target.value)} placeholder="Full name" className={cellInputClass} /></TableCell>
-                              <TableCell>
-                                <select value={entry.gender} onChange={(e) => updateEntry(index, 'gender', e.target.value)} className={cellInputClass}>
-                                  <option value="male">Male</option><option value="female">Female</option>
-                                </select>
-                              </TableCell>
-                              <TableCell><input value={entry.city_municipality} onChange={(e) => updateEntry(index, 'city_municipality', e.target.value)} placeholder="City / Municipality" className={cellInputClass} /></TableCell>
-                              <TableCell><input value={entry.contact_number} onChange={(e) => updateEntry(index, 'contact_number', e.target.value)} placeholder="Contact no." className={cellInputClass} /></TableCell>
-                              <TableCell>
-                                <select value={entry.age_group} onChange={(e) => updateEntry(index, 'age_group', e.target.value)} className={cellInputClass}>
-                                  <option value="">—</option>
-                                  {ageGroups.map(([code, label]) => <option key={code} value={code}>{code} · {label}</option>)}
-                                </select>
-                              </TableCell>
-                              <TableCell>
-                                <select value={entry.highest_education} onChange={(e) => updateEntry(index, 'highest_education', e.target.value)} className={cellInputClass}>
-                                  <option value="">—</option>
-                                  {educationLevels.map((lvl) => <option key={lvl} value={lvl}>{lvl.replaceAll('_', ' ')}</option>)}
-                                </select>
-                              </TableCell>
-                              <TableCell><input value={entry.position_applied_for} onChange={(e) => updateEntry(index, 'position_applied_for', e.target.value)} placeholder="Position" className={cellInputClass} /></TableCell>
-                              <TableCell>
-                                <select value={entry.status} onChange={(e) => updateEntry(index, 'status', e.target.value)} className={cellInputClass}>
-                                  <option value="hots">HOTS</option><option value="near_hired">Near Hired</option><option value="rejected">Rejected</option>
-                                </select>
-                              </TableCell>
-                              <TableCell>
-                                <select disabled={entry.status !== 'rejected'} value={entry.mismatch_code} onChange={(e) => updateEntry(index, 'mismatch_code', e.target.value)} className={`${cellInputClass} disabled:opacity-40`}>
-                                  <option value="">—</option>
-                                  {mismatchCodes.map((code) => <option key={code} value={code}>{code.replaceAll('_', ' ')}</option>)}
-                                </select>
-                              </TableCell>
-                              <TableCell>
-                                <button type="button" onClick={() => setEntries((rows) => rows.filter((_, i) => i !== index))} aria-label="Remove applicant" className="rounded-md p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600">
-                                  <Trash2 className="h-4 w-4" />
-                                </button>
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-
-                      <Button className="mt-3" variant="outline" icon={Plus} onClick={() => setEntries((rows) => [...rows, blankEntry()])}>Add Applicant</Button>
+                      <JobFairResultEntryEditor entries={entries} onChange={setEntries} />
 
                       <div className="mt-6 grid gap-4 sm:grid-cols-2">
+                        <label className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                          Job Fair Clearance No.
+                          <input value={clearanceNo} onChange={(e) => setClearanceNo(e.target.value)} className={`mt-1.5 normal-case ${inputClass}`} />
+                        </label>
+                        <div />
                         <label className="text-xs font-bold uppercase tracking-wide text-slate-500">
                           Vacancies solicited
                           <input type="number" min="0" value={vacancies.solicited} onChange={(e) => setVacancies((x) => ({ ...x, solicited: Number(e.target.value) }))} className={`mt-1.5 ${inputClass}`} />
@@ -348,6 +289,7 @@ export default function EmployerJobFairDashboard() {
                           disabled={!validEntries.length}
                           onClick={() => act(() => submitJobFairResults(selected.job_fair_id, {
                             ...totals,
+                            clearance_no: clearanceNo || null,
                             total_vacancies_solicited: vacancies.solicited,
                             total_vacancies_offered: vacancies.offered,
                             remarks,
@@ -357,7 +299,10 @@ export default function EmployerJobFairDashboard() {
                           Save Results
                         </Button>
                         {selected.participation.result_report?.id && (
-                          <Button variant="navy" icon={Download} onClick={download}>RO1-JF Form 3</Button>
+                          <>
+                            <Button variant="outline" icon={Eye} onClick={() => setViewingReport(true)}>View Report</Button>
+                            <Button variant="navy" icon={Download} onClick={download}>RO1-JF Form 3</Button>
+                          </>
                         )}
                         {!validEntries.length && (
                           <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500"><Clock3 className="h-3.5 w-3.5" />Add at least one applicant with a name and position to save.</span>
@@ -371,6 +316,15 @@ export default function EmployerJobFairDashboard() {
           )}
         </>
       )}
+
+      <Dialog open={viewingReport} onOpenChange={setViewingReport}>
+        <DialogContent className="max-w-5xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{selected?.title} — RO1-JF Form 3</DialogTitle>
+          </DialogHeader>
+          <EstablishmentReportPreview report={selected?.participation?.result_report} />
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

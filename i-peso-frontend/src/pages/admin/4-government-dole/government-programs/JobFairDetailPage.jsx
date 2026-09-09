@@ -1,12 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { CheckCircle2, ClipboardEdit, Download, FileText, Flame, Mail, RefreshCw, Save, Search, ShieldCheck, TrendingUp, UserCheck, Users, XCircle } from 'lucide-react'
+import { CheckCircle2, ClipboardEdit, Download, Eye, FileText, Flame, Mail, RefreshCw, Save, Search, ShieldCheck, TrendingUp, UserCheck, Users, XCircle } from 'lucide-react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { AlertBox, Badge, Button, Card, CardHeader, LoadingSkeleton, StatCard } from '@/components/ui'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '@/components/ui/accordion'
 import { Select, SelectGroup, SelectLabel, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import PageHeader from '@/pages/admin/_components/PageHeader'
 import LocationPreviewCard from '@/components/maps/LocationPreviewCard'
+import EstablishmentReportPreview from '@/components/reports/EstablishmentReportPreview'
+import JobFairResultEntryEditor from '@/components/reports/JobFairResultEntryEditor'
 import { adminService } from '@/services/adminService'
 
 // Grouped by the same tone used for the status Badge, so the grouping in the
@@ -19,14 +22,15 @@ const statusGroups = [
 ]
 const statusTones = Object.fromEntries(statusGroups.flatMap((g) => g.statuses.map((s) => [s, g.tone])))
 
-const zeroProxy = { company_name: '', employer_type: 'paper_only_employer', contact_person: '', contact_number: '', total_male: 0, total_female: 0, total_applicants: 0, total_hots: 0, total_near_hired: 0, total_rejected: 0, total_vacancies_solicited: 0, total_vacancies_offered: 0, remarks: '' }
+const zeroProxy = { company_name: '', employer_type: 'paper_only_employer', contact_person: '', contact_number: '', clearance_no: '', total_male: 0, total_female: 0, total_applicants: 0, total_qualified: 0, total_hots: 0, total_near_hired: 0, total_rejected: 0, total_vacancies_solicited: 0, total_vacancies_offered: 0, remarks: '' }
 const zeroProxyConfirmation = { company_name: '', representative_1_name: '', representative_1_contact: '', email: '', number_of_job_vacancies: 0, will_conduct_onsite_interview: false, logistics_requests: '' }
 const inputClass = 'mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-brand-navy focus:outline-none focus:ring-2 focus:ring-brand-navy/10'
 
 const proxyLabels = {
   company_name: 'Company name', contact_person: 'Contact person', contact_number: 'Contact number',
+  clearance_no: 'Job Fair Clearance No.',
   total_male: 'Male applicants', total_female: 'Female applicants', total_applicants: 'Total applicants',
-  total_hots: 'Hired on the spot', total_near_hired: 'Near-hired', total_rejected: 'Rejected',
+  total_qualified: 'Qualified', total_hots: 'Hired on the spot', total_near_hired: 'Near-hired', total_rejected: 'Mismatched (rejected)',
   total_vacancies_solicited: 'Vacancies solicited', total_vacancies_offered: 'Vacancies offered', remarks: 'Remarks',
 }
 const confirmationLabels = {
@@ -42,7 +46,9 @@ export default function JobFairDetailPage() {
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [proxy, setProxy] = useState(zeroProxy)
+  const [proxyEntries, setProxyEntries] = useState([])
   const [proxyConfirmation, setProxyConfirmation] = useState(zeroProxyConfirmation)
+  const [viewingReport, setViewingReport] = useState(null)
 
   // Search-as-you-type employer picker for "Invite" — replaces a bare
   // numeric employer-ID text box with something an admin can actually use
@@ -101,6 +107,17 @@ export default function JobFairDetailPage() {
 
   const metrics = fair?.metrics ?? {}
   const reports = useMemo(() => fair?.result_reports ?? [], [fair])
+  const unifiedTotals = useMemo(() => reports.reduce((sum, r) => ({
+    total_male: sum.total_male + (r.total_male ?? 0),
+    total_female: sum.total_female + (r.total_female ?? 0),
+    total_applicants: sum.total_applicants + (r.total_applicants ?? 0),
+    total_qualified: sum.total_qualified + (r.total_qualified ?? 0),
+    total_hots: sum.total_hots + (r.total_hots ?? 0),
+    total_near_hired: sum.total_near_hired + (r.total_near_hired ?? 0),
+    total_rejected: sum.total_rejected + (r.total_rejected ?? 0),
+    total_vacancies_solicited: sum.total_vacancies_solicited + (r.total_vacancies_solicited ?? 0),
+    total_vacancies_offered: sum.total_vacancies_offered + (r.total_vacancies_offered ?? 0),
+  }), { total_male: 0, total_female: 0, total_applicants: 0, total_qualified: 0, total_hots: 0, total_near_hired: 0, total_rejected: 0, total_vacancies_solicited: 0, total_vacancies_offered: 0 }), [reports])
 
   const action = async (work, success) => {
     setError(''); setNotice('')
@@ -374,7 +391,23 @@ export default function JobFairDetailPage() {
                 </label>
               ))}
             </div>
-            <Button className="mt-4" icon={Save} onClick={() => action(() => adminService.submitJobFairProxyResults(id, proxy), 'Admin Proxy Encoded report saved.')}>
+
+            <div className="mt-5 border-t border-slate-100 pt-5">
+              <p className="mb-3 text-xs font-bold uppercase tracking-wide text-slate-500">
+                Per-applicant register (optional — leave empty to save aggregate totals only)
+              </p>
+              <JobFairResultEntryEditor entries={proxyEntries} onChange={setProxyEntries} />
+            </div>
+
+            <Button
+              className="mt-5"
+              icon={Save}
+              onClick={() => action(() => adminService.submitJobFairProxyResults(id, {
+                ...proxy,
+                entries: proxyEntries.filter((e) => e.applicant_name && e.position_applied_for)
+                  .map((e) => ({ ...e, mismatch_code: e.mismatch_code || null })),
+              }), 'Admin Proxy Encoded report saved.')}
+            >
               Save Proxy Report
             </Button>
           </Card>
@@ -406,7 +439,16 @@ export default function JobFairDetailPage() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="reports">
+        <TabsContent value="reports" className="space-y-6">
+          {reports.length > 0 && (
+            <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <StatCard label="Establishments reported" value={reports.length} icon={FileText} color="blue" />
+              <StatCard label="Total applicants" value={unifiedTotals.total_applicants} icon={Users} color="blue" />
+              <StatCard label="Hired on the spot" value={unifiedTotals.total_hots} icon={Flame} color="amber" />
+              <StatCard label="Mismatched" value={unifiedTotals.total_rejected} icon={XCircle} color="red" />
+            </section>
+          )}
+
           <Card padding="none">
             <div className="border-b border-slate-100 p-5">
               <CardHeader title="Merged post-event reports" subtitle="Self-service and Admin Proxy Encoded records share one deduplicated reporting source." />
@@ -420,15 +462,34 @@ export default function JobFairDetailPage() {
                     <p className="font-bold text-slate-900">{r.company_name}</p>
                     <p className="text-xs font-semibold text-slate-500">{r.source === 'admin_proxy' ? 'Admin Proxy Encoded' : 'Employer Self-Service'} · {r.total_applicants} applicants · {r.total_hots} HOTS</p>
                   </div>
-                  <Button size="sm" variant="outline" icon={Download} onClick={() => blobDownload(() => adminService.downloadJobFairResult(r.id), `ro1-jf-form-3-${r.id}.pdf`)}>
-                    RO1-JF Form 3
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button size="sm" variant="outline" icon={Eye} onClick={() => setViewingReport(r)}>
+                      View
+                    </Button>
+                    <Button size="sm" variant="outline" icon={Download} onClick={() => blobDownload(() => adminService.downloadJobFairResult(r.id), `ro1-jf-form-3-${r.id}.pdf`)}>
+                      RO1-JF Form 3
+                    </Button>
+                  </div>
                 </div>
               ))}
             </div>
           </Card>
         </TabsContent>
       </Tabs>
+
+      <Dialog open={Boolean(viewingReport)} onOpenChange={(open) => !open && setViewingReport(null)}>
+        <DialogContent className="max-w-5xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{viewingReport?.company_name} — RO1-JF Form 3</DialogTitle>
+          </DialogHeader>
+          <EstablishmentReportPreview report={viewingReport} />
+          {viewingReport && (
+            <Button variant="outline" icon={Download} onClick={() => blobDownload(() => adminService.downloadJobFairResult(viewingReport.id), `ro1-jf-form-3-${viewingReport.id}.pdf`)}>
+              Download PDF
+            </Button>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

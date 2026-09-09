@@ -13,10 +13,37 @@ use Illuminate\Validation\ValidationException;
 
 class JobFairReportService
 {
+    // Legacy generic codes — still accepted so historical reports/tallies stay valid.
     public const MISMATCH_CODES = [
         'skills_mismatch', 'qualification_mismatch', 'experience_mismatch', 'education_mismatch',
         'salary_expectation_mismatch', 'location_mismatch', 'availability_mismatch',
         'incomplete_documents', 'failed_interview', 'other',
+    ];
+
+    // RO1-JF Form 3 employer-side mismatch codes (1-4), shown when an entry's
+    // status is 'employer_mismatch'.
+    public const EMPLOYER_MISMATCH_CODES = [
+        '1' => 'Lack required work experience',
+        '2' => 'Lack needed education/competency/skill',
+        '3' => 'Lack professional license/TESDA certification/skill',
+        '4' => 'Failed to submit documentary requirements',
+    ];
+
+    // RO1-JF Form 3 job-seeker-side mismatch codes (A-D), shown when an
+    // entry's status is 'seeker_mismatch'.
+    public const SEEKER_MISMATCH_CODES = [
+        'A' => 'Salary expectation is not met',
+        'B' => 'Applicant prefers another position',
+        'C' => 'Place of work/location is not acceptable',
+        'D' => 'Applicant did not push through with the application/Unresponsive',
+    ];
+
+    // RO1-JF Form 3 Jobseeker Classification codes (1-4), a per-entry checklist.
+    public const CLASSIFICATION_CODES = [
+        '1' => 'K-12/Senior High School graduate',
+        '2' => 'Person with disability (PWD)/Senior Citizen (SC)',
+        '3' => 'Displaced OFW',
+        '4' => '4Ps/TUPAD Beneficiary',
     ];
 
     public function saveEmployer(JobFair $fair, Employer $employer, array $data): JobFairResultReport
@@ -47,7 +74,7 @@ class JobFairReportService
             'source' => 'admin_proxy',
             'encoded_by_admin_id' => $admin->admin_id,
             'submitted_by_employer_id' => null,
-            'entries' => [],
+            'entries' => $data['entries'] ?? [],
         ]);
     }
 
@@ -84,7 +111,7 @@ class JobFairReportService
 
             $report->mismatchTallies()->delete();
             $tallies = $data['mismatch_tallies'] ?? collect($data['entries'] ?? [])
-                ->where('status', 'rejected')->whereNotNull('mismatch_code')
+                ->whereIn('status', ['employer_mismatch', 'seeker_mismatch', 'rejected'])->whereNotNull('mismatch_code')
                 ->countBy('mismatch_code')->map(fn ($count, $code) => ['mismatch_code' => $code, 'count' => $count])->values()->all();
             foreach ($tallies as $tally) {
                 if ((int) ($tally['count'] ?? 0) > 0) {
@@ -102,11 +129,22 @@ class JobFairReportService
 
     public function download(JobFairResultReport $report)
     {
-        $report->loadMissing(['jobFair', 'employer', 'entries', 'mismatchTallies']);
+        $report->loadMissing(['jobFair', 'employer', 'entries', 'mismatchTallies', 'encodedByAdmin']);
         $report->update(['report_generated_at' => now()]);
         $report->participation?->update(['participation_status' => 'report_generated', 'report_generated_at' => now()]);
 
-        return Pdf::loadView('pdf.job_fairs.roi_form_3', ['report' => $report])
+        $submittedByName = $report->source === 'admin_proxy'
+            ? trim(($report->encodedByAdmin?->first_name ?? '').' '.($report->encodedByAdmin?->last_name ?? '')) ?: null
+            : ($report->contact_person ?: $report->employer?->representative_name);
+        $submittedByEmail = $report->source === 'admin_proxy'
+            ? $report->encodedByAdmin?->email
+            : $report->employer?->email;
+
+        return Pdf::loadView('pdf.job_fairs.roi_form_3', [
+            'report' => $report,
+            'submittedByName' => $submittedByName,
+            'submittedByEmail' => $submittedByEmail,
+        ])
             ->setPaper('a4', 'landscape')
             ->download('ro1-jf-form-3-'.$report->job_fair_id.'-'.$report->id.'.pdf');
     }
@@ -133,20 +171,24 @@ class JobFairReportService
     private function assertTallies(array $data): void
     {
         $errors = [];
+        $totalQualified = (int) ($data['total_qualified'] ?? 0);
         if ((int) $data['total_male'] + (int) $data['total_female'] !== (int) $data['total_applicants']) {
             $errors['total_applicants'][] = 'Total applicants must equal male plus female applicants.';
         }
-        if ((int) $data['total_hots'] + (int) $data['total_near_hired'] + (int) $data['total_rejected'] !== (int) $data['total_applicants']) {
-            $errors['outcomes'][] = 'HOTS, near hired, and rejected totals must equal total applicants.';
+        if ($totalQualified + (int) $data['total_hots'] + (int) $data['total_near_hired'] + (int) $data['total_rejected'] !== (int) $data['total_applicants']) {
+            $errors['outcomes'][] = 'Qualified, HOTS, near hired, and mismatched totals must equal total applicants.';
         }
         if (collect($data['mismatch_tallies'] ?? [])->sum('count') > (int) $data['total_rejected']) {
-            $errors['mismatch_tallies'][] = 'Mismatch tallies cannot exceed the rejected applicant total.';
+            $errors['mismatch_tallies'][] = 'Mismatch tallies cannot exceed the mismatched applicant total.';
         }
-        if (($data['source'] ?? null) === 'employer_self_service') {
-            $entries = collect($data['entries'] ?? []);
+        // Entry-level detail is optional for admin proxy encoding (aggregate-only
+        // paper submissions are still allowed), but whenever rows are supplied —
+        // by either source — they must reconcile with the summary totals above.
+        if (filled($data['entries'] ?? null)) {
+            $entries = collect($data['entries']);
             if ($entries->count() !== (int) $data['total_applicants']) $errors['entries'][] = 'Detailed applicant rows must equal total applicants.';
             if ($entries->where('gender', 'male')->count() !== (int) $data['total_male'] || $entries->where('gender', 'female')->count() !== (int) $data['total_female']) $errors['entries'][] = 'Detailed applicant gender counts must match the summary.';
-            if ($entries->where('status', 'rejected')->contains(fn ($entry) => blank($entry['mismatch_code'] ?? null))) $errors['entries'][] = 'Every rejected applicant requires a mismatch reason.';
+            if ($entries->whereIn('status', ['employer_mismatch', 'seeker_mismatch', 'rejected'])->contains(fn ($entry) => blank($entry['mismatch_code'] ?? null))) $errors['entries'][] = 'Every mismatched applicant requires a mismatch reason.';
         }
         if ($errors) {
             throw ValidationException::withMessages($errors);

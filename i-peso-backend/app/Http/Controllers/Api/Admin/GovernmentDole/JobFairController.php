@@ -93,7 +93,10 @@ class JobFairController extends Controller
         $this->admin($request);
         $fair = JobFair::with([
             'employerJoins.employer', 'employerJoins.requirementSubmissions.requirement',
-            'employerJoins.confirmationSlip', 'employerJoins.resultReport', 'resultReports.mismatchTallies',
+            'employerJoins.confirmationSlip', 'employerJoins.resultReport',
+            'resultReports.mismatchTallies', 'resultReports.entries',
+            'resultReports.employer:employer_id,company_name,representative_name,email',
+            'resultReports.encodedByAdmin:admin_id,first_name,last_name,email',
         ])->findOrFail($id);
         $payload = $service->eventPayload($fair, null, true);
         $payload['participants'] = $fair->employerJoins->map(fn ($item) => $service->participationPayload($item))->values();
@@ -400,11 +403,31 @@ class JobFairController extends Controller
             'employer_id' => ['nullable', 'integer', 'exists:employers,employer_id'], 'company_name' => ['required', 'string', 'max:255'],
             'employer_type' => ['required', Rule::in(['registered_employer', 'walk_in_employer', 'out_of_town_employer', 'paper_only_employer'])],
             'contact_person' => ['nullable', 'string', 'max:255'], 'contact_number' => ['nullable', 'string', 'max:40'],
+            'clearance_no' => ['nullable', 'string', 'max:100'],
             'total_male' => ['required', 'integer', 'min:0'], 'total_female' => ['required', 'integer', 'min:0'], 'total_applicants' => ['required', 'integer', 'min:0'],
+            'total_qualified' => ['required', 'integer', 'min:0'],
             'total_hots' => ['required', 'integer', 'min:0'], 'total_near_hired' => ['required', 'integer', 'min:0'], 'total_rejected' => ['required', 'integer', 'min:0'],
             'total_vacancies_solicited' => ['required', 'integer', 'min:0'], 'total_vacancies_offered' => ['required', 'integer', 'min:0'],
             'remarks' => ['nullable', 'string', 'max:5000'], 'mismatch_tallies' => ['nullable', 'array'],
             'mismatch_tallies.*.mismatch_code' => ['required', Rule::in(JobFairReportService::MISMATCH_CODES)], 'mismatch_tallies.*.count' => ['required', 'integer', 'min:0'],
+            // Optional per-applicant register — same shape as employer self-service,
+            // for admin staff transcribing a full paper RO1-JF Form 3 register.
+            'entries' => ['nullable', 'array'], 'entries.*.applicant_name' => ['required_with:entries', 'string', 'max:255'],
+            'entries.*.gender' => ['required_with:entries', Rule::in(['male', 'female'])],
+            'entries.*.position_applied_for' => ['required_with:entries', 'string', 'max:255'],
+            'entries.*.status' => ['required_with:entries', Rule::in(['qualified', 'near_hired', 'hots', 'employer_mismatch', 'seeker_mismatch'])],
+            'entries.*.city_municipality' => ['nullable', 'string', 'max:255'],
+            'entries.*.contact_number' => ['nullable', 'string', 'max:40'],
+            'entries.*.age_group' => ['nullable', Rule::in(['A', 'B', 'C', 'D', 'E', 'F'])],
+            'entries.*.highest_education' => ['nullable', 'string', 'max:40'],
+            'entries.*.classification_codes' => ['nullable', 'array'],
+            'entries.*.classification_codes.*' => [Rule::in(array_keys(JobFairReportService::CLASSIFICATION_CODES))],
+            'entries.*.mismatch_code' => ['nullable', Rule::in([
+                ...array_keys(JobFairReportService::EMPLOYER_MISMATCH_CODES),
+                ...array_keys(JobFairReportService::SEEKER_MISMATCH_CODES),
+                ...JobFairReportService::MISMATCH_CODES,
+            ])],
+            'entries.*.remarks' => ['nullable', 'string', 'max:2000'],
         ]);
         return response()->json(['message' => 'Admin proxy report saved.', 'result_report' => $reports->saveProxy($jobFair, $admin, $validated)], 201);
     }
