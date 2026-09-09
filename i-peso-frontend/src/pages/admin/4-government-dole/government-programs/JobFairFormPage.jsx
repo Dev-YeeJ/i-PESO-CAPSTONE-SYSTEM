@@ -206,13 +206,14 @@ export default function JobFairFormPage() {
     try {
       if (id) {
         await adminService.updateJobFair(id, payload)
+        navigate(`/admin/job-fairs/${id}`)
       } else {
         const { job_fair: created } = await adminService.createJobFair(payload)
         if (publishNow) {
           await adminService.publishJobFair(created.job_fair_id)
         }
+        navigate(`/admin/job-fairs/${created.job_fair_id}`)
       }
-      navigate('/admin/job-fairs')
     } catch (requestError) {
       const errors = requestError.response?.data?.errors
       setError(errors ? Object.values(errors).flat().join(' ') : requestError.response?.data?.message ?? 'Failed to save job fair.')
@@ -220,6 +221,8 @@ export default function JobFairFormPage() {
       setSubmitting(false)
     }
   }, [form, id, navigate, singleDay, dateError])
+
+  const backTarget = id ? `/admin/job-fairs/${id}` : '/admin/job-fairs'
 
   return (
     <div className="portal-page">
@@ -229,34 +232,45 @@ export default function JobFairFormPage() {
           ? 'Publish the official bulletin, coordinate employers, and prepare post-event government reporting.'
           : 'Publishing this fair automatically emails every verified employer an invitation, with only the documentary requirements still outstanding for their company type.'}
         eyebrow="Government & DOLE"
-        actions={[{ label: 'Back', onClick: () => navigate('/admin/job-fairs'), variant: 'secondary' }]}
+        actions={[{ label: 'Back', onClick: () => navigate(backTarget), variant: 'secondary' }]}
       />
 
       {error && <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{error}</div>}
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
-        <Card>
-          <CardHeader title="Event Details" subtitle="Official source for announcements, employer coordination, and reports." />
-          {loading ? (
-            <LoadingSkeleton variant="card" rows={3} />
-          ) : (
-            <form onSubmit={handleSubmit} className="space-y-5">
-              <div>
-                <label className="block text-sm font-bold text-slate-700">Title</label>
-                <input name="title" value={form.title} onChange={handleChange} required className="mt-2 w-full rounded-lg border border-slate-300 px-4 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100" />
+      {loading ? (
+        <Card><LoadingSkeleton variant="card" rows={3} /></Card>
+      ) : (
+        <form onSubmit={handleSubmit} className={`grid gap-6 ${id ? 'xl:grid-cols-[minmax(0,1fr)_320px]' : ''}`}>
+          <div className="space-y-6">
+            <Card>
+              <CardHeader title="Basic Info" subtitle="What job seekers and employers see first." />
+              <div className="space-y-5">
+                <div>
+                  <label className="block text-sm font-bold text-slate-700">Title</label>
+                  <input name="title" value={form.title} onChange={handleChange} required className="mt-2 w-full rounded-lg border border-slate-300 px-4 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100" />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-slate-700">Description</label>
+                  <textarea name="description" value={form.description} onChange={handleChange} rows={4} className="mt-2 w-full rounded-lg border border-slate-300 px-4 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100" />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-slate-700">Sector</label>
+                  <select name="sector" value={form.sector} onChange={handleChange} className="mt-2 w-full max-w-xs rounded-lg border border-slate-300 px-4 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100">
+                    <option value="local">Local</option>
+                    <option value="overseas">Overseas</option>
+                    <option value="both">Both</option>
+                  </select>
+                </div>
               </div>
+            </Card>
 
-              <div>
-                <label className="block text-sm font-bold text-slate-700">Description</label>
-                <textarea name="description" value={form.description} onChange={handleChange} rows={4} className="mt-2 w-full rounded-lg border border-slate-300 px-4 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100" />
-              </div>
-
-              <div>
-                <label className="block text-sm font-bold text-slate-700">Venue</label>
-                <input name="venue" value={form.venue} onChange={handleChange} required placeholder="e.g. SM City Urdaneta - Events Center, 2nd Floor" className="mt-2 w-full rounded-lg border border-slate-300 px-4 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100" />
-              </div>
-
-              <div className="space-y-4">
+            <Card>
+              <CardHeader title="Location" subtitle="Venue address and the map pin job seekers see." />
+              <div className="space-y-5">
+                <div>
+                  <label className="block text-sm font-bold text-slate-700">Venue</label>
+                  <input name="venue" value={form.venue} onChange={handleChange} required placeholder="e.g. SM City Urdaneta - Events Center, 2nd Floor" className="mt-2 w-full rounded-lg border border-slate-300 px-4 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100" />
+                </div>
                 <AddressPicker
                   title="Venue Location / PSGC"
                   province={form.province}
@@ -271,7 +285,6 @@ export default function JobFairFormPage() {
                   google_place_id={form.google_place_id}
                   onChange={setLocation}
                 />
-
                 <MapPinPicker
                   latitude={form.latitude}
                   longitude={form.longitude}
@@ -285,82 +298,80 @@ export default function JobFairFormPage() {
                   </p>
                 )}
               </div>
+            </Card>
 
-              <div>
-                <label className="block text-sm font-bold text-slate-700">Partner Agencies</label>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {form.partner_agencies.map((agency, index) => (
-                    <span key={agency + index} className="inline-flex items-center gap-1.5 rounded-full border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-bold text-blue-800">
-                      {agency}
-                      <button type="button" onClick={() => removePartnerAgency(index)} aria-label={`Remove ${agency}`} className="text-blue-500 hover:text-blue-800">
-                        <X className="h-3 w-3" />
-                      </button>
-                    </span>
-                  ))}
-                </div>
-                <div className="mt-2 flex gap-2">
-                  <input
-                    value={partnerAgencyInput}
-                    onChange={(event) => setPartnerAgencyInput(event.target.value)}
-                    onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); addPartnerAgency() } }}
-                    className="flex-1 rounded-lg border border-slate-300 px-4 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
-                  />
-                  <Button type="button" variant="outline" icon={Plus} onClick={addPartnerAgency}>Add</Button>
-                </div>
-              </div>
-
-              <div className="grid gap-4 md:grid-cols-2">
+            <Card>
+              <CardHeader title="Schedule" subtitle="Dates, times, and the employer submission deadline." />
+              <div className="space-y-5">
                 <div>
-                  <label className="block text-sm font-bold text-slate-700">Submission Deadline</label>
-                  <input type="date" name="submission_deadline" value={form.submission_deadline} onChange={handleChange} required max={form.start_date || undefined} className="mt-2 w-full rounded-lg border border-slate-300 px-4 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100" />
-                  <p className="mt-1 text-xs text-slate-500">Employers must submit their documentary requirements by this date.</p>
+                  <label className="flex items-center gap-2 text-sm font-bold text-slate-700">
+                    <input type="checkbox" checked={singleDay} onChange={(event) => toggleSingleDay(event.target.checked)} className="h-4 w-4 rounded border-slate-300" />
+                    This is a single-day event
+                  </label>
                 </div>
-                <div>
-                  <label className="block text-sm font-bold text-slate-700">Maximum Representatives</label>
-                  <input type="number" min="1" max="10" name="maximum_representatives" value={form.maximum_representatives} onChange={handleChange} className="mt-2 w-full rounded-lg border border-slate-300 px-4 py-2.5 text-sm" />
-                </div>
-              </div>
 
-              <div>
-                <label className="flex items-center gap-2 text-sm font-bold text-slate-700">
-                  <input type="checkbox" checked={singleDay} onChange={(event) => toggleSingleDay(event.target.checked)} className="h-4 w-4 rounded border-slate-300" />
-                  This is a single-day event
-                </label>
-              </div>
-
-              <div className={`grid gap-4 ${singleDay ? 'md:grid-cols-3' : 'md:grid-cols-2'}`}>
-                <div>
-                  <label className="block text-sm font-bold text-slate-700">Start Date</label>
-                  <input type="date" name="start_date" value={form.start_date} onChange={handleChange} required min={id ? undefined : new Date().toISOString().slice(0, 10)} className="mt-2 w-full rounded-lg border border-slate-300 px-4 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100" />
-                </div>
-                {!singleDay && (
+                <div className={`grid gap-4 md:grid-cols-2 ${singleDay ? 'lg:grid-cols-3' : 'lg:grid-cols-2'}`}>
                   <div>
-                    <label className="block text-sm font-bold text-slate-700">End Date</label>
-                    <input type="date" name="end_date" value={form.end_date} onChange={handleChange} required min={form.start_date || undefined} className="mt-2 w-full rounded-lg border border-slate-300 px-4 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100" />
+                    <label className="block text-sm font-bold text-slate-700">Start Date</label>
+                    <input type="date" name="start_date" value={form.start_date} onChange={handleChange} required min={id ? undefined : new Date().toISOString().slice(0, 10)} className="mt-2 w-full rounded-lg border border-slate-300 px-4 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100" />
                   </div>
-                )}
-                <div>
-                  <label className="block text-sm font-bold text-slate-700">Start Time</label>
-                  <input type="time" name="start_time" value={form.start_time} onChange={handleChange} required className="mt-2 w-full rounded-lg border border-slate-300 px-4 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100" />
+                  {!singleDay && (
+                    <div>
+                      <label className="block text-sm font-bold text-slate-700">End Date</label>
+                      <input type="date" name="end_date" value={form.end_date} onChange={handleChange} required min={form.start_date || undefined} className="mt-2 w-full rounded-lg border border-slate-300 px-4 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100" />
+                    </div>
+                  )}
+                  <div>
+                    <label className="block text-sm font-bold text-slate-700">Start Time</label>
+                    <input type="time" name="start_time" value={form.start_time} onChange={handleChange} required className="mt-2 w-full rounded-lg border border-slate-300 px-4 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold text-slate-700">End Time</label>
+                    <input type="time" name="end_time" value={form.end_time} onChange={handleChange} required className="mt-2 w-full rounded-lg border border-slate-300 px-4 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100" />
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-sm font-bold text-slate-700">End Time</label>
-                  <input type="time" name="end_time" value={form.end_time} onChange={handleChange} required className="mt-2 w-full rounded-lg border border-slate-300 px-4 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100" />
+
+                {dateError && <p className="text-xs font-semibold text-red-600">{dateError}</p>}
+
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div>
+                    <label className="block text-sm font-bold text-slate-700">Submission Deadline</label>
+                    <input type="date" name="submission_deadline" value={form.submission_deadline} onChange={handleChange} required max={form.start_date || undefined} className="mt-2 w-full rounded-lg border border-slate-300 px-4 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100" />
+                    <p className="mt-1 text-xs text-slate-500">Employers must submit their documentary requirements by this date.</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold text-slate-700">Maximum Representatives</label>
+                    <input type="number" min="1" max="10" name="maximum_representatives" value={form.maximum_representatives} onChange={handleChange} className="mt-2 w-full rounded-lg border border-slate-300 px-4 py-2.5 text-sm" />
+                  </div>
                 </div>
               </div>
+            </Card>
 
-              {dateError && <p className="text-xs font-semibold text-red-600">{dateError}</p>}
-
-              <div>
-                <label className="block text-sm font-bold text-slate-700">Sector</label>
-                <select name="sector" value={form.sector} onChange={handleChange} className="mt-2 w-full max-w-xs rounded-lg border border-slate-300 px-4 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100">
-                  <option value="local">Local</option>
-                  <option value="overseas">Overseas</option>
-                  <option value="both">Both</option>
-                </select>
+            <Card>
+              <CardHeader title="Partner Agencies" subtitle="Optional — co-organizers shown on the official bulletin." />
+              <div className="flex flex-wrap gap-2">
+                {form.partner_agencies.map((agency, index) => (
+                  <span key={agency + index} className="inline-flex items-center gap-1.5 rounded-full border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-bold text-blue-800">
+                    {agency}
+                    <button type="button" onClick={() => removePartnerAgency(index)} aria-label={`Remove ${agency}`} className="text-blue-500 hover:text-blue-800">
+                      <X className="h-3 w-3" />
+                    </button>
+                  </span>
+                ))}
               </div>
+              <div className="mt-2 flex gap-2">
+                <input
+                  value={partnerAgencyInput}
+                  onChange={(event) => setPartnerAgencyInput(event.target.value)}
+                  onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); addPartnerAgency() } }}
+                  className="flex-1 rounded-lg border border-slate-300 px-4 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                />
+                <Button type="button" variant="outline" icon={Plus} onClick={addPartnerAgency}>Add</Button>
+              </div>
+            </Card>
 
-              <div className="flex flex-wrap items-center gap-3 border-t border-slate-200 pt-5">
+            <Card>
+              <div className="flex flex-wrap items-center gap-3">
                 {id ? (
                   <Button type="submit" icon={Save} disabled={submitting}>{submitting ? 'Saving...' : 'Save Changes'}</Button>
                 ) : (
@@ -373,36 +384,38 @@ export default function JobFairFormPage() {
                     </Button>
                   </>
                 )}
-                <Button variant="outline" icon={ArrowLeft} onClick={() => navigate('/admin/job-fairs')}>Cancel</Button>
+                <Button type="button" variant="outline" icon={ArrowLeft} onClick={() => navigate(backTarget)}>Cancel</Button>
               </div>
               {!id && (
-                <p className="text-xs text-slate-500">
+                <p className="mt-3 text-xs text-slate-500">
                   <strong>Save as Draft</strong> keeps this private while you finish setting it up.{' '}
                   <strong>Save &amp; Publish</strong> makes it visible to job seekers immediately and emails every
                   verified employer an invitation.
                 </p>
               )}
-            </form>
-          )}
-        </Card>
-
-        <Card>
-          <CardHeader title="Reporting Readiness" subtitle="Participation and post-event reporting only." />
-          <div className="grid grid-cols-2 gap-3">
-            {[
-              ['Approved', metrics?.approved ?? 0],
-              ['Reports', (metrics?.self_service_reports ?? 0) + (metrics?.proxy_reports ?? 0)],
-              ['Applicants', metrics?.total_applicants ?? 0],
-              ['HOTS', metrics?.total_hots ?? 0],
-            ].map(([label, value]) => (
-              <div key={label} className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-                <p className="text-xl font-black text-slate-950">{value}</p>
-                <p className="text-[11px] font-extrabold uppercase text-slate-500">{label}</p>
-              </div>
-            ))}
+            </Card>
           </div>
-        </Card>
-      </div>
+
+          {id && (
+            <Card className="h-fit">
+              <CardHeader title="Reporting Readiness" subtitle="Participation and post-event reporting only." />
+              <div className="grid grid-cols-2 gap-3">
+                {[
+                  ['Approved', metrics?.approved ?? 0],
+                  ['Reports', (metrics?.self_service_reports ?? 0) + (metrics?.proxy_reports ?? 0)],
+                  ['Applicants', metrics?.total_applicants ?? 0],
+                  ['HOTS', metrics?.total_hots ?? 0],
+                ].map(([label, value]) => (
+                  <div key={label} className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                    <p className="text-xl font-black text-slate-950">{value}</p>
+                    <p className="text-[11px] font-extrabold uppercase text-slate-500">{label}</p>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          )}
+        </form>
+      )}
     </div>
   )
 }

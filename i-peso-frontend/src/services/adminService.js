@@ -181,6 +181,11 @@ export const adminService = {
     return data
   },
 
+  getJobFairsSummary: async () => {
+    const { data } = await api.get('/admin/job-fairs/summary')
+    return data
+  },
+
   createJobFair: async (fairData) => {
     const { data } = await api.post('/admin/job-fairs', fairData)
     return data

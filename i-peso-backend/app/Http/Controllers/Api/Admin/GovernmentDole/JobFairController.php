@@ -33,14 +33,44 @@ class JobFairController extends Controller
         $filters = $request->validate([
             'search' => ['nullable', 'string', 'max:255'],
             'status' => ['nullable', Rule::in(['draft', 'published', 'accepting_employers', 'closed', 'completed', 'cancelled', 'upcoming', 'ongoing'])],
+            'sector' => ['nullable', Rule::in(['local', 'overseas', 'both'])],
+            'sort' => ['nullable', Rule::in(['newest', 'oldest', 'title'])],
             'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
         ]);
         $query = JobFair::query();
         if ($filters['search'] ?? null) $query->where('title', 'like', '%'.$filters['search'].'%');
         if ($filters['status'] ?? null) $query->where('status', $filters['status']);
-        $fairs = $query->orderByRaw('COALESCE(start_date, event_date) desc')->paginate($filters['per_page'] ?? 15);
+        if ($filters['sector'] ?? null) $query->where('sector', $filters['sector']);
+        match ($filters['sort'] ?? 'newest') {
+            'oldest' => $query->orderByRaw('COALESCE(start_date, event_date) asc'),
+            'title' => $query->orderBy('title'),
+            default => $query->orderByRaw('COALESCE(start_date, event_date) desc'),
+        };
+        $fairs = $query->paginate($filters['per_page'] ?? 15);
         $fairs->getCollection()->transform(fn (JobFair $fair) => $service->eventPayload($fair, null, true));
         return response()->json($fairs);
+    }
+
+    /**
+     * Summary counts for the directory's stat-card row — mirrors
+     * Admin\ConstituentCRM\EmployerController::summary()'s shape/purpose.
+     */
+    public function summary(Request $request): JsonResponse
+    {
+        $this->admin($request);
+        $summary = JobFair::query()->selectRaw(
+            'COUNT(*) AS total'
+            ." , SUM(CASE WHEN status IN ('published', 'accepting_employers', 'upcoming') THEN 1 ELSE 0 END) AS upcoming"
+            ." , SUM(CASE WHEN status = 'ongoing' THEN 1 ELSE 0 END) AS ongoing"
+            ." , SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) AS completed"
+        )->first();
+
+        return response()->json([
+            'total' => (int) ($summary->total ?? 0),
+            'upcoming' => (int) ($summary->upcoming ?? 0),
+            'ongoing' => (int) ($summary->ongoing ?? 0),
+            'completed' => (int) ($summary->completed ?? 0),
+        ]);
     }
 
     public function store(Request $request, JobFairService $service, GoogleMapsService $maps): JsonResponse

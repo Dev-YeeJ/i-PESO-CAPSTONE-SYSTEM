@@ -204,44 +204,49 @@ export default function JobFairCheckInPage() {
       )}
 
       {result?.kind === 'not_found' && (
-        <Card className="border-red-200">
-          <Badge variant="rejected" className="mb-3">Not registered for this job fair</Badge>
-          <p className="text-sm text-slate-600">Search by name or mobile number instead — the seeker may have RSVP'd under a different phone, or a QR read may have failed.</p>
-          <div className="relative mt-3">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-            <input
-              autoFocus
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search name or mobile number"
-              className="w-full rounded-lg border border-slate-300 bg-white py-2.5 pl-9 pr-3 text-sm focus:border-brand-navy focus:outline-none focus:ring-2 focus:ring-brand-navy/10"
-            />
-          </div>
-          {searching && <p className="mt-2 text-xs text-slate-400">Searching…</p>}
-          {searchResults.length > 0 && (
-            <ul className="mt-3 divide-y divide-slate-100 rounded-lg border border-slate-200">
-              {searchResults.map((row) => (
-                <li key={row.id}>
-                  <button
-                    type="button"
-                    onClick={() => checkIn({ attendee_id: row.id })}
-                    className="flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left text-sm hover:bg-slate-50"
-                  >
-                    <span>
-                      <span className="font-bold text-slate-900">{row.name}</span>
-                      <span className="ml-2 text-slate-500">{row.mobile_number}</span>
-                      {row.is_guest && <span className="ml-2 rounded-full bg-slate-100 px-1.5 py-0.5 text-xs text-slate-500">walk-in</span>}
-                    </span>
-                    {row.is_attended
-                      ? <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
-                      : <Clock3 className="h-4 w-4 shrink-0 text-slate-300" />}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
+        <div className="space-y-4">
+          <Card className="border-red-200">
+            <Badge variant="rejected" className="mb-3">Not registered for this job fair</Badge>
+            <p className="text-sm text-slate-600">Search by name or mobile number instead — the seeker may have RSVP'd under a different phone, or a QR read may have failed.</p>
+            <div className="relative mt-3">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <input
+                autoFocus
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search name or mobile number"
+                className="w-full rounded-lg border border-slate-300 bg-white py-2.5 pl-9 pr-3 text-sm focus:border-brand-navy focus:outline-none focus:ring-2 focus:ring-brand-navy/10"
+              />
+            </div>
+            {searching && <p className="mt-2 text-xs text-slate-400">Searching…</p>}
+            {searchResults.length > 0 && (
+              <ul className="mt-3 divide-y divide-slate-100 rounded-lg border border-slate-200">
+                {searchResults.map((row) => (
+                  <li key={row.id}>
+                    <button
+                      type="button"
+                      onClick={() => checkIn({ attendee_id: row.id })}
+                      className="flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left text-sm hover:bg-slate-50"
+                    >
+                      <span>
+                        <span className="font-bold text-slate-900">{row.name}</span>
+                        <span className="ml-2 text-slate-500">{row.mobile_number}</span>
+                        {row.is_guest && <span className="ml-2 rounded-full bg-slate-100 px-1.5 py-0.5 text-xs text-slate-500">walk-in</span>}
+                      </span>
+                      {row.is_attended
+                        ? <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
+                        : <Clock3 className="h-4 w-4 shrink-0 text-slate-300" />}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <Button variant="outline" className="mt-4 w-full" onClick={scanNext}>
+              <XCircle className="h-4 w-4" /> Cancel and rescan
+            </Button>
+          </Card>
 
-          <div className="mt-5 border-t border-slate-100 pt-4">
+          <Card>
             <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Still can't find them? Encode a walk-in</p>
             <p className="mt-1 text-sm text-slate-500">For a seeker with no i-peso account — only the physical/Google Form pre-registration.</p>
             <form onSubmit={encodeWalkIn} className="mt-3 space-y-2">
@@ -274,12 +279,8 @@ export default function JobFairCheckInPage() {
                 {encoding ? 'Registering…' : 'Register & check in'}
               </Button>
             </form>
-          </div>
-
-          <Button variant="outline" className="mt-4 w-full" onClick={scanNext}>
-            <XCircle className="h-4 w-4" /> Cancel and rescan
-          </Button>
-        </Card>
+          </Card>
+        </div>
       )}
     </div>
   )
