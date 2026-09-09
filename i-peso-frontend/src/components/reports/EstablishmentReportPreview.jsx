@@ -76,12 +76,12 @@ export default function EstablishmentReportPreview({ report }) {
               <TableHead>#</TableHead><TableHead>Name of Jobseeker</TableHead><TableHead>Position</TableHead>
               <TableHead>Sex</TableHead><TableHead>City/Municipality</TableHead><TableHead>Contact</TableHead>
               <TableHead>Classification</TableHead><TableHead>Age Group</TableHead><TableHead>Educ.</TableHead>
-              <TableHead>Status of Application</TableHead><TableHead>Mismatch Reason</TableHead>
+              <TableHead>Status of Application</TableHead><TableHead>Employer Mismatch</TableHead><TableHead>Job Seeker Mismatch</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {entries.length === 0 ? (
-              <TableRow><TableCell colSpan={11} className="py-8 text-center text-sm text-slate-400">No per-applicant register was encoded for this report.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={12} className="py-8 text-center text-sm text-slate-400">No per-applicant register was encoded for this report.</TableCell></TableRow>
             ) : entries.map((entry, index) => (
               <TableRow key={entry.id ?? index}>
                 <TableCell>{index + 1}</TableCell>
@@ -94,7 +94,8 @@ export default function EstablishmentReportPreview({ report }) {
                 <TableCell>{entry.age_group || '—'}</TableCell>
                 <TableCell>{educationCode(entry.highest_education) || '—'}</TableCell>
                 <TableCell>{statusLabel(entry.status)}</TableCell>
-                <TableCell>{entry.mismatch_code ? `(${entry.mismatch_code}) ${mismatchCodeLabel(entry.mismatch_code)}` : '—'}</TableCell>
+                <TableCell>{entry.status === 'employer_mismatch' && entry.mismatch_code ? `(${entry.mismatch_code}) ${mismatchCodeLabel(entry.mismatch_code)}` : '—'}</TableCell>
+                <TableCell>{entry.status === 'seeker_mismatch' && entry.mismatch_code ? `(${entry.mismatch_code}) ${mismatchCodeLabel(entry.mismatch_code)}` : '—'}</TableCell>
               </TableRow>
             ))}
           </TableBody>

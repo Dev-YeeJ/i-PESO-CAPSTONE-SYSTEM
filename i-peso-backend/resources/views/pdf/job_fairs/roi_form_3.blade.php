@@ -2,14 +2,14 @@
 @page { margin: 14px 16px; }
 body{font-family:'DejaVu Sans',sans-serif;font-size:8.2px;color:#0f172a}
 h1{text-align:center;font-size:15px;margin:0;letter-spacing:.5px}
-.code{text-align:center;font-weight:bold;margin:2px 0 8px;font-size:10px}
+.code{text-align:center;font-weight:bold;margin:2px 0 10px;font-size:10px}
 table{width:100%;border-collapse:collapse}
-.meta{margin-bottom:6px}
-.meta td{border:1px solid #64748b;padding:3px 5px;vertical-align:top;width:20%}
-.meta .label{display:block;font-size:6.6px;font-weight:bold;text-transform:uppercase;color:#475569;letter-spacing:.3px}
-.meta .value{font-size:8.6px;font-weight:bold}
+.header-row td{vertical-align:top;padding:0}
+.meta-block .row{margin-bottom:2px}
+.meta-block .label{display:inline-block;min-width:150px;font-size:7px;font-weight:bold;text-transform:uppercase;color:#475569;letter-spacing:.3px}
+.meta-block .value{font-size:8.4px;font-weight:bold}
 .grid th,.grid td{border:1px solid #64748b;padding:2.5px 3px;vertical-align:middle;text-align:center}
-.grid thead th{background:#e2e8f0;font-size:6.8px;font-weight:bold}
+.grid thead th{background:#e2e8f0;font-size:6.6px;font-weight:bold;line-height:1.2}
 .grid td.name,.grid td.position{text-align:left;font-size:7.6px}
 .grid td.num{font-size:7px}
 .check{font-weight:bold;font-size:9px}
@@ -23,41 +23,56 @@ table{width:100%;border-collapse:collapse}
 .tally table td{border:none;padding:1.5px 0;font-size:8px}
 .tally table td.tnum{text-align:right;font-weight:bold}
 .tally .ttotal{border-top:1px solid #64748b;font-weight:bold}
-.submitted{margin-top:10px;font-size:7.6px}
-.sig-line{display:block;border-bottom:1px solid #0f172a;width:220px;height:16px;margin-top:10px}
+.submitted{font-size:7.6px}
+.sig-line{display:block;border-bottom:1px solid #0f172a;width:230px;height:22px}
 .muted{color:#64748b}
 </style></head><body>
 
 <h1>ESTABLISHMENT REPORT</h1><div class="code">RO1-JF Form 3</div>
 
-<table class="meta"><tr>
-  <td><span class="label">Name of Establishment</span><span class="value">{{ $report->company_name }}</span></td>
-  <td><span class="label">Office Location</span><span class="value">{{ $report->office_location ?: 'N/A' }}</span></td>
-  <td><span class="label">Date of Activity</span><span class="value">{{ optional($report->jobFair->start_date ?? $report->jobFair->event_date)->format('m/d/y') }}</span></td>
-  <td><span class="label">Job Fair Clearance No.</span><span class="value">{{ $report->clearance_no ?: '—' }}</span></td>
-  <td><span class="label">Job Fair Venue / Platform</span><span class="value">{{ $report->jobFair->title }} · {{ $report->jobFair->venue }}</span></td>
+<table class="header-row"><tr>
+  <td style="width:46%">
+    <div class="submitted">
+      <strong>Submitted by:</strong>
+      <span class="sig-line"></span>
+      <div>{{ $submittedByName ?: 'N/A' }}</div>
+      <div class="muted">Signature over printed name</div>
+      <div style="margin-top:5px"><strong>E-mail Address and Mobile no.:</strong></div>
+      <div>{{ $submittedByEmail ?: 'N/A' }}{{ $report->contact_number ? ' / '.$report->contact_number : '' }}</div>
+    </div>
+  </td>
+  <td style="width:54%">
+    <div class="meta-block">
+      <div class="row"><span class="label">Name of Establishment:</span> <span class="value">{{ $report->company_name }}</span></div>
+      <div class="row"><span class="label">Office Location:</span> <span class="value">{{ $report->office_location ?: 'N/A' }}</span></div>
+      <div class="row"><span class="label">Date of Activity:</span> <span class="value">{{ optional($report->jobFair->start_date ?? $report->jobFair->event_date)->format('m/d/y') }}</span></div>
+      <div class="row"><span class="label">Job Fair Clearance No.:</span> <span class="value">{{ $report->clearance_no ?: '—' }}</span></div>
+      <div class="row"><span class="label">Job Fair Venue / Name of Job Fair Platform:</span> <span class="value">{{ $report->jobFair->title }} · {{ $report->jobFair->venue }}</span></div>
+    </div>
+  </td>
 </tr></table>
 
-<table class="grid">
+<table class="grid" style="margin-top:10px">
   <thead>
     <tr>
       <th rowspan="2" style="width:2%">#</th>
       <th rowspan="2" style="width:11%">Name of Jobseeker</th>
       <th rowspan="2" style="width:9%">Position Applying For</th>
-      <th rowspan="2" style="width:3%">Sex</th>
+      <th rowspan="2" style="width:3%">Sex<br>M/F</th>
       <th rowspan="2" style="width:9%">City/Municipality of Residence</th>
       <th rowspan="2" style="width:7%">Tel/Cell Phone No.</th>
-      <th rowspan="2" style="width:9%">Jobseeker Classification<br><span class="muted">(refer to code below)</span></th>
+      <th rowspan="2" style="width:8%">Jobseeker Classification<br><span class="muted">(refer to code below)</span></th>
       <th rowspan="2" style="width:4%">Age Group</th>
       <th colspan="6">Highest Educational Attainment</th>
-      <th colspan="5">Status of Application</th>
-      <th rowspan="2" style="width:6%">Reason for Job/Employer Mismatch</th>
+      <th colspan="5">Status of Application<br><span class="muted">(please check only one)</span></th>
+      <th colspan="2">Reason for Job Mismatch<br><span class="muted">(refer to code below)</span></th>
     </tr>
     <tr>
-      <th style="width:2.3%">E</th><th style="width:2.3%">HS</th><th style="width:2.3%">K-12</th>
-      <th style="width:2.3%">V</th><th style="width:2.3%">C</th><th style="width:2.3%">PG</th>
-      <th style="width:4%">Qualified</th><th style="width:4%">Near Hired</th><th style="width:4%">Hired-on-the-spot</th>
-      <th style="width:4.5%">Mismatch ch. (Employer)</th><th style="width:4.5%">Mismatch ch. (Job Seeker)</th>
+      <th style="width:2.2%">E</th><th style="width:2.2%">HS</th><th style="width:2.2%">K-12</th>
+      <th style="width:2.2%">V</th><th style="width:2.2%">C</th><th style="width:2.2%">PG</th>
+      <th style="width:4%">Qualified</th><th style="width:4%">Near<br>Hired</th><th style="width:4%">Hired-on-<br>the-spot</th>
+      <th style="width:4.5%">Mismatch ch.<br>(Employer)</th><th style="width:4.5%">Mismatch ch.<br>(Job Seeker)</th>
+      <th style="width:3%">Employer</th><th style="width:3%">Job Seeker</th>
     </tr>
   </thead>
   <tbody>
@@ -94,10 +109,11 @@ table{width:100%;border-collapse:collapse}
         <td class="check">{{ $entry->status === 'hots' ? '✓' : '' }}</td>
         <td class="check">{{ $entry->status === 'employer_mismatch' ? '✓' : '' }}</td>
         <td class="check">{{ $entry->status === 'seeker_mismatch' ? '✓' : '' }}</td>
-        <td class="num">{{ $entry->mismatch_code ?: '—' }}</td>
+        <td class="num">{{ $entry->status === 'employer_mismatch' ? $entry->mismatch_code : '—' }}</td>
+        <td class="num">{{ $entry->status === 'seeker_mismatch' ? $entry->mismatch_code : '—' }}</td>
       </tr>
     @empty
-      <tr><td colspan="19" class="muted" style="padding:10px">No per-applicant register was encoded for this report — totals below are the only figures on file.</td></tr>
+      <tr><td colspan="21" class="muted" style="padding:10px">No per-applicant register was encoded for this report — totals below are the only figures on file.</td></tr>
     @endforelse
   </tbody>
 </table>
@@ -125,7 +141,7 @@ table{width:100%;border-collapse:collapse}
       </td>
       <td style="width:50%">
         <div class="legend-box">
-          <span class="legend-title">Job Seeker Mismatch</span>
+          <span class="legend-title">Job Seeker Mismatch <span class="muted">(reason for unqualified/job mismatched application)</span></span>
           <ol type="A">
             @foreach(\App\Services\JobFairReportService::SEEKER_MISMATCH_CODES as $code => $label)
               <li>({{ $code }}) {{ $label }}</li>
@@ -138,16 +154,6 @@ table{width:100%;border-collapse:collapse}
       <span class="legend-title">Age Group / Education Codes</span>
       <span class="muted">Age Group — A: 15-24 yrs · B: 25-34 yrs · C: 35-44 yrs · D: 45-54 yrs · E: 55-64 yrs · F: 65+ yrs</span><br>
       <span class="muted">Education — E: Elementary · HS: Old High School · K-12: Senior High School · V: Vocational · C: College (Graduate, put a check in the box if completed) · PG: Post Graduate</span>
-    </div>
-
-    <div class="submitted">
-      <strong>Submitted by:</strong>
-      <span class="sig-line"></span>
-      <div>{{ $submittedByName ?: 'N/A' }}<br>Signature over printed name</div>
-      <div style="margin-top:4px">
-        <strong>E-mail Address and Mobile no.:</strong> {{ $submittedByEmail ?: 'N/A' }}
-        @if($report->contact_number) / {{ $report->contact_number }} @endif
-      </div>
     </div>
   </td>
   <td style="width:36%">
