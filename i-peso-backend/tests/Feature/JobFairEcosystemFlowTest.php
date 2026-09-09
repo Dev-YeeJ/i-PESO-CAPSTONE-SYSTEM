@@ -143,6 +143,47 @@ class JobFairEcosystemFlowTest extends TestCase
         $this->assertSame(0, \DB::table('sms_notifications')->where('provider', '!=', 'log_only')->count());
     }
 
+    public function test_result_register_over_fifteen_entries_paginates_the_roi_form_3_pdf(): void
+    {
+        $admin = Administrator::create([
+            'first_name' => 'PESO', 'last_name' => 'Manager', 'email' => 'pagination-admin@example.test',
+            'mobile_number' => '09170000002', 'password' => 'password123', 'role' => 'administrator', 'status' => 'active', 'email_verified_at' => now(),
+        ]);
+        $employer = $this->employer('pagination-employer@example.test', 'Big Register Manufacturing');
+
+        Sanctum::actingAs($admin);
+        $fairId = $this->postJson('/api/admin/job-fairs', [
+            'title' => 'Large Turnout Job Fair', 'description' => 'PESO employment bulletin.',
+            'start_date' => '2026-11-08', 'end_date' => '2026-11-08', 'start_time' => '08:00', 'end_time' => '16:00',
+            'venue' => 'Urdaneta City Gymnasium',
+            'province' => 'Pangasinan', 'city_municipality' => 'Urdaneta City', 'barangay' => 'Nancayasan',
+            'sector' => 'local', 'target_sector' => 'Multi-sector',
+            'submission_deadline' => '2026-10-20 17:00:00',
+            'contact_email' => 'peso@example.test', 'maximum_representatives' => 2, 'status' => 'draft',
+        ])->assertCreated()->json('job_fair.job_fair_id');
+        $this->postJson("/api/admin/job-fairs/{$fairId}/publish", ['status' => 'accepting_employers'])->assertOk();
+        $this->postJson("/api/admin/job-fairs/{$fairId}/invite", ['employer_id' => $employer->employer_id])->assertCreated();
+
+        Sanctum::actingAs($employer);
+        $this->postJson("/api/employer/job-fairs/{$fairId}/respond", ['response' => 'accepted'])->assertOk();
+
+        // 22 applicants — spans two 15-row pages on the printed form (rows 1-15,
+        // then 16-22 re-numbered 1-7 on the continuation page).
+        $entries = collect(range(1, 22))->map(fn ($n) => [
+            'applicant_name' => "Applicant {$n}", 'gender' => $n % 2 === 0 ? 'female' : 'male',
+            'position_applied_for' => 'Line Worker', 'status' => 'qualified',
+        ])->all();
+        $reportId = $this->postJson("/api/employer/job-fairs/{$fairId}/results", [
+            'total_male' => 11, 'total_female' => 11, 'total_applicants' => 22, 'total_qualified' => 22,
+            'total_hots' => 0, 'total_near_hired' => 0, 'total_rejected' => 0,
+            'total_vacancies_solicited' => 10, 'total_vacancies_offered' => 10,
+            'entries' => $entries,
+        ])->assertOk()->json('result_report.id');
+
+        $this->get("/api/employer/job-fair-results/{$reportId}/roi-form-3")
+            ->assertOk()->assertHeader('content-type', 'application/pdf');
+    }
+
     public function test_verified_employer_reuses_accreditation_documents_for_job_fair_requirements(): void
     {
         Storage::fake('local');
