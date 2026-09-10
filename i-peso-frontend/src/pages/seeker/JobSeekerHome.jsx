@@ -25,6 +25,7 @@ import {
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { StatCard } from '@/components/ui'
 import { applyToJob, toggleSavedJob as toggleSavedJobApi } from '@/services/seekerService'
 
 const feedTabs = [
@@ -248,12 +249,18 @@ export default function JobSeekerHome({
           </div>
         )}
 
+        <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <StatCard label="Profile Readiness" value={`${Math.min(seeker.nsrpCompletion, 100)}%`} icon={UserRound} color="blue" />
+          <StatCard label="Active Applications" value={activeApplications} icon={BriefcaseBusiness} color="blue" />
+          <StatCard label="Saved Jobs" value={savedJobIds.length} icon={BookmarkCheck} color="amber" />
+          <StatCard label="Profile Views (30d)" value={analyticsData?.total_views_30_days ?? '—'} icon={Target} color="green" />
+        </section>
+
         <div className="grid gap-4 lg:grid-cols-[minmax(280px,0.8fr)_minmax(0,2fr)] lg:gap-6 lg:items-start">
           <aside className="grid auto-cols-[minmax(260px,1fr)] grid-flow-col gap-3 overflow-x-auto pb-1 sm:gap-5 lg:sticky lg:top-24 lg:block lg:space-y-5 lg:overflow-visible lg:pb-0">
             <ProfileSnapshot seeker={seeker} activeApplications={activeApplications} />
             <NextBestAction profile={profile} seeker={seeker} />
-            {analyticsData && <ProfileViewsAnalytics analytics={analyticsData} />}
-            <MatchingEngineCard />
+            <ProfileInsightsCard analytics={analyticsData} />
           </aside>
 
           <main className="space-y-5">
@@ -687,41 +694,6 @@ function ProfileSnapshot({ seeker, activeApplications }) {
   )
 }
 
-function ProfileViewsAnalytics({ analytics }) {
-  return (
-    <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-      <div className="flex items-start gap-3">
-        <span className="rounded-xl bg-blue-50 p-2 text-blue-700">
-          <UserRound className="h-5 w-5" />
-        </span>
-        <div>
-          <h2 className="text-sm font-black text-slate-950">Profile Analytics</h2>
-          <p className="mt-1 text-xs leading-5 text-slate-500">Past 30 days visibility</p>
-        </div>
-      </div>
-
-      <div className="mt-4 grid grid-cols-2 gap-3">
-        <SidebarStat label="Profile Views" value={analytics.total_views_30_days} />
-        <SidebarStat label="Search Appearances" value={analytics.search_appearances} />
-      </div>
-
-      {analytics.recent_viewers?.length > 0 && (
-        <div className="mt-5 border-t border-slate-100 pt-4">
-          <p className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-400">Recent Viewers</p>
-          <ul className="mt-3 space-y-3 text-sm font-semibold text-slate-700">
-            {analytics.recent_viewers.map((viewer, i) => (
-              <li key={i} className="flex items-center gap-2">
-                <Building2 className="h-4 w-4 text-slate-400 shrink-0" />
-                <span className="truncate">{viewer.company_name}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-    </section>
-  )
-}
-
 function NextBestAction({ profile, seeker }) {
   const action = nextBestAction(profile, seeker)
 
@@ -748,7 +720,12 @@ function NextBestAction({ profile, seeker }) {
   )
 }
 
-function MatchingEngineCard() {
+// Merges what used to be two separate always-informational sidebar cards
+// (profile view analytics + a static explainer of the ranking engine) into
+// one, so the sticky sidebar doesn't stack four cards deep. The ranking
+// explainer always shows; the profile-views section appears once analytics
+// data has loaded.
+function ProfileInsightsCard({ analytics }) {
   return (
     <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
       <div className="flex items-start gap-3">
@@ -766,6 +743,33 @@ function MatchingEngineCard() {
         <EngineRow icon={Star} title="Merit Score" text="Occupation, skills, experience, and education." />
         <EngineRow icon={MapPin} title="GPS Distance" text="Nearby jobs can still be sorted by commute distance." />
       </div>
+
+      {analytics && (
+        <div className="mt-5 border-t border-slate-100 pt-4">
+          <div className="flex items-center gap-2">
+            <UserRound className="h-4 w-4 text-blue-700" />
+            <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">Profile Visibility (30d)</p>
+          </div>
+          <div className="mt-3 grid grid-cols-2 gap-3">
+            <SidebarStat label="Profile Views" value={analytics.total_views_30_days} />
+            <SidebarStat label="Search Appearances" value={analytics.search_appearances} />
+          </div>
+
+          {analytics.recent_viewers?.length > 0 && (
+            <div className="mt-4">
+              <p className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-400">Recent Viewers</p>
+              <ul className="mt-3 space-y-3 text-sm font-semibold text-slate-700">
+                {analytics.recent_viewers.map((viewer, i) => (
+                  <li key={i} className="flex items-center gap-2">
+                    <Building2 className="h-4 w-4 text-slate-400 shrink-0" />
+                    <span className="truncate">{viewer.company_name}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
     </section>
   )
 }
