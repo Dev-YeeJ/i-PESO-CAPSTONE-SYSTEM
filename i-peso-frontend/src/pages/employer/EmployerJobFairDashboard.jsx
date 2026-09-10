@@ -318,11 +318,11 @@ export default function EmployerJobFairDashboard() {
       )}
 
       <Dialog open={viewingReport} onOpenChange={setViewingReport}>
-        <DialogContent className="max-w-5xl max-h-[85vh] overflow-y-auto">
+        <DialogContent className="max-w-7xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{selected?.title} — RO1-JF Form 3</DialogTitle>
           </DialogHeader>
-          <EstablishmentReportPreview report={selected?.participation?.result_report} />
+          <EstablishmentReportPreview report={selected?.participation?.result_report} jobFair={selected} />
         </DialogContent>
       </Dialog>
     </div>

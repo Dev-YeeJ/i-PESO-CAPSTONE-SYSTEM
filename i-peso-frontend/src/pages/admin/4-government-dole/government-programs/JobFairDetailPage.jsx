@@ -478,11 +478,11 @@ export default function JobFairDetailPage() {
       </Tabs>
 
       <Dialog open={Boolean(viewingReport)} onOpenChange={(open) => !open && setViewingReport(null)}>
-        <DialogContent className="max-w-5xl max-h-[85vh] overflow-y-auto">
+        <DialogContent className="max-w-7xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{viewingReport?.company_name} — RO1-JF Form 3</DialogTitle>
           </DialogHeader>
-          <EstablishmentReportPreview report={viewingReport} />
+          <EstablishmentReportPreview report={viewingReport} jobFair={fair} />
           {viewingReport && (
             <Button variant="outline" icon={Download} onClick={() => blobDownload(() => adminService.downloadJobFairResult(viewingReport.id), `ro1-jf-form-3-${viewingReport.id}.pdf`)}>
               Download PDF
