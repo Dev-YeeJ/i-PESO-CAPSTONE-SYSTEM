@@ -166,6 +166,7 @@ class Employer extends Authenticatable
         $required = [
             'mayors_permit',
             'bir_certificate',
+            'philJobnet_proof',
         ];
 
         switch ($this->company_type) {
@@ -202,10 +203,12 @@ class Employer extends Authenticatable
      * recruitment agencies (see getRequiredDocuments()) but only ever
      * optional — PESO may still ask a regular employer for one — for
      * every other company type, so they don't double up in the Step 3 UI.
+     * PhilJobNet proof is required for every company type (see
+     * getRequiredDocuments()), so it no longer appears here.
      */
     public function getOptionalDocuments(): array
     {
-        $optional = ['philJobnet_proof'];
+        $optional = [];
 
         if (! in_array($this->company_type, ['local_recruitment_agency', 'overseas_recruitment_agency'], true)) {
             $optional[] = 'affidavit_of_undertaking';
