@@ -4,6 +4,8 @@ import {
   AGE_GROUPS, CLASSIFICATION_CODES, EMPLOYER_MISMATCH_CODES, SEEKER_MISMATCH_CODES,
   educationCode, mismatchCodeLabel,
 } from './jobFairResultVocab'
+import pesoSeal from '@/assets/images/peso-urdaneta-seal.jpg'
+import cityUrdanetaSeal from '@/assets/images/urdaneta-city-seal.jpg'
 
 const ROWS_PER_PAGE = 15
 const th = 'whitespace-nowrap border border-slate-300 bg-slate-100 px-1.5 py-1 text-center text-[9px] font-bold uppercase leading-tight text-slate-600'
@@ -45,10 +47,8 @@ function chunk(list, size) {
  *   separately rather than relying on report.job_fair, since neither the
  *   admin nor the employer payload eager-loads that relation on each report
  *   (the page already has the fair loaded once, so no need to duplicate it).
- * @param {string} [logoSrc] optional PESO/DOLE letterhead seal — pass once an
- *   image asset for it exists in the repo; omitted entirely until then.
  */
-export default function EstablishmentReportPreview({ report, jobFair, logoSrc }) {
+export default function EstablishmentReportPreview({ report, jobFair }) {
   if (!report) return null
   const entries = report.entries ?? []
   const submitter = submittedBy(report)
@@ -74,16 +74,15 @@ export default function EstablishmentReportPreview({ report, jobFair, logoSrc })
 
       <div className="rounded-lg border-2 border-slate-800 p-4">
         <div className="flex items-start justify-between gap-4 border-b-2 border-slate-800 pb-3">
-          <div className="flex items-center gap-3">
-            {logoSrc && <img src={logoSrc} alt="" className="h-14 w-14 object-contain" />}
-            <div>
-              <h3 className="text-base font-black uppercase tracking-wide text-slate-900">Establishment Report</h3>
-              <p className="text-xs font-bold text-slate-500">RO1-JF Form 3</p>
-            </div>
+          <img src={pesoSeal} alt="PESO Urdaneta seal" className="h-16 w-16 shrink-0 object-contain" />
+          <div className="flex-1 text-center">
+            <h3 className="text-base font-black uppercase tracking-wide text-slate-900">Establishment Report</h3>
+            <p className="text-xs font-bold text-slate-500">RO1-JF Form 3</p>
+            <Badge className="mt-1.5" variant={report.source === 'admin_proxy' ? 'pending' : 'approved'} icon={false}>
+              {report.source === 'admin_proxy' ? 'Admin Proxy Encoded' : 'Employer Self-Service'}
+            </Badge>
           </div>
-          <Badge variant={report.source === 'admin_proxy' ? 'pending' : 'approved'} icon={false}>
-            {report.source === 'admin_proxy' ? 'Admin Proxy Encoded' : 'Employer Self-Service'}
-          </Badge>
+          <img src={cityUrdanetaSeal} alt="City of Urdaneta seal" className="h-16 w-16 shrink-0 object-contain" />
         </div>
 
         <div className="grid gap-4 border-b-2 border-slate-800 py-3 sm:grid-cols-2">

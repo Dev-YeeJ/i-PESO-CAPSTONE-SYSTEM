@@ -30,6 +30,9 @@ table{width:100%;border-collapse:collapse}
 .sig-line{display:block;border-bottom:1px solid #0f172a;width:230px;height:22px}
 .muted{color:#64748b}
 .page-of{font-weight:normal;font-size:8px}
+.letterhead{border-bottom:2px solid #0f172a;padding-bottom:6px;margin-bottom:6px}
+.letterhead td{vertical-align:middle;padding:0}
+.letterhead img{width:52px;height:52px}
 </style></head><body>
 
 @php
@@ -46,8 +49,14 @@ table{width:100%;border-collapse:collapse}
 
 @foreach($pages as $pageIndex => $pageEntries)
   <div class="page">
-    <h1>ESTABLISHMENT REPORT</h1>
-    <div class="code">RO1-JF Form 3 @if($totalPages > 1)<span class="page-of">&nbsp;&nbsp;·&nbsp;&nbsp;Page {{ $pageIndex + 1 }} of {{ $totalPages }}</span>@endif</div>
+    <table class="letterhead"><tr>
+      <td style="width:52px"><img src="{{ public_path('images/peso-urdaneta-seal.jpg') }}" alt=""></td>
+      <td style="text-align:center">
+        <h1>ESTABLISHMENT REPORT</h1>
+        <div class="code">RO1-JF Form 3 @if($totalPages > 1)<span class="page-of">&nbsp;&nbsp;·&nbsp;&nbsp;Page {{ $pageIndex + 1 }} of {{ $totalPages }}</span>@endif</div>
+      </td>
+      <td style="width:52px;text-align:right"><img src="{{ public_path('images/urdaneta-city-seal.jpg') }}" alt=""></td>
+    </tr></table>
 
     <table class="header-row"><tr>
       <td style="width:46%">
