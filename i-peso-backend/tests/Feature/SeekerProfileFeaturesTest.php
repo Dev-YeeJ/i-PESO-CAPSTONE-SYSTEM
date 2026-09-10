@@ -559,6 +559,39 @@ class SeekerProfileFeaturesTest extends TestCase
             ->assertJsonValidationErrors('educations.1');
     }
 
+    public function test_step_five_rejects_chronologically_impossible_education_years(): void
+    {
+        $seeker = $this->createSeeker();
+        Sanctum::actingAs($seeker);
+
+        // College graduated 2017, then Elementary graduated 2020 — an
+        // earlier schooling stage cannot have a later year than a later one.
+        $this->postJson('/api/seeker/step-5', [
+            'currently_in_school' => false,
+            'educations' => [
+                [
+                    'attainment_level' => 'college_graduate',
+                    'level' => 'tertiary',
+                    'institution_name' => 'Polytechnic University of the Philippines',
+                    'course_strand' => 'BSIT',
+                    'completion_status' => 'graduated',
+                    'year_started' => 2013,
+                    'year_graduated' => 2017,
+                ],
+                [
+                    'attainment_level' => 'elementary_graduate',
+                    'level' => 'elementary',
+                    'institution_name' => 'Nancayasan Elementary School',
+                    'completion_status' => 'graduated',
+                    'year_started' => 2014,
+                    'year_graduated' => 2020,
+                ],
+            ],
+        ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['educations.0', 'educations.1']);
+    }
+
     public function test_step_five_deduplicates_hard_and_soft_skills_case_insensitively(): void
     {
         $seeker = $this->createSeeker();

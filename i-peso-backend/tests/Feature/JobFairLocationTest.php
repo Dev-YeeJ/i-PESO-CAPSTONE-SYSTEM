@@ -369,7 +369,7 @@ class JobFairLocationTest extends TestCase
             $t->string('source');
             $t->string('contact_person')->nullable();
             $t->string('contact_number')->nullable();
-            foreach (['total_male', 'total_female', 'total_applicants', 'total_hots', 'total_near_hired', 'total_rejected', 'total_vacancies_solicited', 'total_vacancies_offered'] as $c) {
+            foreach (['total_male', 'total_female', 'total_applicants', 'total_qualified', 'total_hots', 'total_near_hired', 'total_rejected', 'total_vacancies_solicited', 'total_vacancies_offered'] as $c) {
                 $t->unsignedInteger($c)->default(0);
             }
             $t->text('remarks')->nullable();

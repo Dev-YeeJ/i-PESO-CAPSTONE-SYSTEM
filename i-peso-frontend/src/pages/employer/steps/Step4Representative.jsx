@@ -54,35 +54,9 @@ export default function Step4Representative({ onComplete }) {
     }
   }
 
-  const handleAuthLetterChange = (e) => {
-    const file = e.target.files[0]
-    if (file) {
-      const validTypes = ['application/pdf', 'image/jpeg', 'image/png']
-      if (!validTypes.includes(file.type)) {
-        setErrors((prev) => ({ ...prev, authorization_letter: 'Please upload PDF or image file' }))
-        return
-      }
-
-      if (file.size > 10 * 1024 * 1024) {
-        setErrors((prev) => ({ ...prev, authorization_letter: 'File size must be less than 10MB' }))
-        return
-      }
-
-      setForm((prev) => ({
-        ...prev,
-        authorization_letter: file,
-        authorization_letter_name: file.name,
-      }))
-
-      if (errors.authorization_letter) {
-        setErrors((prev) => ({ ...prev, authorization_letter: '' }))
-      }
-    }
-  }
-
   const handleSubmit = async (e) => {
     e.preventDefault()
-    const allFields = ['first_name', 'last_name', 'designation', 'contact_number', 'representative_is_owner', 'government_id', 'authorization_letter']
+    const allFields = ['first_name', 'last_name', 'designation', 'contact_number', 'government_id']
     setTouched(Object.fromEntries(allFields.map((f) => [f, true])))
 
     const errs = validateEmployerStep4(form)
@@ -100,12 +74,8 @@ export default function Step4Representative({ onComplete }) {
       formDataToSend.append('representative_last_name', lastNameToSave)
       formDataToSend.append('representative_designation', form.designation)
       formDataToSend.append('representative_contact_number', form.contact_number)
-      formDataToSend.append('representative_is_owner', form.representative_is_owner)
       if (form.government_id) {
         formDataToSend.append('government_id', form.government_id)
-      }
-      if (form.authorization_letter) {
-        formDataToSend.append('authorization_letter', form.authorization_letter)
       }
 
       await employerService.saveRepresentative(formDataToSend)
@@ -205,46 +175,12 @@ export default function Step4Representative({ onComplete }) {
       <Field
         label="Direct Contact Number"
         name="contact_number"
-        placeholder="09123456789"
+        placeholder="e.g. 09XXXXXXXXX"
         value={form.contact_number ?? ''}
         onChange={handleChange}
         onBlur={handleBlur}
         error={getError('contact_number')}
       />
-
-      <div>
-        <label className="block text-sm font-medium text-slate-700 mb-2">
-          Is the authorized representative the business owner?
-        </label>
-        <div className="grid grid-cols-2 gap-3">
-          {[
-            { value: '1', label: 'Yes, owner' },
-            { value: '0', label: 'No, representative' },
-          ].map((option) => (
-            <label
-              key={option.value}
-              className={`flex cursor-pointer items-center gap-3 rounded-xl border p-3 ${
-                form.representative_is_owner === option.value
-                  ? 'border-blue-500 bg-blue-50'
-                  : 'border-slate-300'
-              }`}
-            >
-              <input
-                type="radio"
-                name="representative_is_owner"
-                value={option.value}
-                checked={form.representative_is_owner === option.value}
-                onChange={handleChange}
-                className="h-4 w-4 accent-blue-700"
-              />
-              <span className="text-sm text-slate-700">{option.label}</span>
-            </label>
-          ))}
-        </div>
-        {getError('representative_is_owner') && (
-          <p className="mt-1.5 text-xs text-red-600">{getError('representative_is_owner')}</p>
-        )}
-      </div>
 
       {/* Government ID */}
       <div>
@@ -303,68 +239,6 @@ export default function Step4Representative({ onComplete }) {
               <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
             </svg>
             {getError('government_id')}
-          </p>
-        )}
-      </div>
-
-      {/* Authorization Letter */}
-      <div>
-        <label className="block text-sm font-medium text-slate-700 mb-1.5">
-          Authorization Letter / Secretary&apos;s Certificate
-          {form.representative_is_owner === '0' ? ' (Required)' : ' (Optional)'}
-        </label>
-        <div className="border-2 border-dashed border-slate-300 rounded-xl p-6 text-center hover:border-blue-400 transition-colors">
-          {form.authorization_letter_name ? (
-            <div className="space-y-2">
-              <svg className="w-12 h-12 mx-auto text-blue-600" fill="currentColor" viewBox="0 0 20 20">
-                <path d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" />
-              </svg>
-              <p className="text-sm text-slate-600">{form.authorization_letter_name}</p>
-              <button
-                type="button"
-                onClick={() =>
-                  setForm((prev) => ({
-                    ...prev,
-                    authorization_letter: null,
-                    authorization_letter_name: '',
-                  }))
-                }
-                className="text-xs text-red-600 hover:text-red-700"
-              >
-                Remove
-              </button>
-            </div>
-          ) : (
-            <div>
-              <svg className="w-12 h-12 mx-auto mb-3 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-              </svg>
-              <p className="text-sm text-slate-600 mb-2">
-                Upload proof that this person is authorized to represent the company
-              </p>
-              <input
-                type="file"
-                accept=".pdf,.jpg,.jpeg,.png"
-                onChange={handleAuthLetterChange}
-                className="hidden"
-                id="auth-letter-input"
-              />
-              <label
-                htmlFor="auth-letter-input"
-                className="inline-block px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 cursor-pointer transition-colors text-sm font-medium"
-              >
-                Choose File
-              </label>
-              <p className="text-xs text-slate-500 mt-2">PDF or image (max 10MB)</p>
-            </div>
-          )}
-        </div>
-        {getError('authorization_letter') && (
-          <p className="mt-1.5 text-xs text-red-600 flex items-center gap-1">
-            <svg className="w-3 h-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-            </svg>
-            {getError('authorization_letter')}
           </p>
         )}
       </div>

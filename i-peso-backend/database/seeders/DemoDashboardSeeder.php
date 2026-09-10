@@ -180,7 +180,7 @@ class DemoDashboardSeeder extends Seeder
                 'company_name' => $c[0],
                 'trade_name' => $c[0],
                 'industry_type' => $c[1],
-                'industry' => $c[1],
+                'industry' => [$c[1]],
                 'company_size' => $c[2],
                 'company_description' => 'A reputable employer based in Urdaneta City.',
                 'logo_url' => "https://api.dicebear.com/7.x/shapes/svg?seed={$c[0]}&backgroundColor={$c[3]}&shape1Color=ffffff&shape2Color=fef2f2",

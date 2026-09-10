@@ -175,6 +175,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/certificates', [SeekerCertificateController::class, 'store']);
         Route::get('/certificates/{certificate}/view', [SeekerCertificateController::class, 'view']);
         Route::delete('/certificates/{certificate}', [SeekerCertificateController::class, 'destroy']);
+        Route::get('/skill-recommendations', [SeekerController::class, 'getSkillRecommendations']);
         Route::post('/ai-profile-suggestions', [SeekerAiSuggestionController::class, 'suggest'])
             ->middleware('throttle:10,1');
         Route::post('/ai-professional-summary', [SeekerAiSuggestionController::class, 'professionalSummary'])
@@ -232,7 +233,6 @@ Route::middleware('auth:sanctum')->group(function () {
 
             // Employers (Verification)
             Route::get('/employers/pending', [EmployerVerificationController::class, 'getPendingEmployers']);
-            Route::post('/employers/bulk-approve', [EmployerVerificationController::class, 'bulkApproveEmployers']);
             Route::get('/employers/{id}/review', [EmployerVerificationController::class, 'reviewEmployer']);
             Route::post('/employers/{id}/approve', [EmployerVerificationController::class, 'approveEmployer']);
             Route::post('/employers/{id}/reject', [EmployerVerificationController::class, 'rejectEmployer']);
@@ -284,6 +284,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
             // Job Fairs
             Route::get('/job-fairs', [AdminJobFairController::class, 'index']);
+            Route::get('/job-fairs/summary', [AdminJobFairController::class, 'summary']);
             Route::post('/job-fairs', [AdminJobFairController::class, 'store']);
             Route::get('/job-fairs/{id}', [AdminJobFairController::class, 'show']);
             Route::put('/job-fairs/{id}', [AdminJobFairController::class, 'update']);
@@ -291,6 +292,9 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::post('/job-fairs/{jobFair}/publish', [AdminJobFairController::class, 'publish']);
             Route::post('/job-fairs/{jobFair}/invite', [AdminJobFairController::class, 'invite']);
             Route::patch('/job-fairs/{jobFair}/participants/{participation}', [AdminJobFairController::class, 'participationStatus']);
+            Route::post('/job-fairs/{jobFair}/check-in', [AdminJobFairController::class, 'checkIn']);
+            Route::get('/job-fairs/{jobFair}/attendees', [AdminJobFairController::class, 'attendees']);
+            Route::post('/job-fairs/{jobFair}/walk-ins', [AdminJobFairController::class, 'encodeWalkIn']);
             Route::patch('/job-fair-requirements/{submission}/review', [AdminJobFairController::class, 'reviewRequirement']);
             Route::get('/job-fair-requirements/{submission}/view', [AdminJobFairController::class, 'viewRequirement']);
             Route::post('/job-fairs/{jobFair}/proxy-results', [AdminJobFairController::class, 'proxyResults']);

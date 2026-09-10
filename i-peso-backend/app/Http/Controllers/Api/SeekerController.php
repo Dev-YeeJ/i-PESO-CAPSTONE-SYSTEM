@@ -17,6 +17,7 @@ use App\Services\AddressService;
 use App\Services\MatchingProfileService;
 use App\Services\OccupationTitleMatcher;
 use App\Services\SkillCategorizer;
+use App\Services\SkillRecommendationService;
 use App\Services\SkillTaxonomyService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -168,6 +169,68 @@ class SeekerController extends Controller
         ])
             ->map(fn ($value) => Str::lower(Str::squish((string) $value)))
             ->implode('|');
+    }
+
+    /**
+     * The core K-12/college ladder is strictly ordered, so an earlier
+     * schooling stage can never have a later effective year than a later
+     * stage (or vice versa) — e.g. College graduated 2017 then Elementary
+     * graduated 2020. Vocational is deliberately excluded from this check
+     * since TESDA training is commonly taken at any point in a career, not
+     * fixed between senior high and college. Mirrors
+     * EducationBackgroundEditor.jsx's CORE_LEVEL_ORDER/chronologyConflict on
+     * the frontend, so both layers reject the same scenarios.
+     */
+    private function assertEducationChronologyIsConsistent($validator, array $educations): void
+    {
+        $coreLevelOrder = [
+            'elementary_undergraduate', 'elementary_graduate',
+            'high_school_undergraduate', 'high_school_graduate',
+            'senior_high_undergraduate', 'senior_high_graduate',
+            'college_undergraduate', 'college_graduate',
+            'post_graduate',
+        ];
+
+        $effectiveYear = function (array $education): ?int {
+            $year = $education['year_graduated']
+                ?? $education['expected_year_graduated']
+                ?? $education['undergrad_year_last_attended']
+                ?? $education['year_started']
+                ?? null;
+
+            return filled($year) ? (int) $year : null;
+        };
+
+        foreach ($educations as $index => $education) {
+            if (! is_array($education)) {
+                continue;
+            }
+
+            $rank = array_search($education['attainment_level'] ?? null, $coreLevelOrder, true);
+            $year = $effectiveYear($education);
+            if ($rank === false || $year === null) {
+                continue;
+            }
+
+            foreach ($educations as $otherIndex => $otherEducation) {
+                if ($otherIndex <= $index || ! is_array($otherEducation)) {
+                    continue;
+                }
+
+                $otherRank = array_search($otherEducation['attainment_level'] ?? null, $coreLevelOrder, true);
+                $otherYear = $effectiveYear($otherEducation);
+                if ($otherRank === false || $otherYear === null || $otherRank === $rank) {
+                    continue;
+                }
+
+                $outOfOrder = ($rank < $otherRank && $year > $otherYear) || ($rank > $otherRank && $year < $otherYear);
+                if ($outOfOrder) {
+                    $message = 'Education years are out of order — an earlier schooling stage cannot have a later year than a later stage. Review the years across your education records.';
+                    $validator->errors()->add("educations.{$index}", $message);
+                    $validator->errors()->add("educations.{$otherIndex}", $message);
+                }
+            }
+        }
     }
 
     private function graduateStudiesAttainment(?string $courseStrand): string
@@ -1316,6 +1379,8 @@ class SeekerController extends Controller
                 $seenEducationRecords[] = $duplicateKey;
             }
 
+            $this->assertEducationChronologyIsConsistent($validator, $request->input('educations', []));
+
             $doleSkillCount = count($this->normalizeSubmittedSkillItems($request->input('dole_skills', [])));
             $technicalSkillCount = count($this->normalizeSubmittedSkillItems($request->input('technical_skills', [])));
             $softSkillCount = count($this->normalizeSubmittedSkillItems($request->input('soft_skills', [])));
@@ -1454,6 +1519,25 @@ class SeekerController extends Controller
             'message' => 'Educational background and skills saved.',
             'user' => $this->buildPayload($seeker),
         ]);
+    }
+
+    /**
+     * GET /api/seeker/skill-recommendations   [auth:sanctum]
+     *
+     * Suggests hard/soft skills for the authenticated seeker, tied to their
+     * preferred occupations when a real occupation_id is resolvable (see
+     * SkillRecommendationService::getOccupationSkills()), falling back to
+     * generically in-demand skills otherwise. Replaces the frontend's old
+     * hardcoded "always suggests Driver" default list.
+     */
+    public function getSkillRecommendations(Request $request, SkillRecommendationService $recommendations): JsonResponse
+    {
+        $seeker = $this->getSeeker($request);
+        if ($seeker instanceof JsonResponse) {
+            return $seeker;
+        }
+
+        return response()->json(['data' => $recommendations->getRecommendations($seeker)]);
     }
 
     /**

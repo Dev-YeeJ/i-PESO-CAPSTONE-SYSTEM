@@ -282,7 +282,7 @@ export default function SeekerProfile() {
       : `- Delivered ${experience.position || 'assigned'} responsibilities with accuracy, consistency, and attention to operational standards.`
 
     setExperienceDrafts((current) => ({ ...current, [key]: enhanced }))
-    toast.success('AI enhanced the responsibility into a resume-ready bullet.')
+    toast.success('Smart Enhance turned this into a resume-ready bullet.')
   }
 
   const saveResponsibilities = (key) => {
@@ -451,7 +451,7 @@ export default function SeekerProfile() {
                   className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-50 px-3 py-2 text-sm font-bold text-indigo-600 ring-1 ring-indigo-100 transition hover:bg-indigo-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 >
                   {summaryGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-                  {summaryGenerating ? 'Generating...' : professionalSummary || summaryDraft ? 'Regenerate with AI' : 'Generate with AI'}
+                  {summaryGenerating ? 'Generating...' : professionalSummary || summaryDraft ? 'Regenerate Smart Summary' : 'Generate Smart Summary'}
                 </button>
               )}
             >
@@ -605,14 +605,14 @@ export default function SeekerProfile() {
                               <div className="flex flex-wrap items-center justify-between gap-3">
                                 <div>
                                   <p className="text-sm font-bold text-slate-900">Resume bullet points</p>
-                                  <p className="text-xs text-slate-500">Type simple duties, then let AI polish them into stronger resume language.</p>
+                                  <p className="text-xs text-slate-500">Type simple duties, then let Smart Enhance polish them into stronger resume language.</p>
                                 </div>
                                 <button
                                   type="button"
                                   onClick={() => enhanceResponsibilities(key, experience)}
                                   className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-50 px-3 py-2 text-sm font-bold text-indigo-600 ring-1 ring-indigo-100 transition hover:bg-indigo-100 hover:shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                                 >
-                                  <Sparkles className="h-4 w-4" /> AI Enhance Bullets
+                                  <Sparkles className="h-4 w-4" /> Smart Enhance Bullets
                                 </button>
                               </div>
                               <label htmlFor={`responsibilities-${key}`} className="sr-only">Responsibilities for {experience.position}</label>

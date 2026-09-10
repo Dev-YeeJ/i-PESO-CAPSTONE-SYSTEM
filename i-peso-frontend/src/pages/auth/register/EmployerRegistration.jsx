@@ -15,6 +15,7 @@ const companyTypes = [
   { value: 'corporation_partnership', label: 'Corporation / Partnership', helper: 'Use for SEC-registered corporations or partnerships.' },
   { value: 'local_recruitment_agency', label: 'Local Recruitment Agency', helper: 'Use when recruiting workers for local placement.' },
   { value: 'overseas_recruitment_agency', label: 'Overseas Recruitment Agency', helper: 'Use for overseas placement agencies subject to additional review.' },
+  { value: 'government_agency', label: 'Government Agency / LGU', helper: 'Use for a national government agency or local government unit office.' },
 ]
 
 const fields = ['email', 'password', 'password_confirmation', 'company_type']

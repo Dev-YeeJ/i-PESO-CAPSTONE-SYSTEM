@@ -28,7 +28,7 @@ class EmployerController extends Controller
         $summary = Employer::query()->selectRaw(
             'COUNT(*) AS total'
             .", SUM(CASE WHEN verification_status = 'verified' THEN 1 ELSE 0 END) AS verified"
-            .", SUM(CASE WHEN verification_status = 'pending' THEN 1 ELSE 0 END) AS pending"
+            .", SUM(CASE WHEN verification_status = 'pending' AND registration_submitted_at IS NOT NULL THEN 1 ELSE 0 END) AS pending"
             .", SUM(CASE WHEN verification_status = 'rejected' THEN 1 ELSE 0 END) AS rejected"
             .', SUM(CASE WHEN created_at >= ? THEN 1 ELSE 0 END) AS new_this_month'
             .$vacancyColumn,
@@ -108,7 +108,10 @@ class EmployerController extends Controller
                 $employer->city_municipality,
                 $employer->province,
             ])));
-            $employer->industry_business_type = $employer->industry ?: $employer->industry_type;
+            $industries = is_array($employer->industry) && count($employer->industry) > 0
+                ? $employer->industry
+                : array_filter([$employer->industry_type]);
+            $employer->industry_business_type = implode(', ', $industries);
             $employer->missing_documents = (int) ($employer->documents_count ?? 0) === 0;
             $employer->missing_gps = empty($employer->latitude) || empty($employer->longitude);
             $employer->account_status = $employer->verification_status ?: ($employer->email_verified_at ? 'verified' : 'pending');
@@ -174,7 +177,7 @@ class EmployerController extends Controller
 
         $documents = [];
         if (Schema::hasTable('employer_documents')) {
-            $documents = $employer->documents()->select(['document_id', 'employer_id', 'document_type', 'original_filename', 'mime_type', 'file_size', 'uploaded_at', 'verification_status', 'admin_notes', 'expiration_date'])->get()->toArray();
+            $documents = $employer->documents()->select(['document_id', 'employer_id', 'document_type', 'original_filename', 'mime_type', 'file_size', 'uploaded_at', 'verification_status', 'admin_notes', 'expiration_date', 'viewed_at'])->get()->toArray();
         }
 
         $vacancies = [];
@@ -329,7 +332,7 @@ class EmployerController extends Controller
                         $employer->trade_name,
                         $employer->email,
                         $employer->company_type,
-                        $employer->industry,
+                        implode(', ', $employer->industry ?? []),
                         $employer->company_size,
                         $employer->verification_status,
                         optional($employer->created_at)->toDateTimeString(),
@@ -350,7 +353,13 @@ class EmployerController extends Controller
      */
     private function filteredQuery(Request $request): Builder
     {
-        $query = Employer::query()->select([
+        $query = Employer::query()
+            // Excludes registrations still in progress — verification_status
+            // is 'pending' from the moment the account is created (Step 1 of
+            // the onboarding wizard), long before there's a real application
+            // for PESO to see.
+            ->whereNotNull('registration_submitted_at')
+            ->select([
             'employer_id',
             'company_name',
             'company_type',
@@ -396,10 +405,10 @@ class EmployerController extends Controller
         }
 
         if ($request->filled('industry')) {
-            $industry = $request->input('industry').'%';
+            $industry = $request->input('industry');
             $query->where(function ($industryQuery) use ($industry) {
-                $industryQuery->where('industry', 'like', $industry)
-                    ->orWhere('industry_type', 'like', $industry);
+                $industryQuery->whereJsonContains('industry', $industry)
+                    ->orWhere('industry_type', 'like', $industry.'%');
             });
         }
 

@@ -115,6 +115,18 @@ const blankEducation = {
   undergrad_level_reached: '',
 }
 
+// The core K-12/college ladder is strictly ordered, so an earlier stage can
+// never have a later year than a later stage. Vocational/TESDA training is
+// deliberately excluded — it's commonly taken at any point in a career,
+// before or after formal schooling, so it isn't checked against the ladder.
+const CORE_LEVEL_ORDER = [
+  'elementary_undergraduate', 'elementary_graduate',
+  'high_school_undergraduate', 'high_school_graduate',
+  'senior_high_undergraduate', 'senior_high_graduate',
+  'college_undergraduate', 'college_graduate',
+  'post_graduate',
+]
+
 const currentYear = new Date().getFullYear()
 const pastYears = Array.from({ length: currentYear - 1949 }, (_, index) => currentYear - index)
 const expectedYears = Array.from({ length: 16 }, (_, index) => currentYear + index)
@@ -149,7 +161,13 @@ export default function EducationBackgroundEditor({ form: controlledForm, errors
   const duplicateMessage = duplicateIndex !== -1 && isMeaningfulEducation(cleanDraft)
     ? 'This school, level, course, and year range is already recorded.'
     : ''
-  const canSaveDraft = Object.keys(readinessErrors).length === 0 && !duplicateMessage
+
+  const otherRecords = educations
+    .filter((_, index) => index !== editingIndex)
+    .map((education) => cleanEducation(education))
+  const chronologyMessage = isMeaningfulEducation(cleanDraft) ? chronologyConflict(cleanDraft, otherRecords) : ''
+
+  const canSaveDraft = Object.keys(readinessErrors).length === 0 && !duplicateMessage && !chronologyMessage
 
   const emitChange = (event) => {
     if (onChange) {
@@ -223,6 +241,7 @@ export default function EducationBackgroundEditor({ form: controlledForm, errors
 
     const validationErrors = { ...readinessErrors }
     if (duplicateMessage) validationErrors.duplicate = duplicateMessage
+    if (chronologyMessage) validationErrors.chronology = chronologyMessage
 
     if (Object.keys(validationErrors).length) {
       setDraftErrors(validationErrors)
@@ -239,9 +258,11 @@ export default function EducationBackgroundEditor({ form: controlledForm, errors
   }
 
   const baseVisibleErrors = attemptedSubmit ? { ...draftErrors, ...readinessErrors } : { ...draftErrors }
-  const visibleErrors = duplicateMessage && (attemptedSubmit || !canSaveDraft)
-    ? { ...baseVisibleErrors, duplicate: duplicateMessage }
-    : baseVisibleErrors
+  const visibleErrors = {
+    ...baseVisibleErrors,
+    ...(duplicateMessage && (attemptedSubmit || !canSaveDraft) ? { duplicate: duplicateMessage } : {}),
+    ...(chronologyMessage && (attemptedSubmit || !canSaveDraft) ? { chronology: chronologyMessage } : {}),
+  }
 
   const savedRecordsSection = (
     <section className="rounded-xl border border-slate-200 bg-white shadow-sm">
@@ -447,11 +468,17 @@ export default function EducationBackgroundEditor({ form: controlledForm, errors
           </p>
         )}
 
+        {visibleErrors.chronology && (
+          <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700">
+            {visibleErrors.chronology}
+          </p>
+        )}
+
         <div className="flex flex-col gap-2 border-t border-slate-200 pt-4 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-xs leading-5 text-slate-500">
             {canSaveDraft
               ? 'Ready to add this education record.'
-              : 'Complete all required fields to enable the add button.'}
+              : duplicateMessage || chronologyMessage || 'Complete all required fields to enable the add button.'}
           </p>
           <button
             type="button"
@@ -893,4 +920,33 @@ function getBlockedLevels(educations, editingIndex) {
   }
 
   return blocked
+}
+
+function educationEffectiveYear(education) {
+  const year = education.year_graduated || education.expected_year_graduated || education.undergrad_year_last_attended || education.year_started
+  return year ? Number(year) : null
+}
+
+// Compares the draft record against every other saved record and flags a
+// conflict when an earlier schooling stage has a later effective year than
+// a later stage (or vice versa) — e.g. College graduated 2017 then
+// Elementary graduated 2020, which is not a possible academic timeline.
+function chronologyConflict(draftEducation, otherEducations) {
+  const draftRank = CORE_LEVEL_ORDER.indexOf(draftEducation.attainment_level)
+  const draftYear = educationEffectiveYear(draftEducation)
+  if (draftRank === -1 || draftYear === null) return ''
+
+  for (const other of otherEducations) {
+    const otherRank = CORE_LEVEL_ORDER.indexOf(other.attainment_level)
+    const otherYear = educationEffectiveYear(other)
+    if (otherRank === -1 || otherYear === null || otherRank === draftRank) continue
+
+    if (draftRank < otherRank && draftYear > otherYear) {
+      return `${labelForLevel(draftEducation)} (${draftYear}) is an earlier schooling stage than ${labelForLevel(other)} (${otherYear}), so its year can't be later. Check the years on both records.`
+    }
+    if (draftRank > otherRank && draftYear < otherYear) {
+      return `${labelForLevel(draftEducation)} (${draftYear}) comes after ${labelForLevel(other)} (${otherYear}) in school order, so its year can't be earlier. Check the years on both records.`
+    }
+  }
+  return ''
 }

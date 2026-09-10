@@ -306,6 +306,11 @@ class AdminGovernmentProgramController extends Controller
         GovernmentProgram $program,
         UpskillRecommendationService $recommendations,
     ): void {
+        // Notifications send synchronously (no queue worker runs on this
+        // shared-hosting deployment — see GovernmentProgramNotification),
+        // so notifying every recommended seeker can take a while; don't let
+        // PHP's default execution-time limit cut this off partway through.
+        set_time_limit(0);
         $recommendations->recipientsForProgram($program)->each(
             fn ($seeker) => $seeker->notify(new GovernmentProgramNotification($program, 'recommendation_opened'))
         );

@@ -34,6 +34,7 @@ export const validateEmployerStep2 = (f) => {
   if (!f.tin?.trim()) e.tin = 'TIN is required.'
   else if (!/^\d{3}-\d{3}-\d{3}-\d{3}$/.test(f.tin)) e.tin = 'Use the format 000-000-000-000.'
 
+  if (!Array.isArray(f.industry) || f.industry.length === 0) e.industry = 'Select at least one industry.'
   if (!f.company_size) e.company_size = 'Company size is required.'
   if (!f.province) e.province = 'Province is required.'
   if (!f.city) e.city = 'City is required.'
@@ -50,13 +51,7 @@ export const validateEmployerStep4 = (f) => {
   if (!f.designation?.trim()) e.designation = 'Designation is required.'
   if (!f.contact_number?.trim()) e.contact_number = 'Contact number is required.'
   else if (!/^09\d{9}$/.test(f.contact_number)) e.contact_number = 'Enter a valid PH mobile number.'
-  if (!f.government_id) e.government_id = 'Government ID is required.'
-  if (f.representative_is_owner === undefined || f.representative_is_owner === '') {
-    e.representative_is_owner = 'Please indicate whether the representative is the business owner.'
-  }
-  if (f.representative_is_owner === '0' && !f.authorization_letter) {
-    e.authorization_letter = 'Authorization letter or secretary\'s certificate is required for a non-owner representative.'
-  }
+  if (!f.government_id) e.government_id = 'Government ID or Company ID is required.'
   return e
 }
 

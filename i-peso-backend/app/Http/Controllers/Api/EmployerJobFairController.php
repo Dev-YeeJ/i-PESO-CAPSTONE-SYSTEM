@@ -28,7 +28,7 @@ class EmployerJobFairController extends Controller
     {
         $employer = $this->employer($request);
         $fairs = JobFair::query()
-            ->where(fn ($query) => $query->where(fn ($public) => $public->where('is_public', true)->whereIn('status', JobFairService::PUBLIC_STATUSES))
+            ->where(fn ($query) => $query->where(fn ($public) => $public->where('is_public', true)->whereIn('status', JobFairService::PUBLIC_STATUSES)->has('employerJoins'))
                 ->orWhereHas('employerJoins', fn ($joins) => $joins->where('employer_id', $employer->employer_id)))
             ->orderByRaw('COALESCE(start_date, event_date) asc')
             // Same relations eventPayload() requests via loadMissing() — see
@@ -193,8 +193,10 @@ class EmployerJobFairController extends Controller
     private function resultRules(bool $entries): array
     {
         $rules = [
+            'clearance_no' => ['nullable', 'string', 'max:100'],
             'total_male' => ['required', 'integer', 'min:0'], 'total_female' => ['required', 'integer', 'min:0'],
-            'total_applicants' => ['required', 'integer', 'min:0'], 'total_hots' => ['required', 'integer', 'min:0'],
+            'total_applicants' => ['required', 'integer', 'min:0'], 'total_qualified' => ['required', 'integer', 'min:0'],
+            'total_hots' => ['required', 'integer', 'min:0'],
             'total_near_hired' => ['required', 'integer', 'min:0'], 'total_rejected' => ['required', 'integer', 'min:0'],
             'total_vacancies_solicited' => ['required', 'integer', 'min:0'], 'total_vacancies_offered' => ['required', 'integer', 'min:0'],
             'remarks' => ['nullable', 'string', 'max:5000'],
@@ -202,13 +204,20 @@ class EmployerJobFairController extends Controller
         if ($entries) $rules += [
             'entries' => ['required', 'array'], 'entries.*.applicant_name' => ['required', 'string', 'max:255'],
             'entries.*.gender' => ['required', Rule::in(['male', 'female'])], 'entries.*.position_applied_for' => ['required', 'string', 'max:255'],
-            'entries.*.status' => ['required', Rule::in(['hots', 'near_hired', 'rejected'])],
+            'entries.*.status' => ['required', Rule::in(['qualified', 'near_hired', 'hots', 'employer_mismatch', 'seeker_mismatch'])],
             // RO1-JF Form 3 per-applicant DOLE columns (optional so short-form entries still submit).
             'entries.*.city_municipality' => ['nullable', 'string', 'max:255'],
             'entries.*.contact_number' => ['nullable', 'string', 'max:40'],
             'entries.*.age_group' => ['nullable', Rule::in(['A', 'B', 'C', 'D', 'E', 'F'])],
             'entries.*.highest_education' => ['nullable', 'string', 'max:40'],
-            'entries.*.mismatch_code' => ['nullable', Rule::in(JobFairReportService::MISMATCH_CODES)], 'entries.*.remarks' => ['nullable', 'string', 'max:2000'],
+            'entries.*.classification_codes' => ['nullable', 'array'],
+            'entries.*.classification_codes.*' => [Rule::in(array_keys(JobFairReportService::CLASSIFICATION_CODES))],
+            'entries.*.mismatch_code' => ['nullable', Rule::in([
+                ...array_keys(JobFairReportService::EMPLOYER_MISMATCH_CODES),
+                ...array_keys(JobFairReportService::SEEKER_MISMATCH_CODES),
+                ...JobFairReportService::MISMATCH_CODES,
+            ])],
+            'entries.*.remarks' => ['nullable', 'string', 'max:2000'],
         ];
         return $rules;
     }

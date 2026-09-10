@@ -360,10 +360,10 @@ export default function JobMapPage() {
         <header className="z-20 flex items-center justify-between border-b border-slate-200/50 bg-transparent px-4 py-3">
           <div className="flex items-center gap-2.5">
             <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-950 text-amber-400 shadow-inner"><MapPinned className="h-4 w-4" /></span>
-            <div><h1 className="text-sm font-black tracking-wide text-slate-900">AI Job Map</h1><p className="max-w-[250px] text-[10px] font-medium leading-4 text-slate-500">Discover jobs near you.</p></div>
+            <div><h1 className="text-sm font-black tracking-wide text-slate-900">Smart Job Map</h1><p className="max-w-[250px] text-[10px] font-medium leading-4 text-slate-500">Discover jobs near you.</p></div>
           </div>
           <div className="flex items-center gap-1.5">
-            <button type="button" onClick={() => setAssistantOpen((open) => !open)} aria-expanded={assistantOpen} className={`flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-[10px] font-bold shadow-sm transition ${assistantOpen ? 'border-blue-900 bg-blue-950 text-white' : 'border-slate-200 bg-white text-blue-950 hover:bg-slate-50'}`} title="AI-assisted search"><Sparkles className="h-3.5 w-3.5" /> AI Search</button>
+            <button type="button" onClick={() => setAssistantOpen((open) => !open)} aria-expanded={assistantOpen} className={`flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-[10px] font-bold shadow-sm transition ${assistantOpen ? 'border-blue-900 bg-blue-950 text-white' : 'border-slate-200 bg-white text-blue-950 hover:bg-slate-50'}`} title="Smart-assisted search"><Sparkles className="h-3.5 w-3.5" /> Smart Search</button>
             <button type="button" onClick={useCurrentLocation} disabled={isLocating} className="flex h-8 w-8 items-center justify-center rounded-md border border-slate-200 bg-white text-blue-950 shadow-sm transition hover:bg-slate-50 hover:text-blue-700 disabled:opacity-50" title="Use current location">{isLocating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <LocateFixed className="h-3.5 w-3.5" />}</button>
           </div>
         </header>

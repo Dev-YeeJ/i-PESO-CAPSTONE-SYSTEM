@@ -5,20 +5,24 @@ import {
   SOFT_SKILL_SUGGESTIONS,
   TECHNICAL_SKILL_SUGGESTIONS,
 } from '@/data/jobPreferenceVocabularies'
-import { searchSkills } from '@/services/skillService'
+import { getSkillRecommendations, searchSkills } from '@/services/skillService'
 
 const HARD_LIMIT = 20
 const SOFT_LIMIT = 10
 const SEARCH_LIMIT = 12
 const SUGGESTION_LIMIT = 10
 
+// Generic, occupation-agnostic fallback only — shown when the seeker has no
+// preferred occupation resolved yet, or the server recommendations haven't
+// loaded. Deliberately does not include any single trade/skill (e.g.
+// "Driver") that would otherwise show up for every seeker regardless of
+// their actual background.
 const DEFAULT_HARD_SUGGESTIONS = [
   'Web Development',
   'Programming',
   'Microsoft Excel',
   'Data Entry',
   'Computer Literate',
-  'Driver',
 ]
 
 const DEFAULT_SOFT_SUGGESTIONS = [
@@ -92,6 +96,35 @@ export default function SeekerSkillsForm({
   const [loadingType, setLoadingType] = useState(null)
   const [searchResultsByType, setSearchResultsByType] = useState({ hard: [], soft: [] })
   const [warning, setWarning] = useState('')
+  const [serverSuggestions, setServerSuggestions] = useState({ hard: [], soft: [] })
+
+  // Skills actually tied to the seeker's saved preferred occupation(s), via
+  // real O*NET skill-to-occupation evidence — replaces the old hardcoded
+  // "always Driver" default with something connected to their background.
+  // Best-effort: silently falls back to the local suggestion pool below if
+  // this hasn't loaded yet or the request fails.
+  useEffect(() => {
+    let ignore = false
+    getSkillRecommendations()
+      .then((sections) => {
+        if (ignore) return
+        const allSkills = Object.values(sections ?? {}).flatMap((section) => section?.skills ?? [])
+        const normalized = allSkills.map((item) => normalizeSkill({
+          ...item,
+          type: item.category === 'soft' ? 'soft' : 'hard',
+          source: 'occupation_recommended',
+          is_recommended: true,
+        })).filter(Boolean)
+        setServerSuggestions({
+          hard: normalized.filter((item) => item.type === 'hard'),
+          soft: normalized.filter((item) => item.type === 'soft'),
+        })
+      })
+      .catch(() => {
+        // Non-critical — the local suggestion pool below still works.
+      })
+    return () => { ignore = true }
+  }, [])
 
   const selectedSkills = useMemo(
     () => normalizeSelectedSkills(controlled ? value : internalValue),
@@ -152,9 +185,10 @@ export default function SeekerSkillsForm({
       type: 'hard',
       preferredOccupations,
       searchResults: searchResultsByType.hard,
+      serverSuggestions: serverSuggestions.hard,
       selectedSkills,
     }),
-    [preferredOccupations, queries.hard, searchResultsByType.hard, selectedSkills],
+    [preferredOccupations, queries.hard, searchResultsByType.hard, serverSuggestions.hard, selectedSkills],
   )
 
   const softSuggestions = useMemo(
@@ -163,9 +197,10 @@ export default function SeekerSkillsForm({
       type: 'soft',
       preferredOccupations,
       searchResults: searchResultsByType.soft,
+      serverSuggestions: serverSuggestions.soft,
       selectedSkills,
     }),
-    [preferredOccupations, queries.soft, searchResultsByType.soft, selectedSkills],
+    [preferredOccupations, queries.soft, searchResultsByType.soft, serverSuggestions.soft, selectedSkills],
   )
 
   const emit = (nextSkills) => {
@@ -550,6 +585,7 @@ function buildSmartSuggestions({
   type,
   preferredOccupations,
   searchResults,
+  serverSuggestions = [],
   selectedSkills,
 }) {
   const normalizedQuery = normalizeText(query)
@@ -571,6 +607,9 @@ function buildSmartSuggestions({
     ...ruleMatches,
     ...searchResults,
     querySkill,
+    // Real occupation-tied evidence takes priority over the crude keyword
+    // buckets below when it's actually loaded.
+    ...serverSuggestions,
     ...buildRecommendations(preferredOccupations),
     ...buildRelatedSuggestions(selectedSkills),
     ...defaultSuggestions,

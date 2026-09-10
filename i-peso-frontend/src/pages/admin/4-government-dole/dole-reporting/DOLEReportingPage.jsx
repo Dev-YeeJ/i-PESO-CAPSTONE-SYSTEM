@@ -41,6 +41,8 @@ export default function DOLEReportingPage() {
   const [generatedReport, setGeneratedReport] = useState(null)
   const [generatedReportId, setGeneratedReportId] = useState(null)
   const [editableRows, setEditableRows] = useState([])
+  const [previewLguName, setPreviewLguName] = useState('Urdaneta City')
+  const [previewProvince, setPreviewProvince] = useState('Pangasinan')
   const [previewOther, setPreviewOther] = useState({ ftja_total: '', ftja_with_attachment: '' })
   const [previewIssuesConcerns, setPreviewIssuesConcerns] = useState('')
   const [previewSignatories, setPreviewSignatories] = useState(emptySignatories())
@@ -66,6 +68,8 @@ export default function DOLEReportingPage() {
   useEffect(() => {
     if (!generatedReport) return
     setEditableRows(generatedReport.rows || [])
+    setPreviewLguName(generatedReport.lgu_name || 'Urdaneta City')
+    setPreviewProvince(generatedReport.province || 'Pangasinan')
     setPreviewOther({
       ftja_total: generatedReport.other_accomplishments?.ftja_total ?? '',
       ftja_with_attachment: generatedReport.other_accomplishments?.ftja_with_attachment ?? '',
@@ -143,6 +147,8 @@ export default function DOLEReportingPage() {
     try {
       const res = await adminService.updateSprs(generatedReportId, {
         rows: editableRows,
+        lgu_name: previewLguName,
+        province: previewProvince,
         other_accomplishments: {
           ftja_total: previewOther.ftja_total === '' ? null : Number(previewOther.ftja_total),
           ftja_with_attachment: previewOther.ftja_with_attachment === '' ? null : Number(previewOther.ftja_with_attachment),
@@ -352,9 +358,23 @@ export default function DOLEReportingPage() {
               </div>
 
               <div className="flex flex-wrap justify-between gap-3 text-sm mb-4">
-                <div>
-                  <p><span className="font-bold">LGU/PESO:</span> Urdaneta City</p>
-                  <p><span className="font-bold">Province:</span> Pangasinan</p>
+                <div className="space-y-1">
+                  <p className="flex items-center gap-1.5">
+                    <span className="font-bold">LGU/PESO:</span>
+                    <input
+                      className="rounded border border-slate-300 px-1.5 py-0.5 text-sm print:border-none"
+                      value={previewLguName}
+                      onChange={(e) => setPreviewLguName(e.target.value)}
+                    />
+                  </p>
+                  <p className="flex items-center gap-1.5">
+                    <span className="font-bold">Province:</span>
+                    <input
+                      className="rounded border border-slate-300 px-1.5 py-0.5 text-sm print:border-none"
+                      value={previewProvince}
+                      onChange={(e) => setPreviewProvince(e.target.value)}
+                    />
+                  </p>
                 </div>
                 <div className="text-right">
                   <p><span className="font-bold">Reference Month/Year:</span> {generatedReport.period}</p>

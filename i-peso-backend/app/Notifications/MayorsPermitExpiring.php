@@ -3,11 +3,14 @@
 namespace App\Notifications;
 
 use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
-class MayorsPermitExpiring extends Notification implements ShouldQueue
+// Not ShouldQueue: this shared-hosting deployment has no persistent queue
+// worker process, so a queued notification would sit unsent in the `jobs`
+// table forever. Sent synchronously instead — this fires from a scheduled
+// console command, not an HTTP request, so there's no response to block.
+class MayorsPermitExpiring extends Notification
 {
     use Queueable;
 

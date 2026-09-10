@@ -57,7 +57,17 @@ class AuthController extends Controller
     {
         $otp = str_pad(random_int(0, 999999), 6, '0', STR_PAD_LEFT);
         Cache::put("ipeso_otp_{$email}", Hash::make($otp), now()->addMinutes(10));
-        Mail::to($email)->send(new OtpMail($otp));
+
+        // A mail-provider outage must not 500 the caller — registration in
+        // particular would otherwise have already created the account before
+        // failing, leaving the user stuck unable to re-register (email taken)
+        // and unable to verify (no code ever received). Resend OTP is the
+        // user's recovery path once mail is working again.
+        try {
+            Mail::to($email)->send(new OtpMail($otp));
+        } catch (\Throwable $exception) {
+            Log::error('Unable to send OTP email.', ['email' => $email, 'error' => $exception->getMessage()]);
+        }
 
         if ($this->shouldExposeLocalOtp()) {
             Log::info('Local development OTP generated.', [
@@ -175,6 +185,7 @@ class AuthController extends Controller
                 'corporation_partnership',
                 'local_recruitment_agency',
                 'overseas_recruitment_agency',
+                'government_agency',
             ])];
         }
 
@@ -411,7 +422,12 @@ class AuthController extends Controller
 
         Cache::put("ipeso_reset_{$email}", $otp, now()->addMinutes(10));
         Cache::forget("ipeso_reset_attempts_{$email}");
-        Mail::to($email)->send(new OtpMail($otp));
+
+        try {
+            Mail::to($email)->send(new OtpMail($otp));
+        } catch (\Throwable $exception) {
+            Log::error('Unable to send password reset email.', ['email' => $email, 'error' => $exception->getMessage()]);
+        }
 
         return response()->json([
             'message' => 'A 6-digit reset code has been sent to your email.',

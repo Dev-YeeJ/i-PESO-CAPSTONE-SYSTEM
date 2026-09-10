@@ -11,14 +11,37 @@ th{background:#e2e8f0;font-size:7.5px;text-transform:uppercase}
 .blank{color:#94a3b8}
 .sign td{border:none;padding-top:26px;width:33%;text-align:center;font-size:9px}
 .sign .line{border-top:1px solid #111827;padding-top:3px}
+.letterhead{width:100%;margin-bottom:4px}
+.letterhead td{border:none;padding:0;vertical-align:top}
+.letterhead .id{font-size:9px;width:28%}
+.letterhead .center{text-align:center;width:44%}
+.letterhead .ref{width:28%;text-align:right;font-size:9px}
+.letterhead .ref .box{display:inline-block;border:1px solid #64748b;padding:4px 10px;font-weight:bold;margin-top:2px}
+.formno{text-align:right;font-size:7.5px;font-style:italic;margin-bottom:2px}
 </style></head><body>
 @php
   $v = fn($k, $d = null) => data_get($data, $k, $d);
   $rows = $data['rows'] ?? [];
   $cell = fn($value) => $value === null || $value === '' ? '<span class="blank">&nbsp;</span>' : e($value);
 @endphp
-<h1>STATISTICAL PERFORMANCE REPORTING SYSTEM (SPRS)</h1>
-<div class="sub">PESO Monthly Operations Statistical Report &mdash; <strong>{{ $v('period', $report->title) }}</strong></div>
+<div class="formno">SPRS Form 2018</div>
+<table class="letterhead"><tr>
+  <td class="id">
+    LGU/PESO: <strong>{{ $v('lgu_name', 'Urdaneta City') }}</strong><br>
+    Province: <strong>{{ $v('province', 'Pangasinan') }}</strong>
+  </td>
+  <td class="center">
+    <div style="font-weight:bold">DEPARTMENT OF LABOR AND EMPLOYMENT</div>
+    <div>Regional Office No. 1</div>
+    <div>San Fernando City, La Union</div>
+    <h1 style="margin-top:6px">STATISTICAL PERFORMANCE REPORTING SYSTEM (SPRS)</h1>
+    <div class="sub">PESO MONTHLY OPERATIONS STATISTICAL REPORT (PESO OpS)</div>
+  </td>
+  <td class="ref">
+    Reference<br>Month/Year<br>
+    <span class="box">{{ $v('period_short', $v('period', $report->title)) }}</span>
+  </td>
+</tr></table>
 
 <table>
   <thead>
@@ -81,7 +104,7 @@ th{background:#e2e8f0;font-size:7.5px;text-transform:uppercase}
 
 <table class="sign"><tr>
   <td><div class="line">{{ data_get($signatories, 'prepared_by.name', '________________') }}<br><span class="muted">Prepared by{{ data_get($signatories,'prepared_by.position') ? ' — '.$signatories['prepared_by']['position'] : ' (SLEO/PESO Coordinator)' }}</span></div></td>
-  <td><div class="line">{{ data_get($signatories, 'checked_by.name', '________________') }}<br><span class="muted">Checked by{{ data_get($signatories,'checked_by.position') ? ' — '.$signatories['checked_by']['position'] : ' (PESO Manager)' }}</span></div></td>
+  <td><div class="line">{{ data_get($signatories, 'checked_by.name', '________________') }}<br><span class="muted">Checked by{{ data_get($signatories,'checked_by.position') ? ' — '.$signatories['checked_by']['position'] : ' (CGADH1/PESO Manager)' }}</span></div></td>
   <td><div class="line">{{ data_get($signatories, 'approved_by.name', '________________') }}<br><span class="muted">Approved by{{ data_get($signatories,'approved_by.position') ? ' — '.$signatories['approved_by']['position'] : ' (City Mayor)' }}</span></div></td>
 </tr></table>
 

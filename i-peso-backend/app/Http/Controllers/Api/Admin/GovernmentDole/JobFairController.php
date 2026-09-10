@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Administrator;
 use App\Models\Employer;
 use App\Models\JobFair;
+use App\Models\JobFairAttendee;
 use App\Models\JobFairEmployer;
 use App\Models\JobFairConfirmationSlip;
 use App\Models\JobFairRequirementSubmission;
@@ -20,6 +21,7 @@ use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -31,14 +33,44 @@ class JobFairController extends Controller
         $filters = $request->validate([
             'search' => ['nullable', 'string', 'max:255'],
             'status' => ['nullable', Rule::in(['draft', 'published', 'accepting_employers', 'closed', 'completed', 'cancelled', 'upcoming', 'ongoing'])],
+            'sector' => ['nullable', Rule::in(['local', 'overseas', 'both'])],
+            'sort' => ['nullable', Rule::in(['newest', 'oldest', 'title'])],
             'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
         ]);
         $query = JobFair::query();
         if ($filters['search'] ?? null) $query->where('title', 'like', '%'.$filters['search'].'%');
         if ($filters['status'] ?? null) $query->where('status', $filters['status']);
-        $fairs = $query->orderByRaw('COALESCE(start_date, event_date) desc')->paginate($filters['per_page'] ?? 15);
+        if ($filters['sector'] ?? null) $query->where('sector', $filters['sector']);
+        match ($filters['sort'] ?? 'newest') {
+            'oldest' => $query->orderByRaw('COALESCE(start_date, event_date) asc'),
+            'title' => $query->orderBy('title'),
+            default => $query->orderByRaw('COALESCE(start_date, event_date) desc'),
+        };
+        $fairs = $query->paginate($filters['per_page'] ?? 15);
         $fairs->getCollection()->transform(fn (JobFair $fair) => $service->eventPayload($fair, null, true));
         return response()->json($fairs);
+    }
+
+    /**
+     * Summary counts for the directory's stat-card row — mirrors
+     * Admin\ConstituentCRM\EmployerController::summary()'s shape/purpose.
+     */
+    public function summary(Request $request): JsonResponse
+    {
+        $this->admin($request);
+        $summary = JobFair::query()->selectRaw(
+            'COUNT(*) AS total'
+            ." , SUM(CASE WHEN status IN ('published', 'accepting_employers', 'upcoming') THEN 1 ELSE 0 END) AS upcoming"
+            ." , SUM(CASE WHEN status = 'ongoing' THEN 1 ELSE 0 END) AS ongoing"
+            ." , SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) AS completed"
+        )->first();
+
+        return response()->json([
+            'total' => (int) ($summary->total ?? 0),
+            'upcoming' => (int) ($summary->upcoming ?? 0),
+            'ongoing' => (int) ($summary->ongoing ?? 0),
+            'completed' => (int) ($summary->completed ?? 0),
+        ]);
     }
 
     public function store(Request $request, JobFairService $service, GoogleMapsService $maps): JsonResponse
@@ -61,7 +93,10 @@ class JobFairController extends Controller
         $this->admin($request);
         $fair = JobFair::with([
             'employerJoins.employer', 'employerJoins.requirementSubmissions.requirement',
-            'employerJoins.confirmationSlip', 'employerJoins.resultReport', 'resultReports.mismatchTallies',
+            'employerJoins.confirmationSlip', 'employerJoins.resultReport',
+            'resultReports.mismatchTallies', 'resultReports.entries',
+            'resultReports.employer:employer_id,company_name,representative_name,email',
+            'resultReports.encodedByAdmin:admin_id,first_name,last_name,email',
         ])->findOrFail($id);
         $payload = $service->eventPayload($fair, null, true);
         $payload['participants'] = $fair->employerJoins->map(fn ($item) => $service->participationPayload($item))->values();
@@ -109,6 +144,12 @@ class JobFairController extends Controller
         $invited = 0;
         $seekersNotified = 0;
         if ($isFirstPublish) {
+            // Notifications send synchronously (no queue worker runs on this
+            // shared-hosting deployment — see the Notification classes), so
+            // broadcasting to every verified employer and every job seeker
+            // can take a while; don't let PHP's default execution-time limit
+            // cut this off partway through and leave some recipients unnotified.
+            set_time_limit(0);
             $invited = $this->broadcastInvitations($jobFair, $service);
             $seekersNotified = $this->broadcastToSeekers($jobFair);
         }
@@ -119,6 +160,125 @@ class JobFairController extends Controller
                 : 'Job Fair announcement published.',
             'job_fair' => $service->eventPayload($jobFair->fresh(), null, true),
         ]);
+    }
+
+    /**
+     * Info-desk scan: staff points their phone camera at a seeker's digital
+     * QR pass (or types a seeker in via the manual-search fallback) and gets
+     * their pre-registration back, marking attendance on first scan. Scanning
+     * the same pass twice is not an error — it just reports the original
+     * check-in time instead of overwriting it.
+     */
+    public function checkIn(Request $request, JobFair $jobFair, JobFairService $service): JsonResponse
+    {
+        $this->admin($request);
+        $validated = $request->validate([
+            'qr_code_uuid' => ['required_without_all:seeker_id,attendee_id', 'uuid'],
+            'seeker_id' => ['required_without_all:qr_code_uuid,attendee_id', 'integer', 'exists:job_seekers,seeker_id'],
+            // Lets the manual-search fallback re-select a result row directly —
+            // the only option for a guest walk-in, which has no seeker_id or QR.
+            'attendee_id' => ['required_without_all:qr_code_uuid,seeker_id', 'integer', 'exists:job_fair_attendees,id'],
+        ]);
+
+        $attendee = JobFairAttendee::query()
+            ->with(['seeker.seekerSkills', 'seeker.educations', 'seeker.workExperiences', 'seeker.occupations'])
+            ->where('job_fair_id', $jobFair->job_fair_id)
+            ->when($validated['qr_code_uuid'] ?? null, fn ($query, $uuid) => $query->where('qr_code_uuid', $uuid))
+            ->when($validated['seeker_id'] ?? null, fn ($query, $seekerId) => $query->where('seeker_id', $seekerId))
+            ->when($validated['attendee_id'] ?? null, fn ($query, $attendeeId) => $query->where('id', $attendeeId))
+            ->first();
+
+        if (! $attendee) {
+            return response()->json(['message' => 'No pre-registration found for this job fair.'], 404);
+        }
+
+        if ($attendee->is_attended) {
+            return response()->json([
+                'message' => 'Already checked in.',
+                'status' => 'already_checked_in',
+                'attendee' => $service->attendeeProfile($attendee),
+            ]);
+        }
+
+        $attendee->forceFill(['scanned_at' => now(), 'is_attended' => true])->save();
+
+        return response()->json([
+            'message' => 'Checked in.',
+            'status' => 'checked_in',
+            'attendee' => $service->attendeeProfile($attendee),
+        ]);
+    }
+
+    /**
+     * Manual fallback for when the camera can't read a pass — glare, a
+     * cracked screen, low battery brightness, all normal at a mall event.
+     * Covers both app-registered attendees and previously-encoded guests.
+     */
+    public function attendees(Request $request, JobFair $jobFair): JsonResponse
+    {
+        $this->admin($request);
+        $validated = $request->validate(['search' => ['nullable', 'string', 'max:255']]);
+        $search = $validated['search'] ?? null;
+
+        $attendees = JobFairAttendee::query()
+            ->with('seeker:seeker_id,first_name,last_name,mobile_number')
+            ->where('job_fair_id', $jobFair->job_fair_id)
+            ->when($search, fn ($query) => $query->where(function ($outer) use ($search) {
+                $outer->whereHas('seeker', function ($seekerQuery) use ($search) {
+                    $seekerQuery->where('first_name', 'like', "%{$search}%")
+                        ->orWhere('last_name', 'like', "%{$search}%")
+                        ->orWhere('mobile_number', 'like', "%{$search}%");
+                })
+                    ->orWhere('guest_name', 'like', "%{$search}%")
+                    ->orWhere('guest_mobile_number', 'like', "%{$search}%");
+            }))
+            ->orderBy('id', 'desc')
+            ->limit(20)
+            ->get()
+            ->map(fn (JobFairAttendee $attendee) => [
+                'id' => $attendee->id,
+                'seeker_id' => $attendee->seeker_id,
+                'name' => $attendee->seeker ? trim("{$attendee->seeker->first_name} {$attendee->seeker->last_name}") : $attendee->guest_name,
+                'mobile_number' => $attendee->seeker?->mobile_number ?? $attendee->guest_mobile_number,
+                'is_guest' => $attendee->seeker_id === null,
+                'is_attended' => (bool) $attendee->is_attended,
+                'scanned_at' => $attendee->scanned_at?->toISOString(),
+            ])
+            ->values();
+
+        return response()->json(['data' => $attendees]);
+    }
+
+    /**
+     * For attendees with no i-peso account at all — only the physical/Google
+     * Form pre-registration exists for them. Staff types what the form would
+     * have captured and this both checks them in and makes them count
+     * correctly in the SPRS "job applicants registered" tally.
+     */
+    public function encodeWalkIn(Request $request, JobFair $jobFair, JobFairService $service): JsonResponse
+    {
+        $this->admin($request);
+        $validated = $request->validate([
+            'guest_name' => ['required', 'string', 'max:255'],
+            'guest_mobile_number' => ['nullable', 'string', 'max:40'],
+            'guest_email' => ['nullable', 'email', 'max:255'],
+            'guest_educ_attainment' => ['nullable', 'string', 'max:100'],
+            'guest_preferred_job' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $attendee = JobFairAttendee::create([
+            'job_fair_id' => $jobFair->job_fair_id,
+            'qr_code_uuid' => (string) Str::uuid(),
+            'scanned_at' => now(),
+            'is_attended' => true,
+            ...$validated,
+        ]);
+
+        return response()->json([
+            'message' => 'Walk-in registration encoded and checked in.',
+            'status' => 'checked_in',
+            'attendee' => $service->attendeeProfile($attendee),
+        ], 201);
     }
 
     public function invite(Request $request, JobFair $jobFair, JobFairService $service): JsonResponse
@@ -243,11 +403,31 @@ class JobFairController extends Controller
             'employer_id' => ['nullable', 'integer', 'exists:employers,employer_id'], 'company_name' => ['required', 'string', 'max:255'],
             'employer_type' => ['required', Rule::in(['registered_employer', 'walk_in_employer', 'out_of_town_employer', 'paper_only_employer'])],
             'contact_person' => ['nullable', 'string', 'max:255'], 'contact_number' => ['nullable', 'string', 'max:40'],
+            'clearance_no' => ['nullable', 'string', 'max:100'],
             'total_male' => ['required', 'integer', 'min:0'], 'total_female' => ['required', 'integer', 'min:0'], 'total_applicants' => ['required', 'integer', 'min:0'],
+            'total_qualified' => ['required', 'integer', 'min:0'],
             'total_hots' => ['required', 'integer', 'min:0'], 'total_near_hired' => ['required', 'integer', 'min:0'], 'total_rejected' => ['required', 'integer', 'min:0'],
             'total_vacancies_solicited' => ['required', 'integer', 'min:0'], 'total_vacancies_offered' => ['required', 'integer', 'min:0'],
             'remarks' => ['nullable', 'string', 'max:5000'], 'mismatch_tallies' => ['nullable', 'array'],
             'mismatch_tallies.*.mismatch_code' => ['required', Rule::in(JobFairReportService::MISMATCH_CODES)], 'mismatch_tallies.*.count' => ['required', 'integer', 'min:0'],
+            // Optional per-applicant register — same shape as employer self-service,
+            // for admin staff transcribing a full paper RO1-JF Form 3 register.
+            'entries' => ['nullable', 'array'], 'entries.*.applicant_name' => ['required_with:entries', 'string', 'max:255'],
+            'entries.*.gender' => ['required_with:entries', Rule::in(['male', 'female'])],
+            'entries.*.position_applied_for' => ['required_with:entries', 'string', 'max:255'],
+            'entries.*.status' => ['required_with:entries', Rule::in(['qualified', 'near_hired', 'hots', 'employer_mismatch', 'seeker_mismatch'])],
+            'entries.*.city_municipality' => ['nullable', 'string', 'max:255'],
+            'entries.*.contact_number' => ['nullable', 'string', 'max:40'],
+            'entries.*.age_group' => ['nullable', Rule::in(['A', 'B', 'C', 'D', 'E', 'F'])],
+            'entries.*.highest_education' => ['nullable', 'string', 'max:40'],
+            'entries.*.classification_codes' => ['nullable', 'array'],
+            'entries.*.classification_codes.*' => [Rule::in(array_keys(JobFairReportService::CLASSIFICATION_CODES))],
+            'entries.*.mismatch_code' => ['nullable', Rule::in([
+                ...array_keys(JobFairReportService::EMPLOYER_MISMATCH_CODES),
+                ...array_keys(JobFairReportService::SEEKER_MISMATCH_CODES),
+                ...JobFairReportService::MISMATCH_CODES,
+            ])],
+            'entries.*.remarks' => ['nullable', 'string', 'max:2000'],
         ]);
         return response()->json(['message' => 'Admin proxy report saved.', 'result_report' => $reports->saveProxy($jobFair, $admin, $validated)], 201);
     }

@@ -12,6 +12,24 @@ class Employer extends Authenticatable
 {
     use HasApiTokens, Notifiable, SoftDeletes;
 
+    // Mirrors the fixed option list in Step2CompanyProfile.jsx — keep both in sync.
+    public const INDUSTRIES = [
+        'Agriculture & Fishing',
+        'Construction',
+        'Education & Training',
+        'Finance & Banking',
+        'Food & Beverage',
+        'Healthcare & Medical',
+        'Information Technology',
+        'Manufacturing',
+        'Real Estate',
+        'Retail & Commerce',
+        'Transportation & Logistics',
+        'Tourism & Hospitality',
+        'Government & Public Sector',
+        'Other',
+    ];
+
     protected static function boot()
     {
         parent::boot();
@@ -81,6 +99,7 @@ class Employer extends Authenticatable
 
         // Verification & Admin
         'verification_status',
+        'registration_submitted_at',
         'verified_at',
         'rejection_reason',
         'verified_by_admin_id',
@@ -95,8 +114,10 @@ class Employer extends Authenticatable
     protected $casts = [
         'email_verified_at' => 'datetime',
         'verified_at' => 'datetime',
+        'registration_submitted_at' => 'datetime',
         'password' => 'hashed',
         'representative_is_owner' => 'boolean',
+        'industry' => 'array',
         'latitude' => 'float',
         'longitude' => 'float',
         'location_accuracy' => 'integer',
@@ -145,6 +166,7 @@ class Employer extends Authenticatable
         $required = [
             'mayors_permit',
             'bir_certificate',
+            'philJobnet_proof',
         ];
 
         switch ($this->company_type) {
@@ -157,19 +179,43 @@ class Employer extends Authenticatable
             case 'local_recruitment_agency':
                 $required[] = 'sec_certificate';
                 $required[] = 'prpa_license';
+                $required[] = 'affidavit_of_undertaking';
+                $required[] = 'no_pending_case_certificate';
                 break;
             case 'overseas_recruitment_agency':
                 $required[] = 'sec_certificate';
                 $required[] = 'dme_poea_license';
+                $required[] = 'affidavit_of_undertaking';
+                $required[] = 'no_pending_case_certificate';
+                break;
+            case 'government_agency':
+                // Not a DTI/SEC-registered business and not a recruitment
+                // agency — no extra accreditation document beyond the two
+                // base requirements every employer type already carries.
                 break;
         }
 
         return $required;
     }
 
+    /**
+     * The affidavit and no-pending-case certificate are required for
+     * recruitment agencies (see getRequiredDocuments()) but only ever
+     * optional — PESO may still ask a regular employer for one — for
+     * every other company type, so they don't double up in the Step 3 UI.
+     * PhilJobNet proof is required for every company type (see
+     * getRequiredDocuments()), so it no longer appears here.
+     */
     public function getOptionalDocuments(): array
     {
-        return ['philJobnet_proof'];
+        $optional = [];
+
+        if (! in_array($this->company_type, ['local_recruitment_agency', 'overseas_recruitment_agency'], true)) {
+            $optional[] = 'affidavit_of_undertaking';
+            $optional[] = 'no_pending_case_certificate';
+        }
+
+        return $optional;
     }
 
     /**

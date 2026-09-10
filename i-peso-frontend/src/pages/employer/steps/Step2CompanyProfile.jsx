@@ -51,6 +51,12 @@ export default function Step2CompanyProfile({ initialData = {}, onComplete }) {
   const [touched, setTouched] = useState({})
   const [isLoading, setIsLoading] = useState(false)
   const [apiError, setApiError] = useState('')
+  const [otherIndustryText, setOtherIndustryText] = useState(() => {
+    const custom = Array.isArray(initialData.industry) 
+      ? initialData.industry.find(ind => !INDUSTRY_OPTIONS.includes(ind) && ind !== 'Other') 
+      : null;
+    return custom || '';
+  });
 
   const handleChange = useCallback((e) => {
     const { name } = e.target
@@ -69,6 +75,18 @@ export default function Step2CompanyProfile({ initialData = {}, onComplete }) {
   }, [])
 
   const getError = (name) => (touched[name] ? errors[name] : undefined)
+
+  const toggleIndustry = (value) => {
+    setForm((f) => {
+      const current = Array.isArray(f.industry) ? f.industry : []
+      const next = current.includes(value)
+        ? current.filter((item) => item !== value)
+        : [...current, value]
+      return { ...f, industry: next }
+    })
+    setApiError('')
+    setErrors((err) => ({ ...err, industry: undefined }))
+  }
 
   const handleLogoChange = (e) => {
     const file = e.target.files[0]
@@ -119,7 +137,23 @@ export default function Step2CompanyProfile({ initialData = {}, onComplete }) {
       formDataToSend.append('company_name', form.company_name)
       formDataToSend.append('tin', form.tin)
       formDataToSend.append('trade_name', form.trade_name || '')
-      formDataToSend.append('industry', form.industry)
+      let finalIndustries = [];
+      (Array.isArray(form.industry) ? form.industry : []).forEach((ind) => {
+        if (ind === 'Other' || !INDUSTRY_OPTIONS.includes(ind)) {
+          // Handled after loop
+        } else {
+          finalIndustries.push(ind);
+        }
+      });
+      
+      const hasOther = (Array.isArray(form.industry) ? form.industry : []).some(i => i === 'Other' || !INDUSTRY_OPTIONS.includes(i));
+      if (hasOther) {
+        finalIndustries.push(otherIndustryText.trim() || 'Other');
+      }
+
+      finalIndustries.forEach((ind) => {
+        formDataToSend.append('industry[]', ind)
+      })
       formDataToSend.append('company_size', form.company_size)
       formDataToSend.append('province', form.province)
       formDataToSend.append('province_code', form.province_code || '')
@@ -209,26 +243,73 @@ export default function Step2CompanyProfile({ initialData = {}, onComplete }) {
       {/* Industry */}
       <div>
         <label className="block text-sm font-medium text-slate-700 mb-1.5">
-          Industry (Optional)
+          Industry <span className="text-red-500">*</span>
+          <span className="ml-1 font-normal text-slate-400">(select all that apply)</span>
         </label>
-        <select
-          name="industry"
-          value={form.industry ?? ''}
-          onChange={handleChange}
+        <div
           onBlur={handleBlur}
-          className={`w-full px-3.5 py-2.5 text-sm rounded-xl border bg-white transition-all focus:outline-none focus:ring-2 focus:ring-blue-500/20 ${
-            getError('industry')
-              ? 'border-red-400 focus:border-red-400'
-              : 'border-slate-300 focus:border-blue-400'
+          className={`grid grid-cols-1 gap-2 rounded-xl border bg-white p-3 sm:grid-cols-2 ${
+            getError('industry') ? 'border-red-400' : 'border-slate-300'
           }`}
         >
-          <option value="">Select Industry</option>
-          {INDUSTRY_OPTIONS.map((ind) => (
-            <option key={ind} value={ind}>
-              {ind}
-            </option>
-          ))}
-        </select>
+          {INDUSTRY_OPTIONS.map((ind) => {
+            const isOther = ind === 'Other';
+            const checked = isOther 
+              ? Array.isArray(form.industry) && form.industry.some(i => i === 'Other' || !INDUSTRY_OPTIONS.includes(i))
+              : Array.isArray(form.industry) && form.industry.includes(ind);
+
+            const handleToggle = () => {
+              if (isOther) {
+                setForm((f) => {
+                  const current = Array.isArray(f.industry) ? f.industry : [];
+                  if (checked) {
+                    return { ...f, industry: current.filter(i => INDUSTRY_OPTIONS.includes(i) && i !== 'Other') };
+                  } else {
+                    return { ...f, industry: [...current, 'Other'] };
+                  }
+                });
+              } else {
+                toggleIndustry(ind);
+              }
+            };
+
+            return (
+              <label
+                key={ind}
+                className={`flex cursor-pointer items-center gap-2 rounded-lg border p-2 text-sm ${
+                  checked ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-slate-200 text-slate-700'
+                }`}
+              >
+                <input
+                  type="checkbox"
+                  name="industry"
+                  checked={checked}
+                  onChange={handleToggle}
+                  className="h-4 w-4 accent-blue-700"
+                />
+                {ind}
+              </label>
+            )
+          })}
+        </div>
+        
+        {Array.isArray(form.industry) && form.industry.some(i => i === 'Other' || !INDUSTRY_OPTIONS.includes(i)) && (
+          <div className="mt-3">
+            <input
+              type="text"
+              placeholder="Please specify your industry"
+              value={otherIndustryText}
+              onChange={(e) => setOtherIndustryText(e.target.value)}
+              className={`w-full px-3.5 py-2.5 text-sm rounded-xl border bg-white transition-all focus:outline-none focus:ring-2 focus:ring-blue-500/20 ${
+                getError('industry_other') ? 'border-red-400 focus:border-red-400' : 'border-slate-300 focus:border-blue-400'
+              }`}
+            />
+            {getError('industry_other') && (
+              <p className="mt-1.5 text-xs text-red-600">{getError('industry_other')}</p>
+            )}
+          </div>
+        )}
+
         {getError('industry') && (
           <p className="mt-1.5 text-xs text-red-600 flex items-center gap-1">
             <svg className="w-3 h-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">

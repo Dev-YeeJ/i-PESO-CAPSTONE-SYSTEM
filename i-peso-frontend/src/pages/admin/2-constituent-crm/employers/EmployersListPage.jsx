@@ -11,6 +11,13 @@ import { adminService } from '@/services/adminService'
 import { downloadBlob } from '@/services/placementReportService'
 import toast from 'react-hot-toast'
 
+// Mirrors Step2CompanyProfile.jsx's INDUSTRY_OPTIONS (and Employer::INDUSTRIES backend-side) — keep in sync.
+const INDUSTRY_OPTIONS = [
+  'Agriculture & Fishing', 'Construction', 'Education & Training', 'Finance & Banking', 'Food & Beverage',
+  'Healthcare & Medical', 'Information Technology', 'Manufacturing', 'Real Estate', 'Retail & Commerce',
+  'Transportation & Logistics', 'Tourism & Hospitality', 'Government & Public Sector', 'Other',
+]
+
 const initialFilters = {
   search: '',
   verificationStatus: 'all',
@@ -187,7 +194,7 @@ export default function EmployersListPage() {
 
           {showAdvancedFilters && (
             <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-              <label><span className="text-xs font-extrabold uppercase tracking-wide text-slate-500">Industry</span><input value={filters.industry} onChange={(event) => updateFilter('industry', event.target.value)} placeholder="Industry" className="mt-2 w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm" /></label>
+              <label><span className="text-xs font-extrabold uppercase tracking-wide text-slate-500">Industry</span><select value={filters.industry} onChange={(event) => updateFilter('industry', event.target.value)} className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm"><option value="">All industries</option>{INDUSTRY_OPTIONS.map((ind) => <option key={ind} value={ind}>{ind}</option>)}</select></label>
               <label><span className="text-xs font-extrabold uppercase tracking-wide text-slate-500">Province</span><input value={filters.province} onChange={(event) => updateFilter('province', event.target.value)} placeholder="Province" className="mt-2 w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm" /></label>
               <label><span className="text-xs font-extrabold uppercase tracking-wide text-slate-500">City / Municipality</span><input value={filters.city} onChange={(event) => updateFilter('city', event.target.value)} placeholder="City" className="mt-2 w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm" /></label>
               <label><span className="text-xs font-extrabold uppercase tracking-wide text-slate-500">Barangay</span><input value={filters.barangay} onChange={(event) => updateFilter('barangay', event.target.value)} placeholder="Barangay" className="mt-2 w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm" /></label>

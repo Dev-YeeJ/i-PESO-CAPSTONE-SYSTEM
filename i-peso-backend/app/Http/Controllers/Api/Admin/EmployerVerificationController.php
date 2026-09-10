@@ -34,6 +34,11 @@ class EmployerVerificationController extends Controller
         try {
             $query = Employer::query()
                 ->where('verification_status', 'pending')
+                // Excludes registrations still in progress (Steps 1-4 of the
+                // onboarding wizard) — verification_status is 'pending' from
+                // the moment the account is created, long before there's
+                // anything for an admin to actually review.
+                ->whereNotNull('registration_submitted_at')
                 ->with('documents')
                 ->when($filters['search'] ?? null, function ($builder, $search) {
                     $needle = '%'.addcslashes(trim($search), '%_\\').'%';
@@ -83,49 +88,6 @@ class EmployerVerificationController extends Controller
         } catch (\Exception $e) {
             return response()->json(['error' => $this->safeErrorMessage($e, 'Unable to load the verification queue.')], 500);
         }
-    }
-
-    /**
-     * Approve several employers in one pass.
-     * POST /api/admin/employers/bulk-approve
-     */
-    public function bulkApproveEmployers(Request $request): JsonResponse
-    {
-        $validated = $request->validate([
-            'employer_ids' => ['required', 'array', 'min:1', 'max:50'],
-            'employer_ids.*' => ['integer'],
-            'remarks' => ['nullable', 'string', 'max:1000'],
-        ]);
-
-        $approved = [];
-        $failed = [];
-
-        foreach (array_unique($validated['employer_ids']) as $employerId) {
-            $childRequest = Request::create('', 'POST', ['remarks' => $validated['remarks'] ?? null]);
-            $childRequest->setUserResolver(fn () => $request->user());
-
-            $response = $this->approveEmployer($employerId, $childRequest);
-
-            if ($response->getStatusCode() === 200) {
-                $approved[] = $employerId;
-
-                continue;
-            }
-
-            $payload = $response->getData(true);
-            $failed[] = [
-                'employer_id' => $employerId,
-                'reason' => $payload['error'] ?? $payload['message'] ?? 'Could not be approved.',
-            ];
-        }
-
-        return response()->json([
-            'message' => $failed === []
-                ? sprintf('%d employer(s) approved.', count($approved))
-                : sprintf('%d approved, %d could not be approved.', count($approved), count($failed)),
-            'approved' => $approved,
-            'failed' => $failed,
-        ], $approved === [] && $failed !== [] ? 422 : 200);
     }
 
     /** Shape one pending employer for the verification queue. */
@@ -379,19 +341,18 @@ class EmployerVerificationController extends Controller
     /**
      * Finalize employer verification in a single action.
      *
-     * Every uploaded document is treated as APPROVED by default. Only the
-     * documents listed in `rejected_documents` are marked rejected (with a
-     * preset reason). If any *required* document ends up rejected or was never
-     * uploaded, the employer is rejected; otherwise the employer is approved.
+     * Every document's decision was already persisted the moment the admin made
+     * it (see reviewDocument()) — this reads that state rather than trusting a
+     * fresh payload from the frontend. Any required document still 'pending'
+     * (opened but never explicitly rejected) is approved now by default. If any
+     * *required* document ends up rejected or was never uploaded, the employer
+     * is rejected; otherwise the employer is approved.
      *
      * POST /api/admin/employers/{employer_id}/finalize
      */
     public function finalizeVerification($employer_id, Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'rejected_documents' => ['nullable', 'array'],
-            'rejected_documents.*.document_id' => ['required', 'integer'],
-            'rejected_documents.*.reason' => ['required', 'string', 'min:10', 'max:1000'],
             'remarks' => ['nullable', 'string', 'max:1000'],
         ]);
 
@@ -412,21 +373,18 @@ class EmployerVerificationController extends Controller
                 ], 422);
             }
 
-            $rejectedReasons = collect($validated['rejected_documents'] ?? [])
-                ->keyBy('document_id')
-                ->map(fn ($entry) => $entry['reason']);
-
             $requiredTypes = $employer->getRequiredDocuments();
             $uploadedTypes = $employer->documents->pluck('document_type')->all();
             $missingRequired = array_values(array_diff($requiredTypes, $uploadedTypes));
 
-            // Compile the rejection narrative and decide the outcome.
+            // Compile the rejection narrative and decide the outcome from what's
+            // already persisted on each document (set via reviewDocument()).
             $rejectionLines = [];
             $rejectedRequired = false;
 
             foreach ($employer->documents as $document) {
-                if ($rejectedReasons->has($document->document_id)) {
-                    $rejectionLines[] = $this->documentLabel($document->document_type).': '.$rejectedReasons->get($document->document_id);
+                if ($document->verification_status === 'rejected') {
+                    $rejectionLines[] = $this->documentLabel($document->document_type).': '.($document->admin_notes ?? 'Document requires correction.');
                     if (in_array($document->document_type, $requiredTypes, true)) {
                         $rejectedRequired = true;
                     }
@@ -440,15 +398,12 @@ class EmployerVerificationController extends Controller
             $isRejection = $rejectedRequired || ! empty($missingRequired);
             $rejectionReason = implode(' | ', $rejectionLines);
 
-            DB::transaction(function () use ($employer, $rejectedReasons, $isRejection, $rejectionReason, $validated, $request) {
-                // Persist each document's decision (approved unless explicitly rejected).
+            DB::transaction(function () use ($employer, $isRejection, $rejectionReason, $validated, $request) {
+                // Any document not already rejected is approved by default —
+                // covers documents that were only ever viewed, never explicitly
+                // flagged, preserving the existing "approve unless flagged" UX.
                 foreach ($employer->documents as $document) {
-                    if ($rejectedReasons->has($document->document_id)) {
-                        $document->update([
-                            'verification_status' => 'rejected',
-                            'admin_notes' => $rejectedReasons->get($document->document_id),
-                        ]);
-                    } else {
+                    if ($document->verification_status !== 'rejected') {
                         $document->update([
                             'verification_status' => 'approved',
                             'admin_notes' => null,
@@ -523,6 +478,8 @@ class EmployerVerificationController extends Controller
             'prpa_license' => 'PRPA License',
             'dme_poea_license' => 'DMW/POEA License',
             'philJobnet_proof' => 'PhilJobNet Proof',
+            'affidavit_of_undertaking' => 'Affidavit of Undertaking',
+            'no_pending_case_certificate' => 'Certificate of No Pending Case (DOLE)',
             'government_id' => 'Government ID',
             'authorization_letter' => 'Authorization Letter',
         ];
@@ -630,43 +587,23 @@ class EmployerVerificationController extends Controller
             $document = EmployerDocument::with('employer')->findOrFail($document_id);
             $previousStatus = $document->verification_status;
             $employer = $document->employer;
+            // Captured before the update — drives whether this is a live intake
+            // review (employer still 'pending', notification suppressed in favor
+            // of the single consolidated notice finalize() sends) or a standalone
+            // correction on an already-decided employer (notify immediately).
+            $employerStatusBefore = $employer->verification_status;
 
+            // Intentionally does NOT touch the employer's overall verification_status
+            // here — that stays 'pending' for the whole review session so the admin's
+            // review controls (EmployerDetailPage.jsx gates them on 'pending') never
+            // disappear mid-session after just one document is rejected. The overall
+            // verdict is decided once, at finalize(), by reading these persisted
+            // per-document statuses.
             $document->update([
                 'verification_status' => $request->verification_status,
                 'admin_notes' => $request->admin_notes,
+                'viewed_at' => $document->viewed_at ?? now(),
             ]);
-
-            $rejectedRequiredDocuments = $employer->documents()
-                ->whereIn('document_type', $employer->getRequiredDocuments())
-                ->where('verification_status', 'rejected')
-                ->get();
-
-            $rejectionReason = $rejectedRequiredDocuments->isNotEmpty()
-                ? $rejectedRequiredDocuments
-                    ->map(fn ($rejectedDocument) => $this->documentLabel($rejectedDocument->document_type).': '.($rejectedDocument->admin_notes ?? 'Document requires correction.'))
-                    ->implode(' | ')
-                : null;
-
-            if ($request->verification_status === 'rejected' && in_array($document->document_type, $employer->getRequiredDocuments(), true)) {
-                $employer->update([
-                    'verification_status' => 'rejected',
-                    'verified_at' => null,
-                    'rejection_reason' => $rejectionReason,
-                    'verified_by_admin_id' => $request->user()->getKey(),
-                ]);
-            } elseif ($request->verification_status === 'approved') {
-                $stillRejected = $employer->documents()
-                    ->whereIn('document_type', $employer->getRequiredDocuments())
-                    ->where('verification_status', 'rejected')
-                    ->exists();
-
-                $employer->update([
-                    'verification_status' => $stillRejected ? 'rejected' : 'pending',
-                    'verified_at' => null,
-                    'rejection_reason' => $stillRejected ? $rejectionReason : null,
-                    'verified_by_admin_id' => $stillRejected ? $request->user()->getKey() : null,
-                ]);
-            }
 
             ActivityLogger::logAs($request->user(), 'reviewed_employer_document', sprintf(
                 'Marked employer document #%d (%s) as %s for employer #%d.%s',
@@ -677,22 +614,22 @@ class EmployerVerificationController extends Controller
                 $document->admin_notes ? " Notes: {$document->admin_notes}" : ''
             ));
 
-            $notificationQueued = true;
-            if ($previousStatus !== $document->verification_status) {
+            $notificationQueued = false;
+            if ($employerStatusBefore !== 'pending' && $previousStatus !== $document->verification_status) {
                 $event = $document->verification_status === 'rejected'
                     ? 'document_rejected'
                     : 'document_approved';
 
                 if (
                     $document->verification_status === 'approved'
-                    && in_array($document->document_type, $document->employer->getRequiredDocuments(), true)
-                    && $this->allRequiredDocumentsApproved($document->employer)
+                    && in_array($document->document_type, $employer->getRequiredDocuments(), true)
+                    && $this->allRequiredDocumentsApproved($employer)
                 ) {
                     $event = 'all_required_documents_approved';
                 }
 
                 $notificationQueued = $this->queueProgressNotification(
-                    $document->employer,
+                    $employer,
                     $event,
                     $document->document_type,
                     $document->admin_notes,
@@ -704,6 +641,7 @@ class EmployerVerificationController extends Controller
                 'document_id' => $document->document_id,
                 'verification_status' => $document->verification_status,
                 'admin_notes' => $document->admin_notes,
+                'viewed_at' => $document->viewed_at?->toISOString(),
                 'notification_queued' => $notificationQueued,
             ], 200);
         } catch (\Exception $e) {

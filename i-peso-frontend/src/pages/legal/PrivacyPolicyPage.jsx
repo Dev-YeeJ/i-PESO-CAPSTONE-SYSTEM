@@ -1,10 +1,10 @@
 import { ShieldCheck } from 'lucide-react';
-import LegalPageLayout, { ConfirmNote, PolicySection } from './LegalPageLayout';
+import LegalPageLayout, { PolicySection } from './LegalPageLayout';
 
 // Effective date of this policy text. Bump this whenever the content below
 // changes materially — it is the only date on the page that is not a
 // [PESO TO CONFIRM] placeholder.
-const EFFECTIVE_DATE = 'August 26, 2026';
+const EFFECTIVE_DATE = 'September 9, 2026';
 
 const inlineLinkClass = 'font-semibold text-[#0A192F] underline decoration-[#B45309]/50 decoration-2 underline-offset-2 hover:decoration-[#B45309]';
 
@@ -66,11 +66,13 @@ export default function PrivacyPolicyPage() {
             PESO — Urdaneta City
           </a>.
         </p>
-        <ConfirmNote>
-          Data Protection Officer (DPO): name/position and direct contact details to be confirmed by PESO.
-          Until then, privacy concerns may be raised through the office contact details above, or through
-          your PESO administrator.
-        </ConfirmNote>
+        <p>
+          Privacy inquiries and data subject requests (access, correction, and similar concerns) are handled
+          directly by the PESO Urdaneta City office through the contact details above. Complaints that cannot
+          be resolved at the office level are escalated to the Department of Labor and Employment (DOLE).
+          PESO has not designated a separately named Data Protection Officer; this section will be updated if
+          one is appointed.
+        </p>
       </PolicySection>
 
       <PolicySection id="data-we-collect" number={3} title="What Personal Data We Collect">
@@ -131,12 +133,19 @@ export default function PrivacyPolicyPage() {
       </PolicySection>
 
       <PolicySection id="retention" number={7} title="How Long We Keep Your Data">
-        <ConfirmNote>
-          PESO has not yet specified a formal retention period for job seeker and employer records after
-          account closure or prolonged inactivity. Once confirmed, that period will be published here. Until
-          then, data is retained for as long as your account remains active and as needed to comply with
-          DOLE reporting and record-keeping requirements.
-        </ConfirmNote>
+        <p>
+          We keep your job seeker or employer data for as long as your account remains active. After your
+          account is closed, or after three (3) years of continuous inactivity, your personal data is deleted
+          or anonymized — except where a longer period is needed to complete an active DOLE report, resolve
+          an ongoing dispute or complaint, or comply with a legal obligation, in which case we keep only what
+          is needed for that purpose.
+        </p>
+        <p>
+          This three-year period is aligned with the prescriptive period for employment-related money claims
+          under Article 306 of the Labor Code, and follows the National Privacy Commission's general
+          principle that personal data should not be kept longer than necessary for the purpose it was
+          collected for.
+        </p>
       </PolicySection>
 
       <PolicySection id="security" number={8} title="How We Protect Your Data">
@@ -164,11 +173,13 @@ export default function PrivacyPolicyPage() {
           <li>Data portability, where technically feasible.</li>
           <li>File a complaint with the National Privacy Commission (NPC).</li>
         </ul>
-        <ConfirmNote>
-          Requests to exercise these rights may be filed at the office contact details in Section 2 once
-          published. PESO's National Privacy Commission registration number, if applicable, will also be
-          published here.
-        </ConfirmNote>
+        <p>
+          Requests to exercise these rights may be filed at the office contact details in Section 2. National
+          Privacy Commission registration and the Public Employment Information System (PEIS) are
+          administered by the Department of Labor and Employment (DOLE) at the national level rather than
+          registered separately by this local PESO office; inquiries about national-level registration may be
+          directed to DOLE.
+        </p>
       </PolicySection>
 
       <PolicySection id="changes" number={10} title="Changes to This Policy">

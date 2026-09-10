@@ -963,12 +963,12 @@ const Step2 = ({ form, errors, onChange }) => (
       </FormField>
     )}
 
-    {/* First-Time Jobseeker Act */}
+    {/* First-Time Jobseeker */}
     <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '20px', marginTop: '8px' }}>
-      <SectionHeader title="FIRST-TIME JOBSEEKER ACT" subtitle="Republic Act No. 11261" />
+      <SectionHeader title="FIRST-TIME JOBSEEKER" />
     </div>
 
-    <FormField label="Are you claiming First-Time Jobseeker benefits under RA 11261?" error={errors.is_first_time_jobseeker}>
+    <FormField label="Is this your first time looking for a job?" error={errors.is_first_time_jobseeker}>
       <div style={{ display: 'flex', gap: '10px' }}>
         {[{ v: true, l: '✓ Yes, this is my first time seeking employment' }, { v: false, l: '✗ No' }].map(({ v, l }) => {
           const active = form.is_first_time_jobseeker === v || form.is_first_time_jobseeker === String(v)

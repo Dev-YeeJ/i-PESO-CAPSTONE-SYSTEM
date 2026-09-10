@@ -70,7 +70,7 @@ class EmployerRegistrationStep3Test extends TestCase
             'company_name' => 'Step Three Test Company',
             'tin' => '123-456-789-000',
             'trade_name' => 'Step Three',
-            'industry' => 'Information Technology',
+            'industry' => ['Information Technology'],
             'company_size' => 'micro',
             'province' => 'Pangasinan',
             'province_code' => '015500000',

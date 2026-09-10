@@ -3,11 +3,15 @@
 namespace App\Notifications;
 
 use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
-class EmployerVerificationProgressUpdated extends Notification implements ShouldQueue
+// Not ShouldQueue: this shared-hosting deployment has no persistent queue
+// worker process, so a queued notification would sit unsent in the `jobs`
+// table forever. Sending synchronously guarantees delivery is attempted;
+// callers already wrap ->notify() in try/catch so a transport failure
+// (e.g. mail) logs and degrades gracefully instead of breaking the request.
+class EmployerVerificationProgressUpdated extends Notification
 {
     use Queueable;
 
@@ -116,6 +120,8 @@ class EmployerVerificationProgressUpdated extends Notification implements Should
             'prpa_license' => 'PRPA License',
             'dme_poea_license' => 'DMW/POEA License',
             'philJobnet_proof' => 'PhilJobNet Proof',
+            'affidavit_of_undertaking' => 'Affidavit of Undertaking',
+            'no_pending_case_certificate' => 'Certificate of No Pending Case (DOLE)',
             'government_id' => 'Government ID',
             'authorization_letter' => 'Authorization Letter',
             default => 'Submitted document',

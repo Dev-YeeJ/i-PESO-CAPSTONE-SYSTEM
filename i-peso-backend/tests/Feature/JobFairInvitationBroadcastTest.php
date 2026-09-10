@@ -428,7 +428,7 @@ class JobFairInvitationBroadcastTest extends TestCase
             $t->unsignedBigInteger('employer_id')->nullable(); $t->string('company_name');
             $t->string('normalized_company_name'); $t->string('dedupe_key'); $t->string('employer_type');
             $t->string('source'); $t->string('contact_person')->nullable(); $t->string('contact_number')->nullable();
-            foreach (['total_male', 'total_female', 'total_applicants', 'total_hots', 'total_near_hired', 'total_rejected', 'total_vacancies_solicited', 'total_vacancies_offered'] as $c) {
+            foreach (['total_male', 'total_female', 'total_applicants', 'total_qualified', 'total_hots', 'total_near_hired', 'total_rejected', 'total_vacancies_solicited', 'total_vacancies_offered'] as $c) {
                 $t->unsignedInteger($c)->default(0);
             }
             $t->text('remarks')->nullable(); $t->unsignedBigInteger('encoded_by_admin_id')->nullable();
