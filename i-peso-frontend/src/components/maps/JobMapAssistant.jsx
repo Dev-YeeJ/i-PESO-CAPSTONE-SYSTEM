@@ -68,7 +68,7 @@ export default function JobMapAssistant({ onFiltersParsed }) {
           <span className="flex h-6 w-6 items-center justify-center rounded-md bg-amber-400 text-blue-950 shadow-sm">
             <Sparkles className="h-3.5 w-3.5" />
           </span>
-          <h2 className="text-xs font-bold tracking-wide text-white">AI Assistant</h2>
+          <h2 className="text-xs font-bold tracking-wide text-white">Smart Assistant</h2>
         </div>
       </div>
 
@@ -82,7 +82,7 @@ export default function JobMapAssistant({ onFiltersParsed }) {
         <input
           value={query}
           onChange={(event) => setQuery(event.target.value)}
-          placeholder="Ask AI to find jobs, e.g. '80% match nearby'..."
+          placeholder="Ask Smart Search to find jobs, e.g. '80% match nearby'..."
           disabled={isProcessing}
           className="w-full rounded-lg border border-white/10 bg-white/5 py-2 pl-3 pr-9 text-xs text-white shadow-inner outline-none transition placeholder:text-slate-400 focus:bg-white/10 focus:ring-1 focus:ring-amber-400/50 disabled:opacity-50"
         />

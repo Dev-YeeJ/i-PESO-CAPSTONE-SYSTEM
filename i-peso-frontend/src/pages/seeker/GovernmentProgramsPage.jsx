@@ -4,10 +4,9 @@ import { Link, useSearchParams } from 'react-router-dom'
 import ProgramCard from '@/components/government-programs/ProgramCard'
 import EligibilityBadge from '@/components/government-programs/EligibilityBadge'
 import { EmptyState, LoadingSkeleton } from '@/components/ui'
-import { PROGRAM_CATEGORIES } from '@/components/government-programs/programConstants'
 import governmentProgramService from '@/services/governmentProgramService'
 
-const initialFilters = { search: '', category: '', status: 'open' }
+const initialFilters = { search: '', status: 'open' }
 
 export default function GovernmentProgramsPage() {
   const [searchParams] = useSearchParams()
@@ -47,25 +46,6 @@ export default function GovernmentProgramsPage() {
           </p>
         </div>
       </div>
-
-      {/* Category Pills */}
-      <section aria-label="Program categories">
-        <div className="flex flex-wrap gap-3">
-          {PROGRAM_CATEGORIES.map((category) => (
-            <button
-              key={category.value}
-              onClick={() => setFilters((current) => ({ ...current, category: current.category === category.value ? '' : category.value }))}
-              className={`rounded-full px-5 py-2.5 text-sm font-bold transition-all shadow-sm ${
-                filters.category === category.value 
-                  ? 'bg-blue-900 text-white ring-2 ring-blue-900 ring-offset-2' 
-                  : 'bg-white border border-slate-200 text-slate-700 hover:border-blue-300 hover:bg-blue-50/50'
-              }`}
-            >
-              {category.label}
-            </button>
-          ))}
-        </div>
-      </section>
 
       {/* Control Bar & Results */}
       <section className="space-y-6">

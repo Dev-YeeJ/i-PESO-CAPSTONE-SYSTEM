@@ -11,6 +11,7 @@ php artisan down --retry=60
 composer install --no-dev --prefer-dist --optimize-autoloader --no-interaction
 php artisan migrate --force
 php artisan employer-documents:migrate-private
+php artisan occupations:bootstrap-if-empty
 php artisan storage:link
 php artisan optimize
 php artisan app:production-check

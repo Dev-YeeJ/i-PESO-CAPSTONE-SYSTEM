@@ -581,7 +581,7 @@ function JobCard({ job, saved = false, applying = false, onSave, onDetails, onQu
         </div>
 
         <div className="flex flex-wrap items-center gap-2 mt-2">
-          <ScoreBadge icon={Star} label={`${job.matchScore}% Match`} className={matchMeta.className} />
+          {!job.matchDeferred && <ScoreBadge icon={Star} label={`${job.matchScore}% Match`} className={matchMeta.className} />}
           {job.requiredSkills.slice(0, 3).map((skill) => (
             <span key={skill} className="rounded-md bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">
               {skill}
@@ -591,10 +591,12 @@ function JobCard({ job, saved = false, applying = false, onSave, onDetails, onQu
             <span className="text-xs font-semibold text-slate-400">+{job.requiredSkills.length - 3} more</span>
           )}
         </div>
-        
+
         <div className="flex flex-col gap-3 border-t border-slate-100 pt-3 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-xs font-semibold text-emerald-700 flex items-center gap-1">
-            {job.missingCriticalSkills.length ? (
+            {job.matchDeferred ? (
+              <span className="text-slate-500">Open the details to check requirements</span>
+            ) : job.missingCriticalSkills.length ? (
               <span className="text-amber-600 flex items-center gap-1">
                 <AlertTriangle className="h-3.5 w-3.5"/> Missing {job.missingCriticalSkills.length} skill{job.missingCriticalSkills.length > 1 ? 's' : ''}
               </span>
@@ -794,20 +796,31 @@ function JobDetailModal({ job, saved, applying = false, onClose, onSave, onQuick
 
         <div className="space-y-5">
           <div className="grid gap-3 sm:grid-cols-4">
-            <Fact icon={Star} label="Merit" value={`${job.matchScore}%`} />
+            {job.matchDeferred
+              ? <Fact icon={Star} label="Merit" value="Not scored" />
+              : <Fact icon={Star} label="Merit" value={`${job.matchScore}%`} />}
             <Fact icon={MapPin} label="Distance" value={formatDistance(job.distanceKm)} />
             <Fact icon={WalletCards} label="Salary" value={job.salaryRange} />
             <Fact icon={CalendarDays} label="Deadline" value={formatDate(job.deadline) || 'Open'} />
           </div>
 
-          <div className="rounded-xl border border-slate-200 p-4">
-            <h3 className="font-black text-slate-950">Why this appears in your feed</h3>
-            <div className="mt-4 space-y-3">
-              {Object.entries(job.matchSummary).map(([key, value]) => (
-                <ScoreRow key={key} label={titleCase(key)} value={value} />
-              ))}
+          {job.matchDeferred ? (
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+              <h3 className="font-black text-slate-950">Match scoring not run for this list</h3>
+              <p className="mt-2 text-sm leading-6 text-slate-600">
+                This job comes from a broader feed that skips detailed match scoring. Compare the required skills below against your profile, or check the Recommended tab for jobs scored against your profile.
+              </p>
             </div>
-          </div>
+          ) : (
+            <div className="rounded-xl border border-slate-200 p-4">
+              <h3 className="font-black text-slate-950">Why this appears in your feed</h3>
+              <div className="mt-4 space-y-3">
+                {Object.entries(job.matchSummary).map(([key, value]) => (
+                  <ScoreRow key={key} label={titleCase(key)} value={value} />
+                ))}
+              </div>
+            </div>
+          )}
 
           <div className="grid gap-4 md:grid-cols-2">
             <div className="rounded-xl border border-slate-200 p-4">
@@ -820,20 +833,22 @@ function JobDetailModal({ job, saved, applying = false, onClose, onSave, onQuick
                 ))}
               </div>
             </div>
-            <div className="rounded-xl border border-slate-200 p-4">
-              <h3 className="font-black text-slate-950">Skill gaps</h3>
-              {job.missingCriticalSkills.length ? (
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {job.missingCriticalSkills.map((skill) => (
-                    <span key={skill} className="rounded-full bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-700">
-                      {skill}
-                    </span>
-                  ))}
-                </div>
-              ) : (
-                <p className="mt-3 text-sm leading-6 text-slate-600">No critical skill gap was detected from the current job requirement data.</p>
-              )}
-            </div>
+            {!job.matchDeferred && (
+              <div className="rounded-xl border border-slate-200 p-4">
+                <h3 className="font-black text-slate-950">Skill gaps</h3>
+                {job.missingCriticalSkills.length ? (
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {job.missingCriticalSkills.map((skill) => (
+                      <span key={skill} className="rounded-full bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-700">
+                        {skill}
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="mt-3 text-sm leading-6 text-slate-600">No critical skill gap was detected from the current job requirement data.</p>
+                )}
+              </div>
+            )}
           </div>
 
           <div className="rounded-xl border border-slate-200 p-4">
@@ -1047,6 +1062,10 @@ function normalizeApiJobs(rows) {
       salaryRange: formatSalary(row),
       requiredSkills,
       matchScore: Math.round(Number(match.percentage ?? match.total_score ?? 0)),
+      // Nearby/Latest feeds intentionally skip full match scoring for
+      // performance — match/match_percentage come back null and this flag
+      // tells the card to hide match UI instead of showing a misleading 0%.
+      matchDeferred: Boolean(row.match_deferred),
       workSetup: normalizeWorkSetup(row.work_setup),
       employmentType: normalizeEmploymentType(row.employment_type),
       jobLevel: inferJobLevel(experienceLevel, row.minimum_experience_months),
@@ -1102,8 +1121,8 @@ function nextBestAction(profile, seeker) {
   if (!summary) {
     return {
       title: 'Add your Professional Summary',
-      description: 'You are missing a short About Me section. Add one with AI to make your profile easier for employers to understand.',
-      cta: 'Open Profile to Add with AI',
+      description: 'You are missing a short About Me section. Add one now to make your profile easier for employers to understand.',
+      cta: 'Complete Your Profile',
       href: '/seeker/profile',
     }
   }
