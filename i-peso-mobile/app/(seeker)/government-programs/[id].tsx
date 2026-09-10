@@ -1,6 +1,7 @@
-import { useState } from 'react'
-import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { useCallback, useState } from 'react'
+import { Alert, BackHandler, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
+import { useFocusEffect } from '@react-navigation/native'
 import { useQuery } from '@tanstack/react-query'
 import { getCitizenCharterSteps, seekerService } from '@/services/seekerService'
 import { downloadAndShare } from '@/utils/fileTransfer'
@@ -46,6 +47,30 @@ export default function ProgramDetailScreen() {
   const [attachmentBusy, setAttachmentBusy] = useState(false)
   const [attachmentError, setAttachmentError] = useState('')
 
+  // government-programs/[id] is a flat sibling in the Tabs navigator (not nested under
+  // Government Programs' own stack — same architecture as job-fairs.tsx/citizen-charter.tsx),
+  // so a plain router.back() has no real history to unwind to and falls through to the first
+  // tab (Home) instead of Government Programs. router.canGoBack() was tried here first, but it
+  // reports true off the root Stack's own history rather than this Tabs navigator's, so back()
+  // still landed on Home — same unconditional replace() already proven to work for this exact
+  // architecture in job-fairs.tsx/citizen-charter.tsx is used instead.
+  const goBackToPrograms = useCallback(() => {
+    router.replace('/(seeker)/government-programs')
+  }, [router])
+
+  // Android's hardware back button goes through the tab navigator's own goBack() by default,
+  // not through the header's onBack — without this it would hit the exact same flat-sibling
+  // fallthrough-to-Home bug even after fixing the custom back arrow above.
+  useFocusEffect(
+    useCallback(() => {
+      const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+        goBackToPrograms()
+        return true
+      })
+      return () => subscription.remove()
+    }, [goBackToPrograms]),
+  )
+
   const { data: program, isLoading, error } = useQuery({
     queryKey: ['governmentProgram', id],
     queryFn: () => seekerService.getGovernmentProgram(id),
@@ -68,7 +93,7 @@ export default function ProgramDetailScreen() {
   if (isLoading) {
     return (
       <View style={styles.flex}>
-        <ScreenHeader title="Program Details" onBack={() => router.back()} />
+        <ScreenHeader title="Program Details" onBack={goBackToPrograms} />
         <ScreenSkeleton label="Loading program details" />
       </View>
     )
@@ -77,12 +102,12 @@ export default function ProgramDetailScreen() {
   if (error || !program) {
     return (
       <View style={styles.flex}>
-        <ScreenHeader title="Program Details" onBack={() => router.back()} />
+        <ScreenHeader title="Program Details" onBack={goBackToPrograms} />
         <View style={styles.center}>
           <AlertBox variant="warning">
             {error ? apiErrorMessage(error, 'Unable to load this program.') : 'Unable to load this program.'}
           </AlertBox>
-          <Button variant="outline" onPress={() => router.back()}>Go Back</Button>
+          <Button variant="outline" onPress={goBackToPrograms}>Go Back</Button>
         </View>
       </View>
     )
@@ -97,7 +122,7 @@ export default function ProgramDetailScreen() {
 
   return (
     <View style={styles.flex}>
-      <ScreenHeader title="Program Details" onBack={() => router.back()} />
+      <ScreenHeader title="Program Details" onBack={goBackToPrograms} />
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.header}>
           <Text style={styles.programTitle}>{textFrom(program.title, 'Untitled program')}</Text>

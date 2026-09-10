@@ -349,9 +349,10 @@ function JobsHeader({
               style={styles.searchInput}
               value={query}
               onChangeText={setQuery}
-              placeholder="Search jobs, skills, or employers"
+              placeholder="Search jobs or skills"
               placeholderTextColor={colors.subtle}
               returnKeyType="search"
+              numberOfLines={1}
               onSubmitEditing={onAiSearch}
             />
           </View>
@@ -546,7 +547,11 @@ const styles = StyleSheet.create({
   },
   searchBox: {
     flex: 1,
-    minHeight: 48,
+    // A fixed height (not minHeight) so this box can never grow if the placeholder/typed text
+    // ever wraps onto a second line — a known Android Flexbox quirk where a `flex: 1` TextInput
+    // next to another flexible sibling (the AI button) can get measured at an ambiguous width
+    // on its first layout pass, causing text to wrap before the real width settles.
+    height: 48,
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,

@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react'
-import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import { ActivityIndicator, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native'
 import { colors, radii, spacing, typography } from '@/theme'
 import { seekerService, type AiSuggestionItem, type OccupationClassificationSuggestion, type SkillOption } from '@/services/seekerService'
 import { Combobox } from './Combobox'
 import { AddressSearchField } from './AddressSearchField'
 import type { GeocodedLocation } from '@/services/seekerService'
-import { getProvinces, getCitiesByProvince } from '@/services/psgcService'
+import { getBarangaysByCity, getCitiesByProvince, getProvinces, matchPsgcLocation } from '@/services/psgcService'
 import {
   Choice,
   ChoiceGroup,
@@ -22,7 +22,6 @@ import {
   newEligibility,
   newLanguage,
   newOccupationPref,
-  newSkill,
   newTraining,
   newWorkExperience,
 } from './payloads'
@@ -311,6 +310,11 @@ const EDUCATION_LEVEL_OPTIONS = [
 ]
 const COURSE_REQUIRED_LEVELS = ['tertiary', 'senior_high_strand', 'vocational', 'graduate_studies']
 
+// Mirrors web's EducationBackgroundEditor.jsx YearSelect ranges exactly.
+const CURRENT_YEAR = new Date().getFullYear()
+const PAST_YEAR_OPTIONS = Array.from({ length: CURRENT_YEAR - 1949 }, (_, i) => String(CURRENT_YEAR - i)).map((y) => ({ label: y, value: y }))
+const EXPECTED_YEAR_OPTIONS = Array.from({ length: 16 }, (_, i) => String(CURRENT_YEAR + i)).map((y) => ({ label: y, value: y }))
+
 // Mirrors web's EMPLOYMENT_STATUS_OPTIONS (per work-experience row) exactly.
 const WORK_EMPLOYMENT_STATUS_OPTIONS = [
   { value: 'permanent', label: 'Permanent' },
@@ -347,12 +351,12 @@ function SubLabel({ children }: { children: string }) {
 
 // height_ft on the wire is decimal feet (backend: between:2.5,8.5) — the UI
 // collects it as a feet/inches pair and converts, per the NSRP form's units.
-const FEET_OPTIONS = [2, 3, 4, 5, 6, 7, 8].map((f) => ({ label: `${f} ft`, value: String(f) }))
-const INCH_OPTIONS = Array.from({ length: 12 }, (_, i) => ({ label: `${i} in`, value: String(i) }))
+const FEET_OPTIONS = [{ label: 'Feet', value: '0' }, ...[2, 3, 4, 5, 6, 7, 8].map((f) => ({ label: `${f} ft`, value: String(f) }))]
+const INCH_VALUES = Array.from({ length: 12 }, (_, i) => i)
 
 function feetInchesFromDecimal(decimalFeet: string): { feet: number; inches: number } {
   const parsed = Number(decimalFeet)
-  if (!Number.isFinite(parsed) || parsed <= 0) return { feet: 5, inches: 0 }
+  if (!Number.isFinite(parsed) || parsed <= 0) return { feet: 0, inches: 0 }
   const feet = Math.floor(parsed)
   const inches = Math.round((parsed - feet) * 12)
   return inches >= 12 ? { feet: feet + 1, inches: 0 } : { feet, inches }
@@ -420,6 +424,71 @@ function DateOfBirthField({ value, onChange, error }: { value: string; onChange:
 
 export function Step1Personal({ value, onChange, errors }: { value: Step1Value; onChange: (v: Step1Value) => void; errors?: ServerErrors }) {
   const set = <K extends keyof Step1Value>(key: K, val: Step1Value[K]) => onChange({ ...value, [key]: val })
+  const [provinces, setProvinces] = useState<{ code: string; name: string }[]>([])
+  const [cities, setCities] = useState<{ code: string; name: string }[]>([])
+  const [barangays, setBarangays] = useState<{ code: string; name: string }[]>([])
+  const [addressListsLoading, setAddressListsLoading] = useState(false)
+  const [locationNotice, setLocationNotice] = useState('')
+
+  const applyResolvedLocation = async (place: GeocodedLocation) => {
+    setLocationNotice('')
+    let matched
+    try {
+      matched = await matchPsgcLocation(place)
+    } catch {
+      setLocationNotice('The location was found, but its official address lists could not be loaded. Please select the address fields manually.')
+      matched = null
+    }
+    const province = matched?.provinceName?.trim() || place.province_name?.trim() || ''
+    const city = matched?.cityName?.trim() || place.city_name?.trim() || ''
+    const barangay = matched?.barangayName?.trim() || place.barangay_name?.trim() || ''
+
+    onChange({
+      ...value,
+      address_province_code: matched?.address_province_code ?? '',
+      address_city_code: matched?.address_city_code ?? '',
+      address_barangay_code: matched?.address_barangay_code ?? '',
+      address_province: province,
+      address_municipality_city: city,
+      address_barangay: barangay,
+      address_house_street: matched?.houseStreet || [place.house_number, place.street].filter(Boolean).join(' ').trim(),
+      latitude: place.latitude,
+      longitude: place.longitude,
+    })
+  }
+
+  useEffect(() => {
+    let active = true
+    setAddressListsLoading(true)
+    getProvinces()
+      .then((items) => active && setProvinces(items))
+      .catch(() => active && setProvinces([]))
+      .finally(() => active && setAddressListsLoading(false))
+    return () => { active = false }
+  }, [])
+
+  useEffect(() => {
+    let active = true
+    setCities([])
+    setBarangays([])
+    if (!value.address_province_code) return undefined
+    getCitiesByProvince(value.address_province_code)
+      .then((items) => active && setCities(items))
+      .catch(() => active && setCities([]))
+    return () => { active = false }
+  }, [value.address_province_code])
+
+  useEffect(() => {
+    let active = true
+    if (!value.address_city_code) {
+      setBarangays([])
+      return undefined
+    }
+    getBarangaysByCity(value.address_city_code)
+      .then((items) => active && setBarangays(items))
+      .catch(() => active && setBarangays([]))
+    return () => { active = false }
+  }, [value.address_city_code])
 
   const toggleDisability = (option: string) => {
     if (option === 'none') {
@@ -446,6 +515,10 @@ export function Step1Personal({ value, onChange, errors }: { value: Step1Value; 
       ) : null}
       {(() => {
         const height = feetInchesFromDecimal(value.height_ft)
+        const inchOptions = INCH_VALUES.map((inches) => ({
+          label: inches === 0 ? (height.feet === 0 ? 'Inches' : '0 in') : `${inches} in`,
+          value: String(inches),
+        }))
         const setHeight = (feet: number, inches: number) => set('height_ft', decimalFromFeetInches(feet, inches))
         return (
           <>
@@ -457,7 +530,7 @@ export function Step1Personal({ value, onChange, errors }: { value: Step1Value; 
                 <SelectField label="Feet" required options={FEET_OPTIONS} value={String(height.feet)} onChange={(v) => setHeight(Number(v), height.inches)} />
               </View>
               <View style={styles.choiceRowItem}>
-                <SelectField label="Inches" required options={INCH_OPTIONS} value={String(height.inches)} onChange={(v) => setHeight(height.feet, Number(v))} />
+                <SelectField label="Inches" required options={inchOptions} value={String(height.inches)} onChange={(v) => setHeight(height.feet, Number(v))} />
               </View>
             </View>
             <Text style={styles.helperText}>Select feet and inches</Text>
@@ -468,21 +541,48 @@ export function Step1Personal({ value, onChange, errors }: { value: Step1Value; 
       <Field label="TIN (Tax Identification No.)" value={value.tin} onChangeText={(v) => set('tin', v)} keyboardType="number-pad" error={fieldError(errors, 'tin')} />
 
       <SubLabel>Present Address</SubLabel>
-      <Text style={styles.addressHint}>Search and select your complete Philippine address, or use your current location.</Text>
+      <Text style={styles.addressHint}>Search or use your current location, then select the Province, City / Municipality, and Barangay below.</Text>
       <AddressSearchField
-        onAddressSelected={(place: GeocodedLocation) => {
-          onChange({
-            ...value,
-            address_province: place.province_name || value.address_province,
-            address_municipality_city: place.city_name || value.address_municipality_city,
-            address_barangay: place.barangay_name || value.address_barangay,
-            address_house_street: [place.house_number, place.street].filter(Boolean).join(' ').trim() || value.address_house_street,
-          })
-        }}
+        onError={setLocationNotice}
+        onAddressSelected={applyResolvedLocation}
       />
-      <Field label="Province" required value={value.address_province} onChangeText={(v) => set('address_province', v)} error={fieldError(errors, 'address_province')} />
-      <Field label="City / Municipality" required value={value.address_municipality_city} onChangeText={(v) => set('address_municipality_city', v)} error={fieldError(errors, 'address_municipality_city')} />
-      <Field label="Barangay" required value={value.address_barangay} onChangeText={(v) => set('address_barangay', v)} error={fieldError(errors, 'address_barangay')} />
+      {locationNotice ? <Text style={styles.errorText}>{locationNotice}</Text> : null}
+      <SelectField
+        label="Province"
+        required
+        placeholder={addressListsLoading ? 'Loading provinces...' : 'Select province'}
+        options={provinces.map((province) => ({ label: province.name, value: province.code }))}
+        value={value.address_province_code}
+        onChange={(code) => {
+          const province = provinces.find((item) => item.code === code)
+          onChange({ ...value, address_province_code: code, address_province: province?.name ?? '', address_city_code: '', address_municipality_city: '', address_barangay_code: '', address_barangay: '' })
+        }}
+        error={fieldError(errors, 'address_province')}
+      />
+      <SelectField
+        label="City / Municipality"
+        required
+        placeholder={value.address_province_code ? 'Select city / municipality' : 'Select province first'}
+        options={cities.map((city) => ({ label: city.name, value: city.code }))}
+        value={value.address_city_code}
+        onChange={(code) => {
+          const city = cities.find((item) => item.code === code)
+          onChange({ ...value, address_city_code: code, address_municipality_city: city?.name ?? '', address_barangay_code: '', address_barangay: '' })
+        }}
+        error={fieldError(errors, 'address_municipality_city')}
+      />
+      <SelectField
+        label="Barangay"
+        required
+        placeholder={value.address_city_code ? 'Select barangay' : 'Select city first'}
+        options={barangays.map((barangay) => ({ label: barangay.name, value: barangay.code }))}
+        value={value.address_barangay_code}
+        onChange={(code) => {
+          const barangay = barangays.find((item) => item.code === code)
+          onChange({ ...value, address_barangay_code: code, address_barangay: barangay?.name ?? '' })
+        }}
+        error={fieldError(errors, 'address_barangay')}
+      />
       <Field label="House No. / Street" required value={value.address_house_street} onChangeText={(v) => set('address_house_street', v)} error={fieldError(errors, 'address_house_street')} />
 
       <SubLabel>Disability Disclosure</SubLabel>
@@ -561,6 +661,18 @@ export function Step2Employment({ value, onChange, errors }: { value: Step2Value
           onChangeText={(v) => set('household_id_4ps', formatHouseholdId4ps(v))}
           error={fieldError(errors, 'household_id_4ps')}
         />
+      ) : null}
+
+      <SubLabel>First-Time Jobseeker Act</SubLabel>
+      <ToggleGroup
+        label="Are you claiming First-Time Jobseeker benefits?"
+        value={value.is_first_time_jobseeker}
+        onChange={(v) => set('is_first_time_jobseeker', v)}
+      />
+      {value.is_first_time_jobseeker ? (
+        <Text style={styles.helperText}>
+          You can upload your barangay-issued Certificate of First-Time Jobseeker later from your profile.
+        </Text>
       ) : null}
     </>
   )
@@ -801,49 +913,91 @@ function SkillListEditor({
   max: number
   category: 'technical' | 'soft'
 }) {
+  const [query, setQuery] = useState('')
+  const [results, setResults] = useState<SkillOption[]>([])
+  const [loading, setLoading] = useState(false)
+  const limitReached = items.length >= max
+
+  useEffect(() => {
+    if (query.trim().length < 2) {
+      setResults([])
+      return
+    }
+    let cancelled = false
+    setLoading(true)
+    const timer = setTimeout(() => {
+      seekerService
+        .searchSkills(query.trim(), category)
+        .then((r) => { if (!cancelled) setResults(r) })
+        .catch(() => { if (!cancelled) setResults([]) })
+        .finally(() => { if (!cancelled) setLoading(false) })
+    }, 300)
+    return () => { cancelled = true; clearTimeout(timer) }
+  }, [query, category])
+
+  const addSkill = (name: string, source = 'user_added', is_official = false) => {
+    const trimmed = name.trim()
+    if (!trimmed || limitReached) return
+    if (items.some((s) => s.name.trim().toLowerCase() === trimmed.toLowerCase())) return
+    onChange([...items, { name: trimmed, proficiency: 'intermediate', source: normalizeCatalogSkillSource(source), is_official, is_recommended: false }])
+    setQuery('')
+    setResults([])
+  }
+
+  const removeSkill = (name: string) => onChange(items.filter((s) => s.name !== name))
+
   return (
-    <>
-      <RepeatableSection
-        title={title}
-        hint={hint}
-        items={items}
-        addLabel="Add skill"
-        onAdd={() => items.length < max && onChange([...items, newSkill()])}
-        onRemove={(i) => onChange(items.filter((_, idx) => idx !== i))}
-        emptyLabel="No skills added yet."
-        renderItem={(i) => {
-          const skill = items[i]
-          const update = (patch: Partial<typeof skill>) => {
-            const next = [...items]
-            next[i] = { ...skill, ...patch }
-            onChange(next)
-          }
-          return (
-            <>
-              <Combobox<SkillOption>
-                label="Skill name"
-                value={skill.name}
-                onChangeText={(v) => update({ name: v, source: 'user_added', is_official: false })}
-                onSelect={(item) => update({ name: item.name, source: normalizeCatalogSkillSource(item.source), is_official: item.source === 'dole' })}
-                search={(q) => seekerService.searchSkills(q, category)}
-                renderLabel={(item) => item.name}
-                keyExtractor={(item) => String(item.id)}
-                placeholder="e.g. MS Excel"
-              />
-              <ChoiceGroup label="Proficiency" columns={false} options={[{ label: 'Beginner', value: 'beginner' }, { label: 'Intermediate', value: 'intermediate' }, { label: 'Expert', value: 'expert' }]} value={skill.proficiency} onChange={(v) => update({ proficiency: v })} />
-            </>
-          )
-        }}
+    <View style={styles.skillCard}>
+      <View style={styles.skillCardHeader}>
+        <Text style={styles.sectionTitle}>{title}</Text>
+        <Text style={styles.skillCountBadge}>{items.length}/{max} selected</Text>
+      </View>
+      <Text style={styles.hint}>{hint}</Text>
+
+      <TextInput
+        style={[styles.skillSearchInput, limitReached && styles.skillSearchInputDisabled]}
+        value={query}
+        onChangeText={setQuery}
+        editable={!limitReached}
+        placeholder={limitReached ? `${title} limit reached` : `Search or add a ${category === 'technical' ? 'hard' : 'soft'} skill`}
+        placeholderTextColor={colors.subtle}
+        onSubmitEditing={() => addSkill(query)}
+        returnKeyType="done"
       />
+      {loading ? <ActivityIndicator size="small" color={colors.info} style={styles.skillSearchLoading} /> : null}
+      {results.length > 0 ? (
+        <View style={styles.skillResultsDropdown}>
+          {results.slice(0, 8).map((r) => (
+            <TouchableOpacity key={String(r.id)} style={styles.skillResultRow} onPress={() => addSkill(r.name, r.source, r.source === 'dole')} activeOpacity={0.85}>
+              <Text style={styles.skillResultText}>{r.name}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      ) : null}
+
+      <View style={styles.skillSelectedBox}>
+        {items.length === 0 ? (
+          <Text style={styles.emptyText}>No {category === 'technical' ? 'hard' : 'soft'} skills selected yet.</Text>
+        ) : (
+          <View style={styles.skillChipsRow}>
+            {items.map((s) => (
+              <View key={s.name} style={styles.skillSelectedChip}>
+                <Text style={styles.skillSelectedChipText} numberOfLines={1}>{s.name}</Text>
+                <TouchableOpacity onPress={() => removeSkill(s.name)} hitSlop={8} activeOpacity={0.7}>
+                  <Text style={styles.skillSelectedChipRemove}>✕</Text>
+                </TouchableOpacity>
+              </View>
+            ))}
+          </View>
+        )}
+      </View>
+
       <SkillAiSuggestions
         category={category}
         currentSkills={items.map((s) => s.name)}
-        onAdd={(item) => {
-          if (items.length >= max) return
-          onChange([...items, { name: item.name, proficiency: 'intermediate', source: 'system', is_official: false, is_recommended: true }])
-        }}
+        onAdd={(item) => addSkill(item.name, 'system', false)}
       />
-    </>
+    </View>
   )
 }
 
@@ -901,18 +1055,18 @@ export function Step5Education({ value, onChange, errors }: { value: Step5Value;
                 />
               ) : null}
               <ChoiceGroup label="Completion Status" required columns={false} options={[{ label: 'Graduated', value: 'graduated' }, { label: 'Undergraduate', value: 'undergraduate' }, { label: 'Currently studying', value: 'currently_studying' }]} value={edu.completion_status} onChange={(v) => update({ completion_status: v })} />
-              <Field label="Year Started" required keyboardType="number-pad" value={edu.year_started} onChangeText={(v) => update({ year_started: v })} error={fieldError(errors, `educations.${i}.year_started`)} />
+              <SelectField label="Year Started" required placeholder="Select year" options={PAST_YEAR_OPTIONS} value={edu.year_started} onChange={(v) => update({ year_started: v })} error={fieldError(errors, `educations.${i}.year_started`)} />
               {edu.completion_status === 'graduated' ? (
-                <Field label="Year Graduated" required keyboardType="number-pad" value={edu.year_graduated} onChangeText={(v) => update({ year_graduated: v })} error={fieldError(errors, `educations.${i}.year_graduated`)} />
+                <SelectField label="Year Graduated" required placeholder="Select year" options={PAST_YEAR_OPTIONS} value={edu.year_graduated} onChange={(v) => update({ year_graduated: v })} error={fieldError(errors, `educations.${i}.year_graduated`)} />
               ) : null}
               {edu.completion_status === 'undergraduate' ? (
                 <>
                   <Field label="Level Reached" required value={edu.undergrad_level_reached} onChangeText={(v) => update({ undergrad_level_reached: v })} error={fieldError(errors, `educations.${i}.undergrad_level_reached`)} />
-                  <Field label="Year Last Attended" required keyboardType="number-pad" value={edu.undergrad_year_last_attended} onChangeText={(v) => update({ undergrad_year_last_attended: v })} error={fieldError(errors, `educations.${i}.undergrad_year_last_attended`)} />
+                  <SelectField label="Year Last Attended" required placeholder="Select year" options={PAST_YEAR_OPTIONS} value={edu.undergrad_year_last_attended} onChange={(v) => update({ undergrad_year_last_attended: v })} error={fieldError(errors, `educations.${i}.undergrad_year_last_attended`)} />
                 </>
               ) : null}
               {edu.completion_status === 'currently_studying' ? (
-                <Field label="Expected Year of Graduation" keyboardType="number-pad" value={edu.expected_year_graduated} onChangeText={(v) => update({ expected_year_graduated: v })} error={fieldError(errors, `educations.${i}.expected_year_graduated`)} />
+                <SelectField label="Expected Year of Graduation" placeholder="Select year" options={EXPECTED_YEAR_OPTIONS} value={edu.expected_year_graduated} onChange={(v) => update({ expected_year_graduated: v })} error={fieldError(errors, `educations.${i}.expected_year_graduated`)} />
               ) : null}
             </>
           )
@@ -1035,6 +1189,23 @@ export function Step7Experience({ value, onChange, errors }: { value: Step7Value
 
 const styles = StyleSheet.create({
   subLabel: { marginTop: spacing.sm, marginBottom: spacing.sm, color: colors.primary, fontSize: typography.title, fontFamily: typography.family.bold },
+  sectionTitle: { color: colors.primary, fontSize: typography.title, fontFamily: typography.family.bold },
+  hint: { color: colors.secondaryText, fontSize: typography.small, lineHeight: 18, marginTop: spacing.xs, marginBottom: spacing.md },
+  emptyText: { color: colors.secondaryText, fontSize: typography.small, fontStyle: 'italic' },
+  skillCard: { borderWidth: 1, borderColor: colors.border, borderRadius: radii.lg, backgroundColor: colors.surface, padding: spacing.lg, marginBottom: spacing.lg },
+  skillCardHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
+  skillCountBadge: { borderWidth: 1, borderColor: colors.border, borderRadius: radii.pill, paddingHorizontal: spacing.md, paddingVertical: spacing.xs, color: colors.muted, fontSize: typography.small, fontFamily: typography.family.bold, backgroundColor: colors.background },
+  skillSearchInput: { borderWidth: 1, borderColor: colors.border, borderRadius: radii.md, backgroundColor: colors.background, paddingHorizontal: spacing.lg, paddingVertical: spacing.md, color: colors.primary, fontSize: typography.body },
+  skillSearchInputDisabled: { opacity: 0.6 },
+  skillSearchLoading: { marginTop: spacing.sm, alignSelf: 'flex-start' },
+  skillResultsDropdown: { marginTop: spacing.xs, borderWidth: 1, borderColor: colors.border, borderRadius: radii.md, backgroundColor: colors.surface, overflow: 'hidden' },
+  skillResultRow: { paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.border },
+  skillResultText: { color: colors.primary, fontSize: typography.body, fontFamily: typography.family.medium },
+  skillSelectedBox: { marginTop: spacing.md, borderWidth: 1, borderColor: colors.border, borderRadius: radii.md, backgroundColor: colors.background, padding: spacing.md, minHeight: 56, justifyContent: 'center' },
+  skillChipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  skillSelectedChip: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, borderWidth: 1, borderColor: colors.infoBorder, backgroundColor: colors.infoBackground, borderRadius: radii.pill, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, maxWidth: '100%' },
+  skillSelectedChipText: { color: colors.info, fontSize: typography.small, fontFamily: typography.family.bold, flexShrink: 1 },
+  skillSelectedChipRemove: { color: colors.info, fontSize: typography.small, fontFamily: typography.family.bold },
   choiceGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.md },
   choiceRow: { flexDirection: 'row', gap: spacing.md },
   choiceRowItem: { flex: 1 },

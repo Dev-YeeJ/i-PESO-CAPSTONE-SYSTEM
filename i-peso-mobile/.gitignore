@@ -33,6 +33,10 @@ yarn-error.*
 # local env files
 .env*.local
 
+# Firebase service account key (used once with `eas credentials` to set up FCM push, then not
+# needed again) — unlike google-services.json this is a real secret and must never be committed.
+firebase-adminsdk*.json
+
 # typescript
 *.tsbuildinfo
 

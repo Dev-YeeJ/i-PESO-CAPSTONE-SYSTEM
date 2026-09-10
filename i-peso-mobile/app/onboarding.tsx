@@ -142,7 +142,9 @@ export default function OnboardingScreen() {
       if (step === 1) {
         const address = buildAddressString(form.step1)
         try {
-          const geo = await seekerService.geocodeAddress(address)
+          const geo = form.step1.latitude != null && form.step1.longitude != null
+            ? { latitude: form.step1.latitude, longitude: form.step1.longitude, place_id: null }
+            : await seekerService.geocodeAddress(address)
           if (geo?.latitude != null && geo?.longitude != null) {
             payload = { ...payload, latitude: geo.latitude, longitude: geo.longitude, google_place_id: geo.place_id ?? null }
           }

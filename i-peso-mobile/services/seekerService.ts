@@ -53,11 +53,16 @@ export interface SeekerProfile {
   address_barangay?: string | null
   address_municipality_city?: string | null
   address_province?: string | null
+  address_province_code?: string | null
   latitude?: number | string | null
   longitude?: number | string | null
+  address_municipality_city_code?: string | null
+  address_city_code?: string | null
+  address_barangay_code?: string | null
   disabilities?: Array<{ disability_type: string; disability_specification?: string | null }>
   is_4ps_beneficiary?: boolean | null
   household_id_4ps?: string | null
+  is_first_time_jobseeker?: boolean | null
   employment_status?: string | null
   employment_type?: string | null
   self_employed_type?: string | null
@@ -255,7 +260,6 @@ export interface SeekerNotification {
     status?: string
     type?: string
     action_url?: string
-    action_type?: string
     application_id?: number | string
     program_id?: number | string
     job_fair_id?: number | string
@@ -281,6 +285,12 @@ export interface JobFair {
   start_time?: string | null
   end_time?: string | null
   venue?: string | null
+  latitude?: number | null
+  longitude?: number | null
+  // Single source of truth from the backend for "does this fair get a pin on the public Job
+  // Map" (public + in a map-eligible status + has coordinates) — mirrors i-peso-frontend's
+  // JobMapPage.jsx, which filters on this same flag rather than re-deriving it client-side.
+  map_eligible?: boolean
   sector?: string | null
   target_sector?: string | null
   partner_agencies?: string[] | null
@@ -418,6 +428,28 @@ export interface GeocodedLocation {
   barangay_name?: string | null
   street?: string | null
   house_number?: string | null
+  address_components?: Array<{ long_name?: string; types?: string[] }>
+  addressComponents?: Array<{ longText?: string; long_name?: string; types?: string[] }>
+}
+
+async function reverseGeocodeFallback(latitude: number, longitude: number): Promise<GeocodedLocation | null> {
+  const params = new URLSearchParams({ format: 'jsonv2', addressdetails: '1', lat: String(latitude), lon: String(longitude) })
+  const response = await fetch(`https://nominatim.openstreetmap.org/reverse?${params.toString()}`, {
+    headers: { Accept: 'application/json', 'User-Agent': 'i-PESO-Mobile/1.0 address reverse lookup' },
+  })
+  if (!response.ok) throw new Error('Address lookup is unavailable.')
+  const result = await response.json() as Record<string, unknown>
+  const address = (result.address ?? {}) as Record<string, string>
+  return {
+    formatted: String(result.display_name ?? ''),
+    latitude: Number(result.lat ?? latitude),
+    longitude: Number(result.lon ?? longitude),
+    province_name: address.state ?? address.province ?? address.state_district ?? null,
+    city_name: address.city ?? address.municipality ?? address.town ?? address.county ?? address.city_district ?? null,
+    barangay_name: address.village ?? address.suburb ?? address.neighbourhood ?? address.quarter ?? address.city_district ?? null,
+    street: address.road ?? address.pedestrian ?? address.residential ?? null,
+    house_number: address.house_number ?? null,
+  }
 }
 
 export interface SeekerAnalytics {
@@ -767,10 +799,35 @@ export const seekerService = {
 
   /** Mirrors i-peso-frontend's geoService.autocompleteAddress — address-search suggestions. */
   async autocompleteAddress(text: string, sessionToken?: string, coords?: { latitude?: number; longitude?: number }): Promise<GeocodedLocation[]> {
-    const res = await apiClient.get('/geo/autocomplete', {
-      params: { text, latitude: coords?.latitude, longitude: coords?.longitude, session_token: sessionToken },
-    })
-    return res.data?.suggestions ?? []
+    try {
+      const res = await apiClient.get('/geo/autocomplete', {
+        params: { text, latitude: coords?.latitude, longitude: coords?.longitude, session_token: sessionToken },
+      })
+      return res.data?.suggestions ?? []
+    } catch {
+      const params = new URLSearchParams({ format: 'jsonv2', addressdetails: '1', countrycodes: 'ph', limit: '5', q: text })
+      const response = await fetch(`https://nominatim.openstreetmap.org/search?${params.toString()}`, {
+        headers: { Accept: 'application/json', 'User-Agent': 'i-PESO-Mobile/1.0 address search' },
+      })
+      if (!response.ok) throw new Error('Address search is unavailable.')
+      const results = await response.json() as Array<Record<string, unknown>>
+      return results.map((result) => {
+        const address = (result.address ?? {}) as Record<string, string>
+        return {
+          place_id: `osm:${result.osm_type}:${result.osm_id}`,
+          formatted: String(result.display_name ?? ''),
+          address_line1: [address.house_number, address.road].filter(Boolean).join(' ') || String(result.name ?? ''),
+          address_line2: [address.village ?? address.suburb, address.city ?? address.municipality ?? address.town, address.state].filter(Boolean).join(', '),
+          latitude: Number(result.lat),
+          longitude: Number(result.lon),
+          province_name: address.state ?? address.province ?? null,
+          city_name: address.city ?? address.municipality ?? address.town ?? null,
+          barangay_name: address.village ?? address.suburb ?? address.neighbourhood ?? null,
+          street: address.road ?? null,
+          house_number: address.house_number ?? null,
+        }
+      })
+    }
   },
 
   /** Mirrors i-peso-frontend's geoService.getPlaceAddress — resolves a suggestion into a full address. */
@@ -781,8 +838,30 @@ export const seekerService = {
 
   /** Mirrors i-peso-frontend's geoService.reverseGeocode — "use my current location". */
   async reverseGeocode(latitude: number, longitude: number): Promise<GeocodedLocation | null> {
-    const res = await apiClient.get('/geo/reverse', { params: { latitude, longitude } })
-    return res.data?.location ?? null
+    try {
+      const res = await apiClient.get('/geo/reverse', { params: { latitude, longitude } })
+      const location = res.data?.location as GeocodedLocation | null | undefined
+      if (location && (location.province_name || location.city_name || location.barangay_name)) {
+        return location
+      }
+
+      const fallback = await reverseGeocodeFallback(latitude, longitude)
+      return fallback
+        ? {
+            ...fallback,
+            ...location,
+            province_name: location?.province_name || fallback.province_name,
+            city_name: location?.city_name || fallback.city_name,
+            barangay_name: location?.barangay_name || fallback.barangay_name,
+            street: location?.street || fallback.street,
+            house_number: location?.house_number || fallback.house_number,
+            latitude,
+            longitude,
+          }
+        : location ?? null
+    } catch {
+      return reverseGeocodeFallback(latitude, longitude)
+    }
   },
 
   // ── Analytics / Citizen Charter / AI assist ───────────────────────────

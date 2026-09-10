@@ -16,6 +16,12 @@ import { colors, gradients, radii, shadows, spacing, textStyles } from '@/theme'
 
 type IconName = React.ComponentProps<typeof MaterialIcons>['name']
 
+// Nested/detail routes that must render without the bottom bar at all — not just excluded
+// from its item list. They still live inside this Tabs navigator (so `router.push` between
+// them keeps working the same as every other seeker screen), but visually they should read as
+// a stack page, not a tab destination.
+const HIDDEN_BAR_ROUTES = new Set(['job-fairs', 'job-fairs/[id]', 'employer-posters', 'government-programs/[id]'])
+
 /** Icon per route. Kept here so the tab bar owns its own presentation. */
 const ICONS: Record<string, IconName> = {
   index: 'home',
@@ -64,6 +70,13 @@ export function AnimatedTabBar({ state, descriptors, navigation }: BottomTabBarP
 
   const handleLayout = (event: LayoutChangeEvent) => {
     setBarWidth(event.nativeEvent.layout.width)
+  }
+
+  // Checked after every hook above (not as an early return) so the hook call order never
+  // changes across renders, including when navigating from a hidden route to a visible one.
+  const activeRouteName = state.routes[state.index]?.name
+  if (activeRouteName && HIDDEN_BAR_ROUTES.has(activeRouteName)) {
+    return null
   }
 
   return (

@@ -69,9 +69,14 @@ export function buildStep1Payload(v: Step1Value) {
     height_ft: numOrNull(v.height_ft),
     tin: textOrNull(v.tin),
     address_province: v.address_province.trim(),
+    address_province_code: textOrNull(v.address_province_code),
     address_municipality_city: v.address_municipality_city.trim(),
+    address_city_code: textOrNull(v.address_city_code),
     address_barangay: v.address_barangay.trim(),
+    address_barangay_code: textOrNull(v.address_barangay_code),
     address_house_street: v.address_house_street.trim(),
+    latitude: v.latitude,
+    longitude: v.longitude,
     disabilities: v.disabilities.length ? v.disabilities : ['none'],
     disability_specification: v.disabilities.includes('others') ? textOrNull(v.disability_specification) : null,
   }
@@ -98,6 +103,7 @@ export function buildStep2Payload(v: Step2Value) {
     former_ofw_return_date: v.is_former_ofw ? textOrNull(v.former_ofw_return_date) : null,
     is_4ps_beneficiary: v.is_4ps_beneficiary,
     household_id_4ps: v.is_4ps_beneficiary ? textOrNull(v.household_id_4ps) : null,
+    is_first_time_jobseeker: v.is_first_time_jobseeker,
   }
 }
 
@@ -253,6 +259,8 @@ export function validateStep(step: number, form: OnboardingFormValue): string {
       || !v.address_province.trim() || !v.address_municipality_city.trim() || !v.address_barangay.trim() || !v.address_house_street.trim()) {
       return 'Please complete the required personal information and address fields.'
     }
+    const heightFt = Number(v.height_ft)
+    if (!Number.isFinite(heightFt) || heightFt < 2.5 || heightFt > 8.5) return 'Select a valid height in feet and inches.'
     if (!v.sex) return 'Select your sex.'
     if (!v.civil_status) return 'Select your civil status.'
     if (!v.religion) return 'Select your religion.'
@@ -335,9 +343,14 @@ export function mapProfileToForm(profile: SeekerProfile): OnboardingFormValue {
     height_ft: profile.height_ft != null ? String(profile.height_ft) : '',
     tin: profile.tin ?? '',
     address_province: profile.address_province ?? '',
+    address_province_code: profile.address_province_code ?? '',
     address_municipality_city: profile.address_municipality_city ?? '',
+    address_city_code: profile.address_city_code ?? profile.address_municipality_city_code ?? '',
     address_barangay: profile.address_barangay ?? '',
+    address_barangay_code: profile.address_barangay_code ?? '',
     address_house_street: profile.address_house_street ?? '',
+    latitude: profile.latitude != null ? Number(profile.latitude) : null,
+    longitude: profile.longitude != null ? Number(profile.longitude) : null,
     disabilities: disabilityList,
     disability_specification: (profile.disabilities ?? []).find((d) => d.disability_type === 'others')?.disability_specification ?? '',
   }
@@ -359,6 +372,7 @@ export function mapProfileToForm(profile: SeekerProfile): OnboardingFormValue {
     former_ofw_return_date: profile.former_ofw_return_date ?? '',
     is_4ps_beneficiary: Boolean(profile.is_4ps_beneficiary),
     household_id_4ps: profile.household_id_4ps ?? '',
+    is_first_time_jobseeker: Boolean(profile.is_first_time_jobseeker),
   }
 
   const occupations = Array.isArray(profile.occupations) ? profile.occupations : []

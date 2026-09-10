@@ -148,14 +148,14 @@ export default function GovernmentProgramsScreen() {
 
       <Card padding="md" style={styles.bulletinCard}>
         <View style={styles.bulletinRow}>
-          <MaterialIcons name="fact-check" size={22} color={colors.info} />
+          <MaterialIcons name="collections" size={22} color={colors.info} />
           <View style={styles.bulletinText}>
-            <Text style={styles.bulletinTitle}>PESO Citizen Charter</Text>
-            <Text style={styles.bulletinSub}>Requirements, fees, and steps for frontline services</Text>
+            <Text style={styles.bulletinTitle}>Employer Posters</Text>
+            <Text style={styles.bulletinSub}>Browse PESO-approved employer job fair posters</Text>
           </View>
         </View>
-        <Button variant="secondary" onPress={() => router.push('/(seeker)/citizen-charter')} style={styles.bulletinBtn}>
-          View Citizen Charter
+        <Button variant="secondary" onPress={() => router.push('/(seeker)/employer-posters')} style={styles.bulletinBtn}>
+          View Employer Posters
         </Button>
       </Card>
 

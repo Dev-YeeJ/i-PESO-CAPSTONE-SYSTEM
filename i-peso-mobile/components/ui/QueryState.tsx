@@ -2,6 +2,7 @@ import { ReactNode } from 'react'
 import { StyleSheet, View } from 'react-native'
 import MaterialIcons from '@expo/vector-icons/MaterialIcons'
 import { AlertBox } from './AlertBox'
+import { Button } from './Button'
 import { EmptyState } from './EmptyState'
 import { Skeleton, SkeletonGroup } from './Skeleton'
 import { apiErrorMessage } from '@/utils/apiError'
@@ -11,6 +12,8 @@ interface QueryStateProps {
   isLoading: boolean
   error?: unknown
   errorFallback?: string
+  /** Renders a "Retry" button under the error message that calls this. */
+  onRetry?: () => void
   isEmpty?: boolean
   emptyIcon?: React.ComponentProps<typeof MaterialIcons>['name']
   emptyTitle?: string
@@ -27,6 +30,7 @@ export function QueryState({
   isLoading,
   error,
   errorFallback = 'Something went wrong. Please try again.',
+  onRetry,
   isEmpty = false,
   emptyIcon,
   emptyTitle = 'Nothing here yet',
@@ -61,7 +65,11 @@ export function QueryState({
 
   if (error) {
     return (
-      <AlertBox variant="danger" style={styles.alert}>
+      <AlertBox
+        variant="danger"
+        style={styles.alert}
+        action={onRetry ? <Button variant="outline" size="sm" onPress={onRetry}>Retry</Button> : undefined}
+      >
         {apiErrorMessage(error, errorFallback)}
       </AlertBox>
     )

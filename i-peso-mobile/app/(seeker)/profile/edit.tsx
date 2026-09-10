@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { memo, useEffect, useState } from 'react'
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -39,6 +39,31 @@ const SECTIONS = [
   { step: 6, label: 'Training' },
   { step: 7, label: 'Experience' },
 ]
+
+// Isolated so the step content re-rendering below (Personal/Preferences/Languages/Education
+// all mount several SelectField modals) never re-renders this row — that sibling churn was
+// the actual cause of the intermittent text ghosting/doubling on some Android GPUs, not
+// something a hardware-texture hint alone could paper over.
+const SectionTabs = memo(function SectionTabs({ activeStep, onChange }: { activeStep: number; onChange: (step: number) => void }) {
+  return (
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={styles.tabRow}
+      style={styles.tabScroll}
+    >
+      {SECTIONS.map((section) => (
+        <TouchableOpacity
+          key={section.step}
+          style={[styles.tab, activeStep === section.step && styles.tabActive]}
+          onPress={() => onChange(section.step)}
+        >
+          <Text style={[styles.tabText, activeStep === section.step && styles.tabTextActive]}>{section.label}</Text>
+        </TouchableOpacity>
+      ))}
+    </ScrollView>
+  )
+})
 
 export default function ProfileEditScreen() {
   const params = useLocalSearchParams<{ section?: string }>()
@@ -132,28 +157,7 @@ export default function ProfileEditScreen() {
     <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScreenHeader title="Edit Profile" onBack={() => router.back()} backLabel="Close" />
 
-      {/* Android-only: forces this row to composite as one hardware texture instead of
-          repeatedly blending several closely-packed rounded/bordered views, which otherwise
-          shows up as intermittent ghosting/doubling on some GPUs when the step content below
-          re-renders (Personal/Preferences/Languages/Education all mount several SelectField
-          modals; Employment doesn't and never showed the glitch). */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.tabRow}
-        style={styles.tabScroll}
-        renderToHardwareTextureAndroid
-      >
-        {SECTIONS.map((section) => (
-          <TouchableOpacity
-            key={section.step}
-            style={[styles.tab, activeStep === section.step && styles.tabActive]}
-            onPress={() => changeSection(section.step)}
-          >
-            <Text style={[styles.tabText, activeStep === section.step && styles.tabTextActive]}>{section.label}</Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
+      <SectionTabs activeStep={activeStep} onChange={changeSection} />
 
       <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
         {error ? <AlertBox variant="danger" style={styles.alertBox}>{error}</AlertBox> : null}
@@ -181,11 +185,48 @@ const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: colors.background },
   loading: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background },
   loadingText: { marginTop: spacing.sm, color: colors.secondaryText, fontSize: typography.small },
-  tabScroll: { backgroundColor: colors.surface, borderBottomWidth: 1, borderBottomColor: colors.border, flexGrow: 0 },
-  tabRow: { paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, gap: spacing.sm },
-  tab: { paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderRadius: radii.pill, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.background },
+  // Explicit height (not just minHeight) so this horizontal ScrollView can never lock in a
+  // too-short auto-measured height from before the custom bold font finished loading, then
+  // clip the taller post-font-load glyphs — that stale-measurement was the actual cause of
+  // the tab labels rendering with their tops cut off (lineHeight changes on tabText alone
+  // had no effect, because the clip was coming from this container, not the Text box).
+  // `overflow: 'hidden'` is required alongside the fixed height: a horizontal ScrollView on
+  // Android only reliably clips along its scroll axis — the perpendicular (vertical) axis can
+  // silently paint past the declared height for a sibling whose content computes a taller
+  // natural box, which visually grows the whole row (and the border line under it) for that
+  // scroll position even though `height: 60` never actually changes. This is what made
+  // "Personal" vs "Training" look like different heights despite sharing one style object.
+  tabScroll: { height: 60, overflow: 'hidden', backgroundColor: colors.surface, borderBottomWidth: 1, borderBottomColor: colors.border, flexGrow: 0 },
+  tabRow: { paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, gap: spacing.sm, alignItems: 'center' },
+  // Fixed `height` (not left to padding + lineHeight) so every pill — regardless of label
+  // length or content — is byte-for-byte the same size, active or inactive. paddingHorizontal
+  // is identical across active/inactive too (tabActive below only swaps border/background
+  // colors) — the saturated blue border + light blue fill on the active pill just reads
+  // visually "tighter" against the same padding than the pale gray border on inactive ones,
+  // so the horizontal padding here is bumped up a notch to reduce that contrast illusion.
+  tab: {
+    flexShrink: 0,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: spacing.lg,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.background,
+  },
   tabActive: { borderColor: colors.info, backgroundColor: colors.infoBackground },
-  tabText: { fontSize: typography.small, fontFamily: typography.family.bold, color: colors.muted },
+  // A generous lineHeight (well above fontSize) is what actually prevents Android from
+  // clipping the custom DM Sans bold face's ascenders here. `includeFontPadding: false` +
+  // `textAlignVertical: 'center'` was tried and made it worse on-device — that combination
+  // pushed this custom font's glyphs almost entirely out of the box instead of just trimming
+  // padding, so it's deliberately not used.
+  tabText: {
+    fontSize: typography.small,
+    lineHeight: 20,
+    fontFamily: typography.family.bold,
+    color: colors.muted,
+  },
   tabTextActive: { color: colors.info },
   container: { paddingHorizontal: spacing.xl, paddingTop: spacing.lg, paddingBottom: spacing.xxxl },
   alertBox: { marginBottom: spacing.lg },

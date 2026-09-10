@@ -12,6 +12,29 @@ import { ScreenSkeleton } from '@/components/ui/ScreenSkeleton'
 import { colors, spacing, typography } from '@/theme'
 import { formatDistanceToNow } from 'date-fns'
 
+// Every backend Notification class (ApplicationStatusNotification, GovernmentProgramNotification,
+// InterviewBaseNotification, JobFairNotification/JobFairPublished) keys this as `data.type` — it
+// was previously checked here as `data.action_type`, a field the backend never actually sends, so
+// that branch could never fire. The presence-based checks (application_id/program_id/job_fair_id)
+// happened to mask it for most notifications, but `type` is the real, authoritative source.
+function iconForNotification(data?: SeekerNotification['data']): React.ComponentProps<typeof MaterialIcons>['name'] {
+  switch (data?.type) {
+    case 'application_status':
+      return 'work'
+    case 'government_program':
+      return 'school'
+    case 'job_fair':
+      return 'event'
+    case 'interview':
+      return 'event-available'
+    default:
+      if (data?.application_id) return 'work'
+      if (data?.program_id) return 'school'
+      if (data?.job_fair_id) return 'event'
+      return 'notifications'
+  }
+}
+
 export default function NotificationsScreen() {
   const router = useRouter()
   const queryClient = useQueryClient()
@@ -100,13 +123,7 @@ export default function NotificationsScreen() {
                   <View style={styles.notificationHeader}>
                     <View style={styles.iconContainer}>
                       <MaterialIcons
-                        name={
-                          item.data?.application_id ? 'work' :
-                          item.data?.program_id ? 'school' :
-                          item.data?.job_fair_id ? 'event' :
-                          item.data?.action_type === 'application_update' ? 'work' :
-                          item.data?.action_type === 'job_fair' ? 'event' : 'notifications'
-                        }
+                        name={iconForNotification(item.data)}
                         size={20}
                         color={isUnread ? colors.secondary : colors.muted}
                       />

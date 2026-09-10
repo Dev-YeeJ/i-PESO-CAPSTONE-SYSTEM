@@ -278,7 +278,7 @@ export default function SeekerHomeScreen() {
           </AlertBox>
         ) : null}
 
-        <SectionHeader title="At a glance" />
+        <SectionHeader title="At a glance" style={styles.sectionHeader} />
         <View style={styles.statsRow}>
           <StatCard title="Applications" value={stats?.active_applications ?? 0} />
           <StatCard title="Matches" value={jobs.length} />
@@ -290,7 +290,7 @@ export default function SeekerHomeScreen() {
 
         {/* Quick Actions — the 3 most-used flows get full-weight cards; the rest sit in a
             denser secondary row so the hierarchy actually says something about priority. */}
-        <SectionHeader title="Quick actions" />
+        <SectionHeader title="Quick actions" style={styles.sectionHeader} />
         <View style={styles.primaryActionsGrid}>
           {PRIMARY_ACTIONS.map((action, index) => (
             <QuickAction
@@ -331,6 +331,7 @@ export default function SeekerHomeScreen() {
 
         <SectionHeader
           title={FEED_MODE_TITLES[feedMode]}
+          style={styles.sectionHeader}
           action={
             <TouchableOpacity onPress={() => router.push('/(seeker)/jobs')} hitSlop={8} accessibilityRole="button">
               <Text style={styles.viewAllText}>View all →</Text>
@@ -473,6 +474,10 @@ const styles = StyleSheet.create({
   strengthCtaText: { color: colors.blue600, ...textStyles.smallBold, lineHeight: undefined },
 
   alertBox: { marginHorizontal: spacing.lg, marginBottom: spacing.lg },
+
+  // The ScrollView's own content has no horizontal padding (so the hero gradient bleeds
+  // edge-to-edge), so every section header needs this to line up with the padded cards below.
+  sectionHeader: { marginHorizontal: spacing.lg },
 
   statsRow: { flexDirection: 'row', gap: spacing.sm, paddingHorizontal: spacing.lg },
   primaryActionsGrid: { flexDirection: 'row', gap: spacing.sm, paddingHorizontal: spacing.lg },

@@ -48,7 +48,7 @@ import { colors, radii, spacing, typography } from '@/theme'
 const CERTIFICATE_CATEGORIES = [
   'training_certificate', 'tesda_nc_certificate', 'professional_certificate',
   'seminar_certificate', 'workshop_certificate', 'employment_certificate',
-  'academic_certificate', 'other',
+  'academic_certificate', 'first_time_jobseeker_certificate', 'other',
 ]
 
 export default function ProfileScreen() {
@@ -219,6 +219,11 @@ export default function ProfileScreen() {
   }
 
   const generateResume = async () => {
+    // Belt-and-suspenders against a double-fire: the "Generate" button already passes
+    // disabled={resumeBusy}, but this makes it impossible even if two taps land in the
+    // same event-loop tick — resume generation is server-throttled to 5/minute
+    // (routes/api.php), so duplicate requests burn through that quota for nothing.
+    if (resumeBusy) return
     if (!profile?.has_profile_image) {
       Alert.alert('Photo required', 'Upload a professional 2x2 photo before generating your resume.')
       return
@@ -240,7 +245,15 @@ export default function ProfileScreen() {
       )
       setResumeModalOpen(false)
     } catch (caught) {
-      setActionError(apiErrorMessage(caught, 'Unable to generate resume. Check your backend connection.'))
+      // The 429 the backend's `throttle:5,1` returns has no JSON body (just an empty array),
+      // so apiErrorMessage's fallback used to claim a connection problem — misdiagnosing a
+      // rate limit as a network/backend outage.
+      const status = (caught as { response?: { status?: number } })?.response?.status
+      setActionError(
+        status === 429
+          ? "You're generating resumes too quickly. Please wait a minute and try again."
+          : apiErrorMessage(caught, 'Unable to generate resume. Check your backend connection.')
+      )
     } finally {
       setResumeBusy(false)
     }
@@ -293,7 +306,12 @@ export default function ProfileScreen() {
               <Text style={styles.name}>{seekerName(profile)}</Text>
               <Text style={styles.muted}>{textFrom(profile?.email, 'Email not listed')}</Text>
               <Text style={styles.muted}>{addressLine(profile)}</Text>
-              {imageSource ? (
+              {photoBusy ? (
+                <View style={styles.savingRow}>
+                  <ActivityIndicator size="small" color={colors.info} />
+                  <Text style={styles.savingText}>Saving photo...</Text>
+                </View>
+              ) : imageSource ? (
                 <TouchableOpacity onPress={deletePhoto} disabled={photoBusy}>
                   <Text style={styles.removePhotoText}>Remove photo</Text>
                 </TouchableOpacity>
@@ -524,6 +542,19 @@ export default function ProfileScreen() {
             </TouchableOpacity>
           }
         />
+        {profile?.is_first_time_jobseeker && !certificates.some((certificate) => certificate.category === 'first_time_jobseeker_certificate') ? (
+          <AlertBox
+            title="Upload your First-Time Jobseeker certificate"
+            variant="warning"
+            action={
+              <Button variant="primary" size="sm" onPress={() => setCertModalOpen(true)}>
+                Upload Certificate
+              </Button>
+            }
+          >
+            You are claiming First-Time Jobseeker Act (RA 11261) benefits. Upload your barangay-issued certificate as proof.
+          </AlertBox>
+        ) : null}
         <View style={styles.cardList}>
           {certificates.length ? certificates.map((certificate) => (
             <Card key={String(certificate.certificate_id)} padding="md">
@@ -541,7 +572,15 @@ export default function ProfileScreen() {
         <SectionHeader title="Resume" />
         <Card padding="md">
           <Info label="Resume" value={profile?.has_resume ? 'Generated' : 'Not generated'} />
-          <Button variant="outline" fullWidth onPress={() => setResumeModalOpen(true)} style={styles.updateBtn}>
+          <Button
+            variant="outline"
+            fullWidth
+            onPress={() => {
+              setActionError('')
+              setResumeModalOpen(true)
+            }}
+            style={styles.updateBtn}
+          >
             {profile?.has_resume ? 'Regenerate resume' : 'Generate resume'}
           </Button>
         </Card>
@@ -583,8 +622,22 @@ export default function ProfileScreen() {
               {aiSummaryBusy ? 'Generating with AI...' : 'Generate with AI'}
             </Button>
             {aiSummaryNotice ? <Text style={styles.aiSummaryNotice}>{aiSummaryNotice}</Text> : null}
+            {actionError ? (
+              <AlertBox variant="danger" style={styles.modalError}>
+                {actionError}
+              </AlertBox>
+            ) : null}
             <View style={styles.modalActions}>
-              <Button variant="outline" onPress={() => setResumeModalOpen(false)} style={styles.modalBtn}>Cancel</Button>
+              <Button
+                variant="outline"
+                onPress={() => {
+                  setActionError('')
+                  setResumeModalOpen(false)
+                }}
+                style={styles.modalBtn}
+              >
+                Cancel
+              </Button>
               <Button variant="primary" onPress={generateResume} disabled={resumeBusy} style={styles.modalBtn}>
                 {resumeBusy ? 'Generating...' : 'Generate'}
               </Button>
@@ -721,6 +774,8 @@ const styles = StyleSheet.create({
   avatarText: { color: colors.surface, fontSize: typography.heading, fontFamily: typography.family.bold },
   avatarEditLabel: { textAlign: 'center', marginTop: spacing.xs, color: colors.secondary, fontSize: 10, fontFamily: typography.family.bold },
   removePhotoText: { marginTop: spacing.xs, color: colors.error, fontSize: typography.small, fontFamily: typography.family.bold },
+  savingRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: spacing.xs },
+  savingText: { color: colors.info, fontSize: typography.small, fontFamily: typography.family.bold },
   name: { color: colors.textPrimary, fontSize: typography.title, fontFamily: typography.family.bold, marginBottom: spacing.xs },
   muted: { color: colors.textSecondary, fontSize: typography.small, lineHeight: 18 },
   strengthCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.lg },
@@ -778,6 +833,7 @@ const styles = StyleSheet.create({
   modalTextarea: { borderWidth: 1, borderColor: colors.border, borderRadius: radii.md, padding: spacing.md, minHeight: 120, textAlignVertical: 'top', color: colors.textPrimary, fontSize: typography.body },
   aiSummaryBtn: { marginTop: spacing.md, marginBottom: 0 },
   aiSummaryNotice: { marginTop: spacing.sm, color: colors.textSecondary, fontSize: typography.small, lineHeight: 18 },
+  modalError: { marginTop: spacing.md },
   modalActions: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.lg },
   modalBtn: { flex: 1, marginBottom: 0 },
   modalInput: { borderWidth: 1, borderColor: colors.border, borderRadius: radii.md, padding: spacing.md, color: colors.textPrimary, fontSize: typography.body, marginBottom: spacing.md },

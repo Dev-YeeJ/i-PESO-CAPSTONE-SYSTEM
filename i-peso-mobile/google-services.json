@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "925459439763",
+    "project_id": "i-peso-mobile",
+    "storage_bucket": "i-peso-mobile.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:925459439763:android:1befd6f676c6bd5a5b6d66",
+        "android_client_info": {
+          "package_name": "com.ipeso.mobile"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBbBsTRwe3_-v9jU4s2e2H1aw98l53kZ2s"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

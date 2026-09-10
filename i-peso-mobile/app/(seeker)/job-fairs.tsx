@@ -10,8 +10,6 @@ import { Badge } from '@/components/ui/Badge'
 import { Card } from '@/components/ui/Card'
 import { ScreenHeader } from '@/components/ui/ScreenHeader'
 import { QueryState } from '@/components/ui/QueryState'
-import { SegmentedControl } from '@/components/ui/SegmentedControl'
-import { PosterFeedCard } from '@/components/seeker/PosterFeedCard'
 import { colors, spacing, typography } from '@/theme'
 
 function statusVariant(status?: string | null): 'info' | 'success' | 'neutral' {
@@ -24,22 +22,15 @@ function statusVariant(status?: string | null): 'info' | 'success' | 'neutral' {
 export default function JobFairsScreen() {
   const router = useRouter()
   const [refreshing, setRefreshing] = useState(false)
-  const [view, setView] = useState<'fairs' | 'posters'>('fairs')
 
   const { data: jobFairs = [], isLoading, error, refetch } = useQuery({
     queryKey: ['jobFairs'],
     queryFn: () => seekerService.getJobFairs(),
   })
 
-  const { data: posters = [], isLoading: postersLoading, error: postersError, refetch: refetchPosters } = useQuery({
-    queryKey: ['jobFairPosters'],
-    queryFn: () => seekerService.getJobFairPosters(),
-    enabled: view === 'posters',
-  })
-
   const onRefresh = async () => {
     setRefreshing(true)
-    await Promise.all([refetch(), view === 'posters' ? refetchPosters() : Promise.resolve()])
+    await refetch()
     setRefreshing(false)
   }
 
@@ -60,26 +51,16 @@ export default function JobFairsScreen() {
           Register for a digital QR pass to make check-in faster, or simply walk in on the day.
         </Text>
 
-        <SegmentedControl
-          style={styles.segmented}
-          value={view}
-          onChange={setView}
-          options={[
-            { label: 'Job Fairs', value: 'fairs' },
-            { label: 'Employer Posters', value: 'posters' },
-          ]}
-        />
-
-        {view === 'fairs' ? (
-          <QueryState
-            isLoading={isLoading}
-            error={error}
-            errorFallback="Unable to load job fairs. Please try again."
-            isEmpty={!jobFairs.length}
-            emptyIcon="event"
-            emptyTitle="No upcoming job fairs right now"
-            emptyMessage="Check back later or pull down to refresh."
-          >
+        <QueryState
+          isLoading={isLoading}
+          error={error}
+          errorFallback="Unable to load job fairs. Please try again."
+          onRetry={refetch}
+          isEmpty={!jobFairs.length}
+          emptyIcon="event"
+          emptyTitle="No upcoming job fairs right now"
+          emptyMessage="Check back later or pull down to refresh."
+        >
           {jobFairs.map((fair: JobFair) => {
             const employerCount = fair.participating_employers?.length ?? 0
             const vacancyCount = fair.published_vacancies?.length ?? 0
@@ -126,20 +107,7 @@ export default function JobFairsScreen() {
               </Card>
             )
           })}
-          </QueryState>
-        ) : (
-          <QueryState
-            isLoading={postersLoading}
-            error={postersError}
-            errorFallback="Unable to load employer posters. Please try again."
-            isEmpty={!posters.length}
-            emptyIcon="image-not-supported"
-            emptyTitle="No employer posters yet"
-            emptyMessage="PESO-approved job vacancy posters from participating employers will appear here."
-          >
-            {posters.map((poster) => <PosterFeedCard key={String(poster.id)} poster={poster} />)}
-          </QueryState>
-        )}
+        </QueryState>
       </ScrollView>
     </View>
   )
@@ -150,7 +118,6 @@ const styles = StyleSheet.create({
   content: { paddingHorizontal: spacing.lg, paddingTop: spacing.xl, paddingBottom: spacing.xxxl },
   kicker: { color: colors.secondary, fontSize: typography.small, fontFamily: typography.family.bold, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: spacing.xs },
   subtitle: { color: colors.textSecondary, fontSize: typography.body, lineHeight: 20, marginBottom: spacing.lg },
-  segmented: { marginBottom: spacing.lg },
   fairCard: { marginBottom: spacing.md },
   fairHeader: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: spacing.md, marginBottom: spacing.sm },
   badgeStack: { alignItems: 'flex-end', gap: spacing.xs },

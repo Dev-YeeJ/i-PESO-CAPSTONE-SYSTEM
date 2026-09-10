@@ -11,9 +11,14 @@ export interface Step1Value {
   height_ft: string
   tin: string
   address_province: string
+  address_province_code: string
   address_municipality_city: string
+  address_city_code: string
   address_barangay: string
+  address_barangay_code: string
   address_house_street: string
+  latitude: number | null
+  longitude: number | null
   disabilities: string[]
   disability_specification: string
 }
@@ -34,6 +39,7 @@ export interface Step2Value {
   former_ofw_return_date: string
   is_4ps_beneficiary: boolean
   household_id_4ps: string
+  is_first_time_jobseeker: boolean
 }
 
 export interface OccupationPrefEntry {
@@ -139,9 +145,14 @@ export const emptyStep1: Step1Value = {
   height_ft: '',
   tin: '',
   address_province: '',
+  address_province_code: '',
   address_municipality_city: '',
+  address_city_code: '',
   address_barangay: '',
+  address_barangay_code: '',
   address_house_street: '',
+  latitude: null,
+  longitude: null,
   disabilities: [],
   disability_specification: '',
 }
@@ -162,6 +173,7 @@ export const emptyStep2: Step2Value = {
   former_ofw_return_date: '',
   is_4ps_beneficiary: false,
   household_id_4ps: '',
+  is_first_time_jobseeker: false,
 }
 
 export function newOccupationPref(): OccupationPrefEntry {

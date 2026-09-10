@@ -43,11 +43,20 @@ function normalizePlaceName(name: string) {
     .replace(/[^a-z0-9]+/g, '')
 }
 
+function normalizeProvinceName(name: string) {
+  return String(name ?? '')
+    .toLowerCase()
+    .replace(/^(province|prov\.?|city)\s+of\s+/i, '')
+    .replace(/\s+province$/i, '')
+    .replace(/[^a-z0-9]+/g, '')
+}
+
 function sanitizeAddress(str: string) {
   return str
     .toLowerCase()
     .replace(/^(barangay|brgy\.?|barrio)\s+/i, '')
     .replace(/\s+\(pob\.?|poblacion\)/i, '')
+    .replace(/\bbarangay\b|\bbrgy\b/g, '')
     .replace(/[^a-z0-9]/g, '')
 }
 
@@ -115,13 +124,13 @@ export async function getBarangaysByCity(cityCode: string): Promise<PsgcEntry[]>
 export async function findProvinceByName(searchName: string): Promise<PsgcEntry | null> {
   if (!searchName) return null
   const provinces = await getProvinces()
-  const normalized = searchName.toLowerCase().trim()
+  const normalized = normalizeProvinceName(searchName)
 
-  const exact = provinces.find((p) => p.name.toLowerCase() === normalized)
+  const exact = provinces.find((p) => normalizeProvinceName(p.name) === normalized)
   if (exact) return exact
 
   const contains = provinces.find(
-    (p) => p.name.toLowerCase().includes(normalized) || normalized.includes(p.name.toLowerCase())
+    (p) => normalizeProvinceName(p.name).includes(normalized) || normalized.includes(normalizeProvinceName(p.name))
   )
   return contains ?? null
 }
@@ -178,6 +187,93 @@ export interface ResolvedPsgcCodes {
   address_barangay_code: string | null
 }
 
+export interface MatchedPsgcLocation extends ResolvedPsgcCodes {
+  province: PsgcEntry | null
+  city: PsgcCity | null
+  barangay: PsgcEntry | null
+  provinceName: string | null
+  cityName: string | null
+  barangayName: string | null
+  houseStreet: string | null
+}
+
+interface LocationComponent {
+  long_name?: string
+  longText?: string
+  types?: string[]
+}
+
+interface LocationInput {
+  formatted?: string | null
+  province_name?: string | null
+  city_name?: string | null
+  barangay_name?: string | null
+  address_line1?: string | null
+  street?: string | null
+  house_number?: string | null
+  address_components?: LocationComponent[]
+  addressComponents?: LocationComponent[]
+}
+
+function componentNames(components: LocationComponent[], types: string[]) {
+  return components
+    .filter((component) => component.types?.some((type) => types.includes(type)))
+    .map((component) => component.long_name ?? component.longText ?? '')
+    .filter(Boolean)
+}
+
+function uniqueNames(...groups: Array<Array<string | null | undefined>>) {
+  return [...new Set(groups.flat().map((name) => String(name ?? '').trim()).filter(Boolean))]
+}
+
+async function firstMatch<T>(candidates: string[], matcher: (candidate: string) => Promise<T | null>) {
+  for (const candidate of candidates) {
+    const match = await matcher(candidate)
+    if (match) return { match, sourceName: candidate }
+  }
+  return { match: null, sourceName: candidates[0] ?? null }
+}
+
+/** Mirrors the web geoService.matchPsgcLocation flow for search and GPS results. */
+export async function matchPsgcLocation(location: LocationInput): Promise<MatchedPsgcLocation> {
+  const components = location.address_components ?? location.addressComponents ?? []
+  const formattedParts = String(location.formatted ?? '').split(',').map((part) => part.trim()).filter(Boolean)
+  const provinceResult = await firstMatch(
+    uniqueNames([location.province_name], componentNames(components, ['administrative_area_level_1', 'administrative_area_level_2']), formattedParts),
+    findProvinceByName,
+  )
+  const province = provinceResult.match
+  const cityCandidates = uniqueNames(
+    [location.city_name],
+    componentNames(components, ['locality', 'postal_town', 'administrative_area_level_3', 'administrative_area_level_2']),
+    formattedParts,
+  )
+  const cityResult = province
+    ? await firstMatch(cityCandidates, (candidate) => findCityByName(province.code, candidate))
+    : { match: null, sourceName: cityCandidates[0] ?? null }
+  const city = cityResult.match
+  const barangayCandidates = uniqueNames(
+    [location.barangay_name],
+    componentNames(components, ['neighborhood', 'sublocality_level_1', 'sublocality', 'administrative_area_level_4', 'village', 'district']),
+  )
+  const barangayResult = city
+    ? await firstMatch(barangayCandidates, (candidate) => findBarangayByName(city.code, candidate))
+    : { match: null, sourceName: barangayCandidates[0] ?? null }
+
+  return {
+    address_province_code: province?.code ?? null,
+    address_city_code: city?.code ?? null,
+    address_barangay_code: barangayResult.match?.code ?? null,
+    province,
+    city,
+    barangay: barangayResult.match,
+    provinceName: provinceResult.sourceName,
+    cityName: cityResult.sourceName,
+    barangayName: barangayResult.sourceName,
+    houseStreet: [location.house_number, location.street].filter(Boolean).join(' ') || location.address_line1 || null,
+  }
+}
+
 /**
  * Best-effort: resolves free-text province/city/barangay to PSGC codes.
  * Each level only resolves if its parent resolved — returns whatever was
@@ -185,17 +281,17 @@ export interface ResolvedPsgcCodes {
  * in their own try/catch since it does network I/O.
  */
 export async function resolvePsgcCodes(address: {
-  address_province: string
-  address_municipality_city: string
-  address_barangay: string
+  address_province?: string | null
+  address_municipality_city?: string | null
+  address_barangay?: string | null
 }): Promise<ResolvedPsgcCodes | null> {
-  const province = await findProvinceByName(address.address_province)
+  const province = await findProvinceByName(address.address_province ?? '')
   if (!province) return null
 
-  const city = await findCityByName(province.code, address.address_municipality_city)
+  const city = await findCityByName(province.code, address.address_municipality_city ?? '')
   if (!city) return { address_province_code: province.code, address_city_code: null, address_barangay_code: null }
 
-  const barangay = await findBarangayByName(city.code, address.address_barangay)
+  const barangay = await findBarangayByName(city.code, address.address_barangay ?? '')
   return {
     address_province_code: province.code,
     address_city_code: city.code,

@@ -5,7 +5,7 @@ import { useQuery } from '@tanstack/react-query'
 import * as Location from 'expo-location'
 import MaterialIcons from '@expo/vector-icons/MaterialIcons'
 import type { AxiosError } from 'axios'
-import type { JobFilters, NearbyJob } from '@/services/seekerService'
+import type { JobFair, JobFilters, NearbyJob } from '@/services/seekerService'
 import { seekerService } from '@/services/seekerService'
 import { useToggleSavedJob } from '@/hooks/use-toggle-saved-job'
 import { mergeParsedFilters } from '@/utils/mapQueryParser'
@@ -108,6 +108,15 @@ export default function JobMapScreen() {
         return []
       }
     },
+  })
+
+  // Independent of vacancy filters — PESO job fairs are a small, fixed set of events, not
+  // something to re-fetch every time the seeker adjusts a vacancy search. Mirrors
+  // i-peso-frontend's JobMapPage.jsx; a failure here shouldn't block the primary job map.
+  const { data: jobFairs = [] } = useQuery({
+    queryKey: ['jobMapFairs'],
+    queryFn: () => seekerService.getJobFairs(),
+    select: (fairs: JobFair[]) => fairs.filter((fair) => fair.map_eligible && fair.latitude != null && fair.longitude != null),
   })
 
   const jobs = data?.jobs ?? []
@@ -217,13 +226,30 @@ export default function JobMapScreen() {
       <View style={styles.mapWrap}>
         <LeafletMap
           region={region}
-          markers={jobsWithCoords.map((job) => ({
-            postId: String(job.post_id),
-            lat: Number(job.latitude),
-            lng: Number(job.longitude),
-            color: matchColor(job),
-          }))}
+          markers={[
+            ...jobsWithCoords.map((job) => ({
+              postId: String(job.post_id),
+              lat: Number(job.latitude),
+              lng: Number(job.longitude),
+              color: matchColor(job),
+            })),
+            // Prefixed so onMarkerPress can tell a job-fair pin apart from a vacancy pin —
+            // LeafletMap's marker id is a single shared string channel back from the WebView.
+            ...jobFairs.map((fair) => ({
+              postId: `fair:${fair.job_fair_id}`,
+              lat: Number(fair.latitude),
+              lng: Number(fair.longitude),
+              color: colors.primary,
+            })),
+          ]}
           onMarkerPress={(postId) => {
+            // Tapping a standalone PESO Job Fair pin goes to the same place "View event
+            // details" already sends a seeker from a linked vacancy card — mirrors web's
+            // handleJobFairPin in JobMapPage.jsx.
+            if (postId.startsWith('fair:')) {
+              router.push('/(seeker)/job-fairs')
+              return
+            }
             const job = jobsWithCoords.find((j) => String(j.post_id) === postId)
             if (job) openJob(job)
           }}
