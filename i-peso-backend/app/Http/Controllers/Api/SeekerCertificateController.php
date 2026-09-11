@@ -27,7 +27,6 @@ class SeekerCertificateController extends Controller
         'workshop_certificate',
         'employment_certificate',
         'academic_certificate',
-        'first_time_jobseeker_certificate',
         'other',
     ];
 

@@ -983,12 +983,6 @@ const Step2 = ({ form, errors, onChange }) => (
         })}
       </div>
     </FormField>
-
-    {(form.is_first_time_jobseeker === true || form.is_first_time_jobseeker === 'true') && (
-      <p style={{ margin: '-8px 0 0', color: '#64748b', fontSize: '11px' }}>
-        You can upload your barangay-issued Certificate of First-Time Jobseeker later from your profile's certificates section.
-      </p>
-    )}
   </div>
 )
 
