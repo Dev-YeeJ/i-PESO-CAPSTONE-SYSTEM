@@ -301,6 +301,109 @@ class JobFairEcosystemFlowTest extends TestCase
         $this->getJson('/api/job-fairs/posters')->assertOk()->assertJsonCount(0, 'data');
     }
 
+    public function test_result_report_rejects_entries_whose_status_breakdown_contradicts_the_summary(): void
+    {
+        [, $employer, $fairId] = $this->setUpFairWithEmployer('breakdown');
+
+        Sanctum::actingAs($employer);
+        // Summary claims 10 qualified / 0 mismatched, but the register itself
+        // lists 5 qualified + 5 employer-mismatch — the printed form would
+        // contradict itself if this were allowed to save.
+        $entries = collect(range(1, 10))->map(fn ($n) => [
+            'applicant_name' => "Applicant {$n}", 'gender' => $n % 2 === 0 ? 'female' : 'male',
+            'position_applied_for' => 'Line Worker',
+            'status' => $n <= 5 ? 'qualified' : 'employer_mismatch',
+            'mismatch_code' => $n <= 5 ? null : '1',
+        ])->all();
+
+        $this->postJson("/api/employer/job-fairs/{$fairId}/results", [
+            'total_male' => 5, 'total_female' => 5, 'total_applicants' => 10, 'total_qualified' => 10,
+            'total_hots' => 0, 'total_near_hired' => 0, 'total_rejected' => 0,
+            'total_vacancies_solicited' => 5, 'total_vacancies_offered' => 5,
+            'entries' => $entries,
+        ])->assertUnprocessable()->assertJsonValidationErrors('entries');
+    }
+
+    public function test_result_report_rejects_a_mismatch_code_from_the_wrong_code_family(): void
+    {
+        [, $employer, $fairId] = $this->setUpFairWithEmployer('codefamily');
+
+        Sanctum::actingAs($employer);
+        $this->postJson("/api/employer/job-fairs/{$fairId}/results", [
+            'total_male' => 1, 'total_female' => 0, 'total_applicants' => 1, 'total_qualified' => 0,
+            'total_hots' => 0, 'total_near_hired' => 0, 'total_rejected' => 1,
+            'total_vacancies_solicited' => 1, 'total_vacancies_offered' => 1,
+            // status is employer_mismatch, but 'A' is a job-seeker-side code.
+            'entries' => [['applicant_name' => 'Juan Cruz', 'gender' => 'male', 'position_applied_for' => 'Clerk', 'status' => 'employer_mismatch', 'mismatch_code' => 'A']],
+        ])->assertUnprocessable()->assertJsonValidationErrors('entries');
+    }
+
+    public function test_admin_proxy_result_report_resubmission_keeps_its_employer_link_when_omitted(): void
+    {
+        [$admin, $employer, $fairId] = $this->setUpFairWithEmployer('keeplink');
+
+        Sanctum::actingAs($admin);
+        $payload = [
+            'company_name' => 'Keeplink Company', 'employer_id' => $employer->employer_id, 'employer_type' => 'registered_employer',
+            'total_male' => 1, 'total_female' => 0, 'total_applicants' => 1, 'total_qualified' => 1,
+            'total_hots' => 0, 'total_near_hired' => 0, 'total_rejected' => 0,
+            'total_vacancies_solicited' => 1, 'total_vacancies_offered' => 1,
+        ];
+        $this->postJson("/api/admin/job-fairs/{$fairId}/proxy-results", $payload)
+            ->assertCreated()->assertJsonPath('result_report.employer_id', $employer->employer_id);
+
+        // Resubmit a correction without re-selecting the employer — a very
+        // plausible UI reset — and confirm the existing link survives.
+        $this->postJson("/api/admin/job-fairs/{$fairId}/proxy-results", [
+            ...$payload, 'employer_id' => null, 'remarks' => 'Corrected totals.',
+        ])->assertCreated()->assertJsonPath('result_report.employer_id', $employer->employer_id);
+
+        $this->assertSame(1, JobFairResultReport::where('job_fair_id', $fairId)->count());
+    }
+
+    public function test_admin_proxy_accepts_the_new_mismatch_codes_in_aggregate_only_tallies(): void
+    {
+        [$admin, , $fairId] = $this->setUpFairWithEmployer('aggregatetally');
+
+        Sanctum::actingAs($admin);
+        $this->postJson("/api/admin/job-fairs/{$fairId}/proxy-results", [
+            'company_name' => 'Aggregate Only Company', 'employer_type' => 'paper_only_employer',
+            'total_male' => 0, 'total_female' => 1, 'total_applicants' => 1, 'total_qualified' => 0,
+            'total_hots' => 0, 'total_near_hired' => 0, 'total_rejected' => 1,
+            'total_vacancies_solicited' => 1, 'total_vacancies_offered' => 1,
+            // '1' is a new-style employer mismatch code — used to be rejected
+            // because this field only accepted the old generic code list.
+            'mismatch_tallies' => [['mismatch_code' => '1', 'count' => 1]],
+        ])->assertCreated();
+    }
+
+    private function setUpFairWithEmployer(string $slug): array
+    {
+        $admin = Administrator::create([
+            'first_name' => 'PESO', 'last_name' => 'Manager', 'email' => "{$slug}-admin@example.test",
+            'mobile_number' => '09170000003', 'password' => 'password123', 'role' => 'administrator', 'status' => 'active', 'email_verified_at' => now(),
+        ]);
+        $employer = $this->employer("{$slug}-employer@example.test", ucfirst($slug).' Company');
+
+        Sanctum::actingAs($admin);
+        $fairId = $this->postJson('/api/admin/job-fairs', [
+            'title' => ucfirst($slug).' Job Fair', 'description' => 'PESO employment bulletin.',
+            'start_date' => '2026-11-08', 'end_date' => '2026-11-08', 'start_time' => '08:00', 'end_time' => '16:00',
+            'venue' => 'Urdaneta City Gymnasium',
+            'province' => 'Pangasinan', 'city_municipality' => 'Urdaneta City', 'barangay' => 'Nancayasan',
+            'sector' => 'local', 'target_sector' => 'Multi-sector',
+            'submission_deadline' => '2026-10-20 17:00:00',
+            'contact_email' => 'peso@example.test', 'maximum_representatives' => 2, 'status' => 'draft',
+        ])->assertCreated()->json('job_fair.job_fair_id');
+        $this->postJson("/api/admin/job-fairs/{$fairId}/publish", ['status' => 'accepting_employers'])->assertOk();
+        $this->postJson("/api/admin/job-fairs/{$fairId}/invite", ['employer_id' => $employer->employer_id])->assertCreated();
+
+        Sanctum::actingAs($employer);
+        $this->postJson("/api/employer/job-fairs/{$fairId}/respond", ['response' => 'accepted'])->assertOk();
+
+        return [$admin, $employer, $fairId];
+    }
+
     private function employer(string $email, string $company): Employer
     {
         return Employer::create([

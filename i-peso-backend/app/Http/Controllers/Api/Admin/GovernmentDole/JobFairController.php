@@ -409,7 +409,11 @@ class JobFairController extends Controller
             'total_hots' => ['required', 'integer', 'min:0'], 'total_near_hired' => ['required', 'integer', 'min:0'], 'total_rejected' => ['required', 'integer', 'min:0'],
             'total_vacancies_solicited' => ['required', 'integer', 'min:0'], 'total_vacancies_offered' => ['required', 'integer', 'min:0'],
             'remarks' => ['nullable', 'string', 'max:5000'], 'mismatch_tallies' => ['nullable', 'array'],
-            'mismatch_tallies.*.mismatch_code' => ['required', Rule::in(JobFairReportService::MISMATCH_CODES)], 'mismatch_tallies.*.count' => ['required', 'integer', 'min:0'],
+            'mismatch_tallies.*.mismatch_code' => ['required', Rule::in([
+                ...array_keys(JobFairReportService::EMPLOYER_MISMATCH_CODES),
+                ...array_keys(JobFairReportService::SEEKER_MISMATCH_CODES),
+                ...JobFairReportService::MISMATCH_CODES,
+            ])], 'mismatch_tallies.*.count' => ['required', 'integer', 'min:0'],
             // Optional per-applicant register — same shape as employer self-service,
             // for admin staff transcribing a full paper RO1-JF Form 3 register.
             'entries' => ['nullable', 'array'], 'entries.*.applicant_name' => ['required_with:entries', 'string', 'max:255'],

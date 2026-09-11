@@ -94,14 +94,23 @@ class JobFairReportService
         }
         if ($existing) $dedupeKey = $existing->dedupe_key;
 
-        return DB::transaction(function () use ($fair, $data, $participation, $normalized, $dedupeKey) {
+        return DB::transaction(function () use ($fair, $data, $participation, $normalized, $dedupeKey, $existing) {
+            $attributes = collect($data)->except(['entries', 'mismatch_tallies'])->merge([
+                'normalized_company_name' => $normalized,
+                'dedupe_key' => $dedupeKey,
+                'submitted_at' => now(),
+            ]);
+
+            // A resubmission that omits employer_id (e.g. the employer picker
+            // wasn't re-used) must not silently detach an existing report
+            // from the employer it was already correctly linked to.
+            if (blank($attributes->get('employer_id')) && $existing?->employer_id) {
+                $attributes = $attributes->put('employer_id', $existing->employer_id);
+            }
+
             $report = JobFairResultReport::updateOrCreate(
                 ['job_fair_id' => $fair->job_fair_id, 'dedupe_key' => $dedupeKey],
-                collect($data)->except(['entries', 'mismatch_tallies'])->merge([
-                    'normalized_company_name' => $normalized,
-                    'dedupe_key' => $dedupeKey,
-                    'submitted_at' => now(),
-                ])->all(),
+                $attributes->all(),
             );
 
             $report->entries()->delete();
@@ -110,9 +119,16 @@ class JobFairReportService
             }
 
             $report->mismatchTallies()->delete();
-            $tallies = $data['mismatch_tallies'] ?? collect($data['entries'] ?? [])
-                ->whereIn('status', ['employer_mismatch', 'seeker_mismatch', 'rejected'])->whereNotNull('mismatch_code')
-                ->countBy('mismatch_code')->map(fn ($count, $code) => ['mismatch_code' => $code, 'count' => $count])->values()->all();
+            // Once entries are supplied, they are the source of truth for the
+            // mismatch breakdown — any explicitly-passed mismatch_tallies is
+            // ignored rather than silently overriding (or, if empty, wiping)
+            // what the entries themselves say. Explicit mismatch_tallies only
+            // applies to a genuine aggregate-only submission with no entries.
+            $tallies = filled($data['entries'] ?? null)
+                ? collect($data['entries'])
+                    ->whereIn('status', ['employer_mismatch', 'seeker_mismatch', 'rejected'])->whereNotNull('mismatch_code')
+                    ->countBy('mismatch_code')->map(fn ($count, $code) => ['mismatch_code' => $code, 'count' => $count])->values()->all()
+                : ($data['mismatch_tallies'] ?? []);
             foreach ($tallies as $tally) {
                 if ((int) ($tally['count'] ?? 0) > 0) {
                     $report->mismatchTallies()->create($tally);
@@ -189,6 +205,30 @@ class JobFairReportService
             if ($entries->count() !== (int) $data['total_applicants']) $errors['entries'][] = 'Detailed applicant rows must equal total applicants.';
             if ($entries->where('gender', 'male')->count() !== (int) $data['total_male'] || $entries->where('gender', 'female')->count() !== (int) $data['total_female']) $errors['entries'][] = 'Detailed applicant gender counts must match the summary.';
             if ($entries->whereIn('status', ['employer_mismatch', 'seeker_mismatch', 'rejected'])->contains(fn ($entry) => blank($entry['mismatch_code'] ?? null))) $errors['entries'][] = 'Every mismatched applicant requires a mismatch reason.';
+
+            // The per-applicant register is what actually prints on the RO1-JF
+            // Form 3 — if its status breakdown doesn't match the summary
+            // totals, the printed report would contradict itself.
+            if ($entries->where('status', 'qualified')->count() !== $totalQualified) $errors['entries'][] = 'Qualified applicant count must match the summary total.';
+            if ($entries->where('status', 'hots')->count() !== (int) $data['total_hots']) $errors['entries'][] = 'Hired-on-the-spot count must match the summary total.';
+            if ($entries->where('status', 'near_hired')->count() !== (int) $data['total_near_hired']) $errors['entries'][] = 'Near-hired count must match the summary total.';
+            if ($entries->whereIn('status', ['employer_mismatch', 'seeker_mismatch'])->count() !== (int) $data['total_rejected']) $errors['entries'][] = 'Mismatched applicant count must match the summary total.';
+
+            // A mismatch reason code only makes sense within its own status's
+            // code family (Employer 1-4 vs Job Seeker A-D) — otherwise the
+            // wrong legend column gets checked on the printed form.
+            if ($entries->contains(function ($entry) {
+                $code = $entry['mismatch_code'] ?? null;
+                if (blank($code)) return false;
+
+                return match ($entry['status'] ?? null) {
+                    'employer_mismatch' => ! array_key_exists($code, self::EMPLOYER_MISMATCH_CODES),
+                    'seeker_mismatch' => ! array_key_exists($code, self::SEEKER_MISMATCH_CODES),
+                    default => false,
+                };
+            })) {
+                $errors['entries'][] = 'Each mismatch reason code must match its own mismatch type (Employer codes 1-4, Job Seeker codes A-D).';
+            }
         }
         if ($errors) {
             throw ValidationException::withMessages($errors);
