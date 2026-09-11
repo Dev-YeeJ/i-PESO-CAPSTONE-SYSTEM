@@ -79,9 +79,17 @@ return [
             . 'account is reviewed by a PESO administrator before job posting is enabled.',
 
         'employer_documents' =>
-            'Employer verification asks for: SEC, DTI, or CDA registration; a Mayor\'s permit or '
-            . 'business permit; and a BIR Certificate of Registration. You will also give the '
-            . 'name and position of an authorised representative and a valid company ID.',
+            'Every employer must upload: a Mayor\'s Permit (with its expiration date), a BIR '
+            . 'Certificate of Registration, proof of PhilJobNet posting, and a valid government ID '
+            . 'for the authorised representative. On top of that, the company-type-specific '
+            . 'document is: DTI Certificate for a sole proprietorship; SEC Certificate for a '
+            . 'corporation/partnership or a recruitment agency; PRPA License for a local '
+            . 'recruitment agency; or DOLE/POEA License for an overseas recruitment agency. '
+            . 'Recruitment agencies (local or overseas) must also submit an Affidavit of '
+            . 'Undertaking and a Certificate of No Pending Case — optional for every other '
+            . 'company type, though PESO may still ask for one. A company logo can be added too '
+            . 'but is optional and is not a verification requirement. All documents are uploaded '
+            . 'in Step 3 of registration; the representative\'s ID is Step 4.',
 
         'how_to_apply' =>
             'To apply for a job or a program, register a free job seeker account, complete your '
