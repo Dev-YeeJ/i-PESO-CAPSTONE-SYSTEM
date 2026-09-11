@@ -7,6 +7,7 @@ use App\Models\PlacementRecord;
 use App\Models\PlacementReportUpload;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -18,6 +19,13 @@ class PlacementImportService
 {
     /** How many leading rows to scan when locating the real header row. */
     private const HEADER_SCAN_LIMIT = 12;
+
+    /** Per-field column widths (chars) — must mirror placement_records' schema. */
+    private const FIELD_MAX_LENGTHS = [
+        'gender' => 30,
+        'civil_status' => 40,
+        'address' => 500,
+    ];
 
     /** Header aliases keyed by canonical field — drives auto-mapping. */
     private const FIELD_ALIASES = [
@@ -224,40 +232,42 @@ class PlacementImportService
 
         $absolutePath = Storage::disk('local')->path($upload->stored_path);
         $parsed = $this->parse($absolutePath, $upload->selected_sheet);
-
-        $upload->records()->delete();
-
         $canLinkSeekers = Schema::hasTable('job_seekers');
-        $created = 0;
 
-        foreach ($parsed['rows'] as $row) {
-            $record = ['raw_row' => $row];
-            foreach ($mapping as $sourceColumn => $targetField) {
-                if (! $targetField || ! array_key_exists($targetField, PlacementRecord::MAPPABLE_FIELDS)) {
+        return DB::transaction(function () use ($upload, $mapping, $parsed, $canLinkSeekers) {
+            $upload->records()->delete();
+
+            $created = 0;
+
+            foreach ($parsed['rows'] as $row) {
+                $record = ['raw_row' => $row];
+                foreach ($mapping as $sourceColumn => $targetField) {
+                    if (! $targetField || ! array_key_exists($targetField, PlacementRecord::MAPPABLE_FIELDS)) {
+                        continue;
+                    }
+                    $record[$targetField] = $row[$sourceColumn] ?? null;
+                }
+
+                $normalized = $this->normalizeRecord($record);
+                if ($this->isBlankRecord($normalized)) {
                     continue;
                 }
-                $record[$targetField] = $row[$sourceColumn] ?? null;
+
+                $match = $canLinkSeekers
+                    ? $this->matchSeeker($normalized)
+                    : ['seeker_id' => null, 'confidence' => PlacementRecord::MATCH_NONE];
+
+                $normalized['upload_id'] = $upload->id;
+                $normalized['employer_id'] = $upload->employer_id;
+                $normalized['seeker_id'] = $match['seeker_id'];
+                $normalized['seeker_match_confidence'] = $match['confidence'];
+
+                PlacementRecord::create($normalized);
+                $created++;
             }
 
-            $normalized = $this->normalizeRecord($record);
-            if ($this->isBlankRecord($normalized)) {
-                continue;
-            }
-
-            $match = $canLinkSeekers
-                ? $this->matchSeeker($normalized)
-                : ['seeker_id' => null, 'confidence' => PlacementRecord::MATCH_NONE];
-
-            $normalized['upload_id'] = $upload->id;
-            $normalized['employer_id'] = $upload->employer_id;
-            $normalized['seeker_id'] = $match['seeker_id'];
-            $normalized['seeker_match_confidence'] = $match['confidence'];
-
-            PlacementRecord::create($normalized);
-            $created++;
-        }
-
-        return $created;
+            return $created;
+        });
     }
 
     /**
@@ -278,12 +288,23 @@ class PlacementImportService
             return collect();
         }
 
+        // MySQL has no portable regex-replace across the versions this app
+        // targets, so the SQL side only strips the punctuation Filipino names
+        // actually carry (space, hyphen, apostrophe, period) — a superset
+        // filter. normalizeName() below is the authoritative equality check,
+        // so this can only admit extra rows, never miss a real match the way
+        // a spaces-only strip missed "Dela-Cruz" against "DelaCruz".
+        $normalizeSql = "REPLACE(REPLACE(REPLACE(REPLACE(LOWER(TRIM(%s)), ' ', ''), '-', ''), '''', ''), '.', '')";
+
         return JobSeeker::query()
             ->select('seeker_id', 'first_name', 'middle_name', 'last_name', 'date_of_birth')
-            ->whereRaw("REPLACE(LOWER(TRIM(last_name)), ' ', '') = ?", [$last])
-            ->whereRaw("REPLACE(LOWER(TRIM(first_name)), ' ', '') = ?", [$first])
-            ->limit(10)
-            ->get();
+            ->whereRaw(sprintf($normalizeSql, 'last_name').' = ?', [$last])
+            ->whereRaw(sprintf($normalizeSql, 'first_name').' = ?', [$first])
+            ->limit(25)
+            ->get()
+            ->filter(fn (JobSeeker $seeker) => $this->normalizeName((string) $seeker->first_name) === $first
+                && $this->normalizeName((string) $seeker->last_name) === $last)
+            ->values();
     }
 
     /**
@@ -375,6 +396,26 @@ class PlacementImportService
             }
         }
 
+        // No row matched a single known field alias (e.g. an unfamiliar
+        // template) — defaulting to row 0 risks picking a company-name/title
+        // banner row as the header. Prefer whichever row has the most
+        // distinct non-empty cells instead, since a real header row almost
+        // always has more distinct labels than a banner or blank spacer row.
+        if ($bestScore <= 0) {
+            $bestDistinct = -1;
+            for ($i = 0; $i < $limit; $i++) {
+                $distinct = collect($grid[$i])
+                    ->map(fn ($cell) => $this->normalizeText((string) $cell))
+                    ->filter(fn ($cell) => $cell !== '')
+                    ->unique()
+                    ->count();
+                if ($distinct > $bestDistinct) {
+                    $bestDistinct = $distinct;
+                    $bestIndex = $i;
+                }
+            }
+        }
+
         return $bestIndex;
     }
 
@@ -419,7 +460,11 @@ class PlacementImportService
             $out[$field] = match ($field) {
                 'age' => $this->parseAge($value),
                 'birth_date', 'date_hired' => $this->parseDate($value),
-                default => Str::of($value)->squish()->limit(255, '')->toString(),
+                // Each field is capped at its actual placement_records column
+                // width, not one blanket 255 — gender/civil_status are narrower,
+                // and a longer value throws a hard QueryException under MySQL
+                // strict mode instead of just being truncated.
+                default => Str::of($value)->squish()->limit(self::FIELD_MAX_LENGTHS[$field] ?? 255, '')->toString(),
             };
         }
 

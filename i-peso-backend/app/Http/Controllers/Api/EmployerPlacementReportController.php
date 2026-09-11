@@ -260,6 +260,23 @@ class EmployerPlacementReportController extends Controller
             $placementReport->id,
         );
 
+        // A nil declaration has no spreadsheet or column mapping to validate —
+        // re-declaring "no hires" after a rejection is itself the entire
+        // submission, so it must not be routed through the mapping-required
+        // path below (which would always fail for a report with no columns).
+        if ($placementReport->is_nil_report) {
+            $placementReport->update([
+                'status' => PlacementReportUpload::STATUS_PENDING_REVIEW,
+                'employer_remarks' => $request->input('employer_remarks'),
+                'submitted_at' => now(),
+            ]);
+
+            return response()->json([
+                'message' => 'Placement report submitted to PESO for review.',
+                'data' => $this->summary($placementReport->fresh()->loadCount('records')),
+            ]);
+        }
+
         $mapping = $placementReport->mappings->pluck('target_field', 'source_column')->filter()->all();
         $this->assertRequiredMapped($mapping);
 
@@ -335,7 +352,13 @@ class EmployerPlacementReportController extends Controller
 
     private function assertCoverageNotInFuture(int $month, int $year): void
     {
-        if (Carbon::create($year, $month, 1)->startOfMonth()->greaterThan(Carbon::now()->startOfMonth())) {
+        // Every user is in Asia/Manila; app.timezone is UTC with no env
+        // override. Comparing in the server's UTC would reject a legitimately
+        // current-month submission for roughly 8 hours after Manila midnight
+        // but before UTC midnight — so both sides of this comparison are
+        // pinned to Manila explicitly rather than relying on server time.
+        $coverageStart = Carbon::create($year, $month, 1, 0, 0, 0, 'Asia/Manila')->startOfMonth();
+        if ($coverageStart->greaterThan(Carbon::now('Asia/Manila')->startOfMonth())) {
             throw ValidationException::withMessages([
                 'coverage_month' => ['A placement report cannot cover a month that has not started yet.'],
             ]);

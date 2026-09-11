@@ -267,6 +267,21 @@ class PlacementReportFlowTest extends TestCase
         );
     }
 
+    public function test_hyphenated_and_punctuated_surnames_still_match_via_seeker_candidates(): void
+    {
+        $this->seeker(401, 'Juan', '', 'Dela-Cruz', '1998-05-04');
+
+        $service = app(\App\Services\PlacementImportService::class);
+
+        // The SQL side used to strip only spaces from the column, so a DB
+        // name spelled "Dela-Cruz" never matched a reported hire spelled
+        // "DelaCruz" even though normalizeName() (PHP) treats them as equal.
+        $candidates = $service->seekerCandidates('Juan', 'DelaCruz');
+
+        $this->assertCount(1, $candidates);
+        $this->assertSame(401, $candidates->first()->seeker_id);
+    }
+
     public function test_admin_can_correct_and_clear_a_seeker_link(): void
     {
         $employer = $this->employer();
@@ -393,6 +408,87 @@ class PlacementReportFlowTest extends TestCase
         $this->assertSame('2026-02-28', app(PlacementComplianceService::class)->dueDate(2026, 1)->toDateString());
     }
 
+    public function test_long_gender_and_civil_status_values_are_truncated_to_their_column_width(): void
+    {
+        $employer = $this->employer();
+        Sanctum::actingAs($employer);
+
+        // gender/civil_status are narrower than the 255-char default other
+        // fields get — a longer value used to pass straight through and blow
+        // up under MySQL strict mode instead of being capped like every
+        // other field already is.
+        $file = $this->workbookWithExtraColumns([
+            'FIRST NAME' => 'Ana', 'LAST NAME' => 'Santos', 'DATE HIRED' => '2026-03-10', 'POSITION' => 'Encoder',
+            'GENDER' => str_repeat('Female-identifying-nonbinary-descriptor ', 3),
+            'CIVIL STATUS' => str_repeat('Married-with-a-very-long-legal-descriptor ', 3),
+        ]);
+
+        $uploadId = $this->postJson('/api/employer/placement-reports', [
+            'file' => $file, 'coverage_month' => 3, 'coverage_year' => 2026,
+        ])->assertCreated()->json('data.id');
+
+        $mapping = $this->getJson("/api/employer/placement-reports/{$uploadId}")->json('data.mapping');
+
+        $response = $this->postJson("/api/employer/placement-reports/{$uploadId}/preview", ['mapping' => $mapping])
+            ->assertOk();
+
+        $this->assertLessThanOrEqual(30, strlen($response->json('records.0.gender')));
+        $this->assertLessThanOrEqual(40, strlen($response->json('records.0.civil_status')));
+    }
+
+    public function test_a_rejected_nil_declaration_can_be_resubmitted_directly(): void
+    {
+        $employer = $this->employer();
+        $admin = $this->admin();
+
+        Sanctum::actingAs($employer);
+        $uploadId = $this->postJson('/api/employer/placement-reports/nil', [
+            'coverage_month' => 3, 'coverage_year' => 2026,
+        ])->assertCreated()->json('data.id');
+
+        Sanctum::actingAs($admin);
+        $this->postJson("/api/admin/placement-reports/{$uploadId}/reject", ['review_remarks' => 'Please confirm with HR before we accept a nil month.'])
+            ->assertOk();
+
+        Sanctum::actingAs($employer);
+        // Before the fix, submit() always required a column mapping — which a
+        // nil declaration never has — so this was a dead end for the employer.
+        $this->postJson("/api/employer/placement-reports/{$uploadId}/submit", [
+            'employer_remarks' => 'Confirmed with HR: no hires in March.',
+        ])
+            ->assertOk()
+            ->assertJsonPath('data.status', PlacementReportUpload::STATUS_PENDING_REVIEW)
+            ->assertJsonPath('data.is_nil_report', true);
+    }
+
+    public function test_compliance_excludes_an_employer_verified_after_the_period_closed(): void
+    {
+        Carbon::setTestNow('2026-04-01 09:00:00');
+
+        try {
+            // Registered in February but not verified by PESO until April —
+            // after March had already closed. Keying eligibility off
+            // created_at would retroactively brand them overdue for a period
+            // they had no verified portal access to.
+            $lateVerified = $this->employer('late@example.test', 'Late Verified Inc');
+            $lateVerified->forceFill(['verified_at' => '2026-04-01 08:00:00', 'created_at' => '2026-02-01 08:00:00'])->save();
+
+            $onTime = $this->employer('ontime@example.test', 'On Time Inc');
+            $onTime->forceFill(['verified_at' => '2026-02-15 08:00:00', 'created_at' => '2026-02-01 08:00:00'])->save();
+
+            $admin = $this->admin();
+            Sanctum::actingAs($admin);
+
+            $response = $this->getJson('/api/admin/placement-reports/compliance?coverage_month=3&coverage_year=2026')->assertOk();
+
+            $companies = collect($response->json('data'))->pluck('company_name');
+            $this->assertFalse($companies->contains('Late Verified Inc'));
+            $this->assertTrue($companies->contains('On Time Inc'));
+        } finally {
+            Carbon::setTestNow();
+        }
+    }
+
     // ── Fixtures ─────────────────────────────────────────────────────────
 
     private function employer(string $email = 'employer@example.test', string $company = 'OneSource General Solutions'): Employer
@@ -486,6 +582,26 @@ class PlacementReportFlowTest extends TestCase
         return new UploadedFile($path, 'placements.xlsx', null, null, true);
     }
 
+    /**
+     * Build a single-sheet workbook from an explicit header => value row, for
+     * tests that need columns (gender, civil status, ...) the shared
+     * workbook() fixture doesn't carry.
+     *
+     * @param  array<string, string>  $row
+     */
+    private function workbookWithExtraColumns(array $row): UploadedFile
+    {
+        $spreadsheet = new Spreadsheet;
+        $sheet = $spreadsheet->getActiveSheet();
+        $sheet->fromArray([array_keys($row), array_values($row)], null, 'A1');
+
+        $path = tempnam(sys_get_temp_dir(), 'placement').'.xlsx';
+        (new XlsxWriter($spreadsheet))->save($path);
+        $this->tempFiles[] = $path;
+
+        return new UploadedFile($path, 'placements.xlsx', null, null, true);
+    }
+
     private function createTables(): void
     {
         Schema::create('employers', function (Blueprint $table) {
@@ -496,6 +612,7 @@ class PlacementReportFlowTest extends TestCase
             $table->string('trade_name')->nullable();
             $table->string('mobile_number')->nullable();
             $table->string('verification_status')->default('pending');
+            $table->timestamp('verified_at')->nullable();
             $table->timestamp('email_verified_at')->nullable();
             $table->timestamps();
             $table->softDeletes();
