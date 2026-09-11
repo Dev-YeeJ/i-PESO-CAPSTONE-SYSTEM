@@ -235,6 +235,26 @@ class PlacementImportService
         $canLinkSeekers = Schema::hasTable('job_seekers');
 
         return DB::transaction(function () use ($upload, $mapping, $parsed, $canLinkSeekers) {
+            // An admin's manually confirmed seeker link is a deliberate human
+            // decision, not a guess the importer can redo — it must survive a
+            // resubmission (e.g. after a rejection asking for an unrelated
+            // fix) even though every record below is rebuilt from scratch.
+            // Capture confirmations by a stable per-row identity before the
+            // delete wipes them, and reattach them to any matching new row.
+            $identityOf = fn (PlacementRecord $record) => $this->recordIdentity(
+                $record->first_name, $record->middle_name, $record->last_name,
+                // date_hired is cast to a Carbon instance here but a plain
+                // 'Y-m-d' string on the freshly-parsed side below — both must
+                // render identically or every prior confirmation silently
+                // fails to reattach.
+                optional($record->date_hired)->toDateString(),
+            );
+            $confirmed = $upload->records()
+                ->whereNotNull('seeker_match_confirmed_at')
+                ->get()
+                ->filter(fn (PlacementRecord $record) => $identityOf($record) !== null)
+                ->keyBy($identityOf);
+
             $upload->records()->delete();
 
             $created = 0;
@@ -253,14 +273,27 @@ class PlacementImportService
                     continue;
                 }
 
-                $match = $canLinkSeekers
-                    ? $this->matchSeeker($normalized)
-                    : ['seeker_id' => null, 'confidence' => PlacementRecord::MATCH_NONE];
+                $identity = $this->recordIdentity(
+                    $normalized['first_name'] ?? null, $normalized['middle_name'] ?? null,
+                    $normalized['last_name'] ?? null, $normalized['date_hired'] ?? null,
+                );
+                $priorConfirmation = $identity !== null ? $confirmed->get($identity) : null;
+
+                if ($priorConfirmation) {
+                    $normalized['seeker_id'] = $priorConfirmation->seeker_id;
+                    $normalized['seeker_match_confidence'] = $priorConfirmation->seeker_match_confidence;
+                    $normalized['seeker_match_confirmed_by'] = $priorConfirmation->seeker_match_confirmed_by;
+                    $normalized['seeker_match_confirmed_at'] = $priorConfirmation->seeker_match_confirmed_at;
+                } else {
+                    $match = $canLinkSeekers
+                        ? $this->matchSeeker($normalized)
+                        : ['seeker_id' => null, 'confidence' => PlacementRecord::MATCH_NONE];
+                    $normalized['seeker_id'] = $match['seeker_id'];
+                    $normalized['seeker_match_confidence'] = $match['confidence'];
+                }
 
                 $normalized['upload_id'] = $upload->id;
                 $normalized['employer_id'] = $upload->employer_id;
-                $normalized['seeker_id'] = $match['seeker_id'];
-                $normalized['seeker_match_confidence'] = $match['confidence'];
 
                 PlacementRecord::create($normalized);
                 $created++;
@@ -268,6 +301,24 @@ class PlacementImportService
 
             return $created;
         });
+    }
+
+    /**
+     * A stable identity for matching a row to its prior counterpart across a
+     * rebuild — name plus hire date is what actually identifies "the same
+     * reported hire" from the employer's point of view. Null when there isn't
+     * enough on the row to key on safely.
+     */
+    private function recordIdentity(?string $first, ?string $middle, ?string $last, ?string $dateHired): ?string
+    {
+        $first = $this->normalizeName((string) $first);
+        $last = $this->normalizeName((string) $last);
+
+        if ($first === '' || $last === '' || blank($dateHired)) {
+            return null;
+        }
+
+        return $first.'|'.$this->normalizeName((string) $middle).'|'.$last.'|'.$dateHired;
     }
 
     /**

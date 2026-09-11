@@ -319,6 +319,42 @@ class PlacementReportFlowTest extends TestCase
             ->assertJsonPath('data.seeker_match_confidence', PlacementRecord::MATCH_NONE);
     }
 
+    public function test_admin_confirmed_seeker_link_survives_a_resubmission_after_rejection(): void
+    {
+        $this->seeker(501, 'Ana', '', 'Santos', '1999-09-09');
+
+        $employer = $this->employer();
+        $admin = $this->admin();
+
+        Sanctum::actingAs($employer);
+        $file = $this->workbook(['MARCH' => [['Ana', 'Santos', '2026-03-10', 'Encoder']]]);
+        $uploadId = $this->postJson('/api/employer/placement-reports', [
+            'file' => $file, 'coverage_month' => 3, 'coverage_year' => 2026,
+        ])->assertCreated()->json('data.id');
+
+        $mapping = $this->getJson("/api/employer/placement-reports/{$uploadId}")->json('data.mapping');
+        $this->postJson("/api/employer/placement-reports/{$uploadId}/preview", ['mapping' => $mapping])->assertOk();
+        $this->postJson("/api/employer/placement-reports/{$uploadId}/submit")->assertOk();
+
+        Sanctum::actingAs($admin);
+        $recordId = PlacementRecord::where('upload_id', $uploadId)->firstOrFail()->id;
+        $this->postJson("/api/admin/placement-reports/{$uploadId}/records/{$recordId}/link", ['seeker_id' => 501])
+            ->assertOk();
+        $this->postJson("/api/admin/placement-reports/{$uploadId}/reject", ['review_remarks' => 'Please fix an unrelated column.'])
+            ->assertOk();
+
+        Sanctum::actingAs($employer);
+        // Resubmitting rebuilds every record from scratch via buildRecords() —
+        // before the fix this reverted the admin's confirmed link straight
+        // back to whatever the automatic matcher guessed.
+        $this->postJson("/api/employer/placement-reports/{$uploadId}/preview", ['mapping' => $mapping])->assertOk();
+
+        $record = PlacementRecord::where('upload_id', $uploadId)->firstOrFail();
+        $this->assertSame(501, $record->seeker_id);
+        $this->assertNotNull($record->seeker_match_confirmed_at);
+        $this->assertSame(PlacementRecord::MATCH_EXACT, $record->seeker_match_confidence);
+    }
+
     public function test_compliance_view_separates_submitted_nil_and_overdue_employers(): void
     {
         // Set the clock first: employers registered after a period closed were
