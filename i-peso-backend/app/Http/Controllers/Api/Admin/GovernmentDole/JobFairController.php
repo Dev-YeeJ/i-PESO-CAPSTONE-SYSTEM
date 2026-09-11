@@ -417,6 +417,7 @@ class JobFairController extends Controller
             // Optional per-applicant register — same shape as employer self-service,
             // for admin staff transcribing a full paper RO1-JF Form 3 register.
             'entries' => ['nullable', 'array'], 'entries.*.applicant_name' => ['required_with:entries', 'string', 'max:255'],
+            'entries.*.seeker_id' => ['nullable', 'integer', 'exists:job_seekers,seeker_id'],
             'entries.*.gender' => ['required_with:entries', Rule::in(['male', 'female'])],
             'entries.*.position_applied_for' => ['required_with:entries', 'string', 'max:255'],
             'entries.*.status' => ['required_with:entries', Rule::in(['qualified', 'near_hired', 'hots', 'employer_mismatch', 'seeker_mismatch'])],
@@ -455,6 +456,18 @@ class JobFairController extends Controller
             [...$validated, 'source' => 'admin_proxy', 'submitted_by' => trim($admin->first_name.' '.$admin->last_name), 'submitted_at' => now()],
         );
         return response()->json(['message' => 'Admin proxy confirmation slip saved.', 'confirmation_slip' => $slip], 201);
+    }
+
+    /**
+     * "Smart typing" name suggestions for the applicant-name field on the
+     * proxy-encoding register — powers autofill of the rest of that row.
+     */
+    public function applicantSuggestions(Request $request, JobFairReportService $reports): JsonResponse
+    {
+        $this->admin($request);
+        $validated = $request->validate(['q' => ['nullable', 'string', 'max:255']]);
+
+        return response()->json(['data' => $reports->suggestApplicants($validated['q'] ?? '')]);
     }
 
     public function downloadResult(Request $request, JobFairResultReport $resultReport, JobFairReportService $reports)

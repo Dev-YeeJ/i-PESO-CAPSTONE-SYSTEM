@@ -7,8 +7,11 @@ use App\Models\Employer;
 use App\Models\JobFair;
 use App\Models\JobFairEmployer;
 use App\Models\JobFairResultReport;
+use App\Models\JobSeeker;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 class JobFairReportService
@@ -76,6 +79,40 @@ class JobFairReportService
             'submitted_by_employer_id' => null,
             'entries' => $data['entries'] ?? [],
         ]);
+    }
+
+    /**
+     * Job seekers matching a free-text name search, pre-shaped to drop
+     * straight into a result-entry row — the "smart typing" autofill behind
+     * the applicant-name field on both the employer and admin encoding
+     * screens. Every word in the query must appear somewhere in the name, so
+     * incremental/partial full-name typing matches (e.g. "judy salu" already
+     * matches "Judy Ann Gukentre Salu" before the whole name is typed).
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function suggestApplicants(string $query, int $limit = 8): array
+    {
+        $terms = collect(preg_split('/\s+/', trim($query)))->filter();
+        if ($terms->isEmpty()) {
+            return [];
+        }
+
+        return JobSeeker::query()
+            ->where(function ($outer) use ($terms) {
+                foreach ($terms as $term) {
+                    $outer->where(function ($inner) use ($term) {
+                        $inner->where('first_name', 'like', "%{$term}%")
+                            ->orWhere('middle_name', 'like', "%{$term}%")
+                            ->orWhere('last_name', 'like', "%{$term}%");
+                    });
+                }
+            })
+            ->with('disabilities')
+            ->limit($limit)
+            ->get()
+            ->map(fn (JobSeeker $seeker) => $this->applicantSuggestion($seeker))
+            ->all();
     }
 
     private function save(JobFair $fair, array $data, ?JobFairEmployer $participation = null): JobFairResultReport
@@ -233,5 +270,90 @@ class JobFairReportService
         if ($errors) {
             throw ValidationException::withMessages($errors);
         }
+    }
+
+    private function applicantSuggestion(JobSeeker $seeker): array
+    {
+        return [
+            'seeker_id' => $seeker->seeker_id,
+            'name' => collect([$seeker->first_name, $seeker->middle_name, $seeker->last_name])->filter()->join(' '),
+            'gender' => in_array($seeker->sex, ['male', 'female'], true) ? $seeker->sex : null,
+            'city_municipality' => $seeker->address_municipality_city,
+            'contact_number' => $seeker->mobile_number,
+            'age_group' => $this->ageGroupCode($seeker->date_of_birth),
+            'highest_education' => $this->resolveEducationValue($seeker),
+            'classification_codes' => $this->classificationCodesFor($seeker),
+        ];
+    }
+
+    private function ageGroupCode(?Carbon $dateOfBirth): ?string
+    {
+        if (! $dateOfBirth) {
+            return null;
+        }
+        $age = $dateOfBirth->age;
+
+        return match (true) {
+            $age < 15 => null,
+            $age <= 24 => 'A',
+            $age <= 34 => 'B',
+            $age <= 44 => 'C',
+            $age <= 54 => 'D',
+            $age <= 64 => 'E',
+            default => 'F',
+        };
+    }
+
+    /**
+     * Best-effort mapping from a seeker's freeform educational attainment to
+     * the fixed vocabulary JobFairResultEntry.highest_education expects —
+     * mirrors the same keyword matching EstablishmentReportService and the
+     * roi_form_3 PDF template already use for the identical problem.
+     */
+    private function resolveEducationValue(JobSeeker $seeker): ?string
+    {
+        $raw = $seeker->educ_attainment ?: $seeker->educations->sortByDesc('year_graduated')->first()?->level;
+        $value = Str::lower((string) $raw);
+        if ($value === '') {
+            return null;
+        }
+
+        return match (true) {
+            str_contains($value, 'post') || str_contains($value, 'master') || str_contains($value, 'doctor') => 'post_graduate',
+            str_contains($value, 'college') || str_contains($value, 'tertiary') || str_contains($value, 'bachelor') => 'college',
+            str_contains($value, 'vocational') || str_contains($value, 'tvet') => 'vocational',
+            str_contains($value, 'senior high') || str_contains($value, 'k-12') || str_contains($value, 'k12') => 'senior_high',
+            str_contains($value, 'high school') || str_contains($value, 'secondary') => 'high_school',
+            str_contains($value, 'elementary') => 'elementary',
+            default => null,
+        };
+    }
+
+    /**
+     * Best-effort RO1-JF Form 3 classification codes derivable from stored
+     * seeker data. TUPAD (part of code 4) has no stored flag anywhere in this
+     * schema, so it's intentionally left undetected here — the same known
+     * gap already accepted in EstablishmentReportService::classifications().
+     *
+     * @return array<int, string>
+     */
+    private function classificationCodesFor(JobSeeker $seeker): array
+    {
+        $codes = [];
+        if ($this->resolveEducationValue($seeker) === 'senior_high') {
+            $codes[] = '1';
+        }
+        $isSeniorCitizen = $seeker->date_of_birth && $seeker->date_of_birth->age >= 60;
+        if ($seeker->disabilities->isNotEmpty() || $isSeniorCitizen) {
+            $codes[] = '2';
+        }
+        if ($seeker->is_former_ofw) {
+            $codes[] = '3';
+        }
+        if ($seeker->is_4ps_beneficiary) {
+            $codes[] = '4';
+        }
+
+        return $codes;
     }
 }

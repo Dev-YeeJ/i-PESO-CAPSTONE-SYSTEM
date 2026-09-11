@@ -190,6 +190,18 @@ class EmployerJobFairController extends Controller
         return $reports->download($resultReport);
     }
 
+    /**
+     * "Smart typing" name suggestions for the applicant-name field on the
+     * results register — powers autofill of the rest of that row.
+     */
+    public function applicantSuggestions(Request $request, JobFairReportService $reports): JsonResponse
+    {
+        $this->employer($request);
+        $validated = $request->validate(['q' => ['nullable', 'string', 'max:255']]);
+
+        return response()->json(['data' => $reports->suggestApplicants($validated['q'] ?? '')]);
+    }
+
     private function resultRules(bool $entries): array
     {
         $rules = [
@@ -203,6 +215,7 @@ class EmployerJobFairController extends Controller
         ];
         if ($entries) $rules += [
             'entries' => ['required', 'array'], 'entries.*.applicant_name' => ['required', 'string', 'max:255'],
+            'entries.*.seeker_id' => ['nullable', 'integer', 'exists:job_seekers,seeker_id'],
             'entries.*.gender' => ['required', Rule::in(['male', 'female'])], 'entries.*.position_applied_for' => ['required', 'string', 'max:255'],
             'entries.*.status' => ['required', Rule::in(['qualified', 'near_hired', 'hots', 'employer_mismatch', 'seeker_mismatch'])],
             // RO1-JF Form 3 per-applicant DOLE columns (optional so short-form entries still submit).

@@ -396,7 +396,7 @@ export default function JobFairDetailPage() {
               <p className="mb-3 text-xs font-bold uppercase tracking-wide text-slate-500">
                 Per-applicant register (optional — leave empty to save aggregate totals only)
               </p>
-              <JobFairResultEntryEditor entries={proxyEntries} onChange={setProxyEntries} />
+              <JobFairResultEntryEditor entries={proxyEntries} onChange={setProxyEntries} searchApplicants={adminService.searchApplicantSuggestions} />
             </div>
 
             <Button

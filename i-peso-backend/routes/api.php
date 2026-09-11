@@ -110,6 +110,7 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::get('/job-fair-requirements/{submission}/view', [EmployerJobFairController::class, 'viewRequirement']);
             Route::post('/job-fairs/{jobFair}/confirmation-slip', [EmployerJobFairController::class, 'confirmation']);
             Route::post('/job-fairs/{jobFair}/results', [EmployerJobFairController::class, 'results']);
+            Route::get('/applicant-suggestions', [EmployerJobFairController::class, 'applicantSuggestions']);
             Route::get('/job-fair-results/{resultReport}/roi-form-3', [EmployerJobFairController::class, 'downloadReport']);
             Route::get('/reports/establishment-report/preview', [EmployerEstablishmentReportController::class, 'preview']);
             Route::post('/reports/establishment-report/export', [EmployerEstablishmentReportController::class, 'export']);
@@ -298,6 +299,7 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::patch('/job-fair-requirements/{submission}/review', [AdminJobFairController::class, 'reviewRequirement']);
             Route::get('/job-fair-requirements/{submission}/view', [AdminJobFairController::class, 'viewRequirement']);
             Route::post('/job-fairs/{jobFair}/proxy-results', [AdminJobFairController::class, 'proxyResults']);
+            Route::get('/applicant-suggestions', [AdminJobFairController::class, 'applicantSuggestions']);
             Route::post('/job-fairs/{jobFair}/proxy-confirmation-slip', [AdminJobFairController::class, 'proxyConfirmation']);
             Route::get('/job-fair-results/{resultReport}/roi-form-3', [AdminJobFairController::class, 'downloadResult']);
             Route::get('/job-fairs/{jobFair}/export-sprs', [AdminJobFairController::class, 'exportSprs']);

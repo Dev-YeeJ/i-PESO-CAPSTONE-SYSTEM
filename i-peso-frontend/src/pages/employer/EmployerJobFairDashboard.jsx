@@ -11,6 +11,7 @@ import {
   expressJobFairInterest,
   listEmployerJobFairs,
   respondToJobFairInvitation,
+  searchApplicantSuggestions,
   submitJobFairConfirmation,
   submitJobFairResults,
   uploadJobFairRequirement,
@@ -261,7 +262,7 @@ export default function EmployerJobFairDashboard() {
                         ))}
                       </div>
 
-                      <JobFairResultEntryEditor entries={entries} onChange={setEntries} />
+                      <JobFairResultEntryEditor entries={entries} onChange={setEntries} searchApplicants={searchApplicantSuggestions} />
 
                       <div className="mt-6 grid gap-4 sm:grid-cols-2">
                         <label className="text-xs font-bold uppercase tracking-wide text-slate-500">

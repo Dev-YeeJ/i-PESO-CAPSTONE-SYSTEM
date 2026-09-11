@@ -1,45 +1,49 @@
 <!doctype html><html><head><meta charset="utf-8"><style>
-@page { margin: 14px 16px; }
-body{font-family:'DejaVu Sans',sans-serif;font-size:8.2px;color:#0f172a}
-h1{text-align:center;font-size:15px;margin:0;letter-spacing:.5px}
-.code{text-align:center;font-weight:bold;margin:2px 0 10px;font-size:10px}
+@page { margin: 9px 14px; }
+body{font-family:'DejaVu Sans',sans-serif;font-size:8px;color:#0f172a}
+h1{text-align:center;font-size:14px;margin:0;letter-spacing:.5px}
+.code{text-align:center;font-weight:bold;margin:1px 0 6px;font-size:9.5px}
 table{width:100%;border-collapse:collapse}
 .page{page-break-after:always}
 .page:last-child{page-break-after:auto}
 .header-row td{vertical-align:top;padding:0}
-.meta-block .row{margin-bottom:2px}
-.meta-block .label{display:inline-block;min-width:150px;font-size:7px;font-weight:bold;text-transform:uppercase;color:#475569;letter-spacing:.3px}
-.meta-block .value{font-size:8.4px;font-weight:bold}
-.grid th,.grid td{border:1px solid #64748b;padding:2.5px 3px;vertical-align:middle;text-align:center}
-.grid thead th{background:#e2e8f0;font-size:6.6px;font-weight:bold;line-height:1.2}
-.grid td.name,.grid td.position{text-align:left;font-size:7.6px}
-.grid td.num{font-size:7px}
-.grid tbody tr{height:16px}
-.check{font-weight:bold;font-size:9px}
-.footer{margin-top:8px;width:100%}
+.meta-block .row{margin-bottom:1px}
+.meta-block .label{display:inline-block;min-width:150px;font-size:6.8px;font-weight:bold;text-transform:uppercase;color:#475569;letter-spacing:.3px}
+.meta-block .value{font-size:8.2px;font-weight:bold}
+.grid th,.grid td{border:1px solid #64748b;padding:1.5px 3px;vertical-align:middle;text-align:center}
+.grid thead th{background:#e2e8f0;font-size:6.4px;font-weight:bold;line-height:1.15}
+.grid td.name,.grid td.position{text-align:left;font-size:7.4px}
+.grid td.num{font-size:6.8px}
+.grid tbody tr{height:13px}
+.check{font-weight:bold;font-size:8px}
+.footer{margin-top:4px;width:100%}
 .footer td{vertical-align:top;padding:0 6px 0 0}
-.legend-box{border:1px solid #64748b;padding:5px 7px;margin-bottom:6px}
-.legend-title{font-weight:bold;font-size:7.4px;text-transform:uppercase;margin-bottom:2px;display:block}
+.legend-box{border:1px solid #64748b;padding:3px 6px;margin-bottom:3px}
+.legend-title{font-weight:bold;font-size:7px;text-transform:uppercase;margin-bottom:1px;display:block}
 .legend-box ol,.legend-box ul{margin:0;padding-left:12px}
-.legend-box li{font-size:6.8px;line-height:1.35}
-.tally{border:1px solid #64748b;padding:6px}
-.tally table td{border:none;padding:1.5px 0;font-size:8px}
+.legend-box li{font-size:6.4px;line-height:1.2}
+.tally{border:1px solid #64748b;padding:4px}
+.tally table td{border:none;padding:1px 0;font-size:7.4px}
 .tally table td.tnum{text-align:right;font-weight:bold}
 .tally .ttotal{border-top:1px solid #64748b;font-weight:bold}
-.submitted{font-size:7.6px}
-.sig-line{display:block;border-bottom:1px solid #0f172a;width:230px;height:22px}
+.submitted{font-size:7.4px}
+.sig-line{display:block;border-bottom:1px solid #0f172a;width:230px;height:16px}
 .muted{color:#64748b}
-.page-of{font-weight:normal;font-size:8px}
-.letterhead{border-bottom:2px solid #0f172a;padding-bottom:6px;margin-bottom:6px}
+.page-of{font-weight:normal;font-size:7.6px}
+.letterhead{border-bottom:2px solid #0f172a;padding-bottom:3px;margin-bottom:3px}
 .letterhead td{vertical-align:middle;padding:0}
-.letterhead img{width:52px;height:52px}
+.letterhead img{width:42px;height:42px}
 </style></head><body>
 
 @php
   // The physical RO1-JF Form 3 pre-prints exactly 15 numbered rows per page,
   // so a continuation sheet re-starts at row "1" rather than counting up —
   // chunk the register the same way and always pad the last chunk to 15.
-  $pages = $report->entries->chunk(15);
+  // chunk() preserves each entry's original array key, so the second page
+  // onward would otherwise start at key 15 instead of 0 — re-index every
+  // chunk with values() or $pageEntries->get($row) below returns null for
+  // every row past the first page, silently printing it blank.
+  $pages = $report->entries->chunk(15)->map(fn ($page) => $page->values());
   if ($pages->isEmpty()) {
       $pages = collect([collect()]);
   }
@@ -199,19 +203,19 @@ table{width:100%;border-collapse:collapse}
               <tr><td>Female</td><td class="tnum">{{ $report->total_female }}</td></tr>
               <tr class="ttotal"><td>Total</td><td class="tnum">{{ $report->total_applicants }}</td></tr>
             </table>
-            <table style="margin-top:6px">
+            <table style="margin-top:3px">
               <tr><td>Qualified</td><td class="tnum">{{ $report->total_qualified }}</td></tr>
               <tr><td>Near Hired</td><td class="tnum">{{ $report->total_near_hired }}</td></tr>
               <tr><td>Hired-on-the-spot</td><td class="tnum">{{ $report->total_hots }}</td></tr>
               <tr><td>Mismatched</td><td class="tnum">{{ $report->total_rejected }}</td></tr>
             </table>
-            <table style="margin-top:6px">
+            <table style="margin-top:3px">
               <tr><td>Vacancies Solicited</td><td class="tnum">{{ $report->total_vacancies_solicited }}</td></tr>
               <tr><td>Vacancies Offered</td><td class="tnum">{{ $report->total_vacancies_offered }}</td></tr>
             </table>
           </div>
           @if($report->mismatchTallies->isNotEmpty())
-            <div class="tally" style="margin-top:6px">
+            <div class="tally" style="margin-top:3px">
               <span class="legend-title">Mismatch Breakdown</span>
               <table>
                 @foreach($report->mismatchTallies as $tally)

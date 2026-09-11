@@ -377,6 +377,65 @@ class JobFairEcosystemFlowTest extends TestCase
         ])->assertCreated();
     }
 
+    public function test_applicant_suggestions_match_partial_names_and_autofill_seeker_data(): void
+    {
+        $employer = $this->employer('suggest-employer@example.test', 'Suggest Co');
+        $seeker = \App\Models\JobSeeker::create([
+            'email' => 'judy@example.test', 'password' => 'password123',
+            'first_name' => 'Judy', 'middle_name' => 'Ann', 'last_name' => 'Gukentre Salu',
+            'sex' => 'female', 'mobile_number' => '09194757221', 'address_municipality_city' => 'Sta. Maria, Pangasinan',
+            'date_of_birth' => now()->subYears(28)->toDateString(),
+            'educ_attainment' => 'Senior High School Graduate',
+            'is_former_ofw' => true, 'is_4ps_beneficiary' => true,
+        ]);
+        \Illuminate\Support\Facades\DB::table('seeker_disabilities')->insert([
+            'seeker_id' => $seeker->seeker_id, 'disability_type' => 'Visual', 'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        Sanctum::actingAs($employer);
+        // Incremental typing of a full name — only first + last so far.
+        $response = $this->getJson('/api/employer/applicant-suggestions?q=judy+salu')->assertOk();
+
+        $response->assertJsonCount(1, 'data');
+        $suggestion = $response->json('data.0');
+        $this->assertSame($seeker->seeker_id, $suggestion['seeker_id']);
+        $this->assertSame('Judy Ann Gukentre Salu', $suggestion['name']);
+        $this->assertSame('female', $suggestion['gender']);
+        $this->assertSame('Sta. Maria, Pangasinan', $suggestion['city_municipality']);
+        $this->assertSame('09194757221', $suggestion['contact_number']);
+        $this->assertSame('B', $suggestion['age_group']);
+        $this->assertSame('senior_high', $suggestion['highest_education']);
+        // K-12 grad (senior high), PWD (has a disability row), Displaced OFW,
+        // and 4Ps beneficiary should all be derived — TUPAD (also part of
+        // code 4) has no stored flag anywhere, so it's never auto-detected.
+        $this->assertEqualsCanonicalizing(['1', '2', '3', '4'], $suggestion['classification_codes']);
+    }
+
+    public function test_applicant_suggestions_returns_nothing_for_a_blank_query(): void
+    {
+        $employer = $this->employer('blank-query@example.test', 'Blank Query Co');
+        $this->seeker('any@example.test', 'Any', 'Body');
+
+        Sanctum::actingAs($employer);
+        $this->getJson('/api/employer/applicant-suggestions?q=')->assertOk()->assertJsonCount(0, 'data');
+        $this->getJson('/api/employer/applicant-suggestions')->assertOk()->assertJsonCount(0, 'data');
+    }
+
+    public function test_applicant_suggestions_endpoints_are_gated_to_their_own_role(): void
+    {
+        $employer = $this->employer('role-gate-employer@example.test', 'Role Gate Co');
+        $admin = Administrator::create([
+            'first_name' => 'PESO', 'last_name' => 'Manager', 'email' => 'role-gate-admin@example.test',
+            'mobile_number' => '09170000004', 'password' => 'password123', 'role' => 'administrator', 'status' => 'active', 'email_verified_at' => now(),
+        ]);
+
+        Sanctum::actingAs($employer);
+        $this->getJson('/api/admin/applicant-suggestions?q=judy')->assertForbidden();
+
+        Sanctum::actingAs($admin);
+        $this->getJson('/api/employer/applicant-suggestions?q=judy')->assertForbidden();
+    }
+
     private function setUpFairWithEmployer(string $slug): array
     {
         $admin = Administrator::create([
@@ -425,7 +484,9 @@ class JobFairEcosystemFlowTest extends TestCase
         Schema::create('administrators', function (Blueprint $t) { $t->id('admin_id'); $t->string('first_name'); $t->string('last_name'); $t->string('email')->unique(); $t->string('mobile_number')->nullable(); $t->string('password'); $t->string('role')->nullable(); $t->string('status')->nullable(); $t->timestamp('email_verified_at')->nullable(); $t->rememberToken(); $t->timestamps(); });
         Schema::create('employers', function (Blueprint $t) { $t->id('employer_id'); $t->string('email')->unique(); $t->string('password'); $t->string('company_type')->nullable(); $t->string('company_name')->nullable(); $t->string('trade_name')->nullable(); $t->string('mobile_number')->nullable(); $t->string('representative_contact_number')->nullable(); $t->string('verification_status')->nullable(); $t->timestamp('verified_at')->nullable(); $t->timestamp('email_verified_at')->nullable(); $t->softDeletes(); $t->rememberToken(); $t->timestamps(); });
         Schema::create('employer_documents', function (Blueprint $t) { $t->id('document_id'); $t->unsignedBigInteger('employer_id'); $t->string('document_type'); $t->string('document_path'); $t->string('original_filename'); $t->integer('file_size'); $t->string('mime_type'); $t->timestamp('uploaded_at')->nullable(); $t->string('verification_status')->default('pending'); $t->text('admin_notes')->nullable(); $t->date('expiration_date')->nullable(); $t->timestamp('viewed_at')->nullable(); $t->timestamps(); });
-        Schema::create('job_seekers', function (Blueprint $t) { $t->id('seeker_id'); $t->string('email')->nullable(); $t->string('password')->nullable(); $t->string('first_name')->nullable(); $t->string('last_name')->nullable(); $t->string('sex')->nullable(); $t->string('gender')->nullable(); $t->timestamps(); });
+        Schema::create('job_seekers', function (Blueprint $t) { $t->id('seeker_id'); $t->string('email')->nullable(); $t->string('password')->nullable(); $t->string('first_name')->nullable(); $t->string('middle_name')->nullable(); $t->string('last_name')->nullable(); $t->string('sex')->nullable(); $t->string('gender')->nullable(); $t->string('mobile_number')->nullable(); $t->string('address_municipality_city')->nullable(); $t->date('date_of_birth')->nullable(); $t->string('educ_attainment')->nullable(); $t->boolean('is_former_ofw')->default(false); $t->boolean('is_4ps_beneficiary')->default(false); $t->timestamps(); });
+        Schema::create('seeker_disabilities', function (Blueprint $t) { $t->id(); $t->unsignedBigInteger('seeker_id'); $t->string('disability_type')->nullable(); $t->string('disability_specification')->nullable(); $t->timestamps(); });
+        Schema::create('seeker_educations', function (Blueprint $t) { $t->id(); $t->unsignedBigInteger('seeker_id'); $t->string('level')->nullable(); $t->unsignedSmallInteger('year_graduated')->nullable(); $t->timestamps(); });
         Schema::create('seeker_skills', function (Blueprint $t) { $t->id(); $t->unsignedBigInteger('seeker_id'); $t->unsignedBigInteger('skill_id')->nullable(); $t->string('skill_name')->nullable(); $t->timestamps(); });
         Schema::create('job_fair_attendees', function (Blueprint $t) { $t->id(); $t->unsignedBigInteger('job_fair_id'); $t->unsignedBigInteger('seeker_id'); $t->uuid('qr_code_uuid')->unique(); $t->timestamp('scanned_at')->nullable(); $t->boolean('is_attended')->default(false); $t->timestamps(); });
         Schema::create('job_vacancies', function (Blueprint $t) { $t->id('post_id'); $t->unsignedBigInteger('employer_id'); $t->unsignedInteger('vacancies_count')->default(0); $t->boolean('spes_tupad_eligible')->default(false); $t->string('status')->default('active'); $t->timestamps(); });
@@ -436,7 +497,7 @@ class JobFairEcosystemFlowTest extends TestCase
         Schema::create('job_fair_requirement_submissions', function (Blueprint $t) { $t->id(); $t->unsignedBigInteger('job_fair_requirement_id'); $t->unsignedBigInteger('job_fair_employer_id'); $t->unsignedBigInteger('employer_id'); $t->unsignedBigInteger('employer_document_id')->nullable(); $t->string('document_path')->nullable(); $t->string('original_filename')->nullable(); $t->unsignedBigInteger('file_size')->nullable(); $t->string('mime_type')->nullable(); $t->string('status'); $t->text('admin_remarks')->nullable(); $t->timestamp('submitted_at')->nullable(); $t->timestamp('reviewed_at')->nullable(); $t->unsignedBigInteger('reviewed_by')->nullable(); $t->timestamps(); });
         Schema::create('job_fair_confirmation_slips', function (Blueprint $t) { $t->id(); $t->unsignedBigInteger('job_fair_id'); $t->unsignedBigInteger('job_fair_employer_id')->nullable(); $t->unsignedBigInteger('employer_id')->nullable(); $t->string('company_name'); $t->string('representative_1_name')->nullable(); $t->string('representative_1_contact')->nullable(); $t->string('representative_2_name')->nullable(); $t->string('representative_2_contact')->nullable(); $t->string('email')->nullable(); $t->unsignedInteger('number_of_job_vacancies'); $t->boolean('will_conduct_onsite_interview'); $t->text('logistics_requests')->nullable(); $t->string('source'); $t->string('dedupe_key'); $t->string('submitted_by')->nullable(); $t->timestamp('submitted_at')->nullable(); $t->timestamps(); $t->unique(['job_fair_id','dedupe_key']); });
         Schema::create('job_fair_result_reports', function (Blueprint $t) { $t->id(); $t->unsignedBigInteger('job_fair_id'); $t->unsignedBigInteger('job_fair_employer_id')->nullable(); $t->unsignedBigInteger('employer_id')->nullable(); $t->string('company_name'); $t->string('normalized_company_name'); $t->string('dedupe_key'); $t->string('employer_type'); $t->string('source'); $t->string('office_location')->nullable(); $t->string('clearance_no')->nullable(); $t->string('contact_person')->nullable(); $t->string('contact_number')->nullable(); foreach (['total_male','total_female','total_applicants','total_qualified','total_hots','total_near_hired','total_rejected','total_vacancies_solicited','total_vacancies_offered'] as $c) $t->unsignedInteger($c)->default(0); $t->text('remarks')->nullable(); $t->unsignedBigInteger('encoded_by_admin_id')->nullable(); $t->unsignedBigInteger('submitted_by_employer_id')->nullable(); $t->timestamp('submitted_at')->nullable(); $t->timestamp('report_generated_at')->nullable(); $t->timestamps(); $t->unique(['job_fair_id','dedupe_key']); });
-        Schema::create('job_fair_result_entries', function (Blueprint $t) { $t->id(); $t->unsignedBigInteger('result_report_id'); $t->string('applicant_name'); $t->string('gender'); $t->string('city_municipality')->nullable(); $t->string('contact_number')->nullable(); $t->string('age_group', 2)->nullable(); $t->string('highest_education')->nullable(); $t->json('classification_codes')->nullable(); $t->string('position_applied_for'); $t->string('status'); $t->string('mismatch_code')->nullable(); $t->text('remarks')->nullable(); $t->timestamps(); });
+        Schema::create('job_fair_result_entries', function (Blueprint $t) { $t->id(); $t->unsignedBigInteger('result_report_id'); $t->unsignedBigInteger('seeker_id')->nullable(); $t->string('applicant_name'); $t->string('gender'); $t->string('city_municipality')->nullable(); $t->string('contact_number')->nullable(); $t->string('age_group', 2)->nullable(); $t->string('highest_education')->nullable(); $t->json('classification_codes')->nullable(); $t->string('position_applied_for'); $t->string('status'); $t->string('mismatch_code')->nullable(); $t->text('remarks')->nullable(); $t->timestamps(); });
         Schema::create('job_fair_result_mismatch_tallies', function (Blueprint $t) { $t->id(); $t->unsignedBigInteger('result_report_id'); $t->string('mismatch_code'); $t->unsignedInteger('count'); $t->timestamps(); });
         Schema::create('job_fair_vacancies', function (Blueprint $t) { $t->id(); $t->unsignedBigInteger('job_fair_id'); $t->unsignedBigInteger('employer_id'); $t->unsignedBigInteger('vacancy_id'); $t->timestamps(); });
         Schema::create('notifications', function (Blueprint $t) { $t->uuid('id')->primary(); $t->string('type'); $t->morphs('notifiable'); $t->text('data'); $t->timestamp('read_at')->nullable(); $t->timestamps(); });

@@ -50,7 +50,7 @@ export const CLASSIFICATION_CODES = [
 ]
 
 export const blankResultEntry = () => ({
-  applicant_name: '', gender: 'male', city_municipality: '', contact_number: '', age_group: '',
+  applicant_name: '', seeker_id: null, gender: 'male', city_municipality: '', contact_number: '', age_group: '',
   highest_education: '', classification_codes: [], position_applied_for: '', status: 'qualified',
   mismatch_code: '', remarks: '',
 })
