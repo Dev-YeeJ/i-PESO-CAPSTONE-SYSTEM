@@ -9,6 +9,7 @@ use App\Models\PlacementReportUpload;
 use App\Notifications\PlacementReportDue;
 use App\Services\PlacementComplianceService;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Carbon;
@@ -158,15 +159,20 @@ class PlacementReportFlowTest extends TestCase
         ])->assertCreated();
     }
 
-    public function test_admin_cannot_approve_a_second_report_for_the_same_period(): void
+    public function test_the_database_refuses_a_second_settled_report_for_the_same_employer_and_period(): void
     {
         $employer = $this->employer();
-        $admin = $this->admin();
+        $this->submittedReport($employer, month: 3, year: 2026);
 
-        $first = $this->submittedReport($employer, month: 3, year: 2026);
-        // A duplicate that predates the guard, or arrived while the first was
-        // still rejected — approval is the last line of defence.
-        $second = PlacementReportUpload::create([
+        // assertNoSettledReportFor()/assertNoApprovedTwin() are both plain
+        // check-then-act and can be raced by two concurrent requests. The
+        // unique settlement_key index is the actual backstop: even a direct,
+        // unguarded model write for a second settled report of the same
+        // employer+period must now be refused at the database level, not
+        // just the application layer.
+        $this->expectException(UniqueConstraintViolationException::class);
+
+        PlacementReportUpload::create([
             'employer_id' => $employer->employer_id,
             'original_filename' => 'march-again.xlsx',
             'stored_path' => null,
@@ -176,14 +182,46 @@ class PlacementReportFlowTest extends TestCase
             'coverage_year' => 2026,
             'submitted_at' => now(),
         ]);
+    }
 
-        Sanctum::actingAs($admin);
+    public function test_a_race_between_two_concurrent_nil_submissions_is_caught_and_converted_to_a_friendly_error(): void
+    {
+        $employer = $this->employer();
+        Sanctum::actingAs($employer);
 
-        $this->postJson("/api/admin/placement-reports/{$first->id}/approve")->assertOk();
+        // Simulate the actual race: right as this request's own
+        // assertNoSettledReportFor() check has already passed (nothing
+        // settled existed a moment ago) but before its insert lands, another
+        // concurrent request for the SAME employer+period commits its own
+        // settled report first — modeled by injecting the "other" insert
+        // from within this request's own creating() event, immediately
+        // before its write reaches the database.
+        PlacementReportUpload::creating(function (PlacementReportUpload $model) use ($employer) {
+            if ((int) $model->employer_id === $employer->employer_id
+                && (int) $model->coverage_month === 3 && (int) $model->coverage_year === 2026) {
+                PlacementReportUpload::withoutEvents(fn () => PlacementReportUpload::create([
+                    'employer_id' => $employer->employer_id,
+                    'original_filename' => 'concurrent.xlsx',
+                    'stored_path' => null,
+                    'row_count' => 0,
+                    'status' => PlacementReportUpload::STATUS_PENDING_REVIEW,
+                    'is_nil_report' => true,
+                    'coverage_month' => 3,
+                    'coverage_year' => 2026,
+                    'submitted_at' => now(),
+                ]));
+            }
+        });
 
-        $this->postJson("/api/admin/placement-reports/{$second->id}/approve")
-            ->assertStatus(422)
-            ->assertJsonPath('errors.status.0', "Report #{$first->id} for March 2026 is already approved for this employer. Approving this one too would double-count those placements — reject it instead.");
+        try {
+            $this->postJson('/api/employer/placement-reports/nil', [
+                'coverage_month' => 3, 'coverage_year' => 2026,
+            ])
+                ->assertStatus(422)
+                ->assertJsonPath('errors.coverage_month.0', 'Another report for this employer and period was just submitted. Refresh and check your existing reports before trying again.');
+        } finally {
+            PlacementReportUpload::flushEventListeners();
+        }
     }
 
     public function test_nil_report_records_that_nobody_was_hired(): void
@@ -700,6 +738,16 @@ class PlacementReportFlowTest extends TestCase
             $table->timestamp('submitted_at')->nullable();
             $table->timestamp('reviewed_at')->nullable();
             $table->timestamps();
+
+            // Mirrors the production migration's race-proof uniqueness
+            // constraint: NULL (a non-blocking status) never collides, so
+            // only pending_review/approved rows for the same employer+period
+            // are ever compared against each other.
+            $table->string('settlement_key', 60)->nullable()->storedAs(
+                "CASE WHEN status IN ('pending_review', 'approved') AND coverage_year IS NOT NULL AND coverage_month IS NOT NULL "
+                ."THEN employer_id || '-' || coverage_year || '-' || coverage_month ELSE NULL END"
+            );
+            $table->unique('settlement_key');
         });
 
         Schema::create('placement_report_mappings', function (Blueprint $table) {

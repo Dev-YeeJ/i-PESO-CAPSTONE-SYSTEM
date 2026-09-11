@@ -8,6 +8,7 @@ use App\Models\PlacementRecord;
 use App\Models\PlacementReportMapping;
 use App\Models\PlacementReportUpload;
 use App\Services\PlacementImportService;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -135,7 +136,7 @@ class EmployerPlacementReportController extends Controller
         $this->assertCoverageNotInFuture($validated['coverage_month'], $validated['coverage_year']);
         $this->assertNoSettledReportFor($employer, $validated['coverage_month'], $validated['coverage_year']);
 
-        $upload = PlacementReportUpload::create([
+        $upload = $this->catchSettlementRace(fn () => PlacementReportUpload::create([
             'employer_id' => $employer->employer_id,
             'original_filename' => 'No hires declared',
             'stored_path' => null,
@@ -146,7 +147,7 @@ class EmployerPlacementReportController extends Controller
             'coverage_year' => $validated['coverage_year'],
             'employer_remarks' => $validated['employer_remarks'] ?? null,
             'submitted_at' => now(),
-        ]);
+        ]));
 
         return response()->json([
             'message' => 'Recorded: no hires to report for this period.',
@@ -265,11 +266,11 @@ class EmployerPlacementReportController extends Controller
         // submission, so it must not be routed through the mapping-required
         // path below (which would always fail for a report with no columns).
         if ($placementReport->is_nil_report) {
-            $placementReport->update([
+            $this->catchSettlementRace(fn () => $placementReport->update([
                 'status' => PlacementReportUpload::STATUS_PENDING_REVIEW,
                 'employer_remarks' => $request->input('employer_remarks'),
                 'submitted_at' => now(),
-            ]);
+            ]));
 
             return response()->json([
                 'message' => 'Placement report submitted to PESO for review.',
@@ -288,11 +289,11 @@ class EmployerPlacementReportController extends Controller
             ]);
         }
 
-        $placementReport->update([
+        $this->catchSettlementRace(fn () => $placementReport->update([
             'status' => PlacementReportUpload::STATUS_PENDING_REVIEW,
             'employer_remarks' => $request->input('employer_remarks'),
             'submitted_at' => now(),
-        ]);
+        ]));
 
         return response()->json([
             'message' => 'Placement report submitted to PESO for review.',
@@ -348,6 +349,29 @@ class EmployerPlacementReportController extends Controller
         throw ValidationException::withMessages([
             'coverage_month' => ["You already have a report for {$period} that is {$state}. Delete or wait for that one instead of sending a second."],
         ]);
+    }
+
+    /**
+     * assertNoSettledReportFor() above is a plain check-then-act: two
+     * concurrent submissions for the same employer+period can each pass it
+     * before either has written. A unique index on the DB side is the actual
+     * race-proof backstop — this converts the resulting DB-level rejection
+     * into the same friendly error the check above already throws for the
+     * ordinary (non-concurrent) case.
+     */
+    private function catchSettlementRace(callable $write): mixed
+    {
+        try {
+            return $write();
+        } catch (UniqueConstraintViolationException $e) {
+            if (! str_contains($e->getMessage(), 'settlement_key')) {
+                throw $e;
+            }
+
+            throw ValidationException::withMessages([
+                'coverage_month' => ['Another report for this employer and period was just submitted. Refresh and check your existing reports before trying again.'],
+            ]);
+        }
     }
 
     private function assertCoverageNotInFuture(int $month, int $year): void

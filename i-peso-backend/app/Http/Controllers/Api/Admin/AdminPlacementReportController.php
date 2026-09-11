@@ -9,6 +9,7 @@ use App\Models\PlacementRecord;
 use App\Models\PlacementReportUpload;
 use App\Services\PlacementComplianceService;
 use App\Services\PlacementImportService;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -201,12 +202,28 @@ class AdminPlacementReportController extends Controller
 
         $validated = $request->validate(['review_remarks' => ['nullable', 'string', 'max:1000']]);
 
-        $placementReport->update([
-            'status' => PlacementReportUpload::STATUS_APPROVED,
-            'reviewed_by_admin_id' => $admin->admin_id,
-            'review_remarks' => $validated['review_remarks'] ?? null,
-            'reviewed_at' => now(),
-        ]);
+        // assertNoApprovedTwin() above is a plain check-then-act: two
+        // concurrent approvals for the same employer+period can each pass it
+        // before either has written. The unique index on the DB side is the
+        // actual race-proof backstop; this converts that DB-level rejection
+        // into the same kind of friendly error the check above already
+        // throws for the ordinary (non-concurrent) case.
+        try {
+            $placementReport->update([
+                'status' => PlacementReportUpload::STATUS_APPROVED,
+                'reviewed_by_admin_id' => $admin->admin_id,
+                'review_remarks' => $validated['review_remarks'] ?? null,
+                'reviewed_at' => now(),
+            ]);
+        } catch (UniqueConstraintViolationException $e) {
+            if (! str_contains($e->getMessage(), 'settlement_key')) {
+                throw $e;
+            }
+
+            throw ValidationException::withMessages([
+                'status' => ['Another approval for this employer and period was recorded at the same moment. Refresh and check which report is now approved before retrying.'],
+            ]);
+        }
 
         return response()->json([
             'message' => 'Placement report approved. Its records now feed the SPRS placement totals.',
