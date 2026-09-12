@@ -20,6 +20,7 @@ use App\Services\JobFairService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -444,18 +445,38 @@ class JobFairController extends Controller
             'employer_id' => ['nullable', 'integer', 'exists:employers,employer_id'], 'company_name' => ['required', 'string', 'max:255'],
             'representative_1_name' => ['required', 'string', 'max:255'], 'representative_1_contact' => ['required', 'string', 'max:40'],
             'representative_2_name' => ['nullable', 'string', 'max:255'], 'representative_2_contact' => ['nullable', 'string', 'max:40'],
-            'email' => ['nullable', 'email', 'max:255'], 'number_of_job_vacancies' => ['required', 'integer', 'min:0'],
+            'email' => ['nullable', 'email', 'max:255'],
             'will_conduct_onsite_interview' => ['required', 'boolean'], 'logistics_requests' => ['nullable', 'string', 'max:3000'],
+            'vacancies' => ['nullable', 'array'],
+            'vacancies.*.number_needed' => ['required_with:vacancies', 'integer', 'min:0'],
+            'vacancies.*.position_title' => ['required_with:vacancies', 'string', 'max:255'],
+            'vacancies.*.qualifications' => ['nullable', 'string', 'max:2000'],
+            'vacancies.*.place_of_work' => ['nullable', 'string', 'max:255'],
+            'vacancies.*.job_vacancy_id' => ['nullable', 'integer', 'exists:job_vacancies,post_id'],
         ]);
         if (($jobFair->maximum_representatives ?? 2) < 2 && filled($validated['representative_2_name'] ?? null)) {
             return response()->json(['message' => 'This event allows only one company representative.', 'errors' => ['representative_2_name' => ['Remove the second representative.']]], 422);
         }
         $dedupe = filled($validated['employer_id'] ?? null) ? 'employer:'.$validated['employer_id'] : 'company:'.$service->normalizedCompanyName($validated['company_name']);
-        $slip = JobFairConfirmationSlip::updateOrCreate(
-            ['job_fair_id' => $jobFair->job_fair_id, 'dedupe_key' => $dedupe],
-            [...$validated, 'source' => 'admin_proxy', 'submitted_by' => trim($admin->first_name.' '.$admin->last_name), 'submitted_at' => now()],
-        );
-        return response()->json(['message' => 'Admin proxy confirmation slip saved.', 'confirmation_slip' => $slip], 201);
+        $vacancies = collect($validated['vacancies'] ?? []);
+
+        $slip = DB::transaction(function () use ($jobFair, $dedupe, $validated, $vacancies, $admin) {
+            $slip = JobFairConfirmationSlip::updateOrCreate(
+                ['job_fair_id' => $jobFair->job_fair_id, 'dedupe_key' => $dedupe],
+                [...collect($validated)->except('vacancies')->all(),
+                    'number_of_job_vacancies' => (int) $vacancies->sum('number_needed'),
+                    'source' => 'admin_proxy', 'submitted_by' => trim($admin->first_name.' '.$admin->last_name), 'submitted_at' => now()],
+            );
+
+            $slip->vacancies()->delete();
+            foreach ($vacancies as $vacancy) {
+                $slip->vacancies()->create($vacancy);
+            }
+
+            return $slip;
+        });
+
+        return response()->json(['message' => 'Admin proxy confirmation slip saved.', 'confirmation_slip' => $slip->fresh(['vacancies'])], 201);
     }
 
     /**

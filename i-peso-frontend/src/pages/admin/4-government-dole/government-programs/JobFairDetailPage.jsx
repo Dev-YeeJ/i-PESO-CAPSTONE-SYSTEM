@@ -10,6 +10,7 @@ import PageHeader from '@/pages/admin/_components/PageHeader'
 import LocationPreviewCard from '@/components/maps/LocationPreviewCard'
 import EstablishmentReportPreview from '@/components/reports/EstablishmentReportPreview'
 import JobFairResultEntryEditor from '@/components/reports/JobFairResultEntryEditor'
+import ConfirmationVacancyEditor, { blankConfirmationVacancy, stripBlankConfirmationVacancies } from '@/components/reports/ConfirmationVacancyEditor'
 import { adminService } from '@/services/adminService'
 
 // Grouped by the same tone used for the status Badge, so the grouping in the
@@ -23,7 +24,7 @@ const statusGroups = [
 const statusTones = Object.fromEntries(statusGroups.flatMap((g) => g.statuses.map((s) => [s, g.tone])))
 
 const zeroProxy = { company_name: '', employer_type: 'paper_only_employer', contact_person: '', contact_number: '', clearance_no: '', total_male: 0, total_female: 0, total_applicants: 0, total_qualified: 0, total_hots: 0, total_near_hired: 0, total_rejected: 0, total_vacancies_solicited: 0, total_vacancies_offered: 0, remarks: '' }
-const zeroProxyConfirmation = { company_name: '', representative_1_name: '', representative_1_contact: '', email: '', number_of_job_vacancies: 0, will_conduct_onsite_interview: false, logistics_requests: '' }
+const zeroProxyConfirmation = { company_name: '', representative_1_name: '', representative_1_contact: '', email: '', will_conduct_onsite_interview: false, logistics_requests: '' }
 const inputClass = 'mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-brand-navy focus:outline-none focus:ring-2 focus:ring-brand-navy/10'
 
 const proxyLabels = {
@@ -35,7 +36,7 @@ const proxyLabels = {
 }
 const confirmationLabels = {
   company_name: 'Company name', representative_1_name: 'Representative name', representative_1_contact: 'Representative contact',
-  email: 'Email', number_of_job_vacancies: 'Number of vacancies', logistics_requests: 'Logistics requests',
+  email: 'Email', logistics_requests: 'Logistics requests',
 }
 
 export default function JobFairDetailPage() {
@@ -48,6 +49,7 @@ export default function JobFairDetailPage() {
   const [proxy, setProxy] = useState(zeroProxy)
   const [proxyEntries, setProxyEntries] = useState([])
   const [proxyConfirmation, setProxyConfirmation] = useState(zeroProxyConfirmation)
+  const [proxyConfirmationVacancies, setProxyConfirmationVacancies] = useState([blankConfirmationVacancy()])
   const [viewingReport, setViewingReport] = useState(null)
 
   // Search-as-you-type employer picker for "Invite" — replaces a bare
@@ -433,7 +435,19 @@ export default function JobFairDetailPage() {
                 </label>
               ))}
             </div>
-            <Button className="mt-4" icon={Save} onClick={() => action(() => adminService.submitJobFairProxyConfirmation(id, proxyConfirmation), 'Manual confirmation slip saved.')}>
+
+            <div className="mt-5">
+              <p className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500">List of Vacancies / Orders</p>
+              <ConfirmationVacancyEditor vacancies={proxyConfirmationVacancies} onChange={setProxyConfirmationVacancies} />
+            </div>
+
+            <Button
+              className="mt-4"
+              icon={Save}
+              onClick={() => action(() => adminService.submitJobFairProxyConfirmation(id, {
+                ...proxyConfirmation, vacancies: stripBlankConfirmationVacancies(proxyConfirmationVacancies),
+              }), 'Manual confirmation slip saved.')}
+            >
               Save Confirmation
             </Button>
           </Card>

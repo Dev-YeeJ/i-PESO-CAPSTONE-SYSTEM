@@ -5,6 +5,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import EstablishmentReportPreview from '@/components/reports/EstablishmentReportPreview'
 import JobFairResultEntryEditor from '@/components/reports/JobFairResultEntryEditor'
+import ConfirmationVacancyEditor, { blankConfirmationVacancy, stripBlankConfirmationVacancies } from '@/components/reports/ConfirmationVacancyEditor'
 import { blankResultEntry } from '@/components/reports/jobFairResultVocab'
 import {
   downloadJobFairResult,
@@ -17,10 +18,11 @@ import {
   uploadJobFairRequirement,
   viewJobFairRequirement,
 } from '@/services/jobFairService'
+import { getVacancies } from '@/services/employerService'
 
 const blankConfirmation = {
   representative_1_name: '', representative_1_contact: '', representative_2_name: '', representative_2_contact: '',
-  email: '', number_of_job_vacancies: 0, will_conduct_onsite_interview: false, logistics_requests: '',
+  email: '', will_conduct_onsite_interview: false, logistics_requests: '',
 }
 const MISMATCH_STATUSES = ['employer_mismatch', 'seeker_mismatch']
 
@@ -30,6 +32,8 @@ export default function EmployerJobFairDashboard() {
   const [fairs, setFairs] = useState([])
   const [selectedId, setSelectedId] = useState('')
   const [confirmation, setConfirmation] = useState(blankConfirmation)
+  const [confirmationVacancies, setConfirmationVacancies] = useState([blankConfirmationVacancy()])
+  const [myVacancies, setMyVacancies] = useState([])
   const [entries, setEntries] = useState([blankResultEntry()])
   const [vacancies, setVacancies] = useState({ solicited: 0, offered: 0 })
   const [remarks, setRemarks] = useState('')
@@ -54,6 +58,12 @@ export default function EmployerJobFairDashboard() {
     }
   }, [selectedId])
   useEffect(() => { load() }, [load])
+
+  useEffect(() => {
+    getVacancies({ per_page: 100 })
+      .then((res) => setMyVacancies((res.data ?? []).filter((v) => v.status === 'active')))
+      .catch(() => setMyVacancies([]))
+  }, [])
 
   const act = async (work, success) => {
     setError(''); setNotice('')
@@ -230,15 +240,27 @@ export default function EmployerJobFairDashboard() {
                           <label key={key} className="text-xs font-bold uppercase tracking-wide text-slate-500">
                             {key.replaceAll('_', ' ')}
                             <input
-                              type={key === 'number_of_job_vacancies' ? 'number' : key === 'email' ? 'email' : 'text'}
+                              type={key === 'email' ? 'email' : 'text'}
                               value={value}
-                              onChange={(e) => setConfirmation((x) => ({ ...x, [key]: key === 'number_of_job_vacancies' ? Number(e.target.value) : e.target.value }))}
+                              onChange={(e) => setConfirmation((x) => ({ ...x, [key]: e.target.value }))}
                               className={`mt-1.5 normal-case ${inputClass}`}
                             />
                           </label>
                         ))}
                       </div>
-                      <Button className="mt-5" icon={Save} onClick={() => act(() => submitJobFairConfirmation(selected.job_fair_id, confirmation), 'Confirmation slip submitted.')}>
+
+                      <div className="mt-6">
+                        <p className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500">List of Vacancies / Orders</p>
+                        <ConfirmationVacancyEditor vacancies={confirmationVacancies} onChange={setConfirmationVacancies} myVacancies={myVacancies} />
+                      </div>
+
+                      <Button
+                        className="mt-5"
+                        icon={Save}
+                        onClick={() => act(() => submitJobFairConfirmation(selected.job_fair_id, {
+                          ...confirmation, vacancies: stripBlankConfirmationVacancies(confirmationVacancies),
+                        }), 'Confirmation slip submitted.')}
+                      >
                         Submit Confirmation
                       </Button>
                     </TabsContent>

@@ -8,6 +8,7 @@ use App\Models\JobFairResultReport;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
@@ -436,6 +437,59 @@ class JobFairEcosystemFlowTest extends TestCase
         $this->getJson('/api/employer/applicant-suggestions?q=judy')->assertForbidden();
     }
 
+    public function test_confirmation_slip_vacancy_list_derives_the_total_and_links_an_existing_posting(): void
+    {
+        [, $employer, $fairId] = $this->setUpFairWithEmployer('vacancylist');
+        $vacancyId = DB::table('job_vacancies')->insertGetId([
+            'employer_id' => $employer->employer_id, 'vacancies_count' => 2, 'status' => 'active',
+            'created_at' => now(), 'updated_at' => now(),
+        ], 'post_id');
+
+        Sanctum::actingAs($employer);
+        $response = $this->postJson("/api/employer/job-fairs/{$fairId}/confirmation-slip", [
+            'representative_1_name' => 'Maria Santos', 'representative_1_contact' => '09171234567',
+            'email' => $employer->email, 'will_conduct_onsite_interview' => true,
+            'vacancies' => [
+                ['job_vacancy_id' => $vacancyId, 'number_needed' => 2, 'position_title' => 'Machine Operator', 'qualifications' => 'TESDA NC II', 'place_of_work' => 'Urdaneta City'],
+                ['number_needed' => 3, 'position_title' => 'Packer', 'qualifications' => null, 'place_of_work' => 'Urdaneta City'],
+            ],
+        ])->assertOk();
+
+        // number_of_job_vacancies is derived (2 + 3), never trusted from the client directly.
+        $this->assertSame(5, $response->json('confirmation_slip.number_of_job_vacancies'));
+        $this->assertCount(2, $response->json('confirmation_slip.vacancies'));
+        $linkedRow = collect($response->json('confirmation_slip.vacancies'))->firstWhere('job_vacancy_id', $vacancyId);
+        $this->assertSame('Machine Operator', $linkedRow['position_title']);
+        $manualRow = collect($response->json('confirmation_slip.vacancies'))->firstWhere('job_vacancy_id', null);
+        $this->assertSame('Packer', $manualRow['position_title']);
+
+        // Resubmitting with a shorter list fully replaces the old rows, not just appends.
+        $second = $this->postJson("/api/employer/job-fairs/{$fairId}/confirmation-slip", [
+            'representative_1_name' => 'Maria Santos', 'representative_1_contact' => '09171234567',
+            'email' => $employer->email, 'will_conduct_onsite_interview' => true,
+            'vacancies' => [['number_needed' => 1, 'position_title' => 'Cashier', 'place_of_work' => 'Urdaneta City']],
+        ])->assertOk();
+        $this->assertSame(1, $second->json('confirmation_slip.number_of_job_vacancies'));
+        $this->assertCount(1, $second->json('confirmation_slip.vacancies'));
+    }
+
+    public function test_admin_proxy_confirmation_slip_accepts_a_manual_vacancy_list(): void
+    {
+        [$admin, , $fairId] = $this->setUpFairWithEmployer('proxyvacancylist');
+
+        Sanctum::actingAs($admin);
+        $response = $this->postJson("/api/admin/job-fairs/{$fairId}/proxy-confirmation-slip", [
+            'company_name' => 'Phone Confirmed Company', 'representative_1_name' => 'Pedro Reyes',
+            'representative_1_contact' => '09175550000', 'email' => 'paper@example.test',
+            'will_conduct_onsite_interview' => false,
+            'vacancies' => [['number_needed' => 4, 'position_title' => 'Warehouse Associate', 'place_of_work' => 'Dagupan City']],
+        ])->assertCreated();
+
+        $this->assertSame(4, $response->json('confirmation_slip.number_of_job_vacancies'));
+        $this->assertSame('Warehouse Associate', $response->json('confirmation_slip.vacancies.0.position_title'));
+        $this->assertNull($response->json('confirmation_slip.vacancies.0.job_vacancy_id'));
+    }
+
     private function setUpFairWithEmployer(string $slug): array
     {
         $admin = Administrator::create([
@@ -496,6 +550,7 @@ class JobFairEcosystemFlowTest extends TestCase
         Schema::create('job_fair_requirements', function (Blueprint $t) { $t->id(); $t->unsignedBigInteger('job_fair_id'); $t->string('code'); $t->string('label'); $t->boolean('is_required')->default(true); $t->unsignedSmallInteger('sort_order')->default(0); $t->timestamps(); });
         Schema::create('job_fair_requirement_submissions', function (Blueprint $t) { $t->id(); $t->unsignedBigInteger('job_fair_requirement_id'); $t->unsignedBigInteger('job_fair_employer_id'); $t->unsignedBigInteger('employer_id'); $t->unsignedBigInteger('employer_document_id')->nullable(); $t->string('document_path')->nullable(); $t->string('original_filename')->nullable(); $t->unsignedBigInteger('file_size')->nullable(); $t->string('mime_type')->nullable(); $t->string('status'); $t->text('admin_remarks')->nullable(); $t->timestamp('submitted_at')->nullable(); $t->timestamp('reviewed_at')->nullable(); $t->unsignedBigInteger('reviewed_by')->nullable(); $t->timestamps(); });
         Schema::create('job_fair_confirmation_slips', function (Blueprint $t) { $t->id(); $t->unsignedBigInteger('job_fair_id'); $t->unsignedBigInteger('job_fair_employer_id')->nullable(); $t->unsignedBigInteger('employer_id')->nullable(); $t->string('company_name'); $t->string('representative_1_name')->nullable(); $t->string('representative_1_contact')->nullable(); $t->string('representative_2_name')->nullable(); $t->string('representative_2_contact')->nullable(); $t->string('email')->nullable(); $t->unsignedInteger('number_of_job_vacancies'); $t->boolean('will_conduct_onsite_interview'); $t->text('logistics_requests')->nullable(); $t->string('source'); $t->string('dedupe_key'); $t->string('submitted_by')->nullable(); $t->timestamp('submitted_at')->nullable(); $t->timestamps(); $t->unique(['job_fair_id','dedupe_key']); });
+        Schema::create('job_fair_confirmation_vacancies', function (Blueprint $t) { $t->id(); $t->unsignedBigInteger('confirmation_slip_id'); $t->unsignedBigInteger('job_vacancy_id')->nullable(); $t->unsignedInteger('number_needed')->default(0); $t->string('position_title'); $t->text('qualifications')->nullable(); $t->string('place_of_work')->nullable(); $t->timestamps(); });
         Schema::create('job_fair_result_reports', function (Blueprint $t) { $t->id(); $t->unsignedBigInteger('job_fair_id'); $t->unsignedBigInteger('job_fair_employer_id')->nullable(); $t->unsignedBigInteger('employer_id')->nullable(); $t->string('company_name'); $t->string('normalized_company_name'); $t->string('dedupe_key'); $t->string('employer_type'); $t->string('source'); $t->string('office_location')->nullable(); $t->string('clearance_no')->nullable(); $t->string('contact_person')->nullable(); $t->string('contact_number')->nullable(); foreach (['total_male','total_female','total_applicants','total_qualified','total_hots','total_near_hired','total_rejected','total_vacancies_solicited','total_vacancies_offered'] as $c) $t->unsignedInteger($c)->default(0); $t->text('remarks')->nullable(); $t->unsignedBigInteger('encoded_by_admin_id')->nullable(); $t->unsignedBigInteger('submitted_by_employer_id')->nullable(); $t->timestamp('submitted_at')->nullable(); $t->timestamp('report_generated_at')->nullable(); $t->timestamps(); $t->unique(['job_fair_id','dedupe_key']); });
         Schema::create('job_fair_result_entries', function (Blueprint $t) { $t->id(); $t->unsignedBigInteger('result_report_id'); $t->unsignedBigInteger('seeker_id')->nullable(); $t->string('applicant_name'); $t->string('gender'); $t->string('city_municipality')->nullable(); $t->string('contact_number')->nullable(); $t->string('age_group', 2)->nullable(); $t->string('highest_education')->nullable(); $t->json('classification_codes')->nullable(); $t->string('position_applied_for'); $t->string('status'); $t->string('mismatch_code')->nullable(); $t->text('remarks')->nullable(); $t->timestamps(); });
         Schema::create('job_fair_result_mismatch_tallies', function (Blueprint $t) { $t->id(); $t->unsignedBigInteger('result_report_id'); $t->string('mismatch_code'); $t->unsignedInteger('count'); $t->timestamps(); });
