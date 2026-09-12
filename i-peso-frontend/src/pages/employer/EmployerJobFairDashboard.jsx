@@ -226,18 +226,6 @@ export default function EmployerJobFairDashboard() {
       {error && <AlertBox variant="danger" title="Job Fair action failed">{error}</AlertBox>}
       {notice && <AlertBox variant="success" title="Saved">{notice}</AlertBox>}
 
-      <div className="rounded-3xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-white p-6 shadow-sm sm:p-8">
-        <h2 className="mb-1 text-xl font-black text-emerald-950">At the Venue</h2>
-        <p className="mb-6 text-sm font-semibold text-emerald-800">Run the event the way you always have — the digital steps come after.</p>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          {['No laptop or QR scanner needed', 'Bring your usual interview materials', 'Screen and interview as normal', 'Return here after to encode results'].map((item) => (
-            <div key={item} className="flex items-center gap-3 rounded-2xl border border-emerald-100 bg-white p-4 text-sm font-bold text-emerald-900 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
-              <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-500" />{item}
-            </div>
-          ))}
-        </div>
-      </div>
-
       {loading ? (
         <LoadingSkeleton variant="card" rows={2} />
       ) : !fairs.length ? (
