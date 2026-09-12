@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { ArrowLeft, ArrowRight, CalendarDays, CheckCircle2, Clock3, Download, Eye, FileText, FileUp, Mail, MapPin, Save, ShieldCheck } from 'lucide-react'
-import { AlertBox, Badge, Button, Card, LoadingSkeleton } from '@/components/ui'
+import { AlertBox, Badge, Button, Card, EmptyState, LoadingSkeleton } from '@/components/ui'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import EstablishmentReportPreview from '@/components/reports/EstablishmentReportPreview'
@@ -86,10 +86,10 @@ function JobFairCard({ fair, onClick }) {
     <button
       type="button"
       onClick={onClick}
-      className="group flex h-full flex-col items-start gap-3 rounded-2xl border border-slate-200 bg-white p-5 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:border-brand-navy hover:shadow-lg"
+      className="group flex h-full flex-col items-start gap-3 rounded-3xl border border-slate-200 bg-white p-5 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-md"
     >
       <div className="flex w-full items-start justify-between gap-2">
-        <h3 className="font-black text-slate-950">{fair.title}</h3>
+        <h3 className="font-black tracking-tight text-slate-950">{fair.title}</h3>
         <Badge status={status ? (PARTICIPATION_BADGE[status] ?? 'neutral') : 'neutral'} className="shrink-0">{status ? status.replaceAll('_', ' ') : 'Not joined'}</Badge>
       </div>
       {fair.description && <p className="line-clamp-2 text-sm text-slate-500">{fair.description}</p>}
@@ -210,24 +210,38 @@ export default function EmployerJobFairDashboard() {
   const resultsDone = Boolean(selected?.participation?.result_report?.id)
 
   return (
-    <div className="portal-page">
-      <div>
-        <p className="portal-eyebrow">Job Fair Ecosystem</p>
-        <h1 className="portal-title mt-1">Employer Coordination & Results</h1>
-        <p className="portal-subtitle">Complete digital steps when convenient. No laptop, QR scanner, or live system use is required at the venue.</p>
+    <div className="mx-auto max-w-7xl space-y-10 pb-12">
+      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-900 via-blue-950 to-indigo-900 px-8 py-8 text-white shadow-xl sm:px-12 sm:py-10">
+        <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-blue-500/20 blur-3xl"></div>
+        <div className="absolute -bottom-32 -left-20 h-80 w-80 rounded-full bg-indigo-500/20 blur-3xl"></div>
+        <div className="relative z-10">
+          <p className="text-xs font-bold uppercase tracking-widest text-blue-300">PESO Job Fairs</p>
+          <h1 className="mt-1 text-3xl font-black tracking-tight text-white drop-shadow-sm">Job Fair Coordination</h1>
+          <p className="mt-3 max-w-2xl text-base leading-relaxed text-blue-100">
+            Submit requirements, confirm attendance, and encode results for each job fair you join.
+          </p>
+        </div>
       </div>
 
       {error && <AlertBox variant="danger" title="Job Fair action failed">{error}</AlertBox>}
       {notice && <AlertBox variant="success" title="Saved">{notice}</AlertBox>}
 
-      <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm leading-6 text-blue-900">
-        <strong>During the physical event:</strong> use your normal table, paper resumes, screening, and interview process. Return here afterward to encode results from your notes.
+      <div className="rounded-3xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-white p-6 shadow-sm sm:p-8">
+        <h2 className="mb-1 text-xl font-black text-emerald-950">At the Venue</h2>
+        <p className="mb-6 text-sm font-semibold text-emerald-800">Run the event the way you always have — the digital steps come after.</p>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {['No laptop or QR scanner needed', 'Bring your usual interview materials', 'Screen and interview as normal', 'Return here after to encode results'].map((item) => (
+            <div key={item} className="flex items-center gap-3 rounded-2xl border border-emerald-100 bg-white p-4 text-sm font-bold text-emerald-900 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
+              <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-500" />{item}
+            </div>
+          ))}
+        </div>
       </div>
 
       {loading ? (
         <LoadingSkeleton variant="card" rows={2} />
       ) : !fairs.length ? (
-        <Card><p className="p-8 text-center text-slate-500">No published Job Fairs are available.</p></Card>
+        <Card><EmptyState icon={CalendarDays} title="No job fairs announced yet" description="Published PESO job fair announcements will appear here." /></Card>
       ) : !selected ? (
         <div>
           <h2 className="text-base font-extrabold text-slate-950">All Job Fairs</h2>
