@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { CalendarDays, CheckCircle2, Clock3, Download, Eye, FileText, FileUp, MapPin, Save, ShieldCheck } from 'lucide-react'
-import { AlertBox, Badge, Button, Card, CardHeader } from '@/components/ui'
+import { AlertBox, Badge, Button, Card, CardHeader, LoadingSkeleton } from '@/components/ui'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import EstablishmentReportPreview from '@/components/reports/EstablishmentReportPreview'
 import JobFairResultEntryEditor from '@/components/reports/JobFairResultEntryEditor'
 import ConfirmationVacancyEditor, { blankConfirmationVacancy, stripBlankConfirmationVacancies } from '@/components/reports/ConfirmationVacancyEditor'
@@ -27,6 +28,45 @@ const blankConfirmation = {
 const MISMATCH_STATUSES = ['employer_mismatch', 'seeker_mismatch']
 
 const inputClass = 'w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-brand-navy focus:outline-none focus:ring-2 focus:ring-brand-navy/10'
+
+const PARTICIPATION_BADGE = {
+  invited: 'pending',
+  interested: 'review',
+  accepted: 'verified',
+  declined: 'closed',
+  requirements_pending: 'warning',
+  requirements_submitted: 'review',
+  under_review: 'review',
+  approved: 'verified',
+  rejected: 'rejected',
+  attended: 'verified',
+  no_show: 'closed',
+  encoded_results: 'verified',
+  report_generated: 'verified',
+}
+
+const RESULT_STATS = [
+  ['total_applicants', 'Applicants', 'neutral'],
+  ['total_male', 'Male', 'neutral'],
+  ['total_female', 'Female', 'neutral'],
+  ['total_qualified', 'Qualified', 'review'],
+  ['total_hots', 'HOTS', 'verified'],
+  ['total_near_hired', 'Near Hired', 'review'],
+  ['total_rejected', 'Mismatched', 'rejected'],
+]
+
+function FormField({ label, value, onChange, type = 'text', textarea = false, className = '' }) {
+  return (
+    <label className={`text-xs font-bold uppercase tracking-wide text-slate-500 ${className}`}>
+      {label}
+      {textarea ? (
+        <textarea value={value} onChange={(e) => onChange(e.target.value)} rows={2} className={`mt-1.5 resize-none normal-case ${inputClass}`} />
+      ) : (
+        <input type={type} value={value} onChange={(e) => onChange(e.target.value)} className={`mt-1.5 normal-case ${inputClass}`} />
+      )}
+    </label>
+  )
+}
 
 export default function EmployerJobFairDashboard() {
   const [fairs, setFairs] = useState([])
@@ -116,6 +156,12 @@ export default function EmployerJobFairDashboard() {
       })
     : false
 
+  const confirmationRequirement = selected?.requirements?.find((req) => req.code === 'confirmation_slip')
+  const confirmationDone = confirmationRequirement
+    ? Boolean(selected.participation?.requirements?.find((x) => x.job_fair_requirement_id === confirmationRequirement.id))
+    : false
+  const resultsDone = Boolean(selected?.participation?.result_report?.id)
+
   return (
     <div className="portal-page">
       <div>
@@ -132,18 +178,26 @@ export default function EmployerJobFairDashboard() {
       </div>
 
       {loading ? (
-        <Card><p className="p-8 text-center text-slate-500">Loading announcements…</p></Card>
+        <LoadingSkeleton variant="card" rows={2} />
       ) : !fairs.length ? (
         <Card><p className="p-8 text-center text-slate-500">No published Job Fairs are available.</p></Card>
       ) : (
         <>
           <Card>
             <CardHeader title="Job Fair announcement" subtitle="Select an event to view its coordination record." />
-            <select value={selected?.job_fair_id ?? ''} onChange={(e) => setSelectedId(e.target.value)} className={inputClass}>
-              {fairs.map((f) => <option key={f.job_fair_id} value={f.job_fair_id}>{f.title}</option>)}
-            </select>
+            <Select value={selected?.job_fair_id ? String(selected.job_fair_id) : ''} onValueChange={setSelectedId}>
+              <SelectTrigger><SelectValue placeholder="Select a job fair" /></SelectTrigger>
+              <SelectContent>
+                {fairs.map((f) => <SelectItem key={f.job_fair_id} value={String(f.job_fair_id)}>{f.title}</SelectItem>)}
+              </SelectContent>
+            </Select>
 
-            <h2 className="mt-5 text-xl font-black text-slate-950">{selected?.title}</h2>
+            <div className="mt-5 flex flex-wrap items-start justify-between gap-3">
+              <h2 className="text-xl font-black text-slate-950">{selected?.title}</h2>
+              {selected?.participation?.status && (
+                <Badge status={PARTICIPATION_BADGE[selected.participation.status] ?? 'neutral'}>{selected.participation.status.replaceAll('_', ' ')}</Badge>
+              )}
+            </div>
             <p className="mt-2 text-sm text-slate-600">{selected?.description}</p>
             <div className="mt-3 flex flex-wrap gap-4 text-sm text-slate-600">
               <span className="inline-flex items-center gap-2"><CalendarDays className="h-4 w-4 text-slate-400" />{selected?.start_date} · {selected?.start_time}–{selected?.end_time}</span>
@@ -179,13 +233,17 @@ export default function EmployerJobFairDashboard() {
                     <TabsTrigger value="requirements">
                       1. Requirements {requirementsDone && <CheckCircle2 className="ml-1 inline h-3.5 w-3.5 text-emerald-600" />}
                     </TabsTrigger>
-                    <TabsTrigger value="confirmation">2. Confirmation Slip</TabsTrigger>
-                    <TabsTrigger value="results">3. Post-Event Results</TabsTrigger>
+                    <TabsTrigger value="confirmation">
+                      2. Confirmation Slip {confirmationDone && <CheckCircle2 className="ml-1 inline h-3.5 w-3.5 text-emerald-600" />}
+                    </TabsTrigger>
+                    <TabsTrigger value="results">
+                      3. Post-Event Results {resultsDone && <CheckCircle2 className="ml-1 inline h-3.5 w-3.5 text-emerald-600" />}
+                    </TabsTrigger>
                   </TabsList>
 
                   <div className="pb-6">
                     <TabsContent value="requirements">
-                      <p className="mb-4 text-sm text-slate-500">Participation status: <span className="font-bold text-slate-800">{selected.participation.status.replaceAll('_', ' ')}</span></p>
+                      <p className="mb-4 text-sm text-slate-500">Participation status: <span className="font-bold capitalize text-slate-800">{selected.participation.status.replaceAll('_', ' ')}</span></p>
                       <div className="space-y-3">
                         {selected.requirements.map((req) => {
                           const submitted = selected.participation.requirements?.find((x) => x.job_fair_requirement_id === req.id)
@@ -230,23 +288,33 @@ export default function EmployerJobFairDashboard() {
 
                     <TabsContent value="confirmation">
                       <p className="mb-4 text-sm text-slate-500">Maximum {selected.maximum_representatives} representative(s) for this event.</p>
-                      <div className="grid gap-4 sm:grid-cols-2">
-                        {Object.entries(confirmation).map(([key, value]) => key === 'will_conduct_onsite_interview' ? (
-                          <label key={key} className="flex items-center gap-2 text-sm font-semibold text-slate-700 sm:col-span-2">
-                            <input type="checkbox" checked={value} onChange={(e) => setConfirmation((x) => ({ ...x, [key]: e.target.checked }))} className="h-4 w-4 rounded border-slate-300" />
+
+                      <div className="space-y-4">
+                        <div className="rounded-xl border border-slate-200 p-4">
+                          <p className="mb-3 text-xs font-extrabold uppercase tracking-wide text-slate-600">Representative 1</p>
+                          <div className="grid gap-4 sm:grid-cols-2">
+                            <FormField label="Full name" value={confirmation.representative_1_name} onChange={(v) => setConfirmation((x) => ({ ...x, representative_1_name: v }))} />
+                            <FormField label="Contact number" value={confirmation.representative_1_contact} onChange={(v) => setConfirmation((x) => ({ ...x, representative_1_contact: v }))} />
+                          </div>
+                        </div>
+
+                        <div className="rounded-xl border border-slate-200 p-4">
+                          <p className="mb-3 text-xs font-extrabold uppercase tracking-wide text-slate-600">Representative 2 <span className="font-normal normal-case text-slate-400">(optional)</span></p>
+                          <div className="grid gap-4 sm:grid-cols-2">
+                            <FormField label="Full name" value={confirmation.representative_2_name} onChange={(v) => setConfirmation((x) => ({ ...x, representative_2_name: v }))} />
+                            <FormField label="Contact number" value={confirmation.representative_2_contact} onChange={(v) => setConfirmation((x) => ({ ...x, representative_2_contact: v }))} />
+                          </div>
+                        </div>
+
+                        <div className="grid gap-4 sm:grid-cols-2">
+                          <FormField label="Email address" type="email" value={confirmation.email} onChange={(v) => setConfirmation((x) => ({ ...x, email: v }))} />
+                          <label className="flex items-center gap-2 self-end pb-2.5 text-sm font-semibold text-slate-700">
+                            <input type="checkbox" checked={confirmation.will_conduct_onsite_interview} onChange={(e) => setConfirmation((x) => ({ ...x, will_conduct_onsite_interview: e.target.checked }))} className="h-4 w-4 rounded border-slate-300" />
                             Will conduct on-site interview
                           </label>
-                        ) : (
-                          <label key={key} className="text-xs font-bold uppercase tracking-wide text-slate-500">
-                            {key.replaceAll('_', ' ')}
-                            <input
-                              type={key === 'email' ? 'email' : 'text'}
-                              value={value}
-                              onChange={(e) => setConfirmation((x) => ({ ...x, [key]: e.target.value }))}
-                              className={`mt-1.5 normal-case ${inputClass}`}
-                            />
-                          </label>
-                        ))}
+                        </div>
+
+                        <FormField label="Logistics requests (optional)" textarea value={confirmation.logistics_requests} onChange={(v) => setConfirmation((x) => ({ ...x, logistics_requests: v }))} />
                       </div>
 
                       <div className="mt-6">
@@ -269,28 +337,17 @@ export default function EmployerJobFairDashboard() {
                       <p className="mb-4 text-sm text-slate-500">Enter applicants from your physical notes after the event.</p>
 
                       <div className="mb-4 flex flex-wrap gap-2">
-                        {[
-                          ['Applicants', totals.total_applicants, 'bg-slate-100 text-slate-700'],
-                          ['Male', totals.total_male, 'bg-slate-100 text-slate-700'],
-                          ['Female', totals.total_female, 'bg-slate-100 text-slate-700'],
-                          ['Qualified', totals.total_qualified, 'bg-blue-50 text-blue-700'],
-                          ['HOTS', totals.total_hots, 'bg-emerald-50 text-emerald-700'],
-                          ['Near Hired', totals.total_near_hired, 'bg-blue-50 text-blue-700'],
-                          ['Mismatched', totals.total_rejected, 'bg-rose-50 text-rose-700'],
-                        ].map(([label, value, tone]) => (
-                          <span key={label} className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold ${tone}`}>
-                            <span className="text-sm font-black">{value}</span>{label}
-                          </span>
+                        {RESULT_STATS.map(([key, label, status]) => (
+                          <Badge key={key} status={status} icon={false}>
+                            <span className="text-sm font-black">{totals[key]}</span>{label}
+                          </Badge>
                         ))}
                       </div>
 
                       <JobFairResultEntryEditor entries={entries} onChange={setEntries} searchApplicants={searchApplicantSuggestions} />
 
                       <div className="mt-6 grid gap-4 sm:grid-cols-2">
-                        <label className="text-xs font-bold uppercase tracking-wide text-slate-500">
-                          Job Fair Clearance No.
-                          <input value={clearanceNo} onChange={(e) => setClearanceNo(e.target.value)} className={`mt-1.5 normal-case ${inputClass}`} />
-                        </label>
+                        <FormField label="Job Fair Clearance No." value={clearanceNo} onChange={setClearanceNo} />
                         <div />
                         <label className="text-xs font-bold uppercase tracking-wide text-slate-500">
                           Vacancies solicited
@@ -300,10 +357,7 @@ export default function EmployerJobFairDashboard() {
                           Vacancies offered
                           <input type="number" min="0" value={vacancies.offered} onChange={(e) => setVacancies((x) => ({ ...x, offered: Number(e.target.value) }))} className={`mt-1.5 ${inputClass}`} />
                         </label>
-                        <label className="text-xs font-bold uppercase tracking-wide text-slate-500 sm:col-span-2">
-                          Remarks (optional)
-                          <input value={remarks} onChange={(e) => setRemarks(e.target.value)} className={`mt-1.5 normal-case ${inputClass}`} />
-                        </label>
+                        <FormField label="Remarks (optional)" value={remarks} onChange={setRemarks} className="sm:col-span-2" />
                       </div>
 
                       <div className="mt-5 flex flex-wrap items-center gap-2">
