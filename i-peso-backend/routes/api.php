@@ -25,7 +25,6 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\EmployerAiSuggestionController;
 use App\Http\Controllers\Api\EmployerApplicationController;
 use App\Http\Controllers\Api\EmployerJobVacancyController;
-use App\Http\Controllers\Api\EmployerEstablishmentReportController;
 use App\Http\Controllers\Api\EmployerHiringActivityReportController;
 use App\Http\Controllers\Api\EmployerJobFairController;
 use App\Http\Controllers\Api\EmployerNotificationController;
@@ -116,7 +115,6 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::post('/job-fairs/{jobFair}/results', [EmployerJobFairController::class, 'results']);
             Route::get('/applicant-suggestions', [EmployerJobFairController::class, 'applicantSuggestions']);
             Route::get('/job-fair-results/{resultReport}/roi-form-3', [EmployerJobFairController::class, 'downloadReport']);
-            Route::get('/reports/establishment-report/preview', [EmployerEstablishmentReportController::class, 'preview']);
             Route::get('/reports/hiring-activity/preview', [EmployerHiringActivityReportController::class, 'preview']);
             Route::post('/reports/hiring-activity/export', [EmployerHiringActivityReportController::class, 'export']);
 

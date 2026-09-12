@@ -131,19 +131,33 @@ class EstablishmentReportFlowTest extends TestCase
             'submitted_at' => now(), 'created_at' => now(), 'updated_at' => now(),
         ]);
 
-        Sanctum::actingAs($data['employer_one']);
-        $this->getJson('/api/employer/reports/establishment-report/preview')
+        // Employer-side browsing of past Establishment Reports moved into
+        // the Establishment Report page itself (GET /employer/job-fairs,
+        // filtered to approved+ participations) as part of consolidating
+        // "Post-Event Results" into "Establishment Report" — the dedicated
+        // /employer/reports/establishment-report/preview endpoint this used
+        // to hit was removed since nothing calls it anymore. The per-employer
+        // scoping it guaranteed still lives in JobFairReportService::browseReports()
+        // itself (still used by the admin's cross-establishment view below),
+        // so exercise that directly to keep the "never leaks another
+        // employer's reports" guarantee covered.
+        $service = app(\App\Services\JobFairReportService::class);
+
+        $ownReports = $service->browseReports($data['employer_one']->employer_id, []);
+        $this->assertSame(1, $ownReports['summary']['total_reports']);
+        $this->assertSame($reportId, $ownReports['reports'][0]['report']->id);
+
+        // Employer two has no result reports of their own — never leaks employer one's.
+        $otherReports = $service->browseReports($data['employer_two']->employer_id, []);
+        $this->assertSame(0, $otherReports['summary']['total_reports']);
+
+        Sanctum::actingAs($data['admin']);
+        $this->getJson('/api/admin/reports/establishment-report/preview')
             ->assertOk()
             ->assertJsonPath('summary.total_reports', 1)
             ->assertJsonPath('summary.total_applicants', 2)
             ->assertJsonPath('reports.0.report.id', $reportId)
             ->assertJsonPath('reports.0.job_fair.title', 'Urdaneta City Job Fair 2026');
-
-        // Employer two has no result reports of their own — never leaks employer one's.
-        Sanctum::actingAs($data['employer_two']);
-        $this->getJson('/api/employer/reports/establishment-report/preview')
-            ->assertOk()
-            ->assertJsonPath('summary.total_reports', 0);
     }
 
     private function seedReportData(): array

@@ -221,7 +221,7 @@ class EmployerJobFairController extends Controller
         $report = $reports->saveEmployer($jobFair, $employer, $validated);
         Notification::send(Administrator::query()->where('status', 'active')->get(), new JobFairNotification($jobFair, 'results_submitted', $report->participation));
 
-        return response()->json(['message' => 'Post-event results saved.', 'result_report' => $report]);
+        return response()->json(['message' => 'Establishment Report saved.', 'result_report' => $report]);
     }
 
     public function downloadReport(Request $request, JobFairResultReport $resultReport, JobFairReportService $reports)

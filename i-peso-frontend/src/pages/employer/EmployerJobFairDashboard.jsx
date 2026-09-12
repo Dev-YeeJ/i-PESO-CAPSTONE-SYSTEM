@@ -1,20 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowLeft, ArrowRight, CalendarDays, CheckCircle2, Clock3, Download, Eye, FileText, FileUp, Mail, MapPin, Save, ShieldCheck } from 'lucide-react'
+import { ArrowLeft, ArrowRight, CalendarDays, CheckCircle2, ClipboardList, FileText, FileUp, Mail, MapPin, Save, ShieldCheck } from 'lucide-react'
 import { AlertBox, Badge, Button, Card, EmptyState, LoadingSkeleton } from '@/components/ui'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import EstablishmentReportPreview from '@/components/reports/EstablishmentReportPreview'
-import JobFairResultEntryEditor from '@/components/reports/JobFairResultEntryEditor'
 import ConfirmationVacancyEditor, { blankConfirmationVacancy, stripBlankConfirmationVacancies } from '@/components/reports/ConfirmationVacancyEditor'
-import { blankResultEntry } from '@/components/reports/jobFairResultVocab'
 import {
-  downloadJobFairResult,
   expressJobFairInterest,
   listEmployerJobFairs,
   respondToJobFairInvitation,
-  searchApplicantSuggestions,
   submitJobFairConfirmation,
-  submitJobFairResults,
   uploadJobFairRequirement,
   viewJobFairRequirement,
 } from '@/services/jobFairService'
@@ -24,7 +17,6 @@ const blankConfirmation = {
   representative_1_name: '', representative_1_contact: '', representative_2_name: '', representative_2_contact: '',
   email: '', will_conduct_onsite_interview: false, logistics_requests: '',
 }
-const MISMATCH_STATUSES = ['employer_mismatch', 'seeker_mismatch']
 
 const inputClass = 'w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-brand-navy focus:outline-none focus:ring-2 focus:ring-brand-navy/10'
 
@@ -43,16 +35,6 @@ const PARTICIPATION_BADGE = {
   encoded_results: 'verified',
   report_generated: 'verified',
 }
-
-const RESULT_STATS = [
-  ['total_applicants', 'Applicants', 'neutral'],
-  ['total_male', 'Male', 'neutral'],
-  ['total_female', 'Female', 'neutral'],
-  ['total_qualified', 'Qualified', 'review'],
-  ['total_hots', 'HOTS', 'verified'],
-  ['total_near_hired', 'Near Hired', 'review'],
-  ['total_rejected', 'Mismatched', 'rejected'],
-]
 
 function FormField({ label, value, onChange, type = 'text', textarea = false, className = '' }) {
   return (
@@ -110,11 +92,6 @@ export default function EmployerJobFairDashboard() {
   const [confirmation, setConfirmation] = useState(blankConfirmation)
   const [confirmationVacancies, setConfirmationVacancies] = useState([blankConfirmationVacancy()])
   const [myVacancies, setMyVacancies] = useState([])
-  const [entries, setEntries] = useState([blankResultEntry()])
-  const [vacancies, setVacancies] = useState({ solicited: 0, offered: 0 })
-  const [remarks, setRemarks] = useState('')
-  const [clearanceNo, setClearanceNo] = useState('')
-  const [viewingReport, setViewingReport] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
@@ -143,15 +120,10 @@ export default function EmployerJobFairDashboard() {
   }, [])
 
   // Switching which fair is open discards any unsaved draft — each fair
-  // gets its own confirmation/results form, not a shared one that leaks
-  // between events.
+  // gets its own confirmation form, not a shared one that leaks between events.
   useEffect(() => {
     setConfirmation(blankConfirmation)
     setConfirmationVacancies([blankConfirmationVacancy()])
-    setEntries([blankResultEntry()])
-    setVacancies({ solicited: 0, offered: 0 })
-    setRemarks('')
-    setClearanceNo('')
   }, [selectedId])
 
   const act = async (work, success) => {
@@ -190,29 +162,6 @@ export default function EmployerJobFairDashboard() {
     }
   }
 
-  const validEntries = entries.filter((e) => e.applicant_name && e.position_applied_for)
-  const totals = {
-    total_male: validEntries.filter((e) => e.gender === 'male').length,
-    total_female: validEntries.filter((e) => e.gender === 'female').length,
-    total_applicants: validEntries.length,
-    total_qualified: validEntries.filter((e) => e.status === 'qualified').length,
-    total_hots: validEntries.filter((e) => e.status === 'hots').length,
-    total_near_hired: validEntries.filter((e) => e.status === 'near_hired').length,
-    total_rejected: validEntries.filter((e) => MISMATCH_STATUSES.includes(e.status)).length,
-  }
-
-  const download = async () => {
-    try {
-      const blob = await downloadJobFairResult(selected.participation.result_report.id)
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url; a.download = `ro1-jf-form-3-${selected.job_fair_id}.pdf`; a.click()
-      URL.revokeObjectURL(url)
-    } catch (e) {
-      setError(e.response?.data?.message ?? 'Unable to generate report.')
-    }
-  }
-
   const viewSubmission = async (submission) => {
     setError('')
     try {
@@ -234,7 +183,8 @@ export default function EmployerJobFairDashboard() {
   const confirmationDone = confirmationRequirement
     ? Boolean(selected?.participation?.requirements?.find((x) => x.job_fair_requirement_id === confirmationRequirement.id))
     : false
-  const resultsDone = Boolean(selected?.participation?.result_report?.id)
+  const readyForEstablishmentReport = ['approved', 'attended', 'encoded_results', 'report_generated']
+    .includes(selected?.participation?.status)
 
   return (
     <div className="mx-auto max-w-7xl space-y-10 pb-12">
@@ -329,9 +279,6 @@ export default function EmployerJobFairDashboard() {
                     <TabsTrigger value="confirmation">
                       2. Confirmation Slip {confirmationDone && <CheckCircle2 className="ml-1 inline h-3.5 w-3.5 text-emerald-600" />}
                     </TabsTrigger>
-                    <TabsTrigger value="results">
-                      3. Post-Event Results {resultsDone && <CheckCircle2 className="ml-1 inline h-3.5 w-3.5 text-emerald-600" />}
-                    </TabsTrigger>
                   </TabsList>
 
                   <div className="pb-6">
@@ -425,77 +372,27 @@ export default function EmployerJobFairDashboard() {
                         Submit Confirmation
                       </Button>
                     </TabsContent>
-
-                    <TabsContent value="results">
-                      <p className="mb-4 text-sm text-slate-500">Enter applicants from your physical notes after the event.</p>
-
-                      <div className="mb-4 flex flex-wrap gap-2">
-                        {RESULT_STATS.map(([key, label, status]) => (
-                          <Badge key={key} status={status} icon={false}>
-                            <span className="text-sm font-black">{totals[key]}</span>{label}
-                          </Badge>
-                        ))}
-                      </div>
-
-                      <JobFairResultEntryEditor entries={entries} onChange={setEntries} searchApplicants={searchApplicantSuggestions} />
-
-                      <div className="mt-6 grid gap-4 sm:grid-cols-2">
-                        <FormField label="Job Fair Clearance No." value={clearanceNo} onChange={setClearanceNo} />
-                        <div />
-                        <label className="text-xs font-bold uppercase tracking-wide text-slate-500">
-                          Vacancies solicited
-                          <input type="number" min="0" value={vacancies.solicited} onChange={(e) => setVacancies((x) => ({ ...x, solicited: Number(e.target.value) }))} className={`mt-1.5 ${inputClass}`} />
-                        </label>
-                        <label className="text-xs font-bold uppercase tracking-wide text-slate-500">
-                          Vacancies offered
-                          <input type="number" min="0" value={vacancies.offered} onChange={(e) => setVacancies((x) => ({ ...x, offered: Number(e.target.value) }))} className={`mt-1.5 ${inputClass}`} />
-                        </label>
-                        <FormField label="Remarks (optional)" value={remarks} onChange={setRemarks} className="sm:col-span-2" />
-                      </div>
-
-                      <div className="mt-5 flex flex-wrap items-center gap-2">
-                        <Button
-                          icon={Save}
-                          disabled={!validEntries.length}
-                          onClick={() => act(() => submitJobFairResults(selected.job_fair_id, {
-                            ...totals,
-                            clearance_no: clearanceNo || null,
-                            total_vacancies_solicited: vacancies.solicited,
-                            total_vacancies_offered: vacancies.offered,
-                            remarks,
-                            entries: validEntries.map((e) => ({ ...e, mismatch_code: e.mismatch_code || null })),
-                          }), 'Post-event results saved.')}
-                        >
-                          Save Results
-                        </Button>
-                        {selected.participation.result_report?.id && (
-                          <>
-                            <Button variant="outline" icon={Eye} onClick={() => setViewingReport(true)}>View Report</Button>
-                            <Button variant="navy" icon={Download} onClick={download}>RO1-JF Form 3</Button>
-                          </>
-                        )}
-                        {!validEntries.length && (
-                          <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500"><Clock3 className="h-3.5 w-3.5" />Add at least one applicant with a name and position to save.</span>
-                        )}
-                      </div>
-                    </TabsContent>
                   </div>
                 </Tabs>
               </div>
             </Card>
+
+            {readyForEstablishmentReport && (
+              <div className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-5 py-4">
+                <div className="flex items-center gap-3">
+                  <span className="rounded-lg bg-white p-2 text-emerald-700 shadow-sm"><ClipboardList className="h-4 w-4" /></span>
+                  <div>
+                    <p className="text-sm font-bold text-emerald-900">Ready to report your results?</p>
+                    <p className="text-xs text-emerald-700">Submit this event&apos;s Establishment Report (RO1-JF Form 3) from the Establishment Report page.</p>
+                  </div>
+                </div>
+                <Button to="/employer/reports/establishment-report" variant="navy">Go to Establishment Report</Button>
+              </div>
+            )}
             </div>
           )}
         </div>
       )}
-
-      <Dialog open={viewingReport} onOpenChange={setViewingReport}>
-        <DialogContent className="max-w-7xl max-h-[85vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>{selected?.title} — RO1-JF Form 3</DialogTitle>
-          </DialogHeader>
-          <EstablishmentReportPreview report={selected?.participation?.result_report} jobFair={selected} />
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }
