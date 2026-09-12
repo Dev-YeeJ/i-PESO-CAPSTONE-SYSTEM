@@ -278,7 +278,10 @@ async function fetchSkills(query, category, limit) {
 
 function normalizeSelected(value) {
   if (!Array.isArray(value)) return []
-  return value.map((item) => normalizeSkill(item)).filter(Boolean)
+  // Defensively re-dedupes the incoming value itself, not just future
+  // additions — a caller-provided array (e.g. a draft saved before this fix)
+  // could already contain the same skill name twice.
+  return uniqueSkills(value.map((item) => normalizeSkill(item)).filter(Boolean))
 }
 
 function normalizeSkill(item) {
@@ -314,9 +317,12 @@ function uniqueSkills(rows) {
   })
 }
 
+// Always keyed by normalized name, never by id — the same skill name can
+// come from different sources with different ids (the DB-backed catalog
+// search vs. the local starter-skill fallback list, e.g.), and those must
+// still count as one duplicate skill, not two selectable entries.
 function skillKey(skill) {
-  const id = skill?.id ?? skill?.skill_id
-  return id ? `id:${id}` : `name:${skillName(skill).toLowerCase()}`
+  return `name:${skillName(skill).toLowerCase()}`
 }
 
 function skillName(skill) {

@@ -25,9 +25,9 @@ export default function ExperienceTimeFrame({
           type="number"
           min="0"
           max="50"
-          step="0.5"
+          step="1"
           value={value ?? 0}
-          onChange={(event) => onChange?.(event.target.value === '' ? '' : Number(event.target.value))}
+          onChange={(event) => onChange?.(event.target.value === '' ? '' : Math.round(Number(event.target.value)))}
           disabled={disabled}
           className={`${inputClass} ${error ? 'border-red-300 focus:border-red-500 focus:ring-red-100' : ''}`}
           aria-invalid={Boolean(error)}
