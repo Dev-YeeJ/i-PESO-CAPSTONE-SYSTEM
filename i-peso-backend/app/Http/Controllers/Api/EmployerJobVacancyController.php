@@ -162,7 +162,7 @@ class EmployerJobVacancyController extends Controller
             'benefits.*' => ['string', 'max:100'],
             'application_deadline' => ['required', 'date', 'after_or_equal:today'],
             'preferred_gender' => ['nullable', Rule::in(['Any', 'Male', 'Female'])],
-            'minimum_age' => ['nullable', 'integer', 'min:15', 'max:100'],
+            'minimum_age' => ['nullable', 'integer', 'min:18', 'max:100'],
             'maximum_age' => ['nullable', 'integer', 'min:15', 'max:100', 'gte:minimum_age'],
             'open_to_pwds' => ['required', 'boolean'],
             'open_to_senior_citizens' => ['required', 'boolean'],

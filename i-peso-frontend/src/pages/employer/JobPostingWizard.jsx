@@ -206,8 +206,8 @@ export default function JobPostingWizard() {
 
     if (targetStep === 4) {
       if (!form.preferred_gender) nextErrors.preferred_gender = 'Select preferred gender.'
-      if (form.minimum_age !== '' && (Number(form.minimum_age) < 15 || Number(form.minimum_age) > 100)) {
-        nextErrors.minimum_age = 'Minimum age must be from 15 to 100.'
+      if (form.minimum_age !== '' && (Number(form.minimum_age) < 18 || Number(form.minimum_age) > 100)) {
+        nextErrors.minimum_age = 'Minimum age must be from 18 to 100.'
       }
       if (form.maximum_age !== '' && (Number(form.maximum_age) < 15 || Number(form.maximum_age) > 100)) {
         nextErrors.maximum_age = 'Maximum age must be from 15 to 100.'
@@ -666,7 +666,7 @@ function DemographicPreferencesStep({ form, errors, change }) {
           <input
             name="minimum_age"
             type="number"
-            min="15"
+            min="18"
             max="100"
             value={form.minimum_age}
             onChange={change}
