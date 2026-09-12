@@ -117,6 +117,39 @@ class VertexAiSuggestionService
         return $this->normalizeOccupationClassificationResponse($response->json(), $limit);
     }
 
+    /**
+     * Drafts a job posting summary, responsibilities, and skill suggestions
+     * for the employer job-posting wizard. `$existingTechnicalSkills` /
+     * `$existingSoftSkills` are whatever the employer has already typed or
+     * picked into the wizard's own free-text skill tagger (SkillTaxonomyTags
+     * already lets an employer type anything) — passed in so the AI builds
+     * on top of that instead of repeating it, and so the response is
+     * filtered against it as a hard dedupe guarantee, not just a prompt ask.
+     */
+    public function suggestJobPosting(
+        string $jobTitle,
+        ?string $vacancyAnchor,
+        ?string $additionalContext,
+        array $existingTechnicalSkills = [],
+        array $existingSoftSkills = [],
+    ): array {
+        if (! config('services.vertex_ai.enabled')) {
+            throw new RuntimeException('AI suggestions are disabled.');
+        }
+
+        [$http, $url] = $this->resolveHttpClientAndEndpoint();
+
+        $response = $http
+            ->timeout((int) config('services.vertex_ai.timeout', 30))
+            ->post($url, $this->jobPostingPayload($jobTitle, $vacancyAnchor, $additionalContext, $existingTechnicalSkills, $existingSoftSkills));
+
+        if (! $response->successful()) {
+            throw new RuntimeException('AI did not return a job posting draft.');
+        }
+
+        return $this->normalizeJobPostingResponse($response->json(), $existingTechnicalSkills, $existingSoftSkills);
+    }
+
     public function parseMapQuery(string $query): array
     {
         if (! config('services.vertex_ai.enabled')) {
@@ -361,6 +394,29 @@ class VertexAiSuggestionService
         ];
     }
 
+    private function jobPostingPayload(
+        string $jobTitle,
+        ?string $vacancyAnchor,
+        ?string $additionalContext,
+        array $existingTechnicalSkills,
+        array $existingSoftSkills,
+    ): array {
+        return [
+            'contents' => [[
+                'role' => 'user',
+                'parts' => [[
+                    'text' => $this->jobPostingPrompt($jobTitle, $vacancyAnchor, $additionalContext, $existingTechnicalSkills, $existingSoftSkills),
+                ]],
+            ]],
+            'generationConfig' => [
+                'temperature' => 0.4,
+                'maxOutputTokens' => 2000,
+                'responseMimeType' => 'application/json',
+                'responseSchema' => $this->jobPostingSchema(),
+            ],
+        ];
+    }
+
     private function mapQueryPayload(string $query): array
     {
         return [
@@ -447,6 +503,27 @@ class VertexAiSuggestionService
             .'Return only JSON that matches the schema. '
             .'Raw job title: '.json_encode($title, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE).'. '
             .'Allowed broad job families: '.json_encode($groups, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+    }
+
+    private function jobPostingPrompt(
+        string $jobTitle,
+        ?string $vacancyAnchor,
+        ?string $additionalContext,
+        array $existingTechnicalSkills,
+        array $existingSoftSkills,
+    ): string {
+        return 'You are an expert HR and recruitment assistant helping a Philippine PESO-affiliated employer write a job posting. '
+            .'Write a brief, engaging job summary (2-4 sentences), followed by 5 to 7 clear, actionable responsibilities that align with the job title and vacancy anchor. '
+            .'Then suggest 5 to 10 technical/hard skills and 3 to 5 soft skills. '
+            .'High relevance: every suggested skill must be strictly tied to this specific job title and vacancy anchor — never generic filler skills unless truly vital to the role. '
+            .'Zero duplication: never suggest two skills that represent the same competency (e.g. "Data Analysis" and "Data Analytics" are duplicates — include only one), and never repeat any skill already listed under "employer-selected skills" below, since the employer typed or picked those themselves and only wants new, complementary suggestions. '
+            .'Standardized terms: keep skill names concise, using industry-standard terminology (e.g. "Project Management", not "Ability to manage projects"). '
+            .'Return only JSON matching the response schema. '
+            .'Job title: '.json_encode($jobTitle, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES).'. '
+            .'Vacancy anchor (job family/category): '.json_encode($vacancyAnchor ?: 'not specified', JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES).'. '
+            .'Additional context from the employer: '.json_encode($additionalContext ?: 'none provided', JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES).'. '
+            .'Employer-selected technical skills already on this posting (do not repeat): '.json_encode(array_values($existingTechnicalSkills), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES).'. '
+            .'Employer-selected soft skills already on this posting (do not repeat): '.json_encode(array_values($existingSoftSkills), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     }
 
     private function mapQueryPrompt(string $query): string
@@ -546,6 +623,20 @@ class VertexAiSuggestionService
                 ],
             ],
             'required' => ['classifications'],
+        ];
+    }
+
+    private function jobPostingSchema(): array
+    {
+        return [
+            'type' => 'OBJECT',
+            'properties' => [
+                'job_summary' => ['type' => 'STRING'],
+                'responsibilities' => ['type' => 'ARRAY', 'items' => ['type' => 'STRING'], 'minItems' => 5, 'maxItems' => 7],
+                'suggested_technical_skills' => ['type' => 'ARRAY', 'items' => ['type' => 'STRING'], 'minItems' => 5, 'maxItems' => 10],
+                'suggested_soft_skills' => ['type' => 'ARRAY', 'items' => ['type' => 'STRING'], 'minItems' => 3, 'maxItems' => 5],
+            ],
+            'required' => ['job_summary', 'responsibilities', 'suggested_technical_skills', 'suggested_soft_skills'],
         ];
     }
 
@@ -701,6 +792,46 @@ class VertexAiSuggestionService
             ->take($limit)
             ->values()
             ->all();
+    }
+
+    private function normalizeJobPostingResponse(array $response, array $existingTechnicalSkills, array $existingSoftSkills): array
+    {
+        $decoded = $this->decodeStructuredResponse($response);
+
+        $existingKeys = collect([...$existingTechnicalSkills, ...$existingSoftSkills])
+            ->map(fn ($skill) => Str::lower(trim((string) $skill)))
+            ->filter()
+            ->all();
+
+        $dedupeSkills = function (array $skills) use ($existingKeys) {
+            $seen = [];
+            $out = [];
+            foreach ($skills as $skill) {
+                $name = Str::of((string) $skill)->squish()->limit(80, '')->toString();
+                if ($name === '') {
+                    continue;
+                }
+                $key = Str::lower($name);
+                if (in_array($key, $existingKeys, true) || isset($seen[$key])) {
+                    continue;
+                }
+                $seen[$key] = true;
+                $out[] = $name;
+            }
+
+            return $out;
+        };
+
+        return [
+            'job_summary' => Str::of((string) Arr::get($decoded, 'job_summary'))->squish()->limit(600, '')->toString(),
+            'responsibilities' => collect(Arr::get($decoded, 'responsibilities', []))
+                ->map(fn ($item) => Str::of((string) $item)->squish()->limit(200, '')->toString())
+                ->filter(fn ($item) => $item !== '')
+                ->values()
+                ->all(),
+            'suggested_technical_skills' => $dedupeSkills(Arr::get($decoded, 'suggested_technical_skills', [])),
+            'suggested_soft_skills' => $dedupeSkills(Arr::get($decoded, 'suggested_soft_skills', [])),
+        ];
     }
 
     private function cleanSuggestions(array $suggestions): array

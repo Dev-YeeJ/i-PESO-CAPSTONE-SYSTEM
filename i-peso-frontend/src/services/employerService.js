@@ -60,6 +60,11 @@ export const deleteVacancy = async (id) => {
   return response.data
 }
 
+export const suggestJobPosting = async (payload) => {
+  const response = await apiClient.post('/employer/vacancies/ai-suggest', payload)
+  return response.data
+}
+
 export const getNotifications = async ({ page = 1, perPage = 20 } = {}) => {
   const response = await apiClient.get('/employer/notifications', { params: { page, per_page: perPage } })
   return response.data

@@ -22,6 +22,7 @@ use App\Http\Controllers\Api\Admin\OccupationMappingController;
 use App\Http\Controllers\Api\Admin\SystemReports\ActivityController as AdminActivityController;
 use App\Http\Controllers\Api\Admin\SystemReports\ReportController as AdminReportController;
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\EmployerAiSuggestionController;
 use App\Http\Controllers\Api\EmployerApplicationController;
 use App\Http\Controllers\Api\EmployerJobVacancyController;
 use App\Http\Controllers\Api\EmployerEstablishmentReportController;
@@ -131,6 +132,8 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::post('/placement-reports/{placementReport}/submit', [EmployerPlacementReportController::class, 'submit']);
             Route::delete('/placement-reports/{placementReport}', [EmployerPlacementReportController::class, 'destroy']);
 
+            Route::post('/vacancies/ai-suggest', [EmployerAiSuggestionController::class, 'suggestJobPosting'])
+                ->middleware('throttle:10,1');
             Route::apiResource('vacancies', EmployerJobVacancyController::class);
             Route::get('/applications', [EmployerApplicationController::class, 'index']);
             Route::get('/applications/{application}', [EmployerApplicationController::class, 'show']);

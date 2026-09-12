@@ -10,6 +10,7 @@ import {
   GraduationCap,
   Loader2,
   MapPin,
+  Plus,
   ShieldAlert,
   Sparkles,
   Target,
@@ -699,11 +700,49 @@ function DemographicPreferencesStep({ form, errors, change }) {
 }
 
 function CompensationDetailsStep({ form, errors, change, update }) {
-  const draftDescription = () => {
-    const hardSkills = form.required_skills.length ? form.required_skills.join(', ') : 'the required tools and workplace procedures'
-    const softSkills = form.soft_skills.length ? form.soft_skills.join(', ') : 'teamwork, communication, and reliability'
-    update('job_description', `${form.job_title || 'The selected candidate'} will perform daily duties aligned with the role, maintain accurate records, and coordinate with supervisors to meet operational targets.\n\nKey responsibilities:\n- Execute assigned tasks using ${hardSkills}.\n- Maintain quality, safety, and productivity standards throughout the shift.\n- Communicate progress, issues, and documentation clearly with the team.\n- Demonstrate ${softSkills} while serving customers, coworkers, and company requirements.`)
+  const [aiContext, setAiContext] = useState('')
+  const [aiLoading, setAiLoading] = useState(false)
+  const [aiError, setAiError] = useState('')
+  const [aiSkills, setAiSkills] = useState({ technical: [], soft: [] })
+
+  const runAiAssist = async () => {
+    if (!form.job_title.trim()) {
+      setAiError('Add a job title in step 1 before drafting with AI.')
+      return
+    }
+
+    setAiLoading(true)
+    setAiError('')
+    try {
+      const { data } = await employerService.suggestJobPosting({
+        job_title: form.job_title,
+        vacancy_anchor: form.occupation_mapping?.broadField || form.occupation_mapping?.fieldName || null,
+        additional_context: aiContext.trim() || null,
+        existing_technical_skills: form.required_skills,
+        existing_soft_skills: form.soft_skills,
+      })
+
+      const responsibilities = (data?.responsibilities ?? []).map((item) => `- ${item}`).join('\n')
+      update('job_description', [data?.job_summary, responsibilities && `Key responsibilities:\n${responsibilities}`].filter(Boolean).join('\n\n'))
+      setAiSkills({ technical: data?.suggested_technical_skills ?? [], soft: data?.suggested_soft_skills ?? [] })
+    } catch (err) {
+      setAiError(err.response?.data?.message ?? 'AI could not draft a job posting right now. You can still write it manually below.')
+    } finally {
+      setAiLoading(false)
+    }
   }
+
+  const addSuggestedSkill = (skillName, kind) => {
+    const key = kind === 'technical' ? 'required_skills' : 'soft_skills'
+    const limit = kind === 'technical' ? 15 : 10
+    const current = form[key]
+    if (current.length < limit && !current.some((s) => s.toLowerCase() === skillName.toLowerCase())) {
+      update(key, [...current, skillName])
+    }
+    setAiSkills((prev) => ({ ...prev, [kind]: prev[kind].filter((s) => s !== skillName) }))
+  }
+
+  const hasSuggestedSkills = aiSkills.technical.length > 0 || aiSkills.soft.length > 0
 
   return (
     <StepShell
@@ -760,17 +799,32 @@ function CompensationDetailsStep({ form, errors, change, update }) {
       </label>
 
       <div className="mt-6">
+        <Field label="Anything else the AI should know? (optional)" required={false}>
+          <input
+            value={aiContext}
+            onChange={(event) => setAiContext(event.target.value)}
+            className={inputClass}
+            placeholder="e.g. night shift, client-facing, uses SAP"
+            maxLength={300}
+          />
+        </Field>
+      </div>
+
+      <div className="mt-6">
         <Field label="Job Description & Responsibilities" required error={errors.job_description}>
           <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
             <p className="text-xs leading-5 text-slate-500">Draft clear duties for applicants and for better skill matching.</p>
             <button
               type="button"
-              onClick={draftDescription}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-50 px-3 py-2 text-xs font-black text-indigo-600 ring-1 ring-indigo-100 transition hover:bg-indigo-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              onClick={runAiAssist}
+              disabled={aiLoading}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-50 px-3 py-2 text-xs font-black text-indigo-600 ring-1 ring-indigo-100 transition hover:bg-indigo-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              <Sparkles className="h-3.5 w-3.5" /> AI Draft Responsibilities
+              {aiLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+              {aiLoading ? 'Drafting…' : 'AI Draft Responsibilities'}
             </button>
           </div>
+          {aiError && <p className="mb-2 text-xs font-semibold text-red-600">{aiError}</p>}
           <textarea
             name="job_description"
             value={form.job_description}
@@ -781,6 +835,25 @@ function CompensationDetailsStep({ form, errors, change, update }) {
             maxLength={10000}
           />
         </Field>
+
+        {hasSuggestedSkills && (
+          <div className="mt-3 rounded-xl border border-indigo-100 bg-indigo-50/60 p-4">
+            <p className="text-xs font-black uppercase tracking-wide text-indigo-700">AI-suggested skills — tap to add</p>
+            <p className="mt-1 text-xs leading-5 text-indigo-700/80">Built on top of what you've already typed in the skills step — nothing here repeats a skill you already picked.</p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {aiSkills.technical.map((skill) => (
+                <button key={`tech-${skill}`} type="button" onClick={() => addSuggestedSkill(skill, 'technical')} className="inline-flex items-center gap-1.5 rounded-full border border-indigo-200 bg-white px-3 py-1.5 text-xs font-bold text-indigo-800 shadow-sm transition hover:bg-indigo-100">
+                  <Plus className="h-3 w-3" />{skill}
+                </button>
+              ))}
+              {aiSkills.soft.map((skill) => (
+                <button key={`soft-${skill}`} type="button" onClick={() => addSuggestedSkill(skill, 'soft')} className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-white px-3 py-1.5 text-xs font-bold text-emerald-800 shadow-sm transition hover:bg-emerald-100">
+                  <Plus className="h-3 w-3" />{skill}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="mt-6 grid gap-5 md:grid-cols-[minmax(0,1fr)_280px] md:items-end">
