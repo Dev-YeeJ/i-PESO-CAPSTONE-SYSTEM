@@ -27,10 +27,15 @@ class EstablishmentReportFlowTest extends TestCase
         $data = $this->seedReportData();
         Sanctum::actingAs($data['employer_one']);
 
-        $this->getJson('/api/employer/reports/establishment-report/preview?source=all')
+        // Renamed from "Establishment Report" — this is the all-sources ATS
+        // activity cross-reference (App\Services\EstablishmentReportService),
+        // now correctly labeled and moved under Placement Report. The real
+        // Establishment Report (RO1-JF Form 3) is JobFairResultReport-backed;
+        // see test_establishment_report_browses_real_job_fair_result_reports().
+        $this->getJson('/api/employer/reports/hiring-activity/preview?source=all')
             ->assertOk()
-            ->assertJsonPath('title', 'ESTABLISHMENT REPORT')
-            ->assertJsonPath('form_code', 'RO1-JF Form 3')
+            ->assertJsonPath('title', 'HIRING ACTIVITY REPORT')
+            ->assertJsonPath('form_code', null)
             ->assertJsonPath('summary.total', 2)
             ->assertJsonPath('summary.hots', 1)
             ->assertJsonPath('summary.rejected', 1)
@@ -42,7 +47,7 @@ class EstablishmentReportFlowTest extends TestCase
             ->assertJsonPath('reports.0.entries.1.employer_mismatch_reason_code', 'lack_competencies_skills')
             ->assertJsonPath('reports.0.entries.1.seeker_mismatch_reason_code', 'transportation_location');
 
-        $this->getJson('/api/employer/reports/establishment-report/preview?vacancy_id='.$data['vacancy_two_id'])
+        $this->getJson('/api/employer/reports/hiring-activity/preview?vacancy_id='.$data['vacancy_two_id'])
             ->assertOk()
             ->assertJsonPath('summary.total', 0)
             ->assertJsonCount(0, 'reports.0.entries');
@@ -53,7 +58,7 @@ class EstablishmentReportFlowTest extends TestCase
         $data = $this->seedReportData();
         Sanctum::actingAs($data['admin']);
 
-        $this->getJson('/api/admin/reports/establishment-report/preview?employer_id='.$data['employer_two']->employer_id)
+        $this->getJson('/api/admin/reports/hiring-activity/preview?employer_id='.$data['employer_two']->employer_id)
             ->assertOk()
             ->assertJsonPath('summary.total', 1)
             ->assertJsonPath('reports.0.establishment.name', 'Second Employer')
@@ -61,26 +66,84 @@ class EstablishmentReportFlowTest extends TestCase
             ->assertJsonPath('reports.0.entries.0.application_status', 'Qualified');
     }
 
-    public function test_establishment_pdf_and_csv_exports_remain_available(): void
+    public function test_hiring_activity_pdf_and_csv_exports_remain_available(): void
     {
         $data = $this->seedReportData();
         Sanctum::actingAs($data['employer_one']);
 
-        $pdf = $this->postJson('/api/employer/reports/establishment-report/export', [
+        $pdf = $this->postJson('/api/employer/reports/hiring-activity/export', [
             'format' => 'pdf',
             'source' => 'all',
         ])->assertOk();
         $this->assertStringContainsString('application/pdf', (string) $pdf->headers->get('content-type'));
         $this->assertStringStartsWith('%PDF', $pdf->getContent());
 
-        $csv = $this->postJson('/api/employer/reports/establishment-report/export', [
+        $csv = $this->postJson('/api/employer/reports/hiring-activity/export', [
             'format' => 'csv',
             'source' => 'all',
         ])->assertOk();
         $this->assertStringContainsString('text/csv', (string) $csv->headers->get('content-type'));
         $this->assertStringContainsString('Northstar Manufacturing', $csv->streamedContent());
         $this->assertStringContainsString('Employer Mismatch Reason', $csv->streamedContent());
+    }
 
+    public function test_establishment_report_browses_real_job_fair_result_reports(): void
+    {
+        $data = $this->seedReportData();
+
+        Schema::create('job_fair_result_reports', function (Blueprint $table) {
+            $table->id();
+            $table->unsignedBigInteger('job_fair_id');
+            $table->unsignedBigInteger('employer_id')->nullable();
+            $table->string('company_name')->nullable();
+            $table->string('source')->nullable();
+            $table->unsignedInteger('total_male')->default(0);
+            $table->unsignedInteger('total_female')->default(0);
+            $table->unsignedInteger('total_applicants')->default(0);
+            $table->unsignedInteger('total_qualified')->default(0);
+            $table->unsignedInteger('total_hots')->default(0);
+            $table->unsignedInteger('total_near_hired')->default(0);
+            $table->unsignedInteger('total_rejected')->default(0);
+            $table->unsignedInteger('total_vacancies_solicited')->default(0);
+            $table->unsignedInteger('total_vacancies_offered')->default(0);
+            $table->timestamp('submitted_at')->nullable();
+            $table->timestamps();
+        });
+        Schema::create('job_fair_result_entries', function (Blueprint $table) {
+            $table->id();
+            $table->unsignedBigInteger('result_report_id');
+            $table->timestamps();
+        });
+        Schema::create('job_fair_result_mismatch_tallies', function (Blueprint $table) {
+            $table->id();
+            $table->unsignedBigInteger('result_report_id');
+            $table->timestamps();
+        });
+
+        $reportId = DB::table('job_fair_result_reports')->insertGetId([
+            'job_fair_id' => $data['fair_id'],
+            'employer_id' => $data['employer_one']->employer_id,
+            'company_name' => 'Northstar Manufacturing',
+            'source' => 'employer_self_service',
+            'total_male' => 1, 'total_female' => 1, 'total_applicants' => 2, 'total_qualified' => 1,
+            'total_hots' => 1, 'total_near_hired' => 0, 'total_rejected' => 0,
+            'total_vacancies_solicited' => 2, 'total_vacancies_offered' => 2,
+            'submitted_at' => now(), 'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        Sanctum::actingAs($data['employer_one']);
+        $this->getJson('/api/employer/reports/establishment-report/preview')
+            ->assertOk()
+            ->assertJsonPath('summary.total_reports', 1)
+            ->assertJsonPath('summary.total_applicants', 2)
+            ->assertJsonPath('reports.0.report.id', $reportId)
+            ->assertJsonPath('reports.0.job_fair.title', 'Urdaneta City Job Fair 2026');
+
+        // Employer two has no result reports of their own — never leaks employer one's.
+        Sanctum::actingAs($data['employer_two']);
+        $this->getJson('/api/employer/reports/establishment-report/preview')
+            ->assertOk()
+            ->assertJsonPath('summary.total_reports', 0);
     }
 
     private function seedReportData(): array

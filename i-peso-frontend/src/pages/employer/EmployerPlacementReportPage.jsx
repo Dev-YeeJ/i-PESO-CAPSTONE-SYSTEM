@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
 import { UploadCloud, FileSpreadsheet, ArrowLeft, CheckCircle2, Trash2, Loader2, Layers, CalendarX, PencilLine, Save } from 'lucide-react'
 import { Card, CardHeader, Button, Badge, AlertBox } from '@/components/ui'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import PageHeader from '@/pages/admin/_components/PageHeader'
 import toast from 'react-hot-toast'
 import PlacementRecordEditor, { blankPlacementRecord, stripBlankPlacementRecords } from '@/components/reports/PlacementRecordEditor'
+import HiringActivityWorkspace from '@/components/reports/HiringActivityWorkspace'
 import {
   listEmployerPlacementReports,
   uploadPlacementReport,
@@ -178,6 +180,13 @@ export default function EmployerPlacementReportPage() {
         </AlertBox>
       )}
 
+      <Tabs defaultValue="reports">
+        <TabsList>
+          <TabsTrigger value="reports">My Monthly Reports</TabsTrigger>
+          <TabsTrigger value="activity">All Hiring Activity</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="reports" className="space-y-6">
       <Card>
         <div className="mb-4 inline-flex rounded-xl border border-slate-200 bg-slate-50 p-1">
           <button
@@ -294,6 +303,12 @@ export default function EmployerPlacementReportPage() {
           </div>
         )}
       </Card>
+        </TabsContent>
+
+        <TabsContent value="activity">
+          <HiringActivityWorkspace role="employer" />
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }

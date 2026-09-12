@@ -2,13 +2,21 @@ import { createElement, useCallback, useEffect, useMemo, useState } from 'react'
 import { Download, FileDown, FileText, Filter, RefreshCw, UsersRound } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { EmptyState, LoadingSkeleton } from '@/components/ui'
-import { downloadReportBlob, exportEstablishmentReport, previewEstablishmentReport } from '@/services/establishmentReportService'
+import { downloadReportBlob, exportHiringActivityReport, previewHiringActivityReport } from '@/services/hiringActivityReportService'
 
 const emptyFilters = {
   employer_id: '', job_fair_id: '', vacancy_id: '', date_from: '', date_to: '', status: '', source: 'all',
 }
 
-export default function EstablishmentReportWorkspace({ role }) {
+/**
+ * Read-only cross-reference over every application an employer's vacancies
+ * received (online + job fair), any status — NOT the official monthly
+ * Placement Report. That's the employer-submitted spreadsheet/manual-entry
+ * flow elsewhere on this page, which alone feeds the SPRS placed_total,
+ * since not every hire has an Application record behind it. This view is a
+ * lookup aid, kept deliberately separate from the submitted-report list.
+ */
+export default function HiringActivityWorkspace({ role }) {
   const isAdmin = role === 'admin'
   const [filters, setFilters] = useState(emptyFilters)
   const [report, setReport] = useState(null)
@@ -20,7 +28,7 @@ export default function EstablishmentReportWorkspace({ role }) {
     setLoading(true)
     setError('')
     try {
-      setReport(await previewEstablishmentReport(role, filters))
+      setReport(await previewHiringActivityReport(role, filters))
     } catch (requestError) {
       setError(requestError.response?.data?.message ?? 'Unable to generate the report preview.')
     } finally {
@@ -47,8 +55,8 @@ export default function EstablishmentReportWorkspace({ role }) {
   const exportFile = async (format) => {
     setExporting(format)
     try {
-      const blob = await exportEstablishmentReport(role, filters, format)
-      downloadReportBlob(blob, `establishment-report-ro1-jf-form-3.${format}`)
+      const blob = await exportHiringActivityReport(role, filters, format)
+      downloadReportBlob(blob, `hiring-activity-report.${format}`)
       toast.success(`${format.toUpperCase()} report generated.`)
     } catch (requestError) {
       toast.error(requestError.response?.data?.message ?? `Unable to export ${format.toUpperCase()}.`)
@@ -70,10 +78,11 @@ export default function EstablishmentReportWorkspace({ role }) {
     <div className="space-y-6">
       <header className="flex flex-col gap-4 border-b border-slate-200 pb-6 xl:flex-row xl:items-end xl:justify-between">
         <div>
-          <p className="text-xs font-black uppercase text-blue-800">DOLE Region I Job Fair Reporting</p>
-          <h1 className="mt-1 text-3xl font-black text-slate-950">Establishment Report</h1>
-          <p className="mt-1 text-sm font-bold text-slate-500">RO1-JF Form 3</p>
-          <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">Generate the official establishment applicant register from online ATS and Digital Job Fair outcomes.</p>
+          <h2 className="text-xl font-black text-slate-950">All Hiring Activity</h2>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
+            A lookup view over every application received, online and job fair alike — not the official submission.
+            File your monthly report above; this is just a cross-reference.
+          </p>
         </div>
         <div className="flex flex-wrap gap-2">
           <button onClick={() => exportFile('csv')} disabled={Boolean(exporting)} className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 disabled:opacity-50"><FileDown className="h-4 w-4" />{exporting === 'csv' ? 'Exporting...' : 'Export CSV'}</button>
@@ -101,7 +110,7 @@ export default function EstablishmentReportWorkspace({ role }) {
         {metrics.map(([label, value, Icon, tone]) => <div key={label} className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm"><span className={`inline-flex rounded-lg p-2 ${tone}`}>{createElement(Icon, { className: 'h-4 w-4' })}</span><p className="mt-3 text-2xl font-black text-slate-950">{value}</p><p className="mt-1 text-xs font-bold text-slate-500">{label}</p></div>)}
       </section>
 
-      {loading ? <LoadingSkeleton variant="card" rows={3} /> : (report?.reports ?? []).length === 0 ? <EmptyState filtered icon={FileText} title="No report records found" description="Adjust the filters or record applicant outcomes in ATS and Job Fair." /> : (report.reports.map((establishment) =><ReportPreview key={establishment.establishment.employer_id} report={establishment} isAdmin={isAdmin} />))}
+      {loading ? <LoadingSkeleton variant="card" rows={3} /> : (report?.reports ?? []).length === 0 ? <EmptyState filtered icon={FileText} title="No activity found" description="Adjust the filters or record applicant outcomes in ATS and Job Fair." /> : (report.reports.map((establishment) => <ReportPreview key={establishment.establishment.employer_id} report={establishment} isAdmin={isAdmin} />))}
     </div>
   )
 }

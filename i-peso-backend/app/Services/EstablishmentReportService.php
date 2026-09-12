@@ -87,8 +87,12 @@ class EstablishmentReportService
         $allEntries = $reports->pluck('entries')->flatten(1);
 
         return [
-            'title' => 'ESTABLISHMENT REPORT',
-            'form_code' => 'RO1-JF Form 3',
+            // Not RO1-JF Form 3 — this spans every application an employer's
+            // vacancies received (online and job-fair sourced alike), not a
+            // single job fair's post-event register. That form lives at
+            // JobFairReportService::download() / roi_form_3.blade.php.
+            'title' => 'HIRING ACTIVITY REPORT',
+            'form_code' => null,
             'generated_at' => now()->toIso8601String(),
             'filters' => $filters,
             'reports' => $reports,
@@ -100,7 +104,7 @@ class EstablishmentReportService
 
     public function downloadPdf(array $data, string $suffix = '')
     {
-        $filename = 'establishment-report-ro1-jf-form-3'.($suffix ? '-'.$suffix : '').'.pdf';
+        $filename = 'hiring-activity-report'.($suffix ? '-'.$suffix : '').'.pdf';
 
         return Pdf::loadView('reports.establishment-report', $data)
             ->setPaper('a4', 'landscape')
@@ -109,7 +113,7 @@ class EstablishmentReportService
 
     public function downloadCsv(array $data, string $suffix = ''): StreamedResponse
     {
-        $filename = 'establishment-report-ro1-jf-form-3'.($suffix ? '-'.$suffix : '').'.csv';
+        $filename = 'hiring-activity-report'.($suffix ? '-'.$suffix : '').'.csv';
 
         return response()->streamDownload(function () use ($data) {
             $stream = fopen('php://output', 'wb');

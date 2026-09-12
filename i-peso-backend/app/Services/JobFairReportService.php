@@ -202,6 +202,58 @@ class JobFairReportService
             ->download('ro1-jf-form-3-'.$report->job_fair_id.'-'.$report->id.'.pdf');
     }
 
+    /**
+     * Browse RO1-JF Form 3 result reports across job fairs — the "Establishment
+     * Report" landing page's data source. Unlike sprs()/download() (one fair at
+     * a time), this spans every fair, since PESO/an employer wants to look back
+     * over past events without opening each one individually.
+     *
+     * @param  int|null  $employerId  scope to one employer (employer self-service); null browses every establishment (admin)
+     * @param  array{employer_id?: int, job_fair_id?: int, date_from?: string, date_to?: string}  $filters
+     */
+    public function browseReports(?int $employerId, array $filters): array
+    {
+        $reports = JobFairResultReport::query()
+            ->when($employerId, fn ($query, $id) => $query->where('employer_id', $id))
+            ->when(! $employerId && ($filters['employer_id'] ?? null), fn ($query, $id) => $query->where('employer_id', $id))
+            ->when($filters['job_fair_id'] ?? null, fn ($query, $id) => $query->where('job_fair_id', $id))
+            ->when($filters['date_from'] ?? null, fn ($query, $date) => $query->whereHas(
+                'jobFair', fn ($jobFair) => $jobFair->whereDate(DB::raw('COALESCE(start_date, event_date)'), '>=', $date)
+            ))
+            ->when($filters['date_to'] ?? null, fn ($query, $date) => $query->whereHas(
+                'jobFair', fn ($jobFair) => $jobFair->whereDate(DB::raw('COALESCE(start_date, event_date)'), '<=', $date)
+            ))
+            ->with(['jobFair', 'entries', 'mismatchTallies', 'encodedByAdmin', 'employer'])
+            ->latest('submitted_at')
+            ->get();
+
+        return [
+            'reports' => $reports->map(fn (JobFairResultReport $report) => [
+                'report' => $report,
+                'job_fair' => $report->jobFair,
+            ])->values(),
+            'summary' => [
+                'total_reports' => $reports->count(),
+                'total_applicants' => (int) $reports->sum('total_applicants'),
+                'total_qualified' => (int) $reports->sum('total_qualified'),
+                'total_near_hired' => (int) $reports->sum('total_near_hired'),
+                'total_hots' => (int) $reports->sum('total_hots'),
+                'total_rejected' => (int) $reports->sum('total_rejected'),
+            ],
+            'filter_options' => [
+                'job_fairs' => JobFair::query()
+                    ->when($employerId, fn ($query, $id) => $query->whereHas('resultReports', fn ($rr) => $rr->where('employer_id', $id)),
+                        fn ($query) => $query->whereHas('resultReports'))
+                    ->orderByRaw('COALESCE(start_date, event_date) desc')
+                    ->get(['job_fair_id', 'title', 'start_date', 'event_date']),
+                'employers' => $employerId ? [] : Employer::query()
+                    ->whereIn('employer_id', JobFairResultReport::query()->select('employer_id')->distinct())
+                    ->orderBy('company_name')
+                    ->get(['employer_id', 'company_name', 'trade_name']),
+            ],
+        ];
+    }
+
     public function sprs(JobFair $fair): array
     {
         $reports = $fair->resultReports()->get();

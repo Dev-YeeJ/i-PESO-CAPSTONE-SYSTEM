@@ -1,5 +1,5 @@
-import EstablishmentReportWorkspace from '@/components/reports/EstablishmentReportWorkspace'
+import EstablishmentReportBrowser from '@/components/reports/EstablishmentReportBrowser'
 
 export default function AdminEstablishmentReportPage() {
-  return <EstablishmentReportWorkspace role="admin" />
+  return <EstablishmentReportBrowser role="admin" />
 }

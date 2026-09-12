@@ -12,6 +12,7 @@ use App\Http\Controllers\Api\Admin\AdminCitizenCharterController;
 use App\Http\Controllers\Api\Admin\AdminEmployerReportController;
 use App\Http\Controllers\Api\Admin\AdminEstablishmentReportController;
 use App\Http\Controllers\Api\Admin\AdminGovernmentProgramController;
+use App\Http\Controllers\Api\Admin\AdminHiringActivityReportController;
 use App\Http\Controllers\Api\Admin\AdminPlacementReportController;
 use App\Http\Controllers\Api\Admin\AdminRoleController;
 use App\Http\Controllers\Api\Admin\AdminStaffController;
@@ -24,6 +25,7 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\EmployerApplicationController;
 use App\Http\Controllers\Api\EmployerJobVacancyController;
 use App\Http\Controllers\Api\EmployerEstablishmentReportController;
+use App\Http\Controllers\Api\EmployerHiringActivityReportController;
 use App\Http\Controllers\Api\EmployerJobFairController;
 use App\Http\Controllers\Api\EmployerNotificationController;
 use App\Http\Controllers\Api\EmployerPlacementReportController;
@@ -113,7 +115,8 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::get('/applicant-suggestions', [EmployerJobFairController::class, 'applicantSuggestions']);
             Route::get('/job-fair-results/{resultReport}/roi-form-3', [EmployerJobFairController::class, 'downloadReport']);
             Route::get('/reports/establishment-report/preview', [EmployerEstablishmentReportController::class, 'preview']);
-            Route::post('/reports/establishment-report/export', [EmployerEstablishmentReportController::class, 'export']);
+            Route::get('/reports/hiring-activity/preview', [EmployerHiringActivityReportController::class, 'preview']);
+            Route::post('/reports/hiring-activity/export', [EmployerHiringActivityReportController::class, 'export']);
 
             // Placement Report — flexible spreadsheet import (upload -> map -> preview -> submit)
             Route::get('/placement-reports', [EmployerPlacementReportController::class, 'index']);
@@ -309,7 +312,8 @@ Route::middleware('auth:sanctum')->group(function () {
 
             // Reports
             Route::get('/reports/establishment-report/preview', [AdminEstablishmentReportController::class, 'preview']);
-            Route::post('/reports/establishment-report/export', [AdminEstablishmentReportController::class, 'export']);
+            Route::get('/reports/hiring-activity/preview', [AdminHiringActivityReportController::class, 'preview']);
+            Route::post('/reports/hiring-activity/export', [AdminHiringActivityReportController::class, 'export']);
 
             // Placement Report review + approval (employer-submitted spreadsheet imports)
             Route::get('/placement-reports', [AdminPlacementReportController::class, 'index']);
