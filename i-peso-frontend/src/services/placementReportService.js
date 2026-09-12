@@ -30,6 +30,23 @@ export const declareNoPlacements = async (coverage, remarks = '') => {
   return response.data
 }
 
+// ── Employer: type hires directly into a table instead of uploading a file ─
+
+export const startManualPlacementReport = async (coverage) => {
+  const response = await api.post('/employer/placement-reports/manual', {
+    coverage_month: coverage.month,
+    coverage_year: coverage.year,
+  })
+  return response.data
+}
+
+// A "save" step distinct from submit() — can be called repeatedly while
+// drafting, so work is never lost before the report is finally submitted.
+export const saveManualPlacementRecords = async (id, records) => {
+  const response = await api.put(`/employer/placement-reports/${id}/records`, { records })
+  return response.data
+}
+
 export const getEmployerPlacementReport = async (id) => {
   const response = await api.get(`/employer/placement-reports/${id}`)
   return response.data

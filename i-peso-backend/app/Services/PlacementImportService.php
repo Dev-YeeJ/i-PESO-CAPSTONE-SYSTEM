@@ -225,28 +225,70 @@ class PlacementImportService
      */
     public function buildRecords(PlacementReportUpload $upload, array $mapping): int
     {
-        // Nil reports ("we hired nobody this month") carry no spreadsheet.
+        // Nil reports ("we hired nobody this month") carry no spreadsheet, and
+        // neither does a manual-entry report — buildManualRecords() covers that one.
         if ($upload->stored_path === null) {
             return 0;
         }
 
         $absolutePath = Storage::disk('local')->path($upload->stored_path);
         $parsed = $this->parse($absolutePath, $upload->selected_sheet);
-        $canLinkSeekers = Schema::hasTable('job_seekers');
 
-        return DB::transaction(function () use ($upload, $mapping, $parsed, $canLinkSeekers) {
-            // An admin's manually confirmed seeker link is a deliberate human
-            // decision, not a guess the importer can redo — it must survive a
-            // resubmission (e.g. after a rejection asking for an unrelated
-            // fix) even though every record below is rebuilt from scratch.
-            // Capture confirmations by a stable per-row identity before the
-            // delete wipes them, and reattach them to any matching new row.
+        $records = collect($parsed['rows'])->map(function ($row) use ($mapping) {
+            $record = ['raw_row' => $row];
+            foreach ($mapping as $sourceColumn => $targetField) {
+                if (! $targetField || ! array_key_exists($targetField, PlacementRecord::MAPPABLE_FIELDS)) {
+                    continue;
+                }
+                $record[$targetField] = $row[$sourceColumn] ?? null;
+            }
+
+            return $record;
+        });
+
+        return $this->persistRecords($upload, $records, Schema::hasTable('job_seekers'));
+    }
+
+    /**
+     * Rebuild placement_records for an upload from rows entered directly into
+     * the app's table editor — the manual alternative to a spreadsheet
+     * upload. Each row already uses canonical field keys, so no column
+     * mapping applies; otherwise this behaves identically to buildRecords()
+     * (same transaction safety, same confirmed-seeker-link preservation
+     * across a resubmission, same seeker matching).
+     *
+     * @param  array<int, array<string, mixed>>  $rows
+     */
+    public function buildManualRecords(PlacementReportUpload $upload, array $rows): int
+    {
+        $records = collect($rows)->map(fn (array $row) => [...$row, 'raw_row' => $row]);
+
+        return $this->persistRecords($upload, $records, Schema::hasTable('job_seekers'));
+    }
+
+    /**
+     * Shared delete-then-recreate core for both the spreadsheet and manual
+     * entry paths, wrapped in one transaction so a mid-loop failure can never
+     * leave the report with zero or partial records.
+     *
+     * An admin's manually confirmed seeker link is a deliberate human
+     * decision, not a guess the importer can redo — it must survive a
+     * resubmission (e.g. after a rejection asking for an unrelated fix) even
+     * though every record below is rebuilt from scratch. Capture
+     * confirmations by a stable per-row identity before the delete wipes
+     * them, and reattach them to any matching new row.
+     *
+     * @param  Collection<int, array<string, mixed>>  $records  pre-mapped, not yet normalized
+     */
+    private function persistRecords(PlacementReportUpload $upload, Collection $records, bool $canLinkSeekers): int
+    {
+        return DB::transaction(function () use ($upload, $records, $canLinkSeekers) {
             $identityOf = fn (PlacementRecord $record) => $this->recordIdentity(
                 $record->first_name, $record->middle_name, $record->last_name,
                 // date_hired is cast to a Carbon instance here but a plain
-                // 'Y-m-d' string on the freshly-parsed side below — both must
-                // render identically or every prior confirmation silently
-                // fails to reattach.
+                // 'Y-m-d' string on the freshly-normalized side below — both
+                // must render identically or every prior confirmation
+                // silently fails to reattach.
                 optional($record->date_hired)->toDateString(),
             );
             $confirmed = $upload->records()
@@ -259,15 +301,7 @@ class PlacementImportService
 
             $created = 0;
 
-            foreach ($parsed['rows'] as $row) {
-                $record = ['raw_row' => $row];
-                foreach ($mapping as $sourceColumn => $targetField) {
-                    if (! $targetField || ! array_key_exists($targetField, PlacementRecord::MAPPABLE_FIELDS)) {
-                        continue;
-                    }
-                    $record[$targetField] = $row[$sourceColumn] ?? null;
-                }
-
+            foreach ($records as $record) {
                 $normalized = $this->normalizeRecord($record);
                 if ($this->isBlankRecord($normalized)) {
                     continue;

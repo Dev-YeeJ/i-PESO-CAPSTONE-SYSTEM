@@ -1,12 +1,15 @@
 import { useEffect, useMemo, useState } from 'react'
-import { UploadCloud, FileSpreadsheet, ArrowLeft, CheckCircle2, Trash2, Loader2, Layers, CalendarX } from 'lucide-react'
+import { UploadCloud, FileSpreadsheet, ArrowLeft, CheckCircle2, Trash2, Loader2, Layers, CalendarX, PencilLine, Save } from 'lucide-react'
 import { Card, CardHeader, Button, Badge, AlertBox } from '@/components/ui'
 import PageHeader from '@/pages/admin/_components/PageHeader'
 import toast from 'react-hot-toast'
+import PlacementRecordEditor, { blankPlacementRecord, stripBlankPlacementRecords } from '@/components/reports/PlacementRecordEditor'
 import {
   listEmployerPlacementReports,
   uploadPlacementReport,
   declareNoPlacements,
+  startManualPlacementReport,
+  saveManualPlacementRecords,
   getEmployerPlacementReport,
   selectPlacementSheet,
   previewPlacementMapping,
@@ -42,7 +45,7 @@ const firstError = (err, fallback) => {
 }
 
 export default function EmployerPlacementReportPage() {
-  const [view, setView] = useState('list') // list | editor
+  const [view, setView] = useState('list') // list | editor | manual-editor
   const [reports, setReports] = useState([])
   const [loading, setLoading] = useState(true)
   const [active, setActive] = useState(null) // detailed upload in the editor
@@ -52,9 +55,11 @@ export default function EmployerPlacementReportPage() {
   const lastMonth = new Date(new Date().getFullYear(), new Date().getMonth() - 1, 1)
   const [coverageMonth, setCoverageMonth] = useState(lastMonth.getMonth() + 1)
   const [coverageYear, setCoverageYear] = useState(lastMonth.getFullYear())
+  const [entryMode, setEntryMode] = useState('upload') // upload | manual
   const [file, setFile] = useState(null)
   const [uploading, setUploading] = useState(false)
   const [declaring, setDeclaring] = useState(false)
+  const [startingManual, setStartingManual] = useState(false)
 
   const fetchReports = () => {
     setLoading(true)
@@ -73,7 +78,7 @@ export default function EmployerPlacementReportPage() {
     try {
       const res = await getEmployerPlacementReport(id)
       setActive(res.data)
-      setView('editor')
+      setView(res.data.is_manual_entry ? 'manual-editor' : 'editor')
     } catch {
       toast.error('Unable to open this report.')
     }
@@ -94,6 +99,21 @@ export default function EmployerPlacementReportPage() {
       toast.error(firstError(err, 'Upload failed.'))
     } finally {
       setUploading(false)
+    }
+  }
+
+  const handleStartManual = async () => {
+    setStartingManual(true)
+    try {
+      const res = await startManualPlacementReport({ month: coverageMonth, year: coverageYear })
+      toast.success(res.message)
+      setActive(res.data)
+      setView('manual-editor')
+      fetchReports()
+    } catch (err) {
+      toast.error(firstError(err, 'Unable to start a manual report.'))
+    } finally {
+      setStartingManual(false)
     }
   }
 
@@ -133,12 +153,22 @@ export default function EmployerPlacementReportPage() {
     )
   }
 
+  if (view === 'manual-editor' && active) {
+    return (
+      <ManualEntryEditor
+        upload={active}
+        onBack={() => { setActive(null); setView('list'); fetchReports() }}
+        onChange={setActive}
+      />
+    )
+  }
+
   return (
     <div className="space-y-6">
       <PageHeader
         eyebrow="Employer Reporting"
         title="Placement Reports"
-        subtitle="Upload your monthly hired-applicants spreadsheet. Map its columns to standard fields, preview, then submit to PESO for review."
+        subtitle="File your monthly hired-applicants report — upload a spreadsheet or type hires directly into a table."
       />
 
       {deadlineDay && (
@@ -149,33 +179,80 @@ export default function EmployerPlacementReportPage() {
       )}
 
       <Card>
-        <CardHeader title="Upload a new placement report" subtitle="Accepts Excel (.xlsx, .xls) or CSV. Any column layout works — you map the columns after upload. Workbooks with a tab per month are fine too." />
-        <form onSubmit={handleUpload} className="space-y-4">
-          <div className="grid gap-4 sm:grid-cols-3">
-            <label className="text-sm">
-              <span className="mb-1 block font-semibold text-slate-700">Coverage Month</span>
-              <select value={coverageMonth} onChange={(e) => setCoverageMonth(Number(e.target.value))} className="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm">
-                {MONTHS.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
-              </select>
-            </label>
-            <label className="text-sm">
-              <span className="mb-1 block font-semibold text-slate-700">Coverage Year</span>
-              <input type="number" min="2020" max="2100" value={coverageYear} onChange={(e) => setCoverageYear(Number(e.target.value))} className="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm" />
-            </label>
-            <label className="text-sm">
-              <span className="mb-1 block font-semibold text-slate-700">Spreadsheet File</span>
-              <input type="file" accept=".xlsx,.xls,.csv" onChange={(e) => setFile(e.target.files?.[0] ?? null)} className="w-full text-sm file:mr-3 file:rounded-lg file:border-0 file:bg-brand-navy file:px-3 file:py-2 file:text-white" />
-            </label>
-          </div>
-          <div className="flex flex-wrap items-center gap-3">
-            <Button type="submit" icon={uploading ? Loader2 : UploadCloud} disabled={uploading}>
-              {uploading ? 'Uploading…' : 'Upload & Map Columns'}
-            </Button>
-            <Button type="button" variant="outline" icon={declaring ? Loader2 : CalendarX} onClick={handleDeclareNil} disabled={declaring}>
-              {declaring ? 'Recording…' : `No hires in ${MONTHS[coverageMonth - 1]}`}
-            </Button>
-          </div>
-        </form>
+        <div className="mb-4 inline-flex rounded-xl border border-slate-200 bg-slate-50 p-1">
+          <button
+            type="button"
+            onClick={() => setEntryMode('upload')}
+            className={`rounded-lg px-4 py-2 text-sm font-semibold transition ${entryMode === 'upload' ? 'bg-white text-brand-navy shadow-sm' : 'text-slate-500'}`}
+          >
+            Upload spreadsheet
+          </button>
+          <button
+            type="button"
+            onClick={() => setEntryMode('manual')}
+            className={`rounded-lg px-4 py-2 text-sm font-semibold transition ${entryMode === 'manual' ? 'bg-white text-brand-navy shadow-sm' : 'text-slate-500'}`}
+          >
+            Enter manually
+          </button>
+        </div>
+
+        {entryMode === 'upload' ? (
+          <>
+            <CardHeader title="Upload a new placement report" subtitle="Accepts Excel (.xlsx, .xls) or CSV. Any column layout works — you map the columns after upload. Workbooks with a tab per month are fine too." />
+            <form onSubmit={handleUpload} className="space-y-4">
+              <div className="grid gap-4 sm:grid-cols-3">
+                <label className="text-sm">
+                  <span className="mb-1 block font-semibold text-slate-700">Coverage Month</span>
+                  <select value={coverageMonth} onChange={(e) => setCoverageMonth(Number(e.target.value))} className="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm">
+                    {MONTHS.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
+                  </select>
+                </label>
+                <label className="text-sm">
+                  <span className="mb-1 block font-semibold text-slate-700">Coverage Year</span>
+                  <input type="number" min="2020" max="2100" value={coverageYear} onChange={(e) => setCoverageYear(Number(e.target.value))} className="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm" />
+                </label>
+                <label className="text-sm">
+                  <span className="mb-1 block font-semibold text-slate-700">Spreadsheet File</span>
+                  <input type="file" accept=".xlsx,.xls,.csv" onChange={(e) => setFile(e.target.files?.[0] ?? null)} className="w-full text-sm file:mr-3 file:rounded-lg file:border-0 file:bg-brand-navy file:px-3 file:py-2 file:text-white" />
+                </label>
+              </div>
+              <div className="flex flex-wrap items-center gap-3">
+                <Button type="submit" icon={uploading ? Loader2 : UploadCloud} disabled={uploading}>
+                  {uploading ? 'Uploading…' : 'Upload & Map Columns'}
+                </Button>
+                <Button type="button" variant="outline" icon={declaring ? Loader2 : CalendarX} onClick={handleDeclareNil} disabled={declaring}>
+                  {declaring ? 'Recording…' : `No hires in ${MONTHS[coverageMonth - 1]}`}
+                </Button>
+              </div>
+            </form>
+          </>
+        ) : (
+          <>
+            <CardHeader title="Enter this month's hires manually" subtitle="Best for a handful of hires — type each person into a table instead of preparing a file. You can save a draft and come back before submitting." />
+            <div className="space-y-4">
+              <div className="grid gap-4 sm:grid-cols-3">
+                <label className="text-sm">
+                  <span className="mb-1 block font-semibold text-slate-700">Coverage Month</span>
+                  <select value={coverageMonth} onChange={(e) => setCoverageMonth(Number(e.target.value))} className="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm">
+                    {MONTHS.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
+                  </select>
+                </label>
+                <label className="text-sm">
+                  <span className="mb-1 block font-semibold text-slate-700">Coverage Year</span>
+                  <input type="number" min="2020" max="2100" value={coverageYear} onChange={(e) => setCoverageYear(Number(e.target.value))} className="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm" />
+                </label>
+              </div>
+              <div className="flex flex-wrap items-center gap-3">
+                <Button type="button" icon={startingManual ? Loader2 : PencilLine} onClick={handleStartManual} disabled={startingManual}>
+                  {startingManual ? 'Starting…' : 'Start manual entry'}
+                </Button>
+                <Button type="button" variant="outline" icon={declaring ? Loader2 : CalendarX} onClick={handleDeclareNil} disabled={declaring}>
+                  {declaring ? 'Recording…' : `No hires in ${MONTHS[coverageMonth - 1]}`}
+                </Button>
+              </div>
+            </div>
+          </>
+        )}
       </Card>
 
       <Card>
@@ -191,7 +268,9 @@ export default function EmployerPlacementReportPage() {
                 <div className="flex items-center gap-3">
                   {r.is_nil_report
                     ? <CalendarX className="h-5 w-5 text-slate-400" />
-                    : <FileSpreadsheet className="h-5 w-5 text-slate-400" />}
+                    : r.is_manual_entry
+                      ? <PencilLine className="h-5 w-5 text-slate-400" />
+                      : <FileSpreadsheet className="h-5 w-5 text-slate-400" />}
                   <div>
                     <p className="text-sm font-semibold text-slate-800">{r.original_filename}</p>
                     <p className="text-xs text-slate-500">
@@ -417,6 +496,95 @@ function MappingEditor({ upload, onBack, onChange }) {
           <Button icon={submitting ? Loader2 : CheckCircle2} onClick={handleSubmit} disabled={submitting || missingRequired.length > 0}>
             {submitting ? 'Submitting…' : 'Submit for Review'}
           </Button>
+        </div>
+      </Card>
+    </div>
+  )
+}
+
+function ManualEntryEditor({ upload, onBack, onChange }) {
+  const initialRecords = useMemo(() => {
+    const saved = (upload.records || []).map(({ id, linked_seeker_id, seeker_match_confidence, ...fields }) => ({ // eslint-disable-line no-unused-vars
+      ...fields,
+      // date/date_hired come back JSON-serialized with a time component —
+      // <input type="date"> only accepts a bare YYYY-MM-DD.
+      birth_date: fields.birth_date ? String(fields.birth_date).slice(0, 10) : '',
+      date_hired: fields.date_hired ? String(fields.date_hired).slice(0, 10) : '',
+    }))
+    return saved.length ? saved : [blankPlacementRecord()]
+  }, [upload])
+
+  const [records, setRecords] = useState(initialRecords)
+  const [saving, setSaving] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+  const [remarks, setRemarks] = useState(upload.employer_remarks || '')
+  const [hasSaved, setHasSaved] = useState((upload.record_count || 0) > 0)
+
+  const handleSave = async () => {
+    setSaving(true)
+    try {
+      const res = await saveManualPlacementRecords(upload.id, stripBlankPlacementRecords(records))
+      toast.success(res.message)
+      onChange(res.data)
+      setHasSaved((res.data.record_count || 0) > 0)
+    } catch (err) {
+      toast.error(firstError(err, 'Save failed.'))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleSubmit = async () => {
+    if (!hasSaved) return toast.error('Save at least one hire before submitting.')
+    setSubmitting(true)
+    try {
+      const res = await submitPlacementReport(upload.id, remarks)
+      toast.success(res.message)
+      onBack()
+    } catch (err) {
+      toast.error(firstError(err, 'Submit failed.'))
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <div className="space-y-6">
+      <PageHeader
+        eyebrow="Employer Reporting"
+        title="Enter hires manually"
+        subtitle={`${MONTHS[upload.coverage_month - 1]} ${upload.coverage_year}`}
+        actions={[{ label: 'Back', icon: ArrowLeft, variant: 'ghost', onClick: onBack }]}
+      />
+
+      {upload.status === 'rejected' && upload.review_remarks && (
+        <AlertBox variant="danger" title="Returned by PESO for revision">{upload.review_remarks}</AlertBox>
+      )}
+
+      <Card>
+        <CardHeader title="Hires this month" subtitle="Add one row per person hired. Fields marked * are required before submitting. Save as often as you like — nothing is sent to PESO until you submit below." />
+        <PlacementRecordEditor records={records} onChange={setRecords} />
+        <div className="mt-4">
+          <Button variant="outline" icon={saving ? Loader2 : Save} onClick={handleSave} disabled={saving}>
+            {saving ? 'Saving…' : 'Save records'}
+          </Button>
+        </div>
+      </Card>
+
+      <Card>
+        <CardHeader title="Submit to PESO" subtitle="Once submitted, PESO reviews and approves your report. Approved records feed the SPRS placement totals." />
+        <textarea
+          value={remarks}
+          onChange={(e) => setRemarks(e.target.value)}
+          rows={3}
+          placeholder="Optional note for the PESO reviewer…"
+          className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm"
+        />
+        <div className="mt-4">
+          <Button icon={submitting ? Loader2 : CheckCircle2} onClick={handleSubmit} disabled={submitting || !hasSaved}>
+            {submitting ? 'Submitting…' : 'Submit for Review'}
+          </Button>
+          {!hasSaved && <p className="mt-2 text-xs text-slate-500">Save at least one hire before submitting.</p>}
         </div>
       </Card>
     </div>

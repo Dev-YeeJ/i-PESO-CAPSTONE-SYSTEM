@@ -155,6 +155,82 @@ class EmployerPlacementReportController extends Controller
         ], 201);
     }
 
+    /**
+     * Alternative to store() — start a report by typing hires directly into a
+     * table instead of preparing a spreadsheet. Records are added afterward
+     * via replaceManualRecords(); nothing is finalized until submit().
+     */
+    public function storeManual(Request $request): JsonResponse
+    {
+        $employer = $this->employer($request);
+
+        $validated = $request->validate([
+            'coverage_month' => ['required', 'integer', 'min:1', 'max:12'],
+            'coverage_year' => ['required', 'integer', 'min:2020', 'max:2100'],
+        ]);
+
+        $this->assertCoverageNotInFuture($validated['coverage_month'], $validated['coverage_year']);
+        $this->assertNoSettledReportFor($employer, $validated['coverage_month'], $validated['coverage_year']);
+
+        $upload = PlacementReportUpload::create([
+            'employer_id' => $employer->employer_id,
+            'original_filename' => 'Manually entered',
+            'stored_path' => null,
+            'row_count' => 0,
+            'status' => PlacementReportUpload::STATUS_PENDING_MAPPING,
+            'coverage_month' => $validated['coverage_month'],
+            'coverage_year' => $validated['coverage_year'],
+        ]);
+
+        return response()->json([
+            'message' => 'Started a manual placement report. Add each hire below, then submit for review.',
+            'data' => $this->detail($upload->fresh(['mappings'])),
+        ], 201);
+    }
+
+    /**
+     * Bulk-replace every record on a manual-entry report from the table the
+     * employer just edited. Can be called repeatedly while drafting — a
+     * "save" step distinct from submit(), so work is never lost.
+     */
+    public function replaceManualRecords(Request $request, PlacementReportUpload $placementReport): JsonResponse
+    {
+        $this->authorizeOwner($request, $placementReport);
+        $this->assertEditable($placementReport);
+
+        if ($placementReport->stored_path !== null) {
+            throw ValidationException::withMessages([
+                'records' => ['This report was built from an uploaded spreadsheet — edit it through the column mapping instead.'],
+            ]);
+        }
+
+        $validated = $request->validate([
+            'records' => ['present', 'array'],
+            'records.*.first_name' => ['required', 'string', 'max:255'],
+            'records.*.middle_name' => ['nullable', 'string', 'max:255'],
+            'records.*.last_name' => ['required', 'string', 'max:255'],
+            'records.*.gender' => ['nullable', 'string', 'max:30'],
+            'records.*.civil_status' => ['nullable', 'string', 'max:40'],
+            'records.*.age' => ['nullable', 'integer', 'min:15', 'max:100'],
+            'records.*.birth_date' => ['nullable', 'date'],
+            'records.*.date_hired' => ['required', 'date'],
+            'records.*.position' => ['required', 'string', 'max:255'],
+            'records.*.department' => ['nullable', 'string', 'max:255'],
+            'records.*.address' => ['nullable', 'string', 'max:500'],
+            'records.*.educational_attainment' => ['nullable', 'string', 'max:255'],
+            'records.*.assigned_company' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $created = $this->imports->buildManualRecords($placementReport, $validated['records']);
+        $placementReport->update(['row_count' => $created]);
+
+        return response()->json([
+            'message' => $created > 0 ? "{$created} hire(s) saved." : 'All rows cleared.',
+            'data' => $this->summary($placementReport->fresh()->loadCount('records')),
+            'records' => $this->recordPreview($placementReport),
+        ]);
+    }
+
     public function show(Request $request, PlacementReportUpload $placementReport): JsonResponse
     {
         $this->authorizeOwner($request, $placementReport);
@@ -266,6 +342,27 @@ class EmployerPlacementReportController extends Controller
         // submission, so it must not be routed through the mapping-required
         // path below (which would always fail for a report with no columns).
         if ($placementReport->is_nil_report) {
+            $this->catchSettlementRace(fn () => $placementReport->update([
+                'status' => PlacementReportUpload::STATUS_PENDING_REVIEW,
+                'employer_remarks' => $request->input('employer_remarks'),
+                'submitted_at' => now(),
+            ]));
+
+            return response()->json([
+                'message' => 'Placement report submitted to PESO for review.',
+                'data' => $this->summary($placementReport->fresh()->loadCount('records')),
+            ]);
+        }
+
+        // A manual-entry report has no spreadsheet or column mapping either —
+        // its records were already saved directly via replaceManualRecords().
+        if ($placementReport->stored_path === null) {
+            if ($placementReport->records()->count() === 0) {
+                throw ValidationException::withMessages([
+                    'records' => ['Add at least one hire before submitting, or declare no hires for this period.'],
+                ]);
+            }
+
             $this->catchSettlementRace(fn () => $placementReport->update([
                 'status' => PlacementReportUpload::STATUS_PENDING_REVIEW,
                 'employer_remarks' => $request->input('employer_remarks'),
@@ -486,6 +583,7 @@ class EmployerPlacementReportController extends Controller
             'original_filename' => $upload->original_filename,
             'status' => $upload->status,
             'is_nil_report' => (bool) $upload->is_nil_report,
+            'is_manual_entry' => $upload->stored_path === null && ! $upload->is_nil_report,
             'row_count' => $upload->row_count,
             'record_count' => $upload->records_count ?? $upload->records()->count(),
             'coverage_month' => $upload->coverage_month,
@@ -508,14 +606,19 @@ class EmployerPlacementReportController extends Controller
             'mapping' => $upload->mappings->pluck('target_field', 'source_column'),
             'mappable_fields' => PlacementRecord::MAPPABLE_FIELDS,
             'required_fields' => PlacementRecord::REQUIRED_FIELDS,
+            // Only meaningful for a manual-entry report: the table editor
+            // needs every previously-saved row back to resume where the
+            // employer left off (e.g. re-opening one PESO rejected), not
+            // just a capped preview.
+            'records' => $upload->stored_path === null ? $this->recordPreview($upload, null) : [],
         ]);
     }
 
-    private function recordPreview(PlacementReportUpload $upload): array
+    private function recordPreview(PlacementReportUpload $upload, ?int $limit = 10): array
     {
         return $upload->records()
             ->orderBy('id')
-            ->limit(10)
+            ->when($limit, fn ($query, $limit) => $query->limit($limit))
             ->get()
             ->map(fn (PlacementRecord $record) => collect($record->only(array_keys(PlacementRecord::MAPPABLE_FIELDS)))
                 ->merge([

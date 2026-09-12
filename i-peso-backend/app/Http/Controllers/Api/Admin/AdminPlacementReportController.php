@@ -290,6 +290,7 @@ class AdminPlacementReportController extends Controller
             'original_filename' => $upload->original_filename,
             'status' => $upload->status,
             'is_nil_report' => (bool) $upload->is_nil_report,
+            'is_manual_entry' => $upload->stored_path === null && ! $upload->is_nil_report,
             'row_count' => $upload->row_count,
             'record_count' => $upload->records_count ?? $upload->records()->count(),
             'coverage_month' => $upload->coverage_month,

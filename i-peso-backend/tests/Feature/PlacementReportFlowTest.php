@@ -246,6 +246,142 @@ class PlacementReportFlowTest extends TestCase
         ])->assertStatus(422);
     }
 
+    public function test_manual_entry_flow_from_start_through_admin_approval(): void
+    {
+        $employer = $this->employer();
+        $admin = $this->admin();
+
+        Sanctum::actingAs($employer);
+        $uploadId = $this->postJson('/api/employer/placement-reports/manual', [
+            'coverage_month' => 3, 'coverage_year' => 2026,
+        ])
+            ->assertCreated()
+            ->assertJsonPath('data.status', PlacementReportUpload::STATUS_PENDING_MAPPING)
+            ->json('data.id');
+
+        // Save is a draft step — can be called more than once while the
+        // employer is still typing in rows, distinct from final submission.
+        $this->putJson("/api/employer/placement-reports/{$uploadId}/records", [
+            'records' => [
+                ['first_name' => 'Ana', 'last_name' => 'Santos', 'date_hired' => '2026-03-10', 'position' => 'Encoder'],
+            ],
+        ])->assertOk()->assertJsonPath('data.record_count', 1);
+
+        $this->putJson("/api/employer/placement-reports/{$uploadId}/records", [
+            'records' => [
+                ['first_name' => 'Ana', 'last_name' => 'Santos', 'date_hired' => '2026-03-10', 'position' => 'Encoder'],
+                ['first_name' => 'Ben', 'middle_name' => 'Cruz', 'last_name' => 'Lim', 'date_hired' => '2026-03-15', 'position' => 'Driver', 'gender' => 'male'],
+            ],
+        ])->assertOk()->assertJsonPath('data.record_count', 2);
+
+        $this->postJson("/api/employer/placement-reports/{$uploadId}/submit")
+            ->assertOk()
+            ->assertJsonPath('data.status', PlacementReportUpload::STATUS_PENDING_REVIEW);
+
+        Sanctum::actingAs($admin);
+        $this->postJson("/api/admin/placement-reports/{$uploadId}/approve")
+            ->assertOk()
+            ->assertJsonPath('data.status', PlacementReportUpload::STATUS_APPROVED);
+
+        $this->assertSame(2, PlacementRecord::where('upload_id', $uploadId)->count());
+    }
+
+    public function test_manual_entry_cannot_be_submitted_with_no_records(): void
+    {
+        $employer = $this->employer();
+        Sanctum::actingAs($employer);
+
+        $uploadId = $this->postJson('/api/employer/placement-reports/manual', [
+            'coverage_month' => 3, 'coverage_year' => 2026,
+        ])->assertCreated()->json('data.id');
+
+        $this->postJson("/api/employer/placement-reports/{$uploadId}/submit")
+            ->assertStatus(422)
+            ->assertJsonPath('errors.records.0', 'Add at least one hire before submitting, or declare no hires for this period.');
+    }
+
+    public function test_manual_entry_rejects_a_row_missing_a_required_field(): void
+    {
+        $employer = $this->employer();
+        Sanctum::actingAs($employer);
+
+        $uploadId = $this->postJson('/api/employer/placement-reports/manual', [
+            'coverage_month' => 3, 'coverage_year' => 2026,
+        ])->assertCreated()->json('data.id');
+
+        // No last_name — one of the four fields the paper form treats as mandatory.
+        $this->putJson("/api/employer/placement-reports/{$uploadId}/records", [
+            'records' => [['first_name' => 'Ana', 'date_hired' => '2026-03-10', 'position' => 'Encoder']],
+        ])->assertStatus(422)->assertJsonValidationErrors(['records.0.last_name']);
+    }
+
+    public function test_manual_entry_records_cannot_be_saved_onto_a_spreadsheet_upload(): void
+    {
+        $employer = $this->employer();
+        Sanctum::actingAs($employer);
+
+        $uploadId = $this->submittedReport($employer, month: 3, year: 2026)->id;
+        // submittedReport() leaves stored_path null too, so force a non-null
+        // path to simulate a genuine spreadsheet-backed upload.
+        PlacementReportUpload::where('id', $uploadId)->update(['stored_path' => 'placement_reports/1/fake.xlsx', 'status' => PlacementReportUpload::STATUS_PENDING_MAPPING]);
+
+        $this->putJson("/api/employer/placement-reports/{$uploadId}/records", [
+            'records' => [['first_name' => 'Ana', 'last_name' => 'Santos', 'date_hired' => '2026-03-10', 'position' => 'Encoder']],
+        ])
+            ->assertStatus(422)
+            ->assertJsonPath('errors.records.0', 'This report was built from an uploaded spreadsheet — edit it through the column mapping instead.');
+    }
+
+    public function test_reopening_a_manual_entry_report_returns_its_saved_records(): void
+    {
+        $employer = $this->employer();
+        Sanctum::actingAs($employer);
+
+        $uploadId = $this->postJson('/api/employer/placement-reports/manual', [
+            'coverage_month' => 3, 'coverage_year' => 2026,
+        ])->assertCreated()->json('data.id');
+
+        $this->putJson("/api/employer/placement-reports/{$uploadId}/records", [
+            'records' => [['first_name' => 'Ana', 'last_name' => 'Santos', 'date_hired' => '2026-03-10', 'position' => 'Encoder']],
+        ])->assertOk();
+
+        // Re-opening (e.g. after PESO rejects it and the employer comes back
+        // to fix something) must return the previously-saved row so the
+        // table editor isn't reset back to blank.
+        $this->getJson("/api/employer/placement-reports/{$uploadId}")
+            ->assertOk()
+            ->assertJsonCount(1, 'data.records')
+            ->assertJsonPath('data.records.0.first_name', 'Ana');
+    }
+
+    public function test_admin_confirmed_seeker_link_survives_a_manual_entry_resubmission_after_rejection(): void
+    {
+        $this->seeker(501, 'Ana', '', 'Santos', '1999-09-09');
+        $employer = $this->employer();
+        $admin = $this->admin();
+
+        Sanctum::actingAs($employer);
+        $uploadId = $this->postJson('/api/employer/placement-reports/manual', [
+            'coverage_month' => 3, 'coverage_year' => 2026,
+        ])->assertCreated()->json('data.id');
+        $records = [['first_name' => 'Ana', 'last_name' => 'Santos', 'date_hired' => '2026-03-10', 'position' => 'Encoder']];
+        $this->putJson("/api/employer/placement-reports/{$uploadId}/records", ['records' => $records])->assertOk();
+        $this->postJson("/api/employer/placement-reports/{$uploadId}/submit")->assertOk();
+
+        Sanctum::actingAs($admin);
+        $recordId = PlacementRecord::where('upload_id', $uploadId)->firstOrFail()->id;
+        $this->postJson("/api/admin/placement-reports/{$uploadId}/records/{$recordId}/link", ['seeker_id' => 501])->assertOk();
+        $this->postJson("/api/admin/placement-reports/{$uploadId}/reject", ['review_remarks' => 'Please fix an unrelated column.'])->assertOk();
+
+        Sanctum::actingAs($employer);
+        // Same row re-saved — confirmed link must survive the rebuild.
+        $this->putJson("/api/employer/placement-reports/{$uploadId}/records", ['records' => $records])->assertOk();
+
+        $record = PlacementRecord::where('upload_id', $uploadId)->firstOrFail();
+        $this->assertSame(501, $record->seeker_id);
+        $this->assertNotNull($record->seeker_match_confirmed_at);
+    }
+
     public function test_coverage_month_is_required_and_cannot_be_in_the_future(): void
     {
         $employer = $this->employer();

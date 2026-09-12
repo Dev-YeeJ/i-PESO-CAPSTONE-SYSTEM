@@ -119,9 +119,11 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::get('/placement-reports', [EmployerPlacementReportController::class, 'index']);
             Route::post('/placement-reports', [EmployerPlacementReportController::class, 'store'])->middleware('throttle:20,1');
             Route::post('/placement-reports/nil', [EmployerPlacementReportController::class, 'storeNil']);
+            Route::post('/placement-reports/manual', [EmployerPlacementReportController::class, 'storeManual']);
             Route::get('/placement-reports/{placementReport}', [EmployerPlacementReportController::class, 'show']);
             Route::post('/placement-reports/{placementReport}/sheet', [EmployerPlacementReportController::class, 'selectSheet']);
             Route::post('/placement-reports/{placementReport}/preview', [EmployerPlacementReportController::class, 'preview']);
+            Route::put('/placement-reports/{placementReport}/records', [EmployerPlacementReportController::class, 'replaceManualRecords']);
             Route::post('/placement-reports/{placementReport}/submit', [EmployerPlacementReportController::class, 'submit']);
             Route::delete('/placement-reports/{placementReport}', [EmployerPlacementReportController::class, 'destroy']);
 
