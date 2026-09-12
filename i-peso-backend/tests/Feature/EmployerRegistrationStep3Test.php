@@ -52,6 +52,24 @@ class EmployerRegistrationStep3Test extends TestCase
                 $table->softDeletes();
             });
         }
+
+        if (! Schema::hasTable('employer_documents')) {
+            Schema::create('employer_documents', function (Blueprint $table) {
+                $table->id('document_id');
+                $table->unsignedBigInteger('employer_id');
+                $table->string('document_type');
+                $table->string('document_path')->nullable();
+                $table->string('original_filename')->nullable();
+                $table->integer('file_size')->nullable();
+                $table->string('mime_type')->nullable();
+                $table->timestamp('uploaded_at')->nullable();
+                $table->string('verification_status')->default('pending');
+                $table->text('admin_notes')->nullable();
+                $table->timestamp('viewed_at')->nullable();
+                $table->date('expiration_date')->nullable();
+                $table->timestamps();
+            });
+        }
     }
 
     public function test_verified_employer_can_save_company_profile(): void
@@ -103,5 +121,40 @@ class EmployerRegistrationStep3Test extends TestCase
             'location_accuracy' => 25,
             'google_place_id' => 'test-place-id',
         ]);
+    }
+
+    /**
+     * The affidavit of undertaking and no-pending-case certificate used to
+     * be optional outside the two recruitment-agency types. They're now
+     * required for every company type, with nothing left optional.
+     */
+    public function test_affidavit_and_no_pending_case_certificate_are_required_for_every_company_type(): void
+    {
+        foreach ([
+            'sole_proprietorship',
+            'corporation_partnership',
+            'local_recruitment_agency',
+            'overseas_recruitment_agency',
+            'government_agency',
+        ] as $companyType) {
+            $employer = Employer::create([
+                'email' => "required-docs-{$companyType}@example.com",
+                'password' => 'password123',
+                'company_type' => $companyType,
+                'email_verified_at' => now(),
+                'verification_status' => 'pending',
+            ]);
+
+            Sanctum::actingAs($employer);
+
+            $response = $this->getJson('/api/employer/required-documents');
+
+            $response->assertOk();
+            $required = $response->json('required_documents');
+            $this->assertContains('affidavit_of_undertaking', $required, "affidavit_of_undertaking should be required for {$companyType}");
+            $this->assertContains('no_pending_case_certificate', $required, "no_pending_case_certificate should be required for {$companyType}");
+            $this->assertSame([], $response->json('optional_documents'), "no document should be optional for {$companyType}");
+            $this->assertSame(array_unique($required), array_values($required), "required_documents should not contain duplicates for {$companyType}");
+        }
     }
 }
