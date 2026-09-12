@@ -20,6 +20,11 @@ export default function SkillTaxonomyTags({
   limit = 20,
   allowCustom = true,
   className = '',
+  // Skill names tied to whatever the caller already knows about this specific
+  // posting (e.g. AI suggestions scoped to the chosen job title/vacancy
+  // anchor) — shown first in "Recommended skills", ahead of the generic
+  // catalog list, and flagged so SuggestionPill can visually set them apart.
+  contextualSuggestions = [],
 }) {
   const inputRef = useRef(null)
   const [query, setQuery] = useState('')
@@ -51,14 +56,30 @@ export default function SkillTaxonomyTags({
 
     return selectedKeys.has(skillKey(skill)) ? null : skill
   }, [allowCustom, category, query, selectedKeys, selectionFull])
+  const contextualSkills = useMemo(
+    () => (contextualSuggestions || [])
+      .map((name) => skillName(name))
+      .filter(Boolean)
+      .map((name) => ({
+        id: null,
+        skill_id: null,
+        name,
+        skill_name: name,
+        category,
+        source: 'ai_contextual',
+        is_ai_suggested: true,
+      })),
+    [category, contextualSuggestions],
+  )
   const recommendedSkills = useMemo(
     () => uniqueSkills([
+      ...contextualSkills,
       ...starterSkills,
       ...starterFallbacks,
     ])
       .filter((skill) => !selectedKeys.has(skillKey(skill)))
       .slice(0, 16),
-    [selectedKeys, starterFallbacks, starterSkills],
+    [contextualSkills, selectedKeys, starterFallbacks, starterSkills],
   )
   const visibleResults = useMemo(
     () => uniqueSkills(results).filter((skill) => !selectedKeys.has(skillKey(skill))).slice(0, 16),
@@ -203,7 +224,7 @@ export default function SkillTaxonomyTags({
         <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
           <div className="mb-2 flex items-center justify-between gap-3">
             <p className="text-[11px] font-black uppercase tracking-wide text-slate-500">
-              {hasSearchQuery ? 'Matching skills' : 'Recommended skills'}
+              {hasSearchQuery ? 'Matching skills' : contextualSkills.length > 0 ? 'Recommended for this role' : 'Recommended skills'}
             </p>
             {(starterLoading || loading) && (
               <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-slate-500">
@@ -336,11 +357,20 @@ function SuggestionPill({ skill, onClick }) {
     <button
       type="button"
       onClick={onClick}
-      className="group inline-flex max-w-full items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-2 text-left text-xs font-extrabold text-slate-700 shadow-sm transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-900"
+      className={`group inline-flex max-w-full items-center gap-2 rounded-full border px-3 py-2 text-left text-xs font-extrabold shadow-sm transition ${
+        skill.is_ai_suggested
+          ? 'border-indigo-200 bg-indigo-50 text-indigo-800 hover:border-indigo-300 hover:bg-indigo-100'
+          : 'border-slate-200 bg-white text-slate-700 hover:border-blue-200 hover:bg-blue-50 hover:text-blue-900'
+      }`}
       title={skillName(skill)}
     >
-      <Plus className="h-3.5 w-3.5 shrink-0 text-slate-400 transition group-hover:text-blue-800" />
+      <Plus className={`h-3.5 w-3.5 shrink-0 transition ${skill.is_ai_suggested ? 'text-indigo-500' : 'text-slate-400 group-hover:text-blue-800'}`} />
       <span className="truncate">{skillName(skill)}</span>
+      {skill.is_ai_suggested && (
+        <span className="rounded-full bg-indigo-100 px-1.5 py-0.5 text-[10px] font-black text-indigo-700">
+          AI
+        </span>
+      )}
       {skill.is_hot && (
         <span className="rounded-full bg-blue-50 px-1.5 py-0.5 text-[10px] font-black text-blue-700">
           In Demand

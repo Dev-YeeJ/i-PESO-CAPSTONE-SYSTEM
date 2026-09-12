@@ -590,6 +590,33 @@ function AlgorithmAnchorsStep({ form, errors, update, setLocation }) {
 }
 
 function QualificationsStep({ form, errors, update }) {
+  const [aiSkills, setAiSkills] = useState({ technical: [], soft: [] })
+  const [aiLoading, setAiLoading] = useState(false)
+  const [aiError, setAiError] = useState('')
+
+  const suggestSkills = async () => {
+    if (!form.job_title.trim()) {
+      setAiError('Add a job title in step 1 before requesting skill suggestions.')
+      return
+    }
+
+    setAiLoading(true)
+    setAiError('')
+    try {
+      const { data } = await employerService.suggestJobPosting({
+        job_title: form.job_title,
+        vacancy_anchor: form.occupation_mapping?.broadField || form.occupation_mapping?.fieldName || null,
+        existing_technical_skills: form.required_skills,
+        existing_soft_skills: form.soft_skills,
+      })
+      setAiSkills({ technical: data?.suggested_technical_skills ?? [], soft: data?.suggested_soft_skills ?? [] })
+    } catch (err) {
+      setAiError(err.response?.data?.message ?? 'AI could not suggest skills right now. You can still search or type your own below.')
+    } finally {
+      setAiLoading(false)
+    }
+  }
+
   return (
     <StepShell
       icon={GraduationCap}
@@ -618,7 +645,21 @@ function QualificationsStep({ form, errors, update }) {
         />
       </div>
 
-      <div className="mt-6 grid gap-5 lg:grid-cols-2">
+      <div className="mt-6 flex flex-wrap items-center justify-between gap-2">
+        <p className="text-sm font-bold text-slate-700">Skills for {form.job_title || 'this role'}</p>
+        <button
+          type="button"
+          onClick={suggestSkills}
+          disabled={aiLoading}
+          className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-50 px-3 py-2 text-xs font-black text-indigo-600 ring-1 ring-indigo-100 transition hover:bg-indigo-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {aiLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+          {aiLoading ? 'Suggesting…' : 'AI Suggest Skills'}
+        </button>
+      </div>
+      {aiError && <p className="mt-1.5 text-xs font-semibold text-red-600">{aiError}</p>}
+
+      <div className="mt-3 grid gap-5 lg:grid-cols-2">
         <SkillTaxonomyTags
           label="Required Hard Skills"
           required
@@ -630,6 +671,7 @@ function QualificationsStep({ form, errors, update }) {
           placeholder="Type a required hard skill"
           error={errors.required_skills}
           limit={15}
+          contextualSuggestions={aiSkills.technical}
         />
 
         <SkillTaxonomyTags
@@ -642,6 +684,7 @@ function QualificationsStep({ form, errors, update }) {
           placeholder="Type a preferred soft skill"
           error={errors.soft_skills}
           limit={10}
+          contextualSuggestions={aiSkills.soft}
         />
       </div>
     </StepShell>
