@@ -364,27 +364,25 @@ export default function EmployerDetailPage() {
                 </TabsList>
 
                 <TabsContent value="overview" className="space-y-5">
-                  <div className="grid gap-5 lg:grid-cols-2">
-                    <Card>
-                      <CardHeader title="Company Details" subtitle="Core business information registered in the system." />
-                      <div className="grid gap-y-5 sm:grid-cols-2">
-                        <InfoItem label="Company name" value={companyProfile.company_name || employer.company_name} />
-                        <InfoItem label="Industry" value={formatIndustry(companyProfile.industry || employer.industry)} />
-                        <InfoItem label="TIN" value={companyProfile.tin || employer.tin} />
-                        <InfoItem label="Business address" value={companyProfile.business_address || businessAddress.complete_address} />
-                      </div>
-                    </Card>
+                  <Card>
+                    <CardHeader title="Company Details" subtitle="Core business information registered in the system." />
+                    <div className="grid gap-x-8 gap-y-5 sm:grid-cols-2">
+                      <InfoItem label="Company name" value={companyProfile.company_name || employer.company_name} />
+                      <InfoItem label="Industry" value={formatIndustry(companyProfile.industry || employer.industry)} />
+                      <InfoItem label="TIN" value={companyProfile.tin || employer.tin} />
+                      <InfoItem label="Business address" value={companyProfile.business_address || businessAddress.complete_address} />
+                    </div>
+                  </Card>
 
-                    <Card>
-                      <CardHeader title="Representative" subtitle="Authorized contact person for PESO coordination." />
-                      <div className="grid gap-y-5 sm:grid-cols-2">
-                        <InfoItem label="Name" value={representative.representative_name || `${representative.representative_first_name || ''} ${representative.representative_last_name || ''}`.trim()} />
-                        <InfoItem label="Designation" value={representative.representative_designation} />
-                        <InfoItem label="Contact number" value={representative.representative_contact_number || representative.mobile_number} />
-                        <InfoItem label="Email address" value={representative.email} />
-                      </div>
-                    </Card>
-                  </div>
+                  <Card>
+                    <CardHeader title="Representative" subtitle="Authorized contact person for PESO coordination." />
+                    <div className="grid gap-x-8 gap-y-5 sm:grid-cols-2">
+                      <InfoItem label="Name" value={representative.representative_name || `${representative.representative_first_name || ''} ${representative.representative_last_name || ''}`.trim()} />
+                      <InfoItem label="Designation" value={representative.representative_designation} />
+                      <InfoItem label="Contact number" value={representative.representative_contact_number || representative.mobile_number} />
+                      <InfoItem label="Email address" value={representative.email} />
+                    </div>
+                  </Card>
                 </TabsContent>
 
                 {verificationStatus !== 'pending' && (
