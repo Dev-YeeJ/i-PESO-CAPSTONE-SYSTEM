@@ -351,10 +351,7 @@ export default function EmployerDetailPage() {
             </div>
           </div>
 
-          {/* Main content and sidebar */}
-          <div className="grid gap-5 xl:grid-cols-[minmax(0,1.7fr)_minmax(300px,0.8fr)]">
-            <main>
-              <Tabs value={activeTab ?? 'overview'} onValueChange={setActiveTab}>
+          <Tabs value={activeTab ?? 'overview'} onValueChange={setActiveTab}>
                 <TabsList>
                   <TabsTrigger value="overview">Overview</TabsTrigger>
                   {verificationStatus !== 'pending' && (
@@ -383,6 +380,57 @@ export default function EmployerDetailPage() {
                       <InfoItem label="Email address" value={representative.email} />
                     </div>
                   </Card>
+
+                  <Card>
+                    <CardHeader title="Operational Review" subtitle="Verification status and updates." />
+                    <div className="grid gap-3 sm:grid-cols-3">
+                      <div className="flex items-center gap-3 rounded-xl bg-slate-50 p-3">
+                        <span className={`rounded-lg p-2 ${verificationStatus === 'approved' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}><ShieldCheck className="h-4 w-4" /></span>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs text-slate-500">Status</p>
+                          <p className="text-sm font-bold text-slate-800 capitalize">{formatValue(verificationStatus)}</p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-3 rounded-xl bg-slate-50 p-3">
+                        <span className="rounded-lg bg-slate-200 p-2 text-slate-700"><Clock className="h-4 w-4" /></span>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs text-slate-500">Last updated</p>
+                          <p className="text-sm font-bold text-slate-800">{formatDate(employer.updated_at)}</p>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-col gap-1 rounded-xl bg-slate-50 p-3">
+                        <div className="flex items-center gap-2">
+                          <FileText className="h-4 w-4 text-slate-400" />
+                          <p className="text-xs text-slate-500">Remarks</p>
+                        </div>
+                        <p className="mt-1 pl-6 text-sm font-medium text-slate-800">{verificationRemarks || 'No remarks recorded'}</p>
+                      </div>
+                    </div>
+                  </Card>
+
+                  {/* Extra profile sections for verified employers */}
+                  {verificationStatus !== 'pending' && (
+                    <div className="grid gap-5 lg:grid-cols-2">
+                      <Card>
+                        <CardHeader title="Data Quality Flags" subtitle="Operational indicators for follow-up." />
+                        <div className="flex flex-wrap gap-2">
+                          {Object.entries(dataQualityFlags || {}).filter(([, value]) => value).map(([key]) => <Badge key={key} status="warning">{labelForFlag(key)}</Badge>)}
+                          {!Object.values(dataQualityFlags || {}).some(Boolean) && <span className="text-sm text-slate-500">No flags detected.</span>}
+                        </div>
+                      </Card>
+
+                      <Card>
+                        <CardHeader title="Job Fair Participation" subtitle="Events the employer joined." />
+                        {jobFairParticipation?.length ? (
+                          <div className="space-y-2">
+                            {jobFairParticipation.map((fair) => <div key={fair.id} className="rounded-xl border border-slate-200 bg-slate-50 p-3"><p className="text-sm font-bold text-slate-800">{fair.name}</p><p className="mt-1 text-xs text-slate-500">{formatDate(fair.date)}</p></div>)}
+                          </div>
+                        ) : <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 p-5 text-center"><p className="text-sm text-slate-500">No job fair participation records.</p></div>}
+                      </Card>
+                    </div>
+                  )}
                 </TabsContent>
 
                 {verificationStatus !== 'pending' && (
@@ -579,61 +627,6 @@ export default function EmployerDetailPage() {
                   )}
                 </TabsContent>
               </Tabs>
-            </main>
-
-            <aside className="space-y-5">
-              <Card>
-                <CardHeader title="Operational Review" subtitle="Verification status and updates." />
-                <div className="space-y-3">
-                  <div className="flex items-center gap-3 rounded-xl bg-slate-50 p-3">
-                    <span className={`rounded-lg p-2 ${verificationStatus === 'approved' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}><ShieldCheck className="h-4 w-4" /></span>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-xs text-slate-500">Status</p>
-                      <p className="text-sm font-bold text-slate-800 capitalize">{formatValue(verificationStatus)}</p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-3 rounded-xl bg-slate-50 p-3">
-                    <span className="rounded-lg bg-slate-200 p-2 text-slate-700"><Clock className="h-4 w-4" /></span>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-xs text-slate-500">Last updated</p>
-                      <p className="text-sm font-bold text-slate-800">{formatDate(employer.updated_at)}</p>
-                    </div>
-                  </div>
-
-                  <div className="flex flex-col gap-1 rounded-xl bg-slate-50 p-3">
-                    <div className="flex items-center gap-2">
-                      <FileText className="h-4 w-4 text-slate-400" />
-                      <p className="text-xs text-slate-500">Remarks</p>
-                    </div>
-                    <p className="mt-1 pl-6 text-sm font-medium text-slate-800">{verificationRemarks || 'No remarks recorded'}</p>
-                  </div>
-                </div>
-              </Card>
-
-              {/* Extra profile sections for verified employers */}
-              {verificationStatus !== 'pending' && (
-                <>
-                  <Card>
-                    <CardHeader title="Data Quality Flags" subtitle="Operational indicators for follow-up." />
-                    <div className="flex flex-wrap gap-2">
-                      {Object.entries(dataQualityFlags || {}).filter(([, value]) => value).map(([key]) => <Badge key={key} status="warning">{labelForFlag(key)}</Badge>)}
-                      {!Object.values(dataQualityFlags || {}).some(Boolean) && <span className="text-sm text-slate-500">No flags detected.</span>}
-                    </div>
-                  </Card>
-
-                  <Card>
-                    <CardHeader title="Job Fair Participation" subtitle="Events the employer joined." />
-                    {jobFairParticipation?.length ? (
-                      <div className="space-y-2">
-                        {jobFairParticipation.map((fair) => <div key={fair.id} className="rounded-xl border border-slate-200 bg-slate-50 p-3"><p className="text-sm font-bold text-slate-800">{fair.name}</p><p className="mt-1 text-xs text-slate-500">{formatDate(fair.date)}</p></div>)}
-                      </div>
-                    ) : <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 p-5 text-center"><p className="text-sm text-slate-500">No job fair participation records.</p></div>}
-                  </Card>
-                </>
-              )}
-            </aside>
-          </div>
         </div>
       </div>
       </div>
