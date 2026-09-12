@@ -239,6 +239,147 @@ class JobFairEcosystemFlowTest extends TestCase
     }
 
     /**
+     * Regression test for a bug where accepting an invitation left
+     * participation_status stuck at 'accepted' forever (syncRequirementStatus
+     * silently no-opped because its guard didn't include 'accepted'), which
+     * in turn meant the admin's own Job Fair detail page always showed
+     * "0 of N approved" for a verified employer even though the reused
+     * accreditation documents genuinely satisfied every requirement. This
+     * asserts the admin dashboard sees accurate approved counts straight
+     * from respond() — without the employer ever loading their own portal,
+     * which is what used to (accidentally) populate the data via the old
+     * GET-triggered mutation in eventPayload().
+     */
+    public function test_admin_dashboard_shows_accurate_requirement_progress_right_after_employer_accepts(): void
+    {
+        Storage::fake('local');
+        $admin = Administrator::create([
+            'first_name' => 'PESO', 'last_name' => 'Manager', 'email' => 'dashboard-admin@example.test',
+            'mobile_number' => '09170000005', 'password' => 'password123', 'role' => 'administrator', 'status' => 'active', 'email_verified_at' => now(),
+        ]);
+        $employer = $this->employer('dashboard-employer@example.test', 'Dashboard Accuracy Corp');
+
+        foreach ([
+            ['mayors_permit', 'permit.pdf'],
+            ['dti_certificate', 'dti.pdf'],
+            ['philJobnet_proof', 'philjobnet.pdf'],
+            ['no_pending_case_certificate', 'no-pending-case.pdf'],
+        ] as [$type, $filename]) {
+            Storage::disk('local')->put("employer_documents/{$filename}", '%PDF-1.4 fake content');
+            DB::table('employer_documents')->insert([
+                'employer_id' => $employer->employer_id, 'document_type' => $type,
+                'document_path' => "employer_documents/{$filename}", 'original_filename' => $filename,
+                'file_size' => 1024, 'mime_type' => 'application/pdf', 'uploaded_at' => now(),
+                'verification_status' => 'approved', 'created_at' => now(), 'updated_at' => now(),
+            ]);
+        }
+        DB::table('job_vacancies')->insert([
+            'employer_id' => $employer->employer_id, 'vacancies_count' => 3, 'status' => 'active',
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        Sanctum::actingAs($admin);
+        $fairId = $this->postJson('/api/admin/job-fairs', [
+            'title' => 'Dashboard Accuracy Job Fair', 'description' => 'Checks the admin sees real progress immediately.',
+            'start_date' => '2026-12-01', 'end_date' => '2026-12-01', 'start_time' => '08:00', 'end_time' => '16:00',
+            'venue' => 'PESO Urdaneta Hall',
+            'province' => 'Pangasinan', 'city_municipality' => 'Urdaneta City', 'barangay' => 'Nancayasan',
+            'sector' => 'local', 'target_sector' => 'Multi-sector',
+            'partner_agencies' => ['DOLE'], 'submission_deadline' => '2026-11-20 17:00:00',
+            'contact_email' => 'peso@example.test', 'maximum_representatives' => 2, 'status' => 'draft',
+        ])->assertCreated()->json('job_fair.job_fair_id');
+        $this->postJson("/api/admin/job-fairs/{$fairId}/publish", ['status' => 'accepting_employers'])->assertOk();
+        $participationId = $this->postJson("/api/admin/job-fairs/{$fairId}/invite", ['employer_id' => $employer->employer_id])
+            ->assertCreated()->json('participation.id');
+
+        // Simulate stray/legacy data — a requirement submission that exists
+        // even though this employer never accepted. The checklist must stay
+        // hidden purely because the status says "invited", regardless of
+        // what submission rows happen to already exist.
+        $strayRequirementId = DB::table('job_fair_requirements')->where('job_fair_id', $fairId)->where('code', 'business_permit')->value('id');
+        DB::table('job_fair_requirement_submissions')->insert([
+            'job_fair_requirement_id' => $strayRequirementId, 'job_fair_employer_id' => $participationId,
+            'employer_id' => $employer->employer_id, 'original_filename' => 'stray.pdf',
+            'status' => 'approved', 'submitted_at' => now(), 'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        Sanctum::actingAs($admin);
+        $beforeAccept = $this->getJson("/api/admin/job-fairs/{$fairId}")->assertOk()->json();
+        $participantBefore = collect($beforeAccept['participants'])->firstWhere('employer_id', $employer->employer_id);
+        $this->assertSame('invited', $participantBefore['status']);
+        $this->assertSame([], $participantBefore['requirements']);
+
+        // The employer accepts — this alone (no employer dashboard visit,
+        // no admin action) must be enough for reused documents to appear.
+        Sanctum::actingAs($employer);
+        $this->postJson("/api/employer/job-fairs/{$fairId}/respond", ['response' => 'accepted'])->assertOk();
+
+        Sanctum::actingAs($admin);
+        $after = $this->getJson("/api/admin/job-fairs/{$fairId}")->assertOk()->json();
+        $participantAfter = collect($after['participants'])->firstWhere('employer_id', $employer->employer_id);
+
+        // 5 of the 7 required requirements (business_permit,
+        // business_registration, philjobnet_registration, job_vacancy_count,
+        // no_pending_case) are covered by a reused document or the
+        // active-posting count; posterized_vacancy and confirmation_slip are
+        // still genuinely outstanding, so the participation correctly lands
+        // on "requirements_pending" — not stuck at "accepted", and not a
+        // misleading "0 of 7" either.
+        $this->assertSame('requirements_pending', $participantAfter['status']);
+        $approvedCount = collect($participantAfter['requirements'])->where('status', 'approved')->count();
+        $this->assertSame(5, $approvedCount);
+    }
+
+    /**
+     * A PESO staff member recording a phone/walk-in acceptance through the
+     * admin's manual participation-status control is a second path into
+     * "accepted" besides the employer's own Accept Invitation click. It must
+     * trigger the exact same auto-satisfaction, or this second door
+     * reintroduces the identical "0 approved" bug this fix targets.
+     */
+    public function test_admin_recording_a_phone_acceptance_also_auto_satisfies_requirements(): void
+    {
+        Storage::fake('local');
+        $admin = Administrator::create([
+            'first_name' => 'PESO', 'last_name' => 'Manager', 'email' => 'phone-admin@example.test',
+            'mobile_number' => '09170000006', 'password' => 'password123', 'role' => 'administrator', 'status' => 'active', 'email_verified_at' => now(),
+        ]);
+        $employer = $this->employer('phone-employer@example.test', 'Phone Accept Corp');
+        DB::table('job_vacancies')->insert([
+            'employer_id' => $employer->employer_id, 'vacancies_count' => 1, 'status' => 'active',
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        Sanctum::actingAs($admin);
+        $fairId = $this->postJson('/api/admin/job-fairs', [
+            'title' => 'Phone Acceptance Job Fair', 'description' => 'Checks the admin-recorded acceptance path.',
+            'start_date' => '2026-12-05', 'end_date' => '2026-12-05', 'start_time' => '08:00', 'end_time' => '16:00',
+            'venue' => 'PESO Urdaneta Hall',
+            'province' => 'Pangasinan', 'city_municipality' => 'Urdaneta City', 'barangay' => 'Nancayasan',
+            'sector' => 'local', 'target_sector' => 'Multi-sector',
+            'partner_agencies' => ['DOLE'], 'submission_deadline' => '2026-11-25 17:00:00',
+            'contact_email' => 'peso@example.test', 'maximum_representatives' => 2, 'status' => 'draft',
+        ])->assertCreated()->json('job_fair.job_fair_id');
+        $this->postJson("/api/admin/job-fairs/{$fairId}/publish", ['status' => 'accepting_employers'])->assertOk();
+        $participationId = $this->postJson("/api/admin/job-fairs/{$fairId}/invite", ['employer_id' => $employer->employer_id])
+            ->assertCreated()->json('participation.id');
+
+        // PESO calls the employer, who verbally accepts — recorded manually,
+        // with no employer self-service action at all.
+        $this->patchJson("/api/admin/job-fairs/{$fairId}/participants/{$participationId}", [
+            'status' => 'accepted', 'confirmation_channel' => 'phone',
+        ])->assertOk();
+
+        $after = $this->getJson("/api/admin/job-fairs/{$fairId}")->assertOk()->json();
+        $participant = collect($after['participants'])->firstWhere('employer_id', $employer->employer_id);
+
+        $this->assertSame('requirements_pending', $participant['status']);
+        $jobVacancyCount = collect($participant['requirements'])->firstWhere('label', 'Job Vacancy Count');
+        $this->assertNotNull($jobVacancyCount, 'Job Vacancy Count should be auto-satisfied even for a phone-recorded acceptance.');
+        $this->assertSame('approved', $jobVacancyCount['status']);
+    }
+
+    /**
      * The admin used to have to review every requirement AND then separately
      * flip a raw participation_status dropdown to "approved" by hand.
      * syncRequirementStatus() now does that second step automatically —

@@ -58,7 +58,7 @@ class EmployerJobFairController extends Controller
         return response()->json(['message' => 'Interest recorded. PESO may also confirm your participation by phone or email.', 'participation' => $participation]);
     }
 
-    public function respond(Request $request, JobFair $jobFair): JsonResponse
+    public function respond(Request $request, JobFair $jobFair, JobFairService $service): JsonResponse
     {
         $employer = $this->employer($request);
         $validated = $request->validate(['response' => ['required', Rule::in(['accepted', 'declined'])], 'remarks' => ['nullable', 'string', 'max:2000']]);
@@ -69,10 +69,16 @@ class EmployerJobFairController extends Controller
             'remarks' => $validated['remarks'] ?? $participation->remarks,
         ]);
 
-        return response()->json(['message' => 'Invitation response saved.', 'participation' => $participation->fresh()]);
+        if ($validated['response'] === 'accepted') {
+            $service->processAcceptance($jobFair, $participation);
+        }
+
+        $participation = $participation->fresh(['requirementSubmissions.requirement']);
+
+        return response()->json(['message' => 'Invitation response saved.', 'participation' => $service->participationPayload($participation)]);
     }
 
-    public function uploadRequirement(Request $request, JobFair $jobFair, JobFairRequirement $requirement): JsonResponse
+    public function uploadRequirement(Request $request, JobFair $jobFair, JobFairRequirement $requirement, JobFairService $service): JsonResponse
     {
         $employer = $this->employer($request);
         abort_unless($requirement->job_fair_id === $jobFair->job_fair_id, 404);
@@ -105,7 +111,7 @@ class EmployerJobFairController extends Controller
         }
 
         if ($oldPath && $oldPath !== $path) Storage::disk('local')->delete($oldPath);
-        $this->syncRequirementStatus($participation);
+        $service->syncRequirementStatus($participation);
         Notification::send(Administrator::query()->where('status', 'active')->get(), new JobFairNotification($jobFair, 'requirements_submitted', $participation));
 
         return response()->json(['message' => 'Requirement submitted for PESO review.', 'submission' => [
@@ -135,7 +141,7 @@ class EmployerJobFairController extends Controller
         ]);
     }
 
-    public function confirmation(Request $request, JobFair $jobFair): JsonResponse
+    public function confirmation(Request $request, JobFair $jobFair, JobFairService $service): JsonResponse
     {
         $employer = $this->employer($request);
         $participation = $this->participation($jobFair, $employer);
@@ -179,7 +185,7 @@ class EmployerJobFairController extends Controller
                 ['job_fair_requirement_id' => $confirmationRequirement->id, 'job_fair_employer_id' => $participation->id],
                 ['employer_id' => $employer->employer_id, 'status' => 'submitted', 'original_filename' => 'Digital confirmation slip', 'submitted_at' => now()],
             );
-            $this->syncRequirementStatus($participation);
+            $service->syncRequirementStatus($participation);
         }
 
         return response()->json(['message' => 'Confirmation slip submitted.', 'confirmation_slip' => $slip->fresh(['vacancies'])]);
@@ -281,27 +287,4 @@ class EmployerJobFairController extends Controller
         return $request->user();
     }
 
-    // Mirrors JobFairService::syncRequirementStatus() exactly — kept as a
-    // separate copy since this controller doesn't otherwise depend on that
-    // service, not because the logic is meant to diverge.
-    private function syncRequirementStatus(JobFairEmployer $participation): void
-    {
-        if (! in_array($participation->participation_status, ['requirements_pending', 'requirements_submitted'], true)) {
-            return;
-        }
-
-        $requiredIds = $participation->jobFair->requirements()->where('is_required', true)->pluck('id');
-        $submissions = $participation->requirementSubmissions()->whereIn('job_fair_requirement_id', $requiredIds)->get(['status']);
-        $submittedCount = $submissions->whereIn('status', ['submitted', 'approved'])->count();
-        $approvedCount = $submissions->where('status', 'approved')->count();
-        $required = $requiredIds->count();
-
-        if ($required > 0 && $approvedCount >= $required) {
-            $participation->update(['participation_status' => 'approved', 'approved_at' => now()]);
-            $participation->employer->notify(new JobFairNotification($participation->jobFair, 'participation_approved', $participation));
-            return;
-        }
-
-        $participation->update(['participation_status' => $submittedCount >= $required ? 'requirements_submitted' : 'requirements_pending']);
-    }
 }

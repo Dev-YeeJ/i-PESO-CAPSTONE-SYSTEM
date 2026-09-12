@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowLeft, ArrowRight, CalendarDays, CheckCircle2, Clock3, Download, Eye, FileText, FileUp, Mail, MapPin, Save, ShieldCheck } from 'lucide-react'
 import { AlertBox, Badge, Button, Card, EmptyState, LoadingSkeleton } from '@/components/ui'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -118,6 +118,8 @@ export default function EmployerJobFairDashboard() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
+  const [justAccepted, setJustAccepted] = useState(false)
+  const requirementsCardRef = useRef(null)
 
   const selected = useMemo(() => fairs.find((x) => String(x.job_fair_id) === String(selectedId)), [fairs, selectedId])
 
@@ -158,6 +160,31 @@ export default function EmployerJobFairDashboard() {
       await work()
       setNotice(success)
       await load()
+    } catch (e) {
+      setError(Object.values(e.response?.data?.errors ?? {}).flat().join(' ') || e.response?.data?.message || 'Action failed.')
+    }
+  }
+
+  const acceptInvitation = async () => {
+    setError(''); setNotice('')
+    try {
+      const { participation } = await respondToJobFairInvitation(selected.job_fair_id, 'accepted')
+      // Reflect the accepted/requirements status immediately from this
+      // response instead of waiting on a full reload, then reconcile the
+      // rest of the list (published vacancies, other participants, etc.)
+      // in the background.
+      setFairs((prev) => prev.map((fair) => (
+        String(fair.job_fair_id) === String(selected.job_fair_id) ? { ...fair, participation } : fair
+      )))
+      setNotice('Invitation accepted.')
+      if (participation?.status === 'requirements_pending') {
+        setJustAccepted(true)
+        requestAnimationFrame(() => {
+          requirementsCardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+        })
+        window.setTimeout(() => setJustAccepted(false), 2500)
+      }
+      load()
     } catch (e) {
       setError(Object.values(e.response?.data?.errors ?? {}).flat().join(' ') || e.response?.data?.message || 'Action failed.')
     }
@@ -279,7 +306,7 @@ export default function EmployerJobFairDashboard() {
               )}
               {selected.participation?.status === 'invited' && (
                 <>
-                  <Button onClick={() => act(() => respondToJobFairInvitation(selected.job_fair_id, 'accepted'), 'Invitation accepted.')}>Accept Invitation</Button>
+                  <Button onClick={acceptInvitation}>Accept Invitation</Button>
                   <Button variant="outline" onClick={() => act(() => respondToJobFairInvitation(selected.job_fair_id, 'declined'), 'Invitation declined.')}>Decline</Button>
                 </>
               )}
@@ -288,9 +315,13 @@ export default function EmployerJobFairDashboard() {
           </Card>
 
           {selected.participation && (
-            <Card padding="none">
-              <div className="border-b border-slate-100 p-5 pb-0">
-                <Tabs defaultValue="requirements">
+            <div
+              ref={requirementsCardRef}
+              className={`rounded-xl transition-shadow ${justAccepted ? 'ring-2 ring-emerald-400 ring-offset-2' : ''}`}
+            >
+              <Card padding="none">
+                <div className="border-b border-slate-100 p-5 pb-0">
+                  <Tabs defaultValue="requirements">
                   <TabsList>
                     <TabsTrigger value="requirements">
                       1. Requirements {requirementsDone && <CheckCircle2 className="ml-1 inline h-3.5 w-3.5 text-emerald-600" />}
@@ -452,6 +483,7 @@ export default function EmployerJobFairDashboard() {
                 </Tabs>
               </div>
             </Card>
+            </div>
           )}
         </div>
       )}

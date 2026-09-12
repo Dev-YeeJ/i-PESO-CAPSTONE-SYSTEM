@@ -351,7 +351,7 @@ class JobFairController extends Controller
         return $notified;
     }
 
-    public function participationStatus(Request $request, JobFair $jobFair, JobFairEmployer $participation): JsonResponse
+    public function participationStatus(Request $request, JobFair $jobFair, JobFairEmployer $participation, JobFairService $service): JsonResponse
     {
         $admin = $this->admin($request);
         abort_unless($participation->job_fair_id === $jobFair->job_fair_id, 404);
@@ -369,7 +369,17 @@ class JobFairController extends Controller
         if (in_array($validated['status'], ['approved', 'rejected'], true)) {
             $participation->employer->notify(new JobFairNotification($jobFair, 'participation_'.$validated['status'], $participation));
         }
-        return response()->json(['message' => 'Participation status updated.', 'participation' => $participation->fresh()]);
+
+        // A PESO staff member recording a phone/walk-in acceptance on the
+        // employer's behalf needs the exact same auto-satisfaction the
+        // employer's own "Accept Invitation" click triggers — otherwise this
+        // second acceptance path leaves the requirement checklist just as
+        // empty as the bug being fixed here.
+        if ($validated['status'] === 'accepted') {
+            $service->processAcceptance($jobFair, $participation);
+        }
+
+        return response()->json(['message' => 'Participation status updated.', 'participation' => $service->participationPayload($participation->fresh(['requirementSubmissions.requirement']))]);
     }
 
     public function reviewRequirement(Request $request, JobFairRequirementSubmission $submission, JobFairService $service): JsonResponse
