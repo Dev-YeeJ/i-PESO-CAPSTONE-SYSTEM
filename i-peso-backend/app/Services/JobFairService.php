@@ -11,6 +11,7 @@ use App\Models\JobFairRequirement;
 use App\Models\JobFairRequirementSubmission;
 use App\Models\JobSeeker;
 use App\Models\JobVacancy;
+use App\Notifications\JobFairNotification;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
@@ -416,11 +417,38 @@ class JobFairService
         };
     }
 
-    private function syncRequirementStatus(JobFairEmployer $participation): void
+    /**
+     * Recomputes participation_status from actual submission state — never
+     * a manual admin pick for these three values. Only touches a
+     * participation still in the requirements-gathering phase, so it never
+     * downgrades a decisive manual call (rejected/attended/no_show) or a
+     * later report-stage status back into this pipeline.
+     *
+     * Once every *required* requirement is individually approved (whether
+     * by an admin reviewing a submission, or auto-satisfied/reused without
+     * ever needing review), this jumps straight to "approved" instead of
+     * sitting at "requirements_submitted" waiting for someone to notice and
+     * flip a separate status dropdown by hand.
+     */
+    public function syncRequirementStatus(JobFairEmployer $participation): void
     {
-        $required = $participation->jobFair->requirements()->where('is_required', true)->count();
-        $submitted = $participation->requirementSubmissions()->whereIn('status', ['submitted', 'approved'])->count();
-        $participation->update(['participation_status' => $submitted >= $required ? 'requirements_submitted' : 'requirements_pending']);
+        if (! in_array($participation->participation_status, ['requirements_pending', 'requirements_submitted'], true)) {
+            return;
+        }
+
+        $requiredIds = $participation->jobFair->requirements()->where('is_required', true)->pluck('id');
+        $submissions = $participation->requirementSubmissions()->whereIn('job_fair_requirement_id', $requiredIds)->get(['status']);
+        $submittedCount = $submissions->whereIn('status', ['submitted', 'approved'])->count();
+        $approvedCount = $submissions->where('status', 'approved')->count();
+        $required = $requiredIds->count();
+
+        if ($required > 0 && $approvedCount >= $required) {
+            $participation->update(['participation_status' => 'approved', 'approved_at' => now()]);
+            $participation->employer->notify(new JobFairNotification($participation->jobFair, 'participation_approved', $participation));
+            return;
+        }
+
+        $participation->update(['participation_status' => $submittedCount >= $required ? 'requirements_submitted' : 'requirements_pending']);
     }
 
     public function dashboard(JobFair $fair): array

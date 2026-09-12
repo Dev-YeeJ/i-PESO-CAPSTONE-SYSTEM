@@ -281,10 +281,27 @@ class EmployerJobFairController extends Controller
         return $request->user();
     }
 
+    // Mirrors JobFairService::syncRequirementStatus() exactly — kept as a
+    // separate copy since this controller doesn't otherwise depend on that
+    // service, not because the logic is meant to diverge.
     private function syncRequirementStatus(JobFairEmployer $participation): void
     {
-        $required = $participation->jobFair->requirements()->where('is_required', true)->count();
-        $submitted = $participation->requirementSubmissions()->whereIn('status', ['submitted', 'approved'])->count();
-        $participation->update(['participation_status' => $submitted >= $required ? 'requirements_submitted' : 'requirements_pending']);
+        if (! in_array($participation->participation_status, ['requirements_pending', 'requirements_submitted'], true)) {
+            return;
+        }
+
+        $requiredIds = $participation->jobFair->requirements()->where('is_required', true)->pluck('id');
+        $submissions = $participation->requirementSubmissions()->whereIn('job_fair_requirement_id', $requiredIds)->get(['status']);
+        $submittedCount = $submissions->whereIn('status', ['submitted', 'approved'])->count();
+        $approvedCount = $submissions->where('status', 'approved')->count();
+        $required = $requiredIds->count();
+
+        if ($required > 0 && $approvedCount >= $required) {
+            $participation->update(['participation_status' => 'approved', 'approved_at' => now()]);
+            $participation->employer->notify(new JobFairNotification($participation->jobFair, 'participation_approved', $participation));
+            return;
+        }
+
+        $participation->update(['participation_status' => $submittedCount >= $required ? 'requirements_submitted' : 'requirements_pending']);
     }
 }

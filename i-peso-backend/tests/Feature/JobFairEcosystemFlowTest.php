@@ -238,6 +238,71 @@ class JobFairEcosystemFlowTest extends TestCase
         $this->assertNull($jobVacancyCount);
     }
 
+    /**
+     * The admin used to have to review every requirement AND then separately
+     * flip a raw participation_status dropdown to "approved" by hand.
+     * syncRequirementStatus() now does that second step automatically —
+     * this locks in that it only fires once every required requirement is
+     * actually approved, not merely submitted.
+     */
+    public function test_participation_auto_approves_once_every_required_requirement_is_approved(): void
+    {
+        Storage::fake('local');
+        $admin = Administrator::create([
+            'first_name' => 'PESO', 'last_name' => 'Manager', 'email' => 'autoapprove-admin@example.test',
+            'mobile_number' => '09170000004', 'password' => 'password123', 'role' => 'administrator', 'status' => 'active', 'email_verified_at' => now(),
+        ]);
+        $employer = $this->employer('autoapprove-employer@example.test', 'Auto Approve Corp');
+
+        Sanctum::actingAs($admin);
+        $fairId = $this->postJson('/api/admin/job-fairs', [
+            'title' => 'Auto Approve Job Fair', 'description' => 'Checks the automatic participation approval.',
+            'start_date' => '2026-11-20', 'end_date' => '2026-11-20', 'start_time' => '08:00', 'end_time' => '16:00',
+            'venue' => 'PESO Urdaneta Hall',
+            'province' => 'Pangasinan', 'city_municipality' => 'Urdaneta City', 'barangay' => 'Nancayasan',
+            'sector' => 'local', 'target_sector' => 'Multi-sector',
+            'partner_agencies' => ['DOLE'], 'submission_deadline' => '2026-11-05 17:00:00',
+            'contact_email' => 'peso@example.test', 'maximum_representatives' => 2, 'status' => 'draft',
+        ])->assertCreated()->json('job_fair.job_fair_id');
+        $this->postJson("/api/admin/job-fairs/{$fairId}/publish", ['status' => 'accepting_employers'])->assertOk();
+        $this->postJson("/api/admin/job-fairs/{$fairId}/invite", ['employer_id' => $employer->employer_id])->assertCreated();
+
+        Sanctum::actingAs($employer);
+        $this->postJson("/api/employer/job-fairs/{$fairId}/respond", ['response' => 'accepted'])->assertOk();
+
+        $participation = DB::table('job_fair_employers')
+            ->where('job_fair_id', $fairId)->where('employer_id', $employer->employer_id)->first();
+        $requirementIds = DB::table('job_fair_requirements')->where('job_fair_id', $fairId)->where('is_required', true)->pluck('id');
+        $this->assertGreaterThan(1, $requirementIds->count(), 'Sanity check: a job fair should have more than one required requirement.');
+
+        // Seed a submitted-but-unreviewed submission for every required
+        // requirement, mirroring where a fully self-service employer would
+        // be right before an admin starts reviewing.
+        foreach ($requirementIds as $requirementId) {
+            DB::table('job_fair_requirement_submissions')->insert([
+                'job_fair_requirement_id' => $requirementId, 'job_fair_employer_id' => $participation->id,
+                'employer_id' => $employer->employer_id, 'original_filename' => 'doc.pdf',
+                'status' => 'submitted', 'submitted_at' => now(), 'created_at' => now(), 'updated_at' => now(),
+            ]);
+        }
+        DB::table('job_fair_employers')->where('id', $participation->id)->update(['participation_status' => 'requirements_submitted']);
+
+        Sanctum::actingAs($admin);
+        $submissionIds = DB::table('job_fair_requirement_submissions')->where('job_fair_employer_id', $participation->id)->pluck('id');
+
+        // Approving all but the last one should not yet flip participation —
+        // it's still incomplete.
+        foreach ($submissionIds->slice(0, -1) as $submissionId) {
+            $this->patchJson("/api/admin/job-fair-requirements/{$submissionId}/review", ['status' => 'approved'])->assertOk();
+        }
+        $this->assertDatabaseHas('job_fair_employers', ['id' => $participation->id, 'participation_status' => 'requirements_submitted']);
+
+        // Approving the very last required requirement should auto-complete
+        // participation without any separate manual status change.
+        $this->patchJson("/api/admin/job-fair-requirements/{$submissionIds->last()}/review", ['status' => 'approved'])->assertOk();
+        $this->assertDatabaseHas('job_fair_employers', ['id' => $participation->id, 'participation_status' => 'approved']);
+    }
+
     public function test_seeker_poster_feed_only_shows_approved_posterized_vacancy_submissions(): void
     {
         Storage::fake('local');

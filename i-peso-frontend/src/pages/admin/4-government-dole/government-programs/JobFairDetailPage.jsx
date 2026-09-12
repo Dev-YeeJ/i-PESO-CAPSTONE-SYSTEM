@@ -3,7 +3,7 @@ import { CheckCircle2, ClipboardEdit, Download, Eye, FileText, Flame, Mail, Refr
 import { useNavigate, useParams } from 'react-router-dom'
 import { AlertBox, Badge, Button, Card, CardHeader, LoadingSkeleton, StatCard } from '@/components/ui'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
-import { Select, SelectGroup, SelectLabel, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import PageHeader from '@/pages/admin/_components/PageHeader'
 import LocationPreviewCard from '@/components/maps/LocationPreviewCard'
@@ -12,8 +12,11 @@ import JobFairResultEntryEditor from '@/components/reports/JobFairResultEntryEdi
 import ConfirmationVacancyEditor, { blankConfirmationVacancy, stripBlankConfirmationVacancies } from '@/components/reports/ConfirmationVacancyEditor'
 import { adminService } from '@/services/adminService'
 
-// Grouped by the same tone used for the status Badge, so the grouping in the
-// dropdown and the color once selected always agree.
+// Every possible participation_status value, grouped only to color the
+// read-only status Badge — most of these are computed automatically
+// (invited/interested/accepted/declined/requirements_pending/
+// requirements_submitted/approved/encoded_results/report_generated), not
+// admin picks. See MANUAL_STATUS_ACTIONS below for the ones that still are.
 const statusGroups = [
   { label: 'Pending', tone: 'pending', statuses: ['invited', 'interested', 'called_peso', 'pending_response', 'requirements_pending'] },
   { label: 'In review', tone: 'review', statuses: ['accepted', 'under_review', 'requirements_submitted'] },
@@ -21,6 +24,21 @@ const statusGroups = [
   { label: 'Rejected', tone: 'rejected', statuses: ['declined', 'rejected', 'no_show'] },
 ]
 const statusTones = Object.fromEntries(statusGroups.flatMap((g) => g.statuses.map((s) => [s, g.tone])))
+
+// The only participation_status values with no automatic trigger anywhere
+// in the system — a phone call, a decisive rejection, or physical
+// attendance genuinely need an admin to say so. Phrased as actions rather
+// than raw status nouns, and never pre-selected to the current status
+// (which usually isn't one of these), since this is "record an event",
+// not "edit a field".
+const MANUAL_STATUS_ACTIONS = [
+  ['called_peso', 'Log phone call'],
+  ['pending_response', 'Mark pending response'],
+  ['under_review', 'Move to under review'],
+  ['rejected', 'Reject participation'],
+  ['attended', 'Mark attended'],
+  ['no_show', 'Mark no-show'],
+]
 
 // Matches StatCard's own color token names, resized for a compact inline swatch.
 const statTone = {
@@ -333,15 +351,14 @@ export default function JobFairDetailPage() {
                       {totalReqs ? `${approvedReqs}/${totalReqs} requirements approved` : 'View requirements'}
                     </button>
 
-                    <Select value={p.status} onValueChange={(value) => action(() => adminService.updateJobFairParticipation(id, p.id, { status: value }), 'Participation updated.')}>
-                      <SelectTrigger className="mt-auto"><SelectValue /></SelectTrigger>
+                    {/* Status above is computed automatically wherever possible (see
+                        syncRequirementStatus). This is only for the handful of
+                        events nothing else can detect — it always resets to the
+                        placeholder rather than mirroring the current status. */}
+                    <Select value="" onValueChange={(value) => action(() => adminService.updateJobFairParticipation(id, p.id, { status: value }), 'Participation updated.')}>
+                      <SelectTrigger className="mt-auto"><SelectValue placeholder="Record a manual event…" /></SelectTrigger>
                       <SelectContent>
-                        {statusGroups.map((group) => (
-                          <SelectGroup key={group.label}>
-                            <SelectLabel>{group.label}</SelectLabel>
-                            {group.statuses.map((s) => <SelectItem key={s} value={s}>{s.replaceAll('_', ' ')}</SelectItem>)}
-                          </SelectGroup>
-                        ))}
+                        {MANUAL_STATUS_ACTIONS.map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}
                       </SelectContent>
                     </Select>
                   </div>

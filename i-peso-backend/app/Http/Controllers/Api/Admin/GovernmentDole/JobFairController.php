@@ -372,7 +372,7 @@ class JobFairController extends Controller
         return response()->json(['message' => 'Participation status updated.', 'participation' => $participation->fresh()]);
     }
 
-    public function reviewRequirement(Request $request, JobFairRequirementSubmission $submission): JsonResponse
+    public function reviewRequirement(Request $request, JobFairRequirementSubmission $submission, JobFairService $service): JsonResponse
     {
         $admin = $this->admin($request);
         $validated = $request->validate(['status' => ['required', Rule::in(['approved', 'rejected'])], 'admin_remarks' => ['nullable', 'string', 'max:3000']]);
@@ -380,6 +380,17 @@ class JobFairController extends Controller
             return response()->json(['message' => 'A rejection remark is required.', 'errors' => ['admin_remarks' => ['Explain what must be corrected.']]], 422);
         }
         $submission->update([...$validated, 'reviewed_at' => now(), 'reviewed_by' => $admin->admin_id]);
+
+        // Mirrors the employer-accreditation pattern (approve every document,
+        // the account itself becomes verified with no separate step): an
+        // admin who has already approved each individual requirement
+        // shouldn't also have to remember to flip participation_status to
+        // "approved" by hand — syncRequirementStatus() already does exactly
+        // this check for the auto-satisfied/reused-document paths.
+        if ($submission->participation) {
+            $service->syncRequirementStatus($submission->participation);
+        }
+
         return response()->json(['message' => 'Requirement review saved.', 'submission' => $submission->fresh()]);
     }
 
