@@ -1,9 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { CalendarDays, CheckCircle2, Clock3, Download, Eye, FileText, FileUp, MapPin, Save, ShieldCheck } from 'lucide-react'
-import { AlertBox, Badge, Button, Card, CardHeader, LoadingSkeleton } from '@/components/ui'
+import { ArrowLeft, ArrowRight, CalendarDays, CheckCircle2, Clock3, Download, Eye, FileText, FileUp, Mail, MapPin, Save, ShieldCheck } from 'lucide-react'
+import { AlertBox, Badge, Button, Card, LoadingSkeleton } from '@/components/ui'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import EstablishmentReportPreview from '@/components/reports/EstablishmentReportPreview'
 import JobFairResultEntryEditor from '@/components/reports/JobFairResultEntryEditor'
 import ConfirmationVacancyEditor, { blankConfirmationVacancy, stripBlankConfirmationVacancies } from '@/components/reports/ConfirmationVacancyEditor'
@@ -68,6 +67,43 @@ function FormField({ label, value, onChange, type = 'text', textarea = false, cl
   )
 }
 
+function DetailChip({ icon: Icon, label, value, action }) {
+  return (
+    <div className="flex items-start gap-3 rounded-xl bg-slate-50 p-3">
+      <span className="mt-0.5 rounded-lg bg-white p-1.5 text-brand-navy shadow-sm">{Icon && <Icon className="h-4 w-4" />}</span>
+      <div className="min-w-0 flex-1">
+        <p className="text-[11px] font-extrabold uppercase tracking-wide text-slate-400">{label}</p>
+        <p className="mt-0.5 truncate text-sm font-semibold text-slate-800">{value || 'Not specified'}</p>
+        {action}
+      </div>
+    </div>
+  )
+}
+
+function JobFairCard({ fair, onClick }) {
+  const status = fair.participation?.status
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="group flex h-full flex-col items-start gap-3 rounded-2xl border border-slate-200 bg-white p-5 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:border-brand-navy hover:shadow-lg"
+    >
+      <div className="flex w-full items-start justify-between gap-2">
+        <h3 className="font-black text-slate-950">{fair.title}</h3>
+        <Badge status={status ? (PARTICIPATION_BADGE[status] ?? 'neutral') : 'neutral'} className="shrink-0">{status ? status.replaceAll('_', ' ') : 'Not joined'}</Badge>
+      </div>
+      {fair.description && <p className="line-clamp-2 text-sm text-slate-500">{fair.description}</p>}
+      <div className="mt-auto flex w-full flex-col gap-1.5 border-t border-slate-100 pt-3 text-xs text-slate-500">
+        <span className="flex items-center gap-1.5"><CalendarDays className="h-3.5 w-3.5 shrink-0 text-slate-400" />{fair.start_date} · {fair.start_time}–{fair.end_time}</span>
+        <span className="flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5 shrink-0 text-slate-400" /><span className="truncate">{fair.venue}</span></span>
+      </div>
+      <span className="mt-1 inline-flex items-center gap-1 text-xs font-bold text-brand-navy opacity-0 transition-opacity group-hover:opacity-100">
+        View details <ArrowRight className="h-3.5 w-3.5" />
+      </span>
+    </button>
+  )
+}
+
 export default function EmployerJobFairDashboard() {
   const [fairs, setFairs] = useState([])
   const [selectedId, setSelectedId] = useState('')
@@ -83,20 +119,19 @@ export default function EmployerJobFairDashboard() {
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
 
-  const selected = useMemo(() => fairs.find((x) => String(x.job_fair_id) === String(selectedId)) ?? fairs[0], [fairs, selectedId])
+  const selected = useMemo(() => fairs.find((x) => String(x.job_fair_id) === String(selectedId)), [fairs, selectedId])
 
   const load = useCallback(async () => {
     setLoading(true)
     try {
       const data = await listEmployerJobFairs()
       setFairs(data)
-      if (!selectedId && data[0]) setSelectedId(String(data[0].job_fair_id))
     } catch (e) {
       setError(e.response?.data?.message ?? 'Unable to load Job Fairs.')
     } finally {
       setLoading(false)
     }
-  }, [selectedId])
+  }, [])
   useEffect(() => { load() }, [load])
 
   useEffect(() => {
@@ -104,6 +139,18 @@ export default function EmployerJobFairDashboard() {
       .then((res) => setMyVacancies((res.data ?? []).filter((v) => v.status === 'active')))
       .catch(() => setMyVacancies([]))
   }, [])
+
+  // Switching which fair is open discards any unsaved draft — each fair
+  // gets its own confirmation/results form, not a shared one that leaks
+  // between events.
+  useEffect(() => {
+    setConfirmation(blankConfirmation)
+    setConfirmationVacancies([blankConfirmationVacancy()])
+    setEntries([blankResultEntry()])
+    setVacancies({ solicited: 0, offered: 0 })
+    setRemarks('')
+    setClearanceNo('')
+  }, [selectedId])
 
   const act = async (work, success) => {
     setError(''); setNotice('')
@@ -158,7 +205,7 @@ export default function EmployerJobFairDashboard() {
 
   const confirmationRequirement = selected?.requirements?.find((req) => req.code === 'confirmation_slip')
   const confirmationDone = confirmationRequirement
-    ? Boolean(selected.participation?.requirements?.find((x) => x.job_fair_requirement_id === confirmationRequirement.id))
+    ? Boolean(selected?.participation?.requirements?.find((x) => x.job_fair_requirement_id === confirmationRequirement.id))
     : false
   const resultsDone = Boolean(selected?.participation?.result_report?.id)
 
@@ -181,51 +228,64 @@ export default function EmployerJobFairDashboard() {
         <LoadingSkeleton variant="card" rows={2} />
       ) : !fairs.length ? (
         <Card><p className="p-8 text-center text-slate-500">No published Job Fairs are available.</p></Card>
+      ) : !selected ? (
+        <div>
+          <h2 className="text-base font-extrabold text-slate-950">All Job Fairs</h2>
+          <p className="mt-1 text-sm text-slate-500">Select an event to view its coordination record.</p>
+          <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            {fairs.map((fair) => (
+              <JobFairCard key={fair.job_fair_id} fair={fair} onClick={() => setSelectedId(String(fair.job_fair_id))} />
+            ))}
+          </div>
+        </div>
       ) : (
-        <>
-          <Card>
-            <CardHeader title="Job Fair announcement" subtitle="Select an event to view its coordination record." />
-            <Select value={selected?.job_fair_id ? String(selected.job_fair_id) : ''} onValueChange={setSelectedId}>
-              <SelectTrigger><SelectValue placeholder="Select a job fair" /></SelectTrigger>
-              <SelectContent>
-                {fairs.map((f) => <SelectItem key={f.job_fair_id} value={String(f.job_fair_id)}>{f.title}</SelectItem>)}
-              </SelectContent>
-            </Select>
+        <div className="space-y-5">
+          <button type="button" onClick={() => setSelectedId('')} className="flex items-center gap-2 text-sm font-bold text-slate-500 transition-colors hover:text-slate-800">
+            <ArrowLeft className="h-4 w-4" />
+            Back to all Job Fairs
+          </button>
 
-            <div className="mt-5 flex flex-wrap items-start justify-between gap-3">
-              <h2 className="text-xl font-black text-slate-950">{selected?.title}</h2>
-              {selected?.participation?.status && (
-                <Badge status={PARTICIPATION_BADGE[selected.participation.status] ?? 'neutral'}>{selected.participation.status.replaceAll('_', ' ')}</Badge>
+          <Card>
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div className="min-w-0">
+                <h2 className="text-2xl font-black text-slate-950">{selected.title}</h2>
+                {selected.description && <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">{selected.description}</p>}
+              </div>
+              {selected.participation?.status && (
+                <Badge status={PARTICIPATION_BADGE[selected.participation.status] ?? 'neutral'} className="shrink-0">{selected.participation.status.replaceAll('_', ' ')}</Badge>
               )}
             </div>
-            <p className="mt-2 text-sm text-slate-600">{selected?.description}</p>
-            <div className="mt-3 flex flex-wrap gap-4 text-sm text-slate-600">
-              <span className="inline-flex items-center gap-2"><CalendarDays className="h-4 w-4 text-slate-400" />{selected?.start_date} · {selected?.start_time}–{selected?.end_time}</span>
-              <span className="inline-flex items-center gap-2">
-                <MapPin className="h-4 w-4 text-slate-400" />{selected?.venue}
-                {selected?.latitude && selected?.longitude && (
-                  <a href={`https://www.google.com/maps/search/?api=1&query=${selected.latitude},${selected.longitude}`} target="_blank" rel="noopener noreferrer" className="font-bold text-brand-navy hover:underline">
+
+            <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              <DetailChip icon={CalendarDays} label="Date & time" value={`${selected.start_date} · ${selected.start_time}–${selected.end_time}`} />
+              <DetailChip
+                icon={MapPin}
+                label="Venue"
+                value={selected.venue}
+                action={selected.latitude && selected.longitude ? (
+                  <a href={`https://www.google.com/maps/search/?api=1&query=${selected.latitude},${selected.longitude}`} target="_blank" rel="noopener noreferrer" className="mt-1 inline-block text-xs font-bold text-brand-navy hover:underline">
                     Get Directions
                   </a>
-                )}
-              </span>
+                ) : null}
+              />
+              <DetailChip icon={Mail} label="PESO contact" value={selected.contact_email} />
             </div>
 
-            <div className="mt-4 flex flex-wrap gap-2">
-              {!selected?.participation && (
+            <div className="mt-5 flex flex-wrap gap-2 border-t border-slate-100 pt-5">
+              {!selected.participation && (
                 <Button onClick={() => act(() => expressJobFairInterest(selected.job_fair_id), 'Interest sent to PESO.')}>Express Interest</Button>
               )}
-              {selected?.participation?.status === 'invited' && (
+              {selected.participation?.status === 'invited' && (
                 <>
                   <Button onClick={() => act(() => respondToJobFairInvitation(selected.job_fair_id, 'accepted'), 'Invitation accepted.')}>Accept Invitation</Button>
                   <Button variant="outline" onClick={() => act(() => respondToJobFairInvitation(selected.job_fair_id, 'declined'), 'Invitation declined.')}>Decline</Button>
                 </>
               )}
-              <a href={`mailto:${selected?.contact_email ?? ''}`} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50">Contact PESO</a>
+              <a href={`mailto:${selected.contact_email ?? ''}`} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50">Contact PESO</a>
             </div>
           </Card>
 
-          {selected?.participation && (
+          {selected.participation && (
             <Card padding="none">
               <div className="border-b border-slate-100 p-5 pb-0">
                 <Tabs defaultValue="requirements">
@@ -391,7 +451,7 @@ export default function EmployerJobFairDashboard() {
               </div>
             </Card>
           )}
-        </>
+        </div>
       )}
 
       <Dialog open={viewingReport} onOpenChange={setViewingReport}>
