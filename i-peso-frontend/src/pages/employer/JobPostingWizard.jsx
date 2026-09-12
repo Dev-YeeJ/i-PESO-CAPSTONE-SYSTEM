@@ -209,8 +209,8 @@ export default function JobPostingWizard() {
       if (form.minimum_age !== '' && (Number(form.minimum_age) < 18 || Number(form.minimum_age) > 100)) {
         nextErrors.minimum_age = 'Minimum age must be from 18 to 100.'
       }
-      if (form.maximum_age !== '' && (Number(form.maximum_age) < 15 || Number(form.maximum_age) > 100)) {
-        nextErrors.maximum_age = 'Maximum age must be from 15 to 100.'
+      if (form.maximum_age !== '' && (Number(form.maximum_age) < 18 || Number(form.maximum_age) > 100)) {
+        nextErrors.maximum_age = 'Maximum age must be from 18 to 100.'
       }
       if (
         form.minimum_age !== ''
@@ -716,7 +716,7 @@ function DemographicPreferencesStep({ form, errors, change }) {
           <input
             name="maximum_age"
             type="number"
-            min="15"
+            min={form.minimum_age || '18'}
             max="100"
             value={form.maximum_age}
             onChange={change}

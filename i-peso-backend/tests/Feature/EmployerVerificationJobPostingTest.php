@@ -249,6 +249,63 @@ class EmployerVerificationJobPostingTest extends TestCase
         ]);
     }
 
+    /**
+     * maximum_age's floor used to be 15 — stale from before minimum_age was
+     * raised to 18 for every job posting (the legal minimum working age),
+     * so a posting could accept applicants as young as 15 as long as no
+     * minimum_age was also set. Locks in that both ends of the age range
+     * share the same 18-100 floor/ceiling.
+     */
+    public function test_maximum_age_below_the_legal_minimum_is_rejected(): void
+    {
+        $employer = $this->createEmployer();
+        $employer->update(['verification_status' => 'verified']);
+
+        Sanctum::actingAs($employer->fresh());
+        $this->postJson('/api/employer/vacancies', [
+            ...$this->vacancyPayload(),
+            'minimum_age' => null,
+            'maximum_age' => 16,
+        ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['maximum_age']);
+    }
+
+    public function test_maximum_age_at_the_legal_minimum_is_accepted(): void
+    {
+        $employer = $this->createEmployer();
+        $employer->update(['verification_status' => 'verified']);
+
+        Sanctum::actingAs($employer->fresh());
+        $this->postJson('/api/employer/vacancies', [
+            ...$this->vacancyPayload(),
+            'minimum_age' => null,
+            'maximum_age' => 18,
+        ])
+            ->assertCreated();
+
+        $this->assertDatabaseHas('job_vacancies', [
+            'employer_id' => $employer->employer_id,
+            'minimum_age' => null,
+            'maximum_age' => 18,
+        ]);
+    }
+
+    public function test_maximum_age_below_minimum_age_is_rejected(): void
+    {
+        $employer = $this->createEmployer();
+        $employer->update(['verification_status' => 'verified']);
+
+        Sanctum::actingAs($employer->fresh());
+        $this->postJson('/api/employer/vacancies', [
+            ...$this->vacancyPayload(),
+            'minimum_age' => 40,
+            'maximum_age' => 30,
+        ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['maximum_age']);
+    }
+
     public function test_within_radius_scope_returns_nearby_vacancies_with_distance(): void
     {
         $employer = $this->createEmployer();
