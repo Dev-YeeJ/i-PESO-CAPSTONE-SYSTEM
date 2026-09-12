@@ -25,6 +25,11 @@ export const getRequiredDocuments = async () => {
   return response.data
 }
 
+export const setCompanyType = async (companyType) => {
+  const response = await apiClient.post('/employer/register/company-type', { company_type: companyType })
+  return response.data
+}
+
 export const saveRepresentative = async (formData) => {
   const response = await apiClient.post('/employer/register/step-4', formData)
   return response.data

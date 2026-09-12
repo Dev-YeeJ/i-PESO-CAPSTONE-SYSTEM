@@ -24,7 +24,7 @@ export const employerRegistrationSteps = [
   {
     label: 'Legal Documents',
     shortLabel: 'Documents',
-    ready: ['SEC, DTI or CDA registration', 'Mayor’s or business permit', 'BIR Certificate of Registration'],
+    ready: ['Your company’s legal type (sole proprietorship, corporation, agency, etc.)', 'SEC, DTI or CDA registration', 'Mayor’s or business permit', 'BIR Certificate of Registration'],
   },
   {
     label: 'Representative',

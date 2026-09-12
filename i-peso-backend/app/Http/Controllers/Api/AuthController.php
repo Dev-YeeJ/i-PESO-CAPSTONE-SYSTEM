@@ -179,15 +179,12 @@ class AuthController extends Controller
             $rules['first_name']    = ['required', 'string', 'min:2', 'max:100', "regex:/^[\pL\s.'-]+$/u"];
             $rules['last_name']     = ['required', 'string', 'min:2', 'max:100', "regex:/^[\pL\s.'-]+$/u"];
             $rules['mobile_number'] = ['required', 'regex:/^09\d{9}$/'];
-        } else {
-            $rules['company_type'] = ['required', Rule::in([
-                'sole_proprietorship',
-                'corporation_partnership',
-                'local_recruitment_agency',
-                'overseas_recruitment_agency',
-                'government_agency',
-            ])];
         }
+
+        // Employer company type is no longer collected at account creation —
+        // it's picked on the Legal Documents step instead (see
+        // EmployerRegistrationController::setCompanyType()), right where it
+        // actually determines which documents to ask for.
 
         $validated = $request->validate($rules);
 
@@ -212,7 +209,6 @@ class AuthController extends Controller
             return Employer::create([
                 'email'               => $validated['email'],
                 'password'            => Hash::make($validated['password']),
-                'company_type'        => $validated['company_type'],
                 'verification_status' => 'pending',
             ]);
         });

@@ -99,6 +99,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/register/step-3', [EmployerRegistrationController::class, 'registerStep3']);
         Route::post('/register/step-4', [EmployerRegistrationController::class, 'registerStep4']);
         Route::get('/required-documents', [EmployerRegistrationController::class, 'getRequiredDocuments']);
+        Route::post('/register/company-type', [EmployerRegistrationController::class, 'setCompanyType']);
         Route::get('/notifications', [EmployerNotificationController::class, 'index']);
         Route::get('/notifications/unread-count', [EmployerNotificationController::class, 'unreadCount']);
         Route::patch('/notifications/read-all', [EmployerNotificationController::class, 'markAllAsRead']);
