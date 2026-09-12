@@ -1,4 +1,4 @@
-import { createElement, useState } from 'react'
+import { createElement, useEffect, useState } from 'react'
 import {
   ArrowLeft,
   ArrowRight,
@@ -591,31 +591,37 @@ function AlgorithmAnchorsStep({ form, errors, update, setLocation }) {
 
 function QualificationsStep({ form, errors, update }) {
   const [aiSkills, setAiSkills] = useState({ technical: [], soft: [] })
-  const [aiLoading, setAiLoading] = useState(false)
-  const [aiError, setAiError] = useState('')
+  const jobTitle = form.job_title.trim()
+  const vacancyAnchor = form.occupation_mapping?.broadField || form.occupation_mapping?.fieldName || null
 
-  const suggestSkills = async () => {
-    if (!form.job_title.trim()) {
-      setAiError('Add a job title in step 1 before requesting skill suggestions.')
+  useEffect(() => {
+    if (!jobTitle) {
+      setAiSkills({ technical: [], soft: [] })
       return
     }
 
-    setAiLoading(true)
-    setAiError('')
-    try {
-      const { data } = await employerService.suggestJobPosting({
-        job_title: form.job_title,
-        vacancy_anchor: form.occupation_mapping?.broadField || form.occupation_mapping?.fieldName || null,
+    let cancelled = false
+
+    employerService
+      .suggestJobPosting({
+        job_title: jobTitle,
+        vacancy_anchor: vacancyAnchor,
         existing_technical_skills: form.required_skills,
         existing_soft_skills: form.soft_skills,
       })
-      setAiSkills({ technical: data?.suggested_technical_skills ?? [], soft: data?.suggested_soft_skills ?? [] })
-    } catch (err) {
-      setAiError(err.response?.data?.message ?? 'AI could not suggest skills right now. You can still search or type your own below.')
-    } finally {
-      setAiLoading(false)
+      .then(({ data }) => {
+        if (cancelled) return
+        setAiSkills({ technical: data?.suggested_technical_skills ?? [], soft: data?.suggested_soft_skills ?? [] })
+      })
+      .catch(() => {
+        if (!cancelled) setAiSkills({ technical: [], soft: [] })
+      })
+
+    return () => {
+      cancelled = true
     }
-  }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [jobTitle, vacancyAnchor])
 
   return (
     <StepShell
@@ -645,19 +651,7 @@ function QualificationsStep({ form, errors, update }) {
         />
       </div>
 
-      <div className="mt-6 flex flex-wrap items-center justify-between gap-2">
-        <p className="text-sm font-bold text-slate-700">Skills for {form.job_title || 'this role'}</p>
-        <button
-          type="button"
-          onClick={suggestSkills}
-          disabled={aiLoading}
-          className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-50 px-3 py-2 text-xs font-black text-indigo-600 ring-1 ring-indigo-100 transition hover:bg-indigo-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          {aiLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
-          {aiLoading ? 'Suggesting…' : 'AI Suggest Skills'}
-        </button>
-      </div>
-      {aiError && <p className="mt-1.5 text-xs font-semibold text-red-600">{aiError}</p>}
+      <p className="mt-6 text-sm font-bold text-slate-700">Skills for {form.job_title || 'this role'}</p>
 
       <div className="mt-3 grid gap-5 lg:grid-cols-2">
         <SkillTaxonomyTags
