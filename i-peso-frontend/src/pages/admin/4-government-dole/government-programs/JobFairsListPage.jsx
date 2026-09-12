@@ -1,28 +1,48 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { CalendarCheck2, CalendarClock, CalendarDays, Download, Filter, Pencil, Plus, Radio, Search, SlidersHorizontal, Trash2, UsersRound } from 'lucide-react'
+import { CalendarCheck2, CalendarClock, CalendarDays, CheckCircle2, ClipboardEdit, Flame, Pencil, Plus, Radio, Search, Trash2, Users, UsersRound, X } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import { Button, Card, EmptyState, LoadingSkeleton, StatCard } from '@/components/ui'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { ConfirmModal, PageHeader, StatusBadge } from '@/pages/admin/_components'
 import { adminService } from '@/services/adminService'
 
 const formatDate = (value) => value ? new Date(value).toLocaleDateString() : 'TBD'
 
-const metricCards = [
-  ['approved', 'Approved'],
-  ['total_applicants', 'Applicants'],
-  ['total_hots', 'HOTS'],
-  ['proxy_reports', 'Proxy Reports'],
+const metricTiles = [
+  ['approved', 'Approved', CheckCircle2, 'border-emerald-100 bg-emerald-50 text-emerald-700'],
+  ['total_applicants', 'Applicants', Users, 'border-blue-100 bg-blue-50 text-blue-700'],
+  ['total_hots', 'HOTS', Flame, 'border-amber-100 bg-amber-50 text-amber-700'],
+  ['proxy_reports', 'Proxy Reports', ClipboardEdit, 'border-violet-100 bg-violet-50 text-violet-700'],
 ]
+
+const statusOptions = [
+  ['all', 'All statuses'], ['draft', 'Draft'], ['published', 'Published'], ['accepting_employers', 'Accepting employers'],
+  ['upcoming', 'Upcoming'], ['ongoing', 'Ongoing'], ['closed', 'Closed'], ['completed', 'Completed'], ['cancelled', 'Cancelled'],
+]
+const sectorOptions = [['all', 'All sectors'], ['local', 'Local'], ['overseas', 'Overseas'], ['both', 'Local & Overseas']]
+const sortOptions = [['newest', 'Newest first'], ['oldest', 'Oldest first'], ['title', 'Title A-Z']]
 
 const initialFilters = { search: '', status: 'all', sector: 'all', sort: 'newest' }
 
+function FilterSelect({ label, value, onChange, options, className = '' }) {
+  return (
+    <label className={className}>
+      <span className="text-xs font-extrabold uppercase tracking-wide text-slate-500">{label}</span>
+      <Select value={value} onValueChange={onChange}>
+        <SelectTrigger className="mt-2"><SelectValue /></SelectTrigger>
+        <SelectContent>
+          {options.map(([value_, optionLabel]) => <SelectItem key={value_} value={value_}>{optionLabel}</SelectItem>)}
+        </SelectContent>
+      </Select>
+    </label>
+  )
+}
+
 export default function JobFairsListPage() {
-  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false)
   const [page, setPage] = useState(1)
-  const [downloadError, setDownloadError] = useState('')
   const [pendingDelete, setPendingDelete] = useState(null)
   const navigate = useNavigate()
   const queryClient = useQueryClient()
@@ -69,9 +89,7 @@ export default function JobFairsListPage() {
   const fairs = jobFairsQuery.data?.data ?? []
   const pagination = jobFairsQuery.data ?? {}
   const loading = jobFairsQuery.isLoading
-  const errorMessage = jobFairsQuery.isError
-    ? jobFairsQuery.error?.response?.data?.message ?? 'Unable to load job fairs.'
-    : downloadError
+  const errorMessage = jobFairsQuery.isError ? jobFairsQuery.error?.response?.data?.message ?? 'Unable to load job fairs.' : ''
 
   const refresh = () => { jobFairsQuery.refetch(); summaryQuery.refetch() }
 
@@ -87,20 +105,6 @@ export default function JobFairsListPage() {
       caught?.response?.data?.message ?? 'Unable to delete this job fair.',
     ),
   })
-
-  const downloadSprs = async (fair) => {
-    try {
-      const blob = await adminService.downloadJobFairSprs(fair.job_fair_id)
-      const url = URL.createObjectURL(blob)
-      const link = document.createElement('a')
-      link.href = url
-      link.download = `sprs-1-6-${fair.job_fair_id}.pdf`
-      link.click()
-      URL.revokeObjectURL(url)
-    } catch (requestError) {
-      setDownloadError(requestError.response?.data?.message ?? 'Unable to generate SPRS report.')
-    }
-  }
 
   return (
     <div className="portal-page">
@@ -123,57 +127,18 @@ export default function JobFairsListPage() {
 
       <Card padding="sm">
         <div className="flex flex-wrap items-end gap-3">
-          <label className="min-w-[260px] flex-1">
-            <span className="text-xs font-extrabold uppercase tracking-wide text-slate-500">Search job fairs</span>
+          <label className="min-w-[220px] flex-1">
+            <span className="text-xs font-extrabold uppercase tracking-wide text-slate-500">Search</span>
             <div className="relative mt-2">
               <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
               <input value={filters.search} onChange={(e) => updateFilter('search', e.target.value)} placeholder="Search by title" className="w-full rounded-xl border border-slate-300 py-2.5 pl-10 pr-4 text-sm focus:border-brand-navy focus:ring-2 focus:ring-brand-navy/10" />
             </div>
           </label>
-          <label className="w-full sm:w-48">
-            <span className="text-xs font-extrabold uppercase tracking-wide text-slate-500">Status</span>
-            <select value={filters.status} onChange={(e) => updateFilter('status', e.target.value)} className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm">
-              <option value="all">All statuses</option>
-              <option value="draft">Draft</option>
-              <option value="published">Published</option>
-              <option value="accepting_employers">Accepting employers</option>
-              <option value="upcoming">Upcoming</option>
-              <option value="ongoing">Ongoing</option>
-              <option value="closed">Closed</option>
-              <option value="completed">Completed</option>
-              <option value="cancelled">Cancelled</option>
-            </select>
-          </label>
-          <Button variant="outline" icon={SlidersHorizontal} onClick={() => setShowAdvancedFilters((current) => !current)}>{showAdvancedFilters ? 'Hide filters' : 'More filters'}</Button>
+          <FilterSelect label="Status" value={filters.status} onChange={(v) => updateFilter('status', v)} options={statusOptions} className="w-full sm:w-44" />
+          <FilterSelect label="Sector" value={filters.sector} onChange={(v) => updateFilter('sector', v)} options={sectorOptions} className="w-full sm:w-40" />
+          <FilterSelect label="Sort" value={filters.sort} onChange={(v) => updateFilter('sort', v)} options={sortOptions} className="w-full sm:w-44" />
+          {filtersActive && <Button variant="outline" size="sm" icon={X} onClick={clearFilters}>Reset</Button>}
         </div>
-
-        {showAdvancedFilters && (
-          <div className="mt-5 grid gap-3 sm:grid-cols-2">
-            <label>
-              <span className="text-xs font-extrabold uppercase tracking-wide text-slate-500">Sector</span>
-              <select value={filters.sector} onChange={(e) => updateFilter('sector', e.target.value)} className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm">
-                <option value="all">All sectors</option>
-                <option value="local">Local</option>
-                <option value="overseas">Overseas</option>
-                <option value="both">Local & Overseas</option>
-              </select>
-            </label>
-            <label>
-              <span className="text-xs font-extrabold uppercase tracking-wide text-slate-500">Sort</span>
-              <select value={filters.sort} onChange={(e) => updateFilter('sort', e.target.value)} className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm">
-                <option value="newest">Newest first</option>
-                <option value="oldest">Oldest first</option>
-                <option value="title">Title A-Z</option>
-              </select>
-            </label>
-          </div>
-        )}
-
-        {filtersActive && (
-          <div className="mt-5 flex flex-wrap items-center gap-2">
-            <Button variant="outline" size="sm" icon={Filter} onClick={clearFilters}>Reset filters</Button>
-          </div>
-        )}
       </Card>
 
       {errorMessage && (
@@ -208,11 +173,14 @@ export default function JobFairsListPage() {
                     <span>{formatDate(fair.start_date)} to {formatDate(fair.end_date)}</span>
                     <span>{fair.venue}</span>
                   </div>
-                  <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-                    {metricCards.map(([key, label]) => (
-                      <div key={key} className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
-                        <p className="text-lg font-black text-slate-950">{fair.metrics?.[key] ?? 0}</p>
-                        <p className="text-[11px] font-extrabold uppercase text-slate-500">{label}</p>
+                  <div className="mt-4 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+                    {metricTiles.map(([key, label, Icon, tone]) => (
+                      <div key={key} className={`flex items-center gap-2.5 rounded-xl border px-3 py-2.5 ${tone}`}>
+                        {Icon && <Icon className="h-4 w-4 shrink-0" />}
+                        <div>
+                          <p className="text-base font-black leading-none">{fair.metrics?.[key] ?? 0}</p>
+                          <p className="mt-0.5 text-[10px] font-extrabold uppercase tracking-wide opacity-75">{label}</p>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -220,7 +188,6 @@ export default function JobFairsListPage() {
 
                 <div className="flex flex-wrap items-center gap-2 xl:flex-col xl:items-stretch">
                   <Button variant="outline" icon={UsersRound} onClick={() => navigate(`/admin/job-fairs/${fair.job_fair_id}`)}>Manage</Button>
-                  <Button variant="navy" icon={Download} onClick={() => downloadSprs(fair)}>SPRS 1.6</Button>
                   <Button variant="outline" icon={Pencil} onClick={() => navigate(`/admin/job-fairs/${fair.job_fair_id}/edit`)}>Edit</Button>
                   <button
                     type="button"

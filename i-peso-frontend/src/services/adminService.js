@@ -206,13 +206,6 @@ export const adminService = {
     return data
   },
 
-  downloadJobFairSprs: async (id) => {
-    const response = await api.get(`/admin/job-fairs/${id}/export-sprs`, {
-      responseType: 'blob',
-    })
-    return response.data
-  },
-
   publishJobFair: async (id, status = 'published') => (await api.post(`/admin/job-fairs/${id}/publish`, { status })).data,
   inviteJobFairEmployer: async (id, payload) => (await api.post(`/admin/job-fairs/${id}/invite`, payload)).data,
   updateJobFairParticipation: async (fairId, participationId, payload) => (await api.patch(`/admin/job-fairs/${fairId}/participants/${participationId}`, payload)).data,
