@@ -1,7 +1,11 @@
-import { createElement, useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { AlertTriangle, ArrowLeft, Building2, CheckCircle2, ChevronDown, Download, Eye, FileText, MapPin, ShieldAlert, ShieldCheck, XCircle, Mail, Phone, User, Clock, BriefcaseBusiness } from 'lucide-react'
+import { AlertTriangle, ArrowLeft, Building2, CheckCircle2, Download, Eye, FileText, MapPin, ShieldCheck, XCircle, Clock, BriefcaseBusiness } from 'lucide-react'
 import { Badge, Button, Card, CardHeader } from '@/components/ui'
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
+import { Dialog, DialogContent, DialogHeader, DialogFooter, DialogTitle, DialogDescription } from '@/components/ui/dialog'
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import { adminService } from '@/services/adminService'
 
 const DOCUMENT_LABELS = {
@@ -59,21 +63,22 @@ export default function EmployerDetailPage() {
   // reviewDocument() persists it immediately, so there's no separate local
   // "staged" state to keep in sync (or to lose on a refresh).
   const [reviewingDocumentId, setReviewingDocumentId] = useState(null)
-  const [notice, setNotice] = useState('')
   const [error, setError] = useState('')
   // Confirmation dialog state
   const [confirmDialog, setConfirmDialog] = useState(null)
   // Track documents viewed during this session so UI updates immediately
   const [viewedDocumentIds, setViewedDocumentIds] = useState(new Set())
-  // Verification documents accordion — expanded by default so the review
-  // workflow (approve/reject) stays visible without an extra click.
-  const [documentsExpanded, setDocumentsExpanded] = useState(true)
+  // Main-column tab — defaults to whichever the admin actually needs first:
+  // the document queue for a pending employer, the profile otherwise.
+  const [activeTab, setActiveTab] = useState(null)
 
   const loadEmployer = useCallback(async () => {
     setLoading(true)
     setError('')
     try {
-      setEmployer(await adminService.getEmployerDetail(id))
+      const data = await adminService.getEmployerDetail(id)
+      setEmployer(data)
+      setActiveTab((current) => current ?? (data.verification_status === 'pending' ? 'documents' : 'overview'))
     } catch (requestError) {
       setError(requestError.response?.data?.message ?? requestError.response?.data?.error ?? 'Unable to load employer profile.')
     } finally {
@@ -137,7 +142,6 @@ export default function EmployerDetailPage() {
   const finalize = async () => {
     setActionLoading(true)
     setError('')
-    setNotice('')
     try {
       const result = await adminService.finalizeEmployerVerification(id, {})
       // Auto-close: return to the employer directory after a successful decision.
@@ -180,6 +184,11 @@ export default function EmployerDetailPage() {
     setPreviewDocument(null)
   }
 
+  const closeDownloadModal = () => {
+    setDownloadDocument(null)
+    setDownloadReason('')
+  }
+
   const confirmDownload = async () => {
     if (downloadReason.trim().length < 10) {
       setError('Provide an official download purpose of at least 10 characters.')
@@ -197,8 +206,7 @@ export default function EmployerDetailPage() {
       link.download = downloadDocument.original_filename
       link.click()
       URL.revokeObjectURL(fileUrl)
-      setDownloadDocument(null)
-      setDownloadReason('')
+      closeDownloadModal()
     } catch (requestError) {
       setError(requestError.response?.data?.message ?? 'Unable to download this document.')
     } finally {
@@ -257,8 +265,6 @@ export default function EmployerDetailPage() {
   const missingDocuments = requiredDocuments.filter((type) => !verificationDocuments.some((document) => document.document_type === type))
   const dataQualityFlags = employer.data_quality_flags ?? {}
   const activeVacanciesSummary = employer.active_vacancies_summary ?? {}
-  const closedVacanciesSummary = employer.closed_vacancies_summary ?? {}
-  const applicationsSummary = employer.applications_summary ?? {}
   const jobFairParticipation = employer.job_fair_participation ?? []
   const verificationStatus = employer.verification_status ?? companyProfile.verification_status ?? 'pending'
   const verificationRemarks = employer.verification_remarks ?? companyProfile.rejection_reason ?? employer.rejection_reason
@@ -280,12 +286,6 @@ export default function EmployerDetailPage() {
   ]
 
   const requiredCount = requiredDocuments.length
-  // Only count docs that are truly approved in the DB. "Pending" docs are NOT yet approved
-  // even though they will be approved by default when the admin finalizes.
-  const dbApprovedRequiredCount = requiredDocuments.filter((type) => {
-    const doc = verificationDocuments.find((d) => d.document_type === type)
-    return doc && doc.verification_status === 'approved'
-  }).length
 
   // Check if all required documents have been viewed (only for unapproved docs)
   const unviewedRequiredDocs = requiredDocuments.filter((type) => {
@@ -310,163 +310,159 @@ export default function EmployerDetailPage() {
   const hasMissingRequired = missingDocuments.length > 0
   const willReject = hasRejectedRequired || hasMissingRequired
   const rejectedCount = verificationDocuments.filter(isRejected).length
+  const activeVacancies = employer.active_vacancies ?? []
 
   return (
     <>
       <div className="-mx-4 -mt-8 bg-slate-50 pb-12 sm:-mx-6">
       <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
-        <button onClick={() => navigate('/admin/employers')} className="mb-6 flex items-center gap-2 text-sm font-bold text-slate-500 transition-colors hover:text-slate-800">
+        <button onClick={() => navigate('/admin/employers')} className="mb-5 flex items-center gap-2 text-sm font-bold text-slate-500 transition-colors hover:text-slate-800">
           <ArrowLeft className="h-4 w-4" />
           Back to directory
         </button>
 
-        {error && <div className="mb-6 flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-medium text-red-800"><AlertTriangle className="h-4 w-4 shrink-0" />{error}</div>}
-        {notice && <div className="mb-6 flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-medium text-emerald-800"><CheckCircle2 className="h-4 w-4 shrink-0" />{notice}</div>}
+        {error && <div className="mb-5 flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-medium text-red-800"><AlertTriangle className="h-4 w-4 shrink-0" />{error}</div>}
 
-        <div className="mb-4 space-y-4">
-          {/* Hero Banner Section */}
+        <div className="space-y-4">
+          {/* Compact hero */}
           <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200">
-            <div className="h-32 bg-gradient-to-r from-brand-navy to-blue-700 sm:h-48" />
-            <div className="relative px-5 pb-6 sm:px-7">
-              <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
-                <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
-                  <div className="relative -mt-10 shrink-0 sm:-mt-12">
-                    <div className="relative flex h-28 w-28 items-center justify-center overflow-hidden rounded-2xl border-4 border-white bg-white shadow-lg sm:h-32 sm:w-32">
+            <div className="h-16 bg-gradient-to-r from-brand-navy to-blue-700 sm:h-20" />
+            <div className="relative px-5 pb-5 sm:px-6">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="relative -mt-8 shrink-0 sm:-mt-9">
+                    <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-2xl border-4 border-white bg-white shadow-lg sm:h-20 sm:w-20">
                       {companyProfile.company_logo_url ? (
-                        <img src={companyProfile.company_logo_url} alt="Logo" className="h-full w-full object-contain p-2" />
+                        <img src={companyProfile.company_logo_url} alt="Logo" className="h-full w-full object-contain p-1.5" />
                       ) : (
-                        <Building2 className="h-10 w-10 text-slate-300 sm:h-12 sm:w-12" />
+                        <Building2 className="h-8 w-8 text-slate-300 sm:h-9 sm:w-9" />
                       )}
                     </div>
                   </div>
-                  <div className="min-w-0 flex-1 pt-1 sm:pt-4">
-                    <p className="text-xs font-black uppercase tracking-[0.22em] text-blue-600 mb-1">
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-black uppercase tracking-[0.18em] text-blue-600">
                       {verificationStatus === 'pending' ? 'PESO Employer Audit Hub' : 'Employer Profile'}
                     </p>
-                    <div className="flex items-center gap-2">
-                      <h1 className="truncate text-2xl font-black text-slate-950 sm:text-3xl">{companyProfile.company_name || employer.company_name}</h1>
-                    </div>
+                    <h1 className="truncate text-xl font-black text-slate-950 sm:text-2xl">{companyProfile.company_name || employer.company_name}</h1>
                   </div>
                 </div>
-                <div className="flex flex-wrap gap-3 lg:justify-end lg:pl-4">
-                  <Badge status={verificationStatus === 'approved' ? 'approved' : verificationStatus === 'rejected' ? 'rejected' : 'pending'}>{formatValue(verificationStatus)}</Badge>
-                </div>
+                <Badge status={verificationStatus === 'approved' ? 'approved' : verificationStatus === 'rejected' ? 'rejected' : 'pending'}>{formatValue(verificationStatus)}</Badge>
               </div>
             </div>
           </div>
-          {/* Main Content and Sidebar Layout */}
-          <div className="grid gap-6 xl:grid-cols-[minmax(0,1.7fr)_minmax(320px,0.8fr)]">
-            <main className="space-y-6">
-              <Card>
-                <CardHeader title="Company Details" subtitle="Core business information registered in the system." />
-                <div className="grid gap-x-8 gap-y-5 sm:grid-cols-2">
-                  <InfoItem label="Company name" value={companyProfile.company_name || employer.company_name} />
-                  <InfoItem label="Industry" value={formatIndustry(companyProfile.industry || employer.industry)} />
-                  <InfoItem label="TIN" value={companyProfile.tin || employer.tin} />
-                  <InfoItem label="Business address" value={companyProfile.business_address || businessAddress.complete_address} />
-                </div>
-              </Card>
 
-              <Card>
-                <CardHeader title="Representative" subtitle="Authorized contact person for PESO coordination." />
-                <div className="grid gap-x-8 gap-y-5 sm:grid-cols-2">
-                  <InfoItem label="Name" value={representative.representative_name || `${representative.representative_first_name || ''} ${representative.representative_last_name || ''}`.trim()} />
-                  <InfoItem label="Designation" value={representative.representative_designation} />
-                  <InfoItem label="Contact number" value={representative.representative_contact_number || representative.mobile_number} />
-                  <InfoItem label="Email address" value={representative.email} />
-                </div>
-              </Card>
+          {/* Main content and sidebar */}
+          <div className="grid gap-5 xl:grid-cols-[minmax(0,1.7fr)_minmax(300px,0.8fr)]">
+            <main>
+              <Tabs value={activeTab ?? 'overview'} onValueChange={setActiveTab}>
+                <TabsList>
+                  <TabsTrigger value="overview">Overview</TabsTrigger>
+                  {verificationStatus !== 'pending' && (
+                    <TabsTrigger value="vacancies">Vacancies{activeVacancies.length > 0 ? ` (${activeVacancies.length})` : ''}</TabsTrigger>
+                  )}
+                  <TabsTrigger value="documents">Documents{totalUploaded > 0 ? ` (${totalUploaded})` : ''}</TabsTrigger>
+                </TabsList>
 
-              {/* Job Vacancies List */}
-              {verificationStatus !== 'pending' && (
-                <div className="space-y-4">
-                  <h2 className="text-lg font-black text-slate-900">Active Job Vacancies</h2>
-                  {employer.active_vacancies?.length > 0 ? (
-                    <div className="grid gap-4">
-                      {employer.active_vacancies.map(job => (
-                        <div key={job.post_id} className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-5 transition-all hover:border-brand-navy hover:shadow-md sm:flex-row sm:items-center sm:justify-between">
-                          <div>
-                            <h3 className="text-base font-bold text-slate-900">{job.job_title}</h3>
-                            <div className="mt-2 flex flex-wrap gap-2 text-xs text-slate-500">
-                              <span className="flex items-center gap-1"><MapPin className="h-3 w-3" />{job.location}</span>
-                              <span className="flex items-center gap-1"><BriefcaseBusiness className="h-3 w-3 capitalize" />{job.employment_type?.replaceAll('_', ' ')}</span>
-                              <span className="flex items-center gap-1"><Clock className="h-3 w-3" />Posted {formatDate(job.created_at)}</span>
+                <TabsContent value="overview" className="space-y-5">
+                  <div className="grid gap-5 lg:grid-cols-2">
+                    <Card>
+                      <CardHeader title="Company Details" subtitle="Core business information registered in the system." />
+                      <div className="grid gap-y-5 sm:grid-cols-2">
+                        <InfoItem label="Company name" value={companyProfile.company_name || employer.company_name} />
+                        <InfoItem label="Industry" value={formatIndustry(companyProfile.industry || employer.industry)} />
+                        <InfoItem label="TIN" value={companyProfile.tin || employer.tin} />
+                        <InfoItem label="Business address" value={companyProfile.business_address || businessAddress.complete_address} />
+                      </div>
+                    </Card>
+
+                    <Card>
+                      <CardHeader title="Representative" subtitle="Authorized contact person for PESO coordination." />
+                      <div className="grid gap-y-5 sm:grid-cols-2">
+                        <InfoItem label="Name" value={representative.representative_name || `${representative.representative_first_name || ''} ${representative.representative_last_name || ''}`.trim()} />
+                        <InfoItem label="Designation" value={representative.representative_designation} />
+                        <InfoItem label="Contact number" value={representative.representative_contact_number || representative.mobile_number} />
+                        <InfoItem label="Email address" value={representative.email} />
+                      </div>
+                    </Card>
+                  </div>
+                </TabsContent>
+
+                {verificationStatus !== 'pending' && (
+                  <TabsContent value="vacancies">
+                    {activeVacancies.length > 0 ? (
+                      <div className="grid gap-3">
+                        {activeVacancies.map((job) => (
+                          <div key={job.post_id} className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 transition-all hover:border-brand-navy hover:shadow-md sm:flex-row sm:items-center sm:justify-between">
+                            <div>
+                              <h3 className="text-sm font-bold text-slate-900">{job.job_title}</h3>
+                              <div className="mt-1.5 flex flex-wrap gap-2 text-xs text-slate-500">
+                                <span className="flex items-center gap-1"><MapPin className="h-3 w-3" />{job.location}</span>
+                                <span className="flex items-center gap-1"><BriefcaseBusiness className="h-3 w-3 capitalize" />{job.employment_type?.replaceAll('_', ' ')}</span>
+                                <span className="flex items-center gap-1"><Clock className="h-3 w-3" />Posted {formatDate(job.created_at)}</span>
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <Card className="text-center">
-                      <BriefcaseBusiness className="mx-auto h-12 w-12 text-slate-300" />
-                      <p className="mt-2 text-sm font-medium text-slate-600">No active job vacancies.</p>
-                    </Card>
-                  )}
-                </div>
-              )}
-
-              <Card padding="none">
-                <button
-                  type="button"
-                  onClick={() => setDocumentsExpanded((current) => !current)}
-                  aria-expanded={documentsExpanded}
-                  className="flex w-full items-center justify-between gap-3 p-5 pb-3 text-left transition hover:bg-slate-50 sm:p-6 sm:pb-4"
-                >
-                  <div>
-                    <h2 className="text-lg font-black text-slate-950">Verification documents</h2>
-                    {verificationStatus === 'pending' && (
-                      <p className="mt-1 text-sm text-slate-500">Review each document. Documents will be approved unless you flag them for rejection before finalizing.</p>
+                        ))}
+                      </div>
+                    ) : (
+                      <Card className="text-center">
+                        <BriefcaseBusiness className="mx-auto h-10 w-10 text-slate-300" />
+                        <p className="mt-2 text-sm font-medium text-slate-600">No active job vacancies.</p>
+                      </Card>
                     )}
-                  </div>
-                  <div className="flex shrink-0 items-center gap-2">
-                    <Badge status={totalUploaded ? 'active' : 'warning'}>{totalUploaded ? `${totalUploaded} uploaded` : 'No documents'}</Badge>
-                    <ChevronDown className={`h-5 w-5 text-slate-400 transition-transform ${documentsExpanded ? 'rotate-180' : ''}`} />
-                  </div>
-                </button>
-
-                {documentsExpanded && (
-                  <>
-                {/* Approval progress bar */}
-                {verificationStatus === 'pending' && requiredCount > 0 && (
-                  <div className="px-6 mt-4">
-                    <div className="flex items-center justify-between text-xs font-bold text-slate-400">
-                      <span>Approval progress</span>
-                      <span>{approvalPct}%</span>
-                    </div>
-                    <div className="mt-1 h-2 overflow-hidden rounded-full bg-slate-100">
-                      <div
-                        className="h-full rounded-full transition-all duration-500"
-                        style={{
-                          width: `${Math.max(approvalPct, 2)}%`,
-                          background: willReject
-                            ? 'linear-gradient(90deg, #ef4444, #f97316)'
-                            : 'linear-gradient(90deg, #10b981, #059669)',
-                        }}
-                      />
-                    </div>
-                  </div>
+                  </TabsContent>
                 )}
 
-                {/* Landscape (table) layout of the requirements */}
-                <div className="px-6 pb-6 mt-5 overflow-x-auto">
-                  <table className="w-full min-w-[720px] table-fixed border-collapse text-left text-sm">
-                    <thead>
-                      <tr className="border-b border-slate-200 text-[11px] font-extrabold uppercase tracking-wide text-slate-400">
-                        <th className="w-[32%] px-3 py-2">Document</th>
-                        <th className="w-[26%] px-3 py-2">Status</th>
-                        <th className="w-[14%] px-3 py-2">Expiration</th>
-                        <th className="w-[28%] px-3 py-2 text-right">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
+                <TabsContent value="documents" className="space-y-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <h2 className="text-base font-extrabold text-slate-950">Verification documents</h2>
+                      {verificationStatus === 'pending' && (
+                        <p className="mt-0.5 text-sm text-slate-500">Review each document. Documents will be approved unless you flag them for rejection before finalizing.</p>
+                      )}
+                    </div>
+                    <Badge status={totalUploaded ? 'active' : 'warning'}>{totalUploaded ? `${totalUploaded} uploaded` : 'No documents'}</Badge>
+                  </div>
+
+                  {/* Approval progress bar */}
+                  {verificationStatus === 'pending' && requiredCount > 0 && (
+                    <div>
+                      <div className="flex items-center justify-between text-xs font-bold text-slate-400">
+                        <span>Approval progress</span>
+                        <span>{approvalPct}%</span>
+                      </div>
+                      <div className="mt-1 h-2 overflow-hidden rounded-full bg-slate-100">
+                        <div
+                          className="h-full rounded-full transition-all duration-500"
+                          style={{
+                            width: `${Math.max(approvalPct, 2)}%`,
+                            background: willReject
+                              ? 'linear-gradient(90deg, #ef4444, #f97316)'
+                              : 'linear-gradient(90deg, #10b981, #059669)',
+                          }}
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-[32%]">Document</TableHead>
+                        <TableHead className="w-[26%]">Status</TableHead>
+                        <TableHead className="w-[14%]">Expiration</TableHead>
+                        <TableHead className="w-[28%] text-right">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
                       {documentRows.map((row) => {
                         const doc = row.document
                         const label = DOCUMENT_LABELS[row.type] ?? row.type
                         const rejected = isRejected(doc)
                         const busy = doc && reviewingDocumentId === doc.document_id
                         return (
-                          <tr key={`${row.type}-${doc?.document_id ?? 'missing'}`} className="border-b border-slate-100 align-top">
-                            <td className="whitespace-normal break-words px-2 py-2">
+                          <TableRow key={`${row.type}-${doc?.document_id ?? 'missing'}`} className="align-top">
+                            <TableCell className="whitespace-normal break-words">
                               <div className="flex items-center gap-2">
                                 <span className="font-bold text-slate-900">{label}</span>
                                 {row.required && <span className="rounded-md bg-blue-50 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-blue-600">Required</span>}
@@ -476,8 +472,8 @@ export default function EmployerDetailPage() {
                               ) : (
                                 <p className="mt-1 text-xs text-amber-600">No file submitted</p>
                               )}
-                            </td>
-                            <td className="whitespace-normal break-words px-2 py-2">
+                            </TableCell>
+                            <TableCell className="whitespace-normal break-words">
                               {!doc ? (
                                 <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-bold text-amber-700"><AlertTriangle className="h-3.5 w-3.5" />Not submitted</span>
                               ) : rejected ? (
@@ -495,8 +491,8 @@ export default function EmployerDetailPage() {
                                   )}
                                 </div>
                               )}
-                            </td>
-                            <td className="px-2 py-2 text-xs text-slate-600">
+                            </TableCell>
+                            <TableCell className="text-xs text-slate-600">
                               {row.type === 'mayors_permit' ? (
                                 doc?.expiration_date ? (
                                   <div className="flex flex-col items-start gap-1">
@@ -507,8 +503,8 @@ export default function EmployerDetailPage() {
                                   </div>
                                 ) : '—'
                               ) : '—'}
-                            </td>
-                            <td className="px-2 py-2">
+                            </TableCell>
+                            <TableCell>
                               <div className="flex flex-col items-end gap-2">
                                 {doc && (
                                   <>
@@ -526,72 +522,71 @@ export default function EmployerDetailPage() {
                                           {busy ? 'Saving...' : 'Undo'}
                                         </Button>
                                       ) : (
-                                        <select
-                                          value=""
-                                          disabled={busy}
-                                          onChange={(event) => { if (event.target.value) rejectRow(doc.document_id, event.target.value) }}
-                                          className="w-full max-w-[180px] rounded-lg border border-red-200 bg-red-50 px-2 py-1.5 text-xs font-bold text-red-700 focus:outline-none focus:ring-1 focus:ring-red-300 disabled:opacity-50"
-                                        >
-                                          <option value="">{busy ? 'Saving…' : 'Reject…'}</option>
-                                          {REJECTION_REASONS.map((reason) => <option key={reason} title={reason} value={reason}>{reason}</option>)}
-                                        </select>
+                                        <Select value="" onValueChange={(reason) => rejectRow(doc.document_id, reason)} disabled={busy}>
+                                          <SelectTrigger className="h-8 w-full max-w-[170px] border-red-200 bg-red-50 px-2.5 py-1 text-xs font-bold text-red-700 focus:ring-red-200">
+                                            <SelectValue placeholder={busy ? 'Saving…' : 'Reject…'} />
+                                          </SelectTrigger>
+                                          <SelectContent>
+                                            {REJECTION_REASONS.map((reason) => (
+                                              <SelectItem key={reason} value={reason}>{reason}</SelectItem>
+                                            ))}
+                                          </SelectContent>
+                                        </Select>
                                       )
                                     )}
                                   </>
                                 )}
                               </div>
-                            </td>
-                          </tr>
+                            </TableCell>
+                          </TableRow>
                         )
                       })}
-                    </tbody>
-                  </table>
+                    </TableBody>
+                  </Table>
                   {documentRows.length === 0 && (
-                    <div className="mt-3 rounded-xl border border-dashed border-slate-200 bg-slate-50 p-5 text-center text-sm text-slate-500">No documents have been uploaded for this employer.</div>
+                    <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 p-5 text-center text-sm text-slate-500">No documents have been uploaded for this employer.</div>
                   )}
-                </div>
 
-                {/* Form Action Footer */}
-                {verificationStatus === 'pending' && (
-                  <div className="mt-2 mx-6 mb-6 flex flex-col items-center justify-between gap-4 border-t border-slate-100 pt-5 md:flex-row">
-                    <Button variant="ghost" onClick={() => navigate('/admin/employers')} icon={ArrowLeft}>Back to Queue</Button>
-                    
-                    {/* The viewed-gate is checked first: the backend rejects finalize with a
-                        422 unless every uploaded required document has been opened, so a
-                        missing document must not hand the admin an enabled button. */}
-                    {!allRequiredViewed ? (
-                      <div className="flex items-center gap-3">
-                        <span className="text-sm font-semibold text-amber-600">
-                          Open {unviewedRequiredDocs.map((type) => DOCUMENT_LABELS[type] ?? type).join(', ')} before completing the review
-                        </span>
-                        <Button icon={CheckCircle2} disabled>{missingDocuments.length > 0 ? 'Reject Accreditation' : 'Complete Review'}</Button>
-                      </div>
-                    ) : missingDocuments.length > 0 ? (
-                      <div className="flex items-center gap-3">
-                        <span className="text-sm font-semibold text-red-600">Missing {missingDocuments.length} required document(s)</span>
-                        <Button onClick={handleFinalize} icon={XCircle} disabled={actionLoading}>{actionLoading ? 'Loading...' : 'Reject Accreditation'}</Button>
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-3">
-                        {rejectedCount > 0 && (
-                          <span className="text-sm font-semibold text-red-600">
-                            {rejectedCount} document(s) rejected &mdash; this will reject the employer
+                  {/* Form Action Footer */}
+                  {verificationStatus === 'pending' && (
+                    <div className="flex flex-col items-center justify-between gap-4 border-t border-slate-100 pt-4 md:flex-row">
+                      <Button variant="ghost" onClick={() => navigate('/admin/employers')} icon={ArrowLeft}>Back to Queue</Button>
+
+                      {/* The viewed-gate is checked first: the backend rejects finalize with a
+                          422 unless every uploaded required document has been opened, so a
+                          missing document must not hand the admin an enabled button. */}
+                      {!allRequiredViewed ? (
+                        <div className="flex items-center gap-3">
+                          <span className="text-sm font-semibold text-amber-600">
+                            Open {unviewedRequiredDocs.map((type) => DOCUMENT_LABELS[type] ?? type).join(', ')} before completing the review
                           </span>
-                        )}
-                        <Button onClick={handleFinalize} icon={willReject ? XCircle : CheckCircle2} disabled={actionLoading}>{actionLoading ? 'Loading...' : 'Complete Review'}</Button>
-                      </div>
-                    )}
-                  </div>
-                )}
-                  </>
-                )}
-              </Card>
+                          <Button icon={CheckCircle2} disabled>{missingDocuments.length > 0 ? 'Reject Accreditation' : 'Complete Review'}</Button>
+                        </div>
+                      ) : missingDocuments.length > 0 ? (
+                        <div className="flex items-center gap-3">
+                          <span className="text-sm font-semibold text-red-600">Missing {missingDocuments.length} required document(s)</span>
+                          <Button onClick={handleFinalize} icon={XCircle} disabled={actionLoading}>{actionLoading ? 'Loading...' : 'Reject Accreditation'}</Button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-3">
+                          {rejectedCount > 0 && (
+                            <span className="text-sm font-semibold text-red-600">
+                              {rejectedCount} document(s) rejected &mdash; this will reject the employer
+                            </span>
+                          )}
+                          <Button onClick={handleFinalize} icon={willReject ? XCircle : CheckCircle2} disabled={actionLoading}>{actionLoading ? 'Loading...' : 'Complete Review'}</Button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </TabsContent>
+              </Tabs>
             </main>
 
-            <aside className="space-y-6">
+            <aside className="space-y-5">
               <Card>
                 <CardHeader title="Operational Review" subtitle="Verification status and updates." />
-                <div className="space-y-4">
+                <div className="space-y-3">
                   <div className="flex items-center gap-3 rounded-xl bg-slate-50 p-3">
                     <span className={`rounded-lg p-2 ${verificationStatus === 'approved' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}><ShieldCheck className="h-4 w-4" /></span>
                     <div className="min-w-0 flex-1">
@@ -599,7 +594,7 @@ export default function EmployerDetailPage() {
                       <p className="text-sm font-bold text-slate-800 capitalize">{formatValue(verificationStatus)}</p>
                     </div>
                   </div>
-                  
+
                   <div className="flex items-center gap-3 rounded-xl bg-slate-50 p-3">
                     <span className="rounded-lg bg-slate-200 p-2 text-slate-700"><Clock className="h-4 w-4" /></span>
                     <div className="min-w-0 flex-1">
@@ -613,18 +608,18 @@ export default function EmployerDetailPage() {
                       <FileText className="h-4 w-4 text-slate-400" />
                       <p className="text-xs text-slate-500">Remarks</p>
                     </div>
-                    <p className="mt-1 text-sm font-medium text-slate-800 pl-6">{verificationRemarks || 'No remarks recorded'}</p>
+                    <p className="mt-1 pl-6 text-sm font-medium text-slate-800">{verificationRemarks || 'No remarks recorded'}</p>
                   </div>
                 </div>
               </Card>
 
-              {/* Extra Profile Sections for Verified Employers */}
+              {/* Extra profile sections for verified employers */}
               {verificationStatus !== 'pending' && (
                 <>
                   <Card>
                     <CardHeader title="Data Quality Flags" subtitle="Operational indicators for follow-up." />
                     <div className="flex flex-wrap gap-2">
-                      {Object.entries(dataQualityFlags || {}).filter(([, value]) => value).map(([key]) => <Badge key={key} status="warning">{key.replace(/_/g, ' ')}</Badge>)}
+                      {Object.entries(dataQualityFlags || {}).filter(([, value]) => value).map(([key]) => <Badge key={key} status="warning">{labelForFlag(key)}</Badge>)}
                       {!Object.values(dataQualityFlags || {}).some(Boolean) && <span className="text-sm text-slate-500">No flags detected.</span>}
                     </div>
                   </Card>
@@ -641,39 +636,44 @@ export default function EmployerDetailPage() {
               )}
             </aside>
           </div>
-        </div>  </div>
+        </div>
+      </div>
       </div>
 
-      {/* ── DOWNLOAD MODAL ───────────────────────────────────────── */}
-      {downloadDocument && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 backdrop-blur-sm" onClick={() => { setDownloadDocument(null); setDownloadReason('') }}>
-          <div className="mx-4 w-full max-w-lg rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center gap-3">
-              <span className="rounded-xl bg-blue-50 p-3 text-blue-700"><Download className="h-6 w-6" /></span>
-              <div>
-                <h3 className="text-lg font-black text-slate-950">Download Document</h3>
-                <p className="text-sm text-slate-500">{DOCUMENT_LABELS[downloadDocument.document_type] ?? downloadDocument.document_type}</p>
+      {/* ── DOWNLOAD DIALOG ───────────────────────────────────────── */}
+      <Dialog open={!!downloadDocument} onOpenChange={(open) => { if (!open) closeDownloadModal() }}>
+        <DialogContent>
+          {downloadDocument && (
+            <>
+              <DialogHeader>
+                <div className="flex items-center gap-3">
+                  <span className="rounded-xl bg-blue-50 p-3 text-blue-700"><Download className="h-6 w-6" /></span>
+                  <div>
+                    <DialogTitle>Download Document</DialogTitle>
+                    <DialogDescription>{DOCUMENT_LABELS[downloadDocument.document_type] ?? downloadDocument.document_type}</DialogDescription>
+                  </div>
+                </div>
+              </DialogHeader>
+              <p className="text-xs text-slate-500">{downloadDocument.original_filename}</p>
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3">
+                <p className="flex items-center gap-1.5 text-xs font-bold text-emerald-800">
+                  <CheckCircle2 className="h-3.5 w-3.5" />
+                  The downloaded file is the original without any watermarks
+                </p>
+                <p className="mt-1 text-xs text-emerald-700/80">This download is audit-logged for compliance purposes.</p>
               </div>
-            </div>
-            <p className="mt-3 text-xs text-slate-500">{downloadDocument.original_filename}</p>
-            <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 p-3">
-              <p className="flex items-center gap-1.5 text-xs font-bold text-emerald-800">
-                <CheckCircle2 className="h-3.5 w-3.5" />
-                The downloaded file is the original without any watermarks
-              </p>
-              <p className="mt-1 text-xs text-emerald-700/80">This download is audit-logged for compliance purposes.</p>
-            </div>
-            <label className="mt-4 block text-sm text-slate-600">
-              <span className="mb-1.5 block text-xs font-extrabold uppercase tracking-wide text-slate-400">Official download purpose</span>
-              <input value={downloadReason} onChange={(event) => setDownloadReason(event.target.value)} className="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm focus:border-brand-navy focus:outline-none focus:ring-1 focus:ring-brand-navy" placeholder="State the reason for secure download (min 10 characters)" />
-            </label>
-            <div className="mt-5 flex justify-end gap-2">
-              <Button variant="ghost" onClick={() => { setDownloadDocument(null); setDownloadReason('') }}>Cancel</Button>
-              <Button variant="secondary" icon={Download} onClick={confirmDownload} disabled={downloading}>{downloading ? 'Downloading...' : 'Download file'}</Button>
-            </div>
-          </div>
-        </div>
-      )}
+              <label className="block text-sm text-slate-600">
+                <span className="mb-1.5 block text-xs font-extrabold uppercase tracking-wide text-slate-400">Official download purpose</span>
+                <input value={downloadReason} onChange={(event) => setDownloadReason(event.target.value)} className="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm focus:border-brand-navy focus:outline-none focus:ring-1 focus:ring-brand-navy" placeholder="State the reason for secure download (min 10 characters)" />
+              </label>
+              <DialogFooter>
+                <Button variant="ghost" onClick={closeDownloadModal}>Cancel</Button>
+                <Button variant="secondary" icon={Download} onClick={confirmDownload} disabled={downloading}>{downloading ? 'Downloading...' : 'Download file'}</Button>
+              </DialogFooter>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* ── DOCUMENT PREVIEW WITH WATERMARK ──────────────────────── */}
       {previewDocument && (
@@ -685,30 +685,34 @@ export default function EmployerDetailPage() {
       )}
 
       {/* ── CONFIRMATION DIALOG ───────────────────────────────────── */}
-      {confirmDialog && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/70 backdrop-blur-sm" onClick={() => setConfirmDialog(null)}>
-          <div className="mx-4 w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center gap-3">
-              <span className={`rounded-xl p-3 ${confirmDialog.variant === 'approve' ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>
-                {confirmDialog.variant === 'approve' ? <CheckCircle2 className="h-6 w-6" /> : <AlertTriangle className="h-6 w-6" />}
-              </span>
-              <h3 className="text-lg font-black text-slate-950">{confirmDialog.title}</h3>
-            </div>
-            <p className="mt-4 text-sm leading-6 text-slate-600">{confirmDialog.message}</p>
-            <div className="mt-6 flex justify-end gap-2">
-              <Button variant="ghost" onClick={() => setConfirmDialog(null)}>Cancel</Button>
-              <Button
-                variant={confirmDialog.variant === 'approve' ? 'secondary' : 'danger'}
-                onClick={confirmDialog.onConfirm}
-                disabled={actionLoading}
-                className={confirmDialog.variant === 'approve' ? '!border-emerald-600 !bg-emerald-600 !text-white hover:!bg-emerald-700' : ''}
-              >
-                {actionLoading ? 'Processing...' : confirmDialog.confirmLabel}
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+      <Dialog open={!!confirmDialog} onOpenChange={(open) => { if (!open) setConfirmDialog(null) }}>
+        <DialogContent className="max-w-md">
+          {confirmDialog && (
+            <>
+              <DialogHeader>
+                <div className="flex items-center gap-3">
+                  <span className={`rounded-xl p-3 ${confirmDialog.variant === 'approve' ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>
+                    {confirmDialog.variant === 'approve' ? <CheckCircle2 className="h-6 w-6" /> : <AlertTriangle className="h-6 w-6" />}
+                  </span>
+                  <DialogTitle>{confirmDialog.title}</DialogTitle>
+                </div>
+              </DialogHeader>
+              <DialogDescription className="leading-6">{confirmDialog.message}</DialogDescription>
+              <DialogFooter>
+                <Button variant="ghost" onClick={() => setConfirmDialog(null)}>Cancel</Button>
+                <Button
+                  variant={confirmDialog.variant === 'approve' ? 'secondary' : 'danger'}
+                  onClick={confirmDialog.onConfirm}
+                  disabled={actionLoading}
+                  className={confirmDialog.variant === 'approve' ? '!border-emerald-600 !bg-emerald-600 !text-white hover:!bg-emerald-700' : ''}
+                >
+                  {actionLoading ? 'Processing...' : confirmDialog.confirmLabel}
+                </Button>
+              </DialogFooter>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </>
   )
 }
@@ -718,23 +722,6 @@ function InfoItem({ label, value }) {
     <div>
       <p className="text-xs font-bold uppercase tracking-wide text-slate-400">{label}</p>
       <p className="mt-1 text-sm font-semibold text-slate-800">{value ? formatValue(value) : 'Not provided'}</p>
-    </div>
-  )
-}
-
-function StatTile({ label, value }) {
-  return <div className="rounded-xl border border-slate-200 bg-slate-50 p-3"><p className="text-xl font-black text-slate-950">{value}</p><p className="mt-0.5 text-[10px] font-extrabold uppercase tracking-wide text-slate-500">{label}</p></div>
-}
-
-function ReadinessCheck({ label, passed, detail }) {
-  return (
-    <div className="flex items-center gap-2">
-      {passed
-        ? <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
-        : <XCircle className="h-4 w-4 shrink-0 text-red-500" />
-      }
-      <span className={`text-sm font-semibold ${passed ? 'text-emerald-800' : 'text-red-700'}`}>{label}</span>
-      {detail && <span className="text-xs text-slate-400">({detail})</span>}
     </div>
   )
 }
@@ -788,7 +775,7 @@ function WatermarkedPreview({ previewDocument, documentLabels, onClose }) {
       // Center watermark
       ctx.textAlign = 'center'
       ctx.textBaseline = 'middle'
-      
+
       // Large text
       ctx.font = '900 72px sans-serif'
       ctx.fillStyle = 'rgba(239, 68, 68, 0.15)'
@@ -843,8 +830,8 @@ function WatermarkedPreview({ previewDocument, documentLabels, onClose }) {
         {isImage ? (
           <div className="relative h-full w-full overflow-hidden rounded-xl bg-slate-800 shadow-2xl ring-1 ring-white/10 flex items-center justify-center">
             {/* Using a canvas means right-click "Save Image As" downloads the burned-in watermark version! */}
-             <canvas 
-                ref={canvasRef} 
+             <canvas
+                ref={canvasRef}
                 className="max-h-full max-w-full object-contain select-none"
                 style={{ userSelect: 'none', WebkitUserSelect: 'none' }}
                 title="Watermarked preview"
@@ -852,10 +839,10 @@ function WatermarkedPreview({ previewDocument, documentLabels, onClose }) {
           </div>
         ) : (
           <div className="relative h-full w-full overflow-hidden rounded-xl bg-slate-800 shadow-2xl ring-1 ring-white/10">
-            <iframe 
-              title={previewDocument.original_filename} 
-              src={`${previewDocument.url}#toolbar=0&navpanes=0`} 
-              className="h-full w-full border-0 bg-white" 
+            <iframe
+              title={previewDocument.original_filename}
+              src={`${previewDocument.url}#toolbar=0&navpanes=0`}
+              className="h-full w-full border-0 bg-white"
             />
             {/* Watermark overlay just for display over PDF */}
             <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center overflow-hidden select-none" style={{ userSelect: 'none', WebkitUserSelect: 'none' }}>
