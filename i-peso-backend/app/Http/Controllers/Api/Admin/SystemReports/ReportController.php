@@ -21,6 +21,7 @@ use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 
 class ReportController extends Controller
 {
@@ -725,6 +726,118 @@ class ReportController extends Controller
         ])->setPaper('a4', 'portrait');
 
         return $pdf->download('sprs-' . str_replace(' ', '-', strtolower($data['period'] ?? $report->report_id)) . '.pdf');
+    }
+
+    /**
+     * PDF/CSV export for a generated report — every category except SPRS
+     * (which has its own dedicated exportSprsPdf()/pdf.sprs_monthly, a fixed
+     * DOLE form) previously had no way to leave the on-screen view at all,
+     * unlike every other report feature in this system (Establishment
+     * Report, Placement Report, Hiring Activity all export). Works for any
+     * category since it walks data_summary generically rather than assuming
+     * a fixed shape, mirroring how AnalyticsDetailPage.jsx already renders
+     * the same structure on screen.
+     */
+    public function export(Request $request, int $id)
+    {
+        $admin = auth()->user();
+        if (! $admin instanceof Administrator) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        $validated = $request->validate(['format' => ['nullable', Rule::in(['pdf', 'csv'])]]);
+        $format = $validated['format'] ?? 'pdf';
+
+        $report = AnalyticsReport::findOrFail($id);
+        $blocks = $this->flattenReportSections($report->data_summary ?? []);
+        $filename = 'analytics-report-'.$report->report_id.'-'.now()->format('Ymd');
+
+        if ($format === 'csv') {
+            return response()->streamDownload(function () use ($blocks) {
+                $stream = fopen('php://output', 'wb');
+                fwrite($stream, "\xEF\xBB\xBF");
+                foreach ($blocks as $block) {
+                    fputcsv($stream, [$block['title']]);
+                    if ($block['type'] === 'table') {
+                        fputcsv($stream, array_map(fn ($column) => $this->prettyLabel($column), $block['columns']));
+                        foreach ($block['rows'] as $row) {
+                            fputcsv($stream, array_map(fn ($column) => $this->csvCell($row[$column] ?? ''), $block['columns']));
+                        }
+                    } else {
+                        foreach ($block['rows'] as $label => $value) {
+                            fputcsv($stream, [$label, $this->csvCell($value)]);
+                        }
+                    }
+                    fputcsv($stream, []);
+                }
+                fclose($stream);
+            }, "{$filename}.csv", ['Content-Type' => 'text/csv; charset=UTF-8']);
+        }
+
+        return \Barryvdh\DomPDF\Facade\Pdf::loadView('pdf.analytics_report', ['report' => $report, 'blocks' => $blocks])
+            ->setPaper('a4', 'portrait')
+            ->download("{$filename}.pdf");
+    }
+
+    /**
+     * Normalize an arbitrarily-nested data_summary into flat renderable
+     * blocks shared by the PDF and CSV export.
+     *
+     * @return array<int, array{title: string, type: 'table'|'metrics', columns?: array, rows: array}>
+     */
+    private function flattenReportSections(array $dataSummary): array
+    {
+        $blocks = [];
+        foreach ($dataSummary as $key => $value) {
+            $blocks = array_merge($blocks, $this->flattenValue($this->prettyLabel((string) $key), $value));
+        }
+
+        return $blocks;
+    }
+
+    private function flattenValue(string $title, mixed $value): array
+    {
+        if (is_array($value) && array_is_list($value)) {
+            $rows = array_map(fn ($row) => is_array($row) ? $row : ['value' => $row], $value);
+            $columns = collect($rows)->flatMap(fn ($row) => array_keys($row))->unique()->values()->all();
+
+            return [['title' => $title, 'type' => 'table', 'columns' => $columns ?: ['value'], 'rows' => $rows]];
+        }
+
+        if (is_array($value)) {
+            $metrics = [];
+            $nestedBlocks = [];
+            foreach ($value as $subKey => $subValue) {
+                $label = $this->prettyLabel((string) $subKey);
+                if (is_array($subValue)) {
+                    $nestedBlocks = array_merge($nestedBlocks, $this->flattenValue("{$title} — {$label}", $subValue));
+                } else {
+                    $metrics[$label] = $subValue;
+                }
+            }
+            $result = $metrics ? [['title' => $title, 'type' => 'metrics', 'rows' => $metrics]] : [];
+
+            return array_merge($result, $nestedBlocks);
+        }
+
+        return [['title' => $title, 'type' => 'metrics', 'rows' => [$title => $value]]];
+    }
+
+    private function prettyLabel(string $value): string
+    {
+        return ucwords(str_replace('_', ' ', $value));
+    }
+
+    private function csvCell(mixed $value): string
+    {
+        if (is_array($value)) {
+            return json_encode($value);
+        }
+        if (is_bool($value)) {
+            return $value ? 'Yes' : 'No';
+        }
+
+        return (string) ($value ?? '');
     }
 
     public function show(int $id): JsonResponse

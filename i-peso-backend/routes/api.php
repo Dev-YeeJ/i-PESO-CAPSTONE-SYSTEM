@@ -330,6 +330,7 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::post('/reports/generate-sprs', [AdminReportController::class, 'generateSPRS']);
             Route::put('/reports/{id}/sprs', [AdminReportController::class, 'updateSprs']);
             Route::get('/reports/{id}/export-sprs-pdf', [AdminReportController::class, 'exportSprsPdf']);
+            Route::get('/reports/{id}/export', [AdminReportController::class, 'export']);
             Route::get('/reports/{id}', [AdminReportController::class, 'show']);
             Route::delete('/reports/{id}', [AdminReportController::class, 'destroy']);
         });

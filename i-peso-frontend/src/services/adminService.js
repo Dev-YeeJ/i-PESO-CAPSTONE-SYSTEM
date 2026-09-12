@@ -258,6 +258,11 @@ export const adminService = {
     return data
   },
 
+  exportReport: async (id, format = 'pdf') => {
+    const { data } = await api.get(`/admin/reports/${id}/export`, { params: { format }, responseType: 'blob' })
+    return data
+  },
+
   deleteReport: async (id) => {
     const { data } = await api.delete(`/admin/reports/${id}`)
     return data
