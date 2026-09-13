@@ -6,6 +6,7 @@ import {
 import { Card, CardHeader, Button, Badge, AlertBox, StatCard } from '@/components/ui'
 import { ConfirmModal, PageHeader } from '@/pages/admin/_components'
 import DataTable from '@/pages/admin/_components/DataTable'
+import HiringActivityWorkspace from '@/components/reports/HiringActivityWorkspace'
 import toast from 'react-hot-toast'
 import {
   listAdminPlacementReports,
@@ -251,6 +252,7 @@ export default function AdminPlacementReportPage() {
         {[
           { key: 'reports', label: 'Submitted reports' },
           { key: 'compliance', label: 'Monthly compliance' },
+          { key: 'activity', label: 'All hiring activity' },
         ].map((tab) => (
           <button
             key={tab.key}
@@ -262,7 +264,7 @@ export default function AdminPlacementReportPage() {
         ))}
       </div>
 
-      {mode === 'compliance' ? <ComplianceView /> : (
+      {mode === 'activity' ? <HiringActivityWorkspace role="admin" /> : mode === 'compliance' ? <ComplianceView /> : (
         <>
           <div className="flex flex-wrap gap-2">
             {[

@@ -15,7 +15,12 @@ export default function RequiredDocumentsCheckbox({ requiredDocuments, uploadedD
   }
 
   const uploadedSet = new Set(uploadedDocuments || [])
-  const uploadedCount = uploadedDocuments?.length || 0
+  // Count only uploads that satisfy a currently-required document — an
+  // employer can change company type after already uploading documents for
+  // a previous selection, and those leftover uploads (e.g. a PRPA license
+  // no longer required after switching to Sole Proprietorship) shouldn't
+  // inflate this count past the current total.
+  const uploadedCount = (requiredDocuments || []).filter((doc) => uploadedSet.has(doc)).length
   const totalCount = requiredDocuments?.length || 0
 
   return (

@@ -95,6 +95,78 @@ class EmployerVerificationJobPostingTest extends TestCase
         ]);
     }
 
+    public function test_employer_can_set_company_type_on_the_legal_documents_step(): void
+    {
+        $employer = Employer::create([
+            'email' => fake()->unique()->safeEmail(),
+            'password' => 'password123',
+            'company_name' => 'Test Employer',
+            'verification_status' => 'pending',
+            'email_verified_at' => now(),
+        ]);
+        $this->assertNull($employer->company_type);
+
+        Sanctum::actingAs($employer);
+
+        $response = $this->postJson('/api/employer/register/company-type', ['company_type' => 'local_recruitment_agency'])
+            ->assertOk()
+            ->assertJsonPath('company_type', 'local_recruitment_agency')
+            ->assertJsonPath('optional_documents', []);
+
+        $required = $response->json('required_documents');
+        $this->assertContains('prpa_license', $required);
+        $this->assertContains('sec_certificate', $required);
+
+        $this->assertDatabaseHas('employers', [
+            'employer_id' => $employer->employer_id,
+            'company_type' => 'local_recruitment_agency',
+        ]);
+    }
+
+    public function test_company_type_cannot_be_changed_once_verified(): void
+    {
+        $employer = $this->createEmployer();
+        $employer->update(['verification_status' => 'verified']);
+
+        Sanctum::actingAs($employer);
+
+        $this->postJson('/api/employer/register/company-type', ['company_type' => 'corporation_partnership'])
+            ->assertStatus(422);
+
+        $this->assertDatabaseHas('employers', [
+            'employer_id' => $employer->employer_id,
+            'company_type' => 'sole_proprietorship',
+        ]);
+    }
+
+    public function test_registration_cannot_be_submitted_without_a_company_type(): void
+    {
+        Storage::fake('public');
+        Storage::fake('local');
+        $employer = Employer::create([
+            'email' => fake()->unique()->safeEmail(),
+            'password' => 'password123',
+            'company_name' => 'Test Employer',
+            'verification_status' => 'pending',
+            'email_verified_at' => now(),
+        ]);
+        $this->uploadRequiredDocuments($employer, 'pending');
+
+        Sanctum::actingAs($employer);
+        $this->post('/api/employer/register/step-4', [
+            'representative_first_name' => 'Jamie',
+            'representative_last_name' => 'Santos',
+            'representative_designation' => 'Owner',
+            'representative_contact_number' => '09123456789',
+            'government_id' => UploadedFile::fake()->createWithContent(
+                'government-id.png',
+                base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=')
+            ),
+        ])
+            ->assertStatus(422)
+            ->assertJsonPath('message', 'Please select your company type before submitting.');
+    }
+
     public function test_admin_cannot_approve_employer_until_required_documents_are_approved(): void
     {
         Notification::fake();
@@ -175,6 +247,63 @@ class EmployerVerificationJobPostingTest extends TestCase
             'employer_id' => $employer->employer_id,
             'status' => 'closed',
         ]);
+    }
+
+    /**
+     * maximum_age's floor used to be 15 — stale from before minimum_age was
+     * raised to 18 for every job posting (the legal minimum working age),
+     * so a posting could accept applicants as young as 15 as long as no
+     * minimum_age was also set. Locks in that both ends of the age range
+     * share the same 18-100 floor/ceiling.
+     */
+    public function test_maximum_age_below_the_legal_minimum_is_rejected(): void
+    {
+        $employer = $this->createEmployer();
+        $employer->update(['verification_status' => 'verified']);
+
+        Sanctum::actingAs($employer->fresh());
+        $this->postJson('/api/employer/vacancies', [
+            ...$this->vacancyPayload(),
+            'minimum_age' => null,
+            'maximum_age' => 16,
+        ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['maximum_age']);
+    }
+
+    public function test_maximum_age_at_the_legal_minimum_is_accepted(): void
+    {
+        $employer = $this->createEmployer();
+        $employer->update(['verification_status' => 'verified']);
+
+        Sanctum::actingAs($employer->fresh());
+        $this->postJson('/api/employer/vacancies', [
+            ...$this->vacancyPayload(),
+            'minimum_age' => null,
+            'maximum_age' => 18,
+        ])
+            ->assertCreated();
+
+        $this->assertDatabaseHas('job_vacancies', [
+            'employer_id' => $employer->employer_id,
+            'minimum_age' => null,
+            'maximum_age' => 18,
+        ]);
+    }
+
+    public function test_maximum_age_below_minimum_age_is_rejected(): void
+    {
+        $employer = $this->createEmployer();
+        $employer->update(['verification_status' => 'verified']);
+
+        Sanctum::actingAs($employer->fresh());
+        $this->postJson('/api/employer/vacancies', [
+            ...$this->vacancyPayload(),
+            'minimum_age' => 40,
+            'maximum_age' => 30,
+        ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['maximum_age']);
     }
 
     public function test_within_radius_scope_returns_nearby_vacancies_with_distance(): void

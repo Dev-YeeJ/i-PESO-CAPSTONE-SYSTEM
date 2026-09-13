@@ -20,6 +20,10 @@ export default function SkillTaxonomyTags({
   limit = 20,
   allowCustom = true,
   className = '',
+  // Skill names tied to whatever the caller already knows about this specific
+  // posting (e.g. suggestions scoped to the chosen job title/vacancy anchor)
+  // — shown first in "Recommended skills", ahead of the generic catalog list.
+  contextualSuggestions = [],
 }) {
   const inputRef = useRef(null)
   const [query, setQuery] = useState('')
@@ -51,14 +55,29 @@ export default function SkillTaxonomyTags({
 
     return selectedKeys.has(skillKey(skill)) ? null : skill
   }, [allowCustom, category, query, selectedKeys, selectionFull])
+  const contextualSkills = useMemo(
+    () => (contextualSuggestions || [])
+      .map((name) => skillName(name))
+      .filter(Boolean)
+      .map((name) => ({
+        id: null,
+        skill_id: null,
+        name,
+        skill_name: name,
+        category,
+        source: 'contextual',
+      })),
+    [category, contextualSuggestions],
+  )
   const recommendedSkills = useMemo(
     () => uniqueSkills([
+      ...contextualSkills,
       ...starterSkills,
       ...starterFallbacks,
     ])
       .filter((skill) => !selectedKeys.has(skillKey(skill)))
       .slice(0, 16),
-    [selectedKeys, starterFallbacks, starterSkills],
+    [contextualSkills, selectedKeys, starterFallbacks, starterSkills],
   )
   const visibleResults = useMemo(
     () => uniqueSkills(results).filter((skill) => !selectedKeys.has(skillKey(skill))).slice(0, 16),
@@ -203,7 +222,7 @@ export default function SkillTaxonomyTags({
         <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
           <div className="mb-2 flex items-center justify-between gap-3">
             <p className="text-[11px] font-black uppercase tracking-wide text-slate-500">
-              {hasSearchQuery ? 'Matching skills' : 'Recommended skills'}
+              {hasSearchQuery ? 'Matching skills' : contextualSkills.length > 0 ? 'Recommended for this role' : 'Recommended skills'}
             </p>
             {(starterLoading || loading) && (
               <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-slate-500">
@@ -278,7 +297,10 @@ async function fetchSkills(query, category, limit) {
 
 function normalizeSelected(value) {
   if (!Array.isArray(value)) return []
-  return value.map((item) => normalizeSkill(item)).filter(Boolean)
+  // Defensively re-dedupes the incoming value itself, not just future
+  // additions — a caller-provided array (e.g. a draft saved before this fix)
+  // could already contain the same skill name twice.
+  return uniqueSkills(value.map((item) => normalizeSkill(item)).filter(Boolean))
 }
 
 function normalizeSkill(item) {
@@ -314,9 +336,12 @@ function uniqueSkills(rows) {
   })
 }
 
+// Always keyed by normalized name, never by id — the same skill name can
+// come from different sources with different ids (the DB-backed catalog
+// search vs. the local starter-skill fallback list, e.g.), and those must
+// still count as one duplicate skill, not two selectable entries.
 function skillKey(skill) {
-  const id = skill?.id ?? skill?.skill_id
-  return id ? `id:${id}` : `name:${skillName(skill).toLowerCase()}`
+  return `name:${skillName(skill).toLowerCase()}`
 }
 
 function skillName(skill) {

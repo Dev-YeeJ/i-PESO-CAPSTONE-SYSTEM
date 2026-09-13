@@ -369,16 +369,15 @@ Response (200):
 
 ## Company Type → Required Documents Matrix
 
-| Company Type | Required Documents |
-|------|----------------------|
-| **Sole Proprietorship** | ✅ Mayor's Permit<br>✅ BIR Certificate (Form 2303)<br>✅ DTI Certificate |
-| **Corporation / Partnership** | ✅ Mayor's Permit<br>✅ BIR Certificate (Form 2303)<br>✅ SEC Certificate |
-| **Local Recruitment Agency (PRPA)** | ✅ Mayor's Permit<br>✅ BIR Certificate (Form 2303)<br>✅ SEC Certificate<br>✅ DOLE PRPA License |
-| **Overseas Recruitment Agency** | ✅ Mayor's Permit<br>✅ BIR Certificate (Form 2303)<br>✅ SEC Certificate<br>✅ DMW/POEA License |
+Every company type requires the base set — Mayor's Permit, BIR Certificate (Form 2303), PhilJobNet Proof, Affidavit of Undertaking, and Certificate of No Pending Case (DOLE) — plus the type-specific document(s) below. Nothing is optional.
 
-**Optional for all**:
-- PhilJobNet Proof
-- Certificate of No Pending Case from DOLE
+| Company Type | Additional Required Documents |
+|------|----------------------|
+| **Sole Proprietorship** | ✅ DTI Certificate |
+| **Corporation / Partnership** | ✅ SEC Certificate |
+| **Local Recruitment Agency (PRPA)** | ✅ SEC Certificate<br>✅ DOLE PRPA License |
+| **Overseas Recruitment Agency** | ✅ SEC Certificate<br>✅ DMW/POEA License |
+| **Government Agency** | *(none — base set only)* |
 
 ---
 

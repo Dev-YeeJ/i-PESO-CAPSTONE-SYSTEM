@@ -211,8 +211,21 @@ class EmployerJobVacancyController extends Controller
             'benefits.*' => ['string', 'max:100'],
             'application_deadline' => ['required', 'date', 'after_or_equal:today'],
             'preferred_gender' => ['nullable', Rule::in(['Any', 'Male', 'Female'])],
-            'minimum_age' => ['nullable', 'integer', 'min:15', 'max:100'],
-            'maximum_age' => ['nullable', 'integer', 'min:15', 'max:100', 'gte:minimum_age'],
+            'minimum_age' => ['nullable', 'integer', 'min:18', 'max:100'],
+            // Not 'gte:minimum_age' — that rule requires both sides to be
+            // the same type and treats a null minimum_age as failing the
+            // comparison outright, so a posting with only a maximum age set
+            // (a common, valid combination) was always rejected. Only
+            // compare the two when a minimum was actually given.
+            'maximum_age' => [
+                'nullable', 'integer', 'min:18', 'max:100',
+                function (string $attribute, mixed $value, \Closure $fail) use ($request) {
+                    $minimumAge = $request->input('minimum_age');
+                    if ($minimumAge !== null && (int) $value < (int) $minimumAge) {
+                        $fail('The maximum age must be greater than or equal to the minimum age.');
+                    }
+                },
+            ],
             'open_to_pwds' => ['required', 'boolean'],
             'open_to_senior_citizens' => ['required', 'boolean'],
             'spes_tupad_eligible' => ['required', 'boolean'],

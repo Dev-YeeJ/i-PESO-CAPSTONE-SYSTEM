@@ -167,6 +167,8 @@ class Employer extends Authenticatable
             'mayors_permit',
             'bir_certificate',
             'philJobnet_proof',
+            'affidavit_of_undertaking',
+            'no_pending_case_certificate',
         ];
 
         switch ($this->company_type) {
@@ -179,19 +181,15 @@ class Employer extends Authenticatable
             case 'local_recruitment_agency':
                 $required[] = 'sec_certificate';
                 $required[] = 'prpa_license';
-                $required[] = 'affidavit_of_undertaking';
-                $required[] = 'no_pending_case_certificate';
                 break;
             case 'overseas_recruitment_agency':
                 $required[] = 'sec_certificate';
                 $required[] = 'dme_poea_license';
-                $required[] = 'affidavit_of_undertaking';
-                $required[] = 'no_pending_case_certificate';
                 break;
             case 'government_agency':
                 // Not a DTI/SEC-registered business and not a recruitment
-                // agency — no extra accreditation document beyond the two
-                // base requirements every employer type already carries.
+                // agency — no extra accreditation document beyond the base
+                // requirements every employer type already carries.
                 break;
         }
 
@@ -199,23 +197,16 @@ class Employer extends Authenticatable
     }
 
     /**
-     * The affidavit and no-pending-case certificate are required for
-     * recruitment agencies (see getRequiredDocuments()) but only ever
-     * optional — PESO may still ask a regular employer for one — for
-     * every other company type, so they don't double up in the Step 3 UI.
-     * PhilJobNet proof is required for every company type (see
-     * getRequiredDocuments()), so it no longer appears here.
+     * No document is optional anymore — the affidavit of undertaking and
+     * the no-pending-case certificate (the last two that used to be
+     * optional outside the recruitment-agency types) are now required for
+     * every company type, see getRequiredDocuments(). Kept as a method
+     * returning an empty array so existing callers (the Step 3 upload UI,
+     * the required-documents API response) keep working unchanged.
      */
     public function getOptionalDocuments(): array
     {
-        $optional = [];
-
-        if (! in_array($this->company_type, ['local_recruitment_agency', 'overseas_recruitment_agency'], true)) {
-            $optional[] = 'affidavit_of_undertaking';
-            $optional[] = 'no_pending_case_certificate';
-        }
-
-        return $optional;
+        return [];
     }
 
     /**

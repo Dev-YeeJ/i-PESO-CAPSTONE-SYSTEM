@@ -9,6 +9,7 @@ use App\Models\PlacementReportUpload;
 use App\Notifications\PlacementReportDue;
 use App\Services\PlacementComplianceService;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Carbon;
@@ -158,15 +159,20 @@ class PlacementReportFlowTest extends TestCase
         ])->assertCreated();
     }
 
-    public function test_admin_cannot_approve_a_second_report_for_the_same_period(): void
+    public function test_the_database_refuses_a_second_settled_report_for_the_same_employer_and_period(): void
     {
         $employer = $this->employer();
-        $admin = $this->admin();
+        $this->submittedReport($employer, month: 3, year: 2026);
 
-        $first = $this->submittedReport($employer, month: 3, year: 2026);
-        // A duplicate that predates the guard, or arrived while the first was
-        // still rejected — approval is the last line of defence.
-        $second = PlacementReportUpload::create([
+        // assertNoSettledReportFor()/assertNoApprovedTwin() are both plain
+        // check-then-act and can be raced by two concurrent requests. The
+        // unique settlement_key index is the actual backstop: even a direct,
+        // unguarded model write for a second settled report of the same
+        // employer+period must now be refused at the database level, not
+        // just the application layer.
+        $this->expectException(UniqueConstraintViolationException::class);
+
+        PlacementReportUpload::create([
             'employer_id' => $employer->employer_id,
             'original_filename' => 'march-again.xlsx',
             'stored_path' => null,
@@ -176,14 +182,46 @@ class PlacementReportFlowTest extends TestCase
             'coverage_year' => 2026,
             'submitted_at' => now(),
         ]);
+    }
 
-        Sanctum::actingAs($admin);
+    public function test_a_race_between_two_concurrent_nil_submissions_is_caught_and_converted_to_a_friendly_error(): void
+    {
+        $employer = $this->employer();
+        Sanctum::actingAs($employer);
 
-        $this->postJson("/api/admin/placement-reports/{$first->id}/approve")->assertOk();
+        // Simulate the actual race: right as this request's own
+        // assertNoSettledReportFor() check has already passed (nothing
+        // settled existed a moment ago) but before its insert lands, another
+        // concurrent request for the SAME employer+period commits its own
+        // settled report first — modeled by injecting the "other" insert
+        // from within this request's own creating() event, immediately
+        // before its write reaches the database.
+        PlacementReportUpload::creating(function (PlacementReportUpload $model) use ($employer) {
+            if ((int) $model->employer_id === $employer->employer_id
+                && (int) $model->coverage_month === 3 && (int) $model->coverage_year === 2026) {
+                PlacementReportUpload::withoutEvents(fn () => PlacementReportUpload::create([
+                    'employer_id' => $employer->employer_id,
+                    'original_filename' => 'concurrent.xlsx',
+                    'stored_path' => null,
+                    'row_count' => 0,
+                    'status' => PlacementReportUpload::STATUS_PENDING_REVIEW,
+                    'is_nil_report' => true,
+                    'coverage_month' => 3,
+                    'coverage_year' => 2026,
+                    'submitted_at' => now(),
+                ]));
+            }
+        });
 
-        $this->postJson("/api/admin/placement-reports/{$second->id}/approve")
-            ->assertStatus(422)
-            ->assertJsonPath('errors.status.0', "Report #{$first->id} for March 2026 is already approved for this employer. Approving this one too would double-count those placements — reject it instead.");
+        try {
+            $this->postJson('/api/employer/placement-reports/nil', [
+                'coverage_month' => 3, 'coverage_year' => 2026,
+            ])
+                ->assertStatus(422)
+                ->assertJsonPath('errors.coverage_month.0', 'Another report for this employer and period was just submitted. Refresh and check your existing reports before trying again.');
+        } finally {
+            PlacementReportUpload::flushEventListeners();
+        }
     }
 
     public function test_nil_report_records_that_nobody_was_hired(): void
@@ -206,6 +244,142 @@ class PlacementReportFlowTest extends TestCase
             'coverage_month' => 3,
             'coverage_year' => 2026,
         ])->assertStatus(422);
+    }
+
+    public function test_manual_entry_flow_from_start_through_admin_approval(): void
+    {
+        $employer = $this->employer();
+        $admin = $this->admin();
+
+        Sanctum::actingAs($employer);
+        $uploadId = $this->postJson('/api/employer/placement-reports/manual', [
+            'coverage_month' => 3, 'coverage_year' => 2026,
+        ])
+            ->assertCreated()
+            ->assertJsonPath('data.status', PlacementReportUpload::STATUS_PENDING_MAPPING)
+            ->json('data.id');
+
+        // Save is a draft step — can be called more than once while the
+        // employer is still typing in rows, distinct from final submission.
+        $this->putJson("/api/employer/placement-reports/{$uploadId}/records", [
+            'records' => [
+                ['first_name' => 'Ana', 'last_name' => 'Santos', 'date_hired' => '2026-03-10', 'position' => 'Encoder'],
+            ],
+        ])->assertOk()->assertJsonPath('data.record_count', 1);
+
+        $this->putJson("/api/employer/placement-reports/{$uploadId}/records", [
+            'records' => [
+                ['first_name' => 'Ana', 'last_name' => 'Santos', 'date_hired' => '2026-03-10', 'position' => 'Encoder'],
+                ['first_name' => 'Ben', 'middle_name' => 'Cruz', 'last_name' => 'Lim', 'date_hired' => '2026-03-15', 'position' => 'Driver', 'gender' => 'male'],
+            ],
+        ])->assertOk()->assertJsonPath('data.record_count', 2);
+
+        $this->postJson("/api/employer/placement-reports/{$uploadId}/submit")
+            ->assertOk()
+            ->assertJsonPath('data.status', PlacementReportUpload::STATUS_PENDING_REVIEW);
+
+        Sanctum::actingAs($admin);
+        $this->postJson("/api/admin/placement-reports/{$uploadId}/approve")
+            ->assertOk()
+            ->assertJsonPath('data.status', PlacementReportUpload::STATUS_APPROVED);
+
+        $this->assertSame(2, PlacementRecord::where('upload_id', $uploadId)->count());
+    }
+
+    public function test_manual_entry_cannot_be_submitted_with_no_records(): void
+    {
+        $employer = $this->employer();
+        Sanctum::actingAs($employer);
+
+        $uploadId = $this->postJson('/api/employer/placement-reports/manual', [
+            'coverage_month' => 3, 'coverage_year' => 2026,
+        ])->assertCreated()->json('data.id');
+
+        $this->postJson("/api/employer/placement-reports/{$uploadId}/submit")
+            ->assertStatus(422)
+            ->assertJsonPath('errors.records.0', 'Add at least one hire before submitting, or declare no hires for this period.');
+    }
+
+    public function test_manual_entry_rejects_a_row_missing_a_required_field(): void
+    {
+        $employer = $this->employer();
+        Sanctum::actingAs($employer);
+
+        $uploadId = $this->postJson('/api/employer/placement-reports/manual', [
+            'coverage_month' => 3, 'coverage_year' => 2026,
+        ])->assertCreated()->json('data.id');
+
+        // No last_name — one of the four fields the paper form treats as mandatory.
+        $this->putJson("/api/employer/placement-reports/{$uploadId}/records", [
+            'records' => [['first_name' => 'Ana', 'date_hired' => '2026-03-10', 'position' => 'Encoder']],
+        ])->assertStatus(422)->assertJsonValidationErrors(['records.0.last_name']);
+    }
+
+    public function test_manual_entry_records_cannot_be_saved_onto_a_spreadsheet_upload(): void
+    {
+        $employer = $this->employer();
+        Sanctum::actingAs($employer);
+
+        $uploadId = $this->submittedReport($employer, month: 3, year: 2026)->id;
+        // submittedReport() leaves stored_path null too, so force a non-null
+        // path to simulate a genuine spreadsheet-backed upload.
+        PlacementReportUpload::where('id', $uploadId)->update(['stored_path' => 'placement_reports/1/fake.xlsx', 'status' => PlacementReportUpload::STATUS_PENDING_MAPPING]);
+
+        $this->putJson("/api/employer/placement-reports/{$uploadId}/records", [
+            'records' => [['first_name' => 'Ana', 'last_name' => 'Santos', 'date_hired' => '2026-03-10', 'position' => 'Encoder']],
+        ])
+            ->assertStatus(422)
+            ->assertJsonPath('errors.records.0', 'This report was built from an uploaded spreadsheet — edit it through the column mapping instead.');
+    }
+
+    public function test_reopening_a_manual_entry_report_returns_its_saved_records(): void
+    {
+        $employer = $this->employer();
+        Sanctum::actingAs($employer);
+
+        $uploadId = $this->postJson('/api/employer/placement-reports/manual', [
+            'coverage_month' => 3, 'coverage_year' => 2026,
+        ])->assertCreated()->json('data.id');
+
+        $this->putJson("/api/employer/placement-reports/{$uploadId}/records", [
+            'records' => [['first_name' => 'Ana', 'last_name' => 'Santos', 'date_hired' => '2026-03-10', 'position' => 'Encoder']],
+        ])->assertOk();
+
+        // Re-opening (e.g. after PESO rejects it and the employer comes back
+        // to fix something) must return the previously-saved row so the
+        // table editor isn't reset back to blank.
+        $this->getJson("/api/employer/placement-reports/{$uploadId}")
+            ->assertOk()
+            ->assertJsonCount(1, 'data.records')
+            ->assertJsonPath('data.records.0.first_name', 'Ana');
+    }
+
+    public function test_admin_confirmed_seeker_link_survives_a_manual_entry_resubmission_after_rejection(): void
+    {
+        $this->seeker(501, 'Ana', '', 'Santos', '1999-09-09');
+        $employer = $this->employer();
+        $admin = $this->admin();
+
+        Sanctum::actingAs($employer);
+        $uploadId = $this->postJson('/api/employer/placement-reports/manual', [
+            'coverage_month' => 3, 'coverage_year' => 2026,
+        ])->assertCreated()->json('data.id');
+        $records = [['first_name' => 'Ana', 'last_name' => 'Santos', 'date_hired' => '2026-03-10', 'position' => 'Encoder']];
+        $this->putJson("/api/employer/placement-reports/{$uploadId}/records", ['records' => $records])->assertOk();
+        $this->postJson("/api/employer/placement-reports/{$uploadId}/submit")->assertOk();
+
+        Sanctum::actingAs($admin);
+        $recordId = PlacementRecord::where('upload_id', $uploadId)->firstOrFail()->id;
+        $this->postJson("/api/admin/placement-reports/{$uploadId}/records/{$recordId}/link", ['seeker_id' => 501])->assertOk();
+        $this->postJson("/api/admin/placement-reports/{$uploadId}/reject", ['review_remarks' => 'Please fix an unrelated column.'])->assertOk();
+
+        Sanctum::actingAs($employer);
+        // Same row re-saved — confirmed link must survive the rebuild.
+        $this->putJson("/api/employer/placement-reports/{$uploadId}/records", ['records' => $records])->assertOk();
+
+        $record = PlacementRecord::where('upload_id', $uploadId)->firstOrFail();
+        $this->assertSame(501, $record->seeker_id);
+        $this->assertNotNull($record->seeker_match_confirmed_at);
     }
 
     public function test_coverage_month_is_required_and_cannot_be_in_the_future(): void
@@ -267,6 +441,21 @@ class PlacementReportFlowTest extends TestCase
         );
     }
 
+    public function test_hyphenated_and_punctuated_surnames_still_match_via_seeker_candidates(): void
+    {
+        $this->seeker(401, 'Juan', '', 'Dela-Cruz', '1998-05-04');
+
+        $service = app(\App\Services\PlacementImportService::class);
+
+        // The SQL side used to strip only spaces from the column, so a DB
+        // name spelled "Dela-Cruz" never matched a reported hire spelled
+        // "DelaCruz" even though normalizeName() (PHP) treats them as equal.
+        $candidates = $service->seekerCandidates('Juan', 'DelaCruz');
+
+        $this->assertCount(1, $candidates);
+        $this->assertSame(401, $candidates->first()->seeker_id);
+    }
+
     public function test_admin_can_correct_and_clear_a_seeker_link(): void
     {
         $employer = $this->employer();
@@ -302,6 +491,42 @@ class PlacementReportFlowTest extends TestCase
             ->assertOk()
             ->assertJsonPath('data.linked_seeker_id', null)
             ->assertJsonPath('data.seeker_match_confidence', PlacementRecord::MATCH_NONE);
+    }
+
+    public function test_admin_confirmed_seeker_link_survives_a_resubmission_after_rejection(): void
+    {
+        $this->seeker(501, 'Ana', '', 'Santos', '1999-09-09');
+
+        $employer = $this->employer();
+        $admin = $this->admin();
+
+        Sanctum::actingAs($employer);
+        $file = $this->workbook(['MARCH' => [['Ana', 'Santos', '2026-03-10', 'Encoder']]]);
+        $uploadId = $this->postJson('/api/employer/placement-reports', [
+            'file' => $file, 'coverage_month' => 3, 'coverage_year' => 2026,
+        ])->assertCreated()->json('data.id');
+
+        $mapping = $this->getJson("/api/employer/placement-reports/{$uploadId}")->json('data.mapping');
+        $this->postJson("/api/employer/placement-reports/{$uploadId}/preview", ['mapping' => $mapping])->assertOk();
+        $this->postJson("/api/employer/placement-reports/{$uploadId}/submit")->assertOk();
+
+        Sanctum::actingAs($admin);
+        $recordId = PlacementRecord::where('upload_id', $uploadId)->firstOrFail()->id;
+        $this->postJson("/api/admin/placement-reports/{$uploadId}/records/{$recordId}/link", ['seeker_id' => 501])
+            ->assertOk();
+        $this->postJson("/api/admin/placement-reports/{$uploadId}/reject", ['review_remarks' => 'Please fix an unrelated column.'])
+            ->assertOk();
+
+        Sanctum::actingAs($employer);
+        // Resubmitting rebuilds every record from scratch via buildRecords() —
+        // before the fix this reverted the admin's confirmed link straight
+        // back to whatever the automatic matcher guessed.
+        $this->postJson("/api/employer/placement-reports/{$uploadId}/preview", ['mapping' => $mapping])->assertOk();
+
+        $record = PlacementRecord::where('upload_id', $uploadId)->firstOrFail();
+        $this->assertSame(501, $record->seeker_id);
+        $this->assertNotNull($record->seeker_match_confirmed_at);
+        $this->assertSame(PlacementRecord::MATCH_EXACT, $record->seeker_match_confidence);
     }
 
     public function test_compliance_view_separates_submitted_nil_and_overdue_employers(): void
@@ -391,6 +616,87 @@ class PlacementReportFlowTest extends TestCase
         // Clamped to the month length rather than overflowing into the next one.
         config(['placement_reports.deadline_day' => 31]);
         $this->assertSame('2026-02-28', app(PlacementComplianceService::class)->dueDate(2026, 1)->toDateString());
+    }
+
+    public function test_long_gender_and_civil_status_values_are_truncated_to_their_column_width(): void
+    {
+        $employer = $this->employer();
+        Sanctum::actingAs($employer);
+
+        // gender/civil_status are narrower than the 255-char default other
+        // fields get — a longer value used to pass straight through and blow
+        // up under MySQL strict mode instead of being capped like every
+        // other field already is.
+        $file = $this->workbookWithExtraColumns([
+            'FIRST NAME' => 'Ana', 'LAST NAME' => 'Santos', 'DATE HIRED' => '2026-03-10', 'POSITION' => 'Encoder',
+            'GENDER' => str_repeat('Female-identifying-nonbinary-descriptor ', 3),
+            'CIVIL STATUS' => str_repeat('Married-with-a-very-long-legal-descriptor ', 3),
+        ]);
+
+        $uploadId = $this->postJson('/api/employer/placement-reports', [
+            'file' => $file, 'coverage_month' => 3, 'coverage_year' => 2026,
+        ])->assertCreated()->json('data.id');
+
+        $mapping = $this->getJson("/api/employer/placement-reports/{$uploadId}")->json('data.mapping');
+
+        $response = $this->postJson("/api/employer/placement-reports/{$uploadId}/preview", ['mapping' => $mapping])
+            ->assertOk();
+
+        $this->assertLessThanOrEqual(30, strlen($response->json('records.0.gender')));
+        $this->assertLessThanOrEqual(40, strlen($response->json('records.0.civil_status')));
+    }
+
+    public function test_a_rejected_nil_declaration_can_be_resubmitted_directly(): void
+    {
+        $employer = $this->employer();
+        $admin = $this->admin();
+
+        Sanctum::actingAs($employer);
+        $uploadId = $this->postJson('/api/employer/placement-reports/nil', [
+            'coverage_month' => 3, 'coverage_year' => 2026,
+        ])->assertCreated()->json('data.id');
+
+        Sanctum::actingAs($admin);
+        $this->postJson("/api/admin/placement-reports/{$uploadId}/reject", ['review_remarks' => 'Please confirm with HR before we accept a nil month.'])
+            ->assertOk();
+
+        Sanctum::actingAs($employer);
+        // Before the fix, submit() always required a column mapping — which a
+        // nil declaration never has — so this was a dead end for the employer.
+        $this->postJson("/api/employer/placement-reports/{$uploadId}/submit", [
+            'employer_remarks' => 'Confirmed with HR: no hires in March.',
+        ])
+            ->assertOk()
+            ->assertJsonPath('data.status', PlacementReportUpload::STATUS_PENDING_REVIEW)
+            ->assertJsonPath('data.is_nil_report', true);
+    }
+
+    public function test_compliance_excludes_an_employer_verified_after_the_period_closed(): void
+    {
+        Carbon::setTestNow('2026-04-01 09:00:00');
+
+        try {
+            // Registered in February but not verified by PESO until April —
+            // after March had already closed. Keying eligibility off
+            // created_at would retroactively brand them overdue for a period
+            // they had no verified portal access to.
+            $lateVerified = $this->employer('late@example.test', 'Late Verified Inc');
+            $lateVerified->forceFill(['verified_at' => '2026-04-01 08:00:00', 'created_at' => '2026-02-01 08:00:00'])->save();
+
+            $onTime = $this->employer('ontime@example.test', 'On Time Inc');
+            $onTime->forceFill(['verified_at' => '2026-02-15 08:00:00', 'created_at' => '2026-02-01 08:00:00'])->save();
+
+            $admin = $this->admin();
+            Sanctum::actingAs($admin);
+
+            $response = $this->getJson('/api/admin/placement-reports/compliance?coverage_month=3&coverage_year=2026')->assertOk();
+
+            $companies = collect($response->json('data'))->pluck('company_name');
+            $this->assertFalse($companies->contains('Late Verified Inc'));
+            $this->assertTrue($companies->contains('On Time Inc'));
+        } finally {
+            Carbon::setTestNow();
+        }
     }
 
     // ── Fixtures ─────────────────────────────────────────────────────────
@@ -486,6 +792,26 @@ class PlacementReportFlowTest extends TestCase
         return new UploadedFile($path, 'placements.xlsx', null, null, true);
     }
 
+    /**
+     * Build a single-sheet workbook from an explicit header => value row, for
+     * tests that need columns (gender, civil status, ...) the shared
+     * workbook() fixture doesn't carry.
+     *
+     * @param  array<string, string>  $row
+     */
+    private function workbookWithExtraColumns(array $row): UploadedFile
+    {
+        $spreadsheet = new Spreadsheet;
+        $sheet = $spreadsheet->getActiveSheet();
+        $sheet->fromArray([array_keys($row), array_values($row)], null, 'A1');
+
+        $path = tempnam(sys_get_temp_dir(), 'placement').'.xlsx';
+        (new XlsxWriter($spreadsheet))->save($path);
+        $this->tempFiles[] = $path;
+
+        return new UploadedFile($path, 'placements.xlsx', null, null, true);
+    }
+
     private function createTables(): void
     {
         Schema::create('employers', function (Blueprint $table) {
@@ -496,6 +822,7 @@ class PlacementReportFlowTest extends TestCase
             $table->string('trade_name')->nullable();
             $table->string('mobile_number')->nullable();
             $table->string('verification_status')->default('pending');
+            $table->timestamp('verified_at')->nullable();
             $table->timestamp('email_verified_at')->nullable();
             $table->timestamps();
             $table->softDeletes();
@@ -547,6 +874,16 @@ class PlacementReportFlowTest extends TestCase
             $table->timestamp('submitted_at')->nullable();
             $table->timestamp('reviewed_at')->nullable();
             $table->timestamps();
+
+            // Mirrors the production migration's race-proof uniqueness
+            // constraint: NULL (a non-blocking status) never collides, so
+            // only pending_review/approved rows for the same employer+period
+            // are ever compared against each other.
+            $table->string('settlement_key', 60)->nullable()->storedAs(
+                "CASE WHEN status IN ('pending_review', 'approved') AND coverage_year IS NOT NULL AND coverage_month IS NOT NULL "
+                ."THEN employer_id || '-' || coverage_year || '-' || coverage_month ELSE NULL END"
+            );
+            $table->unique('settlement_key');
         });
 
         Schema::create('placement_report_mappings', function (Blueprint $table) {

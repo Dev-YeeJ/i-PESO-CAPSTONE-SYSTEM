@@ -29,7 +29,10 @@ class PlacementComplianceService
      */
     public function dueDate(int $year, int $month): Carbon
     {
-        $following = Carbon::create($year, $month, 1)->startOfMonth()->addMonth();
+        // Every user is in Asia/Manila; app.timezone is UTC with no env
+        // override. Pinning the month boundary to Manila explicitly keeps the
+        // deadline anchored to the correct local day rather than UTC's.
+        $following = Carbon::create($year, $month, 1, 0, 0, 0, 'Asia/Manila')->startOfMonth()->addMonth();
         $day = min(max((int) config('placement_reports.deadline_day', 10), 1), $following->daysInMonth);
 
         return $following->setDay($day)->endOfDay();
@@ -38,7 +41,7 @@ class PlacementComplianceService
     /** The most recent coverage period whose deadline has already passed. */
     public function latestOverduePeriod(?Carbon $asOf = null): array
     {
-        $asOf ??= Carbon::now();
+        $asOf ??= Carbon::now('Asia/Manila');
         $period = $asOf->copy()->startOfMonth()->subMonth();
 
         // If this month's deadline has not arrived yet, the period still open
@@ -63,9 +66,13 @@ class PlacementComplianceService
 
         $employers = Employer::query()
             ->whereIn('verification_status', config('placement_reports.reporting_statuses', ['verified']))
-            // An employer registered after the period closed was never in a
-            // position to hire during it, so they are not counted as delinquent.
-            ->where('created_at', '<=', Carbon::create($year, $month, 1)->endOfMonth())
+            // An employer wasn't in a position to report hires for a period
+            // until PESO actually verified them and gave them portal access —
+            // registration date alone would retroactively brand someone
+            // verified after the deadline as delinquent for a period they had
+            // no access to. Fall back to created_at only for legacy rows
+            // verified before the verified_at column existed.
+            ->whereRaw('COALESCE(verified_at, created_at) <= ?', [Carbon::create($year, $month, 1)->endOfMonth()])
             ->select('employer_id', 'company_name', 'trade_name', 'email', 'mobile_number')
             ->orderBy('company_name')
             ->get();
@@ -123,7 +130,7 @@ class PlacementComplianceService
 
         return Employer::query()
             ->whereIn('verification_status', config('placement_reports.reporting_statuses', ['verified']))
-            ->where('created_at', '<=', Carbon::create($year, $month, 1)->endOfMonth())
+            ->whereRaw('COALESCE(verified_at, created_at) <= ?', [Carbon::create($year, $month, 1)->endOfMonth()])
             ->whereNotIn('employer_id', $settledEmployerIds)
             ->get();
     }

@@ -15,3 +15,4 @@ export const viewJobFairRequirement = async (submissionId) => (await api.get(`/e
 export const submitJobFairConfirmation = async (jobFairId, payload) => (await api.post(`/employer/job-fairs/${jobFairId}/confirmation-slip`, payload)).data
 export const submitJobFairResults = async (jobFairId, payload) => (await api.post(`/employer/job-fairs/${jobFairId}/results`, payload)).data
 export const downloadJobFairResult = async (resultId) => (await api.get(`/employer/job-fair-results/${resultId}/roi-form-3`, { responseType: 'blob' })).data
+export const searchApplicantSuggestions = async (query, signal) => (await api.get('/employer/applicant-suggestions', { params: { q: query }, signal })).data.data ?? []

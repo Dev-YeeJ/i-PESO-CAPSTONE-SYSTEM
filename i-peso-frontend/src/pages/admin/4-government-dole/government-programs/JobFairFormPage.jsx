@@ -36,7 +36,7 @@ export default function JobFairFormPage() {
   const { id } = useParams()
   const navigate = useNavigate()
   const [form, setForm] = useState(emptyForm)
-  const [singleDay, setSingleDay] = useState(true)
+  const [multiDay, setMultiDay] = useState(false)
   const [partnerAgencyInput, setPartnerAgencyInput] = useState('')
   const [metrics, setMetrics] = useState(null)
   const [loading, setLoading] = useState(Boolean(id))
@@ -76,7 +76,7 @@ export default function JobFairFormPage() {
           submission_deadline: fair.submission_deadline?.slice(0, 10) ?? '',
           maximum_representatives: fair.maximum_representatives ?? 2,
         })
-        setSingleDay(!startDate || startDate === endDate)
+        setMultiDay(Boolean(startDate) && startDate !== endDate)
         setMetrics(fair.metrics ?? null)
       })
       .catch((requestError) => setError(requestError.response?.data?.message ?? 'Unable to load job fair.'))
@@ -94,15 +94,15 @@ export default function JobFairFormPage() {
     setForm((current) => {
       const next = { ...current, [name]: value }
       // Keep the hidden end date glued to the start date while the event is
-      // marked single-day, so a later toggle-off doesn't reveal a stale value.
-      if (name === 'start_date' && singleDay) next.end_date = value
+      // not marked multi-day, so a later toggle-on doesn't reveal a stale value.
+      if (name === 'start_date' && !multiDay) next.end_date = value
       return next
     })
-  }, [singleDay])
+  }, [multiDay])
 
-  const toggleSingleDay = useCallback((checked) => {
-    setSingleDay(checked)
-    if (checked) setForm((current) => ({ ...current, end_date: current.start_date }))
+  const toggleMultiDay = useCallback((checked) => {
+    setMultiDay(checked)
+    if (!checked) setForm((current) => ({ ...current, end_date: current.start_date }))
   }, [])
 
   const addPartnerAgency = useCallback(() => {
@@ -168,7 +168,7 @@ export default function JobFairFormPage() {
   const today = useMemo(() => new Date().toISOString().slice(0, 10), [])
 
   const dateError = useMemo(() => {
-    if (!singleDay && form.start_date && form.end_date && form.end_date < form.start_date) {
+    if (multiDay && form.start_date && form.end_date && form.end_date < form.start_date) {
       return 'End date cannot be before the start date.'
     }
     if (form.submission_deadline && form.start_date && form.submission_deadline > form.start_date) {
@@ -180,7 +180,7 @@ export default function JobFairFormPage() {
       return 'The submission deadline cannot be in the past.'
     }
     return ''
-  }, [id, today, singleDay, form.start_date, form.end_date, form.submission_deadline])
+  }, [id, today, multiDay, form.start_date, form.end_date, form.submission_deadline])
 
   const [publishAfterSave, setPublishAfterSave] = useState(false)
 
@@ -198,7 +198,7 @@ export default function JobFairFormPage() {
     const payload = {
       ...form,
       event_date: form.start_date,
-      end_date: singleDay ? form.start_date : form.end_date,
+      end_date: multiDay ? form.end_date : form.start_date,
       maximum_representatives: Number(form.maximum_representatives),
       submission_deadline: form.submission_deadline || null,
     }
@@ -220,7 +220,7 @@ export default function JobFairFormPage() {
     } finally {
       setSubmitting(false)
     }
-  }, [form, id, navigate, singleDay, dateError])
+  }, [form, id, navigate, multiDay, dateError])
 
   const backTarget = id ? `/admin/job-fairs/${id}` : '/admin/job-fairs'
 
@@ -305,17 +305,17 @@ export default function JobFairFormPage() {
               <div className="space-y-5">
                 <div>
                   <label className="flex items-center gap-2 text-sm font-bold text-slate-700">
-                    <input type="checkbox" checked={singleDay} onChange={(event) => toggleSingleDay(event.target.checked)} className="h-4 w-4 rounded border-slate-300" />
-                    This is a single-day event
+                    <input type="checkbox" checked={multiDay} onChange={(event) => toggleMultiDay(event.target.checked)} className="h-4 w-4 rounded border-slate-300" />
+                    This is a multi-day event
                   </label>
                 </div>
 
-                <div className={`grid gap-4 md:grid-cols-2 ${singleDay ? 'lg:grid-cols-3' : 'lg:grid-cols-2'}`}>
+                <div className={`grid gap-4 md:grid-cols-2 ${multiDay ? 'lg:grid-cols-2' : 'lg:grid-cols-3'}`}>
                   <div>
                     <label className="block text-sm font-bold text-slate-700">Start Date</label>
                     <input type="date" name="start_date" value={form.start_date} onChange={handleChange} required min={id ? undefined : new Date().toISOString().slice(0, 10)} className="mt-2 w-full rounded-lg border border-slate-300 px-4 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100" />
                   </div>
-                  {!singleDay && (
+                  {multiDay && (
                     <div>
                       <label className="block text-sm font-bold text-slate-700">End Date</label>
                       <input type="date" name="end_date" value={form.end_date} onChange={handleChange} required min={form.start_date || undefined} className="mt-2 w-full rounded-lg border border-slate-300 px-4 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100" />

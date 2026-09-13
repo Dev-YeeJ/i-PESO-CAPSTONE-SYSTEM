@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class JobFairConfirmationSlip extends Model
 {
@@ -19,4 +20,5 @@ class JobFairConfirmationSlip extends Model
     public function jobFair(): BelongsTo { return $this->belongsTo(JobFair::class, 'job_fair_id', 'job_fair_id'); }
     public function employer(): BelongsTo { return $this->belongsTo(Employer::class, 'employer_id', 'employer_id'); }
     public function participation(): BelongsTo { return $this->belongsTo(JobFairEmployer::class, 'job_fair_employer_id'); }
+    public function vacancies(): HasMany { return $this->hasMany(JobFairConfirmationVacancy::class, 'confirmation_slip_id'); }
 }

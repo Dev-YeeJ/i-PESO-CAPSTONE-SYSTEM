@@ -58,7 +58,7 @@ class EmployerJobFairController extends Controller
         return response()->json(['message' => 'Interest recorded. PESO may also confirm your participation by phone or email.', 'participation' => $participation]);
     }
 
-    public function respond(Request $request, JobFair $jobFair): JsonResponse
+    public function respond(Request $request, JobFair $jobFair, JobFairService $service): JsonResponse
     {
         $employer = $this->employer($request);
         $validated = $request->validate(['response' => ['required', Rule::in(['accepted', 'declined'])], 'remarks' => ['nullable', 'string', 'max:2000']]);
@@ -69,10 +69,16 @@ class EmployerJobFairController extends Controller
             'remarks' => $validated['remarks'] ?? $participation->remarks,
         ]);
 
-        return response()->json(['message' => 'Invitation response saved.', 'participation' => $participation->fresh()]);
+        if ($validated['response'] === 'accepted') {
+            $service->processAcceptance($jobFair, $participation);
+        }
+
+        $participation = $participation->fresh(['requirementSubmissions.requirement']);
+
+        return response()->json(['message' => 'Invitation response saved.', 'participation' => $service->participationPayload($participation)]);
     }
 
-    public function uploadRequirement(Request $request, JobFair $jobFair, JobFairRequirement $requirement): JsonResponse
+    public function uploadRequirement(Request $request, JobFair $jobFair, JobFairRequirement $requirement, JobFairService $service): JsonResponse
     {
         $employer = $this->employer($request);
         abort_unless($requirement->job_fair_id === $jobFair->job_fair_id, 404);
@@ -105,7 +111,7 @@ class EmployerJobFairController extends Controller
         }
 
         if ($oldPath && $oldPath !== $path) Storage::disk('local')->delete($oldPath);
-        $this->syncRequirementStatus($participation);
+        $service->syncRequirementStatus($participation);
         Notification::send(Administrator::query()->where('status', 'active')->get(), new JobFairNotification($jobFair, 'requirements_submitted', $participation));
 
         return response()->json(['message' => 'Requirement submitted for PESO review.', 'submission' => [
@@ -135,26 +141,43 @@ class EmployerJobFairController extends Controller
         ]);
     }
 
-    public function confirmation(Request $request, JobFair $jobFair): JsonResponse
+    public function confirmation(Request $request, JobFair $jobFair, JobFairService $service): JsonResponse
     {
         $employer = $this->employer($request);
         $participation = $this->participation($jobFair, $employer);
         $validated = $request->validate([
             'representative_1_name' => ['required', 'string', 'max:255'], 'representative_1_contact' => ['required', 'string', 'max:40'],
             'representative_2_name' => ['nullable', 'string', 'max:255'], 'representative_2_contact' => ['nullable', 'string', 'max:40'],
-            'email' => ['required', 'email', 'max:255'], 'number_of_job_vacancies' => ['required', 'integer', 'min:0'],
+            'email' => ['required', 'email', 'max:255'],
             'will_conduct_onsite_interview' => ['required', 'boolean'], 'logistics_requests' => ['nullable', 'string', 'max:3000'],
+            ...$this->vacancyListRules(),
         ]);
         if (($jobFair->maximum_representatives ?? 2) < 2 && filled($validated['representative_2_name'] ?? null)) {
             return response()->json(['message' => 'This event allows only one company representative.', 'errors' => ['representative_2_name' => ['Remove the second representative.']]], 422);
         }
 
-        $slip = JobFairConfirmationSlip::updateOrCreate(
-            ['job_fair_id' => $jobFair->job_fair_id, 'dedupe_key' => 'employer:'.$employer->employer_id],
-            [...$validated, 'job_fair_employer_id' => $participation->id, 'employer_id' => $employer->employer_id,
-                'company_name' => $employer->company_name ?: $employer->trade_name ?: $employer->email,
-                'source' => 'employer_self_service', 'submitted_by' => $employer->email, 'submitted_at' => now()],
-        );
+        $vacancies = collect($validated['vacancies'] ?? []);
+
+        $slip = DB::transaction(function () use ($jobFair, $employer, $participation, $validated, $vacancies) {
+            $slip = JobFairConfirmationSlip::updateOrCreate(
+                ['job_fair_id' => $jobFair->job_fair_id, 'dedupe_key' => 'employer:'.$employer->employer_id],
+                [...collect($validated)->except('vacancies')->all(),
+                    // Derived from the list itself rather than trusted as a
+                    // separately-submitted number, so it can never drift from
+                    // what the list actually says.
+                    'number_of_job_vacancies' => (int) $vacancies->sum('number_needed'),
+                    'job_fair_employer_id' => $participation->id, 'employer_id' => $employer->employer_id,
+                    'company_name' => $employer->company_name ?: $employer->trade_name ?: $employer->email,
+                    'source' => 'employer_self_service', 'submitted_by' => $employer->email, 'submitted_at' => now()],
+            );
+
+            $slip->vacancies()->delete();
+            foreach ($vacancies as $vacancy) {
+                $slip->vacancies()->create($vacancy);
+            }
+
+            return $slip;
+        });
 
         $confirmationRequirement = $jobFair->requirements()->where('code', 'confirmation_slip')->first();
         if ($confirmationRequirement) {
@@ -162,10 +185,28 @@ class EmployerJobFairController extends Controller
                 ['job_fair_requirement_id' => $confirmationRequirement->id, 'job_fair_employer_id' => $participation->id],
                 ['employer_id' => $employer->employer_id, 'status' => 'submitted', 'original_filename' => 'Digital confirmation slip', 'submitted_at' => now()],
             );
-            $this->syncRequirementStatus($participation);
+            $service->syncRequirementStatus($participation);
         }
 
-        return response()->json(['message' => 'Confirmation slip submitted.', 'confirmation_slip' => $slip]);
+        return response()->json(['message' => 'Confirmation slip submitted.', 'confirmation_slip' => $slip->fresh(['vacancies'])]);
+    }
+
+    /**
+     * Validation for the "LIST OF VACANCIES/ORDERS" table on the paper
+     * Confirmation Slip — shared by the employer self-service and admin
+     * proxy submission, since both now capture the same structured list
+     * instead of a single number_of_job_vacancies count.
+     */
+    private function vacancyListRules(): array
+    {
+        return [
+            'vacancies' => ['nullable', 'array'],
+            'vacancies.*.number_needed' => ['required_with:vacancies', 'integer', 'min:0'],
+            'vacancies.*.position_title' => ['required_with:vacancies', 'string', 'max:255'],
+            'vacancies.*.qualifications' => ['nullable', 'string', 'max:2000'],
+            'vacancies.*.place_of_work' => ['nullable', 'string', 'max:255'],
+            'vacancies.*.job_vacancy_id' => ['nullable', 'integer', 'exists:job_vacancies,post_id'],
+        ];
     }
 
     public function results(Request $request, JobFair $jobFair, JobFairReportService $reports): JsonResponse
@@ -180,7 +221,7 @@ class EmployerJobFairController extends Controller
         $report = $reports->saveEmployer($jobFair, $employer, $validated);
         Notification::send(Administrator::query()->where('status', 'active')->get(), new JobFairNotification($jobFair, 'results_submitted', $report->participation));
 
-        return response()->json(['message' => 'Post-event results saved.', 'result_report' => $report]);
+        return response()->json(['message' => 'Establishment Report saved.', 'result_report' => $report]);
     }
 
     public function downloadReport(Request $request, JobFairResultReport $resultReport, JobFairReportService $reports)
@@ -188,6 +229,18 @@ class EmployerJobFairController extends Controller
         $employer = $this->employer($request);
         abort_unless($resultReport->employer_id === $employer->employer_id && $resultReport->source === 'employer_self_service', 403);
         return $reports->download($resultReport);
+    }
+
+    /**
+     * "Smart typing" name suggestions for the applicant-name field on the
+     * results register — powers autofill of the rest of that row.
+     */
+    public function applicantSuggestions(Request $request, JobFairReportService $reports): JsonResponse
+    {
+        $this->employer($request);
+        $validated = $request->validate(['q' => ['nullable', 'string', 'max:255']]);
+
+        return response()->json(['data' => $reports->suggestApplicants($validated['q'] ?? '')]);
     }
 
     private function resultRules(bool $entries): array
@@ -203,6 +256,7 @@ class EmployerJobFairController extends Controller
         ];
         if ($entries) $rules += [
             'entries' => ['required', 'array'], 'entries.*.applicant_name' => ['required', 'string', 'max:255'],
+            'entries.*.seeker_id' => ['nullable', 'integer', 'exists:job_seekers,seeker_id'],
             'entries.*.gender' => ['required', Rule::in(['male', 'female'])], 'entries.*.position_applied_for' => ['required', 'string', 'max:255'],
             'entries.*.status' => ['required', Rule::in(['qualified', 'near_hired', 'hots', 'employer_mismatch', 'seeker_mismatch'])],
             // RO1-JF Form 3 per-applicant DOLE columns (optional so short-form entries still submit).
@@ -233,10 +287,4 @@ class EmployerJobFairController extends Controller
         return $request->user();
     }
 
-    private function syncRequirementStatus(JobFairEmployer $participation): void
-    {
-        $required = $participation->jobFair->requirements()->where('is_required', true)->count();
-        $submitted = $participation->requirementSubmissions()->whereIn('status', ['submitted', 'approved'])->count();
-        $participation->update(['participation_status' => $submitted >= $required ? 'requirements_submitted' : 'requirements_pending']);
-    }
 }

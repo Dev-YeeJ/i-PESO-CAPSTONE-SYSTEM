@@ -8,6 +8,7 @@ use App\Models\JobFairResultReport;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
@@ -237,6 +238,212 @@ class JobFairEcosystemFlowTest extends TestCase
         $this->assertNull($jobVacancyCount);
     }
 
+    /**
+     * Regression test for a bug where accepting an invitation left
+     * participation_status stuck at 'accepted' forever (syncRequirementStatus
+     * silently no-opped because its guard didn't include 'accepted'), which
+     * in turn meant the admin's own Job Fair detail page always showed
+     * "0 of N approved" for a verified employer even though the reused
+     * accreditation documents genuinely satisfied every requirement. This
+     * asserts the admin dashboard sees accurate approved counts straight
+     * from respond() — without the employer ever loading their own portal,
+     * which is what used to (accidentally) populate the data via the old
+     * GET-triggered mutation in eventPayload().
+     */
+    public function test_admin_dashboard_shows_accurate_requirement_progress_right_after_employer_accepts(): void
+    {
+        Storage::fake('local');
+        $admin = Administrator::create([
+            'first_name' => 'PESO', 'last_name' => 'Manager', 'email' => 'dashboard-admin@example.test',
+            'mobile_number' => '09170000005', 'password' => 'password123', 'role' => 'administrator', 'status' => 'active', 'email_verified_at' => now(),
+        ]);
+        $employer = $this->employer('dashboard-employer@example.test', 'Dashboard Accuracy Corp');
+
+        foreach ([
+            ['mayors_permit', 'permit.pdf'],
+            ['dti_certificate', 'dti.pdf'],
+            ['philJobnet_proof', 'philjobnet.pdf'],
+            ['no_pending_case_certificate', 'no-pending-case.pdf'],
+        ] as [$type, $filename]) {
+            Storage::disk('local')->put("employer_documents/{$filename}", '%PDF-1.4 fake content');
+            DB::table('employer_documents')->insert([
+                'employer_id' => $employer->employer_id, 'document_type' => $type,
+                'document_path' => "employer_documents/{$filename}", 'original_filename' => $filename,
+                'file_size' => 1024, 'mime_type' => 'application/pdf', 'uploaded_at' => now(),
+                'verification_status' => 'approved', 'created_at' => now(), 'updated_at' => now(),
+            ]);
+        }
+        DB::table('job_vacancies')->insert([
+            'employer_id' => $employer->employer_id, 'vacancies_count' => 3, 'status' => 'active',
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        Sanctum::actingAs($admin);
+        $fairId = $this->postJson('/api/admin/job-fairs', [
+            'title' => 'Dashboard Accuracy Job Fair', 'description' => 'Checks the admin sees real progress immediately.',
+            'start_date' => '2026-12-01', 'end_date' => '2026-12-01', 'start_time' => '08:00', 'end_time' => '16:00',
+            'venue' => 'PESO Urdaneta Hall',
+            'province' => 'Pangasinan', 'city_municipality' => 'Urdaneta City', 'barangay' => 'Nancayasan',
+            'sector' => 'local', 'target_sector' => 'Multi-sector',
+            'partner_agencies' => ['DOLE'], 'submission_deadline' => '2026-11-20 17:00:00',
+            'contact_email' => 'peso@example.test', 'maximum_representatives' => 2, 'status' => 'draft',
+        ])->assertCreated()->json('job_fair.job_fair_id');
+        $this->postJson("/api/admin/job-fairs/{$fairId}/publish", ['status' => 'accepting_employers'])->assertOk();
+        $participationId = $this->postJson("/api/admin/job-fairs/{$fairId}/invite", ['employer_id' => $employer->employer_id])
+            ->assertCreated()->json('participation.id');
+
+        // Simulate stray/legacy data — a requirement submission that exists
+        // even though this employer never accepted. The checklist must stay
+        // hidden purely because the status says "invited", regardless of
+        // what submission rows happen to already exist.
+        $strayRequirementId = DB::table('job_fair_requirements')->where('job_fair_id', $fairId)->where('code', 'business_permit')->value('id');
+        DB::table('job_fair_requirement_submissions')->insert([
+            'job_fair_requirement_id' => $strayRequirementId, 'job_fair_employer_id' => $participationId,
+            'employer_id' => $employer->employer_id, 'original_filename' => 'stray.pdf',
+            'status' => 'approved', 'submitted_at' => now(), 'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        Sanctum::actingAs($admin);
+        $beforeAccept = $this->getJson("/api/admin/job-fairs/{$fairId}")->assertOk()->json();
+        $participantBefore = collect($beforeAccept['participants'])->firstWhere('employer_id', $employer->employer_id);
+        $this->assertSame('invited', $participantBefore['status']);
+        $this->assertSame([], $participantBefore['requirements']);
+
+        // The employer accepts — this alone (no employer dashboard visit,
+        // no admin action) must be enough for reused documents to appear.
+        Sanctum::actingAs($employer);
+        $this->postJson("/api/employer/job-fairs/{$fairId}/respond", ['response' => 'accepted'])->assertOk();
+
+        Sanctum::actingAs($admin);
+        $after = $this->getJson("/api/admin/job-fairs/{$fairId}")->assertOk()->json();
+        $participantAfter = collect($after['participants'])->firstWhere('employer_id', $employer->employer_id);
+
+        // 5 of the 7 required requirements (business_permit,
+        // business_registration, philjobnet_registration, job_vacancy_count,
+        // no_pending_case) are covered by a reused document or the
+        // active-posting count; posterized_vacancy and confirmation_slip are
+        // still genuinely outstanding, so the participation correctly lands
+        // on "requirements_pending" — not stuck at "accepted", and not a
+        // misleading "0 of 7" either.
+        $this->assertSame('requirements_pending', $participantAfter['status']);
+        $approvedCount = collect($participantAfter['requirements'])->where('status', 'approved')->count();
+        $this->assertSame(5, $approvedCount);
+    }
+
+    /**
+     * A PESO staff member recording a phone/walk-in acceptance through the
+     * admin's manual participation-status control is a second path into
+     * "accepted" besides the employer's own Accept Invitation click. It must
+     * trigger the exact same auto-satisfaction, or this second door
+     * reintroduces the identical "0 approved" bug this fix targets.
+     */
+    public function test_admin_recording_a_phone_acceptance_also_auto_satisfies_requirements(): void
+    {
+        Storage::fake('local');
+        $admin = Administrator::create([
+            'first_name' => 'PESO', 'last_name' => 'Manager', 'email' => 'phone-admin@example.test',
+            'mobile_number' => '09170000006', 'password' => 'password123', 'role' => 'administrator', 'status' => 'active', 'email_verified_at' => now(),
+        ]);
+        $employer = $this->employer('phone-employer@example.test', 'Phone Accept Corp');
+        DB::table('job_vacancies')->insert([
+            'employer_id' => $employer->employer_id, 'vacancies_count' => 1, 'status' => 'active',
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        Sanctum::actingAs($admin);
+        $fairId = $this->postJson('/api/admin/job-fairs', [
+            'title' => 'Phone Acceptance Job Fair', 'description' => 'Checks the admin-recorded acceptance path.',
+            'start_date' => '2026-12-05', 'end_date' => '2026-12-05', 'start_time' => '08:00', 'end_time' => '16:00',
+            'venue' => 'PESO Urdaneta Hall',
+            'province' => 'Pangasinan', 'city_municipality' => 'Urdaneta City', 'barangay' => 'Nancayasan',
+            'sector' => 'local', 'target_sector' => 'Multi-sector',
+            'partner_agencies' => ['DOLE'], 'submission_deadline' => '2026-11-25 17:00:00',
+            'contact_email' => 'peso@example.test', 'maximum_representatives' => 2, 'status' => 'draft',
+        ])->assertCreated()->json('job_fair.job_fair_id');
+        $this->postJson("/api/admin/job-fairs/{$fairId}/publish", ['status' => 'accepting_employers'])->assertOk();
+        $participationId = $this->postJson("/api/admin/job-fairs/{$fairId}/invite", ['employer_id' => $employer->employer_id])
+            ->assertCreated()->json('participation.id');
+
+        // PESO calls the employer, who verbally accepts — recorded manually,
+        // with no employer self-service action at all.
+        $this->patchJson("/api/admin/job-fairs/{$fairId}/participants/{$participationId}", [
+            'status' => 'accepted', 'confirmation_channel' => 'phone',
+        ])->assertOk();
+
+        $after = $this->getJson("/api/admin/job-fairs/{$fairId}")->assertOk()->json();
+        $participant = collect($after['participants'])->firstWhere('employer_id', $employer->employer_id);
+
+        $this->assertSame('requirements_pending', $participant['status']);
+        $jobVacancyCount = collect($participant['requirements'])->firstWhere('label', 'Job Vacancy Count');
+        $this->assertNotNull($jobVacancyCount, 'Job Vacancy Count should be auto-satisfied even for a phone-recorded acceptance.');
+        $this->assertSame('approved', $jobVacancyCount['status']);
+    }
+
+    /**
+     * The admin used to have to review every requirement AND then separately
+     * flip a raw participation_status dropdown to "approved" by hand.
+     * syncRequirementStatus() now does that second step automatically —
+     * this locks in that it only fires once every required requirement is
+     * actually approved, not merely submitted.
+     */
+    public function test_participation_auto_approves_once_every_required_requirement_is_approved(): void
+    {
+        Storage::fake('local');
+        $admin = Administrator::create([
+            'first_name' => 'PESO', 'last_name' => 'Manager', 'email' => 'autoapprove-admin@example.test',
+            'mobile_number' => '09170000004', 'password' => 'password123', 'role' => 'administrator', 'status' => 'active', 'email_verified_at' => now(),
+        ]);
+        $employer = $this->employer('autoapprove-employer@example.test', 'Auto Approve Corp');
+
+        Sanctum::actingAs($admin);
+        $fairId = $this->postJson('/api/admin/job-fairs', [
+            'title' => 'Auto Approve Job Fair', 'description' => 'Checks the automatic participation approval.',
+            'start_date' => '2026-11-20', 'end_date' => '2026-11-20', 'start_time' => '08:00', 'end_time' => '16:00',
+            'venue' => 'PESO Urdaneta Hall',
+            'province' => 'Pangasinan', 'city_municipality' => 'Urdaneta City', 'barangay' => 'Nancayasan',
+            'sector' => 'local', 'target_sector' => 'Multi-sector',
+            'partner_agencies' => ['DOLE'], 'submission_deadline' => '2026-11-05 17:00:00',
+            'contact_email' => 'peso@example.test', 'maximum_representatives' => 2, 'status' => 'draft',
+        ])->assertCreated()->json('job_fair.job_fair_id');
+        $this->postJson("/api/admin/job-fairs/{$fairId}/publish", ['status' => 'accepting_employers'])->assertOk();
+        $this->postJson("/api/admin/job-fairs/{$fairId}/invite", ['employer_id' => $employer->employer_id])->assertCreated();
+
+        Sanctum::actingAs($employer);
+        $this->postJson("/api/employer/job-fairs/{$fairId}/respond", ['response' => 'accepted'])->assertOk();
+
+        $participation = DB::table('job_fair_employers')
+            ->where('job_fair_id', $fairId)->where('employer_id', $employer->employer_id)->first();
+        $requirementIds = DB::table('job_fair_requirements')->where('job_fair_id', $fairId)->where('is_required', true)->pluck('id');
+        $this->assertGreaterThan(1, $requirementIds->count(), 'Sanity check: a job fair should have more than one required requirement.');
+
+        // Seed a submitted-but-unreviewed submission for every required
+        // requirement, mirroring where a fully self-service employer would
+        // be right before an admin starts reviewing.
+        foreach ($requirementIds as $requirementId) {
+            DB::table('job_fair_requirement_submissions')->insert([
+                'job_fair_requirement_id' => $requirementId, 'job_fair_employer_id' => $participation->id,
+                'employer_id' => $employer->employer_id, 'original_filename' => 'doc.pdf',
+                'status' => 'submitted', 'submitted_at' => now(), 'created_at' => now(), 'updated_at' => now(),
+            ]);
+        }
+        DB::table('job_fair_employers')->where('id', $participation->id)->update(['participation_status' => 'requirements_submitted']);
+
+        Sanctum::actingAs($admin);
+        $submissionIds = DB::table('job_fair_requirement_submissions')->where('job_fair_employer_id', $participation->id)->pluck('id');
+
+        // Approving all but the last one should not yet flip participation —
+        // it's still incomplete.
+        foreach ($submissionIds->slice(0, -1) as $submissionId) {
+            $this->patchJson("/api/admin/job-fair-requirements/{$submissionId}/review", ['status' => 'approved'])->assertOk();
+        }
+        $this->assertDatabaseHas('job_fair_employers', ['id' => $participation->id, 'participation_status' => 'requirements_submitted']);
+
+        // Approving the very last required requirement should auto-complete
+        // participation without any separate manual status change.
+        $this->patchJson("/api/admin/job-fair-requirements/{$submissionIds->last()}/review", ['status' => 'approved'])->assertOk();
+        $this->assertDatabaseHas('job_fair_employers', ['id' => $participation->id, 'participation_status' => 'approved']);
+    }
+
     public function test_seeker_poster_feed_only_shows_approved_posterized_vacancy_submissions(): void
     {
         Storage::fake('local');
@@ -301,6 +508,221 @@ class JobFairEcosystemFlowTest extends TestCase
         $this->getJson('/api/job-fairs/posters')->assertOk()->assertJsonCount(0, 'data');
     }
 
+    public function test_result_report_rejects_entries_whose_status_breakdown_contradicts_the_summary(): void
+    {
+        [, $employer, $fairId] = $this->setUpFairWithEmployer('breakdown');
+
+        Sanctum::actingAs($employer);
+        // Summary claims 10 qualified / 0 mismatched, but the register itself
+        // lists 5 qualified + 5 employer-mismatch — the printed form would
+        // contradict itself if this were allowed to save.
+        $entries = collect(range(1, 10))->map(fn ($n) => [
+            'applicant_name' => "Applicant {$n}", 'gender' => $n % 2 === 0 ? 'female' : 'male',
+            'position_applied_for' => 'Line Worker',
+            'status' => $n <= 5 ? 'qualified' : 'employer_mismatch',
+            'mismatch_code' => $n <= 5 ? null : '1',
+        ])->all();
+
+        $this->postJson("/api/employer/job-fairs/{$fairId}/results", [
+            'total_male' => 5, 'total_female' => 5, 'total_applicants' => 10, 'total_qualified' => 10,
+            'total_hots' => 0, 'total_near_hired' => 0, 'total_rejected' => 0,
+            'total_vacancies_solicited' => 5, 'total_vacancies_offered' => 5,
+            'entries' => $entries,
+        ])->assertUnprocessable()->assertJsonValidationErrors('entries');
+    }
+
+    public function test_result_report_rejects_a_mismatch_code_from_the_wrong_code_family(): void
+    {
+        [, $employer, $fairId] = $this->setUpFairWithEmployer('codefamily');
+
+        Sanctum::actingAs($employer);
+        $this->postJson("/api/employer/job-fairs/{$fairId}/results", [
+            'total_male' => 1, 'total_female' => 0, 'total_applicants' => 1, 'total_qualified' => 0,
+            'total_hots' => 0, 'total_near_hired' => 0, 'total_rejected' => 1,
+            'total_vacancies_solicited' => 1, 'total_vacancies_offered' => 1,
+            // status is employer_mismatch, but 'A' is a job-seeker-side code.
+            'entries' => [['applicant_name' => 'Juan Cruz', 'gender' => 'male', 'position_applied_for' => 'Clerk', 'status' => 'employer_mismatch', 'mismatch_code' => 'A']],
+        ])->assertUnprocessable()->assertJsonValidationErrors('entries');
+    }
+
+    public function test_admin_proxy_result_report_resubmission_keeps_its_employer_link_when_omitted(): void
+    {
+        [$admin, $employer, $fairId] = $this->setUpFairWithEmployer('keeplink');
+
+        Sanctum::actingAs($admin);
+        $payload = [
+            'company_name' => 'Keeplink Company', 'employer_id' => $employer->employer_id, 'employer_type' => 'registered_employer',
+            'total_male' => 1, 'total_female' => 0, 'total_applicants' => 1, 'total_qualified' => 1,
+            'total_hots' => 0, 'total_near_hired' => 0, 'total_rejected' => 0,
+            'total_vacancies_solicited' => 1, 'total_vacancies_offered' => 1,
+        ];
+        $this->postJson("/api/admin/job-fairs/{$fairId}/proxy-results", $payload)
+            ->assertCreated()->assertJsonPath('result_report.employer_id', $employer->employer_id);
+
+        // Resubmit a correction without re-selecting the employer — a very
+        // plausible UI reset — and confirm the existing link survives.
+        $this->postJson("/api/admin/job-fairs/{$fairId}/proxy-results", [
+            ...$payload, 'employer_id' => null, 'remarks' => 'Corrected totals.',
+        ])->assertCreated()->assertJsonPath('result_report.employer_id', $employer->employer_id);
+
+        $this->assertSame(1, JobFairResultReport::where('job_fair_id', $fairId)->count());
+    }
+
+    public function test_admin_proxy_accepts_the_new_mismatch_codes_in_aggregate_only_tallies(): void
+    {
+        [$admin, , $fairId] = $this->setUpFairWithEmployer('aggregatetally');
+
+        Sanctum::actingAs($admin);
+        $this->postJson("/api/admin/job-fairs/{$fairId}/proxy-results", [
+            'company_name' => 'Aggregate Only Company', 'employer_type' => 'paper_only_employer',
+            'total_male' => 0, 'total_female' => 1, 'total_applicants' => 1, 'total_qualified' => 0,
+            'total_hots' => 0, 'total_near_hired' => 0, 'total_rejected' => 1,
+            'total_vacancies_solicited' => 1, 'total_vacancies_offered' => 1,
+            // '1' is a new-style employer mismatch code — used to be rejected
+            // because this field only accepted the old generic code list.
+            'mismatch_tallies' => [['mismatch_code' => '1', 'count' => 1]],
+        ])->assertCreated();
+    }
+
+    public function test_applicant_suggestions_match_partial_names_and_autofill_seeker_data(): void
+    {
+        $employer = $this->employer('suggest-employer@example.test', 'Suggest Co');
+        $seeker = \App\Models\JobSeeker::create([
+            'email' => 'judy@example.test', 'password' => 'password123',
+            'first_name' => 'Judy', 'middle_name' => 'Ann', 'last_name' => 'Gukentre Salu',
+            'sex' => 'female', 'mobile_number' => '09194757221', 'address_municipality_city' => 'Sta. Maria, Pangasinan',
+            'date_of_birth' => now()->subYears(28)->toDateString(),
+            'educ_attainment' => 'Senior High School Graduate',
+            'is_former_ofw' => true, 'is_4ps_beneficiary' => true,
+        ]);
+        \Illuminate\Support\Facades\DB::table('seeker_disabilities')->insert([
+            'seeker_id' => $seeker->seeker_id, 'disability_type' => 'Visual', 'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        Sanctum::actingAs($employer);
+        // Incremental typing of a full name — only first + last so far.
+        $response = $this->getJson('/api/employer/applicant-suggestions?q=judy+salu')->assertOk();
+
+        $response->assertJsonCount(1, 'data');
+        $suggestion = $response->json('data.0');
+        $this->assertSame($seeker->seeker_id, $suggestion['seeker_id']);
+        $this->assertSame('Judy Ann Gukentre Salu', $suggestion['name']);
+        $this->assertSame('female', $suggestion['gender']);
+        $this->assertSame('Sta. Maria, Pangasinan', $suggestion['city_municipality']);
+        $this->assertSame('09194757221', $suggestion['contact_number']);
+        $this->assertSame('B', $suggestion['age_group']);
+        $this->assertSame('senior_high', $suggestion['highest_education']);
+        // K-12 grad (senior high), PWD (has a disability row), Displaced OFW,
+        // and 4Ps beneficiary should all be derived — TUPAD (also part of
+        // code 4) has no stored flag anywhere, so it's never auto-detected.
+        $this->assertEqualsCanonicalizing(['1', '2', '3', '4'], $suggestion['classification_codes']);
+    }
+
+    public function test_applicant_suggestions_returns_nothing_for_a_blank_query(): void
+    {
+        $employer = $this->employer('blank-query@example.test', 'Blank Query Co');
+        $this->seeker('any@example.test', 'Any', 'Body');
+
+        Sanctum::actingAs($employer);
+        $this->getJson('/api/employer/applicant-suggestions?q=')->assertOk()->assertJsonCount(0, 'data');
+        $this->getJson('/api/employer/applicant-suggestions')->assertOk()->assertJsonCount(0, 'data');
+    }
+
+    public function test_applicant_suggestions_endpoints_are_gated_to_their_own_role(): void
+    {
+        $employer = $this->employer('role-gate-employer@example.test', 'Role Gate Co');
+        $admin = Administrator::create([
+            'first_name' => 'PESO', 'last_name' => 'Manager', 'email' => 'role-gate-admin@example.test',
+            'mobile_number' => '09170000004', 'password' => 'password123', 'role' => 'administrator', 'status' => 'active', 'email_verified_at' => now(),
+        ]);
+
+        Sanctum::actingAs($employer);
+        $this->getJson('/api/admin/applicant-suggestions?q=judy')->assertForbidden();
+
+        Sanctum::actingAs($admin);
+        $this->getJson('/api/employer/applicant-suggestions?q=judy')->assertForbidden();
+    }
+
+    public function test_confirmation_slip_vacancy_list_derives_the_total_and_links_an_existing_posting(): void
+    {
+        [, $employer, $fairId] = $this->setUpFairWithEmployer('vacancylist');
+        $vacancyId = DB::table('job_vacancies')->insertGetId([
+            'employer_id' => $employer->employer_id, 'vacancies_count' => 2, 'status' => 'active',
+            'created_at' => now(), 'updated_at' => now(),
+        ], 'post_id');
+
+        Sanctum::actingAs($employer);
+        $response = $this->postJson("/api/employer/job-fairs/{$fairId}/confirmation-slip", [
+            'representative_1_name' => 'Maria Santos', 'representative_1_contact' => '09171234567',
+            'email' => $employer->email, 'will_conduct_onsite_interview' => true,
+            'vacancies' => [
+                ['job_vacancy_id' => $vacancyId, 'number_needed' => 2, 'position_title' => 'Machine Operator', 'qualifications' => 'TESDA NC II', 'place_of_work' => 'Urdaneta City'],
+                ['number_needed' => 3, 'position_title' => 'Packer', 'qualifications' => null, 'place_of_work' => 'Urdaneta City'],
+            ],
+        ])->assertOk();
+
+        // number_of_job_vacancies is derived (2 + 3), never trusted from the client directly.
+        $this->assertSame(5, $response->json('confirmation_slip.number_of_job_vacancies'));
+        $this->assertCount(2, $response->json('confirmation_slip.vacancies'));
+        $linkedRow = collect($response->json('confirmation_slip.vacancies'))->firstWhere('job_vacancy_id', $vacancyId);
+        $this->assertSame('Machine Operator', $linkedRow['position_title']);
+        $manualRow = collect($response->json('confirmation_slip.vacancies'))->firstWhere('job_vacancy_id', null);
+        $this->assertSame('Packer', $manualRow['position_title']);
+
+        // Resubmitting with a shorter list fully replaces the old rows, not just appends.
+        $second = $this->postJson("/api/employer/job-fairs/{$fairId}/confirmation-slip", [
+            'representative_1_name' => 'Maria Santos', 'representative_1_contact' => '09171234567',
+            'email' => $employer->email, 'will_conduct_onsite_interview' => true,
+            'vacancies' => [['number_needed' => 1, 'position_title' => 'Cashier', 'place_of_work' => 'Urdaneta City']],
+        ])->assertOk();
+        $this->assertSame(1, $second->json('confirmation_slip.number_of_job_vacancies'));
+        $this->assertCount(1, $second->json('confirmation_slip.vacancies'));
+    }
+
+    public function test_admin_proxy_confirmation_slip_accepts_a_manual_vacancy_list(): void
+    {
+        [$admin, , $fairId] = $this->setUpFairWithEmployer('proxyvacancylist');
+
+        Sanctum::actingAs($admin);
+        $response = $this->postJson("/api/admin/job-fairs/{$fairId}/proxy-confirmation-slip", [
+            'company_name' => 'Phone Confirmed Company', 'representative_1_name' => 'Pedro Reyes',
+            'representative_1_contact' => '09175550000', 'email' => 'paper@example.test',
+            'will_conduct_onsite_interview' => false,
+            'vacancies' => [['number_needed' => 4, 'position_title' => 'Warehouse Associate', 'place_of_work' => 'Dagupan City']],
+        ])->assertCreated();
+
+        $this->assertSame(4, $response->json('confirmation_slip.number_of_job_vacancies'));
+        $this->assertSame('Warehouse Associate', $response->json('confirmation_slip.vacancies.0.position_title'));
+        $this->assertNull($response->json('confirmation_slip.vacancies.0.job_vacancy_id'));
+    }
+
+    private function setUpFairWithEmployer(string $slug): array
+    {
+        $admin = Administrator::create([
+            'first_name' => 'PESO', 'last_name' => 'Manager', 'email' => "{$slug}-admin@example.test",
+            'mobile_number' => '09170000003', 'password' => 'password123', 'role' => 'administrator', 'status' => 'active', 'email_verified_at' => now(),
+        ]);
+        $employer = $this->employer("{$slug}-employer@example.test", ucfirst($slug).' Company');
+
+        Sanctum::actingAs($admin);
+        $fairId = $this->postJson('/api/admin/job-fairs', [
+            'title' => ucfirst($slug).' Job Fair', 'description' => 'PESO employment bulletin.',
+            'start_date' => '2026-11-08', 'end_date' => '2026-11-08', 'start_time' => '08:00', 'end_time' => '16:00',
+            'venue' => 'Urdaneta City Gymnasium',
+            'province' => 'Pangasinan', 'city_municipality' => 'Urdaneta City', 'barangay' => 'Nancayasan',
+            'sector' => 'local', 'target_sector' => 'Multi-sector',
+            'submission_deadline' => '2026-10-20 17:00:00',
+            'contact_email' => 'peso@example.test', 'maximum_representatives' => 2, 'status' => 'draft',
+        ])->assertCreated()->json('job_fair.job_fair_id');
+        $this->postJson("/api/admin/job-fairs/{$fairId}/publish", ['status' => 'accepting_employers'])->assertOk();
+        $this->postJson("/api/admin/job-fairs/{$fairId}/invite", ['employer_id' => $employer->employer_id])->assertCreated();
+
+        Sanctum::actingAs($employer);
+        $this->postJson("/api/employer/job-fairs/{$fairId}/respond", ['response' => 'accepted'])->assertOk();
+
+        return [$admin, $employer, $fairId];
+    }
+
     private function employer(string $email, string $company): Employer
     {
         return Employer::create([
@@ -322,7 +744,9 @@ class JobFairEcosystemFlowTest extends TestCase
         Schema::create('administrators', function (Blueprint $t) { $t->id('admin_id'); $t->string('first_name'); $t->string('last_name'); $t->string('email')->unique(); $t->string('mobile_number')->nullable(); $t->string('password'); $t->string('role')->nullable(); $t->string('status')->nullable(); $t->timestamp('email_verified_at')->nullable(); $t->rememberToken(); $t->timestamps(); });
         Schema::create('employers', function (Blueprint $t) { $t->id('employer_id'); $t->string('email')->unique(); $t->string('password'); $t->string('company_type')->nullable(); $t->string('company_name')->nullable(); $t->string('trade_name')->nullable(); $t->string('mobile_number')->nullable(); $t->string('representative_contact_number')->nullable(); $t->string('verification_status')->nullable(); $t->timestamp('verified_at')->nullable(); $t->timestamp('email_verified_at')->nullable(); $t->softDeletes(); $t->rememberToken(); $t->timestamps(); });
         Schema::create('employer_documents', function (Blueprint $t) { $t->id('document_id'); $t->unsignedBigInteger('employer_id'); $t->string('document_type'); $t->string('document_path'); $t->string('original_filename'); $t->integer('file_size'); $t->string('mime_type'); $t->timestamp('uploaded_at')->nullable(); $t->string('verification_status')->default('pending'); $t->text('admin_notes')->nullable(); $t->date('expiration_date')->nullable(); $t->timestamp('viewed_at')->nullable(); $t->timestamps(); });
-        Schema::create('job_seekers', function (Blueprint $t) { $t->id('seeker_id'); $t->string('email')->nullable(); $t->string('password')->nullable(); $t->string('first_name')->nullable(); $t->string('last_name')->nullable(); $t->string('sex')->nullable(); $t->string('gender')->nullable(); $t->timestamps(); });
+        Schema::create('job_seekers', function (Blueprint $t) { $t->id('seeker_id'); $t->string('email')->nullable(); $t->string('password')->nullable(); $t->string('first_name')->nullable(); $t->string('middle_name')->nullable(); $t->string('last_name')->nullable(); $t->string('sex')->nullable(); $t->string('gender')->nullable(); $t->string('mobile_number')->nullable(); $t->string('address_municipality_city')->nullable(); $t->date('date_of_birth')->nullable(); $t->string('educ_attainment')->nullable(); $t->boolean('is_former_ofw')->default(false); $t->boolean('is_4ps_beneficiary')->default(false); $t->timestamps(); });
+        Schema::create('seeker_disabilities', function (Blueprint $t) { $t->id(); $t->unsignedBigInteger('seeker_id'); $t->string('disability_type')->nullable(); $t->string('disability_specification')->nullable(); $t->timestamps(); });
+        Schema::create('seeker_educations', function (Blueprint $t) { $t->id(); $t->unsignedBigInteger('seeker_id'); $t->string('level')->nullable(); $t->unsignedSmallInteger('year_graduated')->nullable(); $t->timestamps(); });
         Schema::create('seeker_skills', function (Blueprint $t) { $t->id(); $t->unsignedBigInteger('seeker_id'); $t->unsignedBigInteger('skill_id')->nullable(); $t->string('skill_name')->nullable(); $t->timestamps(); });
         Schema::create('job_fair_attendees', function (Blueprint $t) { $t->id(); $t->unsignedBigInteger('job_fair_id'); $t->unsignedBigInteger('seeker_id'); $t->uuid('qr_code_uuid')->unique(); $t->timestamp('scanned_at')->nullable(); $t->boolean('is_attended')->default(false); $t->timestamps(); });
         Schema::create('job_vacancies', function (Blueprint $t) { $t->id('post_id'); $t->unsignedBigInteger('employer_id'); $t->unsignedInteger('vacancies_count')->default(0); $t->boolean('spes_tupad_eligible')->default(false); $t->string('status')->default('active'); $t->timestamps(); });
@@ -332,8 +756,9 @@ class JobFairEcosystemFlowTest extends TestCase
         Schema::create('job_fair_requirements', function (Blueprint $t) { $t->id(); $t->unsignedBigInteger('job_fair_id'); $t->string('code'); $t->string('label'); $t->boolean('is_required')->default(true); $t->unsignedSmallInteger('sort_order')->default(0); $t->timestamps(); });
         Schema::create('job_fair_requirement_submissions', function (Blueprint $t) { $t->id(); $t->unsignedBigInteger('job_fair_requirement_id'); $t->unsignedBigInteger('job_fair_employer_id'); $t->unsignedBigInteger('employer_id'); $t->unsignedBigInteger('employer_document_id')->nullable(); $t->string('document_path')->nullable(); $t->string('original_filename')->nullable(); $t->unsignedBigInteger('file_size')->nullable(); $t->string('mime_type')->nullable(); $t->string('status'); $t->text('admin_remarks')->nullable(); $t->timestamp('submitted_at')->nullable(); $t->timestamp('reviewed_at')->nullable(); $t->unsignedBigInteger('reviewed_by')->nullable(); $t->timestamps(); });
         Schema::create('job_fair_confirmation_slips', function (Blueprint $t) { $t->id(); $t->unsignedBigInteger('job_fair_id'); $t->unsignedBigInteger('job_fair_employer_id')->nullable(); $t->unsignedBigInteger('employer_id')->nullable(); $t->string('company_name'); $t->string('representative_1_name')->nullable(); $t->string('representative_1_contact')->nullable(); $t->string('representative_2_name')->nullable(); $t->string('representative_2_contact')->nullable(); $t->string('email')->nullable(); $t->unsignedInteger('number_of_job_vacancies'); $t->boolean('will_conduct_onsite_interview'); $t->text('logistics_requests')->nullable(); $t->string('source'); $t->string('dedupe_key'); $t->string('submitted_by')->nullable(); $t->timestamp('submitted_at')->nullable(); $t->timestamps(); $t->unique(['job_fair_id','dedupe_key']); });
+        Schema::create('job_fair_confirmation_vacancies', function (Blueprint $t) { $t->id(); $t->unsignedBigInteger('confirmation_slip_id'); $t->unsignedBigInteger('job_vacancy_id')->nullable(); $t->unsignedInteger('number_needed')->default(0); $t->string('position_title'); $t->text('qualifications')->nullable(); $t->string('place_of_work')->nullable(); $t->timestamps(); });
         Schema::create('job_fair_result_reports', function (Blueprint $t) { $t->id(); $t->unsignedBigInteger('job_fair_id'); $t->unsignedBigInteger('job_fair_employer_id')->nullable(); $t->unsignedBigInteger('employer_id')->nullable(); $t->string('company_name'); $t->string('normalized_company_name'); $t->string('dedupe_key'); $t->string('employer_type'); $t->string('source'); $t->string('office_location')->nullable(); $t->string('clearance_no')->nullable(); $t->string('contact_person')->nullable(); $t->string('contact_number')->nullable(); foreach (['total_male','total_female','total_applicants','total_qualified','total_hots','total_near_hired','total_rejected','total_vacancies_solicited','total_vacancies_offered'] as $c) $t->unsignedInteger($c)->default(0); $t->text('remarks')->nullable(); $t->unsignedBigInteger('encoded_by_admin_id')->nullable(); $t->unsignedBigInteger('submitted_by_employer_id')->nullable(); $t->timestamp('submitted_at')->nullable(); $t->timestamp('report_generated_at')->nullable(); $t->timestamps(); $t->unique(['job_fair_id','dedupe_key']); });
-        Schema::create('job_fair_result_entries', function (Blueprint $t) { $t->id(); $t->unsignedBigInteger('result_report_id'); $t->string('applicant_name'); $t->string('gender'); $t->string('city_municipality')->nullable(); $t->string('contact_number')->nullable(); $t->string('age_group', 2)->nullable(); $t->string('highest_education')->nullable(); $t->json('classification_codes')->nullable(); $t->string('position_applied_for'); $t->string('status'); $t->string('mismatch_code')->nullable(); $t->text('remarks')->nullable(); $t->timestamps(); });
+        Schema::create('job_fair_result_entries', function (Blueprint $t) { $t->id(); $t->unsignedBigInteger('result_report_id'); $t->unsignedBigInteger('seeker_id')->nullable(); $t->string('applicant_name'); $t->string('gender'); $t->string('city_municipality')->nullable(); $t->string('contact_number')->nullable(); $t->string('age_group', 2)->nullable(); $t->string('highest_education')->nullable(); $t->json('classification_codes')->nullable(); $t->string('position_applied_for'); $t->string('status'); $t->string('mismatch_code')->nullable(); $t->text('remarks')->nullable(); $t->timestamps(); });
         Schema::create('job_fair_result_mismatch_tallies', function (Blueprint $t) { $t->id(); $t->unsignedBigInteger('result_report_id'); $t->string('mismatch_code'); $t->unsignedInteger('count'); $t->timestamps(); });
         Schema::create('job_fair_vacancies', function (Blueprint $t) { $t->id(); $t->unsignedBigInteger('job_fair_id'); $t->unsignedBigInteger('employer_id'); $t->unsignedBigInteger('vacancy_id'); $t->timestamps(); });
         Schema::create('notifications', function (Blueprint $t) { $t->uuid('id')->primary(); $t->string('type'); $t->morphs('notifiable'); $t->text('data'); $t->timestamp('read_at')->nullable(); $t->timestamps(); });

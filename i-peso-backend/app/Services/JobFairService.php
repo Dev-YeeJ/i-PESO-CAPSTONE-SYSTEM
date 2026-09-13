@@ -11,6 +11,7 @@ use App\Models\JobFairRequirement;
 use App\Models\JobFairRequirementSubmission;
 use App\Models\JobSeeker;
 use App\Models\JobVacancy;
+use App\Notifications\JobFairNotification;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
@@ -172,8 +173,6 @@ class JobFairService
 
         if ($participation) {
             $participation->loadMissing(['requirementSubmissions.requirement', 'confirmationSlip', 'resultReport.entries', 'resultReport.mismatchTallies']);
-            $this->reuseVerifiedDocuments($fair, $participation);
-            $this->autoSatisfyVacancyCount($fair, $participation);
             $payload['participation'] = $this->participationPayload($participation);
         }
 
@@ -193,8 +192,18 @@ class JobFairService
         return $payload;
     }
 
+    // Before an employer has said yes, there is nothing to show progress on
+    // yet — no document should be requested (and none should have been
+    // auto-satisfied) for an invitation that hasn't been accepted, so the
+    // requirement checklist stays hidden through these statuses rather than
+    // showing a misleading "0 of 7" for someone who was never asked to act.
+    private const PRE_ACCEPTANCE_STATUSES = ['invited', 'interested', 'called_peso', 'pending_response', 'declined'];
+
     public function participationPayload(JobFairEmployer $participation): array
     {
+        $showRequirements = ! in_array($participation->participation_status, self::PRE_ACCEPTANCE_STATUSES, true)
+            && $participation->relationLoaded('requirementSubmissions');
+
         return [
             'id' => $participation->id,
             'employer_id' => $participation->employer_id,
@@ -205,7 +214,7 @@ class JobFairService
             'remarks' => $participation->remarks,
             'joined_at' => $participation->joined_at?->toIso8601String(),
             'invited_at' => $participation->invited_at?->toIso8601String(),
-            'requirements' => $participation->relationLoaded('requirementSubmissions')
+            'requirements' => $showRequirements
                 ? $participation->requirementSubmissions->map(fn ($item) => [
                     'id' => $item->id,
                     'job_fair_requirement_id' => $item->job_fair_requirement_id,
@@ -416,11 +425,73 @@ class JobFairService
         };
     }
 
-    private function syncRequirementStatus(JobFairEmployer $participation): void
+    /**
+     * Runs the moment a participation is accepted — whether the employer
+     * clicked Accept Invitation themselves or PESO recorded a phone/walk-in
+     * acceptance from the admin side. Opens the requirements-gathering
+     * phase, then immediately pulls in whatever verified accreditation
+     * documents and active-posting vacancy count already cover a Job Fair
+     * requirement, so an already-verified employer can resolve straight to
+     * "approved" instead of being asked to re-upload paperwork PESO already
+     * has on file.
+     *
+     * The status flip to requirements_pending happens *before*
+     * reuseVerifiedDocuments()/autoSatisfyVacancyCount() run (rather than
+     * after, per the two calls' own internal syncRequirementStatus() calls)
+     * so any auto-approval those trigger resolves exactly once, instead of
+     * being computed early and then immediately clobbered back to
+     * requirements_pending by this method's own status update.
+     */
+    public function processAcceptance(JobFair $fair, JobFairEmployer $participation): void
     {
-        $required = $participation->jobFair->requirements()->where('is_required', true)->count();
-        $submitted = $participation->requirementSubmissions()->whereIn('status', ['submitted', 'approved'])->count();
-        $participation->update(['participation_status' => $submitted >= $required ? 'requirements_submitted' : 'requirements_pending']);
+        $fair->loadMissing('requirements');
+        $participation->loadMissing('requirementSubmissions.requirement');
+
+        $participation->update(['participation_status' => 'requirements_pending']);
+
+        $this->reuseVerifiedDocuments($fair, $participation);
+        $this->autoSatisfyVacancyCount($fair, $participation);
+        $this->syncRequirementStatus($participation);
+    }
+
+    /**
+     * Recomputes participation_status from actual submission state — never
+     * a manual admin pick for these three values. Only touches a
+     * participation still in the requirements-gathering phase, so it never
+     * downgrades a decisive manual call (rejected/attended/no_show) or a
+     * later report-stage status back into this pipeline.
+     *
+     * Once every *required* requirement is individually approved (whether
+     * by an admin reviewing a submission, or auto-satisfied/reused without
+     * ever needing review), this jumps straight to "approved" instead of
+     * sitting at "requirements_submitted" waiting for someone to notice and
+     * flip a separate status dropdown by hand.
+     */
+    public function syncRequirementStatus(JobFairEmployer $participation): void
+    {
+        // 'accepted' is included so a participation that hasn't been moved
+        // into the requirements pipeline yet (e.g. legacy rows from before
+        // processAcceptance() existed, or any future call site that flips
+        // straight to 'accepted') still gets picked up and progressed the
+        // next time anything touches its requirement submissions, instead
+        // of sitting stuck at 'accepted' forever.
+        if (! in_array($participation->participation_status, ['accepted', 'requirements_pending', 'requirements_submitted'], true)) {
+            return;
+        }
+
+        $requiredIds = $participation->jobFair->requirements()->where('is_required', true)->pluck('id');
+        $submissions = $participation->requirementSubmissions()->whereIn('job_fair_requirement_id', $requiredIds)->get(['status']);
+        $submittedCount = $submissions->whereIn('status', ['submitted', 'approved'])->count();
+        $approvedCount = $submissions->where('status', 'approved')->count();
+        $required = $requiredIds->count();
+
+        if ($required > 0 && $approvedCount >= $required) {
+            $participation->update(['participation_status' => 'approved', 'approved_at' => now()]);
+            $participation->employer->notify(new JobFairNotification($participation->jobFair, 'participation_approved', $participation));
+            return;
+        }
+
+        $participation->update(['participation_status' => $submittedCount >= $required ? 'requirements_submitted' : 'requirements_pending']);
     }
 
     public function dashboard(JobFair $fair): array

@@ -9,7 +9,17 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
-class EmployerEstablishmentReportController extends Controller
+/**
+ * A read-only cross-reference over every application an employer's vacancies
+ * have received — online and job-fair sourced alike. This is NOT the
+ * official monthly Placement Report (that's the employer-submitted
+ * spreadsheet/manual-entry flow, which alone feeds the SPRS placed_total,
+ * since not every hire has an Application record behind it). Formerly
+ * mislabeled "Establishment Report" — moved here because "every hire/
+ * application across the system, any source" is what Placement Report
+ * actually means, not a per-job-fair RO1-JF Form 3 result.
+ */
+class EmployerHiringActivityReportController extends Controller
 {
     public function preview(Request $request, EstablishmentReportService $reports): JsonResponse
     {

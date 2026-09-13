@@ -1,9 +1,11 @@
 import { createElement, useEffect, useState } from 'react'
-import { ArrowLeft, CalendarRange, CircleAlert, FileChartColumn } from 'lucide-react'
+import { ArrowLeft, CalendarRange, CircleAlert, Download, FileChartColumn, FileDown, Loader2 } from 'lucide-react'
 import { useNavigate, useParams } from 'react-router-dom'
+import toast from 'react-hot-toast'
 import { Button, Card } from '@/components/ui'
 import PageHeader from '@/pages/admin/_components/PageHeader'
 import { adminService } from '@/services/adminService'
+import { downloadReportBlob } from '@/services/hiringActivityReportService'
 
 export default function AnalyticsDetailPage() {
   const { id } = useParams()
@@ -11,6 +13,7 @@ export default function AnalyticsDetailPage() {
   const [report, setReport] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [exporting, setExporting] = useState('')
   const backToReports = () => navigate('/admin/labor-analytics?view=reports')
 
   useEffect(() => {
@@ -19,6 +22,18 @@ export default function AnalyticsDetailPage() {
       .catch((requestError) => setError(requestError.response?.data?.message || 'This report could not be loaded.'))
       .finally(() => setLoading(false))
   }, [id])
+
+  const handleExport = async (format) => {
+    setExporting(format)
+    try {
+      const blob = await adminService.exportReport(id, format)
+      downloadReportBlob(blob, `analytics-report-${id}.${format}`)
+    } catch {
+      toast.error(`Unable to export ${format.toUpperCase()}.`)
+    } finally {
+      setExporting('')
+    }
+  }
 
   if (loading) return <ReportSkeleton />
 
@@ -34,7 +49,11 @@ export default function AnalyticsDetailPage() {
         title={report.title || 'Analytics Report'}
         subtitle={`${pretty(report.report_category)} · Generated ${formatDateTime(report.created_at)}`}
         eyebrow="System & Reports"
-        actions={[{ label: 'Back to Reports', icon: ArrowLeft, variant: 'outline', onClick: backToReports }]}
+        actions={[
+          { label: 'Back to Reports', icon: ArrowLeft, variant: 'outline', onClick: backToReports },
+          { label: exporting === 'csv' ? 'Exporting…' : 'Export CSV', icon: exporting === 'csv' ? Loader2 : FileDown, variant: 'outline', onClick: () => (exporting ? null : handleExport('csv')) },
+          { label: exporting === 'pdf' ? 'Generating…' : 'Export PDF', icon: exporting === 'pdf' ? Loader2 : Download, onClick: () => (exporting ? null : handleExport('pdf')) },
+        ]}
       />
       <div className="grid gap-4 sm:grid-cols-2">
         <Card padding="sm"><Meta icon={CalendarRange} label="Coverage period" value={`${formatDate(report.coverage_start)} – ${formatDate(report.coverage_end)}`} /></Card>

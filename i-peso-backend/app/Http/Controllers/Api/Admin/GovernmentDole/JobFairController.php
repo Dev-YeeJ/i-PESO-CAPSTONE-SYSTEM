@@ -20,6 +20,7 @@ use App\Services\JobFairService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -350,7 +351,7 @@ class JobFairController extends Controller
         return $notified;
     }
 
-    public function participationStatus(Request $request, JobFair $jobFair, JobFairEmployer $participation): JsonResponse
+    public function participationStatus(Request $request, JobFair $jobFair, JobFairEmployer $participation, JobFairService $service): JsonResponse
     {
         $admin = $this->admin($request);
         abort_unless($participation->job_fair_id === $jobFair->job_fair_id, 404);
@@ -368,10 +369,20 @@ class JobFairController extends Controller
         if (in_array($validated['status'], ['approved', 'rejected'], true)) {
             $participation->employer->notify(new JobFairNotification($jobFair, 'participation_'.$validated['status'], $participation));
         }
-        return response()->json(['message' => 'Participation status updated.', 'participation' => $participation->fresh()]);
+
+        // A PESO staff member recording a phone/walk-in acceptance on the
+        // employer's behalf needs the exact same auto-satisfaction the
+        // employer's own "Accept Invitation" click triggers — otherwise this
+        // second acceptance path leaves the requirement checklist just as
+        // empty as the bug being fixed here.
+        if ($validated['status'] === 'accepted') {
+            $service->processAcceptance($jobFair, $participation);
+        }
+
+        return response()->json(['message' => 'Participation status updated.', 'participation' => $service->participationPayload($participation->fresh(['requirementSubmissions.requirement']))]);
     }
 
-    public function reviewRequirement(Request $request, JobFairRequirementSubmission $submission): JsonResponse
+    public function reviewRequirement(Request $request, JobFairRequirementSubmission $submission, JobFairService $service): JsonResponse
     {
         $admin = $this->admin($request);
         $validated = $request->validate(['status' => ['required', Rule::in(['approved', 'rejected'])], 'admin_remarks' => ['nullable', 'string', 'max:3000']]);
@@ -379,6 +390,17 @@ class JobFairController extends Controller
             return response()->json(['message' => 'A rejection remark is required.', 'errors' => ['admin_remarks' => ['Explain what must be corrected.']]], 422);
         }
         $submission->update([...$validated, 'reviewed_at' => now(), 'reviewed_by' => $admin->admin_id]);
+
+        // Mirrors the employer-accreditation pattern (approve every document,
+        // the account itself becomes verified with no separate step): an
+        // admin who has already approved each individual requirement
+        // shouldn't also have to remember to flip participation_status to
+        // "approved" by hand — syncRequirementStatus() already does exactly
+        // this check for the auto-satisfied/reused-document paths.
+        if ($submission->participation) {
+            $service->syncRequirementStatus($submission->participation);
+        }
+
         return response()->json(['message' => 'Requirement review saved.', 'submission' => $submission->fresh()]);
     }
 
@@ -409,10 +431,15 @@ class JobFairController extends Controller
             'total_hots' => ['required', 'integer', 'min:0'], 'total_near_hired' => ['required', 'integer', 'min:0'], 'total_rejected' => ['required', 'integer', 'min:0'],
             'total_vacancies_solicited' => ['required', 'integer', 'min:0'], 'total_vacancies_offered' => ['required', 'integer', 'min:0'],
             'remarks' => ['nullable', 'string', 'max:5000'], 'mismatch_tallies' => ['nullable', 'array'],
-            'mismatch_tallies.*.mismatch_code' => ['required', Rule::in(JobFairReportService::MISMATCH_CODES)], 'mismatch_tallies.*.count' => ['required', 'integer', 'min:0'],
+            'mismatch_tallies.*.mismatch_code' => ['required', Rule::in([
+                ...array_keys(JobFairReportService::EMPLOYER_MISMATCH_CODES),
+                ...array_keys(JobFairReportService::SEEKER_MISMATCH_CODES),
+                ...JobFairReportService::MISMATCH_CODES,
+            ])], 'mismatch_tallies.*.count' => ['required', 'integer', 'min:0'],
             // Optional per-applicant register — same shape as employer self-service,
             // for admin staff transcribing a full paper RO1-JF Form 3 register.
             'entries' => ['nullable', 'array'], 'entries.*.applicant_name' => ['required_with:entries', 'string', 'max:255'],
+            'entries.*.seeker_id' => ['nullable', 'integer', 'exists:job_seekers,seeker_id'],
             'entries.*.gender' => ['required_with:entries', Rule::in(['male', 'female'])],
             'entries.*.position_applied_for' => ['required_with:entries', 'string', 'max:255'],
             'entries.*.status' => ['required_with:entries', Rule::in(['qualified', 'near_hired', 'hots', 'employer_mismatch', 'seeker_mismatch'])],
@@ -439,18 +466,50 @@ class JobFairController extends Controller
             'employer_id' => ['nullable', 'integer', 'exists:employers,employer_id'], 'company_name' => ['required', 'string', 'max:255'],
             'representative_1_name' => ['required', 'string', 'max:255'], 'representative_1_contact' => ['required', 'string', 'max:40'],
             'representative_2_name' => ['nullable', 'string', 'max:255'], 'representative_2_contact' => ['nullable', 'string', 'max:40'],
-            'email' => ['nullable', 'email', 'max:255'], 'number_of_job_vacancies' => ['required', 'integer', 'min:0'],
+            'email' => ['nullable', 'email', 'max:255'],
             'will_conduct_onsite_interview' => ['required', 'boolean'], 'logistics_requests' => ['nullable', 'string', 'max:3000'],
+            'vacancies' => ['nullable', 'array'],
+            'vacancies.*.number_needed' => ['required_with:vacancies', 'integer', 'min:0'],
+            'vacancies.*.position_title' => ['required_with:vacancies', 'string', 'max:255'],
+            'vacancies.*.qualifications' => ['nullable', 'string', 'max:2000'],
+            'vacancies.*.place_of_work' => ['nullable', 'string', 'max:255'],
+            'vacancies.*.job_vacancy_id' => ['nullable', 'integer', 'exists:job_vacancies,post_id'],
         ]);
         if (($jobFair->maximum_representatives ?? 2) < 2 && filled($validated['representative_2_name'] ?? null)) {
             return response()->json(['message' => 'This event allows only one company representative.', 'errors' => ['representative_2_name' => ['Remove the second representative.']]], 422);
         }
         $dedupe = filled($validated['employer_id'] ?? null) ? 'employer:'.$validated['employer_id'] : 'company:'.$service->normalizedCompanyName($validated['company_name']);
-        $slip = JobFairConfirmationSlip::updateOrCreate(
-            ['job_fair_id' => $jobFair->job_fair_id, 'dedupe_key' => $dedupe],
-            [...$validated, 'source' => 'admin_proxy', 'submitted_by' => trim($admin->first_name.' '.$admin->last_name), 'submitted_at' => now()],
-        );
-        return response()->json(['message' => 'Admin proxy confirmation slip saved.', 'confirmation_slip' => $slip], 201);
+        $vacancies = collect($validated['vacancies'] ?? []);
+
+        $slip = DB::transaction(function () use ($jobFair, $dedupe, $validated, $vacancies, $admin) {
+            $slip = JobFairConfirmationSlip::updateOrCreate(
+                ['job_fair_id' => $jobFair->job_fair_id, 'dedupe_key' => $dedupe],
+                [...collect($validated)->except('vacancies')->all(),
+                    'number_of_job_vacancies' => (int) $vacancies->sum('number_needed'),
+                    'source' => 'admin_proxy', 'submitted_by' => trim($admin->first_name.' '.$admin->last_name), 'submitted_at' => now()],
+            );
+
+            $slip->vacancies()->delete();
+            foreach ($vacancies as $vacancy) {
+                $slip->vacancies()->create($vacancy);
+            }
+
+            return $slip;
+        });
+
+        return response()->json(['message' => 'Admin proxy confirmation slip saved.', 'confirmation_slip' => $slip->fresh(['vacancies'])], 201);
+    }
+
+    /**
+     * "Smart typing" name suggestions for the applicant-name field on the
+     * proxy-encoding register — powers autofill of the rest of that row.
+     */
+    public function applicantSuggestions(Request $request, JobFairReportService $reports): JsonResponse
+    {
+        $this->admin($request);
+        $validated = $request->validate(['q' => ['nullable', 'string', 'max:255']]);
+
+        return response()->json(['data' => $reports->suggestApplicants($validated['q'] ?? '')]);
     }
 
     public function downloadResult(Request $request, JobFairResultReport $resultReport, JobFairReportService $reports)

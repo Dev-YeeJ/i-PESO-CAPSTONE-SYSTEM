@@ -7,6 +7,7 @@ use App\Models\PlacementRecord;
 use App\Models\PlacementReportUpload;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -18,6 +19,13 @@ class PlacementImportService
 {
     /** How many leading rows to scan when locating the real header row. */
     private const HEADER_SCAN_LIMIT = 12;
+
+    /** Per-field column widths (chars) — must mirror placement_records' schema. */
+    private const FIELD_MAX_LENGTHS = [
+        'gender' => 30,
+        'civil_status' => 40,
+        'address' => 500,
+    ];
 
     /** Header aliases keyed by canonical field — drives auto-mapping. */
     private const FIELD_ALIASES = [
@@ -217,7 +225,8 @@ class PlacementImportService
      */
     public function buildRecords(PlacementReportUpload $upload, array $mapping): int
     {
-        // Nil reports ("we hired nobody this month") carry no spreadsheet.
+        // Nil reports ("we hired nobody this month") carry no spreadsheet, and
+        // neither does a manual-entry report — buildManualRecords() covers that one.
         if ($upload->stored_path === null) {
             return 0;
         }
@@ -225,12 +234,7 @@ class PlacementImportService
         $absolutePath = Storage::disk('local')->path($upload->stored_path);
         $parsed = $this->parse($absolutePath, $upload->selected_sheet);
 
-        $upload->records()->delete();
-
-        $canLinkSeekers = Schema::hasTable('job_seekers');
-        $created = 0;
-
-        foreach ($parsed['rows'] as $row) {
+        $records = collect($parsed['rows'])->map(function ($row) use ($mapping) {
             $record = ['raw_row' => $row];
             foreach ($mapping as $sourceColumn => $targetField) {
                 if (! $targetField || ! array_key_exists($targetField, PlacementRecord::MAPPABLE_FIELDS)) {
@@ -239,25 +243,116 @@ class PlacementImportService
                 $record[$targetField] = $row[$sourceColumn] ?? null;
             }
 
-            $normalized = $this->normalizeRecord($record);
-            if ($this->isBlankRecord($normalized)) {
-                continue;
+            return $record;
+        });
+
+        return $this->persistRecords($upload, $records, Schema::hasTable('job_seekers'));
+    }
+
+    /**
+     * Rebuild placement_records for an upload from rows entered directly into
+     * the app's table editor — the manual alternative to a spreadsheet
+     * upload. Each row already uses canonical field keys, so no column
+     * mapping applies; otherwise this behaves identically to buildRecords()
+     * (same transaction safety, same confirmed-seeker-link preservation
+     * across a resubmission, same seeker matching).
+     *
+     * @param  array<int, array<string, mixed>>  $rows
+     */
+    public function buildManualRecords(PlacementReportUpload $upload, array $rows): int
+    {
+        $records = collect($rows)->map(fn (array $row) => [...$row, 'raw_row' => $row]);
+
+        return $this->persistRecords($upload, $records, Schema::hasTable('job_seekers'));
+    }
+
+    /**
+     * Shared delete-then-recreate core for both the spreadsheet and manual
+     * entry paths, wrapped in one transaction so a mid-loop failure can never
+     * leave the report with zero or partial records.
+     *
+     * An admin's manually confirmed seeker link is a deliberate human
+     * decision, not a guess the importer can redo — it must survive a
+     * resubmission (e.g. after a rejection asking for an unrelated fix) even
+     * though every record below is rebuilt from scratch. Capture
+     * confirmations by a stable per-row identity before the delete wipes
+     * them, and reattach them to any matching new row.
+     *
+     * @param  Collection<int, array<string, mixed>>  $records  pre-mapped, not yet normalized
+     */
+    private function persistRecords(PlacementReportUpload $upload, Collection $records, bool $canLinkSeekers): int
+    {
+        return DB::transaction(function () use ($upload, $records, $canLinkSeekers) {
+            $identityOf = fn (PlacementRecord $record) => $this->recordIdentity(
+                $record->first_name, $record->middle_name, $record->last_name,
+                // date_hired is cast to a Carbon instance here but a plain
+                // 'Y-m-d' string on the freshly-normalized side below — both
+                // must render identically or every prior confirmation
+                // silently fails to reattach.
+                optional($record->date_hired)->toDateString(),
+            );
+            $confirmed = $upload->records()
+                ->whereNotNull('seeker_match_confirmed_at')
+                ->get()
+                ->filter(fn (PlacementRecord $record) => $identityOf($record) !== null)
+                ->keyBy($identityOf);
+
+            $upload->records()->delete();
+
+            $created = 0;
+
+            foreach ($records as $record) {
+                $normalized = $this->normalizeRecord($record);
+                if ($this->isBlankRecord($normalized)) {
+                    continue;
+                }
+
+                $identity = $this->recordIdentity(
+                    $normalized['first_name'] ?? null, $normalized['middle_name'] ?? null,
+                    $normalized['last_name'] ?? null, $normalized['date_hired'] ?? null,
+                );
+                $priorConfirmation = $identity !== null ? $confirmed->get($identity) : null;
+
+                if ($priorConfirmation) {
+                    $normalized['seeker_id'] = $priorConfirmation->seeker_id;
+                    $normalized['seeker_match_confidence'] = $priorConfirmation->seeker_match_confidence;
+                    $normalized['seeker_match_confirmed_by'] = $priorConfirmation->seeker_match_confirmed_by;
+                    $normalized['seeker_match_confirmed_at'] = $priorConfirmation->seeker_match_confirmed_at;
+                } else {
+                    $match = $canLinkSeekers
+                        ? $this->matchSeeker($normalized)
+                        : ['seeker_id' => null, 'confidence' => PlacementRecord::MATCH_NONE];
+                    $normalized['seeker_id'] = $match['seeker_id'];
+                    $normalized['seeker_match_confidence'] = $match['confidence'];
+                }
+
+                $normalized['upload_id'] = $upload->id;
+                $normalized['employer_id'] = $upload->employer_id;
+
+                PlacementRecord::create($normalized);
+                $created++;
             }
 
-            $match = $canLinkSeekers
-                ? $this->matchSeeker($normalized)
-                : ['seeker_id' => null, 'confidence' => PlacementRecord::MATCH_NONE];
+            return $created;
+        });
+    }
 
-            $normalized['upload_id'] = $upload->id;
-            $normalized['employer_id'] = $upload->employer_id;
-            $normalized['seeker_id'] = $match['seeker_id'];
-            $normalized['seeker_match_confidence'] = $match['confidence'];
+    /**
+     * A stable identity for matching a row to its prior counterpart across a
+     * rebuild — name plus hire date is what actually identifies "the same
+     * reported hire" from the employer's point of view. Null when there isn't
+     * enough on the row to key on safely.
+     */
+    private function recordIdentity(?string $first, ?string $middle, ?string $last, ?string $dateHired): ?string
+    {
+        $first = $this->normalizeName((string) $first);
+        $last = $this->normalizeName((string) $last);
 
-            PlacementRecord::create($normalized);
-            $created++;
+        if ($first === '' || $last === '' || blank($dateHired)) {
+            return null;
         }
 
-        return $created;
+        return $first.'|'.$this->normalizeName((string) $middle).'|'.$last.'|'.$dateHired;
     }
 
     /**
@@ -278,12 +373,23 @@ class PlacementImportService
             return collect();
         }
 
+        // MySQL has no portable regex-replace across the versions this app
+        // targets, so the SQL side only strips the punctuation Filipino names
+        // actually carry (space, hyphen, apostrophe, period) — a superset
+        // filter. normalizeName() below is the authoritative equality check,
+        // so this can only admit extra rows, never miss a real match the way
+        // a spaces-only strip missed "Dela-Cruz" against "DelaCruz".
+        $normalizeSql = "REPLACE(REPLACE(REPLACE(REPLACE(LOWER(TRIM(%s)), ' ', ''), '-', ''), '''', ''), '.', '')";
+
         return JobSeeker::query()
             ->select('seeker_id', 'first_name', 'middle_name', 'last_name', 'date_of_birth')
-            ->whereRaw("REPLACE(LOWER(TRIM(last_name)), ' ', '') = ?", [$last])
-            ->whereRaw("REPLACE(LOWER(TRIM(first_name)), ' ', '') = ?", [$first])
-            ->limit(10)
-            ->get();
+            ->whereRaw(sprintf($normalizeSql, 'last_name').' = ?', [$last])
+            ->whereRaw(sprintf($normalizeSql, 'first_name').' = ?', [$first])
+            ->limit(25)
+            ->get()
+            ->filter(fn (JobSeeker $seeker) => $this->normalizeName((string) $seeker->first_name) === $first
+                && $this->normalizeName((string) $seeker->last_name) === $last)
+            ->values();
     }
 
     /**
@@ -375,6 +481,26 @@ class PlacementImportService
             }
         }
 
+        // No row matched a single known field alias (e.g. an unfamiliar
+        // template) — defaulting to row 0 risks picking a company-name/title
+        // banner row as the header. Prefer whichever row has the most
+        // distinct non-empty cells instead, since a real header row almost
+        // always has more distinct labels than a banner or blank spacer row.
+        if ($bestScore <= 0) {
+            $bestDistinct = -1;
+            for ($i = 0; $i < $limit; $i++) {
+                $distinct = collect($grid[$i])
+                    ->map(fn ($cell) => $this->normalizeText((string) $cell))
+                    ->filter(fn ($cell) => $cell !== '')
+                    ->unique()
+                    ->count();
+                if ($distinct > $bestDistinct) {
+                    $bestDistinct = $distinct;
+                    $bestIndex = $i;
+                }
+            }
+        }
+
         return $bestIndex;
     }
 
@@ -419,7 +545,11 @@ class PlacementImportService
             $out[$field] = match ($field) {
                 'age' => $this->parseAge($value),
                 'birth_date', 'date_hired' => $this->parseDate($value),
-                default => Str::of($value)->squish()->limit(255, '')->toString(),
+                // Each field is capped at its actual placement_records column
+                // width, not one blanket 255 — gender/civil_status are narrower,
+                // and a longer value throws a hard QueryException under MySQL
+                // strict mode instead of just being truncated.
+                default => Str::of($value)->squish()->limit(self::FIELD_MAX_LENGTHS[$field] ?? 255, '')->toString(),
             };
         }
 

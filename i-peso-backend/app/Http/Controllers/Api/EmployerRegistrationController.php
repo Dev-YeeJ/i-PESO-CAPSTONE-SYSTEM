@@ -268,6 +268,53 @@ class EmployerRegistrationController extends Controller
     }
 
     /**
+     * Set (or change, before the account is approved) the employer's legal
+     * company type. Deferred here from account creation to the start of the
+     * Legal Documents step, since this is the only thing it actually
+     * affects — see Employer::getRequiredDocuments().
+     * POST /api/employer/register/company-type
+     */
+    public function setCompanyType(Request $request): JsonResponse
+    {
+        try {
+            $employer = $this->authenticatedEmployer($request);
+
+            if ($employer->verification_status === 'verified') {
+                return response()->json([
+                    'message' => 'Company type can no longer be changed after accreditation is approved.',
+                ], 422);
+            }
+
+            $validator = Validator::make($request->all(), [
+                'company_type' => 'required|in:sole_proprietorship,corporation_partnership,local_recruitment_agency,overseas_recruitment_agency,government_agency',
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json(['errors' => $validator->errors()], 422);
+            }
+
+            $employer->update(['company_type' => $request->company_type]);
+
+            $required = $employer->getRequiredDocuments();
+            $optional = $employer->getOptionalDocuments();
+            $uploaded = $employer->documents()
+                ->pluck('document_type')
+                ->toArray();
+
+            return response()->json([
+                'company_type' => $employer->company_type,
+                'required_documents' => $required,
+                'optional_documents' => $optional,
+                'uploaded_documents' => $uploaded,
+                'missing_documents' => array_diff($required, $uploaded),
+                'all_uploaded' => $employer->hasAllRequiredDocuments(),
+            ], 200);
+        } catch (\Exception $e) {
+            return response()->json(['error' => $this->safeErrorMessage($e, 'Unable to save your company type.')], 404);
+        }
+    }
+
+    /**
      * Step 4: Add representative details and submit registration
      * POST /api/employer/register/step-4
      */
@@ -289,6 +336,16 @@ class EmployerRegistrationController extends Controller
         try {
             $employer = $this->authenticatedEmployer($request);
             $isResubmission = $employer->verification_status === 'rejected';
+
+            // Company type is now set on the Legal Documents step (see
+            // setCompanyType()), not at account creation, so it's no longer
+            // guaranteed non-null by this point — guard it explicitly rather
+            // than relying only on the frontend having gated its own flow.
+            if (empty($employer->company_type)) {
+                return response()->json([
+                    'message' => 'Please select your company type before submitting.',
+                ], 422);
+            }
 
             if (! $employer->hasAllRequiredDocuments()) {
                 return response()->json([

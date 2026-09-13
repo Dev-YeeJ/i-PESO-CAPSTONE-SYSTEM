@@ -108,5 +108,25 @@ return [
         'account_status' =>
             'The assistant cannot look up an account, an application, or a verification status. '
             . 'That requires logging in.',
+
+        'placement_report' =>
+            'The Placement Report is a recurring MONTHLY report every verified employer files, '
+            . 'listing everyone they hired that month — no matter how the hire happened (online '
+            . 'application, job fair, walk-in, referral, etc.). It is filed by uploading a '
+            . 'spreadsheet (Excel or CSV), which gets mapped and previewed before final '
+            . 'submission, or by filing a "nil" declaration if nobody was hired that month — that '
+            . 'is different from simply not submitting, since PESO needs to know the difference. '
+            . 'It is due on the 10th of the following month by default, and a PESO administrator '
+            . 'reviews each submission.',
+
+        'establishment_report' =>
+            'The Establishment Report (RO1-JF Form 3) is a different report tied to one specific '
+            . 'Job Fair event — not a recurring monthly report like the Placement Report. After a '
+            . 'job fair, each participating employer records the applicants they saw at that '
+            . 'event (qualified, near-hired, hired-on-the-spot, or mismatched, with a reason '
+            . 'code), either themselves through their Job Fair dashboard or via PESO staff '
+            . 'encoding a paper form on their behalf. It produces one printable RO1-JF Form 3 '
+            . 'per employer per job fair, and PESO can also see a combined total across every '
+            . 'employer that joined that fair.',
     ],
 ];

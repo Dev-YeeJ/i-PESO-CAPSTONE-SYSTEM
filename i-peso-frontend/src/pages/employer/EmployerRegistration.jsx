@@ -159,7 +159,11 @@ export default function EmployerRegistration() {
               <Step2CompanyProfile initialData={initialCompanyData} onComplete={completeStep} />
             )}
             {step === 4 && (
-              <Step3DocumentUpload companyType={profile?.company_type ?? user?.company_type} onComplete={completeStep} />
+              <Step3DocumentUpload
+                companyType={profile?.company_type ?? user?.company_type}
+                onCompanyTypeSet={(companyType) => setProfile((current) => ({ ...current, company_type: companyType }))}
+                onComplete={completeStep}
+              />
             )}
             {step === 5 && <Step4Representative onComplete={completeStep} />}
 
