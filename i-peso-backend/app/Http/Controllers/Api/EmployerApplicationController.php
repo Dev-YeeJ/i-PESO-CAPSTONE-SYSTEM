@@ -123,10 +123,28 @@ class EmployerApplicationController extends Controller
         }
 
         $sweptApplications = [];
+        $alreadyTerminal = false;
 
-        DB::transaction(function () use ($application, $employer, $validated, &$sweptApplications) {
+        DB::transaction(function () use ($application, $employer, $validated, &$sweptApplications, &$alreadyTerminal) {
+            // Re-check under a row lock: two near-simultaneous requests for the same
+            // application (an employer double-clicking "Hire", a client-side retry after a
+            // slow response) can both pass the terminal-status guard above before either one
+            // commits — that guard alone doesn't serialize them. Locking here and re-checking
+            // is what actually stops both from processing (and both notifying the seeker).
+            $locked = Application::whereKey($application->getKey())->lockForUpdate()->first();
+            if (! $locked || in_array($locked->status, ['hired', 'rejected', 'withdrawn'], true)) {
+                $alreadyTerminal = true;
+                return;
+            }
+
             $this->processStatusUpdate($application, $employer, $validated, $sweptApplications);
         });
+
+        if ($alreadyTerminal) {
+            return response()->json([
+                'message' => 'This application can no longer be processed.',
+            ], 409);
+        }
 
         event(new ApplicationStatusChanged($application));
 
@@ -152,7 +170,12 @@ class EmployerApplicationController extends Controller
         $request->validate($rules);
         $validated = $this->validateStatusPayload($request);
 
+        // Ordered by primary key so lock acquisition order below is deterministic — two bulk
+        // requests sharing an application_id but listing it in a different order would
+        // otherwise be a classic lock-ordering deadlock (each waiting on a row the other
+        // already holds).
         $applications = Application::whereIn('apply_id', $request->input('application_ids'))
+            ->orderBy('apply_id')
             ->with(['jobVacancy', 'jobSeeker'])
             ->get();
 
@@ -165,7 +188,12 @@ class EmployerApplicationController extends Controller
 
         DB::transaction(function () use ($applications, $employer, $validated, $meetingService, &$sweptApplications, &$processedApplications) {
             foreach ($applications as $application) {
-                if (in_array($application->status, ['hired', 'rejected', 'withdrawn'], true)) {
+                // Same race as updateStatus() above: lock and re-check rather than trusting
+                // the $applications collection fetched before this transaction opened — a
+                // concurrent request for one of these same application_ids could have already
+                // moved it to a terminal status in the gap between that fetch and this lock.
+                $locked = Application::whereKey($application->getKey())->lockForUpdate()->first();
+                if (! $locked || in_array($locked->status, ['hired', 'rejected', 'withdrawn'], true)) {
                     continue;
                 }
 

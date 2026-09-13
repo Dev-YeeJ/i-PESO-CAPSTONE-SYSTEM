@@ -100,6 +100,7 @@ export interface PushNotificationData {
   application_id?: number | string
   program_id?: number | string
   job_fair_id?: number | string
+  post_id?: number | string
 }
 
 /** Mirrors handleNotificationPress in app/(seeker)/notifications.tsx — same payload, same destinations. */
@@ -107,5 +108,6 @@ export function routeForPushData(data: PushNotificationData): string | null {
   if (data.application_id) return '/(seeker)/applications'
   if (data.program_id) return `/(seeker)/government-programs/${data.program_id}`
   if (data.job_fair_id) return '/(seeker)/job-fairs'
+  if (data.post_id) return `/(seeker)/jobs/${data.post_id}`
   return null
 }

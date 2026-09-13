@@ -663,17 +663,12 @@ export function Step2Employment({ value, onChange, errors }: { value: Step2Value
         />
       ) : null}
 
-      <SubLabel>First-Time Jobseeker Act</SubLabel>
+      <SubLabel>First-Time Jobseeker</SubLabel>
       <ToggleGroup
-        label="Are you claiming First-Time Jobseeker benefits?"
+        label="Is this your first time looking for a job?"
         value={value.is_first_time_jobseeker}
         onChange={(v) => set('is_first_time_jobseeker', v)}
       />
-      {value.is_first_time_jobseeker ? (
-        <Text style={styles.helperText}>
-          You can upload your barangay-issued Certificate of First-Time Jobseeker later from your profile.
-        </Text>
-      ) : null}
     </>
   )
 }

@@ -53,6 +53,45 @@ function educationDuplicateKey(e: EducationEntry): string {
     .join('|')
 }
 
+// The core K-12/college ladder is strictly ordered, so an earlier schooling stage can never
+// have a later effective year than a later stage (e.g. College graduated 2017, then Elementary
+// graduated 2020). Vocational is deliberately excluded — TESDA training isn't fixed to a point
+// in the ladder. Mirrors i-peso-backend's SeekerController::assertEducationChronologyIsConsistent
+// (itself mirroring i-peso-frontend's EducationBackgroundEditor.jsx CORE_LEVEL_ORDER), adapted
+// to mobile's level+completion_status pair since mobile never sends web's separate
+// attainment_level field — the backend check is a silent no-op for mobile payloads without this.
+const CORE_LEVEL_RANK: Record<string, number> = {
+  'elementary:undergraduate': 0, 'elementary:currently_studying': 0, 'elementary:graduated': 1,
+  'secondary_non_k12:undergraduate': 2, 'secondary_non_k12:currently_studying': 2, 'secondary_non_k12:graduated': 3,
+  'secondary_k12:undergraduate': 2, 'secondary_k12:currently_studying': 2, 'secondary_k12:graduated': 3,
+  'senior_high_strand:undergraduate': 4, 'senior_high_strand:currently_studying': 4, 'senior_high_strand:graduated': 5,
+  'tertiary:undergraduate': 6, 'tertiary:currently_studying': 6, 'tertiary:graduated': 7,
+  'graduate_studies:undergraduate': 8, 'graduate_studies:currently_studying': 8, 'graduate_studies:graduated': 8,
+}
+
+function educationEffectiveYear(e: EducationEntry): number | null {
+  const raw = e.year_graduated.trim() || e.expected_year_graduated.trim() || e.undergrad_year_last_attended.trim() || e.year_started.trim()
+  const year = Number(raw)
+  return raw && Number.isFinite(year) ? year : null
+}
+
+function educationChronologyConflict(educations: EducationEntry[]): boolean {
+  const ranked = educations
+    .map((e) => ({ rank: CORE_LEVEL_RANK[`${e.level}:${e.completion_status}`], year: educationEffectiveYear(e) }))
+    .filter((e): e is { rank: number; year: number } => e.rank !== undefined && e.year !== null)
+
+  for (let i = 0; i < ranked.length; i += 1) {
+    for (let j = i + 1; j < ranked.length; j += 1) {
+      const a = ranked[i]
+      const b = ranked[j]
+      if (a.rank === b.rank) continue
+      const outOfOrder = (a.rank < b.rank && a.year > b.year) || (a.rank > b.rank && a.year < b.year)
+      if (outOfOrder) return true
+    }
+  }
+  return false
+}
+
 // ── Payload builders (form value -> API request body) ─────────────────────
 
 export function buildStep1Payload(v: Step1Value) {
@@ -312,6 +351,9 @@ export function validateStep(step: number, form: OnboardingFormValue): string {
       const key = educationDuplicateKey(e)
       if (seenEducationKeys.has(key)) return 'You have duplicate education records — remove or edit the repeated entry.'
       seenEducationKeys.add(key)
+    }
+    if (educationChronologyConflict(validEducations)) {
+      return 'Education years are out of order — an earlier schooling stage cannot have a later year than a later stage. Review the years across your education records.'
     }
     // Mirrors web's SeekerOnboarding.jsx: allSkillsCount = hard (dole + technical) + soft,
     // must be > 0 — "Select at least one skill to continue."

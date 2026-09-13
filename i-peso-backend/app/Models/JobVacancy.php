@@ -85,6 +85,7 @@ class JobVacancy extends Model
         'spes_tupad_eligible' => 'boolean',
         'latitude' => 'float',
         'longitude' => 'float',
+        'seekers_notified_at' => 'datetime',
     ];
 
     /**

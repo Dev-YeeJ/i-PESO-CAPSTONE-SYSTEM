@@ -263,6 +263,7 @@ export interface SeekerNotification {
     application_id?: number | string
     program_id?: number | string
     job_fair_id?: number | string
+    post_id?: number | string
     reference_id?: number | string
   }
   read_at: string | null
