@@ -110,8 +110,15 @@ function PosterCard({ poster }) {
         </button>
       )}
 
-      <div className="flex items-center gap-2 border-t border-slate-100 p-3 text-xs font-semibold text-slate-400">
-        <Building2 className="h-3.5 w-3.5" />PESO-approved employer posting
+      <div className="flex items-center justify-between border-t border-slate-100 p-3 text-xs font-semibold text-slate-400">
+        <div className="flex items-center gap-2">
+          <Building2 className="h-3.5 w-3.5" />PESO-approved employer posting
+        </div>
+        {poster.match_percentage !== undefined && poster.match_percentage !== null && (
+          <div className="flex items-center gap-1.5 rounded-full bg-emerald-50 px-2 py-1 text-[10px] font-black uppercase tracking-widest text-emerald-700 shadow-sm">
+            {Math.round(poster.match_percentage)}% match
+          </div>
+        )}
       </div>
     </article>
   )

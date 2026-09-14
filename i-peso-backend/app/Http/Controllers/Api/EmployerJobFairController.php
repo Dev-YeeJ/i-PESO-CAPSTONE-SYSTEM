@@ -83,41 +83,54 @@ class EmployerJobFairController extends Controller
         $employer = $this->employer($request);
         abort_unless($requirement->job_fair_id === $jobFair->job_fair_id, 404);
         $participation = $this->participation($jobFair, $employer);
-        $validated = $request->validate(['document' => ['required', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:5120']]);
-        $file = $validated['document'];
-        $path = $file->store("job_fair_requirements/{$jobFair->job_fair_id}/{$employer->employer_id}", 'local');
-        $oldPath = null;
+        $validated = $request->validate([
+            'document' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:5120'],
+            'documents' => ['nullable', 'array', 'max:5'],
+            'documents.*' => ['file', 'mimes:pdf,jpg,jpeg,png', 'max:5120'],
+        ]);
 
+        $files = $validated['documents'] ?? ($validated['document'] ? [$validated['document']] : []);
+        abort_unless(count($files) > 0, 422, 'Please upload at least one document.');
+
+        $paths = [];
         try {
-            $submission = DB::transaction(function () use ($requirement, $participation, $employer, $file, $path, &$oldPath) {
+            $submissions = DB::transaction(function () use ($requirement, $participation, $employer, $files, $jobFair, &$paths) {
                 $existing = JobFairRequirementSubmission::query()
                     ->where('job_fair_requirement_id', $requirement->id)
-                    ->where('job_fair_employer_id', $participation->id)->first();
-                $oldPath = $existing?->document_path;
+                    ->where('job_fair_employer_id', $participation->id)->get();
+                
+                foreach($existing as $ex) {
+                    if ($ex->document_path) Storage::disk('local')->delete($ex->document_path);
+                    $ex->delete();
+                }
 
-                return JobFairRequirementSubmission::updateOrCreate(
-                    ['job_fair_requirement_id' => $requirement->id, 'job_fair_employer_id' => $participation->id],
-                    [
+                $subs = [];
+                foreach($files as $file) {
+                    $path = $file->store("job_fair_requirements/{$jobFair->job_fair_id}/{$employer->employer_id}", 'local');
+                    $paths[] = $path;
+                    $subs[] = JobFairRequirementSubmission::create([
+                        'job_fair_requirement_id' => $requirement->id, 
+                        'job_fair_employer_id' => $participation->id,
                         'employer_id' => $employer->employer_id, 'document_path' => $path,
                         'original_filename' => $file->getClientOriginalName(), 'file_size' => $file->getSize(),
                         'mime_type' => $file->getMimeType(), 'status' => 'submitted', 'admin_remarks' => null,
                         'submitted_at' => now(), 'reviewed_at' => null, 'reviewed_by' => null,
-                    ],
-                );
+                    ]);
+                }
+                return collect($subs);
             });
         } catch (\Throwable $exception) {
-            Storage::disk('local')->delete($path);
+            foreach($paths as $p) Storage::disk('local')->delete($p);
             throw $exception;
         }
 
-        if ($oldPath && $oldPath !== $path) Storage::disk('local')->delete($oldPath);
         $service->syncRequirementStatus($participation);
         Notification::send(Administrator::query()->where('status', 'active')->get(), new JobFairNotification($jobFair, 'requirements_submitted', $participation));
 
         return response()->json(['message' => 'Requirement submitted for PESO review.', 'submission' => [
-            'id' => $submission->id, 'job_fair_requirement_id' => $submission->job_fair_requirement_id,
-            'status' => $submission->status, 'original_filename' => $submission->original_filename,
-            'submitted_at' => $submission->submitted_at?->toIso8601String(),
+            'id' => $submissions->first()->id, 'job_fair_requirement_id' => $submissions->first()->job_fair_requirement_id,
+            'status' => $submissions->first()->status, 'original_filename' => count($submissions) > 1 ? count($submissions) . ' files uploaded' : $submissions->first()->original_filename,
+            'submitted_at' => $submissions->first()->submitted_at?->toIso8601String(),
         ]]);
     }
 
@@ -148,10 +161,14 @@ class EmployerJobFairController extends Controller
         $validated = $request->validate([
             'representative_1_name' => ['required', 'string', 'max:255'], 'representative_1_contact' => ['required', 'string', 'max:40'],
             'representative_2_name' => ['nullable', 'string', 'max:255'], 'representative_2_contact' => ['nullable', 'string', 'max:40'],
-            'email' => ['required', 'email', 'max:255'],
+            // Not asked on the form — the employer's own account email is
+            // used instead, same as contact_person/contact_number already
+            // default from the account in results() below.
+            'email' => ['nullable', 'email', 'max:255'],
             'will_conduct_onsite_interview' => ['required', 'boolean'], 'logistics_requests' => ['nullable', 'string', 'max:3000'],
             ...$this->vacancyListRules(),
         ]);
+        $validated['email'] = $validated['email'] ?? $employer->email;
         if (($jobFair->maximum_representatives ?? 2) < 2 && filled($validated['representative_2_name'] ?? null)) {
             return response()->json(['message' => 'This event allows only one company representative.', 'errors' => ['representative_2_name' => ['Remove the second representative.']]], 422);
         }

@@ -7,8 +7,13 @@ export const viewJobFairPoster = async (submissionId) => (await api.get(`/job-fa
 export const listEmployerJobFairs = async () => (await api.get('/employer/job-fairs')).data.data ?? []
 export const expressJobFairInterest = async (jobFairId) => (await api.post(`/employer/job-fairs/${jobFairId}/interest`)).data
 export const respondToJobFairInvitation = async (jobFairId, response, remarks = '') => (await api.post(`/employer/job-fairs/${jobFairId}/respond`, { response, remarks })).data
-export const uploadJobFairRequirement = async (jobFairId, requirementId, file) => {
-  const body = new FormData(); body.append('document', file)
+export const uploadJobFairRequirement = async (jobFairId, requirementId, files) => {
+  const body = new FormData()
+  if (Array.isArray(files) || files instanceof FileList) {
+    for (let i = 0; i < files.length; i++) body.append('documents[]', files[i])
+  } else {
+    body.append('document', files)
+  }
   return (await api.post(`/employer/job-fairs/${jobFairId}/requirements/${requirementId}`, body)).data
 }
 export const viewJobFairRequirement = async (submissionId) => (await api.get(`/employer/job-fair-requirements/${submissionId}/view`, { responseType: 'blob' })).data

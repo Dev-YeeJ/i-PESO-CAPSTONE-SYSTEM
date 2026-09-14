@@ -15,7 +15,7 @@ import { getVacancies } from '@/services/employerService'
 
 const blankConfirmation = {
   representative_1_name: '', representative_1_contact: '', representative_2_name: '', representative_2_contact: '',
-  email: '', will_conduct_onsite_interview: false, logistics_requests: '',
+  will_conduct_onsite_interview: false,
 }
 
 const inputClass = 'w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-brand-navy focus:outline-none focus:ring-2 focus:ring-brand-navy/10'
@@ -286,17 +286,19 @@ export default function EmployerJobFairDashboard() {
                       <p className="mb-4 text-sm text-slate-500">Participation status: <span className="font-bold capitalize text-slate-800">{selected.participation.status.replaceAll('_', ' ')}</span></p>
                       <div className="space-y-3">
                         {selected.requirements.map((req) => {
-                          const submitted = selected.participation.requirements?.find((x) => x.job_fair_requirement_id === req.id)
-                          const reused = Boolean(submitted?.reused_from_verification)
-                          const autoSatisfied = Boolean(submitted?.auto_satisfied)
-                          const canUpload = req.code !== 'confirmation_slip' && !reused && !autoSatisfied && (!submitted || submitted.status === 'rejected')
+                          const submissions = selected.participation.requirements?.filter((x) => x.job_fair_requirement_id === req.id) || []
+                          const reused = submissions.some((s) => s.reused_from_verification)
+                          const autoSatisfied = submissions.some((s) => s.auto_satisfied)
+                          const isRejected = submissions.length > 0 && submissions.every((s) => s.status === 'rejected')
+                          const canUpload = req.code !== 'confirmation_slip' && !reused && !autoSatisfied && (!submissions.length || isRejected)
+                          const status = submissions.length > 0 ? submissions[0].status : 'pending'
 
                           return (
                             <div key={req.id} className="rounded-xl border border-slate-200 p-4">
                               <div className="flex flex-wrap items-center justify-between gap-2">
                                 <span className="text-sm font-bold text-slate-800">{req.label}</span>
-                                <Badge variant={submitted ? (submitted.status === 'rejected' ? 'rejected' : 'approved') : 'neutral'} icon={false}>
-                                  {submitted?.status ?? 'pending'}
+                                <Badge variant={submissions.length > 0 ? (status === 'rejected' ? 'rejected' : 'approved') : 'neutral'} icon={false}>
+                                  {status}
                                 </Badge>
                               </div>
 
@@ -305,21 +307,25 @@ export default function EmployerJobFairDashboard() {
                                   <ShieldCheck className="h-3.5 w-3.5" />Verified from your active job postings — nothing to upload
                                 </p>
                               )}
-                              {submitted?.original_filename && !autoSatisfied && submitted.original_filename !== 'Digital confirmation slip' && (
-                                <button type="button" onClick={() => viewSubmission(submitted)} className="mt-2 flex items-center gap-1.5 text-xs font-semibold text-brand-navy hover:underline">
-                                  <FileText className="h-3.5 w-3.5" />{reused ? `Already verified — ${submitted.original_filename}` : submitted.original_filename}
-                                </button>
-                              )}
+                              
+                              {submissions.map((sub) => (
+                                sub.original_filename && !autoSatisfied && sub.original_filename !== 'Digital confirmation slip' && (
+                                  <button key={sub.id} type="button" onClick={() => viewSubmission(sub)} className="mt-2 flex w-full items-center gap-1.5 text-xs font-semibold text-brand-navy hover:underline">
+                                    <FileText className="h-3.5 w-3.5 shrink-0" /><span className="truncate">{reused ? `Already verified — ${sub.original_filename}` : sub.original_filename}</span>
+                                  </button>
+                                )
+                              ))}
+                              
                               {canUpload && (
                                 <label className="mt-3 flex w-fit cursor-pointer items-center gap-2 rounded-lg border border-dashed border-slate-300 px-3 py-2 text-xs font-bold text-slate-600 hover:border-brand-navy hover:text-brand-navy">
-                                  <FileUp className="h-4 w-4" />Upload document
-                                  <input type="file" accept=".pdf,.jpg,.jpeg,.png" className="hidden" onChange={(e) => {
-                                    const file = e.target.files[0]; e.target.value = ''
-                                    if (file) act(() => uploadJobFairRequirement(selected.job_fair_id, req.id, file), `${req.label} submitted.`)
+                                  <FileUp className="h-4 w-4" />Upload document{req.code === 'posterized_vacancy' ? 's' : ''}
+                                  <input type="file" multiple={req.code === 'posterized_vacancy'} accept=".pdf,.jpg,.jpeg,.png" className="hidden" onChange={(e) => {
+                                    const files = e.target.files; e.target.value = ''
+                                    if (files?.length) act(() => uploadJobFairRequirement(selected.job_fair_id, req.id, files), `${req.label} submitted.`)
                                   }} />
                                 </label>
                               )}
-                              {submitted?.admin_remarks && <p className="mt-2 text-xs font-semibold text-rose-700">PESO: {submitted.admin_remarks}</p>}
+                              {submissions[0]?.admin_remarks && <p className="mt-2 text-xs font-semibold text-rose-700">PESO: {submissions[0].admin_remarks}</p>}
                             </div>
                           )
                         })}
@@ -347,14 +353,11 @@ export default function EmployerJobFairDashboard() {
                         </div>
 
                         <div className="grid gap-4 sm:grid-cols-2">
-                          <FormField label="Email address" type="email" value={confirmation.email} onChange={(v) => setConfirmation((x) => ({ ...x, email: v }))} />
-                          <label className="flex items-center gap-2 self-end pb-2.5 text-sm font-semibold text-slate-700">
+                          <label className="flex items-center gap-2 pb-2.5 text-sm font-semibold text-slate-700">
                             <input type="checkbox" checked={confirmation.will_conduct_onsite_interview} onChange={(e) => setConfirmation((x) => ({ ...x, will_conduct_onsite_interview: e.target.checked }))} className="h-4 w-4 rounded border-slate-300" />
                             Will conduct on-site interview
                           </label>
                         </div>
-
-                        <FormField label="Logistics requests (optional)" textarea value={confirmation.logistics_requests} onChange={(v) => setConfirmation((x) => ({ ...x, logistics_requests: v }))} />
                       </div>
 
                       <div className="mt-6">

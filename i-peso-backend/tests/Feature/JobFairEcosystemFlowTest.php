@@ -273,11 +273,6 @@ class JobFairEcosystemFlowTest extends TestCase
                 'verification_status' => 'approved', 'created_at' => now(), 'updated_at' => now(),
             ]);
         }
-        DB::table('job_vacancies')->insert([
-            'employer_id' => $employer->employer_id, 'vacancies_count' => 3, 'status' => 'active',
-            'created_at' => now(), 'updated_at' => now(),
-        ]);
-
         Sanctum::actingAs($admin);
         $fairId = $this->postJson('/api/admin/job-fairs', [
             'title' => 'Dashboard Accuracy Job Fair', 'description' => 'Checks the admin sees real progress immediately.',
@@ -318,16 +313,15 @@ class JobFairEcosystemFlowTest extends TestCase
         $after = $this->getJson("/api/admin/job-fairs/{$fairId}")->assertOk()->json();
         $participantAfter = collect($after['participants'])->firstWhere('employer_id', $employer->employer_id);
 
-        // 5 of the 7 required requirements (business_permit,
-        // business_registration, philjobnet_registration, job_vacancy_count,
-        // no_pending_case) are covered by a reused document or the
-        // active-posting count; posterized_vacancy and confirmation_slip are
-        // still genuinely outstanding, so the participation correctly lands
-        // on "requirements_pending" — not stuck at "accepted", and not a
-        // misleading "0 of 7" either.
+        // 4 of the 6 required requirements (business_permit,
+        // business_registration, philjobnet_registration, no_pending_case)
+        // are covered by a reused document; posterized_vacancy and
+        // confirmation_slip are still genuinely outstanding, so the
+        // participation correctly lands on "requirements_pending" — not
+        // stuck at "accepted", and not a misleading "0 of 6" either.
         $this->assertSame('requirements_pending', $participantAfter['status']);
         $approvedCount = collect($participantAfter['requirements'])->where('status', 'approved')->count();
-        $this->assertSame(5, $approvedCount);
+        $this->assertSame(4, $approvedCount);
     }
 
     /**
@@ -345,9 +339,12 @@ class JobFairEcosystemFlowTest extends TestCase
             'mobile_number' => '09170000006', 'password' => 'password123', 'role' => 'administrator', 'status' => 'active', 'email_verified_at' => now(),
         ]);
         $employer = $this->employer('phone-employer@example.test', 'Phone Accept Corp');
-        DB::table('job_vacancies')->insert([
-            'employer_id' => $employer->employer_id, 'vacancies_count' => 1, 'status' => 'active',
-            'created_at' => now(), 'updated_at' => now(),
+        Storage::disk('local')->put('employer_documents/permit.pdf', '%PDF-1.4 fake content');
+        DB::table('employer_documents')->insert([
+            'employer_id' => $employer->employer_id, 'document_type' => 'mayors_permit',
+            'document_path' => 'employer_documents/permit.pdf', 'original_filename' => 'permit.pdf',
+            'file_size' => 1024, 'mime_type' => 'application/pdf', 'uploaded_at' => now(),
+            'verification_status' => 'approved', 'created_at' => now(), 'updated_at' => now(),
         ]);
 
         Sanctum::actingAs($admin);
@@ -374,9 +371,9 @@ class JobFairEcosystemFlowTest extends TestCase
         $participant = collect($after['participants'])->firstWhere('employer_id', $employer->employer_id);
 
         $this->assertSame('requirements_pending', $participant['status']);
-        $jobVacancyCount = collect($participant['requirements'])->firstWhere('label', 'Job Vacancy Count');
-        $this->assertNotNull($jobVacancyCount, 'Job Vacancy Count should be auto-satisfied even for a phone-recorded acceptance.');
-        $this->assertSame('approved', $jobVacancyCount['status']);
+        $businessPermit = collect($participant['requirements'])->firstWhere('label', 'Business Permit');
+        $this->assertNotNull($businessPermit, 'Business Permit should be auto-satisfied even for a phone-recorded acceptance.');
+        $this->assertSame('approved', $businessPermit['status']);
     }
 
     /**

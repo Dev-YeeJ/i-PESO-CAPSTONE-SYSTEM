@@ -131,7 +131,6 @@ class JobFairInvitationBroadcastTest extends TestCase
         $this->assertNotContains('business_permit', $outstanding);
         $this->assertContains('philjobnet_registration', $outstanding);
         $this->assertContains('no_pending_case', $outstanding);
-        $this->assertContains('job_vacancy_count', $outstanding);
 
         // A corporation's SEC certificate does NOT satisfy a sole
         // proprietor's DTI-based business_registration requirement, and
@@ -195,41 +194,6 @@ class JobFairInvitationBroadcastTest extends TestCase
         $fair->update(['end_date' => '2026-12-03']);
         $multiDayRendered = (new JobFairNotification($fair->fresh(), 'invited', $participation))->toMail($employer)->render();
         $this->assertStringContainsString('December 1 to December 3, 2026', $multiDayRendered);
-    }
-
-    public function test_job_vacancy_count_is_auto_satisfied_once_the_employer_has_an_active_posting(): void
-    {
-        $fair = $this->createFair();
-        app(JobFairService::class)->seedRequirements($fair);
-        $fair->refresh();
-
-        $employer = $this->employer('has-posting@example.test', 'sole_proprietorship');
-        $participation = JobFairEmployer::create([
-            'job_fair_id' => $fair->job_fair_id, 'employer_id' => $employer->employer_id,
-            'participation_status' => 'requirements_pending', 'source' => 'peso_broadcast', 'invited_at' => now(),
-        ]);
-
-        // No active posting yet — the requirement stays outstanding, and
-        // there is nothing to auto-create.
-        app(JobFairService::class)->autoSatisfyVacancyCount($fair, $participation->fresh());
-        $this->assertSame(0, $participation->requirementSubmissions()->count());
-
-        \DB::table('job_vacancies')->insert([
-            'employer_id' => $employer->employer_id, 'vacancies_count' => 3, 'status' => 'active',
-            'created_at' => now(), 'updated_at' => now(),
-        ]);
-
-        app(JobFairService::class)->autoSatisfyVacancyCount($fair, $participation->fresh()->load('requirementSubmissions'));
-
-        $this->assertDatabaseHas('job_fair_requirement_submissions', [
-            'job_fair_employer_id' => $participation->id,
-            'original_filename' => JobFairService::AUTO_SATISFIED_VACANCY_LABEL,
-            'status' => 'approved',
-        ]);
-
-        // Running it again must not create a second submission.
-        app(JobFairService::class)->autoSatisfyVacancyCount($fair, $participation->fresh()->load('requirementSubmissions'));
-        $this->assertSame(1, $participation->requirementSubmissions()->count());
     }
 
     public function test_the_registered_representative_is_addressed_in_the_invitation_email(): void

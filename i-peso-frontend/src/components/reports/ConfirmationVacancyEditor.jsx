@@ -75,10 +75,10 @@ export default function ConfirmationVacancyEditor({ vacancies, onChange, myVacan
                   </Select>
                 </TableCell>
               )}
-              <TableCell><input type="number" min="0" value={row.number_needed} onChange={(e) => update(index, 'number_needed', e.target.value)} placeholder="0" className={cellInputClass} /></TableCell>
-              <TableCell><input value={row.position_title} onChange={(e) => update(index, 'position_title', e.target.value)} placeholder="Position title" className={cellInputClass} /></TableCell>
-              <TableCell><input value={row.qualifications} onChange={(e) => update(index, 'qualifications', e.target.value)} placeholder="Qualifications" className={cellInputClass} /></TableCell>
-              <TableCell><input value={row.place_of_work} onChange={(e) => update(index, 'place_of_work', e.target.value)} placeholder="Place of work" className={cellInputClass} /></TableCell>
+              <TableCell><input type="number" min="0" value={row.number_needed} onChange={(e) => update(index, 'number_needed', e.target.value)} placeholder="0" className={`${cellInputClass} disabled:opacity-60 disabled:cursor-not-allowed`} disabled={!!row.job_vacancy_id} /></TableCell>
+              <TableCell><input value={row.position_title} onChange={(e) => update(index, 'position_title', e.target.value)} placeholder="Position title" className={`${cellInputClass} disabled:opacity-60 disabled:cursor-not-allowed`} disabled={!!row.job_vacancy_id} /></TableCell>
+              <TableCell><input value={row.qualifications} onChange={(e) => update(index, 'qualifications', e.target.value)} placeholder="Qualifications" className={`${cellInputClass} disabled:opacity-60 disabled:cursor-not-allowed`} disabled={!!row.job_vacancy_id} /></TableCell>
+              <TableCell><input value={row.place_of_work} onChange={(e) => update(index, 'place_of_work', e.target.value)} placeholder="Place of work" className={`${cellInputClass} disabled:opacity-60 disabled:cursor-not-allowed`} disabled={!!row.job_vacancy_id} /></TableCell>
               <TableCell>
                 <button type="button" onClick={() => onChange(vacancies.filter((_, i) => i !== index))} aria-label="Remove vacancy" className="rounded-lg p-2 text-slate-400 transition-colors hover:bg-rose-50 hover:text-rose-600">
                   <Trash2 className="h-4 w-4" />

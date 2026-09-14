@@ -61,8 +61,11 @@ class JobFairController extends Controller
      * feed rather than one per fair — PESO only ever runs one fair at a time
      * in practice, so scoping would just add a filter nobody uses.
      */
-    public function posters(): JsonResponse
+    public function posters(Request $request, \App\Services\EnhancedJobMatchingService $matchingService): JsonResponse
     {
+        $user = $request->user();
+        $isSeeker = $user instanceof JobSeeker;
+
         $posters = JobFairRequirementSubmission::query()
             ->where('status', 'approved')
             ->whereHas('requirement', fn ($query) => $query->where('code', 'posterized_vacancy'))
@@ -72,16 +75,48 @@ class JobFairController extends Controller
             ])
             ->orderByDesc('reviewed_at')
             ->get()
-            ->map(fn (JobFairRequirementSubmission $submission) => [
-                'id' => $submission->id,
-                'company_name' => $submission->employer?->company_name ?: $submission->employer?->trade_name,
-                'job_fair_id' => $submission->participation?->job_fair_id,
-                'job_fair_title' => $submission->participation?->jobFair?->title,
-                'venue' => $submission->participation?->jobFair?->venue,
-                'mime_type' => $submission->mime_type,
-                'original_filename' => $submission->original_filename,
-                'posted_at' => ($submission->reviewed_at ?? $submission->submitted_at)?->toIso8601String(),
-            ])
+            ->map(function (JobFairRequirementSubmission $submission) use ($isSeeker, $user, $matchingService) {
+                $data = [
+                    'id' => $submission->id,
+                    'company_name' => $submission->employer?->company_name ?: $submission->employer?->trade_name,
+                    'job_fair_id' => $submission->participation?->job_fair_id,
+                    'job_fair_title' => $submission->participation?->jobFair?->title,
+                    'venue' => $submission->participation?->jobFair?->venue,
+                    'mime_type' => $submission->mime_type,
+                    'original_filename' => $submission->original_filename,
+                    'posted_at' => ($submission->reviewed_at ?? $submission->submitted_at)?->toIso8601String(),
+                ];
+
+                if ($isSeeker && $submission->participation) {
+                    $fairId = $submission->participation->job_fair_id;
+                    $employerId = $submission->employer_id;
+                    $vacancies = \App\Models\JobFairVacancy::query()
+                        ->where('job_fair_id', $fairId)
+                        ->where('employer_id', $employerId)
+                        ->with('vacancy.occupation')
+                        ->get()
+                        ->pluck('vacancy')
+                        ->filter();
+
+                    $bestScore = null;
+                    foreach ($vacancies as $vacancy) {
+                        try {
+                            $match = $matchingService->calculateMatch($vacancy, $user);
+                            $score = collect($match['factors'] ?? [])->sum('weighted_score');
+                            if ($bestScore === null || $score > $bestScore) {
+                                $bestScore = $score;
+                            }
+                        } catch (\Exception $e) {
+                            // ignore match errors
+                        }
+                    }
+                    if ($bestScore !== null) {
+                        $data['match_percentage'] = $bestScore;
+                    }
+                }
+
+                return $data;
+            })
             ->values();
 
         return response()->json(['data' => $posters]);

@@ -38,7 +38,6 @@ class JobFairService
         'business_permit' => 'Business Permit',
         'business_registration' => 'DTI / BIR / SEC Registration',
         'philjobnet_registration' => 'PhilJobNet Registration',
-        'job_vacancy_count' => 'Job Vacancy Count',
         'posterized_vacancy' => 'Posterized Job Vacancy with Contact Details',
         'no_pending_case' => 'Certificate of No Pending Case from DOLE',
         'confirmation_slip' => 'Confirmation Slip',
@@ -234,45 +233,7 @@ class JobFairService
     /** Marks a requirement submission created by autoSatisfyVacancyCount() rather than an upload. */
     public const AUTO_SATISFIED_VACANCY_LABEL = 'Verified from active job postings';
 
-    /**
-     * "Job Vacancy Count" doesn't need a file the way Business Permit or DTI/
-     * SEC registration do — PESO already knows the number, it's the sum of
-     * the employer's own active job vacancy postings. Auto-satisfy it from
-     * that instead of making the employer produce a document that proves a
-     * number the system can already see.
-     */
-    public function autoSatisfyVacancyCount(JobFair $fair, JobFairEmployer $participation): void
-    {
-        $requirement = $fair->requirements->firstWhere('code', 'job_vacancy_count');
-        if (! $requirement) {
-            return;
-        }
 
-        $alreadySubmitted = $participation->requirementSubmissions
-            ->contains(fn (JobFairRequirementSubmission $submission) => $submission->job_fair_requirement_id === $requirement->id);
-        if ($alreadySubmitted) {
-            return;
-        }
-
-        $hasActivePosting = JobVacancy::where('employer_id', $participation->employer_id)
-            ->where('status', 'active')
-            ->exists();
-        if (! $hasActivePosting) {
-            return;
-        }
-
-        JobFairRequirementSubmission::create([
-            'job_fair_requirement_id' => $requirement->id,
-            'job_fair_employer_id' => $participation->id,
-            'employer_id' => $participation->employer_id,
-            'original_filename' => self::AUTO_SATISFIED_VACANCY_LABEL,
-            'status' => 'approved',
-            'submitted_at' => now(),
-        ]);
-
-        $participation->load('requirementSubmissions.requirement');
-        $this->syncRequirementStatus($participation);
-    }
 
     // A verified employer has already submitted business_permit /
     // business_registration / philjobnet_registration / no_pending_case
@@ -384,12 +345,7 @@ class JobFairService
             ->exists();
 
         return $fair->requirements
-            ->reject(function (JobFairRequirement $requirement) use ($applicableTypes, $approvedTypes, $hasActivePosting) {
-                // PESO already knows the count from the employer's own active
-                // postings — no document needed, see autoSatisfyVacancyCount().
-                if ($requirement->code === 'job_vacancy_count') {
-                    return $hasActivePosting;
-                }
+            ->reject(function (JobFairRequirement $requirement) use ($applicableTypes, $approvedTypes) {
 
                 $mappedTypes = self::REQUIREMENT_DOCUMENT_TYPES[$requirement->code] ?? null;
 
@@ -450,7 +406,6 @@ class JobFairService
         $participation->update(['participation_status' => 'requirements_pending']);
 
         $this->reuseVerifiedDocuments($fair, $participation);
-        $this->autoSatisfyVacancyCount($fair, $participation);
         $this->syncRequirementStatus($participation);
     }
 
