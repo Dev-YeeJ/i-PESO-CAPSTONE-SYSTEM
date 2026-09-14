@@ -198,6 +198,105 @@ const LandingPage = () => {
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> 8 Government Programs
             </span>
           </Motion.div>
+
+          {/* Dashboard Preview Graphic */}
+          <Motion.div 
+            variants={itemVariants}
+            className="mt-16 md:mt-24 relative w-full max-w-4xl mx-auto hidden md:block"
+          >
+            {/* The main dashboard window */}
+            <div className="relative rounded-t-2xl border border-white/10 border-b-0 bg-[#0D1F38]/60 backdrop-blur-xl shadow-2xl overflow-hidden">
+               {/* Browser/Window Header */}
+               <div className="h-10 border-b border-white/10 bg-white/5 flex items-center px-4 gap-2">
+                 <div className="w-3 h-3 rounded-full bg-slate-600/80"></div>
+                 <div className="w-3 h-3 rounded-full bg-slate-600/80"></div>
+                 <div className="w-3 h-3 rounded-full bg-slate-600/80"></div>
+               </div>
+               
+               {/* Dashboard Content */}
+               <div className="p-6 grid grid-cols-3 gap-6 text-left relative z-10">
+                 {/* Left Sidebar Mock */}
+                 <div className="col-span-1 space-y-4">
+                    <div className="h-8 w-3/4 rounded-lg bg-white/10 mb-8"></div>
+                    <div className="flex items-center gap-3">
+                       <div className="w-4 h-4 rounded bg-blue-400/50"></div>
+                       <div className="h-3 w-1/2 rounded bg-white/10"></div>
+                    </div>
+                    <div className="flex items-center gap-3 opacity-60">
+                       <div className="w-4 h-4 rounded bg-white/5"></div>
+                       <div className="h-3 w-2/3 rounded bg-white/5"></div>
+                    </div>
+                    <div className="flex items-center gap-3 opacity-60">
+                       <div className="w-4 h-4 rounded bg-white/5"></div>
+                       <div className="h-3 w-1/2 rounded bg-white/5"></div>
+                    </div>
+                    
+                    <div className="mt-8 pt-6 border-t border-white/5">
+                      <div className="h-28 rounded-xl bg-gradient-to-br from-blue-500/10 to-purple-500/10 border border-white/5 p-4 relative overflow-hidden flex flex-col justify-center">
+                         <div className="absolute -right-4 -top-4 w-20 h-20 bg-blue-500/20 blur-2xl rounded-full"></div>
+                         <div className="text-[10px] text-blue-300 font-bold mb-1 uppercase tracking-wider">Match Score</div>
+                         <div className="text-4xl font-extrabold text-white">98<span className="text-xl text-slate-400">%</span></div>
+                      </div>
+                    </div>
+                 </div>
+                 
+                 {/* Main Content Mock */}
+                 <div className="col-span-2 space-y-4">
+                    <div className="flex gap-4 mb-6">
+                       <div className="h-28 flex-1 rounded-xl bg-white/5 border border-white/10 p-4 flex flex-col justify-between transition-colors hover:bg-white/10">
+                          <div className="flex justify-between items-start">
+                             <div className="h-10 w-10 rounded-lg bg-yellow-400/20 flex items-center justify-center">
+                                <Target className="text-yellow-400 w-5 h-5"/>
+                             </div>
+                             <div className="text-[10px] font-bold uppercase tracking-wider text-emerald-400 bg-emerald-400/10 px-2 py-1 rounded-full">New Match</div>
+                          </div>
+                          <div>
+                            <div className="h-3 w-2/3 rounded bg-white/20 mb-2"></div>
+                            <div className="h-2 w-1/3 rounded bg-white/10"></div>
+                          </div>
+                       </div>
+                       <div className="h-28 flex-1 rounded-xl bg-white/5 border border-white/10 p-4 flex flex-col justify-between transition-colors hover:bg-white/10">
+                           <div className="flex justify-between items-start">
+                             <div className="h-10 w-10 rounded-lg bg-blue-400/20 flex items-center justify-center">
+                                  <Landmark className="text-blue-400 w-5 h-5"/>
+                               </div>
+                           </div>
+                           <div>
+                            <div className="h-3 w-1/2 rounded bg-white/20 mb-2"></div>
+                            <div className="h-2 w-2/3 rounded bg-white/10"></div>
+                          </div>
+                       </div>
+                    </div>
+                    
+                    <div className="space-y-3">
+                       <div className="h-16 w-full rounded-xl bg-white/5 border border-white/10 flex items-center px-4 gap-4 transition-colors hover:bg-white/10">
+                          <div className="h-10 w-10 rounded-full bg-slate-700"></div>
+                          <div className="space-y-2 flex-1">
+                             <div className="h-3 w-1/3 rounded bg-white/20"></div>
+                             <div className="h-2 w-1/4 rounded bg-white/10"></div>
+                          </div>
+                          <div className="px-4 py-2 rounded-lg bg-yellow-400 text-slate-900 text-xs font-bold shadow-[0_0_15px_rgba(250,204,21,0.2)]">Apply Now</div>
+                       </div>
+                       <div className="h-16 w-full rounded-xl bg-white/5 border border-white/10 flex items-center px-4 gap-4">
+                          <div className="h-10 w-10 rounded-full bg-slate-700"></div>
+                          <div className="space-y-2 flex-1">
+                             <div className="h-3 w-1/4 rounded bg-white/20"></div>
+                             <div className="h-2 w-1/3 rounded bg-white/10"></div>
+                          </div>
+                          <div className="px-4 py-2 rounded-lg bg-white/5 text-slate-400 text-xs font-bold">Viewed</div>
+                       </div>
+                    </div>
+                 </div>
+               </div>
+               
+               {/* Fading bottom edge to blend into background */}
+               <div className="absolute bottom-0 left-0 right-0 h-48 bg-gradient-to-t from-[#0A192F] via-[#0A192F]/80 to-transparent z-20 pointer-events-none"></div>
+            </div>
+
+            {/* Decorative glows behind the dashboard */}
+            <div className="absolute -left-20 top-1/4 w-64 h-64 bg-blue-500/10 blur-[100px] rounded-full pointer-events-none"></div>
+            <div className="absolute -right-20 bottom-1/4 w-64 h-64 bg-yellow-500/10 blur-[100px] rounded-full pointer-events-none"></div>
+          </Motion.div>
         </Motion.div>
       </main>
 
