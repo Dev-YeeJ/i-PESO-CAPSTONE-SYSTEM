@@ -322,8 +322,9 @@ const styles = StyleSheet.create({
     ...textStyles.smallMedium,
   },
   gapText: {
-    marginTop: spacing.sm,
     ...textStyles.smallMedium,
+    marginTop: spacing.md,
+    lineHeight: 18,
     color: colors.error,
   },
   footer: {

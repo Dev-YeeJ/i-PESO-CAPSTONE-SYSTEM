@@ -4,6 +4,7 @@ import { colors, radii, spacing, typography } from '@/theme'
 import { seekerService, type AiSuggestionItem, type OccupationClassificationSuggestion, type SkillOption } from '@/services/seekerService'
 import { Combobox } from './Combobox'
 import { AddressSearchField } from './AddressSearchField'
+import { AddressPinMap } from './AddressPinMap'
 import type { GeocodedLocation } from '@/services/seekerService'
 import { getBarangaysByCity, getCitiesByProvince, getProvinces, matchPsgcLocation } from '@/services/psgcService'
 import {
@@ -547,6 +548,16 @@ export function Step1Personal({ value, onChange, errors }: { value: Step1Value; 
         onAddressSelected={applyResolvedLocation}
       />
       {locationNotice ? <Text style={styles.errorText}>{locationNotice}</Text> : null}
+      {value.latitude != null && value.longitude != null ? (
+        <>
+          <Text style={styles.helperText}>Drag the pin to adjust the exact spot.</Text>
+          <AddressPinMap
+            latitude={value.latitude}
+            longitude={value.longitude}
+            onPinMoved={(lat, lng) => onChange({ ...value, latitude: lat, longitude: lng })}
+          />
+        </>
+      ) : null}
       <SelectField
         label="Province"
         required

@@ -32,10 +32,24 @@ import { SuccessSheet } from '@/components/ui/SuccessSheet'
 import { ReportEmployerModal } from '@/components/ReportEmployerModal'
 import { colors, gradients, radii, shadows, spacing, textStyles } from '@/theme'
 
+// Where the header's back button should land, since jobs/[id] is a flat sibling in the
+// Tabs navigator (not nested under any of these screens' own stack) — plain router.back()
+// has no real history to pop and always falls through to the first tab (Home). Callers pass
+// `from` (and `fromId` for the employer profile, which needs the id back) to say where they
+// actually opened this screen from; unset defaults to Home.
+function backTargetFor(from: string | undefined, fromId: string | undefined): string {
+  if (from === 'jobs') return '/(seeker)/jobs'
+  if (from === 'job-map') return '/(seeker)/job-map'
+  if (from === 'notifications') return '/(seeker)/notifications'
+  if (from === 'employer' && fromId) return `/(seeker)/employers/${fromId}`
+  return '/(seeker)'
+}
+
 export default function JobDetailsScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>()
+  const { id, from, fromId } = useLocalSearchParams<{ id: string; from?: string; fromId?: string }>()
   const router = useRouter()
   const queryClient = useQueryClient()
+  const backTarget = backTargetFor(from, fromId)
 
   const [applying, setApplying] = useState(false)
   const [applyError, setApplyError] = useState('')
@@ -81,7 +95,7 @@ export default function JobDetailsScreen() {
   if (isLoading) {
     return (
       <View style={styles.flex}>
-        <ScreenHeader title="Job Details" onBack={() => router.back()} />
+        <ScreenHeader title="Job Details" onBack={() => router.replace(backTarget as never)} />
         <SkeletonGroup label="Loading job details" style={styles.loadingWrap}>
           <Skeleton width="70%" height={26} />
           <Skeleton width="45%" height={16} style={styles.loadingGap} />
@@ -96,11 +110,11 @@ export default function JobDetailsScreen() {
   if (!job) {
     return (
       <View style={styles.flex}>
-        <ScreenHeader title="Job Details" onBack={() => router.back()} />
+        <ScreenHeader title="Job Details" onBack={() => router.replace(backTarget as never)} />
         <View style={styles.center}>
           <Text style={styles.notFoundTitle}>Job not found</Text>
           {error ? <AlertBox variant="warning" style={styles.notFoundAlert}>This job may no longer be active.</AlertBox> : null}
-          <Button variant="outline" onPress={() => router.back()}>Go back</Button>
+          <Button variant="outline" onPress={() => router.replace(backTarget as never)}>Go back</Button>
         </View>
       </View>
     )
@@ -157,7 +171,7 @@ export default function JobDetailsScreen() {
 
   return (
     <View style={styles.flex}>
-      <ScreenHeader title="Job Details" onBack={() => router.back()} />
+      <ScreenHeader title="Job Details" onBack={() => router.replace(backTarget as never)} />
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         {/* The identity block. Everything a seeker needs to decide "is this worth reading?"
@@ -173,7 +187,7 @@ export default function JobDetailsScreen() {
               <Text style={styles.jobTitle}>{textFrom(job.job_title, 'Untitled job')}</Text>
               {job.employer?.employer_id ? (
                 <TouchableOpacity
-                  onPress={() => router.push(`/(seeker)/employers/${job.employer!.employer_id}`)}
+                  onPress={() => router.push({ pathname: '/(seeker)/employers/[id]', params: { id: String(job.employer!.employer_id), from: 'job', fromId: String(id) } })}
                   accessibilityRole="link"
                 >
                   <Text style={[styles.company, styles.companyLink]}>{jobCompany(job)}</Text>

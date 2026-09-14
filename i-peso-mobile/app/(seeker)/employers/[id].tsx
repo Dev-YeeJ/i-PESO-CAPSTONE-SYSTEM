@@ -15,9 +15,19 @@ import { ScreenSkeleton } from '@/components/ui/ScreenSkeleton'
 import { ReportEmployerModal } from '@/components/ReportEmployerModal'
 import { colors, radii, spacing, typography } from '@/theme'
 
+// Where the header's back button should land, since employers/[id] is a flat sibling in the
+// Tabs navigator (see jobs/[id].tsx's backTargetFor for the same reasoning) — plain
+// router.back() has no real history to pop and always falls through to the first tab (Home).
+function backTargetFor(from: string | undefined, fromId: string | undefined): string {
+  if (from === 'job' && fromId) return `/(seeker)/jobs/${fromId}`
+  if (from === 'application' && fromId) return `/(seeker)/applications/${fromId}`
+  return '/(seeker)'
+}
+
 export default function EmployerProfileScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>()
+  const { id, from, fromId } = useLocalSearchParams<{ id: string; from?: string; fromId?: string }>()
   const router = useRouter()
+  const backTarget = backTargetFor(from, fromId)
   const [reportOpen, setReportOpen] = useState(false)
 
   const { data, isLoading, error } = useQuery({
@@ -29,7 +39,7 @@ export default function EmployerProfileScreen() {
   if (isLoading) {
     return (
       <View style={styles.flex}>
-        <ScreenHeader title="Employer Profile" onBack={() => router.back()} />
+        <ScreenHeader title="Employer Profile" onBack={() => router.replace(backTarget as never)} />
         <ScreenSkeleton label="Loading employer profile" />
       </View>
     )
@@ -38,14 +48,14 @@ export default function EmployerProfileScreen() {
   if (error || !data) {
     return (
       <View style={styles.flex}>
-        <ScreenHeader title="Employer Profile" onBack={() => router.back()} />
+        <ScreenHeader title="Employer Profile" onBack={() => router.replace(backTarget as never)} />
         <View style={styles.center}>
           <MaterialIcons name="business" size={48} color={colors.subtle} />
           <Text style={styles.notFoundTitle}>Employer Not Found</Text>
           <AlertBox variant="warning" style={styles.alertBox}>
             {error ? apiErrorMessage(error, 'Unable to load this employer profile.') : 'Unable to load this employer profile.'}
           </AlertBox>
-          <Button variant="outline" onPress={() => router.back()}>Go Back</Button>
+          <Button variant="outline" onPress={() => router.replace(backTarget as never)}>Go Back</Button>
         </View>
       </View>
     )
@@ -55,7 +65,7 @@ export default function EmployerProfileScreen() {
 
   return (
     <View style={styles.flex}>
-      <ScreenHeader title="Employer Profile" onBack={() => router.back()} />
+      <ScreenHeader title="Employer Profile" onBack={() => router.replace(backTarget as never)} />
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.header}>
           <View style={styles.logoWrap}>

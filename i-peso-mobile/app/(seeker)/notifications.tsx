@@ -87,9 +87,9 @@ export default function NotificationsScreen() {
     } else if (notification.data?.program_id) {
       router.push(`/(seeker)/government-programs/${notification.data.program_id}`)
     } else if (notification.data?.job_fair_id) {
-      router.push('/(seeker)/job-fairs')
+      router.push({ pathname: '/(seeker)/job-fairs', params: { from: 'notifications' } })
     } else if (notification.data?.post_id) {
-      router.push(`/(seeker)/jobs/${notification.data.post_id}`)
+      router.push({ pathname: '/(seeker)/jobs/[id]', params: { id: String(notification.data.post_id), from: 'notifications' } })
     }
   }
 

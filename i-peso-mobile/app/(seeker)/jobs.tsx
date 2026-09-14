@@ -182,7 +182,7 @@ export default function JobsScreen() {
             job={item}
             index={index}
             saving={toggleSavedMutation.isPending && String(toggleSavedMutation.variables) === String(item.post_id)}
-            onPress={() => router.push(`/(seeker)/jobs/${item.post_id}`)}
+            onPress={() => router.push({ pathname: '/(seeker)/jobs/[id]', params: { id: String(item.post_id), from: 'jobs' } })}
             onToggleSave={() => toggleSavedMutation.mutate(String(item.post_id))}
           />
         )}
@@ -206,7 +206,7 @@ export default function JobsScreen() {
             isLoading={isLoading}
             locationRequired={locationRequired}
             errorMessage={errorMessage}
-            onOpenMap={() => router.push('/(seeker)/job-map')}
+            onOpenMap={() => router.push({ pathname: '/(seeker)/job-map', params: { from: 'jobs' } })}
             onOpenFilters={() => setFiltersOpen(true)}
             activeFilterCount={activeFilterCount}
             onClearFilters={resetFilters}

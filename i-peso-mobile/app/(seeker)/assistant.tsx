@@ -110,7 +110,10 @@ export default function AssistantScreen() {
       keyboardVerticalOffset={headerHeight + tabBarHeight}
     >
       <View style={styles.flex}>
-        <ScreenHeader title="i-PESO Assistant" onBack={() => router.back()} />
+        {/* router.replace, not router.back(): assistant is a flat sibling in the Tabs
+            navigator (see job-fairs.tsx for the same reasoning) — back() only happens
+            to land on Home today because Home is assistant's one entry point. */}
+        <ScreenHeader title="i-PESO Assistant" onBack={() => router.replace('/(seeker)')} />
 
         <FlatList
           ref={listRef}

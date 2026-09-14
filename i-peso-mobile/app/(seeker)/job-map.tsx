@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { ActivityIndicator, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native'
-import { useRouter } from 'expo-router'
+import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useQuery } from '@tanstack/react-query'
 import * as Location from 'expo-location'
 import MaterialIcons from '@expo/vector-icons/MaterialIcons'
@@ -49,8 +49,17 @@ function matchColor(job: NearbyJob) {
   return colors.subtle
 }
 
+// Where the header's back button should land, since job-map is a flat sibling in the Tabs
+// navigator (see jobs/[id].tsx's backTargetFor for the same reasoning) — plain router.back()
+// has no real history to pop and always falls through to the first tab (Home).
+const BACK_DESTINATIONS: Record<string, string> = {
+  jobs: '/(seeker)/jobs',
+}
+
 export default function JobMapScreen() {
   const router = useRouter()
+  const { from } = useLocalSearchParams<{ from?: string }>()
+  const backTarget = BACK_DESTINATIONS[from ?? ''] ?? '/(seeker)'
 
   const [filters, setFilters] = useState<JobFilters>(DEFAULT_FILTERS)
   const [debouncedFilters, setDebouncedFilters] = useState<JobFilters>(DEFAULT_FILTERS)
@@ -183,7 +192,7 @@ export default function JobMapScreen() {
 
   const toggleSavedMutation = useToggleSavedJob()
 
-  const openJob = (job: NearbyJob) => router.push(`/(seeker)/jobs/${job.post_id}`)
+  const openJob = (job: NearbyJob) => router.push({ pathname: '/(seeker)/jobs/[id]', params: { id: String(job.post_id), from: 'job-map' } })
 
   const activeToggleCount = [
     filters.hideLowMatch, filters.hideApplied, filters.savedOnly, filters.jobFairOnly,
@@ -192,7 +201,7 @@ export default function JobMapScreen() {
 
   return (
     <View style={styles.flex}>
-      <ScreenHeader title="Job Map" onBack={() => router.back()} />
+      <ScreenHeader title="Job Map" onBack={() => router.replace(backTarget as never)} />
 
       <View style={styles.searchBar}>
         <View style={styles.searchInputWrap}>
@@ -247,7 +256,7 @@ export default function JobMapScreen() {
             // details" already sends a seeker from a linked vacancy card — mirrors web's
             // handleJobFairPin in JobMapPage.jsx.
             if (postId.startsWith('fair:')) {
-              router.push('/(seeker)/job-fairs')
+              router.push({ pathname: '/(seeker)/job-fairs', params: { from: 'job-map' } })
               return
             }
             const job = jobsWithCoords.find((j) => String(j.post_id) === postId)

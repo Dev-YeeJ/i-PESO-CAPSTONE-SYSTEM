@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { useQuery } from '@tanstack/react-query'
-import { useRouter } from 'expo-router'
+import { useLocalSearchParams, useRouter } from 'expo-router'
 import MaterialIcons from '@expo/vector-icons/MaterialIcons'
 import type { JobFair } from '@/services/seekerService'
 import { seekerService } from '@/services/seekerService'
@@ -19,8 +19,22 @@ function statusVariant(status?: string | null): 'info' | 'success' | 'neutral' {
   return 'neutral'
 }
 
+// Where each entry point wants the header's back button to land, since job-fairs is a flat
+// sibling in the Tabs navigator (not nested under any of these screens' own stack) — plain
+// router.back() has no real history to pop and always falls through to the first tab (Home).
+// Callers pass `from` to say where they actually opened this screen from; unset (e.g. deep
+// links) defaults to Home, which is at least always a real destination.
+const BACK_DESTINATIONS: Record<string, string> = {
+  home: '/(seeker)',
+  'government-programs': '/(seeker)/government-programs',
+  'job-map': '/(seeker)/job-map',
+  notifications: '/(seeker)/notifications',
+}
+
 export default function JobFairsScreen() {
   const router = useRouter()
+  const { from } = useLocalSearchParams<{ from?: string }>()
+  const backTarget = BACK_DESTINATIONS[from ?? ''] ?? '/(seeker)'
   const [refreshing, setRefreshing] = useState(false)
 
   const { data: jobFairs = [], isLoading, error, refetch } = useQuery({
@@ -36,11 +50,7 @@ export default function JobFairsScreen() {
 
   return (
     <View style={styles.flex}>
-      {/* router.replace, not router.back(): job-fairs is a flat sibling in the
-          Tabs navigator (not nested under Government Programs' own stack), so
-          back() has nowhere real to return to and falls through to the first
-          tab (Home) instead of wherever this screen was actually opened from. */}
-      <ScreenHeader title="Job Fairs" onBack={() => router.replace('/(seeker)/government-programs')} />
+      <ScreenHeader title="Job Fairs" onBack={() => router.replace(backTarget as never)} />
       <ScrollView
         contentContainerStyle={styles.content}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.info} />}
