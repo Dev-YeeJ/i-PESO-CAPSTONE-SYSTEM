@@ -141,7 +141,7 @@ export default function GovernmentProgramsScreen() {
             <Text style={styles.bulletinSub}>Browse upcoming PESO job fairs</Text>
           </View>
         </View>
-        <Button variant="secondary" onPress={() => router.push('/(seeker)/job-fairs')} style={styles.bulletinBtn}>
+        <Button variant="secondary" onPress={() => router.push({ pathname: '/(seeker)/job-fairs', params: { from: 'government-programs' } })} style={styles.bulletinBtn}>
           View Job Fairs
         </Button>
       </Card>

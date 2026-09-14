@@ -6,18 +6,26 @@ interface StatCardProps {
   title: string
   value: string | number
   icon?: React.ReactNode
+  /** Icon-badge color — mirrors web's per-stat color coding (blue/amber/green). Defaults to blue. */
+  tint?: 'blue' | 'amber' | 'green'
   trend?: {
     value: string
     isPositive: boolean
   }
 }
 
-export function StatCard({ title, value, icon, trend }: StatCardProps) {
+const TINTS: Record<NonNullable<StatCardProps['tint']>, { background: string }> = {
+  blue: { background: colors.infoBackground },
+  amber: { background: colors.warningBackground },
+  green: { background: colors.successBackground },
+}
+
+export function StatCard({ title, value, icon, tint = 'blue', trend }: StatCardProps) {
   return (
     <Card padding="md" style={styles.card}>
       <View style={styles.header}>
         <Text style={styles.title}>{title}</Text>
-        {icon && <View style={styles.iconContainer}>{icon}</View>}
+        {icon && <View style={[styles.iconContainer, { backgroundColor: TINTS[tint].background }]}>{icon}</View>}
       </View>
       <View style={styles.content}>
         <Text style={styles.value}>{value}</Text>

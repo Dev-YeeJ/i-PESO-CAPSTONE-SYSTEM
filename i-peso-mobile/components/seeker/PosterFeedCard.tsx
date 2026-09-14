@@ -42,6 +42,11 @@ export function PosterFeedCard({ poster }: { poster: JobFairPoster }) {
           <Text style={styles.company} numberOfLines={1}>{poster.company_name || 'Employer'}</Text>
           <Text style={styles.meta} numberOfLines={1}>{metaLine}</Text>
         </View>
+        {poster.match_percentage != null ? (
+          <View style={styles.matchBadge}>
+            <Text style={styles.matchBadgeText}>{Math.round(poster.match_percentage)}% match</Text>
+          </View>
+        ) : null}
       </View>
 
       {isImage && token ? (
@@ -69,6 +74,8 @@ const styles = StyleSheet.create({
   card: { marginBottom: spacing.md },
   content: { gap: 0 },
   header: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingBottom: spacing.sm },
+  matchBadge: { backgroundColor: colors.successBackground, borderWidth: 1, borderColor: colors.successBorder, borderRadius: radii.pill, paddingHorizontal: spacing.sm, paddingVertical: 4 },
+  matchBadgeText: { color: colors.success, fontSize: 10, fontFamily: typography.family.bold, textTransform: 'uppercase', letterSpacing: 0.5 },
   avatar: { width: 40, height: 40, borderRadius: radii.pill, alignItems: 'center', justifyContent: 'center' },
   avatarText: { color: colors.white, fontSize: typography.small, fontFamily: typography.family.bold },
   headerText: { flex: 1 },

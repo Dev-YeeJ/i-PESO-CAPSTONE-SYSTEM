@@ -58,7 +58,7 @@ export default function ApplicationDetailScreen() {
   if (isLoading) {
     return (
       <View style={styles.flex}>
-        <ScreenHeader title="Application Details" onBack={() => router.back()} />
+        <ScreenHeader title="Application Details" onBack={() => router.replace('/(seeker)/applications')} />
         <ScreenSkeleton label="Loading application details" />
       </View>
     )
@@ -67,10 +67,10 @@ export default function ApplicationDetailScreen() {
   if (!application || error) {
     return (
       <View style={styles.flex}>
-        <ScreenHeader title="Application Details" onBack={() => router.back()} />
+        <ScreenHeader title="Application Details" onBack={() => router.replace('/(seeker)/applications')} />
         <View style={styles.center}>
           <Text style={styles.notFoundTitle}>Application Not Found</Text>
-          <Button variant="outline" onPress={() => router.back()}>Go Back</Button>
+          <Button variant="outline" onPress={() => router.replace('/(seeker)/applications')}>Go Back</Button>
         </View>
       </View>
     )
@@ -80,14 +80,17 @@ export default function ApplicationDetailScreen() {
 
   return (
     <View style={styles.flex}>
-      <ScreenHeader title="Application Details" onBack={() => router.back()} />
+      {/* router.replace, not router.back(): applications/[id] is a flat sibling in the
+          Tabs navigator (see job-fairs.tsx for the same reasoning), so back() falls
+          through to the first tab (Home) instead of returning to Applications. */}
+      <ScreenHeader title="Application Details" onBack={() => router.replace('/(seeker)/applications')} />
 
       <ScrollView contentContainerStyle={styles.content}>
         {withdrawError ? <AlertBox variant="danger" style={styles.alertBox}>{withdrawError}</AlertBox> : null}
 
         <Text style={styles.jobTitle}>{textFrom(job?.job_title, 'Untitled job')}</Text>
         {job?.employer?.employer_id ? (
-          <TouchableOpacity onPress={() => router.push(`/(seeker)/employers/${job.employer!.employer_id}`)}>
+          <TouchableOpacity onPress={() => router.push({ pathname: '/(seeker)/employers/[id]', params: { id: String(job.employer!.employer_id), from: 'application', fromId: String(id) } })}>
             <Text style={[styles.company, styles.companyLink]}>{jobCompany(job)}</Text>
           </TouchableOpacity>
         ) : (

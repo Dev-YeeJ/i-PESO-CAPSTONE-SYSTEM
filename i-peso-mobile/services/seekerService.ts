@@ -322,6 +322,7 @@ export interface JobFairPoster {
   mime_type?: string | null
   original_filename?: string | null
   posted_at?: string | null
+  match_percentage?: number | null
 }
 
 export interface ProgramEligibility {

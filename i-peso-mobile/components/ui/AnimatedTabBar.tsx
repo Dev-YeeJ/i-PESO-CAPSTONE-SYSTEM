@@ -20,7 +20,7 @@ type IconName = React.ComponentProps<typeof MaterialIcons>['name']
 // from its item list. They still live inside this Tabs navigator (so `router.push` between
 // them keeps working the same as every other seeker screen), but visually they should read as
 // a stack page, not a tab destination.
-const HIDDEN_BAR_ROUTES = new Set(['job-fairs', 'job-fairs/[id]', 'employer-posters', 'government-programs/[id]'])
+const HIDDEN_BAR_ROUTES = new Set(['job-fairs', 'job-fairs/[id]', 'employer-posters', 'government-programs/[id]', 'applications/[id]', 'profile/edit', 'assistant', 'jobs/[id]', 'employers/[id]', 'job-map'])
 
 /** Icon per route. Kept here so the tab bar owns its own presentation. */
 const ICONS: Record<string, IconName> = {

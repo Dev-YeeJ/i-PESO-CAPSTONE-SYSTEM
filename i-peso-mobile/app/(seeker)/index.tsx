@@ -6,27 +6,21 @@ import {
   StatusBar,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native'
 import { router } from 'expo-router'
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import MaterialIcons from '@expo/vector-icons/MaterialIcons'
 import { LinearGradient } from 'expo-linear-gradient'
 import Animated, { FadeInUp } from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import type { NearbyJob, ProfileStrengthItem, SeekerProfile } from '@/services/seekerService'
+import type { NearbyJob, NearbyJobsResponse, ProfileStrengthItem, SeekerProfile } from '@/services/seekerService'
 import { seekerService } from '@/services/seekerService'
 import { useAuthStore } from '@/stores/authStore'
 import { useMotion } from '@/hooks/useMotion'
-import {
-  firstName,
-  formatSalary,
-  jobCompany,
-  jobLocation,
-  textFrom,
-  titleCase,
-} from '@/utils/seekerView'
+import { firstName, listFrom } from '@/utils/seekerView'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
@@ -36,23 +30,26 @@ import { StatCard } from '@/components/ui/StatCard'
 import { SectionHeader } from '@/components/ui/SectionHeader'
 import { MatchRing } from '@/components/ui/MatchRing'
 import { Skeleton, SkeletonGroup } from '@/components/ui/Skeleton'
-import { SegmentedControl } from '@/components/ui/SegmentedControl'
-import { colors, gradients, radii, shadows, spacing, textStyles } from '@/theme'
+import { JobFeedCard } from '@/components/seeker/JobFeedCard'
+import { colors, gradients, radii, shadows, spacing, textStyles, typography } from '@/theme'
 
 type QuickActionIcon = React.ComponentProps<typeof MaterialIcons>['name']
 type FeedMode = 'recommended' | 'nearby' | 'latest'
 
-const FEED_MODE_OPTIONS: { label: string; value: FeedMode }[] = [
-  { label: 'Recommended', value: 'recommended' },
-  { label: 'Nearby', value: 'nearby' },
-  { label: 'Latest', value: 'latest' },
+// Mirrors web's JobFeedSelector — title + description per feed, with a live count badge.
+const FEED_SELECTOR_ITEMS: { value: FeedMode; title: string; description: string }[] = [
+  { value: 'recommended', title: 'Recommended Jobs', description: 'Ranked by your profile and skills' },
+  { value: 'nearby', title: 'Nearby Jobs', description: 'Based on your saved GPS location' },
+  { value: 'latest', title: 'Latest Active Vacancies', description: 'Broader fallback across active postings' },
 ]
 
-const FEED_MODE_TITLES: Record<FeedMode, string> = {
-  recommended: 'Recommended for you',
-  nearby: 'Nearby matches',
-  latest: 'Latest vacancies',
-}
+const EMPTY_JOBS: NearbyJob[] = []
+
+const SORT_ITEMS: { value: 'match' | 'distance' | 'newest'; label: string }[] = [
+  { value: 'match', label: 'Match' },
+  { value: 'distance', label: 'Distance' },
+  { value: 'newest', label: 'Newest' },
+]
 
 const PRIMARY_ACTIONS: { icon: QuickActionIcon; label: string; path: string }[] = [
   { icon: 'work', label: 'Browse Jobs', path: '/(seeker)/jobs' },
@@ -92,23 +89,51 @@ function pickNextBestAction(items?: ProfileStrengthItem[]) {
 
 export default function SeekerHomeScreen() {
   const insets = useSafeAreaInsets()
-  const m = useMotion()
   const user = useAuthStore((state) => state.user)
   const token = useAuthStore((state) => state.token)
 
+  const queryClient = useQueryClient()
   const [profile, setProfile] = useState<SeekerProfile | null>(null)
   const [profileFetchedAt, setProfileFetchedAt] = useState(0)
-  const [jobs, setJobs] = useState<NearbyJob[]>([])
-  const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState('')
   const [jobsMessage, setJobsMessage] = useState('')
   const [feedMode, setFeedMode] = useState<FeedMode>('nearby')
+  const [searchQuery, setSearchQuery] = useState('')
+  const [activeTab, setActiveTab] = useState<'jobs' | 'saved'>('jobs')
+  const [sort, setSort] = useState<'match' | 'distance' | 'newest'>('match')
+
+  const flipSavedInFeeds = (jobId: string) => {
+    (['recommended', 'nearby', 'latest'] as const).forEach((mode) => {
+      queryClient.setQueryData<NearbyJobsResponse>(['homeFeed', mode], (current) =>
+        current?.jobs
+          ? { ...current, jobs: current.jobs.map((job) => (String(job.post_id) === jobId ? { ...job, is_saved: !job.is_saved } : job)) }
+          : current
+      )
+    })
+  }
+
+  const toggleSaveMutation = useMutation({
+    mutationFn: (jobId: string) => seekerService.toggleSavedJob(jobId),
+    onMutate: (jobId) => flipSavedInFeeds(jobId),
+    onError: (_err, jobId) => flipSavedInFeeds(jobId),
+  })
 
   const { data: unreadCount = 0 } = useQuery({
     queryKey: ['notificationsUnreadCount'],
     queryFn: () => seekerService.getUnreadNotificationCount(),
     refetchInterval: 30000,
+  })
+
+  const { data: jobFairs = [] } = useQuery({
+    queryKey: ['jobFairs'],
+    queryFn: () => seekerService.getJobFairs(),
+  })
+  const upcomingFairs = jobFairs.slice(0, 2)
+
+  const { data: analytics } = useQuery({
+    queryKey: ['seekerAnalytics'],
+    queryFn: () => seekerService.getAnalytics(),
   })
 
   const greeting = useMemo(() => {
@@ -118,57 +143,68 @@ export default function SeekerHomeScreen() {
     return 'Good evening'
   }, [])
 
-  const loadDashboard = useCallback(async (mode: FeedMode) => {
+  const loadProfile = useCallback(async () => {
     setError('')
-    setJobsMessage('')
-
-    const [profileResult, jobsResult] = await Promise.allSettled([
-      seekerService.getProfile(),
-      seekerService.searchJobs({ radiusKm: 20, limit: 8, feedMode: mode }),
-    ])
-
-    if (profileResult.status === 'fulfilled') {
-      setProfile(profileResult.value)
+    try {
+      const result = await seekerService.getProfile()
+      setProfile(result)
       setProfileFetchedAt(Date.now())
-    } else {
+    } catch {
       setError('Unable to load your profile. Check the backend connection.')
-    }
-
-    if (jobsResult.status === 'fulfilled') {
-      let resultJobs = jobsResult.value.jobs ?? []
-
-      // Mirrors the website's feed fallback: if "Recommended" comes back empty
-      // (e.g. profile too new for the matching engine), fall back to the latest
-      // active vacancies instead of showing a bare empty state.
-      if (mode === 'recommended' && resultJobs.length === 0) {
-        try {
-          const fallback = await seekerService.searchJobs({ radiusKm: 20, limit: 8, feedMode: 'latest' })
-          resultJobs = fallback.jobs ?? []
-          if (resultJobs.length) {
-            setJobsMessage('No personalized recommendations yet — showing the latest active vacancies instead.')
-          }
-        } catch {
-          // Keep the empty recommended result; the empty state below still renders.
-        }
-      }
-
-      setJobs(resultJobs)
-    } else {
-      setJobs([])
-      setJobsMessage('Nearby jobs need your saved address location. Update onboarding if jobs do not load.')
     }
   }, [])
 
   useEffect(() => {
-    setLoading(true)
-    loadDashboard(feedMode).finally(() => setLoading(false))
-  }, [loadDashboard, feedMode])
+    loadProfile()
+  }, [loadProfile])
+
+  // Fetched in parallel (not just the active tab) so the feed-selector cards can show a count
+  // per feed the way web's JobFeedSelector does, rather than only knowing the active one.
+  const recommendedQuery = useQuery({
+    queryKey: ['homeFeed', 'recommended'],
+    queryFn: () => seekerService.searchJobs({ radiusKm: 20, limit: 8, feedMode: 'recommended' }),
+  })
+  const nearbyQuery = useQuery({
+    queryKey: ['homeFeed', 'nearby'],
+    queryFn: () => seekerService.searchJobs({ radiusKm: 20, limit: 8, feedMode: 'nearby' }),
+  })
+  const latestQuery = useQuery({
+    queryKey: ['homeFeed', 'latest'],
+    queryFn: () => seekerService.searchJobs({ radiusKm: 20, limit: 8, feedMode: 'latest' }),
+  })
+  const feedQueries = { recommended: recommendedQuery, nearby: nearbyQuery, latest: latestQuery }
+  const feedCounts = {
+    recommended: recommendedQuery.data?.jobs?.length ?? 0,
+    nearby: nearbyQuery.data?.jobs?.length ?? 0,
+    latest: latestQuery.data?.jobs?.length ?? 0,
+  }
+
+  useEffect(() => {
+    // Mirrors the website's feed fallback: if "Recommended" comes back empty (e.g. profile
+    // too new for the matching engine), fall back to the latest active vacancies instead of
+    // showing a bare empty state.
+    if (feedMode === 'recommended' && recommendedQuery.isSuccess && feedCounts.recommended === 0 && feedCounts.latest > 0) {
+      setJobsMessage('No personalized recommendations yet — showing the latest active vacancies instead.')
+    } else if (feedMode === 'nearby' && nearbyQuery.isError) {
+      setJobsMessage('Nearby jobs need your saved address location. Update onboarding if jobs do not load.')
+    } else {
+      setJobsMessage('')
+    }
+  }, [feedMode, recommendedQuery.isSuccess, nearbyQuery.isError, feedCounts.recommended, feedCounts.latest])
+
+  const effectiveFeedMode: FeedMode =
+    feedMode === 'recommended' && recommendedQuery.isSuccess && feedCounts.recommended === 0 && feedCounts.latest > 0
+      ? 'latest'
+      : feedMode
+  const jobs = feedQueries[effectiveFeedMode].data?.jobs ?? EMPTY_JOBS
+  const jobsLoading = feedQueries[feedMode].isLoading
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true)
-    await loadDashboard(feedMode)
+    await Promise.allSettled([loadProfile(), recommendedQuery.refetch(), nearbyQuery.refetch(), latestQuery.refetch()])
     setRefreshing(false)
-  }, [loadDashboard, feedMode])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loadProfile])
 
   const activeProfile = profile ?? user
   // profileFetchedAt (set on every successful fetch) rides along as the cache-bust value —
@@ -181,7 +217,33 @@ export default function SeekerHomeScreen() {
   }, [profile?.has_profile_image, profile?.id, token, profileFetchedAt])
   const strength = profile?.profile_strength?.percentage ?? 0
   const stats = profile?.dashboard_stats
-  const topJobs = jobs.slice(0, 3)
+  const filteredJobs = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase()
+    const base = activeTab === 'saved' ? jobs.filter((job) => job.is_saved) : jobs
+    if (!query) return base
+    return base.filter((job) => {
+      const haystack = [
+        job.job_title,
+        job.employer?.company_name,
+        job.barangay,
+        job.city_municipality,
+        job.province,
+        ...listFrom(job.required_skills),
+      ].filter(Boolean).join(' ').toLowerCase()
+      return haystack.includes(query)
+    })
+  }, [activeTab, jobs, searchQuery])
+  const sortedJobs = useMemo(() => {
+    const withMatch = (job: NearbyJob) => Number(job.match_percentage ?? job.match?.percentage ?? 0)
+    const withDistance = (job: NearbyJob) => Number(job.distance_km ?? Number.MAX_SAFE_INTEGER)
+    const withDate = (job: NearbyJob) => (job.posted_at ? new Date(job.posted_at).getTime() : 0)
+    return [...filteredJobs].sort((left, right) => {
+      if (sort === 'distance') return withDistance(left) - withDistance(right) || withMatch(right) - withMatch(left)
+      if (sort === 'newest') return withDate(right) - withDate(left) || withMatch(right) - withMatch(left)
+      return withMatch(right) - withMatch(left) || withDistance(left) - withDistance(right)
+    })
+  }, [filteredJobs, sort])
+  const topJobs = sortedJobs.slice(0, 3)
   const nextAction = pickNextBestAction(profile?.profile_strength?.items)
 
   const readinessStatus = strength >= 80 ? 'Ready' : (strength >= 40 ? 'In Progress' : 'Needs Attention')
@@ -278,14 +340,70 @@ export default function SeekerHomeScreen() {
           </AlertBox>
         ) : null}
 
+        {upcomingFairs.length ? (
+          <PressableScale
+            scaleTo="buttonPress"
+            ripple={null}
+            style={styles.bulletinCard}
+            onPress={() => router.push('/(seeker)/job-fairs')}
+            accessibilityRole="button"
+            accessibilityLabel="Open PESO Job Fair Bulletin"
+          >
+            <View style={styles.bulletinHeader}>
+              <View style={styles.flexOne}>
+                <Text style={styles.bulletinKicker}>PESO Job Fair Bulletin</Text>
+                <Text style={styles.bulletinTitle}>Upcoming employment events</Text>
+              </View>
+              <MaterialIcons name="chevron-right" size={22} color={colors.blue700} />
+            </View>
+            {upcomingFairs.map((fair) => (
+              <View key={String(fair.job_fair_id)} style={styles.bulletinRow}>
+                <Text style={styles.bulletinFairTitle} numberOfLines={1}>{fair.title}</Text>
+                <View style={styles.bulletinMetaRow}>
+                  <MaterialIcons name="event" size={13} color={colors.blue700} />
+                  <Text style={styles.bulletinMeta} numberOfLines={1}>
+                    {[fair.start_date, fair.start_time?.slice(0, 5)].filter(Boolean).join(' · ')}
+                  </Text>
+                </View>
+                {fair.venue ? (
+                  <View style={styles.bulletinMetaRow}>
+                    <MaterialIcons name="place" size={13} color={colors.blue700} />
+                    <Text style={styles.bulletinMeta} numberOfLines={1}>{fair.venue}</Text>
+                  </View>
+                ) : null}
+              </View>
+            ))}
+          </PressableScale>
+        ) : null}
+
         <SectionHeader title="At a glance" style={styles.sectionHeader} />
         <View style={styles.statsRow}>
-          <StatCard title="Applications" value={stats?.active_applications ?? 0} />
-          <StatCard title="Matches" value={jobs.length} />
+          <StatCard
+            title="Profile Readiness"
+            value={`${Math.min(strength, 100)}%`}
+            tint="blue"
+            icon={<MaterialIcons name="person-outline" size={18} color={colors.blue700} />}
+          />
+          <StatCard
+            title="Active Applications"
+            value={stats?.active_applications ?? 0}
+            tint="blue"
+            icon={<MaterialIcons name="work-outline" size={18} color={colors.blue700} />}
+          />
         </View>
         <View style={[styles.statsRow, { marginTop: spacing.sm }]}>
-          <StatCard title="Saved Jobs" value={stats?.saved_jobs?.length ?? 0} />
-          <StatCard title="Skills" value={stats?.skills ?? 0} />
+          <StatCard
+            title="Saved Jobs"
+            value={stats?.saved_jobs?.length ?? 0}
+            tint="amber"
+            icon={<MaterialIcons name="bookmark-border" size={18} color={colors.warning} />}
+          />
+          <StatCard
+            title="Profile Views (30d)"
+            value={analytics?.total_views_30_days ?? 0}
+            tint="green"
+            icon={<MaterialIcons name="track-changes" size={18} color={colors.success} />}
+          />
         </View>
 
         {/* Quick Actions — the 3 most-used flows get full-weight cards; the rest sit in a
@@ -327,17 +445,80 @@ export default function SeekerHomeScreen() {
           ))}
         </View>
 
-        <SegmentedControl options={FEED_MODE_OPTIONS} value={feedMode} onChange={setFeedMode} style={styles.feedModeControl} />
-
-        <SectionHeader
-          title={FEED_MODE_TITLES[feedMode]}
-          style={styles.sectionHeader}
-          action={
-            <TouchableOpacity onPress={() => router.push('/(seeker)/jobs')} hitSlop={8} accessibilityRole="button">
-              <Text style={styles.viewAllText}>View all →</Text>
+        <View style={styles.searchBox}>
+          <MaterialIcons name="search" size={20} color={colors.subtle} />
+          <TextInput
+            style={styles.searchInput}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholder="Search jobs, skills, or employers"
+            placeholderTextColor={colors.subtle}
+            returnKeyType="search"
+          />
+          {searchQuery ? (
+            <TouchableOpacity onPress={() => setSearchQuery('')} hitSlop={8} accessibilityRole="button" accessibilityLabel="Clear search">
+              <MaterialIcons name="close" size={18} color={colors.subtle} />
             </TouchableOpacity>
-          }
-        />
+          ) : null}
+        </View>
+
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.feedSelectorRow}>
+          {FEED_SELECTOR_ITEMS.map((item) => {
+            const active = feedMode === item.value
+            return (
+              <PressableScale
+                key={item.value}
+                scaleTo="buttonPress"
+                ripple={null}
+                style={[styles.feedSelectorCard, active && styles.feedSelectorCardActive]}
+                onPress={() => setFeedMode(item.value)}
+                accessibilityRole="button"
+                accessibilityState={{ selected: active }}
+              >
+                <View style={styles.feedSelectorTop}>
+                  <Text style={[styles.feedSelectorTitle, active && styles.feedSelectorTitleActive]} numberOfLines={1}>{item.title}</Text>
+                  <View style={[styles.feedSelectorCount, active && styles.feedSelectorCountActive]}>
+                    <Text style={[styles.feedSelectorCountText, active && styles.feedSelectorCountTextActive]}>{feedCounts[item.value]}</Text>
+                  </View>
+                </View>
+                <Text style={[styles.feedSelectorDesc, active && styles.feedSelectorDescActive]} numberOfLines={1}>{item.description}</Text>
+              </PressableScale>
+            )
+          })}
+        </ScrollView>
+
+        <View style={styles.feedControlsRow}>
+          <View style={styles.tabRow}>
+            <TabButton label="Jobs" icon="star" active={activeTab === 'jobs'} onPress={() => setActiveTab('jobs')} />
+            <TabButton
+              label="Saved Jobs"
+              icon="bookmark"
+              active={activeTab === 'saved'}
+              count={jobs.filter((job) => job.is_saved).length}
+              onPress={() => setActiveTab('saved')}
+            />
+          </View>
+          <TouchableOpacity onPress={() => router.push('/(seeker)/jobs')} hitSlop={8} accessibilityRole="button">
+            <Text style={styles.viewAllText}>View all →</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.sortRow}>
+          <Text style={styles.resultCountText}>{sortedJobs.length} result{sortedJobs.length === 1 ? '' : 's'}</Text>
+          <View style={styles.sortChipsRow}>
+            {SORT_ITEMS.map((item) => (
+              <TouchableOpacity
+                key={item.value}
+                onPress={() => setSort(item.value)}
+                style={[styles.sortChip, sort === item.value && styles.sortChipActive]}
+                accessibilityRole="button"
+                accessibilityState={{ selected: sort === item.value }}
+              >
+                <Text style={[styles.sortChipText, sort === item.value && styles.sortChipTextActive]}>{item.label}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
 
         {jobsMessage ? (
           <AlertBox variant="info" style={styles.alertBox}>
@@ -345,7 +526,7 @@ export default function SeekerHomeScreen() {
           </AlertBox>
         ) : null}
 
-        {loading ? (
+        {jobsLoading ? (
           <SkeletonGroup label="Loading your matches" style={styles.jobSkeletons}>
             {[0, 1, 2].map((row) => (
               <View key={row} style={styles.jobSkeletonCard}>
@@ -362,47 +543,66 @@ export default function SeekerHomeScreen() {
               </View>
             ))}
           </SkeletonGroup>
-        ) : topJobs.length ? topJobs.map((job, index) => (
-          <Animated.View
-            key={String(job.post_id)}
-            entering={m.enabled ? FadeInUp.delay(m.stagger(index)).duration(260) : undefined}
-          >
-            <PressableScale
-              onPress={() => router.push(`/(seeker)/jobs/${job.post_id}`)}
-              style={styles.jobCard}
-              accessibilityRole="button"
-              accessibilityLabel={`Open ${textFrom(job.job_title, 'job')} at ${jobCompany(job)}`}
-            >
-              <View style={styles.jobCardHeaderRow}>
-                <View style={styles.jobLogo}>
-                  <Text style={styles.jobLogoText}>{jobCompany(job).charAt(0).toUpperCase()}</Text>
-                </View>
-                <View style={styles.jobTitleWrap}>
-                  <Text style={styles.jobTitle} numberOfLines={2}>{textFrom(job.job_title, 'Untitled job')}</Text>
-                  <Text style={styles.jobCompany} numberOfLines={1}>{jobCompany(job)}</Text>
-                </View>
-                <MatchRing percentage={job.match?.percentage ?? 0} size={44} strokeWidth={4} />
-              </View>
-              <Text style={styles.jobSalary} numberOfLines={1}>{formatSalary(job)}</Text>
-              <View style={styles.jobMetaContainer}>
-                <MaterialIcons name="place" size={13} color={colors.subtle} />
-                <Text style={styles.jobMeta} numberOfLines={1}>{jobLocation(job)}</Text>
-              </View>
-              <Badge variant="neutral" style={styles.employmentBadge}>
-                {titleCase(job.employment_type, 'Employment type not listed')}
-              </Badge>
-            </PressableScale>
-          </Animated.View>
-        )) : (
+        ) : topJobs.length ? (
+          <View style={styles.feedListWrap}>
+            {topJobs.map((job, index) => (
+              <JobFeedCard
+                key={String(job.post_id)}
+                job={job}
+                index={index}
+                saving={toggleSaveMutation.isPending && String(toggleSaveMutation.variables) === String(job.post_id)}
+                onPress={() => router.push(`/(seeker)/jobs/${job.post_id}`)}
+                onToggleSave={() => toggleSaveMutation.mutate(String(job.post_id))}
+              />
+            ))}
+          </View>
+        ) : (
           <Card padding="md" style={styles.emptyCard}>
-            <Text style={styles.emptyTitle}>No nearby jobs yet</Text>
+            <Text style={styles.emptyTitle}>
+              {searchQuery ? 'No jobs match your search' : activeTab === 'saved' ? 'No saved jobs yet' : 'No nearby jobs yet'}
+            </Text>
             <Text style={styles.emptySub}>
-              Jobs appear here when employers post active vacancies near your saved address.
+              {searchQuery
+                ? 'Try another keyword, or clear the search to see your full feed.'
+                : activeTab === 'saved'
+                ? 'Save promising vacancies so you can compare them later.'
+                : 'Jobs appear here when employers post active vacancies near your saved address.'}
             </Text>
           </Card>
         )}
       </ScrollView>
     </View>
+  )
+}
+
+function TabButton({
+  label,
+  icon,
+  active,
+  count,
+  onPress,
+}: {
+  label: string
+  icon: QuickActionIcon
+  active: boolean
+  count?: number
+  onPress: () => void
+}) {
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      style={[styles.tabBtn, active && styles.tabBtnActive]}
+      accessibilityRole="button"
+      accessibilityState={{ selected: active }}
+    >
+      <MaterialIcons name={icon} size={15} color={active ? colors.white : colors.textSecondary} />
+      <Text style={[styles.tabBtnText, active && styles.tabBtnTextActive]}>{label}</Text>
+      {count ? (
+        <View style={[styles.tabBtnCount, active && styles.tabBtnCountActive]}>
+          <Text style={[styles.tabBtnCountText, active && styles.tabBtnCountTextActive]}>{count}</Text>
+        </View>
+      ) : null}
+    </TouchableOpacity>
   )
 }
 
@@ -475,6 +675,24 @@ const styles = StyleSheet.create({
 
   alertBox: { marginHorizontal: spacing.lg, marginBottom: spacing.lg },
 
+  bulletinCard: {
+    marginHorizontal: spacing.lg,
+    marginBottom: spacing.lg,
+    borderRadius: radii.lg,
+    borderWidth: 1,
+    borderColor: colors.blue200,
+    backgroundColor: colors.blue50,
+    padding: spacing.lg,
+    gap: spacing.md,
+  },
+  bulletinHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  bulletinKicker: { ...textStyles.label, color: colors.blue700, letterSpacing: 0.6 },
+  bulletinTitle: { ...textStyles.titleMedium, color: colors.blue900, marginTop: 2 },
+  bulletinRow: { backgroundColor: colors.surface, borderRadius: radii.md, padding: spacing.md, gap: 4, ...shadows.xs },
+  bulletinFairTitle: { ...textStyles.smallBold, color: colors.textPrimary },
+  bulletinMetaRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
+  bulletinMeta: { ...textStyles.small, color: colors.textSecondary, flexShrink: 1 },
+
   // The ScrollView's own content has no horizontal padding (so the hero gradient bleeds
   // edge-to-edge), so every section header needs this to line up with the padded cards below.
   sectionHeader: { marginHorizontal: spacing.lg },
@@ -489,29 +707,56 @@ const styles = StyleSheet.create({
   secondaryAction: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, backgroundColor: colors.blue50, borderRadius: radii.pill, paddingVertical: spacing.sm, paddingHorizontal: spacing.md },
   secondaryActionLabel: { color: colors.blue700, ...textStyles.smallMedium, lineHeight: undefined },
 
-  feedModeControl: { marginTop: spacing.xl, marginHorizontal: spacing.lg },
   viewAllText: { color: colors.blue600, ...textStyles.smallBold, lineHeight: undefined },
 
-  jobCard: {
+  feedSelectorRow: { flexDirection: 'row', gap: spacing.sm, paddingHorizontal: spacing.lg, marginTop: spacing.lg },
+  feedSelectorCard: { width: 190, borderRadius: radii.md, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, padding: spacing.md },
+  feedSelectorCardActive: { backgroundColor: colors.blue700, borderColor: colors.blue700 },
+  feedSelectorTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
+  feedSelectorTitle: { ...textStyles.smallBold, color: colors.textPrimary, flexShrink: 1 },
+  feedSelectorTitleActive: { color: colors.white },
+  feedSelectorCount: { minWidth: 22, borderRadius: radii.pill, backgroundColor: colors.background, paddingHorizontal: 6, paddingVertical: 2, alignItems: 'center' },
+  feedSelectorCountActive: { backgroundColor: 'rgba(255,255,255,0.2)' },
+  feedSelectorCountText: { ...textStyles.label, fontSize: 10, color: colors.textSecondary },
+  feedSelectorCountTextActive: { color: colors.white },
+  feedSelectorDesc: { ...textStyles.small, fontSize: 11, color: colors.textSecondary, marginTop: spacing.xs },
+  feedSelectorDescActive: { color: colors.blue200 },
+
+  feedControlsRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm, paddingHorizontal: spacing.lg, marginTop: spacing.xl },
+  tabRow: { flexDirection: 'row', gap: spacing.sm, flexShrink: 1 },
+  tabBtn: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, borderWidth: 1, borderColor: colors.border, borderRadius: radii.md, paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
+  tabBtnActive: { backgroundColor: colors.blue600, borderColor: colors.blue600 },
+  tabBtnText: { ...textStyles.smallBold, color: colors.textSecondary },
+  tabBtnTextActive: { color: colors.white },
+  tabBtnCount: { minWidth: 18, borderRadius: radii.pill, backgroundColor: colors.background, paddingHorizontal: 5, alignItems: 'center' },
+  tabBtnCountActive: { backgroundColor: 'rgba(255,255,255,0.2)' },
+  tabBtnCountText: { ...textStyles.label, fontSize: 10, color: colors.textSecondary },
+  tabBtnCountTextActive: { color: colors.white },
+
+  sortRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm, paddingHorizontal: spacing.lg, marginTop: spacing.md, marginBottom: spacing.md },
+  resultCountText: { ...textStyles.small, color: colors.textSecondary },
+  sortChipsRow: { flexDirection: 'row', gap: spacing.xs },
+  sortChip: { borderRadius: radii.pill, borderWidth: 1, borderColor: colors.border, paddingHorizontal: spacing.sm, paddingVertical: 4 },
+  sortChipActive: { backgroundColor: colors.blue50, borderColor: colors.blue200 },
+  sortChipText: { ...textStyles.small, fontSize: 11, color: colors.textSecondary },
+  sortChipTextActive: { color: colors.blue700, fontFamily: typography.family.bold },
+
+  searchBox: {
+    marginTop: spacing.xl,
     marginHorizontal: spacing.lg,
-    marginBottom: spacing.md,
+    height: 48,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    borderRadius: radii.md,
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: radii.lg,
-    padding: spacing.lg,
-    ...shadows.card,
+    paddingHorizontal: spacing.md,
   },
-  jobCardHeaderRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md },
-  jobLogo: { width: 40, height: 40, borderRadius: radii.md, backgroundColor: colors.blue50, alignItems: 'center', justifyContent: 'center' },
-  jobLogoText: { color: colors.blue700, ...textStyles.bodyBold, lineHeight: undefined },
-  jobTitleWrap: { flex: 1 },
-  jobTitle: { color: colors.textPrimary, ...textStyles.titleMedium, fontFamily: 'DMSans_700Bold', lineHeight: 21 },
-  jobCompany: { color: colors.textSecondary, ...textStyles.smallMedium, marginTop: 2 },
-  jobSalary: { marginTop: spacing.md, ...textStyles.bodyBold, color: colors.blue800 },
-  jobMetaContainer: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: spacing.xs, marginBottom: spacing.md },
-  jobMeta: { color: colors.textSecondary, ...textStyles.small, flexShrink: 1 },
-  employmentBadge: { alignSelf: 'flex-start' },
+  searchInput: { flex: 1, color: colors.textPrimary, fontSize: typography.body, fontFamily: typography.family.medium },
+
+  feedListWrap: { paddingHorizontal: spacing.lg },
 
   jobSkeletons: { paddingHorizontal: spacing.lg, gap: spacing.md },
   jobSkeletonCard: {

@@ -144,7 +144,7 @@ export default function ProfileEditScreen() {
   if (loading) {
     return (
       <View style={styles.flex}>
-        <ScreenHeader title="Edit Profile" onBack={() => router.back()} backLabel="Close" />
+        <ScreenHeader title="Edit Profile" onBack={() => router.replace('/(seeker)/profile')} backLabel="Close" />
         <View style={styles.loading}>
           <ActivityIndicator color={colors.info} />
           <Text style={styles.loadingText}>Loading your profile...</Text>
@@ -155,7 +155,7 @@ export default function ProfileEditScreen() {
 
   return (
     <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <ScreenHeader title="Edit Profile" onBack={() => router.back()} backLabel="Close" />
+      <ScreenHeader title="Edit Profile" onBack={() => router.replace('/(seeker)/profile')} backLabel="Close" />
 
       <SectionTabs activeStep={activeStep} onChange={changeSection} />
 
