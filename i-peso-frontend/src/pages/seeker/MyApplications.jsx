@@ -113,7 +113,7 @@ export default function MyApplications() {
           <p className="text-xs font-bold uppercase tracking-widest text-blue-300">Employment Journey</p>
           <h1 className="mt-1 text-3xl font-black tracking-tight text-white drop-shadow-sm">My Applications</h1>
           <p className="mt-3 max-w-2xl text-base leading-relaxed text-blue-100">
-            Track every application submitted through the dashboard, AI Job Map, and job fairs.
+            Track every application submitted through the dashboard, Smart Job Map, and job fairs.
           </p>
         </div>
       </div>
@@ -134,7 +134,7 @@ export default function MyApplications() {
               icon={BriefcaseBusiness}
               title="No applications yet"
               description="Explore nearby vacancies and submit your first application."
-              action={{ label: 'Open AI Job Map', icon: Compass, to: '/seeker/job-map' }}
+              action={{ label: 'Open Smart Job Map', icon: Compass, to: '/seeker/job-map' }}
             />
           </div>
         ) : (

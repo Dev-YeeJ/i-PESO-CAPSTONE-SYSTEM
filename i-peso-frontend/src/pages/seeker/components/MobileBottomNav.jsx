@@ -31,5 +31,5 @@ export default function MobileBottomNav({ links }) {
 function mobileLabel(label) {
   if (label === 'My Applications') return 'Applications'
   if (label === 'Government Programs') return 'Programs'
-  return label.replace('AI ', '')
+  return label.replace('Smart ', '')
 }

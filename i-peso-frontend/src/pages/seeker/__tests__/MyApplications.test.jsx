@@ -55,7 +55,7 @@ describe('MyApplications (seeker application tracking)', () => {
     renderPage()
 
     expect(await screen.findByText('No applications yet')).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: /open ai job map/i })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /open smart job map/i })).toBeInTheDocument()
   })
 
   it('confirms withdrawal in an accessible dialog, never window.confirm', async () => {

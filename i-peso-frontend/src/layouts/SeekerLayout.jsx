@@ -10,7 +10,7 @@ import SignOutConfirmDialog from '@/components/common/SignOutConfirmDialog'
 const navLinks = [
   { to: '/seeker/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/seeker/job-fairs', label: 'Job Fairs', icon: CalendarDays },
-  { to: '/seeker/job-map', label: 'AI Job Map', icon: MapPin },
+  { to: '/seeker/job-map', label: 'Smart Job Map', icon: MapPin },
   { to: '/seeker/applications', label: 'My Applications', icon: ClipboardList },
   { to: '/seeker/government-programs', label: 'Government Programs', icon: GraduationCap },
   { to: '/seeker/profile', label: 'My Profile', icon: UserRound },
@@ -19,7 +19,7 @@ const navLinks = [
 const pageNames = {
   '/seeker/dashboard': 'Dashboard',
   '/seeker/job-fairs': 'Job Fairs',
-  '/seeker/job-map': 'AI Job Map',
+  '/seeker/job-map': 'Smart Job Map',
   '/seeker/applications': 'My Applications',
   '/seeker/government-programs': 'Government Programs',
 

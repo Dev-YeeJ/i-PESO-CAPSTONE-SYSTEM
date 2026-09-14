@@ -3,6 +3,16 @@ import { LocateFixed, Loader2, MapPin } from 'lucide-react'
 import PsgcCascade from '@/pages/employer/components/PsgcCascade'
 import toast from 'react-hot-toast'
 import { detectAddress } from '@/services/geoService'
+import { MapContainer, Marker as LeafletMarker, TileLayer } from 'react-leaflet'
+import L from 'leaflet'
+import 'leaflet/dist/leaflet.css'
+
+const leafletPinIcon = L.divIcon({
+  className: '',
+  iconSize: [26, 26],
+  iconAnchor: [13, 26],
+  html: '<span style="display:block;width:26px;height:26px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:#2563eb;border:3px solid #fff;box-shadow:0 2px 6px rgba(15,23,42,.3)"></span>',
+})
 
 export default function AddressPicker({
   title = "Address & Location",
@@ -112,7 +122,7 @@ export default function AddressPicker({
             className="inline-flex items-center gap-1.5 rounded-lg border border-blue-200 bg-white px-3 py-1.5 text-xs font-bold text-blue-700 shadow-sm transition-colors hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
           >
             {locating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <LocateFixed className="h-3.5 w-3.5" />}
-            Detect Current Location
+            Use current location
           </button>
         )}
       </div>
@@ -120,7 +130,7 @@ export default function AddressPicker({
       {(latitude && longitude) && (
         <div className="mb-4 flex items-center gap-2 text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 px-3 py-2 rounded-lg">
           <LocateFixed className="h-4 w-4" />
-          <span>GPS Location saved. Ready for map display.</span>
+          <span>GPS Location saved. You can adjust the pin on the map below.</span>
         </div>
       )}
 
@@ -163,6 +173,37 @@ export default function AddressPicker({
             placeholder="e.g. 123 Main St."
           />
         </div>
+        {(latitude && longitude) && (
+          <div className="mt-4 h-64 w-full rounded-xl overflow-hidden border border-slate-300 relative z-0">
+            <MapContainer key={`${latitude}-${longitude}-initial`} center={[latitude, longitude]} zoom={15} className="h-full w-full">
+              <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+              <LeafletMarker 
+                position={[latitude, longitude]} 
+                icon={leafletPinIcon} 
+                draggable={true}
+                eventHandlers={{
+                  dragend: (e) => {
+                    const marker = e.target
+                    const position = marker.getLatLng()
+                    onChange({
+                      province,
+                      province_code: provinceCode,
+                      city,
+                      city_code: cityCode,
+                      barangay,
+                      barangay_code: barangayCode,
+                      street,
+                      location_accuracy,
+                      google_place_id,
+                      latitude: position.lat,
+                      longitude: position.lng,
+                    })
+                  }
+                }}
+              />
+            </MapContainer>
+          </div>
+        )}
     </div>
   )
 }
