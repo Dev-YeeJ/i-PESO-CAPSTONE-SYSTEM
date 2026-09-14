@@ -87,22 +87,27 @@ class EmployerJobFairController extends Controller
         $employer = $this->employer($request);
         abort_unless($requirement->job_fair_id === $jobFair->job_fair_id, 404);
         $participation = $this->participation($jobFair, $employer);
+
+        // Posterized Job Vacancy is an actual photo of a flyer/poster, not a
+        // scanned document — a phone camera or export can easily produce a
+        // format outside the standard pdf/jpg/png set (webp, heic/heif from
+        // iPhones, gif, bmp). Every other requirement stays document-only.
+        $isGallery = $requirement->code === 'posterized_vacancy';
+        $mimes = $isGallery ? 'pdf,jpg,jpeg,png,webp,gif,bmp,heic,heif' : 'pdf,jpg,jpeg,png';
+
         $validated = $request->validate([
-            'document' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:5120'],
+            'document' => ['nullable', 'file', "mimes:{$mimes}", 'max:5120'],
             'documents' => ['nullable', 'array', 'max:5'],
-            'documents.*' => ['file', 'mimes:pdf,jpg,jpeg,png', 'max:5120'],
+            'documents.*' => ['file', "mimes:{$mimes}", 'max:5120'],
         ]);
 
         $files = $validated['documents'] ?? ($validated['document'] ? [$validated['document']] : []);
         abort_unless(count($files) > 0, 422, 'Please upload at least one document.');
 
-        // Posterized Job Vacancy is the one requirement that can hold more
-        // than one image — a new upload adds to what's already there
-        // (rejected copies aside) instead of wiping the gallery out, up to
-        // 5 photos total. Every other requirement is a single canonical
+        // A new upload for the gallery requirement adds to what's already
+        // there (rejected copies aside) instead of wiping it out, up to 5
+        // photos total. Every other requirement is a single canonical
         // document, so a re-upload still fully replaces it.
-        $isGallery = $requirement->code === 'posterized_vacancy';
-
         $paths = [];
         try {
             $submissions = DB::transaction(function () use ($requirement, $participation, $employer, $files, $jobFair, $isGallery, &$paths) {

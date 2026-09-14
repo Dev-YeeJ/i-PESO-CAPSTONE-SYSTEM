@@ -757,6 +757,56 @@ class JobFairEcosystemFlowTest extends TestCase
         $this->assertSame(3, DB::table('job_fair_requirement_submissions')->where('job_fair_requirement_id', $posterRequirementId)->count());
     }
 
+    /**
+     * Regression test for a real employer complaint: the file picker for
+     * Posterized Job Vacancy only accepted ".pdf,.jpg,.jpeg,.png" (frontend
+     * `accept`) and only validated those same four types (backend `mimes`),
+     * so a phone photo in any other format — webp is extremely common —
+     * couldn't even be selected in the OS file picker, let alone uploaded.
+     * Every other requirement (a scanned document, not a photo) keeps the
+     * original, narrower set.
+     */
+    public function test_posterized_vacancy_accepts_a_webp_photo_but_other_requirements_do_not(): void
+    {
+        Storage::fake('local');
+        $admin = Administrator::create([
+            'first_name' => 'PESO', 'last_name' => 'Manager', 'email' => 'webp-admin@example.test',
+            'mobile_number' => '09170000011', 'password' => 'password123', 'role' => 'administrator', 'status' => 'active', 'email_verified_at' => now(),
+        ]);
+        $employer = $this->employer('webp-employer@example.test', 'Webp Corp');
+
+        Sanctum::actingAs($admin);
+        $fairId = $this->postJson('/api/admin/job-fairs', [
+            'title' => 'Webp Format Job Fair', 'description' => 'Checks posterized vacancy accepts non-pdf/jpg/png image formats.',
+            'start_date' => '2026-11-28', 'end_date' => '2026-11-28', 'start_time' => '08:00', 'end_time' => '16:00',
+            'venue' => 'PESO Urdaneta Hall',
+            'province' => 'Pangasinan', 'city_municipality' => 'Urdaneta City', 'barangay' => 'Nancayasan',
+            'sector' => 'local', 'target_sector' => 'Multi-sector',
+            'partner_agencies' => ['DOLE'], 'submission_deadline' => '2026-11-14 17:00:00',
+            'contact_email' => 'peso@example.test', 'maximum_representatives' => 2, 'status' => 'draft',
+        ])->assertCreated()->json('job_fair.job_fair_id');
+        $this->postJson("/api/admin/job-fairs/{$fairId}/publish", ['status' => 'accepting_employers'])->assertOk();
+        $this->postJson("/api/admin/job-fairs/{$fairId}/invite", ['employer_id' => $employer->employer_id])->assertCreated();
+
+        Sanctum::actingAs($employer);
+        $this->postJson("/api/employer/job-fairs/{$fairId}/respond", ['response' => 'accepted'])->assertOk();
+        $event = $this->getJson('/api/employer/job-fairs')->assertOk()->json('data.0');
+        $posterRequirementId = collect($event['requirements'])->firstWhere('code', 'posterized_vacancy')['id'];
+        $permitRequirementId = collect($event['requirements'])->firstWhere('code', 'business_permit')['id'];
+
+        $this->post("/api/employer/job-fairs/{$fairId}/requirements/{$posterRequirementId}", [
+            'document' => UploadedFile::fake()->create('poster.webp', 500, 'image/webp'),
+        ], ['Accept' => 'application/json'])->assertOk();
+        $this->assertDatabaseHas('job_fair_requirement_submissions', [
+            'job_fair_requirement_id' => $posterRequirementId, 'original_filename' => 'poster.webp',
+        ]);
+
+        // A document requirement stays limited to actual document formats.
+        $this->post("/api/employer/job-fairs/{$fairId}/requirements/{$permitRequirementId}", [
+            'document' => UploadedFile::fake()->create('permit.webp', 500, 'image/webp'),
+        ], ['Accept' => 'application/json'])->assertStatus(422);
+    }
+
     public function test_result_report_rejects_entries_whose_status_breakdown_contradicts_the_summary(): void
     {
         [, $employer, $fairId] = $this->setUpFairWithEmployer('breakdown');
