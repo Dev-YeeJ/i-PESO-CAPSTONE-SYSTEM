@@ -1,22 +1,22 @@
+import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { motion as Motion, useReducedMotion } from 'framer-motion';
+import { motion as Motion, useReducedMotion, AnimatePresence } from 'framer-motion';
 import {
   ArrowRight,
+  Briefcase,
   CalendarDays,
   CheckCircle2,
+  FileBadge,
+  FileSearch,
   Landmark,
   MapPin,
   Search,
   Sparkles,
   Target,
+  Users,
 } from 'lucide-react';
 import IPesoLogo from '@/components/branding/IPesoLogo';
 
-// Real i-PESO government programs — mirrors the live catalogue in
-// GovernmentProgram (visibility=public, program_status=open). Hardcoded
-// rather than fetched: this endpoint isn't exposed to guests, and the
-// program list changes rarely enough that static, verified copy beats an
-// extra unauthenticated API surface for a landing page.
 const PROGRAMS = [
   { tag: 'SPES', name: 'SPES 2026 Application', blurb: 'Paid work for students and out-of-school youth during the school break.' },
   { tag: 'TUPAD', name: 'TUPAD Assistance Program', blurb: 'Short-term emergency employment for displaced or underemployed workers.' },
@@ -28,39 +28,50 @@ const PROGRAMS = [
   { tag: 'GUIDANCE', name: 'Career Guidance Seminar', blurb: 'Sessions for students, first-time job seekers, and career shifters.' },
 ];
 
-const FEATURES = [
+const SEEKER_FEATURES = [
   {
     icon: Target,
     title: 'Skill-tag matching',
-    body: 'Search by skill, distance, and match score — not just a job title keyword.',
+    body: 'Stop guessing keywords. We score your skills against requirements to show you the best fits.',
   },
   {
     icon: Landmark,
-    title: 'Government programs',
-    body: 'Apply to SPES, TUPAD, and other DOLE programs from the same account, no second form.',
+    title: 'One Account for Government Programs',
+    body: 'Apply for TUPAD, SPES, and local jobs without retyping your details every time.',
   },
   {
     icon: CalendarDays,
-    title: 'Job fairs',
-    body: 'RSVP to local job fairs and get a digital pass — no printed form to lose.',
+    title: 'Digital Job Fairs',
+    body: 'RSVP to local job fairs and get a digital QR pass — no printed forms to lose.',
   },
   {
-    icon: Sparkles,
-    title: 'Assistant',
-    body: 'Ask a question in Tagalog or English, anytime — answers come from real listings, not guesses.',
+    icon: MapPin,
+    title: 'Local First',
+    body: 'See jobs available within Urdaneta City and nearby towns, sorted by distance.',
   },
 ];
 
-const SEEKER_STEPS = [
-  { title: 'Register and verify', body: 'Create your account and complete your NSRP profile.' },
-  { title: 'Get matched', body: 'We score openings by your skills, location, and preferences.' },
-  { title: 'Apply and attend', body: 'Apply to jobs, join job fairs, or enrol in a program.' },
-];
-
-const EMPLOYER_STEPS = [
-  { title: 'Register and verify', body: 'Submit your business documents for PESO review.' },
-  { title: 'Post openings', body: 'List positions with the skills and location you need.' },
-  { title: 'Review and hire', body: 'Screen applicants and schedule interviews in one place.' },
+const EMPLOYER_FEATURES = [
+  {
+    icon: FileBadge,
+    title: 'Pre-verified Talent',
+    body: 'Every applicant is verified by PESO, so you know you are hiring real, legitimate candidates.',
+  },
+  {
+    icon: FileSearch,
+    title: 'Ranked Applicants',
+    body: 'Instantly see who actually has the required skills with our automated matching score.',
+  },
+  {
+    icon: Users,
+    title: 'Centralized Screening',
+    body: 'Review applications, schedule interviews, and hire directly from your dashboard.',
+  },
+  {
+    icon: Briefcase,
+    title: 'Free City-wide Reach',
+    body: 'Post your openings and instantly reach thousands of registered Urdaneta citizens.',
+  },
 ];
 
 function useSectionMotion() {
@@ -77,6 +88,7 @@ function useSectionMotion() {
 const LandingPage = () => {
   const navigate = useNavigate();
   const sectionMotion = useSectionMotion();
+  const [activeTab, setActiveTab] = useState('seeker');
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -113,8 +125,7 @@ const LandingPage = () => {
 
         <div className="hidden md:flex items-center gap-8 text-sm font-medium text-slate-300">
           <a href="#features" className="hover:text-white transition-colors">Features</a>
-          <a href="#how-it-works" className="hover:text-white transition-colors">How it Works</a>
-          <a href="#jobs" className="hover:text-white transition-colors">Jobs</a>
+          <a href="#jobs" className="hover:text-white transition-colors">Discovery</a>
           <a href="#programs" className="hover:text-white transition-colors">Programs</a>
         </div>
 
@@ -199,13 +210,29 @@ const LandingPage = () => {
             </span>
           </Motion.div>
 
-          {/* Dashboard Preview Graphic */}
+          {/* Interactive Dashboard Preview Graphic */}
           <Motion.div 
             variants={itemVariants}
             className="mt-16 md:mt-24 relative w-full max-w-4xl mx-auto hidden md:block"
           >
+            {/* Interactive Toggle */}
+            <div className="absolute -top-6 left-1/2 -translate-x-1/2 z-30 flex items-center bg-[#0D1F38] border border-white/10 rounded-full p-1 shadow-2xl">
+              <button 
+                onClick={() => setActiveTab('seeker')}
+                className={`px-6 py-2 rounded-full text-sm font-bold transition-all ${activeTab === 'seeker' ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}
+              >
+                Seeker View
+              </button>
+              <button 
+                onClick={() => setActiveTab('employer')}
+                className={`px-6 py-2 rounded-full text-sm font-bold transition-all ${activeTab === 'employer' ? 'bg-yellow-500 text-slate-900 shadow-[0_0_15px_rgba(250,204,21,0.3)]' : 'text-slate-400 hover:text-white'}`}
+              >
+                Employer View
+              </button>
+            </div>
+
             {/* The main dashboard window */}
-            <div className="relative rounded-t-2xl border border-white/10 border-b-0 bg-[#0D1F38]/60 backdrop-blur-xl shadow-2xl overflow-hidden">
+            <div className="relative rounded-t-2xl border border-white/10 border-b-0 bg-[#0D1F38]/80 backdrop-blur-xl shadow-2xl overflow-hidden min-h-[360px]">
                {/* Browser/Window Header */}
                <div className="h-10 border-b border-white/10 bg-white/5 flex items-center px-4 gap-2">
                  <div className="w-3 h-3 rounded-full bg-slate-600/80"></div>
@@ -213,80 +240,142 @@ const LandingPage = () => {
                  <div className="w-3 h-3 rounded-full bg-slate-600/80"></div>
                </div>
                
-               {/* Dashboard Content */}
-               <div className="p-6 grid grid-cols-3 gap-6 text-left relative z-10">
-                 {/* Left Sidebar Mock */}
-                 <div className="col-span-1 space-y-4">
-                    <div className="h-8 w-3/4 rounded-lg bg-white/10 mb-8"></div>
-                    <div className="flex items-center gap-3">
-                       <div className="w-4 h-4 rounded bg-blue-400/50"></div>
-                       <div className="h-3 w-1/2 rounded bg-white/10"></div>
-                    </div>
-                    <div className="flex items-center gap-3 opacity-60">
-                       <div className="w-4 h-4 rounded bg-white/5"></div>
-                       <div className="h-3 w-2/3 rounded bg-white/5"></div>
-                    </div>
-                    <div className="flex items-center gap-3 opacity-60">
-                       <div className="w-4 h-4 rounded bg-white/5"></div>
-                       <div className="h-3 w-1/2 rounded bg-white/5"></div>
-                    </div>
-                    
-                    <div className="mt-8 pt-6 border-t border-white/5">
-                      <div className="h-28 rounded-xl bg-gradient-to-br from-blue-500/10 to-purple-500/10 border border-white/5 p-4 relative overflow-hidden flex flex-col justify-center">
-                         <div className="absolute -right-4 -top-4 w-20 h-20 bg-blue-500/20 blur-2xl rounded-full"></div>
-                         <div className="text-[10px] text-blue-300 font-bold mb-1 uppercase tracking-wider">Match Score</div>
-                         <div className="text-4xl font-extrabold text-white">98<span className="text-xl text-slate-400">%</span></div>
-                      </div>
-                    </div>
-                 </div>
-                 
-                 {/* Main Content Mock */}
-                 <div className="col-span-2 space-y-4">
-                    <div className="flex gap-4 mb-6">
-                       <div className="h-28 flex-1 rounded-xl bg-white/5 border border-white/10 p-4 flex flex-col justify-between transition-colors hover:bg-white/10">
-                          <div className="flex justify-between items-start">
-                             <div className="h-10 w-10 rounded-lg bg-yellow-400/20 flex items-center justify-center">
-                                <Target className="text-yellow-400 w-5 h-5"/>
+               {/* Dashboard Content - Changes based on active tab */}
+               <div className="p-6 relative z-10">
+                 <AnimatePresence mode="wait">
+                   {activeTab === 'seeker' ? (
+                     <Motion.div 
+                       key="seeker-view"
+                       initial={{ opacity: 0, y: 10 }}
+                       animate={{ opacity: 1, y: 0 }}
+                       exit={{ opacity: 0, y: -10 }}
+                       transition={{ duration: 0.3 }}
+                       className="grid grid-cols-3 gap-6 text-left"
+                     >
+                       {/* Seeker Left Sidebar Mock */}
+                       <div className="col-span-1 space-y-4">
+                          <div className="h-8 w-3/4 rounded-lg bg-white/10 mb-8"></div>
+                          <div className="flex items-center gap-3">
+                             <div className="w-4 h-4 rounded bg-blue-400/50"></div>
+                             <div className="h-3 w-1/2 rounded bg-white/10"></div>
+                          </div>
+                          <div className="flex items-center gap-3 opacity-60">
+                             <div className="w-4 h-4 rounded bg-white/5"></div>
+                             <div className="h-3 w-2/3 rounded bg-white/5"></div>
+                          </div>
+                          
+                          <div className="mt-8 pt-6 border-t border-white/5">
+                            <div className="h-28 rounded-xl bg-gradient-to-br from-blue-500/10 to-purple-500/10 border border-white/5 p-4 relative overflow-hidden flex flex-col justify-center">
+                               <div className="absolute -right-4 -top-4 w-20 h-20 bg-blue-500/20 blur-2xl rounded-full"></div>
+                               <div className="text-[10px] text-blue-300 font-bold mb-1 uppercase tracking-wider">Your Match Score</div>
+                               <div className="text-4xl font-extrabold text-white">98<span className="text-xl text-slate-400">%</span></div>
+                            </div>
+                          </div>
+                       </div>
+                       
+                       {/* Seeker Main Content Mock */}
+                       <div className="col-span-2 space-y-4">
+                          <div className="flex gap-4 mb-6">
+                             <div className="h-28 flex-1 rounded-xl bg-white/5 border border-white/10 p-4 flex flex-col justify-between transition-colors hover:bg-white/10">
+                                <div className="flex justify-between items-start">
+                                   <div className="h-10 w-10 rounded-lg bg-yellow-400/20 flex items-center justify-center">
+                                      <Target className="text-yellow-400 w-5 h-5"/>
+                                   </div>
+                                   <div className="text-[10px] font-bold uppercase tracking-wider text-emerald-400 bg-emerald-400/10 px-2 py-1 rounded-full">New Match</div>
+                                </div>
+                                <div>
+                                  <div className="h-3 w-2/3 rounded bg-white/20 mb-2"></div>
+                                  <div className="h-2 w-1/3 rounded bg-white/10"></div>
+                                </div>
                              </div>
-                             <div className="text-[10px] font-bold uppercase tracking-wider text-emerald-400 bg-emerald-400/10 px-2 py-1 rounded-full">New Match</div>
+                             <div className="h-28 flex-1 rounded-xl bg-white/5 border border-white/10 p-4 flex flex-col justify-between transition-colors hover:bg-white/10">
+                                 <div className="flex justify-between items-start">
+                                   <div className="h-10 w-10 rounded-lg bg-blue-400/20 flex items-center justify-center">
+                                        <Landmark className="text-blue-400 w-5 h-5"/>
+                                     </div>
+                                 </div>
+                                 <div>
+                                  <div className="h-3 w-1/2 rounded bg-white/20 mb-2"></div>
+                                  <div className="h-2 w-2/3 rounded bg-white/10"></div>
+                                </div>
+                             </div>
                           </div>
-                          <div>
-                            <div className="h-3 w-2/3 rounded bg-white/20 mb-2"></div>
-                            <div className="h-2 w-1/3 rounded bg-white/10"></div>
+                          
+                          <div className="space-y-3">
+                             <div className="h-16 w-full rounded-xl bg-white/5 border border-white/10 flex items-center px-4 gap-4 transition-colors hover:bg-white/10">
+                                <div className="h-10 w-10 rounded-full bg-slate-700"></div>
+                                <div className="space-y-2 flex-1">
+                                   <div className="h-3 w-1/3 rounded bg-white/20"></div>
+                                   <div className="h-2 w-1/4 rounded bg-white/10"></div>
+                                </div>
+                                <div className="px-4 py-2 rounded-lg bg-yellow-400 text-slate-900 text-xs font-bold shadow-[0_0_15px_rgba(250,204,21,0.2)]">Apply Now</div>
+                             </div>
+                             <div className="h-16 w-full rounded-xl bg-white/5 border border-white/10 flex items-center px-4 gap-4">
+                                <div className="h-10 w-10 rounded-full bg-slate-700"></div>
+                                <div className="space-y-2 flex-1">
+                                   <div className="h-3 w-1/4 rounded bg-white/20"></div>
+                                   <div className="h-2 w-1/3 rounded bg-white/10"></div>
+                                </div>
+                                <div className="px-4 py-2 rounded-lg bg-white/5 text-slate-400 text-xs font-bold">Viewed</div>
+                             </div>
                           </div>
                        </div>
-                       <div className="h-28 flex-1 rounded-xl bg-white/5 border border-white/10 p-4 flex flex-col justify-between transition-colors hover:bg-white/10">
-                           <div className="flex justify-between items-start">
-                             <div className="h-10 w-10 rounded-lg bg-blue-400/20 flex items-center justify-center">
-                                  <Landmark className="text-blue-400 w-5 h-5"/>
-                               </div>
+                     </Motion.div>
+                   ) : (
+                     <Motion.div 
+                       key="employer-view"
+                       initial={{ opacity: 0, y: 10 }}
+                       animate={{ opacity: 1, y: 0 }}
+                       exit={{ opacity: 0, y: -10 }}
+                       transition={{ duration: 0.3 }}
+                       className="grid grid-cols-3 gap-6 text-left"
+                     >
+                       {/* Employer Left Sidebar Mock */}
+                       <div className="col-span-1 space-y-4">
+                          <div className="h-8 w-3/4 rounded-lg bg-white/10 mb-8"></div>
+                          <div className="flex items-center gap-3 opacity-60">
+                             <div className="w-4 h-4 rounded bg-white/5"></div>
+                             <div className="h-3 w-1/2 rounded bg-white/5"></div>
+                          </div>
+                          <div className="flex items-center gap-3">
+                             <div className="w-4 h-4 rounded bg-yellow-400/50"></div>
+                             <div className="h-3 w-2/3 rounded bg-white/10"></div>
+                          </div>
+                          
+                          <div className="mt-8 pt-6 border-t border-white/5">
+                            <div className="h-28 rounded-xl bg-gradient-to-br from-yellow-500/10 to-orange-500/10 border border-white/5 p-4 relative overflow-hidden flex flex-col justify-center">
+                               <div className="absolute -right-4 -top-4 w-20 h-20 bg-yellow-500/20 blur-2xl rounded-full"></div>
+                               <div className="text-[10px] text-yellow-300 font-bold mb-1 uppercase tracking-wider">Active Applicants</div>
+                               <div className="text-4xl font-extrabold text-white">42</div>
+                            </div>
+                          </div>
+                       </div>
+                       
+                       {/* Employer Main Content Mock */}
+                       <div className="col-span-2 space-y-3">
+                          <div className="mb-4">
+                            <div className="text-sm font-bold text-white mb-2">Top Ranked Applicants</div>
+                            <div className="h-1 w-full bg-white/5 rounded"></div>
+                          </div>
+                          {[95, 88, 72].map((score, i) => (
+                            <div key={i} className="h-16 w-full rounded-xl bg-white/5 border border-white/10 flex items-center px-4 gap-4 transition-colors hover:bg-white/10">
+                              <div className="h-10 w-10 rounded-full bg-slate-700 flex items-center justify-center border border-emerald-400/30">
+                                <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                              </div>
+                              <div className="space-y-2 flex-1">
+                                 <div className="h-3 w-1/3 rounded bg-white/20"></div>
+                                 <div className="h-2 w-1/4 rounded bg-white/10"></div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <div className="text-xs font-bold text-emerald-400">{score}% Match</div>
+                                <div className="px-3 py-1.5 rounded-lg bg-white/10 text-white text-xs font-bold hover:bg-white/20 cursor-pointer">Review</div>
+                              </div>
                            </div>
-                           <div>
-                            <div className="h-3 w-1/2 rounded bg-white/20 mb-2"></div>
-                            <div className="h-2 w-2/3 rounded bg-white/10"></div>
-                          </div>
+                          ))}
                        </div>
-                    </div>
-                    
-                    <div className="space-y-3">
-                       <div className="h-16 w-full rounded-xl bg-white/5 border border-white/10 flex items-center px-4 gap-4 transition-colors hover:bg-white/10">
-                          <div className="h-10 w-10 rounded-full bg-slate-700"></div>
-                          <div className="space-y-2 flex-1">
-                             <div className="h-3 w-1/3 rounded bg-white/20"></div>
-                             <div className="h-2 w-1/4 rounded bg-white/10"></div>
-                          </div>
-                          <div className="px-4 py-2 rounded-lg bg-yellow-400 text-slate-900 text-xs font-bold shadow-[0_0_15px_rgba(250,204,21,0.2)]">Apply Now</div>
-                       </div>
-                       <div className="h-16 w-full rounded-xl bg-white/5 border border-white/10 flex items-center px-4 gap-4">
-                          <div className="h-10 w-10 rounded-full bg-slate-700"></div>
-                          <div className="space-y-2 flex-1">
-                             <div className="h-3 w-1/4 rounded bg-white/20"></div>
-                             <div className="h-2 w-1/3 rounded bg-white/10"></div>
-                          </div>
-                          <div className="px-4 py-2 rounded-lg bg-white/5 text-slate-400 text-xs font-bold">Viewed</div>
-                       </div>
-                    </div>
-                 </div>
+                     </Motion.div>
+                   )}
+                 </AnimatePresence>
                </div>
                
                {/* Fading bottom edge to blend into background */}
@@ -294,136 +383,98 @@ const LandingPage = () => {
             </div>
 
             {/* Decorative glows behind the dashboard */}
-            <div className="absolute -left-20 top-1/4 w-64 h-64 bg-blue-500/10 blur-[100px] rounded-full pointer-events-none"></div>
-            <div className="absolute -right-20 bottom-1/4 w-64 h-64 bg-yellow-500/10 blur-[100px] rounded-full pointer-events-none"></div>
+            <div className="absolute -left-20 top-1/4 w-64 h-64 bg-blue-500/10 blur-[100px] rounded-full pointer-events-none transition-opacity duration-700" style={{ opacity: activeTab === 'seeker' ? 1 : 0.3 }}></div>
+            <div className="absolute -right-20 bottom-1/4 w-64 h-64 bg-yellow-500/10 blur-[100px] rounded-full pointer-events-none transition-opacity duration-700" style={{ opacity: activeTab === 'employer' ? 1 : 0.3 }}></div>
           </Motion.div>
         </Motion.div>
       </main>
 
-      {/* ── Features ── */}
+      {/* ── Features - Tabbed Layout ── */}
       <Motion.section id="features" {...sectionMotion} className="relative z-10 bg-[#0D1F38] border-t border-white/5 px-6 py-24">
         <div className="max-w-6xl mx-auto">
-          <div className="max-w-2xl mb-14">
-            <p className="text-xs font-bold uppercase tracking-[0.2em] text-yellow-400">What you get</p>
-            <h2 className="mt-3 text-3xl md:text-4xl font-extrabold tracking-tight text-white">
-              One account, the whole employment process.
-            </h2>
+          <div className="flex flex-col md:flex-row md:items-end justify-between mb-14 gap-8">
+            <div className="max-w-2xl">
+              <p className="text-xs font-bold uppercase tracking-[0.2em] text-yellow-400">What you get</p>
+              <h2 className="mt-3 text-3xl md:text-4xl font-extrabold tracking-tight text-white">
+                Built for {activeTab === 'seeker' ? 'finding work' : 'finding talent'}.
+              </h2>
+            </div>
+            
+            {/* Redundant toggle here for mobile users who scroll past the dashboard */}
+            <div className="flex bg-[#0A192F] p-1 rounded-xl border border-white/10">
+              <button 
+                onClick={() => setActiveTab('seeker')}
+                className={`px-4 py-2 text-sm font-bold rounded-lg transition-colors ${activeTab === 'seeker' ? 'bg-white/10 text-white' : 'text-slate-400'}`}
+              >
+                For Job Seekers
+              </button>
+              <button 
+                onClick={() => setActiveTab('employer')}
+                className={`px-4 py-2 text-sm font-bold rounded-lg transition-colors ${activeTab === 'employer' ? 'bg-white/10 text-white' : 'text-slate-400'}`}
+              >
+                For Employers
+              </button>
+            </div>
           </div>
 
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-            {FEATURES.map((feature) => {
-              const Icon = feature.icon
-              return (
-                <div key={feature.title} className="rounded-2xl border border-white/10 bg-white/[0.03] p-6 transition-colors hover:border-white/20 hover:bg-white/[0.05]">
-                  <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-yellow-400/15 text-yellow-400">
-                    <Icon className="h-5 w-5" aria-hidden="true" />
-                  </span>
-                  <h3 className="mt-4 font-bold text-white">{feature.title}</h3>
-                  <p className="mt-2 text-sm leading-relaxed text-slate-400">{feature.body}</p>
-                </div>
-              )
-            })}
+            <AnimatePresence mode="popLayout">
+              {(activeTab === 'seeker' ? SEEKER_FEATURES : EMPLOYER_FEATURES).map((feature, i) => {
+                const Icon = feature.icon;
+                return (
+                  <Motion.div 
+                    key={feature.title}
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.95 }}
+                    transition={{ duration: 0.3, delay: i * 0.05 }}
+                    className="rounded-2xl border border-white/10 bg-white/[0.03] p-6 transition-all hover:border-white/20 hover:bg-white/[0.05] hover:-translate-y-1"
+                  >
+                    <span className={`flex h-10 w-10 items-center justify-center rounded-xl ${activeTab === 'seeker' ? 'bg-blue-500/15 text-blue-400' : 'bg-yellow-400/15 text-yellow-400'}`}>
+                      <Icon className="h-5 w-5" aria-hidden="true" />
+                    </span>
+                    <h3 className="mt-4 font-bold text-white">{feature.title}</h3>
+                    <p className="mt-2 text-sm leading-relaxed text-slate-400">{feature.body}</p>
+                  </Motion.div>
+                )
+              })}
+            </AnimatePresence>
           </div>
         </div>
       </Motion.section>
 
-      {/* ── How it works ──
-          A two-sided marketplace gets a two-track process, not a generic
-          linear list — it mirrors the seeker/employer split the app already
-          makes at the very first registration screen. */}
-      <Motion.section id="how-it-works" {...sectionMotion} className="relative z-10 bg-[#0A192F] border-t border-white/5 px-6 py-24">
-        <div className="max-w-6xl mx-auto">
-          <div className="max-w-2xl mb-16 text-center mx-auto">
-            <p className="text-xs font-bold uppercase tracking-[0.2em] text-yellow-400">How it works</p>
-            <h2 className="mt-3 text-3xl md:text-4xl font-extrabold tracking-tight text-white">
-              Two paths. One place they meet.
-            </h2>
-          </div>
-
-          <div className="relative grid gap-10 md:grid-cols-2 md:gap-16">
-            <div className="pointer-events-none absolute left-1/2 top-0 hidden h-full w-px -translate-x-1/2 bg-gradient-to-b from-white/0 via-white/15 to-white/0 md:block" />
-
-            <div>
-              <p className="mb-6 text-sm font-bold uppercase tracking-wide text-blue-300">Job Seeker</p>
-              <ol className="space-y-6">
-                {SEEKER_STEPS.map((step, index) => (
-                  <li key={step.title} className="flex gap-4">
-                    <span className="font-mono text-sm font-medium text-blue-300/70 pt-0.5">{String(index + 1).padStart(2, '0')}</span>
-                    <div>
-                      <p className="font-bold text-white">{step.title}</p>
-                      <p className="mt-1 text-sm leading-relaxed text-slate-400">{step.body}</p>
-                    </div>
-                  </li>
-                ))}
-              </ol>
-            </div>
-
-            <div>
-              <p className="mb-6 text-sm font-bold uppercase tracking-wide text-yellow-400">Employer</p>
-              <ol className="space-y-6">
-                {EMPLOYER_STEPS.map((step, index) => (
-                  <li key={step.title} className="flex gap-4">
-                    <span className="font-mono text-sm font-medium text-yellow-400/70 pt-0.5">{String(index + 1).padStart(2, '0')}</span>
-                    <div>
-                      <p className="font-bold text-white">{step.title}</p>
-                      <p className="mt-1 text-sm leading-relaxed text-slate-400">{step.body}</p>
-                    </div>
-                  </li>
-                ))}
-              </ol>
-            </div>
-          </div>
-
-          <div className="mt-14 flex items-center justify-center gap-3 text-sm font-bold text-white">
-            <span className="h-px w-10 bg-gradient-to-r from-transparent to-white/30" />
-            <CheckCircle2 className="h-4 w-4 text-emerald-400" aria-hidden="true" />
-            Matched, hired, working
-            <span className="h-px w-10 bg-gradient-to-l from-transparent to-white/30" />
-          </div>
-        </div>
-      </Motion.section>
-
-      {/* ── Jobs ──
-          The live database has no active listings yet, so this section
-          describes the real discovery mechanism instead of faking job
-          cards. Map access is seeker-gated; the assistant is not — say so
-          plainly rather than overclaiming what a guest can do here. */}
-      <Motion.section id="jobs" {...sectionMotion} className="relative z-10 bg-[#0D1F38] border-t border-white/5 px-6 py-24">
+      {/* ── Jobs Discovery ── */}
+      <Motion.section id="jobs" {...sectionMotion} className="relative z-10 bg-[#0A192F] border-t border-white/5 px-6 py-24">
         <div className="max-w-6xl mx-auto grid items-center gap-14 md:grid-cols-2">
           <div>
-            <p className="text-xs font-bold uppercase tracking-[0.2em] text-yellow-400">Job discovery</p>
+            <p className="text-xs font-bold uppercase tracking-[0.2em] text-blue-400">Job discovery</p>
             <h2 className="mt-3 text-3xl md:text-4xl font-extrabold tracking-tight text-white">
-              Find work near you, matched to what you can do.
+              Stop guessing if you are qualified.
             </h2>
             <p className="mt-5 text-base leading-relaxed text-slate-400">
-              Ask the assistant what&apos;s open right now — no account needed. Register to unlock
-              the interactive map, with distance and skill-match scoring on every listing.
+              When you complete your NSRP profile, our system scores your skills and experience against every open job in Urdaneta City. You see the highest matches first, saving you from applying to jobs that aren't a fit.
             </p>
             <button
               onClick={() => navigate('/register/seeker')}
               className="mt-8 inline-flex items-center gap-2 rounded-xl bg-white px-6 py-3.5 text-sm font-bold text-slate-900 shadow-lg transition-all hover:bg-slate-100"
             >
-              Register to browse the map <ArrowRight className="h-4 w-4" aria-hidden="true" />
+              Create your profile <ArrowRight className="h-4 w-4" aria-hidden="true" />
             </button>
           </div>
 
           <div className="relative mx-auto flex h-64 w-64 items-center justify-center sm:h-72 sm:w-72" aria-hidden="true">
             <span className="absolute inset-0 rounded-full border border-white/10" />
             <span className="absolute inset-6 rounded-full border border-white/10" />
-            <span className="absolute inset-12 rounded-full border border-yellow-400/20" />
-            <span className="absolute left-[30%] top-[38%] flex h-3 w-3 items-center justify-center rounded-full bg-yellow-400 shadow-[0_0_16px_rgba(250,204,21,0.6)]" />
-            <span className="absolute left-[62%] top-[58%] h-2 w-2 rounded-full bg-blue-300" />
-            <span className="absolute left-[70%] top-[30%] h-2 w-2 rounded-full bg-blue-300" />
-            <MapPin className="h-8 w-8 text-yellow-400" />
+            <span className="absolute inset-12 rounded-full border border-blue-400/20" />
+            <span className="absolute left-[30%] top-[38%] flex h-3 w-3 items-center justify-center rounded-full bg-blue-400 shadow-[0_0_16px_rgba(96,165,250,0.6)]" />
+            <span className="absolute left-[62%] top-[58%] h-2 w-2 rounded-full bg-slate-500" />
+            <span className="absolute left-[70%] top-[30%] h-2 w-2 rounded-full bg-slate-500" />
+            <MapPin className="h-8 w-8 text-blue-400" />
           </div>
         </div>
       </Motion.section>
 
-      {/* ── Programs ──
-          Paper band — the one contrast beat in an otherwise all-navy page.
-          Real programs from the GovernmentProgram catalogue, presented as
-          document tiles: these are actual DOLE/PESO forms, not marketing
-          copy, so they get to look like the paperwork they are. */}
+      {/* ── Programs ── */}
       <Motion.section id="programs" {...sectionMotion} className="relative z-10 bg-[#F8F7F2] px-6 py-24 text-[#0A192F]">
         <div className="max-w-6xl mx-auto">
           <div className="max-w-2xl mb-14">
@@ -435,7 +486,7 @@ const LandingPage = () => {
 
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {PROGRAMS.map((program) => (
-              <div key={program.name} className="rounded-xl border border-[#0A192F]/10 bg-white p-5 shadow-sm transition-shadow hover:shadow-md">
+              <div key={program.name} className="rounded-xl border border-[#0A192F]/10 bg-white p-5 shadow-sm transition-all hover:shadow-md hover:-translate-y-1 cursor-default">
                 <span className="font-mono text-[10px] font-medium tracking-wide text-[#B45309]">{program.tag}</span>
                 <h3 className="mt-2 text-sm font-bold leading-snug text-[#0A192F]">{program.name}</h3>
                 <p className="mt-2 text-xs leading-relaxed text-slate-600">{program.blurb}</p>
@@ -452,11 +503,7 @@ const LandingPage = () => {
         </div>
       </Motion.section>
 
-      {/* ── Footer ──
-          No street address or phone number: PESO hasn't supplied verified
-          contact details yet (see config/peso_knowledge.php). The assistant
-          — already on every guest page — is the honest substitute for a
-          "contact us" block until that information exists. */}
+      {/* ── Footer ── */}
       <footer className="relative z-10 border-t border-white/5 bg-[#071122] px-6 py-12">
         <div className="max-w-6xl mx-auto flex flex-col gap-8 sm:flex-row sm:items-start sm:justify-between">
           <div className="flex items-center gap-3">
@@ -482,16 +529,9 @@ const LandingPage = () => {
               <p className="text-xs font-bold uppercase tracking-wide text-slate-500">On this page</p>
               <div className="mt-2.5 flex flex-col gap-2 text-slate-400">
                 <a href="#features" className="hover:text-white transition-colors">Features</a>
-                <a href="#how-it-works" className="hover:text-white transition-colors">How it works</a>
+                <a href="#jobs" className="hover:text-white transition-colors">Discovery</a>
                 <a href="#programs" className="hover:text-white transition-colors">Programs</a>
               </div>
-            </div>
-            <div className="max-w-[16rem]">
-              <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Questions?</p>
-              <p className="mt-2.5 flex items-start gap-1.5 text-slate-400">
-                <Search className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                Ask the assistant in the corner of this page — it answers from real PESO records.
-              </p>
             </div>
           </div>
         </div>
