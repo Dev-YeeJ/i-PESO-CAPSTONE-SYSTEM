@@ -1,12 +1,10 @@
+import { useState } from 'react'
 import { Plus, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
 const cellInputClass = 'w-full min-w-[8rem] rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-sm text-slate-800 placeholder:text-slate-400 focus:border-brand-navy focus:outline-none focus:ring-2 focus:ring-brand-navy/10'
-
-// Sentinel for "no existing posting picked" — Radix Select items can't use an empty string.
-const MANUAL_ENTRY = '__manual__'
 
 export const blankConfirmationVacancy = () => ({
   job_vacancy_id: null, number_needed: '', position_title: '', qualifications: '', place_of_work: '',
@@ -17,41 +15,53 @@ export const stripBlankConfirmationVacancies = (vacancies) => vacancies.filter((
 
 /**
  * "LIST OF VACANCIES/ORDERS" table on the Confirmation Slip — mirrors
- * PlacementRecordEditor.jsx's established conventions. When `myVacancies` is
- * given (the employer's own postings), each row also gets a "Use an
- * existing posting" picker that auto-fills the row from that posting — the
- * fields stay editable afterward, so a picked posting is a starting point,
- * not a lock. Omitted entirely for the admin proxy (walk-in/paper-only)
- * form, which has no employer account to pick postings from.
+ * PlacementRecordEditor.jsx's established conventions. The table itself is
+ * always plain manual entry; when `myVacancies` is given (the employer's own
+ * postings), a picker above the table adds a new row pre-filled from a
+ * chosen posting — a convenient starting point, not a lock, so every field
+ * (including one added this way) stays freely editable afterward. Omitted
+ * entirely for the admin proxy (walk-in/paper-only) form, which has no
+ * employer account to pick postings from.
  */
 export default function ConfirmationVacancyEditor({ vacancies, onChange, myVacancies }) {
+  const [picking, setPicking] = useState('')
   const update = (index, key, value) => onChange(vacancies.map((row, i) => (i === index ? { ...row, [key]: value } : row)))
 
-  const applyExistingVacancy = (index, vacancyId) => {
-    if (!vacancyId) {
-      update(index, 'job_vacancy_id', null)
-      return
-    }
+  const addFromExistingPosting = (vacancyId) => {
     const posting = myVacancies?.find((item) => String(item.post_id) === String(vacancyId))
     if (!posting) return
-    onChange(vacancies.map((row, i) => (i === index
-      ? {
-          ...row,
-          job_vacancy_id: posting.post_id,
-          position_title: posting.job_title || row.position_title,
-          number_needed: posting.vacancies_count || row.number_needed,
-          qualifications: posting.job_description || row.qualifications,
-          place_of_work: posting.location || posting.city_municipality || row.place_of_work,
-        }
-      : row)))
+    onChange([
+      ...vacancies,
+      {
+        job_vacancy_id: posting.post_id,
+        number_needed: posting.vacancies_count || '',
+        position_title: posting.job_title || '',
+        qualifications: posting.job_description || '',
+        place_of_work: posting.location || posting.city_municipality || '',
+      },
+    ])
+    setPicking('')
   }
 
   return (
     <div className="space-y-3">
+      {!!myVacancies?.length && (
+        <div className="flex flex-wrap items-center gap-2">
+          <Select value={picking} onValueChange={addFromExistingPosting}>
+            <SelectTrigger className="h-9 w-full max-w-xs rounded-lg border-slate-200 px-2.5 py-1.5 text-sm">
+              <SelectValue placeholder="Use an existing posting…" />
+            </SelectTrigger>
+            <SelectContent>
+              {myVacancies.map((posting) => <SelectItem key={posting.post_id} value={String(posting.post_id)}>{posting.job_title}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          <span className="text-xs text-slate-500">Adds a row pre-filled from that posting — still editable below.</span>
+        </div>
+      )}
+
       <Table>
         <TableHeader>
           <TableRow>
-            {myVacancies && <TableHead>Use existing posting</TableHead>}
             <TableHead>Number Needed *</TableHead>
             <TableHead>Position Title *</TableHead>
             <TableHead>Qualifications</TableHead>
@@ -62,23 +72,10 @@ export default function ConfirmationVacancyEditor({ vacancies, onChange, myVacan
         <TableBody>
           {vacancies.map((row, index) => (
             <TableRow key={index}>
-              {myVacancies && (
-                <TableCell>
-                  <Select value={row.job_vacancy_id ? String(row.job_vacancy_id) : MANUAL_ENTRY} onValueChange={(value) => applyExistingVacancy(index, value === MANUAL_ENTRY ? null : value)}>
-                    <SelectTrigger className="h-9 min-w-[10rem] rounded-lg border-slate-200 px-2.5 py-1.5 text-sm">
-                      <SelectValue placeholder="Type manually" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value={MANUAL_ENTRY}>— Type manually —</SelectItem>
-                      {myVacancies.map((posting) => <SelectItem key={posting.post_id} value={String(posting.post_id)}>{posting.job_title}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </TableCell>
-              )}
-              <TableCell><input type="number" min="0" value={row.number_needed} onChange={(e) => update(index, 'number_needed', e.target.value)} placeholder="0" className={`${cellInputClass} disabled:opacity-60 disabled:cursor-not-allowed`} disabled={!!row.job_vacancy_id} /></TableCell>
-              <TableCell><input value={row.position_title} onChange={(e) => update(index, 'position_title', e.target.value)} placeholder="Position title" className={`${cellInputClass} disabled:opacity-60 disabled:cursor-not-allowed`} disabled={!!row.job_vacancy_id} /></TableCell>
-              <TableCell><input value={row.qualifications} onChange={(e) => update(index, 'qualifications', e.target.value)} placeholder="Qualifications" className={`${cellInputClass} disabled:opacity-60 disabled:cursor-not-allowed`} disabled={!!row.job_vacancy_id} /></TableCell>
-              <TableCell><input value={row.place_of_work} onChange={(e) => update(index, 'place_of_work', e.target.value)} placeholder="Place of work" className={`${cellInputClass} disabled:opacity-60 disabled:cursor-not-allowed`} disabled={!!row.job_vacancy_id} /></TableCell>
+              <TableCell><input type="number" min="0" value={row.number_needed} onChange={(e) => update(index, 'number_needed', e.target.value)} placeholder="0" className={cellInputClass} /></TableCell>
+              <TableCell><input value={row.position_title} onChange={(e) => update(index, 'position_title', e.target.value)} placeholder="Position title" className={cellInputClass} /></TableCell>
+              <TableCell><input value={row.qualifications} onChange={(e) => update(index, 'qualifications', e.target.value)} placeholder="Qualifications" className={cellInputClass} /></TableCell>
+              <TableCell><input value={row.place_of_work} onChange={(e) => update(index, 'place_of_work', e.target.value)} placeholder="Place of work" className={cellInputClass} /></TableCell>
               <TableCell>
                 <button type="button" onClick={() => onChange(vacancies.filter((_, i) => i !== index))} aria-label="Remove vacancy" className="rounded-lg p-2 text-slate-400 transition-colors hover:bg-rose-50 hover:text-rose-600">
                   <Trash2 className="h-4 w-4" />

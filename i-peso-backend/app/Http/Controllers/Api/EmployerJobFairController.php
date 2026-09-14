@@ -92,13 +92,25 @@ class EmployerJobFairController extends Controller
         // scanned document — a phone camera or export can easily produce a
         // format outside the standard pdf/jpg/png set (webp, heic/heif from
         // iPhones, gif, bmp). Every other requirement stays document-only.
+        //
+        // Uses 'extensions' rather than 'mimes' for the gallery case:
+        // 'mimes' validates by sniffing the file's actual content through
+        // PHP's fileinfo/libmagic, and shared hosting environments often
+        // ship an outdated magic database that misidentifies (or plain
+        // fails to recognize) newer formats like webp/heic — silently
+        // rejecting a real photo of exactly the type this list already
+        // allows. 'extensions' checks the uploaded filename's extension
+        // directly instead, which is what the file picker's `accept`
+        // already filtered on and is why this is safe.
         $isGallery = $requirement->code === 'posterized_vacancy';
-        $mimes = $isGallery ? 'pdf,jpg,jpeg,png,webp,gif,bmp,heic,heif' : 'pdf,jpg,jpeg,png';
+        $fileRules = $isGallery
+            ? ['file', 'extensions:jpg,jpeg,png,webp,gif,bmp,heic,heif,pdf', 'max:5120']
+            : ['file', 'mimes:pdf,jpg,jpeg,png', 'max:5120'];
 
         $validated = $request->validate([
-            'document' => ['nullable', 'file', "mimes:{$mimes}", 'max:5120'],
+            'document' => array_merge(['nullable'], $fileRules),
             'documents' => ['nullable', 'array', 'max:5'],
-            'documents.*' => ['file', "mimes:{$mimes}", 'max:5120'],
+            'documents.*' => $fileRules,
         ]);
 
         $files = $validated['documents'] ?? ($validated['document'] ? [$validated['document']] : []);

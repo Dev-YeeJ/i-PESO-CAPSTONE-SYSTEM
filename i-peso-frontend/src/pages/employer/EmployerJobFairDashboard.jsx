@@ -11,7 +11,7 @@ import {
   uploadJobFairRequirement,
   viewJobFairRequirement,
 } from '@/services/jobFairService'
-import { getVacancies } from '@/services/employerService'
+import { getProfile, getVacancies } from '@/services/employerService'
 
 const blankConfirmation = {
   representative_1_name: '', representative_1_contact: '', representative_position: '',
@@ -92,6 +92,7 @@ export default function EmployerJobFairDashboard() {
   const [confirmation, setConfirmation] = useState(blankConfirmation)
   const [confirmationVacancies, setConfirmationVacancies] = useState([blankConfirmationVacancy()])
   const [myVacancies, setMyVacancies] = useState([])
+  const [myProfile, setMyProfile] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
@@ -117,6 +118,9 @@ export default function EmployerJobFairDashboard() {
     getVacancies({ per_page: 100 })
       .then((res) => setMyVacancies((res.data ?? []).filter((v) => v.status === 'active')))
       .catch(() => setMyVacancies([]))
+    getProfile()
+      .then((res) => setMyProfile(res.employer))
+      .catch(() => setMyProfile(null))
   }, [])
 
   // Switching which fair is open discards any unsaved draft — each fair
@@ -125,6 +129,23 @@ export default function EmployerJobFairDashboard() {
     setConfirmation(blankConfirmation)
     setConfirmationVacancies([blankConfirmationVacancy()])
   }, [selectedId])
+
+  // Pre-fills Representative 1 from the account's own registered
+  // representative — still freely editable, since a different staff member
+  // may be the one actually attending this particular event.
+  useEffect(() => {
+    if (!myProfile) return
+    setConfirmation((current) => (
+      current.representative_1_name || current.representative_1_contact || current.representative_position
+        ? current
+        : {
+            ...current,
+            representative_1_name: myProfile.representative_name || '',
+            representative_position: myProfile.representative_designation || '',
+            representative_1_contact: myProfile.representative_contact_number || '',
+          }
+    ))
+  }, [myProfile, selectedId])
 
   const act = async (work, success) => {
     setError(''); setNotice('')
@@ -306,7 +327,7 @@ export default function EmployerJobFairDashboard() {
                                 <span className="text-sm font-bold text-slate-800">{req.label}</span>
                                 {isGallery ? (
                                   <Badge variant={nonRejected.length > 0 ? 'approved' : 'neutral'} icon={false}>
-                                    {nonRejected.length} of 5 photos
+                                    {nonRejected.length > 0 ? `${nonRejected.length} photo${nonRejected.length === 1 ? '' : 's'} uploaded` : 'No photos yet'}
                                   </Badge>
                                 ) : (
                                   <Badge variant={submissions.length > 0 ? (status === 'rejected' ? 'rejected' : 'approved') : 'neutral'} icon={false}>
