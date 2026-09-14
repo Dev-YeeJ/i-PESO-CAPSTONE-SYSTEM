@@ -48,7 +48,7 @@ import { colors, radii, spacing, typography } from '@/theme'
 const CERTIFICATE_CATEGORIES = [
   'training_certificate', 'tesda_nc_certificate', 'professional_certificate',
   'seminar_certificate', 'workshop_certificate', 'employment_certificate',
-  'academic_certificate', 'first_time_jobseeker_certificate', 'other',
+  'academic_certificate', 'other',
 ]
 
 export default function ProfileScreen() {
@@ -542,19 +542,6 @@ export default function ProfileScreen() {
             </TouchableOpacity>
           }
         />
-        {profile?.is_first_time_jobseeker && !certificates.some((certificate) => certificate.category === 'first_time_jobseeker_certificate') ? (
-          <AlertBox
-            title="Upload your First-Time Jobseeker certificate"
-            variant="warning"
-            action={
-              <Button variant="primary" size="sm" onPress={() => setCertModalOpen(true)}>
-                Upload Certificate
-              </Button>
-            }
-          >
-            You are claiming First-Time Jobseeker Act (RA 11261) benefits. Upload your barangay-issued certificate as proof.
-          </AlertBox>
-        ) : null}
         <View style={styles.cardList}>
           {certificates.length ? certificates.map((certificate) => (
             <Card key={String(certificate.certificate_id)} padding="md">

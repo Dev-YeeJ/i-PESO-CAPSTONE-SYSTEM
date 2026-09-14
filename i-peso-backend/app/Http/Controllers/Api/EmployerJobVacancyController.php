@@ -4,8 +4,11 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Employer;
+use App\Models\JobSeeker;
 use App\Models\JobVacancy;
+use App\Notifications\NewJobVacancyPosted;
 use App\Services\ActivityLogger;
+use App\Services\EnhancedJobMatchingService;
 use App\Services\GoogleMapsService;
 use App\Services\AddressService;
 use App\Services\MatchingProfileService;
@@ -37,7 +40,8 @@ class EmployerJobVacancyController extends Controller
         Request $request,
         GoogleMapsService $maps,
         SkillTaxonomyService $taxonomy,
-        MatchingProfileService $matchingProfiles
+        MatchingProfileService $matchingProfiles,
+        EnhancedJobMatchingService $matching
     ): JsonResponse {
         $employer = $this->employer($request);
         $vacancy = $employer->vacancies()->create($this->validatedData($request, $maps));
@@ -49,6 +53,8 @@ class EmployerJobVacancyController extends Controller
             $vacancy->job_title,
             $vacancy->post_id
         ));
+
+        $this->notifyMatchingSeekersIfNewlyActive($vacancy, $matching);
 
         return response()->json([
             'message' => 'Job vacancy created successfully.',
@@ -68,7 +74,8 @@ class EmployerJobVacancyController extends Controller
         JobVacancy $vacancy,
         GoogleMapsService $maps,
         SkillTaxonomyService $taxonomy,
-        MatchingProfileService $matchingProfiles
+        MatchingProfileService $matchingProfiles,
+        EnhancedJobMatchingService $matching
     ): JsonResponse {
         $this->ensureOwnership($request, $vacancy);
         $vacancy->update($this->validatedData($request, $maps));
@@ -81,10 +88,52 @@ class EmployerJobVacancyController extends Controller
             $vacancy->post_id
         ));
 
+        // Covers a vacancy created as 'draft' and only later switched to 'active' — store()
+        // already handles the common case of posting directly as active.
+        $this->notifyMatchingSeekersIfNewlyActive($vacancy, $matching);
+
         return response()->json([
             'message' => 'Job vacancy updated successfully.',
             'vacancy' => $vacancy->fresh(),
         ]);
+    }
+
+    /**
+     * Notifies job seekers with an 80%+ match score against this vacancy — once per vacancy,
+     * the first time it's active (guarded by seekers_notified_at, mirroring
+     * JobFairController::publish()'s published_at guard so a later edit never re-notifies).
+     * Scored against every seeker with a completed profile; an incomplete profile can't produce
+     * a meaningful match score anyway. Synchronous like every other broadcast notification in
+     * this app (see JobFairController::broadcastToSeekers) — this deployment has no queue
+     * worker, so set_time_limit(0) guards against PHP's default execution-time limit cutting a
+     * large seeker base off partway through.
+     */
+    private function notifyMatchingSeekersIfNewlyActive(JobVacancy $vacancy, EnhancedJobMatchingService $matching): void
+    {
+        if ($vacancy->status !== 'active' || $vacancy->seekers_notified_at !== null) {
+            return;
+        }
+
+        set_time_limit(0);
+
+        JobSeeker::query()
+            ->where('profile_completed', true)
+            ->chunkById(100, function ($seekers) use ($vacancy, $matching) {
+                foreach ($seekers as $seeker) {
+                    try {
+                        $result = $matching->calculateMatch($vacancy, $seeker);
+                    } catch (\Throwable $e) {
+                        report($e);
+                        continue;
+                    }
+
+                    if ((float) ($result['percentage'] ?? 0) >= 80) {
+                        $seeker->notify(new NewJobVacancyPosted($vacancy));
+                    }
+                }
+            }, 'seeker_id');
+
+        $vacancy->update(['seekers_notified_at' => now()]);
     }
 
     public function destroy(Request $request, JobVacancy $vacancy): JsonResponse

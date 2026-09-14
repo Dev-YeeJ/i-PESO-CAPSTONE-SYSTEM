@@ -25,12 +25,15 @@ function iconForNotification(data?: SeekerNotification['data']): React.Component
       return 'school'
     case 'job_fair':
       return 'event'
+    case 'job_vacancy':
+      return 'new-releases'
     case 'interview':
       return 'event-available'
     default:
       if (data?.application_id) return 'work'
       if (data?.program_id) return 'school'
       if (data?.job_fair_id) return 'event'
+      if (data?.post_id) return 'new-releases'
       return 'notifications'
   }
 }
@@ -43,6 +46,10 @@ export default function NotificationsScreen() {
   const { data, isLoading, refetch } = useQuery({
     queryKey: ['notifications'],
     queryFn: () => seekerService.getNotifications(),
+    // The Home bell badge already polls every 30s (index.tsx) — this list never did, so a
+    // status update landing while this screen is open (not just backgrounded) wouldn't show
+    // up until a manual pull-to-refresh or a full remount. Matches the badge's cadence.
+    refetchInterval: 30000,
   })
   const notifications = data?.notifications ?? []
   const unreadCount = data?.unread_count ?? 0
@@ -81,6 +88,8 @@ export default function NotificationsScreen() {
       router.push(`/(seeker)/government-programs/${notification.data.program_id}`)
     } else if (notification.data?.job_fair_id) {
       router.push('/(seeker)/job-fairs')
+    } else if (notification.data?.post_id) {
+      router.push(`/(seeker)/jobs/${notification.data.post_id}`)
     }
   }
 

@@ -192,6 +192,10 @@ function notificationAppearance(data) {
     return { icon: CalendarDays, classes: 'bg-violet-100 text-violet-700' }
   }
 
+  if (data?.type === 'job_vacancy') {
+    return { icon: BriefcaseBusiness, classes: 'bg-emerald-100 text-emerald-700' }
+  }
+
   switch (data?.status) {
     case 'pending':
       return { icon: MailCheck, classes: 'bg-blue-100 text-blue-700' }

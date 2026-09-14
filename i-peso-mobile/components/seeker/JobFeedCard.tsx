@@ -37,7 +37,12 @@ const SWIPE_MAX = 104
 export function JobFeedCard({ job, index = 0, saving = false, onPress, onToggleSave }: JobFeedCardProps) {
   const m = useMotion()
   const requiredSkills = listFrom(job.required_skills).slice(0, 3)
-  const missing = job.missing_skills?.slice(0, 2) ?? []
+  // Nearby/Latest feeds intentionally skip full match scoring for performance and come back
+  // with match_deferred: true — match_percentage/missing_skills are then just absent/empty,
+  // not genuinely "0% / no gaps". Showing the ring or "Strong Match" off that default would be
+  // a fabricated result, so match UI is hidden entirely for these jobs instead (mirrors the fix
+  // for the same bug on i-peso-frontend's JobSeekerHome.jsx).
+  const missing = job.match_deferred ? [] : job.missing_skills?.slice(0, 2) ?? []
   const match = Math.round(Number(job.match_percentage ?? job.match?.percentage ?? 0))
   const distance = job.distance_km ? `${Number(job.distance_km).toFixed(Number(job.distance_km) >= 10 ? 0 : 1)} km away` : ''
 
@@ -135,7 +140,7 @@ export function JobFeedCard({ job, index = 0, saving = false, onPress, onToggleS
                 <Text style={styles.title} numberOfLines={2}>{textFrom(job.job_title, 'Untitled job')}</Text>
                 <Text style={styles.company} numberOfLines={1}>{jobCompany(job)}</Text>
               </View>
-              <MatchRing percentage={match} size={52} strokeWidth={5} />
+              {job.match_deferred ? null : <MatchRing percentage={match} size={52} strokeWidth={5} />}
             </View>
 
             <Text style={styles.salary} numberOfLines={1}>{formatSalary(job)}</Text>
@@ -149,7 +154,7 @@ export function JobFeedCard({ job, index = 0, saving = false, onPress, onToggleS
               {job.has_applied ? <Badge variant="info">{titleCase(job.application_status, 'Applied')}</Badge> : null}
               {job.job_fair?.is_available_at_job_fair ? <Badge variant="warning">Job Fair</Badge> : null}
               {job.certificate_match?.matched ? <Badge variant="success">Certificate Match</Badge> : null}
-              {match >= 80 ? <Badge variant="success">Strong Match</Badge> : null}
+              {!job.match_deferred && match >= 80 ? <Badge variant="success">Strong Match</Badge> : null}
             </View>
 
             {requiredSkills.length ? (
