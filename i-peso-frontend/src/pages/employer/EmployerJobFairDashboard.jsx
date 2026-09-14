@@ -221,8 +221,16 @@ export default function EmployerJobFairDashboard() {
         </div>
       </div>
 
-      {error && <AlertBox variant="danger" title="Job Fair action failed">{error}</AlertBox>}
-      {notice && <AlertBox variant="success" title="Saved">{notice}</AlertBox>}
+      {(error || notice) && (
+        // Fixed instead of inline: this page scrolls tall (Requirements/Confirmation
+        // Slip tabs sit well below the fold), and an inline banner up here was
+        // invisible after actions taken further down — including uploads, which
+        // then looked like they silently did nothing.
+        <div className="fixed inset-x-4 top-24 z-40 mx-auto max-w-2xl sm:inset-x-0">
+          {error && <AlertBox variant="danger" title="Job Fair action failed" action={<button type="button" onClick={() => setError('')} className="text-xs font-bold text-red-700 hover:underline">Dismiss</button>} className="shadow-lg">{error}</AlertBox>}
+          {notice && <AlertBox variant="success" title="Saved" action={<button type="button" onClick={() => setNotice('')} className="text-xs font-bold text-emerald-700 hover:underline">Dismiss</button>} className="shadow-lg">{notice}</AlertBox>}
+        </div>
+      )}
 
       {loading ? (
         <LoadingSkeleton variant="card" rows={2} />

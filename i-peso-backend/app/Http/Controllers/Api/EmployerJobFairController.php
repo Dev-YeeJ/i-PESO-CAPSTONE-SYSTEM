@@ -102,9 +102,12 @@ class EmployerJobFairController extends Controller
         // allows. 'extensions' checks the uploaded filename's extension
         // directly instead, which is what the file picker's `accept`
         // already filtered on and is why this is safe.
+        // Poster flyers (designed in Canva/Photoshop, often PNG) routinely run
+        // past a 5MB cap that's fine for a scanned document — 10MB gives real
+        // headroom without moving the goalposts on the other requirements.
         $isGallery = $requirement->code === 'posterized_vacancy';
         $fileRules = $isGallery
-            ? ['file', 'extensions:jpg,jpeg,png,webp,gif,bmp,heic,heif,pdf', 'max:5120']
+            ? ['file', 'extensions:jpg,jpeg,png,webp,gif,bmp,heic,heif,pdf', 'max:10240']
             : ['file', 'mimes:pdf,jpg,jpeg,png', 'max:5120'];
 
         $validated = $request->validate([
