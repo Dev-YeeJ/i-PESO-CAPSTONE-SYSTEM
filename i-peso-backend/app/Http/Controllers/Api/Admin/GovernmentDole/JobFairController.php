@@ -465,9 +465,8 @@ class JobFairController extends Controller
         $validated = $request->validate([
             'employer_id' => ['nullable', 'integer', 'exists:employers,employer_id'], 'company_name' => ['required', 'string', 'max:255'],
             'representative_1_name' => ['required', 'string', 'max:255'], 'representative_1_contact' => ['required', 'string', 'max:40'],
+            'representative_position' => ['required', 'string', 'max:255'],
             'representative_2_name' => ['nullable', 'string', 'max:255'], 'representative_2_contact' => ['nullable', 'string', 'max:40'],
-            'email' => ['nullable', 'email', 'max:255'],
-            'will_conduct_onsite_interview' => ['required', 'boolean'], 'logistics_requests' => ['nullable', 'string', 'max:3000'],
             'vacancies' => ['nullable', 'array'],
             'vacancies.*.number_needed' => ['required_with:vacancies', 'integer', 'min:0'],
             'vacancies.*.position_title' => ['required_with:vacancies', 'string', 'max:255'],

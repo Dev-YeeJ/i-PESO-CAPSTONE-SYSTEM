@@ -90,23 +90,30 @@ class JobFairController extends Controller
                 if ($isSeeker && $submission->participation) {
                     $fairId = $submission->participation->job_fair_id;
                     $employerId = $submission->employer_id;
-                    $vacancies = \App\Models\JobFairVacancy::query()
-                        ->where('job_fair_id', $fairId)
-                        ->where('employer_id', $employerId)
-                        ->with('vacancy.occupation')
+                    // The employer's own postings entered on their Confirmation
+                    // Slip ("use an existing posting" rows) are the only
+                    // reliable link between a job fair and a real JobVacancy —
+                    // JobFairVacancy is dead code with no live write path.
+                    $vacancies = \App\Models\JobFairConfirmationVacancy::query()
+                        ->whereHas(
+                            'confirmationSlip',
+                            fn ($query) => $query->where('job_fair_id', $fairId)->where('employer_id', $employerId)
+                        )
+                        ->whereNotNull('job_vacancy_id')
+                        ->with('jobVacancy.occupation')
                         ->get()
-                        ->pluck('vacancy')
+                        ->pluck('jobVacancy')
                         ->filter();
 
                     $bestScore = null;
                     foreach ($vacancies as $vacancy) {
                         try {
                             $match = $matchingService->calculateMatch($vacancy, $user);
-                            $score = collect($match['factors'] ?? [])->sum('weighted_score');
+                            $score = (float) ($match['percentage'] ?? 0);
                             if ($bestScore === null || $score > $bestScore) {
                                 $bestScore = $score;
                             }
-                        } catch (\Exception $e) {
+                        } catch (\Throwable $e) {
                             // ignore match errors
                         }
                     }

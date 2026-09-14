@@ -10,12 +10,11 @@ class JobFairConfirmationSlip extends Model
 {
     protected $fillable = [
         'job_fair_id', 'job_fair_employer_id', 'employer_id', 'company_name',
-        'representative_1_name', 'representative_1_contact', 'representative_2_name',
-        'representative_2_contact', 'email', 'number_of_job_vacancies',
-        'will_conduct_onsite_interview', 'logistics_requests', 'source', 'dedupe_key',
-        'submitted_by', 'submitted_at',
+        'representative_1_name', 'representative_1_contact', 'representative_position',
+        'representative_2_name', 'representative_2_contact', 'number_of_job_vacancies',
+        'source', 'dedupe_key', 'submitted_by', 'submitted_at',
     ];
-    protected $casts = ['number_of_job_vacancies' => 'integer', 'will_conduct_onsite_interview' => 'boolean', 'submitted_at' => 'datetime'];
+    protected $casts = ['number_of_job_vacancies' => 'integer', 'submitted_at' => 'datetime'];
 
     public function jobFair(): BelongsTo { return $this->belongsTo(JobFair::class, 'job_fair_id', 'job_fair_id'); }
     public function employer(): BelongsTo { return $this->belongsTo(Employer::class, 'employer_id', 'employer_id'); }

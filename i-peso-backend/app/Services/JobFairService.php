@@ -172,6 +172,18 @@ class JobFairService
 
         if ($participation) {
             $participation->loadMissing(['requirementSubmissions.requirement', 'confirmationSlip', 'resultReport.entries', 'resultReport.mismatchTallies']);
+            // Self-heals a participation already inside the requirements
+            // pipeline whose reusable accreditation documents were never
+            // picked up — e.g. one that accepted before this auto-satisfaction
+            // existed, or approved a new accreditation document after already
+            // accepting. Scoped to these two in-progress statuses only, so an
+            // 'invited'/'interested' employer still gets nothing created just
+            // from viewing the page, and reuseVerifiedDocuments() itself is a
+            // cheap no-op once nothing is missing.
+            if (in_array($participation->participation_status, ['requirements_pending', 'requirements_submitted'], true)) {
+                $this->reuseVerifiedDocuments($fair, $participation);
+                $participation->loadMissing(['requirementSubmissions.requirement']);
+            }
             $payload['participation'] = $this->participationPayload($participation);
         }
 

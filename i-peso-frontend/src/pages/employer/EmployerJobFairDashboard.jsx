@@ -14,8 +14,8 @@ import {
 import { getVacancies } from '@/services/employerService'
 
 const blankConfirmation = {
-  representative_1_name: '', representative_1_contact: '', representative_2_name: '', representative_2_contact: '',
-  will_conduct_onsite_interview: false,
+  representative_1_name: '', representative_1_contact: '', representative_position: '',
+  representative_2_name: '', representative_2_contact: '',
 }
 
 const inputClass = 'w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-brand-navy focus:outline-none focus:ring-2 focus:ring-brand-navy/10'
@@ -289,17 +289,30 @@ export default function EmployerJobFairDashboard() {
                           const submissions = selected.participation.requirements?.filter((x) => x.job_fair_requirement_id === req.id) || []
                           const reused = submissions.some((s) => s.reused_from_verification)
                           const autoSatisfied = submissions.some((s) => s.auto_satisfied)
+                          const isGallery = req.code === 'posterized_vacancy'
+                          const nonRejected = submissions.filter((s) => s.status !== 'rejected')
                           const isRejected = submissions.length > 0 && submissions.every((s) => s.status === 'rejected')
-                          const canUpload = req.code !== 'confirmation_slip' && !reused && !autoSatisfied && (!submissions.length || isRejected)
+                          // Posterized Job Vacancy can hold up to 5 photos, so the
+                          // uploader stays available (to add more) as long as
+                          // there's room — every other requirement is a single
+                          // document, hidden again once one is on file.
+                          const canUpload = req.code !== 'confirmation_slip' && !reused && !autoSatisfied
+                            && (isGallery ? nonRejected.length < 5 : (!submissions.length || isRejected))
                           const status = submissions.length > 0 ? submissions[0].status : 'pending'
 
                           return (
                             <div key={req.id} className="rounded-xl border border-slate-200 p-4">
                               <div className="flex flex-wrap items-center justify-between gap-2">
                                 <span className="text-sm font-bold text-slate-800">{req.label}</span>
-                                <Badge variant={submissions.length > 0 ? (status === 'rejected' ? 'rejected' : 'approved') : 'neutral'} icon={false}>
-                                  {status}
-                                </Badge>
+                                {isGallery ? (
+                                  <Badge variant={nonRejected.length > 0 ? 'approved' : 'neutral'} icon={false}>
+                                    {nonRejected.length} of 5 photos
+                                  </Badge>
+                                ) : (
+                                  <Badge variant={submissions.length > 0 ? (status === 'rejected' ? 'rejected' : 'approved') : 'neutral'} icon={false}>
+                                    {status}
+                                  </Badge>
+                                )}
                               </div>
 
                               {autoSatisfied && (
@@ -307,7 +320,7 @@ export default function EmployerJobFairDashboard() {
                                   <ShieldCheck className="h-3.5 w-3.5" />Verified from your active job postings — nothing to upload
                                 </p>
                               )}
-                              
+
                               {submissions.map((sub) => (
                                 sub.original_filename && !autoSatisfied && sub.original_filename !== 'Digital confirmation slip' && (
                                   <button key={sub.id} type="button" onClick={() => viewSubmission(sub)} className="mt-2 flex w-full items-center gap-1.5 text-xs font-semibold text-brand-navy hover:underline">
@@ -315,11 +328,11 @@ export default function EmployerJobFairDashboard() {
                                   </button>
                                 )
                               ))}
-                              
+
                               {canUpload && (
                                 <label className="mt-3 flex w-fit cursor-pointer items-center gap-2 rounded-lg border border-dashed border-slate-300 px-3 py-2 text-xs font-bold text-slate-600 hover:border-brand-navy hover:text-brand-navy">
-                                  <FileUp className="h-4 w-4" />Upload document{req.code === 'posterized_vacancy' ? 's' : ''}
-                                  <input type="file" multiple={req.code === 'posterized_vacancy'} accept=".pdf,.jpg,.jpeg,.png" className="hidden" onChange={(e) => {
+                                  <FileUp className="h-4 w-4" />{isGallery ? (nonRejected.length > 0 ? 'Add another photo' : 'Upload photos') : 'Upload document'}
+                                  <input type="file" multiple={isGallery} accept=".pdf,.jpg,.jpeg,.png" className="hidden" onChange={(e) => {
                                     const files = e.target.files; e.target.value = ''
                                     if (files?.length) act(() => uploadJobFairRequirement(selected.job_fair_id, req.id, files), `${req.label} submitted.`)
                                   }} />
@@ -340,6 +353,7 @@ export default function EmployerJobFairDashboard() {
                           <p className="mb-3 text-xs font-extrabold uppercase tracking-wide text-slate-600">Representative 1</p>
                           <div className="grid gap-4 sm:grid-cols-2">
                             <FormField label="Full name" value={confirmation.representative_1_name} onChange={(v) => setConfirmation((x) => ({ ...x, representative_1_name: v }))} />
+                            <FormField label="Position/s" value={confirmation.representative_position} onChange={(v) => setConfirmation((x) => ({ ...x, representative_position: v }))} />
                             <FormField label="Contact number" value={confirmation.representative_1_contact} onChange={(v) => setConfirmation((x) => ({ ...x, representative_1_contact: v }))} />
                           </div>
                         </div>
@@ -350,13 +364,6 @@ export default function EmployerJobFairDashboard() {
                             <FormField label="Full name" value={confirmation.representative_2_name} onChange={(v) => setConfirmation((x) => ({ ...x, representative_2_name: v }))} />
                             <FormField label="Contact number" value={confirmation.representative_2_contact} onChange={(v) => setConfirmation((x) => ({ ...x, representative_2_contact: v }))} />
                           </div>
-                        </div>
-
-                        <div className="grid gap-4 sm:grid-cols-2">
-                          <label className="flex items-center gap-2 pb-2.5 text-sm font-semibold text-slate-700">
-                            <input type="checkbox" checked={confirmation.will_conduct_onsite_interview} onChange={(e) => setConfirmation((x) => ({ ...x, will_conduct_onsite_interview: e.target.checked }))} className="h-4 w-4 rounded border-slate-300" />
-                            Will conduct on-site interview
-                          </label>
                         </div>
                       </div>
 

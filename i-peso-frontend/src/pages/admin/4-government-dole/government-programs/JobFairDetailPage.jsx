@@ -49,7 +49,7 @@ const statTone = {
 }
 
 const zeroProxy = { company_name: '', employer_type: 'paper_only_employer', contact_person: '', contact_number: '', clearance_no: '', total_male: 0, total_female: 0, total_applicants: 0, total_qualified: 0, total_hots: 0, total_near_hired: 0, total_rejected: 0, total_vacancies_solicited: 0, total_vacancies_offered: 0, remarks: '' }
-const zeroProxyConfirmation = { company_name: '', representative_1_name: '', representative_1_contact: '', email: '', will_conduct_onsite_interview: false, logistics_requests: '' }
+const zeroProxyConfirmation = { company_name: '', representative_1_name: '', representative_1_contact: '', representative_position: '' }
 const inputClass = 'mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-brand-navy focus:outline-none focus:ring-2 focus:ring-brand-navy/10'
 
 function StepLabel({ step, children }) {
@@ -437,17 +437,10 @@ export default function JobFairDetailPage() {
                 <p className="mb-3 text-xs font-extrabold uppercase tracking-wide text-slate-600">Company & Representative</p>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <Field label="Company name" value={proxyConfirmation.company_name} onChange={(v) => setProxyConfirmation((x) => ({ ...x, company_name: v }))} />
-                  <Field label="Email" type="email" value={proxyConfirmation.email} onChange={(v) => setProxyConfirmation((x) => ({ ...x, email: v }))} />
                   <Field label="Representative name" value={proxyConfirmation.representative_1_name} onChange={(v) => setProxyConfirmation((x) => ({ ...x, representative_1_name: v }))} />
+                  <Field label="Position/s" value={proxyConfirmation.representative_position} onChange={(v) => setProxyConfirmation((x) => ({ ...x, representative_position: v }))} />
                   <Field label="Representative contact" value={proxyConfirmation.representative_1_contact} onChange={(v) => setProxyConfirmation((x) => ({ ...x, representative_1_contact: v }))} />
                 </div>
-                <div className="mt-4 flex flex-wrap items-center justify-between gap-4">
-                  <label className="flex items-center gap-2 text-sm font-semibold text-slate-700">
-                    <input type="checkbox" checked={proxyConfirmation.will_conduct_onsite_interview} onChange={(e) => setProxyConfirmation((x) => ({ ...x, will_conduct_onsite_interview: e.target.checked }))} className="h-4 w-4 rounded border-slate-300" />
-                    Will conduct on-site interview
-                  </label>
-                </div>
-                <Field label="Logistics requests" textarea value={proxyConfirmation.logistics_requests} onChange={(v) => setProxyConfirmation((x) => ({ ...x, logistics_requests: v }))} className="mt-4 block" />
               </div>
 
               <div>
