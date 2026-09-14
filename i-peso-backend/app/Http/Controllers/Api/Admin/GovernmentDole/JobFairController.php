@@ -292,8 +292,9 @@ class JobFairController extends Controller
             ['job_fair_id' => $jobFair->job_fair_id, 'employer_id' => $employer->employer_id],
             ['participation_status' => 'invited', 'source' => 'admin_invitation', 'confirmation_channel' => 'digital', 'invited_at' => now(), 'remarks' => $validated['remarks'] ?? null],
         );
+        $service->reuseVerifiedDocuments($jobFair, $participation);
         $employer->notify(new JobFairNotification($jobFair, 'invited', $participation, $service->outstandingRequirementsFor($jobFair, $employer)));
-        return response()->json(['message' => 'Employer invited.', 'participation' => $participation], 201);
+        return response()->json(['message' => 'Employer invited.', 'participation' => $service->participationPayload($participation->fresh(['requirementSubmissions.requirement']))], 201);
     }
 
     /**
@@ -321,6 +322,7 @@ class JobFairController extends Controller
                         'confirmation_channel' => 'digital',
                         'invited_at' => now(),
                     ]);
+                    $service->reuseVerifiedDocuments($jobFair, $participation);
                     $employer->notify(new JobFairNotification($jobFair, 'invited', $participation, $service->outstandingRequirementsFor($jobFair, $employer)));
                     $invited++;
                 }

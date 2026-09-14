@@ -172,17 +172,17 @@ class JobFairService
 
         if ($participation) {
             $participation->loadMissing(['requirementSubmissions.requirement', 'confirmationSlip', 'resultReport.entries', 'resultReport.mismatchTallies']);
-            // Self-heals a participation already inside the requirements
-            // pipeline whose reusable accreditation documents were never
-            // picked up — e.g. one that accepted before this auto-satisfaction
-            // existed, or approved a new accreditation document after already
-            // accepting. Scoped to these two in-progress statuses only, so an
-            // 'invited'/'interested' employer still gets nothing created just
-            // from viewing the page, and reuseVerifiedDocuments() itself is a
-            // cheap no-op once nothing is missing.
-            if (in_array($participation->participation_status, ['requirements_pending', 'requirements_submitted'], true)) {
+            // Accreditation is a standing fact about the employer's account,
+            // completely independent of where they are in this fair's
+            // invite/accept pipeline — there's no reason a merely
+            // "interested" or "invited" employer should be told to
+            // re-upload a Business Permit PESO already has on file. Self-
+            // heals any participation that hasn't picked up its reusable
+            // documents yet, at any stage short of an explicit decline
+            // (reuseVerifiedDocuments() is a cheap no-op once nothing's
+            // missing, so this is safe to call unconditionally otherwise).
+            if ($participation->participation_status !== 'declined') {
                 $this->reuseVerifiedDocuments($fair, $participation);
-                $participation->loadMissing(['requirementSubmissions.requirement']);
             }
             $payload['participation'] = $this->participationPayload($participation);
         }
@@ -203,17 +203,16 @@ class JobFairService
         return $payload;
     }
 
-    // Before an employer has said yes, there is nothing to show progress on
-    // yet — no document should be requested (and none should have been
-    // auto-satisfied) for an invitation that hasn't been accepted, so the
-    // requirement checklist stays hidden through these statuses rather than
-    // showing a misleading "0 of 7" for someone who was never asked to act.
-    private const PRE_ACCEPTANCE_STATUSES = ['invited', 'interested', 'called_peso', 'pending_response', 'declined'];
-
     public function participationPayload(JobFairEmployer $participation): array
     {
-        $showRequirements = ! in_array($participation->participation_status, self::PRE_ACCEPTANCE_STATUSES, true)
-            && $participation->relationLoaded('requirementSubmissions');
+        // Reused/auto-satisfied documents are now populated the moment a
+        // participation exists at all (see reuseVerifiedDocuments()'s call
+        // sites — expressing interest, an admin invite, the publish-time
+        // broadcast, and this payload's own callers), so the checklist
+        // reflects real state at every stage instead of being hidden pre-
+        // acceptance: an employer's standing accreditation isn't something
+        // that only counts once they've said yes to one specific fair.
+        $showRequirements = $participation->relationLoaded('requirementSubmissions');
 
         return [
             'id' => $participation->id,
@@ -255,6 +254,14 @@ class JobFairService
     // (manual or previously reused).
     public function reuseVerifiedDocuments(JobFair $fair, JobFairEmployer $participation): void
     {
+        // Self-contained on purpose: this now gets called from several
+        // places (expressing interest, an admin invite, the publish-time
+        // broadcast, and eventPayload's self-heal) — loading its own
+        // relations here means none of those callers can forget to and
+        // hit a lazy-loading violation.
+        $fair->loadMissing('requirements');
+        $participation->loadMissing('requirementSubmissions.requirement');
+
         // Callers (eventPayload) may have already eager-loaded a
         // column-limited `employer` relation (e.g. employer_id,
         // company_name, trade_name only) for display purposes — that
@@ -412,9 +419,6 @@ class JobFairService
      */
     public function processAcceptance(JobFair $fair, JobFairEmployer $participation): void
     {
-        $fair->loadMissing('requirements');
-        $participation->loadMissing('requirementSubmissions.requirement');
-
         $participation->update(['participation_status' => 'requirements_pending']);
 
         $this->reuseVerifiedDocuments($fair, $participation);

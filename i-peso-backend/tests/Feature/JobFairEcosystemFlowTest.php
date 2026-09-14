@@ -315,16 +315,16 @@ class JobFairEcosystemFlowTest extends TestCase
     }
 
     /**
-     * Regression test for a bug where accepting an invitation left
-     * participation_status stuck at 'accepted' forever (syncRequirementStatus
-     * silently no-opped because its guard didn't include 'accepted'), which
-     * in turn meant the admin's own Job Fair detail page always showed
-     * "0 of N approved" for a verified employer even though the reused
-     * accreditation documents genuinely satisfied every requirement. This
-     * asserts the admin dashboard sees accurate approved counts straight
-     * from respond() — without the employer ever loading their own portal,
-     * which is what used to (accidentally) populate the data via the old
-     * GET-triggered mutation in eventPayload().
+     * Regression test for a real employer complaint: expressing interest or
+     * merely being invited (participation_status 'interested'/'invited')
+     * showed every reusable requirement as "pending" and demanded a fresh
+     * upload, even though PESO had already approved the exact same
+     * documents during the employer's own accreditation. Accreditation
+     * isn't scoped to one job fair's invite/accept pipeline, so
+     * reuseVerifiedDocuments() now runs the moment a participation exists
+     * at all (interest(), invite(), and the publish-time broadcast), not
+     * only once accepted — this asserts the admin sees it immediately too,
+     * without the employer ever loading their own portal or accepting.
      */
     public function test_admin_dashboard_shows_accurate_requirement_progress_right_after_employer_accepts(): void
     {
@@ -360,28 +360,24 @@ class JobFairEcosystemFlowTest extends TestCase
             'contact_email' => 'peso@example.test', 'maximum_representatives' => 2, 'status' => 'draft',
         ])->assertCreated()->json('job_fair.job_fair_id');
         $this->postJson("/api/admin/job-fairs/{$fairId}/publish", ['status' => 'accepting_employers'])->assertOk();
-        $participationId = $this->postJson("/api/admin/job-fairs/{$fairId}/invite", ['employer_id' => $employer->employer_id])
-            ->assertCreated()->json('participation.id');
 
-        // Simulate stray/legacy data — a requirement submission that exists
-        // even though this employer never accepted. The checklist must stay
-        // hidden purely because the status says "invited", regardless of
-        // what submission rows happen to already exist.
-        $strayRequirementId = DB::table('job_fair_requirements')->where('job_fair_id', $fairId)->where('code', 'business_permit')->value('id');
-        DB::table('job_fair_requirement_submissions')->insert([
-            'job_fair_requirement_id' => $strayRequirementId, 'job_fair_employer_id' => $participationId,
-            'employer_id' => $employer->employer_id, 'original_filename' => 'stray.pdf',
-            'status' => 'approved', 'submitted_at' => now(), 'created_at' => now(), 'updated_at' => now(),
-        ]);
+        // Inviting alone — no accept yet — must already be enough for the
+        // admin to see reused documents. Accreditation is a standing fact
+        // about the employer's account, not something that only counts
+        // once they've said yes to this specific fair.
+        $this->postJson("/api/admin/job-fairs/{$fairId}/invite", ['employer_id' => $employer->employer_id])
+            ->assertCreated()->json('participation.id');
 
         Sanctum::actingAs($admin);
         $beforeAccept = $this->getJson("/api/admin/job-fairs/{$fairId}")->assertOk()->json();
         $participantBefore = collect($beforeAccept['participants'])->firstWhere('employer_id', $employer->employer_id);
         $this->assertSame('invited', $participantBefore['status']);
-        $this->assertSame([], $participantBefore['requirements']);
+        $approvedBeforeAccept = collect($participantBefore['requirements'])->where('status', 'approved')->count();
+        $this->assertSame(4, $approvedBeforeAccept, 'Reused documents should already show even before the employer accepts.');
 
-        // The employer accepts — this alone (no employer dashboard visit,
-        // no admin action) must be enough for reused documents to appear.
+        // The employer accepts — the count doesn't change (everything
+        // reusable was already picked up at invite time); what changes is
+        // the overall participation status advancing.
         Sanctum::actingAs($employer);
         $this->postJson("/api/employer/job-fairs/{$fairId}/respond", ['response' => 'accepted'])->assertOk();
 
@@ -398,6 +394,60 @@ class JobFairEcosystemFlowTest extends TestCase
         $this->assertSame('requirements_pending', $participantAfter['status']);
         $approvedCount = collect($participantAfter['requirements'])->where('status', 'approved')->count();
         $this->assertSame(4, $approvedCount);
+    }
+
+    /**
+     * Regression test matching the exact reported scenario: an already-
+     * verified employer self-expresses interest in a job fair (never
+     * invited, never accepted — participation_status stays 'interested')
+     * and still saw every reusable requirement as "pending" with an upload
+     * button, despite PESO having approved the same documents during
+     * registration. interest() now reuses them immediately.
+     */
+    public function test_expressing_interest_alone_already_shows_reused_documents(): void
+    {
+        Storage::fake('local');
+        $admin = Administrator::create([
+            'first_name' => 'PESO', 'last_name' => 'Manager', 'email' => 'interest-admin@example.test',
+            'mobile_number' => '09170000010', 'password' => 'password123', 'role' => 'administrator', 'status' => 'active', 'email_verified_at' => now(),
+        ]);
+        $employer = $this->employer('interest-employer@example.test', 'Interested Corp');
+
+        Storage::disk('local')->put('employer_documents/permit.pdf', '%PDF-1.4 fake content');
+        DB::table('employer_documents')->insert([
+            'employer_id' => $employer->employer_id, 'document_type' => 'mayors_permit',
+            'document_path' => 'employer_documents/permit.pdf', 'original_filename' => 'permit.pdf',
+            'file_size' => 1024, 'mime_type' => 'application/pdf', 'uploaded_at' => now(),
+            'verification_status' => 'approved', 'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        Sanctum::actingAs($admin);
+        $fairId = $this->postJson('/api/admin/job-fairs', [
+            'title' => 'Self Service Interest Job Fair', 'description' => 'Checks reuse fires on interest() alone.',
+            'start_date' => '2026-12-03', 'end_date' => '2026-12-03', 'start_time' => '08:00', 'end_time' => '16:00',
+            'venue' => 'PESO Urdaneta Hall',
+            'province' => 'Pangasinan', 'city_municipality' => 'Urdaneta City', 'barangay' => 'Nancayasan',
+            'sector' => 'local', 'target_sector' => 'Multi-sector',
+            'partner_agencies' => ['DOLE'], 'submission_deadline' => '2026-11-22 17:00:00',
+            'contact_email' => 'peso@example.test', 'maximum_representatives' => 2, 'status' => 'draft',
+        ])->assertCreated()->json('job_fair.job_fair_id');
+        $this->postJson("/api/admin/job-fairs/{$fairId}/publish", ['status' => 'accepting_employers'])->assertOk();
+
+        Sanctum::actingAs($employer);
+        $response = $this->postJson("/api/employer/job-fairs/{$fairId}/interest")->assertOk();
+        $this->assertSame('interested', $response->json('participation.status'));
+
+        $event = $this->getJson('/api/employer/job-fairs')->assertOk()->json('data.0');
+        $this->assertSame('interested', $event['participation']['status']);
+        $businessPermit = collect($event['participation']['requirements'])->firstWhere('label', 'Business Permit');
+        $this->assertNotNull($businessPermit, 'Business Permit should already be reused while merely "interested".');
+        $this->assertSame('approved', $businessPermit['status']);
+        $this->assertTrue($businessPermit['reused_from_verification']);
+
+        // A requirement with no accreditation document behind it (posterized
+        // vacancy) still genuinely needs a manual submission.
+        $posterizedVacancy = collect($event['participation']['requirements'])->firstWhere('label', 'Posterized Job Vacancy with Contact Details');
+        $this->assertNull($posterizedVacancy);
     }
 
     /**
