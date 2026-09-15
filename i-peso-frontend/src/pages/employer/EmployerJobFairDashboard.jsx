@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { AnimatePresence, motion as Motion } from 'framer-motion'
 import { ArrowLeft, ArrowRight, CalendarDays, CheckCircle2, ClipboardList, FileText, FileUp, Mail, MapPin, Save, ShieldCheck } from 'lucide-react'
 import { AlertBox, Badge, Button, Card, EmptyState, LoadingSkeleton } from '@/components/ui'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -62,13 +63,22 @@ function DetailChip({ icon: Icon, label, value, action }) {
   )
 }
 
+const cardEntrance = {
+  hidden: { opacity: 0, y: 14 },
+  show: { opacity: 1, y: 0 },
+}
+
 function JobFairCard({ fair, onClick }) {
   const status = fair.participation?.status
   return (
-    <button
+    <Motion.button
       type="button"
       onClick={onClick}
-      className="group flex h-full flex-col items-start gap-3 rounded-3xl border border-slate-200 bg-white p-5 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-md"
+      variants={cardEntrance}
+      whileHover={{ y: -4 }}
+      whileTap={{ scale: 0.98 }}
+      transition={{ type: 'spring', stiffness: 400, damping: 28 }}
+      className="group flex h-full flex-col items-start gap-3 rounded-3xl border border-slate-200 bg-white p-5 text-left shadow-sm transition-colors hover:border-blue-200 hover:shadow-md"
     >
       <div className="flex w-full items-start justify-between gap-2">
         <h3 className="font-black tracking-tight text-slate-950">{fair.title}</h3>
@@ -82,7 +92,7 @@ function JobFairCard({ fair, onClick }) {
       <span className="mt-1 inline-flex items-center gap-1 text-xs font-bold text-brand-navy opacity-0 transition-opacity group-hover:opacity-100">
         View details <ArrowRight className="h-3.5 w-3.5" />
       </span>
-    </button>
+    </Motion.button>
   )
 }
 
@@ -193,12 +203,15 @@ export default function EmployerJobFairDashboard() {
     }
   }
 
-  const requirementsDone = selected?.requirements?.length
-    ? selected.requirements.every((req) => {
-        const submitted = selected.participation?.requirements?.find((x) => x.job_fair_requirement_id === req.id)
-        return submitted && submitted.status !== 'rejected'
-      })
-    : false
+  const requirementsProgress = useMemo(() => {
+    const total = selected?.requirements?.length ?? 0
+    const done = total ? selected.requirements.filter((req) => {
+      const submitted = selected.participation?.requirements?.find((x) => x.job_fair_requirement_id === req.id)
+      return submitted && submitted.status !== 'rejected'
+    }).length : 0
+    return { total, done }
+  }, [selected])
+  const requirementsDone = requirementsProgress.total > 0 && requirementsProgress.done === requirementsProgress.total
 
   const confirmationRequirement = selected?.requirements?.find((req) => req.code === 'confirmation_slip')
   const confirmationDone = confirmationRequirement
@@ -221,16 +234,26 @@ export default function EmployerJobFairDashboard() {
         </div>
       </div>
 
-      {(error || notice) && (
+      {
         // Fixed instead of inline: this page scrolls tall (Requirements/Confirmation
         // Slip tabs sit well below the fold), and an inline banner up here was
         // invisible after actions taken further down — including uploads, which
         // then looked like they silently did nothing.
-        <div className="fixed inset-x-4 top-24 z-40 mx-auto max-w-2xl sm:inset-x-0">
-          {error && <AlertBox variant="danger" title="Job Fair action failed" action={<button type="button" onClick={() => setError('')} className="text-xs font-bold text-red-700 hover:underline">Dismiss</button>} className="shadow-lg">{error}</AlertBox>}
-          {notice && <AlertBox variant="success" title="Saved" action={<button type="button" onClick={() => setNotice('')} className="text-xs font-bold text-emerald-700 hover:underline">Dismiss</button>} className="shadow-lg">{notice}</AlertBox>}
-        </div>
-      )}
+      }
+      <div className="pointer-events-none fixed inset-x-4 top-24 z-40 mx-auto max-w-2xl space-y-2 sm:inset-x-0">
+        <AnimatePresence>
+          {error && (
+            <Motion.div key="error" initial={{ opacity: 0, y: -12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }} transition={{ duration: 0.2 }} className="pointer-events-auto">
+              <AlertBox variant="danger" title="Job Fair action failed" action={<button type="button" onClick={() => setError('')} className="text-xs font-bold text-red-700 hover:underline">Dismiss</button>} className="shadow-lg">{error}</AlertBox>
+            </Motion.div>
+          )}
+          {notice && (
+            <Motion.div key="notice" initial={{ opacity: 0, y: -12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }} transition={{ duration: 0.2 }} className="pointer-events-auto">
+              <AlertBox variant="success" title="Saved" action={<button type="button" onClick={() => setNotice('')} className="text-xs font-bold text-emerald-700 hover:underline">Dismiss</button>} className="shadow-lg">{notice}</AlertBox>
+            </Motion.div>
+          )}
+        </AnimatePresence>
+      </div>
 
       {loading ? (
         <LoadingSkeleton variant="card" rows={2} />
@@ -240,14 +263,19 @@ export default function EmployerJobFairDashboard() {
         <div>
           <h2 className="text-base font-extrabold text-slate-950">All Job Fairs</h2>
           <p className="mt-1 text-sm text-slate-500">Select an event to view its coordination record.</p>
-          <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          <Motion.div
+            initial="hidden"
+            animate="show"
+            variants={{ show: { transition: { staggerChildren: 0.06 } } }}
+            className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-3"
+          >
             {fairs.map((fair) => (
               <JobFairCard key={fair.job_fair_id} fair={fair} onClick={() => setSelectedId(String(fair.job_fair_id))} />
             ))}
-          </div>
+          </Motion.div>
         </div>
       ) : (
-        <div className="space-y-5">
+        <Motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, ease: 'easeOut' }} className="space-y-5">
           <button type="button" onClick={() => setSelectedId('')} className="flex items-center gap-2 text-sm font-bold text-slate-500 transition-colors hover:text-slate-800">
             <ArrowLeft className="h-4 w-4" />
             Back to all Job Fairs
@@ -312,7 +340,23 @@ export default function EmployerJobFairDashboard() {
 
                   <div className="pb-6">
                     <TabsContent value="requirements">
-                      <p className="mb-4 text-sm text-slate-500">Participation status: <span className="font-bold capitalize text-slate-800">{selected.participation.status.replaceAll('_', ' ')}</span></p>
+                      <Motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
+                      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                        <p className="text-sm text-slate-500">Participation status: <span className="font-bold capitalize text-slate-800">{selected.participation.status.replaceAll('_', ' ')}</span></p>
+                        {requirementsProgress.total > 0 && (
+                          <div className="flex items-center gap-2">
+                            <div className="h-1.5 w-28 overflow-hidden rounded-full bg-slate-100">
+                              <Motion.div
+                                className={`h-full rounded-full ${requirementsDone ? 'bg-emerald-500' : 'bg-brand-navy'}`}
+                                initial={{ width: 0 }}
+                                animate={{ width: `${(requirementsProgress.done / requirementsProgress.total) * 100}%` }}
+                                transition={{ duration: 0.4, ease: 'easeOut' }}
+                              />
+                            </div>
+                            <span className="text-xs font-bold text-slate-500">{requirementsProgress.done}/{requirementsProgress.total} ready</span>
+                          </div>
+                        )}
+                      </div>
                       <div className="space-y-3">
                         {selected.requirements.map((req) => {
                           const submissions = selected.participation.requirements?.filter((x) => x.job_fair_requirement_id === req.id) || []
@@ -372,9 +416,11 @@ export default function EmployerJobFairDashboard() {
                           )
                         })}
                       </div>
+                      </Motion.div>
                     </TabsContent>
 
                     <TabsContent value="confirmation">
+                      <Motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
                       <p className="mb-4 text-sm text-slate-500">Maximum {selected.maximum_representatives} representative(s) for this event.</p>
 
                       <div className="space-y-4">
@@ -410,6 +456,7 @@ export default function EmployerJobFairDashboard() {
                       >
                         Submit Confirmation
                       </Button>
+                      </Motion.div>
                     </TabsContent>
                   </div>
                 </Tabs>
@@ -430,7 +477,7 @@ export default function EmployerJobFairDashboard() {
             )}
             </div>
           )}
-        </div>
+        </Motion.div>
       )}
     </div>
   )
