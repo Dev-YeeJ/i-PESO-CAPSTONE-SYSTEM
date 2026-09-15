@@ -519,6 +519,56 @@ class JobFairController extends Controller
         return $reports->download($resultReport);
     }
 
+    public function downloadAttendancePdf(Request $request, JobFair $jobFair)
+    {
+        $this->admin($request);
+        $attendees = JobFairAttendee::with(['seeker.educations'])
+            ->where('job_fair_id', $jobFair->job_fair_id)
+            ->where('is_attended', true)
+            ->orderBy('scanned_at', 'asc')
+            ->get();
+
+        return Pdf::loadView('pdf.job_fairs.attendance', ['fair' => $jobFair, 'attendees' => $attendees])
+            ->setPaper('a4', 'landscape')
+            ->download('job-fair-attendance-'.$jobFair->job_fair_id.'.pdf');
+    }
+
+    public function downloadAttendanceExcel(Request $request, JobFair $jobFair)
+    {
+        $this->admin($request);
+        $attendees = JobFairAttendee::with(['seeker.educations'])
+            ->where('job_fair_id', $jobFair->job_fair_id)
+            ->where('is_attended', true)
+            ->orderBy('scanned_at', 'asc')
+            ->get();
+
+        $csv = fopen('php://temp', 'r+');
+        fputcsv($csv, ['Time In', 'Name', 'Gender', 'Contact Number', 'Education', 'Registration Type']);
+        
+        foreach ($attendees as $att) {
+            $educ = $att->guest_educ_attainment ?? '-';
+            if ($att->seeker) {
+                $educ = $att->seeker->educations->first()?->education_level ?? '-';
+            }
+            
+            fputcsv($csv, [
+                $att->scanned_at ? $att->scanned_at->setTimezone('Asia/Manila')->format('M d, Y h:i A') : '-',
+                $att->seeker ? trim($att->seeker->first_name . ' ' . $att->seeker->last_name) : $att->guest_name,
+                $att->seeker ? ucfirst($att->seeker->sex ?? 'Unknown') : 'Unknown',
+                $att->seeker ? $att->seeker->mobile_number : $att->guest_mobile_number,
+                $educ,
+                $att->seeker ? 'App/Web' : 'Walk-in',
+            ]);
+        }
+        rewind($csv);
+        $content = stream_get_contents($csv);
+        fclose($csv);
+
+        return response($content)
+            ->header('Content-Type', 'text/csv')
+            ->header('Content-Disposition', 'attachment; filename="job-fair-attendance-'.$jobFair->job_fair_id.'.csv"');
+    }
+
     public function exportSprs(Request $request, JobFair $jobFair, JobFairReportService $reports)
     {
         $this->admin($request);

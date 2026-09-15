@@ -330,6 +330,17 @@ export default function JobFairDetailPage() {
             </section>
           )}
 
+          <Card padding="sm" className="mb-6 flex flex-wrap items-center justify-between gap-4 border-emerald-100 bg-emerald-50/30">
+            <div>
+              <p className="font-black text-emerald-950">Job Seeker Attendance Report</p>
+              <p className="text-xs font-semibold text-emerald-700/80">List of seekers who checked in at the info desk</p>
+            </div>
+            <div className="flex gap-2">
+              <Button size="sm" variant="outline" icon={Download} onClick={() => blobDownload(() => adminService.downloadJobFairAttendancePdf(id), `job-fair-attendance-${id}.pdf`)}>Download PDF</Button>
+              <Button size="sm" variant="outline" icon={Download} onClick={() => blobDownload(() => adminService.downloadJobFairAttendanceExcel(id), `job-fair-attendance-${id}.csv`)}>Download Excel</Button>
+            </div>
+          </Card>
+
           <JobFairReportsChart metrics={metrics} reports={reports} />
 
           <Card padding="none">

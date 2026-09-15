@@ -311,6 +311,8 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::post('/job-fairs/{jobFair}/proxy-confirmation-slip', [AdminJobFairController::class, 'proxyConfirmation']);
             Route::get('/job-fair-results/{resultReport}/roi-form-3', [AdminJobFairController::class, 'downloadResult']);
             Route::get('/job-fairs/{jobFair}/export-sprs', [AdminJobFairController::class, 'exportSprs']);
+            Route::get('/job-fairs/{jobFair}/download-attendance-pdf', [AdminJobFairController::class, 'downloadAttendancePdf']);
+            Route::get('/job-fairs/{jobFair}/download-attendance-excel', [AdminJobFairController::class, 'downloadAttendanceExcel']);
             Route::get('/job-fairs/{jobFair}/invitation-letter', [AdminJobFairController::class, 'invitation']);
 
             // Reports
