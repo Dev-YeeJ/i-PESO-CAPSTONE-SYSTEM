@@ -312,9 +312,7 @@ export default function JobFairDetailPage() {
                 total_requirements: (fair?.requirements ?? []).length
               }))}
               onReviewRequirements={setReviewingParticipantId}
-              onManualStatus={(pid, value) => action(() => adminService.updateJobFairParticipation(id, pid, { status: value }), 'Participation updated.')}
               statusTones={statusTones}
-              manualStatusActions={MANUAL_STATUS_ACTIONS}
             />
           </motion.div>
         </TabsContent>
