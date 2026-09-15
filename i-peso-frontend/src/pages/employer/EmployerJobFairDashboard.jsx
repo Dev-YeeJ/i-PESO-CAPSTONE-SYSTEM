@@ -97,6 +97,40 @@ function JobFairCard({ fair, onClick }) {
   )
 }
 
+// A real <button> that opens the hidden file input via a ref, instead of a
+// <label> wrapping the input and relying on the browser's own "clicking a
+// label activates its nested control" mechanism to open the file dialog.
+// That label-based approach is what every requirement uploader on this page
+// used to use; the same-shaped upload elsewhere in the app (document
+// re-upload, registration) has always used this ref+button approach instead,
+// and only that one has been confirmed working end to end.
+function RequirementUploadButton({ isGallery, hasExisting, onSelect }) {
+  const fileInputRef = useRef(null)
+  return (
+    <>
+      <input
+        ref={fileInputRef}
+        type="file"
+        multiple={isGallery}
+        accept={isGallery ? undefined : '.pdf,.jpg,.jpeg,.png'}
+        className="hidden"
+        onChange={(e) => {
+          const files = e.target.files
+          e.target.value = ''
+          if (files?.length) onSelect(files)
+        }}
+      />
+      <button
+        type="button"
+        onClick={() => fileInputRef.current?.click()}
+        className="mt-3 flex w-fit items-center gap-2 rounded-lg border border-dashed border-slate-300 px-3 py-2 text-xs font-bold text-slate-600 hover:border-brand-navy hover:text-brand-navy"
+      >
+        <FileUp className="h-4 w-4" />{isGallery ? (hasExisting ? 'Add another photo' : 'Upload photos') : 'Upload document'}
+      </button>
+    </>
+  )
+}
+
 export default function EmployerJobFairDashboard() {
   const [fairs, setFairs] = useState([])
   const [selectedId, setSelectedId] = useState('')
@@ -406,15 +440,14 @@ export default function EmployerJobFairDashboard() {
                               ))}
 
                               {canUpload && (
-                                <label onClick={() => logDebug(`Upload label clicked (${req.label})`)} className="mt-3 flex w-fit cursor-pointer items-center gap-2 rounded-lg border border-dashed border-slate-300 px-3 py-2 text-xs font-bold text-slate-600 hover:border-brand-navy hover:text-brand-navy">
-                                  <FileUp className="h-4 w-4" />{isGallery ? (nonRejected.length > 0 ? 'Add another photo' : 'Upload photos') : 'Upload document'}
-                                  <input type="file" multiple={isGallery} accept={isGallery ? undefined : '.pdf,.jpg,.jpeg,.png'} className="hidden" onChange={(e) => {
-                                    const files = e.target.files; e.target.value = ''
-                                    logDebug(`onChange fired, ${files?.length ?? 0} file(s) selected`)
-                                    if (!files?.length) return
+                                <RequirementUploadButton
+                                  isGallery={isGallery}
+                                  hasExisting={nonRejected.length > 0}
+                                  onSelect={(files) => {
+                                    logDebug(`onChange fired, ${files.length} file(s) selected`)
                                     act(() => uploadJobFairRequirement(selected.job_fair_id, req.id, files), `${req.label} submitted.`, { loading: `Uploading ${files.length > 1 ? `${files.length} photos` : files[0].name}…` })
-                                  }} />
-                                </label>
+                                  }}
+                                />
                               )}
                               {submissions[0]?.admin_remarks && <p className="mt-2 text-xs font-semibold text-rose-700">PESO: {submissions[0].admin_remarks}</p>}
                             </div>
