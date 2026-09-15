@@ -88,26 +88,16 @@ class EmployerJobFairController extends Controller
         abort_unless($requirement->job_fair_id === $jobFair->job_fair_id, 404);
         $participation = $this->participation($jobFair, $employer);
 
-        // Posterized Job Vacancy is an actual photo of a flyer/poster, not a
-        // scanned document — a phone camera or export can easily produce a
-        // format outside the standard pdf/jpg/png set (webp, heic/heif from
-        // iPhones, gif, bmp). Every other requirement stays document-only.
-        //
-        // Uses 'extensions' rather than 'mimes' for the gallery case:
-        // 'mimes' validates by sniffing the file's actual content through
-        // PHP's fileinfo/libmagic, and shared hosting environments often
-        // ship an outdated magic database that misidentifies (or plain
-        // fails to recognize) newer formats like webp/heic — silently
-        // rejecting a real photo of exactly the type this list already
-        // allows. 'extensions' checks the uploaded filename's extension
-        // directly instead, which is what the file picker's `accept`
-        // already filtered on and is why this is safe.
-        // Poster flyers (designed in Canva/Photoshop, often PNG) routinely run
-        // past a 5MB cap that's fine for a scanned document — 10MB gives real
-        // headroom without moving the goalposts on the other requirements.
+        // Posterized Job Vacancy accepts any file type/extension at all --
+        // no mimes/extensions restriction — since employers export flyers
+        // from a wide range of tools and formats kept tripping up an
+        // allowlist. Safe to leave unrestricted: this disk ('local') isn't
+        // web-accessible, files are only ever served back through the
+        // authenticated view/download endpoints below, never executed.
+        // Every other requirement stays document-only (pdf/jpg/jpeg/png).
         $isGallery = $requirement->code === 'posterized_vacancy';
         $fileRules = $isGallery
-            ? ['file', 'extensions:jpg,jpeg,png,webp,gif,bmp,heic,heif,pdf', 'max:10240']
+            ? ['file', 'max:10240']
             : ['file', 'mimes:pdf,jpg,jpeg,png', 'max:5120'];
 
         $validated = $request->validate([
