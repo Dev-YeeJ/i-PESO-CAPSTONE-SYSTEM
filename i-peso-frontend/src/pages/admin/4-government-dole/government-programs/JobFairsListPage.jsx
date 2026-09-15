@@ -7,6 +7,8 @@ import toast from 'react-hot-toast'
 import { Button, EmptyState, LoadingSkeleton, StatCard } from '@/components/ui'
 import { ConfirmModal, StatusBadge } from '@/pages/admin/_components'
 import { adminService } from '@/services/adminService'
+import JobFairsCalendar from './components/JobFairsCalendar'
+import { LayoutList, Calendar as CalendarIcon } from 'lucide-react'
 
 const formatDate = (value) => value ? new Date(value).toLocaleDateString() : 'TBD'
 
@@ -33,6 +35,7 @@ function Info({ icon: Icon, label, value }) {
 
 export default function JobFairsListPage() {
   const [page, setPage] = useState(1)
+  const [viewMode, setViewMode] = useState('list')
   const [pendingDelete, setPendingDelete] = useState(null)
   const navigate = useNavigate()
   const queryClient = useQueryClient()
@@ -140,6 +143,25 @@ export default function JobFairsListPage() {
         </div>
       )}
 
+      <div className="flex justify-end">
+        <div className="inline-flex rounded-lg border border-slate-200 bg-white p-1 shadow-sm">
+          <button 
+            type="button" 
+            onClick={() => setViewMode('list')} 
+            className={`flex items-center gap-2 rounded-md px-4 py-2 text-sm font-semibold transition-colors ${viewMode === 'list' ? 'bg-blue-50 text-blue-700' : 'text-slate-500 hover:bg-slate-50'}`}
+          >
+            <LayoutList className="h-4 w-4" /> List View
+          </button>
+          <button 
+            type="button" 
+            onClick={() => setViewMode('calendar')} 
+            className={`flex items-center gap-2 rounded-md px-4 py-2 text-sm font-semibold transition-colors ${viewMode === 'calendar' ? 'bg-blue-50 text-blue-700' : 'text-slate-500 hover:bg-slate-50'}`}
+          >
+            <CalendarIcon className="h-4 w-4" /> Calendar View
+          </button>
+        </div>
+      </div>
+
       {loading ? (
         <LoadingSkeleton variant="card" rows={3} />
       ) : fairs.length === 0 ? (
@@ -154,6 +176,10 @@ export default function JobFairsListPage() {
             description="Create a job fair to coordinate employers and automate post-event government reports."
             action={{ label: 'Create job fair', icon: Plus, onClick: () => navigate('/admin/job-fairs/create') }}
           />
+        </motion.div>
+      ) : viewMode === 'calendar' ? (
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+          <JobFairsCalendar fairs={fairs} />
         </motion.div>
       ) : (
         <motion.div 

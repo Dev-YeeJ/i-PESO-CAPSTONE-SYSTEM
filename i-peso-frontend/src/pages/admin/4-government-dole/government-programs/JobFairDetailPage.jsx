@@ -12,6 +12,9 @@ import EstablishmentReportPreview from '@/components/reports/EstablishmentReport
 import JobFairResultEntryEditor from '@/components/reports/JobFairResultEntryEditor'
 import ConfirmationVacancyEditor, { blankConfirmationVacancy, stripBlankConfirmationVacancies } from '@/components/reports/ConfirmationVacancyEditor'
 import { adminService } from '@/services/adminService'
+import { Command } from 'cmdk'
+import JobFairEmployersTable from './components/JobFairEmployersTable'
+import JobFairReportsChart from './components/JobFairReportsChart'
 
 // Every possible participation_status value, grouped only to color the
 // read-only status Badge — most of these are computed automatically
@@ -275,49 +278,46 @@ export default function JobFairDetailPage() {
               </div>
 
               <div ref={employerPickerRef} className="relative mt-5">
-                <label className="text-xs font-bold uppercase tracking-wide text-slate-500">Invite a verified employer</label>
-                <div className="relative mt-1.5">
-                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                  <input
+                <label className="text-xs font-bold uppercase tracking-wide text-slate-500 mb-1.5 block">Invite a verified employer</label>
+                <Command className="rounded-xl border border-slate-300 shadow-sm overflow-visible bg-white" shouldFilter={false}>
+                  <Command.Input
                     value={employerQuery}
-                    onChange={(e) => { setEmployerQuery(e.target.value); setEmployerPickerOpen(true) }}
+                    onValueChange={(val) => { setEmployerQuery(val); setEmployerPickerOpen(true) }}
                     onFocus={() => setEmployerPickerOpen(true)}
                     placeholder="Search company name…"
-                    className="w-full rounded-lg border border-slate-300 py-2 pl-9 pr-3 text-sm focus:border-brand-navy focus:outline-none focus:ring-2 focus:ring-brand-navy/10"
+                    className="w-full border-none bg-transparent px-4 py-2.5 text-sm focus:outline-none focus:ring-0"
                   />
-                </div>
-                <AnimatePresence>
-                  {employerPickerOpen && employerQuery.trim() && (
-                    <motion.div 
-                      initial={{ opacity: 0, y: -10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -10 }}
-                      transition={{ duration: 0.2 }}
-                      className="absolute z-10 mt-1.5 w-full overflow-hidden rounded-xl border border-slate-200 bg-white/90 backdrop-blur-xl shadow-2xl"
-                    >
-                      {employerSearching ? (
-                        <p className="px-4 py-3 text-xs font-semibold text-slate-500">Searching…</p>
-                      ) : employerResults.length === 0 ? (
-                        <p className="px-4 py-3 text-xs font-semibold text-slate-500">No verified employer matches.</p>
-                      ) : (
-                        <ul className="max-h-64 divide-y divide-slate-100 overflow-y-auto">
-                          {employerResults.map((employer) => (
-                            <li key={employer.employer_id}>
-                              <button
-                                type="button"
-                                onClick={() => inviteEmployer(employer)}
-                                className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm transition hover:bg-blue-50 hover:text-blue-700"
+                  <AnimatePresence>
+                    {employerPickerOpen && employerQuery.trim() && (
+                      <motion.div 
+                        initial={{ opacity: 0, y: -5 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -5 }}
+                        transition={{ duration: 0.15 }}
+                        className="absolute z-10 w-full top-full mt-1 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl"
+                      >
+                        <Command.List className="max-h-64 overflow-y-auto p-1">
+                          {employerSearching ? (
+                            <Command.Loading className="px-4 py-3 text-xs font-semibold text-slate-500">Searching…</Command.Loading>
+                          ) : employerResults.length === 0 ? (
+                            <Command.Empty className="px-4 py-3 text-xs font-semibold text-slate-500">No verified employer matches.</Command.Empty>
+                          ) : (
+                            employerResults.map((employer) => (
+                              <Command.Item
+                                key={employer.employer_id}
+                                onSelect={() => inviteEmployer(employer)}
+                                className="flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition data-[selected=true]:bg-blue-50 data-[selected=true]:text-blue-700"
                               >
                                 <Mail className="h-4 w-4 shrink-0 text-slate-400" />
                                 <span className="truncate font-bold text-slate-900">{employer.company_name}</span>
-                              </button>
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-                    </motion.div>
-                  )}
-                </AnimatePresence>
+                              </Command.Item>
+                            ))
+                          )}
+                        </Command.List>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </Command>
               </div>
 
               {fair?.latitude && fair?.longitude && (
@@ -337,59 +337,16 @@ export default function JobFairDetailPage() {
               <Button variant="outline" icon={RefreshCw} onClick={load} className="shadow-sm">Refresh</Button>
             </div>
 
-            {!(fair?.participants ?? []).length ? (
-              <Card><p className="p-8 text-center text-sm text-slate-500">No employer participation records yet.</p></Card>
-            ) : (
-              <motion.div 
-                initial="hidden"
-                animate="show"
-                variants={{ hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.05 } } }}
-                className="grid gap-4 md:grid-cols-2 xl:grid-cols-3"
-              >
-                {fair.participants.map((p) => {
-                  const totalReqs = (fair.requirements ?? []).length
-                  const approvedReqs = (p.requirements ?? []).filter((r) => r.status === 'approved').length
-                  return (
-                    <motion.div 
-                      key={p.id} 
-                      variants={{ hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0 } }}
-                      whileHover={{ y: -2 }}
-                      className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-blue-200 hover:shadow-md"
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <p className="truncate text-base font-black text-slate-950">{p.company_name}</p>
-                          <p className="mt-1 truncate text-xs font-semibold text-slate-500 uppercase tracking-wide">{p.source?.replaceAll('_', ' ')} · {p.confirmation_channel || 'channel not set'}</p>
-                        </div>
-                        <Badge variant={statusTones[p.status] ?? 'neutral'} icon={false} className="shrink-0 font-bold">{p.status.replaceAll('_', ' ')}</Badge>
-                      </div>
-
-                      <button
-                        type="button"
-                        onClick={() => setReviewingParticipantId(p.id)}
-                        className="flex items-center gap-1.5 self-start rounded-lg bg-blue-50 px-3 py-1.5 text-xs font-bold text-blue-700 hover:bg-blue-100 transition"
-                      >
-                        <FileText className="h-3.5 w-3.5" />
-                        {totalReqs ? `${approvedReqs}/${totalReqs} requirements approved` : 'View requirements'}
-                      </button>
-
-                      {/* Status above is computed automatically wherever possible (see
-                          syncRequirementStatus). This is only for the handful of
-                          events nothing else can detect — it always resets to the
-                          placeholder rather than mirroring the current status. */}
-                      <div className="mt-auto pt-2 border-t border-slate-100">
-                        <Select value="" onValueChange={(value) => action(() => adminService.updateJobFairParticipation(id, p.id, { status: value }), 'Participation updated.')}>
-                          <SelectTrigger className="w-full bg-slate-50 hover:bg-slate-100 border-slate-200"><SelectValue placeholder="Record a manual event…" /></SelectTrigger>
-                          <SelectContent>
-                            {MANUAL_STATUS_ACTIONS.map(([value, label]) => <SelectItem key={value} value={value} className="font-semibold">{label}</SelectItem>)}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </motion.div>
-                  )
-                })}
-              </motion.div>
-            )}
+            <JobFairEmployersTable 
+              participants={(fair?.participants ?? []).map(p => ({
+                ...p, 
+                total_requirements: (fair?.requirements ?? []).length
+              }))}
+              onReviewRequirements={setReviewingParticipantId}
+              onManualStatus={(pid, value) => action(() => adminService.updateJobFairParticipation(id, pid, { status: value }), 'Participation updated.')}
+              statusTones={statusTones}
+              manualStatusActions={MANUAL_STATUS_ACTIONS}
+            />
           </motion.div>
         </TabsContent>
 
@@ -498,6 +455,8 @@ export default function JobFairDetailPage() {
               <StatCard label="Mismatched" value={unifiedTotals.total_rejected} icon={XCircle} color="red" />
             </section>
           )}
+
+          <JobFairReportsChart metrics={metrics} reports={reports} />
 
           <Card padding="none">
             <div className="border-b border-slate-100 p-5">
