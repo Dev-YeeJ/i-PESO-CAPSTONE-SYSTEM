@@ -106,7 +106,9 @@ export default function JobFairsScreen() {
 
                   <View style={styles.metaRow}>
                     <MaterialIcons name="business" size={16} color={colors.subtle} />
-                    <Text style={styles.meta}>{employerCount} employer{employerCount === 1 ? '' : 's'} participating</Text>
+                    <Text style={styles.meta}>
+                      {employerCount > 0 ? `${employerCount} employer${employerCount === 1 ? '' : 's'} confirmed` : 'Employers confirming soon'}
+                    </Text>
                   </View>
 
                   <View style={styles.metaRow}>

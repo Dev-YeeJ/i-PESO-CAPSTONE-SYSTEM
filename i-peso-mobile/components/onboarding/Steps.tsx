@@ -302,9 +302,9 @@ const LANGUAGE_OPTIONS = [
 ]
 const EDUCATION_LEVEL_OPTIONS = [
   { label: 'Elementary', value: 'elementary' },
-  { label: 'High School', value: 'secondary_non_k12' },
-  { label: 'Junior High (K12)', value: 'secondary_k12' },
-  { label: 'Senior High', value: 'senior_high_strand' },
+  { label: 'High School (Old Curriculum)', value: 'secondary_non_k12' },
+  { label: 'Junior High School (K-12)', value: 'secondary_k12' },
+  { label: 'Senior High School', value: 'senior_high_strand' },
   { label: 'Vocational', value: 'vocational' },
   { label: 'College', value: 'tertiary' },
   { label: 'Graduate Studies', value: 'graduate_studies' },
