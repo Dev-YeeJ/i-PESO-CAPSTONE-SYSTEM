@@ -199,10 +199,19 @@ class EmployerPlacementReportController extends Controller
                 'middle_name' => $app->jobSeeker->middle_name,
                 'last_name' => $app->jobSeeker->last_name,
                 'gender' => $app->jobSeeker->sex ?? 'male',
+                'civil_status' => $app->jobSeeker->civil_status,
+                'birth_date' => $app->jobSeeker->date_of_birth?->format('Y-m-d'),
+                'address' => trim("{$app->jobSeeker->address_street}, {$app->jobSeeker->address_barangay}, {$app->jobSeeker->address_municipality_city}", ", \t\n\r\0\x0B"),
+                'educational_attainment' => $app->jobSeeker->highest_education_attained,
+                'assigned_company' => $employer->company_name ?: $employer->trade_name,
+                'age' => $app->jobSeeker->date_of_birth ? $app->jobSeeker->date_of_birth->age : null,
                 'employment_type' => $app->placement_employment_type ?? 'regular',
                 'salary_monthly' => $app->placement_salary ?? 0,
-                'position_title' => $app->jobVacancy?->job_title ?? 'Unknown',
+                'position' => $app->jobVacancy?->job_title ?? 'Unknown',
                 'date_hired' => $app->status_changed_at?->format('Y-m-d') ?? null,
+                'seeker_id' => $app->jobSeeker->seeker_id,
+                'seeker_match_confidence' => \App\Models\PlacementRecord::MATCH_EXACT,
+                'seeker_match_confirmed_at' => now(),
             ]);
         }
 
@@ -248,6 +257,9 @@ class EmployerPlacementReportController extends Controller
             'records.*.address' => ['nullable', 'string', 'max:500'],
             'records.*.educational_attainment' => ['nullable', 'string', 'max:255'],
             'records.*.assigned_company' => ['nullable', 'string', 'max:255'],
+            'records.*.seeker_id' => ['nullable', 'integer'],
+            'records.*.seeker_match_confidence' => ['nullable', 'string'],
+            'records.*.seeker_match_confirmed_at' => ['nullable', 'date'],
         ]);
 
         $created = $this->imports->buildManualRecords($placementReport, $validated['records']);
