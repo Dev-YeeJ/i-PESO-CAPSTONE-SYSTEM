@@ -2,20 +2,19 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { CheckCircle2, ClipboardEdit, Download, Eye, FileText, Flame, Mail, RefreshCw, Save, Search, ShieldCheck, TrendingUp, UserCheck, Users, XCircle } from 'lucide-react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { AlertBox, Badge, Button, Card, CardHeader, LoadingSkeleton, StatCard } from '@/components/ui'
+import { Badge, Button, Card, CardHeader, LoadingSkeleton, StatCard } from '@/components/ui'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
+import { toast } from 'sonner'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import PageHeader from '@/pages/admin/_components/PageHeader'
 import LocationPreviewCard from '@/components/maps/LocationPreviewCard'
 import EstablishmentReportPreview from '@/components/reports/EstablishmentReportPreview'
-import JobFairResultEntryEditor from '@/components/reports/JobFairResultEntryEditor'
-import ConfirmationVacancyEditor, { blankConfirmationVacancy, stripBlankConfirmationVacancies } from '@/components/reports/ConfirmationVacancyEditor'
+import { JobFairProxyForms } from './components/JobFairProxyForms'
 import { adminService } from '@/services/adminService'
 import { Command } from 'cmdk'
 import JobFairEmployersTable from './components/JobFairEmployersTable'
 import JobFairReportsChart from './components/JobFairReportsChart'
-
 // Every possible participation_status value, grouped only to color the
 // read-only status Badge — most of these are computed automatically
 // (invited/interested/accepted/declined/requirements_pending/
@@ -52,8 +51,6 @@ const statTone = {
   red: 'bg-red-50 text-red-600',
 }
 
-const zeroProxy = { company_name: '', employer_type: 'paper_only_employer', contact_person: '', contact_number: '', clearance_no: '', total_male: 0, total_female: 0, total_applicants: 0, total_qualified: 0, total_hots: 0, total_near_hired: 0, total_rejected: 0, total_vacancies_solicited: 0, total_vacancies_offered: 0, remarks: '' }
-const zeroProxyConfirmation = { company_name: '', representative_1_name: '', representative_1_contact: '', representative_position: '' }
 const inputClass = 'mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-brand-navy focus:outline-none focus:ring-2 focus:ring-brand-navy/10'
 
 function StepLabel({ step, children }) {
@@ -83,12 +80,6 @@ export default function JobFairDetailPage() {
   const navigate = useNavigate()
   const [fair, setFair] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
-  const [notice, setNotice] = useState('')
-  const [proxy, setProxy] = useState(zeroProxy)
-  const [proxyEntries, setProxyEntries] = useState([])
-  const [proxyConfirmation, setProxyConfirmation] = useState(zeroProxyConfirmation)
-  const [proxyConfirmationVacancies, setProxyConfirmationVacancies] = useState([blankConfirmationVacancy()])
   const [viewingReport, setViewingReport] = useState(null)
   const [reviewingParticipantId, setReviewingParticipantId] = useState(null)
 
@@ -167,13 +158,12 @@ export default function JobFairDetailPage() {
   const reviewingParticipant = fair?.participants?.find((p) => p.id === reviewingParticipantId) ?? null
 
   const action = async (work, success) => {
-    setError(''); setNotice('')
     try {
       await work()
-      setNotice(success)
+      toast.success(success)
       await load()
     } catch (e) {
-      setError(Object.values(e.response?.data?.errors ?? {}).flat().join(' ') || e.response?.data?.message || 'Action failed.')
+      toast.error(Object.values(e.response?.data?.errors ?? {}).flat().join(' ') || e.response?.data?.message || 'Action failed.')
     }
   }
 
@@ -185,7 +175,7 @@ export default function JobFairDetailPage() {
       link.href = url; link.download = filename; link.click()
       URL.revokeObjectURL(url)
     } catch (e) {
-      setError(e.response?.data?.message ?? 'Download failed.')
+      toast.error(e.response?.data?.message ?? 'Download failed.')
     }
   }
 
@@ -230,27 +220,6 @@ export default function JobFairDetailPage() {
         ]}
       />
 
-      {error && <AlertBox variant="danger" title="Action failed">{error}</AlertBox>}
-      {notice && <AlertBox variant="success" title="Saved">{notice}</AlertBox>}
-
-      {/* Always-visible KPI strip — sticks below the app header while scrolling
-          any tab, so the admin never has to hop back to Overview to see it. */}
-      <div className="sticky top-0 z-10 -mx-4 border-b border-slate-200 bg-white/95 px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
-        <div className="flex flex-wrap gap-x-6 gap-y-2.5">
-          {statCards.map((card) => (
-            <div key={card.label} className="flex items-center gap-2">
-              <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${statTone[card.color] ?? statTone.blue}`}>
-                <card.icon className="h-3.5 w-3.5" />
-              </span>
-              <div>
-                <p className="text-sm font-black leading-none text-slate-900">{card.value ?? 0}</p>
-                <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">{card.label}</p>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
       <Tabs defaultValue="overview">
         <TabsList>
           <TabsTrigger value="overview">Overview</TabsTrigger>
@@ -261,6 +230,13 @@ export default function JobFairDetailPage() {
 
         <TabsContent value="overview">
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }} className="space-y-6">
+            
+            <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-4">
+              {statCards.map((card) => (
+                <StatCard key={card.label} label={card.label} value={card.value} icon={card.icon} tone={card.color} />
+              ))}
+            </div>
+
             <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm leading-6 text-blue-900 shadow-sm">
               <strong>Physical event status quo:</strong> i-PESO does not force digital crowd control at the venue — employers use their normal tables and paper resumes; the system focuses on coordination before the event and report automation afterward.
             </div>
@@ -352,96 +328,7 @@ export default function JobFairDetailPage() {
 
         <TabsContent value="paper">
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }} className="space-y-6">
-          <Card>
-            <CardHeader title={<StepLabel step={1}>Encode walk-in employer paper form</StepLabel>} subtitle="Admin Proxy Encoding does not create an employer account." />
-
-            <div className="space-y-5">
-              <div className="rounded-xl border border-slate-200 p-4">
-                <p className="mb-3 text-xs font-extrabold uppercase tracking-wide text-slate-600">Employer Details</p>
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <Field label="Company name" value={proxy.company_name} onChange={(v) => setProxy((x) => ({ ...x, company_name: v }))} />
-                  <label className="text-xs font-bold uppercase tracking-wide text-slate-500">
-                    Employer type
-                    <select value={proxy.employer_type} onChange={(e) => setProxy((x) => ({ ...x, employer_type: e.target.value }))} className={inputClass}>
-                      <option value="paper_only_employer">Paper-only</option>
-                      <option value="walk_in_employer">Walk-in</option>
-                      <option value="out_of_town_employer">Out-of-town</option>
-                      <option value="registered_employer">Registered</option>
-                    </select>
-                  </label>
-                  <Field label="Contact person" value={proxy.contact_person} onChange={(v) => setProxy((x) => ({ ...x, contact_person: v }))} />
-                  <Field label="Contact number" value={proxy.contact_number} onChange={(v) => setProxy((x) => ({ ...x, contact_number: v }))} />
-                  <Field label="Job Fair Clearance No." value={proxy.clearance_no} onChange={(v) => setProxy((x) => ({ ...x, clearance_no: v }))} />
-                </div>
-              </div>
-
-              <div className="rounded-xl border border-slate-200 p-4">
-                <p className="mb-3 text-xs font-extrabold uppercase tracking-wide text-slate-600">Aggregate Totals</p>
-                <div className="grid gap-4 sm:grid-cols-3">
-                  <Field label="Male applicants" type="number" value={proxy.total_male} onChange={(v) => setProxy((x) => ({ ...x, total_male: v }))} />
-                  <Field label="Female applicants" type="number" value={proxy.total_female} onChange={(v) => setProxy((x) => ({ ...x, total_female: v }))} />
-                  <Field label="Total applicants" type="number" value={proxy.total_applicants} onChange={(v) => setProxy((x) => ({ ...x, total_applicants: v }))} />
-                  <Field label="Qualified" type="number" value={proxy.total_qualified} onChange={(v) => setProxy((x) => ({ ...x, total_qualified: v }))} />
-                  <Field label="Hired on the spot" type="number" value={proxy.total_hots} onChange={(v) => setProxy((x) => ({ ...x, total_hots: v }))} />
-                  <Field label="Near-hired" type="number" value={proxy.total_near_hired} onChange={(v) => setProxy((x) => ({ ...x, total_near_hired: v }))} />
-                  <Field label="Mismatched (rejected)" type="number" value={proxy.total_rejected} onChange={(v) => setProxy((x) => ({ ...x, total_rejected: v }))} />
-                  <Field label="Vacancies solicited" type="number" value={proxy.total_vacancies_solicited} onChange={(v) => setProxy((x) => ({ ...x, total_vacancies_solicited: v }))} />
-                  <Field label="Vacancies offered" type="number" value={proxy.total_vacancies_offered} onChange={(v) => setProxy((x) => ({ ...x, total_vacancies_offered: v }))} />
-                </div>
-                <Field label="Remarks" textarea value={proxy.remarks} onChange={(v) => setProxy((x) => ({ ...x, remarks: v }))} className="mt-4 block" />
-              </div>
-
-              <div>
-                <p className="mb-3 text-xs font-extrabold uppercase tracking-wide text-slate-600">
-                  Per-applicant register <span className="font-normal normal-case text-slate-400">(optional — leave empty to save aggregate totals only)</span>
-                </p>
-                <JobFairResultEntryEditor entries={proxyEntries} onChange={setProxyEntries} searchApplicants={adminService.searchApplicantSuggestions} />
-              </div>
-            </div>
-
-            <Button
-              className="mt-5"
-              icon={Save}
-              onClick={() => action(() => adminService.submitJobFairProxyResults(id, {
-                ...proxy,
-                entries: proxyEntries.filter((e) => e.applicant_name && e.position_applied_for)
-                  .map((e) => ({ ...e, mismatch_code: e.mismatch_code || null })),
-              }), 'Admin Proxy Encoded report saved.')}
-            >
-              Save Proxy Report
-            </Button>
-          </Card>
-
-          <Card>
-            <CardHeader title={<StepLabel step={2}>Encode manual confirmation slip</StepLabel>} subtitle="For confirmations received by phone, email, or paper." />
-
-            <div className="space-y-5">
-              <div className="rounded-xl border border-slate-200 p-4">
-                <p className="mb-3 text-xs font-extrabold uppercase tracking-wide text-slate-600">Company & Representative</p>
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <Field label="Company name" value={proxyConfirmation.company_name} onChange={(v) => setProxyConfirmation((x) => ({ ...x, company_name: v }))} />
-                  <Field label="Representative name" value={proxyConfirmation.representative_1_name} onChange={(v) => setProxyConfirmation((x) => ({ ...x, representative_1_name: v }))} />
-                  <Field label="Position/s" value={proxyConfirmation.representative_position} onChange={(v) => setProxyConfirmation((x) => ({ ...x, representative_position: v }))} />
-                  <Field label="Representative contact" value={proxyConfirmation.representative_1_contact} onChange={(v) => setProxyConfirmation((x) => ({ ...x, representative_1_contact: v }))} />
-                </div>
-              </div>
-
-              <div>
-                <p className="mb-2 text-xs font-extrabold uppercase tracking-wide text-slate-600">List of Vacancies / Orders</p>
-                <ConfirmationVacancyEditor vacancies={proxyConfirmationVacancies} onChange={setProxyConfirmationVacancies} />
-              </div>
-            </div>
-
-            <Button
-              className="mt-5"
-              icon={Save}
-              onClick={() => action(() => adminService.submitJobFairProxyConfirmation(id, {
-                ...proxyConfirmation, vacancies: stripBlankConfirmationVacancies(proxyConfirmationVacancies),
-              }), 'Manual confirmation slip saved.')}
-            >
-              Save Confirmation
-            </Button>
-          </Card>
+            <JobFairProxyForms fairId={id} onSuccess={() => load({ silent: true })} />
           </motion.div>
         </TabsContent>
 
