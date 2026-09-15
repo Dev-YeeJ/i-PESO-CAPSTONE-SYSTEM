@@ -71,8 +71,8 @@ export default function ConfirmationVacancyEditor({ vacancies, onChange, myVacan
           <TableRow>
             <TableHead>Number Needed *</TableHead>
             <TableHead>Position Title *</TableHead>
-            <TableHead>Qualifications</TableHead>
-            <TableHead>Place of Work</TableHead>
+            <TableHead className="max-w-[14rem]">Qualifications</TableHead>
+            <TableHead className="max-w-[10rem]">Place of Work</TableHead>
             <TableHead />
           </TableRow>
         </TableHeader>
