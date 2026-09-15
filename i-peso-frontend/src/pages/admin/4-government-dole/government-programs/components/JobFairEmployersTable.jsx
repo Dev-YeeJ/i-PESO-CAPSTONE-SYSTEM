@@ -5,7 +5,7 @@ import { ChevronDown, ChevronUp, FileText, Search, ChevronLeft, ChevronRight, Ch
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 
-export default function JobFairEmployersTable({ participants, onReviewRequirements, onManualStatus, statusTones, manualStatusActions }) {
+export default function JobFairEmployersTable({ participants, onReviewRequirements, statusTones }) {
   const [sorting, setSorting] = useState([])
   const [globalFilter, setGlobalFilter] = useState('')
 
@@ -53,26 +53,7 @@ export default function JobFairEmployersTable({ participants, onReviewRequiremen
         )
       }
     },
-    {
-      id: 'actions',
-      header: 'Manual Override',
-      cell: ({ row }) => {
-        const p = row.original
-        return (
-          <Select value="" onValueChange={(value) => onManualStatus(p.id, value)}>
-            <SelectTrigger className="w-full min-w-[160px] bg-white border-slate-200 hover:bg-slate-50 text-xs">
-              <SelectValue placeholder="Record event…" />
-            </SelectTrigger>
-            <SelectContent>
-              {manualStatusActions.map(([value, label]) => (
-                <SelectItem key={value} value={value} className="text-xs font-semibold">{label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        )
-      }
-    }
-  ], [onReviewRequirements, onManualStatus, statusTones, manualStatusActions])
+  ], [onReviewRequirements, statusTones])
 
   const table = useReactTable({
     data: participants,

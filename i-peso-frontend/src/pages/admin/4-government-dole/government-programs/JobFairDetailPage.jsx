@@ -181,6 +181,16 @@ export default function JobFairDetailPage() {
     }
   }
 
+  const blobPreview = async (work) => {
+    try {
+      const blob = await work()
+      const url = URL.createObjectURL(blob)
+      window.open(url, '_blank')
+    } catch (e) {
+      toast.error(e.response?.data?.message ?? 'Preview failed.')
+    }
+  }
+
   const inviteEmployer = (employer) => {
     setEmployerPickerOpen(false)
     setEmployerQuery('')
@@ -421,7 +431,7 @@ export default function JobFairDetailPage() {
                         </p>
                       )}
                       {hasViewableFile && (
-                        <button type="button" onClick={() => blobDownload(() => adminService.viewJobFairRequirement(submitted.id), submitted.original_filename || `requirement-${submitted.id}`)} className="mt-2 flex items-center gap-1.5 text-xs font-semibold text-blue-700 hover:underline">
+                        <button type="button" onClick={() => blobPreview(() => adminService.viewJobFairRequirement(submitted.id))} className="mt-2 flex items-center gap-1.5 text-xs font-semibold text-blue-700 hover:underline">
                           <FileText className="h-3.5 w-3.5" />View {submitted.original_filename}
                         </button>
                       )}
