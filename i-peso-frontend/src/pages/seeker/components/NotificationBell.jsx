@@ -24,11 +24,15 @@ export default function NotificationBell() {
     staleTime: 60_000,
   })
 
+  // refetchOnWindowFocus is deliberately left off (inherits the app-wide
+  // default) -- see the employer NotificationBell for why: it fires right
+  // when a native OS file picker closes after choosing a file, which can
+  // land in the same tick as an upload <input>'s pending 'change' event
+  // elsewhere on the page. The 30s poll below is fresh enough regardless.
   const unreadQuery = useQuery({
     queryKey: ['seekerNotifications', 'unreadCount'],
     queryFn: getNotificationUnreadCount,
     refetchInterval: 30000,
-    refetchOnWindowFocus: true,
   })
 
   const notifications = notificationsQuery.data?.notifications ?? []
