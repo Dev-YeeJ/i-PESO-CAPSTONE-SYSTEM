@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { AnimatePresence, motion as Motion } from 'framer-motion'
+import { motion as Motion } from 'framer-motion'
+import toast from 'react-hot-toast'
 import { ArrowLeft, ArrowRight, CalendarDays, CheckCircle2, ClipboardList, FileText, FileUp, Mail, MapPin, Save, ShieldCheck } from 'lucide-react'
-import { AlertBox, Badge, Button, Card, EmptyState, LoadingSkeleton } from '@/components/ui'
+import { Badge, Button, Card, EmptyState, LoadingSkeleton } from '@/components/ui'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import ConfirmationVacancyEditor, { blankConfirmationVacancy, stripBlankConfirmationVacancies } from '@/components/reports/ConfirmationVacancyEditor'
 import {
@@ -104,8 +105,6 @@ export default function EmployerJobFairDashboard() {
   const [myVacancies, setMyVacancies] = useState([])
   const [myProfile, setMyProfile] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
-  const [notice, setNotice] = useState('')
   const [justAccepted, setJustAccepted] = useState(false)
   const requirementsCardRef = useRef(null)
 
@@ -117,7 +116,7 @@ export default function EmployerJobFairDashboard() {
       const data = await listEmployerJobFairs()
       setFairs(data)
     } catch (e) {
-      setError(e.response?.data?.message ?? 'Unable to load Job Fairs.')
+      toast.error(e.response?.data?.message ?? 'Unable to load Job Fairs.')
     } finally {
       setLoading(false)
     }
@@ -157,19 +156,21 @@ export default function EmployerJobFairDashboard() {
     ))
   }, [myProfile, selectedId])
 
-  const act = async (work, success) => {
-    setError(''); setNotice('')
+  // A toast fires the instant it's called, so even a slow upload gets
+  // immediate visible feedback ("Uploading…") instead of the page looking
+  // like it did nothing while the request is in flight.
+  const act = async (work, success, { loading } = {}) => {
+    const toastId = loading ? toast.loading(loading) : null
     try {
       await work()
-      setNotice(success)
+      toast.success(success, { id: toastId ?? undefined })
       await load()
     } catch (e) {
-      setError(Object.values(e.response?.data?.errors ?? {}).flat().join(' ') || e.response?.data?.message || 'Action failed.')
+      toast.error(Object.values(e.response?.data?.errors ?? {}).flat().join(' ') || e.response?.data?.message || 'Action failed.', { id: toastId ?? undefined })
     }
   }
 
   const acceptInvitation = async () => {
-    setError(''); setNotice('')
     try {
       const { participation } = await respondToJobFairInvitation(selected.job_fair_id, 'accepted')
       // Reflect the accepted/requirements status immediately from this
@@ -179,7 +180,7 @@ export default function EmployerJobFairDashboard() {
       setFairs((prev) => prev.map((fair) => (
         String(fair.job_fair_id) === String(selected.job_fair_id) ? { ...fair, participation } : fair
       )))
-      setNotice('Invitation accepted.')
+      toast.success('Invitation accepted.')
       if (participation?.status === 'requirements_pending') {
         setJustAccepted(true)
         requestAnimationFrame(() => {
@@ -189,17 +190,16 @@ export default function EmployerJobFairDashboard() {
       }
       load()
     } catch (e) {
-      setError(Object.values(e.response?.data?.errors ?? {}).flat().join(' ') || e.response?.data?.message || 'Action failed.')
+      toast.error(Object.values(e.response?.data?.errors ?? {}).flat().join(' ') || e.response?.data?.message || 'Action failed.')
     }
   }
 
   const viewSubmission = async (submission) => {
-    setError('')
     try {
       const blob = await viewJobFairRequirement(submission.id)
       window.open(URL.createObjectURL(blob), '_blank')
     } catch (e) {
-      setError(e.response?.data?.message ?? 'Unable to open this document.')
+      toast.error(e.response?.data?.message ?? 'Unable to open this document.')
     }
   }
 
@@ -234,26 +234,6 @@ export default function EmployerJobFairDashboard() {
         </div>
       </div>
 
-      {
-        // Fixed instead of inline: this page scrolls tall (Requirements/Confirmation
-        // Slip tabs sit well below the fold), and an inline banner up here was
-        // invisible after actions taken further down — including uploads, which
-        // then looked like they silently did nothing.
-      }
-      <div className="pointer-events-none fixed inset-x-4 top-24 z-40 mx-auto max-w-2xl space-y-2 sm:inset-x-0">
-        <AnimatePresence>
-          {error && (
-            <Motion.div key="error" initial={{ opacity: 0, y: -12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }} transition={{ duration: 0.2 }} className="pointer-events-auto">
-              <AlertBox variant="danger" title="Job Fair action failed" action={<button type="button" onClick={() => setError('')} className="text-xs font-bold text-red-700 hover:underline">Dismiss</button>} className="shadow-lg">{error}</AlertBox>
-            </Motion.div>
-          )}
-          {notice && (
-            <Motion.div key="notice" initial={{ opacity: 0, y: -12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }} transition={{ duration: 0.2 }} className="pointer-events-auto">
-              <AlertBox variant="success" title="Saved" action={<button type="button" onClick={() => setNotice('')} className="text-xs font-bold text-emerald-700 hover:underline">Dismiss</button>} className="shadow-lg">{notice}</AlertBox>
-            </Motion.div>
-          )}
-        </AnimatePresence>
-      </div>
 
       {loading ? (
         <LoadingSkeleton variant="card" rows={2} />
@@ -407,7 +387,8 @@ export default function EmployerJobFairDashboard() {
                                   <FileUp className="h-4 w-4" />{isGallery ? (nonRejected.length > 0 ? 'Add another photo' : 'Upload photos') : 'Upload document'}
                                   <input type="file" multiple={isGallery} accept={isGallery ? 'image/*' : '.pdf,.jpg,.jpeg,.png'} className="hidden" onChange={(e) => {
                                     const files = e.target.files; e.target.value = ''
-                                    if (files?.length) act(() => uploadJobFairRequirement(selected.job_fair_id, req.id, files), `${req.label} submitted.`)
+                                    if (!files?.length) return
+                                    act(() => uploadJobFairRequirement(selected.job_fair_id, req.id, files), `${req.label} submitted.`, { loading: `Uploading ${files.length > 1 ? `${files.length} photos` : files[0].name}…` })
                                   }} />
                                 </label>
                               )}
