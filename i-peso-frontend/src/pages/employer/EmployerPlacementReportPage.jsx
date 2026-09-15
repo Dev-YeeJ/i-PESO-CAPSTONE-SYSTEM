@@ -141,27 +141,18 @@ export default function EmployerPlacementReportPage() {
     <div className="space-y-6">
       <PageHeader
         eyebrow="Employer Reporting"
-        title="Placement Reports"
-        subtitle="File your monthly hired-applicants report — upload a spreadsheet or type hires directly into a table."
+        title="Monthly Placement Report"
       />
 
       {deadlineDay && (
-        <AlertBox variant="info" title="When reports are due">
-          PESO expects each month&apos;s report by the {ordinal(deadlineDay)} of the following month. If you hired
-          nobody in a month, record that instead — it keeps your account in good standing.
+        <AlertBox variant="info" title="Reporting Deadline">
+          Please submit your placement report by the {ordinal(deadlineDay)} of the following month. If there were no hires, you can submit a "No hires" report.
         </AlertBox>
       )}
 
-      <Tabs defaultValue="reports">
-        <TabsList>
-          <TabsTrigger value="reports">My Monthly Reports</TabsTrigger>
-          <TabsTrigger value="activity">All Hiring Activity</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="reports" className="space-y-6">
-        <Card>
-          <CardHeader title="Generate Placement Report" subtitle="Automatically fetch hires tracked in the system for this month. You can review the list, add any missing hires manually, and save." />
-          <div className="space-y-4">
+      <Card>
+        <CardHeader title="Generate Placement Report" subtitle="Select the coverage month and year to generate a unified report combining system-tracked hires and your manual entries." />
+        <div className="space-y-4">
               <div className="grid gap-4 sm:grid-cols-3">
                 <label className="text-sm">
                   <span className="mb-1 block font-semibold text-slate-700">Coverage Month</span>
@@ -179,7 +170,7 @@ export default function EmployerPlacementReportPage() {
                   {startingManual ? 'Generating…' : 'Generate Report'}
                 </Button>
                 <Button type="button" variant="outline" icon={declaring ? Loader2 : CalendarX} onClick={handleDeclareNil} disabled={declaring}>
-                  {declaring ? 'Recording…' : `No hires in ${MONTHS[coverageMonth - 1]}`}
+                  {declaring ? 'Submitting…' : `No hires in ${MONTHS[coverageMonth - 1]}`}
                 </Button>
               </div>
             </div>
@@ -187,9 +178,9 @@ export default function EmployerPlacementReportPage() {
         <Card>
         <CardHeader title="My submitted reports" />
         {loading ? (
-          <div className="flex items-center gap-2 py-8 text-sm text-slate-500"><Loader2 className="h-4 w-4 animate-spin" /> Loading…</div>
+          <div className="flex items-center gap-2 py-8 text-sm text-slate-500"><Loader2 className="h-4 w-4 animate-spin" /> Loading reports…</div>
         ) : reports.length === 0 ? (
-          <p className="py-8 text-center text-sm text-slate-500">No placement reports yet. Upload your first file above.</p>
+          <p className="py-8 text-center text-sm text-slate-500">No placement reports submitted yet.</p>
         ) : (
           <div className="divide-y divide-slate-100">
             {reports.map((r) => (
@@ -223,12 +214,7 @@ export default function EmployerPlacementReportPage() {
           </div>
         )}
       </Card>
-        </TabsContent>
 
-        <TabsContent value="activity">
-          <HiringActivityWorkspace role="employer" />
-        </TabsContent>
-      </Tabs>
     </div>
   )
 }

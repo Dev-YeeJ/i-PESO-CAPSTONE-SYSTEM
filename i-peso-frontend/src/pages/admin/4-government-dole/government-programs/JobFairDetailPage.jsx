@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { AnimatePresence } from 'framer-motion'
+// eslint-disable-next-line no-unused-vars
+import { motion, AnimatePresence } from 'framer-motion'
 import { CheckCircle2, ClipboardEdit, Download, Eye, FileText, Flame, Mail, RefreshCw, Save, Search, ShieldCheck, TrendingUp, UserCheck, Users, XCircle } from 'lucide-react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Badge, Button, Card, CardHeader, LoadingSkeleton, StatCard } from '@/components/ui'
@@ -347,7 +348,7 @@ export default function JobFairDetailPage() {
                 <div key={r.id} className="flex flex-wrap items-center justify-between gap-3 p-4">
                   <div>
                     <p className="font-bold text-slate-900">{r.company_name}</p>
-                    <p className="text-xs font-semibold text-slate-500">{r.source === 'admin_proxy' ? 'Admin Proxy Encoded' : 'Employer Self-Service'} · {r.total_applicants} applicants · {r.total_hots} HOTS</p>
+                    <p className="text-xs font-semibold text-slate-500">{r.total_applicants} applicants · {r.total_hots} HOTS</p>
                   </div>
                   <div className="flex gap-2">
                     <Button size="sm" variant="outline" icon={Eye} onClick={() => setViewingReport(r)}>

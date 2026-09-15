@@ -458,7 +458,7 @@ class JobFairService
         $approvedCount = $submissions->where('status', 'approved')->count();
         $required = $requiredIds->count();
 
-        if ($required > 0 && $approvedCount >= $required) {
+        if ($required === 0 || $approvedCount >= $required) {
             $participation->update(['participation_status' => 'approved', 'approved_at' => now()]);
             $participation->employer->notify(new JobFairNotification($participation->jobFair, 'participation_approved', $participation));
             return;

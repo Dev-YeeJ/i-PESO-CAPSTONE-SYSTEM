@@ -253,9 +253,7 @@ export default function EmployerJobFairDashboard() {
   const requirementsDone = requirementsProgress.total > 0 && requirementsProgress.done === requirementsProgress.total
 
   const confirmationRequirement = selected?.requirements?.find((req) => req.code === 'confirmation_slip')
-  const confirmationDone = confirmationRequirement
-    ? Boolean(selected?.participation?.requirements?.find((x) => x.job_fair_requirement_id === confirmationRequirement.id))
-    : false
+  const confirmationDone = Boolean(selected?.participation?.confirmation_slip?.id)
   const readyForEstablishmentReport = ['approved', 'attended', 'encoded_results', 'report_generated']
     .includes(selected?.participation?.status)
 
@@ -388,7 +386,8 @@ export default function EmployerJobFairDashboard() {
                           // uploader stays available (to add more) as long as
                           // there's room — every other requirement is a single
                           // document, hidden again once one is on file.
-                          const canUpload = req.code !== 'confirmation_slip' && !reused && !autoSatisfied
+                          const isApproved = ['approved', 'requirements_approved', 'attended'].includes(selected.participation.status)
+                          const canUpload = !isApproved && req.code !== 'confirmation_slip' && !reused && !autoSatisfied
                             && (isGallery ? nonRejected.length < 5 : (!submissions.length || isRejected))
                           const status = submissions.length > 0 ? submissions[0].status : 'pending'
 
@@ -444,7 +443,7 @@ export default function EmployerJobFairDashboard() {
                           <div className="space-y-6">
                             <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-5 py-4">
                               <div className="flex items-center gap-3">
-                                <span className="rounded-lg bg-white p-2 text-emerald-700 shadow-sm"><CheckCircle className="h-4 w-4" /></span>
+                                <span className="rounded-lg bg-white p-2 text-emerald-700 shadow-sm"><CheckCircle2 className="h-4 w-4" /></span>
                                 <div>
                                   <p className="text-sm font-bold text-emerald-900">Confirmation Slip Submitted</p>
                                   <p className="text-xs text-emerald-700">You have already submitted your confirmation for this Job Fair.</p>
