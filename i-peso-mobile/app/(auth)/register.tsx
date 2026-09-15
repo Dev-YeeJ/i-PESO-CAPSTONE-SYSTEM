@@ -56,7 +56,11 @@ export default function RegisterScreen() {
   const [isLoading, setIsLoading] = useState(false)
 
   const handleChange = useCallback((name: string, value: string) => {
-    const nextValue = name === 'mobile_number' ? normalizeMobileNumber(value) : value
+    let nextValue = value
+    if (name === 'mobile_number') nextValue = normalizeMobileNumber(value)
+    // Mirrors i-peso-frontend's SeekerRegistration.jsx change() — lowercase and strip
+    // whitespace live as the user types, not just on blur.
+    else if (name === 'email') nextValue = value.replace(/\s/g, '').toLowerCase()
     setForm((current) => ({ ...current, [name]: nextValue }))
     setErrors((current) => ({ ...current, [name]: '' }))
     setApiError('')
