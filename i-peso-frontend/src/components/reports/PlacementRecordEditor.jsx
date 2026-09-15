@@ -1,6 +1,7 @@
 import { Plus, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import ApplicantNameSuggest from './ApplicantNameSuggest'
 
 const cellInputClass = 'w-full min-w-[7rem] rounded-md border border-transparent bg-transparent px-2 py-1.5 text-sm hover:border-slate-200 focus:border-brand-navy focus:bg-white focus:outline-none focus:ring-1 focus:ring-brand-navy/20 disabled:cursor-not-allowed disabled:opacity-70 disabled:hover:border-transparent'
 
@@ -19,7 +20,7 @@ export const stripBlankPlacementRecords = (records) => records.filter((row) => O
  * PlacementRecord::MAPPABLE_FIELDS one column per field. No column-mapping
  * step applies since a typed row is already in canonical field shape.
  */
-export default function PlacementRecordEditor({ records, onChange }) {
+export default function PlacementRecordEditor({ records, onChange, searchApplicants }) {
   const update = (index, key, value) => {
     onChange(records.map((row, i) => {
       if (i !== index) return row
@@ -35,6 +36,38 @@ export default function PlacementRecordEditor({ records, onChange }) {
         if (age >= 15 && age <= 100) newRow.age = age
       }
       return newRow
+    }))
+  }
+
+  const applyApplicantSuggestion = (index, suggestion) => {
+    onChange(records.map((row, i) => {
+      if (i !== index) return row
+      
+      const bd = suggestion.birth_date ? new Date(suggestion.birth_date) : null
+      let age = ''
+      if (bd) {
+        const today = new Date()
+        age = today.getFullYear() - bd.getFullYear()
+        const m = today.getMonth() - bd.getMonth()
+        if (m < 0 || (m === 0 && today.getDate() < bd.getDate())) {
+          age--
+        }
+        if (age < 15 || age > 100) age = ''
+      }
+      
+      return {
+        ...row,
+        seeker_id: suggestion.seeker_id,
+        first_name: suggestion.first_name || row.first_name,
+        middle_name: suggestion.middle_name || row.middle_name,
+        last_name: suggestion.last_name || row.last_name,
+        gender: suggestion.gender || row.gender,
+        civil_status: suggestion.civil_status || row.civil_status,
+        birth_date: suggestion.birth_date || row.birth_date,
+        age: age || row.age,
+        address: suggestion.address || row.address,
+        educational_attainment: suggestion.educational_attainment || row.educational_attainment,
+      }
     }))
   }
 
@@ -63,7 +96,19 @@ export default function PlacementRecordEditor({ records, onChange }) {
           <TableBody>
             {records.map((row, index) => (
               <TableRow key={index}>
-                <TableCell><input value={row.first_name || ''} onChange={(e) => update(index, 'first_name', e.target.value)} readOnly={!!row.seeker_id} placeholder="First name" className={cellInputClass} /></TableCell>
+                <TableCell>
+                  {searchApplicants && !row.seeker_id ? (
+                    <ApplicantNameSuggest
+                      value={row.first_name || ''}
+                      onChangeText={(text) => update(index, 'first_name', text)}
+                      onSelect={(suggestion) => applyApplicantSuggestion(index, suggestion)}
+                      searchFn={searchApplicants}
+                      placeholder="First name"
+                    />
+                  ) : (
+                    <input value={row.first_name || ''} onChange={(e) => update(index, 'first_name', e.target.value)} readOnly={!!row.seeker_id} placeholder="First name" className={cellInputClass} />
+                  )}
+                </TableCell>
                 <TableCell><input value={row.middle_name || ''} onChange={(e) => update(index, 'middle_name', e.target.value)} readOnly={!!row.seeker_id} placeholder="Middle name" className={cellInputClass} /></TableCell>
                 <TableCell><input value={row.last_name || ''} onChange={(e) => update(index, 'last_name', e.target.value)} readOnly={!!row.seeker_id} placeholder="Last name" className={cellInputClass} /></TableCell>
                 <TableCell>

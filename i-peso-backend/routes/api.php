@@ -120,6 +120,7 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::post('/reports/hiring-activity/export', [EmployerHiringActivityReportController::class, 'export']);
 
             // Placement Report — flexible spreadsheet import (upload -> map -> preview -> submit)
+            Route::get('/placement-reports/applicant-suggestions', [EmployerPlacementReportController::class, 'applicantSuggestions']);
             Route::get('/placement-reports', [EmployerPlacementReportController::class, 'index']);
             Route::post('/placement-reports', [EmployerPlacementReportController::class, 'store'])->middleware('throttle:20,1');
             Route::post('/placement-reports/nil', [EmployerPlacementReportController::class, 'storeNil']);

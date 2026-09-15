@@ -7,6 +7,11 @@ export const listEmployerPlacementReports = async () => {
   return response.data
 }
 
+export const searchPlacementApplicantSuggestions = async (query, signal) => {
+  const response = await api.get('/employer/placement-reports/applicant-suggestions', { params: { q: query }, signal })
+  return response.data.data ?? []
+}
+
 export const uploadPlacementReport = async (file, coverage = {}) => {
   const formData = new FormData()
   formData.append('file', file)

@@ -12,7 +12,8 @@ import {
   declareNoPlacements, 
   startManualPlacementReport, 
   getEmployerPlacementReport, 
-  deletePlacementReport 
+  deletePlacementReport,
+  searchPlacementApplicantSuggestions
 } from '@/services/placementReportService'
 
 const STATUS_TONE = {
@@ -280,7 +281,7 @@ function ManualEntryEditor({ upload, onBack, onChange }) {
 
       <Card>
         <CardHeader title="Hires this month" subtitle="Add one row per person hired. Fields marked * are required before submitting. Save as often as you like — nothing is sent to PESO until you submit below." />
-        <PlacementRecordEditor records={records} onChange={setRecords} />
+        <PlacementRecordEditor records={records} onChange={setRecords} searchApplicants={searchPlacementApplicantSuggestions} />
         <div className="mt-4">
           <Button variant="outline" icon={saving ? Loader2 : Save} onClick={handleSave} disabled={saving}>
             {saving ? 'Saving…' : 'Save records'}

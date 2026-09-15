@@ -8,6 +8,7 @@ use App\Models\PlacementRecord;
 use App\Models\Application;
 use App\Models\PlacementReportMapping;
 use App\Models\PlacementReportUpload;
+use App\Models\JobSeeker;
 use App\Services\PlacementImportService;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\JsonResponse;
@@ -40,6 +41,47 @@ class EmployerPlacementReportController extends Controller
             'data' => $uploads,
             'deadline_day' => (int) config('placement_reports.deadline_day', 10),
         ]);
+    }
+
+    public function applicantSuggestions(Request $request): JsonResponse
+    {
+        $this->employer($request);
+        $validated = $request->validate(['q' => ['nullable', 'string', 'max:255']]);
+        
+        $query = $validated['q'] ?? '';
+        $terms = collect(preg_split('/\s+/', trim($query)))->filter();
+        
+        if ($terms->isEmpty()) {
+            return response()->json(['data' => []]);
+        }
+        
+        $seekers = JobSeeker::query()
+            ->where(function ($outer) use ($terms) {
+                foreach ($terms as $term) {
+                    $outer->where(function ($inner) use ($term) {
+                        $inner->where('first_name', 'like', "%{$term}%")
+                            ->orWhere('middle_name', 'like', "%{$term}%")
+                            ->orWhere('last_name', 'like', "%{$term}%");
+                    });
+                }
+            })
+            ->limit(8)
+            ->get()
+            ->map(fn (JobSeeker $seeker) => [
+                'seeker_id' => $seeker->seeker_id,
+                'name' => collect([$seeker->first_name, $seeker->middle_name, $seeker->last_name])->filter()->join(' '),
+                'first_name' => $seeker->first_name,
+                'middle_name' => $seeker->middle_name,
+                'last_name' => $seeker->last_name,
+                'gender' => in_array($seeker->sex, ['male', 'female'], true) ? $seeker->sex : null,
+                'civil_status' => $seeker->civil_status,
+                'birth_date' => $seeker->date_of_birth?->format('Y-m-d'),
+                'address' => $seeker->address_municipality_city,
+                'educational_attainment' => $seeker->highest_education_attainment,
+            ])
+            ->all();
+
+        return response()->json(['data' => $seekers]);
     }
 
     /**
