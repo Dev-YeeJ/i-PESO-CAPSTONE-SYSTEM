@@ -29,8 +29,7 @@ class JobFairService
     public const MAP_STATUSES = ['published', 'accepting_employers', 'upcoming', 'ongoing'];
 
     public const PARTICIPATION_STATUSES = [
-        'invited', 'interested', 'called_peso', 'pending_response', 'accepted', 'declined',
-        'requirements_pending', 'requirements_submitted', 'under_review', 'approved', 'rejected',
+        'invited', 'requirements_pending', 'under_review', 'approved', 'declined', 'rejected',
         'attended', 'no_show', 'encoded_results', 'report_generated',
     ];
 
@@ -448,7 +447,7 @@ class JobFairService
         // straight to 'accepted') still gets picked up and progressed the
         // next time anything touches its requirement submissions, instead
         // of sitting stuck at 'accepted' forever.
-        if (! in_array($participation->participation_status, ['invited', 'interested', 'accepted', 'requirements_pending', 'requirements_submitted'], true)) {
+        if (! in_array($participation->participation_status, ['invited', 'requirements_pending', 'under_review'], true)) {
             return;
         }
 
@@ -464,7 +463,7 @@ class JobFairService
             return;
         }
 
-        $participation->update(['participation_status' => $submittedCount >= $required ? 'requirements_submitted' : 'requirements_pending']);
+        $participation->update(['participation_status' => $submittedCount >= $required ? 'under_review' : 'requirements_pending']);
     }
 
     public function dashboard(JobFair $fair): array
@@ -475,11 +474,10 @@ class JobFairService
 
         return [
             'total_invited' => $participants->whereNotNull('invited_at')->count(),
-            'interested' => $statusCount('interested'),
-            'accepted' => $statusCount('accepted'),
+            'requirements_pending' => $statusCount('requirements_pending'),
+            'under_review' => $statusCount('under_review'),
             'declined' => $statusCount('declined'),
-            'requirements_submitted' => $statusCount('requirements_submitted'),
-            'requirements_incomplete' => $participants->whereIn('participation_status', ['requirements_pending', 'accepted'])->count(),
+            'requirements_incomplete' => $participants->where('participation_status', 'requirements_pending')->count(),
             'approved' => $statusCount('approved'),
             'attended' => $participants->whereNotNull('attended_at')->count(),
             'no_show' => $participants->whereNotNull('no_show_at')->count(),

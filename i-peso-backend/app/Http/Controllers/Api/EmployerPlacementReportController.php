@@ -77,7 +77,7 @@ class EmployerPlacementReportController extends Controller
                 'civil_status' => $seeker->civil_status,
                 'birth_date' => $seeker->date_of_birth?->format('Y-m-d'),
                 'address' => $seeker->address_municipality_city,
-                'educational_attainment' => $seeker->highest_education_attainment,
+                'educational_attainment' => $seeker->educ_attainment,
             ])
             ->all();
 
@@ -681,8 +681,8 @@ class EmployerPlacementReportController extends Controller
                 'gender' => $app->jobSeeker->sex ?? 'male',
                 'civil_status' => $app->jobSeeker->civil_status,
                 'birth_date' => $app->jobSeeker->date_of_birth?->format('Y-m-d'),
-                'address' => trim("{$app->jobSeeker->address_street}, {$app->jobSeeker->address_barangay}, {$app->jobSeeker->address_municipality_city}", ", \t\n\r\0\x0B"),
-                'educational_attainment' => $app->jobSeeker->highest_education_attained,
+                'address' => trim("{$app->jobSeeker->address_house_street}, {$app->jobSeeker->address_barangay}, {$app->jobSeeker->address_municipality_city}", ", \t\n\r\0\x0B"),
+                'educational_attainment' => $app->jobSeeker->educ_attainment,
                 'assigned_company' => $employer->company_name ?: $employer->trade_name,
                 'age' => $app->jobSeeker->date_of_birth ? $app->jobSeeker->date_of_birth->age : null,
                 'employment_type' => $app->placement_employment_type ?? 'regular',

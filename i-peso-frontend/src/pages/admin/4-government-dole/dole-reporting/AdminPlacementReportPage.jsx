@@ -6,7 +6,6 @@ import {
 import { Card, CardHeader, Button, Badge, AlertBox, StatCard } from '@/components/ui'
 import { ConfirmModal, PageHeader } from '@/pages/admin/_components'
 import DataTable from '@/pages/admin/_components/DataTable'
-import DataTable from '@/pages/admin/_components/DataTable'
 import toast from 'react-hot-toast'
 import {
   listAdminPlacementReports,

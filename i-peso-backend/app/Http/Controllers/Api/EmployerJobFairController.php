@@ -51,15 +51,12 @@ class EmployerJobFairController extends Controller
 
         $participation = JobFairEmployer::updateOrCreate(
             ['job_fair_id' => $jobFair->job_fair_id, 'employer_id' => $employer->employer_id],
-            ['participation_status' => 'interested', 'source' => 'employer_self_service', 'joined_at' => now(), 'responded_at' => now()],
+            ['participation_status' => 'requirements_pending', 'source' => 'employer_self_service', 'joined_at' => now(), 'responded_at' => now()],
         );
-        // Standing accreditation documents already satisfy some requirements
-        // regardless of where they are in this fair's own pipeline — no
-        // reason to make them wait until formally accepted to see that.
-        $service->reuseVerifiedDocuments($jobFair, $participation);
+        $service->processAcceptance($jobFair, $participation);
         Notification::send(Administrator::query()->where('status', 'active')->get(), new JobFairNotification($jobFair, 'interest_submitted', $participation));
 
-        return response()->json(['message' => 'Interest recorded. PESO may also confirm your participation by phone or email.', 'participation' => $service->participationPayload($participation->fresh(['requirementSubmissions.requirement']))]);
+        return response()->json(['message' => 'Successfully joined the Job Fair.', 'participation' => $service->participationPayload($participation->fresh(['requirementSubmissions.requirement']))]);
     }
 
     public function respond(Request $request, JobFair $jobFair, JobFairService $service): JsonResponse
@@ -68,7 +65,7 @@ class EmployerJobFairController extends Controller
         $validated = $request->validate(['response' => ['required', Rule::in(['accepted', 'declined'])], 'remarks' => ['nullable', 'string', 'max:2000']]);
         $participation = $this->participation($jobFair, $employer);
         $participation->update([
-            'participation_status' => $validated['response'],
+            'participation_status' => $validated['response'] === 'accepted' ? 'requirements_pending' : $validated['response'],
             'responded_at' => now(),
             'remarks' => $validated['remarks'] ?? $participation->remarks,
         ]);

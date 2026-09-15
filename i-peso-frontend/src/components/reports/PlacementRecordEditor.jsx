@@ -137,9 +137,9 @@ export default function PlacementRecordEditor({ records, onChange, searchApplica
                 </TableCell>
                 <TableCell><input type="number" min="15" max="100" value={row.age || ''} onChange={(e) => update(index, 'age', e.target.value)} readOnly={!!row.seeker_id} placeholder="Age" className={cellInputClass} /></TableCell>
                 <TableCell><input type="date" value={row.birth_date || ''} onChange={(e) => update(index, 'birth_date', e.target.value)} readOnly={!!row.seeker_id} className={cellInputClass} /></TableCell>
-                <TableCell><input type="date" value={row.date_hired || ''} onChange={(e) => update(index, 'date_hired', e.target.value)} readOnly={!!row.seeker_id} className={cellInputClass} /></TableCell>
-                <TableCell><input value={row.position || ''} onChange={(e) => update(index, 'position', e.target.value)} readOnly={!!row.seeker_id} placeholder="Position" className={cellInputClass} /></TableCell>
-                <TableCell><input value={row.department || ''} onChange={(e) => update(index, 'department', e.target.value)} readOnly={!!row.seeker_id} placeholder="Department" className={cellInputClass} /></TableCell>
+                <TableCell><input type="date" value={row.date_hired || ''} onChange={(e) => update(index, 'date_hired', e.target.value)} className={cellInputClass} /></TableCell>
+                <TableCell><input value={row.position || ''} onChange={(e) => update(index, 'position', e.target.value)} placeholder="Position" className={cellInputClass} /></TableCell>
+                <TableCell><input value={row.department || ''} onChange={(e) => update(index, 'department', e.target.value)} placeholder="Department" className={cellInputClass} /></TableCell>
                 <TableCell><input value={row.address || ''} onChange={(e) => update(index, 'address', e.target.value)} readOnly={!!row.seeker_id} placeholder="Address" className={cellInputClass} /></TableCell>
                 <TableCell>
                   {row.seeker_id ? (
@@ -156,7 +156,7 @@ export default function PlacementRecordEditor({ records, onChange, searchApplica
                     </select>
                   )}
                 </TableCell>
-                <TableCell><input value={row.assigned_company || ''} onChange={(e) => update(index, 'assigned_company', e.target.value)} readOnly={!!row.seeker_id} placeholder="Assigned company" className={cellInputClass} /></TableCell>
+                <TableCell><input value={row.assigned_company || ''} onChange={(e) => update(index, 'assigned_company', e.target.value)} placeholder="Assigned company" className={cellInputClass} /></TableCell>
                 <TableCell>
                   {!row.seeker_id && (
                     <button type="button" onClick={() => onChange(records.filter((_, i) => i !== index))} aria-label="Remove hire" className="rounded-md p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600">

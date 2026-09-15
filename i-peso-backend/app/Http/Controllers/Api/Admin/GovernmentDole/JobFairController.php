@@ -362,7 +362,7 @@ class JobFairController extends Controller
             'remarks' => ['nullable', 'string', 'max:3000'], 'confirmation_channel' => ['nullable', Rule::in(['digital', 'phone', 'email', 'walk_in'])],
         ]);
         $timestamps = match ($validated['status']) {
-            'accepted', 'declined' => ['responded_at' => now()], 'under_review', 'approved', 'rejected' => ['reviewed_at' => now(), 'reviewed_by' => $admin->admin_id],
+            'requirements_pending', 'declined' => ['responded_at' => now()], 'under_review', 'approved', 'rejected' => ['reviewed_at' => now(), 'reviewed_by' => $admin->admin_id],
             'attended' => ['attended_at' => now()], 'no_show' => ['no_show_at' => now()], default => [],
         };
         if ($validated['status'] === 'approved') $timestamps['approved_at'] = now();
@@ -377,7 +377,7 @@ class JobFairController extends Controller
         // employer's own "Accept Invitation" click triggers — otherwise this
         // second acceptance path leaves the requirement checklist just as
         // empty as the bug being fixed here.
-        if ($validated['status'] === 'accepted') {
+        if ($validated['status'] === 'requirements_pending') {
             $service->processAcceptance($jobFair, $participation);
         }
 
