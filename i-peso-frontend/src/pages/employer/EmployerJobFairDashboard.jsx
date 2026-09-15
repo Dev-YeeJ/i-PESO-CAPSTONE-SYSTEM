@@ -116,8 +116,10 @@ function RequirementUploadButton({ isGallery, hasExisting, onSelect }) {
         className="hidden"
         onChange={(e) => {
           const files = e.target.files
+          if (files?.length) {
+            onSelect(Array.from(files))
+          }
           e.target.value = ''
-          if (files?.length) onSelect(files)
         }}
       />
       <button
