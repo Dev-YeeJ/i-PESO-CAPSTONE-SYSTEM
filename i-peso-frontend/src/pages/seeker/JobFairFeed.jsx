@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { BriefcaseBusiness, Building2, CalendarDays, CheckCircle2, MapPin, QrCode, UsersRound, CalendarClock } from 'lucide-react'
 import { AlertBox, Button, Card, CardHeader, EmptyState, LoadingSkeleton } from '@/components/ui'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -138,9 +139,13 @@ export default function JobFairFeed() {
                         </h3>
                         <div className="mt-3 flex flex-wrap gap-2">
                           {fair.participating_employers.map((e) => (
-                            <span key={e.employer_id} className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-700 shadow-sm">
+                            <Link 
+                              key={e.employer_id} 
+                              to={`/seeker/job-fairs/${fair.job_fair_id}/employers/${e.employer_id}`}
+                              className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-700 shadow-sm transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700"
+                            >
                               {e.company_name}
-                            </span>
+                            </Link>
                           ))}
                         </div>
                       </section>

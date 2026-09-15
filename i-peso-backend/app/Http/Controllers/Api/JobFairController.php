@@ -78,6 +78,7 @@ class JobFairController extends Controller
             ->map(function (JobFairRequirementSubmission $submission) use ($isSeeker, $user, $matchingService) {
                 $data = [
                     'id' => $submission->id,
+                    'employer_id' => $submission->employer_id,
                     'company_name' => $submission->employer?->company_name ?: $submission->employer?->trade_name,
                     'job_fair_id' => $submission->participation?->job_fair_id,
                     'job_fair_title' => $submission->participation?->jobFair?->title,
@@ -383,6 +384,95 @@ class JobFairController extends Controller
         ])->setPaper('a4', 'portrait');
 
         return $pdf->download("sprs-1-6-job-fair-{$fair->job_fair_id}.pdf");
+    }
+
+    public function employerBooth(Request $request, int $jobFairId, int $employerId, \App\Services\EnhancedJobMatchingService $matchingService): JsonResponse
+    {
+        $user = $request->user();
+        $isSeeker = $user instanceof JobSeeker;
+
+        $fair = JobFair::findOrFail($jobFairId);
+        $employer = Employer::findOrFail($employerId);
+
+        $posterSubmission = JobFairRequirementSubmission::query()
+            ->where('status', 'approved')
+            ->whereHas('requirement', fn ($query) => $query->where('code', 'posterized_vacancy'))
+            ->where('employer_id', $employerId)
+            ->whereHas('participation', fn ($query) => $query->where('job_fair_id', $jobFairId))
+            ->first();
+
+        $posterData = null;
+        if ($posterSubmission) {
+            $posterData = [
+                'id' => $posterSubmission->id,
+                'mime_type' => $posterSubmission->mime_type,
+                'original_filename' => $posterSubmission->original_filename,
+                'posted_at' => ($posterSubmission->reviewed_at ?? $posterSubmission->submitted_at)?->toIso8601String(),
+            ];
+        }
+
+        $confirmedVacancies = \App\Models\JobFairConfirmationVacancy::query()
+            ->whereHas('confirmationSlip', fn ($query) => $query->where('job_fair_id', $jobFairId)->where('employer_id', $employerId))
+            ->with('jobVacancy.occupation', 'jobVacancy.employer')
+            ->get();
+
+        $vacanciesData = $confirmedVacancies->map(function ($cv) use ($isSeeker, $user, $matchingService) {
+            $data = [
+                'id' => $cv->id,
+                'number_needed' => $cv->number_needed,
+                'position_title' => $cv->position_title,
+                'qualifications' => $cv->qualifications,
+                'place_of_work' => $cv->place_of_work,
+                'job_vacancy_id' => $cv->job_vacancy_id,
+                'vacancy' => null,
+                'match_percentage' => null,
+            ];
+
+            if ($cv->job_vacancy_id && $cv->jobVacancy) {
+                $vacancy = $cv->jobVacancy;
+                $data['vacancy'] = [
+                    'post_id' => $vacancy->post_id,
+                    'job_title' => $vacancy->job_title,
+                    'job_description' => $vacancy->job_description,
+                    'location' => $vacancy->location ?: $vacancy->city_municipality,
+                    'salary_range' => $vacancy->salary_range,
+                    'employment_type' => $vacancy->employment_type,
+                ];
+
+                if ($isSeeker) {
+                    try {
+                        $match = $matchingService->calculateMatch($vacancy, $user);
+                        $data['match_percentage'] = (float) ($match['percentage'] ?? 0);
+                    } catch (\Throwable $e) {
+                        // ignore
+                    }
+                }
+            }
+
+            return $data;
+        });
+
+        $bestScore = $vacanciesData->max('match_percentage');
+        if ($posterData && $bestScore !== null) {
+            $posterData['match_percentage'] = $bestScore;
+        }
+
+        return response()->json([
+            'employer' => [
+                'employer_id' => $employer->employer_id,
+                'company_name' => $employer->company_name,
+                'trade_name' => $employer->trade_name,
+                'company_description' => $employer->company_description,
+            ],
+            'job_fair' => [
+                'job_fair_id' => $fair->job_fair_id,
+                'title' => $fair->title,
+                'venue' => $fair->venue,
+                'start_date' => $fair->start_date?->toDateString() ?? $fair->event_date?->toDateString(),
+            ],
+            'poster' => $posterData,
+            'vacancies' => $vacanciesData,
+        ]);
     }
 
     private function seeker(Request $request): JobSeeker
