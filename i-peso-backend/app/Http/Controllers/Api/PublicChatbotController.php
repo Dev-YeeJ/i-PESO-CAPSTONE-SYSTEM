@@ -36,8 +36,10 @@ class PublicChatbotController extends Controller
         $history = $data['history'] ?? [];
         $history[] = ['role' => 'user', 'text' => $data['message']];
 
+        $user = $request->user('sanctum');
+
         try {
-            $result = $chat->reply($history);
+            $result = $chat->reply($history, $user);
 
             return response()->json([
                 'reply' => $result['text'],

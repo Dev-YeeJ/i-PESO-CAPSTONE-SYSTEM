@@ -1,0 +1,260 @@
+/* ================================================================
+   ACE MASCOT — animated rig styles.
+   Drop this in next to AceMascot.jsx and import it from there.
+
+   NOTE: this assumes a single <AceMascot /> on the page at a time,
+   since the rig's moving parts are targeted by id (#armL, #eyeL,
+   etc). If you ever need two Ace instances visible at once, the
+   ids below would need to be made unique per instance.
+================================================================= */
+
+.ace-mascot {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 640 / 560;
+}
+.ace-mascot .ace-rig {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.ace-mascot .ace-rig,
+.ace-mascot .ace-rig * {
+  transform-box: view-box;
+}
+
+#rig-float { transition: transform .4s cubic-bezier(.34,1.1,.64,1); }
+#armL, #armR, #antennaGrp, #panelGrp, #eyeL, #eyeR,
+#thoughtDots > *, #sparkles > *, #soundArcs > * {
+  transition: transform .4s cubic-bezier(.34,1.1,.64,1), opacity .35s ease;
+}
+#mouthGrp path, #mouthGrp ellipse { transition: opacity .3s ease; }
+#blushL, #blushR { transition: transform .3s ease; }
+#thoughtDots, #soundArcs { transition: opacity .35s ease; }
+
+/* ---------- idle loop ---------- */
+@keyframes aceFloatY {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  25% { transform: translateY(-9px) rotate(-1deg); }
+  50% { transform: translateY(-2px) rotate(0deg); }
+  75% { transform: translateY(-6px) rotate(1deg); }
+}
+@keyframes aceShadowBreathe {
+  0%, 100% { transform: scaleX(1); opacity: 1; }
+  50% { transform: scaleX(0.9); opacity: 0.75; }
+}
+@keyframes aceAntennaPulse {
+  0%, 100% { opacity: 0.72; }
+  50% { opacity: 1; }
+}
+@keyframes aceAntennaSway {
+  0%, 100% { transform: rotate(0deg); }
+  50% { transform: rotate(3deg); }
+}
+@keyframes aceBlink {
+  0%, 92%, 100% { transform: scaleY(1); }
+  96% { transform: scaleY(0.12); }
+}
+@keyframes aceArmSwayL {
+  0%, 100% { transform: rotate(-15deg); }
+  50% { transform: rotate(-10deg); }
+}
+@keyframes aceArmSwayR {
+  0%, 100% { transform: rotate(-50deg); }
+  50% { transform: rotate(-55deg); }
+}
+
+.ace-mascot[data-state="idle"] #rig-float { animation: aceFloatY 5s ease-in-out infinite; transform-origin: 320px 340px; }
+.ace-mascot[data-state="idle"] #shadow { animation: aceShadowBreathe 5s ease-in-out infinite; }
+.ace-mascot[data-state="idle"] .ball { animation: aceAntennaPulse 2.6s ease-in-out infinite; }
+.ace-mascot[data-state="idle"] #antennaGrp { animation: aceAntennaSway 3.6s ease-in-out infinite; transform-origin: 320px 138px; }
+.ace-mascot[data-state="idle"] #eyeL, .ace-mascot[data-state="idle"] #eyeR { animation: aceBlink 4.2s ease-in-out infinite; transform-origin: 270px 270px; }
+.ace-mascot[data-state="idle"] #eyeR { transform-origin: 370px 270px; }
+.ace-mascot[data-state="idle"] #armL { animation: aceArmSwayL 5s ease-in-out infinite; transform-origin: 168px 300px; }
+.ace-mascot[data-state="idle"] #armR { animation: aceArmSwayR 5s ease-in-out infinite .3s; transform-origin: 467px 303px; }
+
+/* ---------- greeting (one-shot) ---------- */
+@keyframes aceArriveIn {
+  0% { transform: translateY(60px) scale(0.4) rotate(0deg); opacity: 0; }
+  55% { transform: translateY(-16px) scale(1.06) rotate(-2deg); opacity: 1; }
+  72% { transform: translateY(4px) scale(0.98) rotate(2deg); }
+  86% { transform: translateY(-2px) scale(1.01) rotate(-1deg); }
+  100% { transform: translateY(0) scale(1) rotate(0deg); }
+}
+@keyframes aceWaveArm {
+  0%, 100% { transform: rotate(-50deg); }
+  25%, 75% { transform: rotate(-72deg); }
+  50% { transform: rotate(-62deg); }
+}
+@keyframes aceWaveArcs {
+  0%, 100% { opacity: 0; }
+  20%, 80% { opacity: 1; }
+}
+@keyframes aceGreetFlash {
+  0%, 100% { opacity: 0.75; }
+  30% { opacity: 1; }
+}
+@keyframes aceEyeHappy {
+  0%, 100% { transform: scaleY(1); }
+  50% { transform: scaleY(0.65) translateY(5px); }
+}
+.ace-mascot[data-state="greeting"] #rig-float { animation: aceArriveIn 1.1s cubic-bezier(.2,.9,.3,1.15) both; transform-origin: 320px 340px; }
+.ace-mascot[data-state="greeting"] #armR { animation: aceWaveArm 1.6s ease-in-out 0.85s 3; transform-origin: 467px 303px; }
+.ace-mascot[data-state="greeting"] #armL { transform: rotate(-15deg); transform-origin: 168px 300px; }
+.ace-mascot[data-state="greeting"] #waveArcs { animation: aceWaveArcs 1.6s ease-in-out 0.85s 3; }
+.ace-mascot[data-state="greeting"] .ball { animation: aceGreetFlash .5s ease-in-out .3s 2; }
+.ace-mascot[data-state="greeting"] #eyeL, .ace-mascot[data-state="greeting"] #eyeR { animation: aceEyeHappy 1.6s ease-in-out 0.85s 3; transform-origin: 270px 270px; }
+.ace-mascot[data-state="greeting"] #eyeR { transform-origin: 370px 270px; }
+.ace-mascot[data-state="greeting"] #blushL { transform: scale(1.15); transform-origin: 228px 300px; }
+.ace-mascot[data-state="greeting"] #blushR { transform: scale(1.15); transform-origin: 412px 300px; }
+
+/* ---------- listening loop ---------- */
+@keyframes aceLeanBob {
+  0%, 100% { transform: rotate(-2deg); }
+  50% { transform: rotate(-6deg); }
+}
+@keyframes aceEyeWiden {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.14); }
+}
+@keyframes aceArcPulse {
+  0% { opacity: 0; transform: scale(0.85); }
+  50% { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(1.1); }
+}
+@keyframes aceAntennaSwayFast {
+  0%, 100% { transform: rotate(-2deg); }
+  50% { transform: rotate(2deg); }
+}
+.ace-mascot[data-state="listening"] #panelGrp { animation: aceLeanBob 1.8s ease-in-out infinite; transform-origin: 320px 280px; }
+.ace-mascot[data-state="listening"] #armL, .ace-mascot[data-state="listening"] #armR { transform: rotate(-15deg); transform-origin: 168px 300px; }
+.ace-mascot[data-state="listening"] #armR { transform: rotate(-18deg); transform-origin: 467px 303px; }
+.ace-mascot[data-state="listening"] #eyeR { animation: aceEyeWiden 1.6s ease-in-out infinite; transform-origin: 370px 270px; }
+.ace-mascot[data-state="listening"] #soundArcs { opacity: 1; }
+.ace-mascot[data-state="listening"] #soundArcs .arc1 { animation: aceArcPulse 1.6s ease-in-out infinite; }
+.ace-mascot[data-state="listening"] #soundArcs .arc2 { animation: aceArcPulse 1.6s ease-in-out infinite 0.5s; }
+.ace-mascot[data-state="listening"] .ball { animation: aceAntennaPulse 2.6s ease-in-out infinite; }
+.ace-mascot[data-state="listening"] #antennaGrp { animation: aceAntennaSwayFast 1.6s ease-in-out infinite; transform-origin: 320px 138px; }
+
+/* ---------- thinking loop ---------- */
+@keyframes aceDotCycle {
+  0%, 100% { opacity: 0.15; transform: translateY(0); }
+  40% { opacity: 1; transform: translateY(-5px); }
+}
+@keyframes aceScanTilt {
+  0%, 100% { transform: rotate(-3deg); }
+  50% { transform: rotate(3deg); }
+}
+@keyframes aceDriftArmL {
+  0%, 100% { transform: rotate(-15deg); }
+  50% { transform: rotate(-17deg); }
+}
+@keyframes aceDriftArmR {
+  0%, 100% { transform: rotate(-50deg); }
+  50% { transform: rotate(-48deg); }
+}
+.ace-mascot[data-state="thinking"] #eyeL, .ace-mascot[data-state="thinking"] #eyeR { transform: scaleY(0.18) translateY(24px); transform-origin: 270px 270px; }
+.ace-mascot[data-state="thinking"] #eyeR { transform-origin: 370px 270px; }
+.ace-mascot[data-state="thinking"] #mouthGrp .mouth-smile { opacity: 0; }
+.ace-mascot[data-state="thinking"] #mouthGrp .mouth-flat { opacity: 1; }
+.ace-mascot[data-state="thinking"] #thoughtDots { opacity: 1; }
+.ace-mascot[data-state="thinking"] #thoughtDots .d1 { animation: aceDotCycle 1.2s ease-in-out infinite; }
+.ace-mascot[data-state="thinking"] #thoughtDots .d2 { animation: aceDotCycle 1.2s ease-in-out infinite .15s; }
+.ace-mascot[data-state="thinking"] #thoughtDots .d3 { animation: aceDotCycle 1.2s ease-in-out infinite .3s; }
+.ace-mascot[data-state="thinking"] .ball { animation: aceAntennaPulse 1.2s ease-in-out infinite; }
+.ace-mascot[data-state="thinking"] #panelGrp { animation: aceScanTilt 2.6s ease-in-out infinite; transform-origin: 320px 280px; }
+.ace-mascot[data-state="thinking"] #armL { animation: aceDriftArmL 3.4s ease-in-out infinite; transform-origin: 168px 300px; }
+.ace-mascot[data-state="thinking"] #armR { animation: aceDriftArmR 3.4s ease-in-out infinite .4s; transform-origin: 467px 303px; }
+
+/* ---------- success : reply lands (one-shot) ---------- */
+@keyframes aceWindUp {
+  0% { transform: scale(1,1); }
+  100% { transform: scale(0.94,1.04); }
+}
+@keyframes aceHop {
+  0% { transform: translateY(0) scale(0.94,1.04); }
+  45% { transform: translateY(-38px) scale(1.06,0.94); }
+  65% { transform: translateY(4px) scale(0.96,1.05); }
+  80% { transform: translateY(-8px) scale(1.01,0.99); }
+  100% { transform: translateY(0) scale(1,1); }
+}
+@keyframes aceSparkleBurst {
+  0% { opacity: 0; transform: scale(0.3) translateY(0); }
+  35% { opacity: 1; }
+  100% { opacity: 0; transform: scale(1.15) translateY(-14px); }
+}
+@keyframes aceWaveArmSuccess {
+  0%, 100% { transform: rotate(-50deg); }
+  50% { transform: rotate(-68deg); }
+}
+@keyframes aceCheerArmL {
+  0%, 100% { transform: rotate(-15deg); }
+  50% { transform: rotate(-42deg); }
+}
+@keyframes aceBlushPop {
+  0%, 100% { transform: scale(1); opacity: 0.85; }
+  45% { transform: scale(1.35); opacity: 1; }
+}
+.ace-mascot[data-state="success"] #rig-float { animation: aceWindUp .2s ease forwards, aceHop .6s ease .2s forwards; transform-origin: 320px 340px; }
+.ace-mascot[data-state="success"] #eyeL, .ace-mascot[data-state="success"] #eyeR { transform: scaleY(1); }
+.ace-mascot[data-state="success"] #mouthGrp .mouth-smile { opacity: 0; }
+.ace-mascot[data-state="success"] #mouthGrp .mouth-grin { opacity: 1; transition-delay: .3s; }
+.ace-mascot[data-state="success"] #armR { animation: aceWaveArmSuccess .6s ease-in-out .3s 1; transform-origin: 467px 303px; }
+.ace-mascot[data-state="success"] #armL { animation: aceCheerArmL .6s ease-in-out .3s 1; transform-origin: 168px 300px; }
+.ace-mascot[data-state="success"] #sparkles .s1 { animation: aceSparkleBurst .9s ease .35s both; transform-origin: 232px 166px; }
+.ace-mascot[data-state="success"] #sparkles .s2 { animation: aceSparkleBurst .9s ease .43s both; transform-origin: 408px 166px; }
+.ace-mascot[data-state="success"] #sparkles .s3 { animation: aceSparkleBurst .9s ease .51s both; transform-origin: 200px 271px; }
+.ace-mascot[data-state="success"] #sparkles .s4 { animation: aceSparkleBurst .9s ease .59s both; transform-origin: 440px 271px; }
+.ace-mascot[data-state="success"] .ball { animation: aceAntennaPulse .5s ease-in-out 2; }
+.ace-mascot[data-state="success"] #blushL { animation: aceBlushPop .7s ease .3s 1; transform-origin: 228px 300px; }
+.ace-mascot[data-state="success"] #blushR { animation: aceBlushPop .7s ease .3s 1; transform-origin: 412px 300px; }
+
+/* ---------- error / fallback (one-shot then holds) ---------- */
+@keyframes aceApologeticTilt {
+  0%, 100% { transform: rotate(-2deg) translateY(0); }
+  50% { transform: rotate(2deg) translateY(3px); }
+}
+@keyframes aceDimBall {
+  0%, 100% { opacity: 0.4; }
+  45% { opacity: 0.65; }
+  55% { opacity: 0.3; }
+}
+@keyframes aceShrugArmL {
+  0% { transform: rotate(-15deg); }
+  25% { transform: rotate(-32deg); }
+  60%, 100% { transform: rotate(-15deg); }
+}
+@keyframes aceShrugArmR {
+  0% { transform: rotate(-15deg); }
+  25% { transform: rotate(-30deg); }
+  60%, 100% { transform: rotate(-15deg); }
+}
+@keyframes aceSlowBlinkConcern {
+  0%, 80%, 100% { transform: scaleY(1); }
+  90% { transform: scaleY(0.35); }
+}
+.ace-mascot[data-state="error"] #rig-float { animation: aceApologeticTilt 2.6s ease-in-out infinite; transform-origin: 320px 340px; }
+.ace-mascot[data-state="error"] #armL { animation: aceShrugArmL 1s ease-out; transform-origin: 168px 300px; }
+.ace-mascot[data-state="error"] #armR { animation: aceShrugArmR 1s ease-out; transform-origin: 467px 303px; }
+.ace-mascot[data-state="error"] #mouthGrp .mouth-smile { opacity: 0; }
+.ace-mascot[data-state="error"] #mouthGrp .mouth-concern { opacity: 1; }
+.ace-mascot[data-state="error"] .ball { animation: aceDimBall 1.4s ease-in-out infinite; }
+.ace-mascot[data-state="error"] #body-fill { opacity: 0.92; }
+.ace-mascot[data-state="error"] #eyeL, .ace-mascot[data-state="error"] #eyeR { animation: aceSlowBlinkConcern 3.4s ease-in-out infinite; transform-origin: 270px 270px; }
+.ace-mascot[data-state="error"] #eyeR { transform-origin: 370px 270px; }
+
+/* ---------- default resting pose for any state that doesn't override arms ---------- */
+.ace-mascot #armL { transform: rotate(-15deg); transform-origin: 168px 300px; }
+.ace-mascot #armR { transform: rotate(-50deg); transform-origin: 467px 303px; }
+.ace-mascot #waveArcs { opacity: 0; }
+.ace-mascot #soundArcs { opacity: 0; }
+.ace-mascot #thoughtDots { opacity: 0; }
+.ace-mascot #sparkles .s1, .ace-mascot #sparkles .s2, .ace-mascot #sparkles .s3, .ace-mascot #sparkles .s4 { opacity: 0; }
+.ace-mascot #mouthGrp .mouth-flat, .ace-mascot #mouthGrp .mouth-grin, .ace-mascot #mouthGrp .mouth-concern, .ace-mascot #mouthGrp .mouth-listen { opacity: 0; }
+.ace-mascot #mouthGrp .mouth-smile { opacity: 1; }
+
+@media (prefers-reduced-motion: reduce) {
+  .ace-mascot * { animation: none !important; }
+}

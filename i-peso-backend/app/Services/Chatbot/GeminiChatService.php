@@ -4,6 +4,10 @@ namespace App\Services\Chatbot;
 
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Foundation\Auth\User;
+use App\Models\JobSeeker;
+use App\Models\Employer;
+use App\Models\Administrator;
 
 /**
  * Drives one assistant turn against the Gemini API.
@@ -31,7 +35,7 @@ class GeminiChatService
      *         Oldest first, ending with the visitor's current message.
      * @return array{text: string, office_location: ?array{address: string}}
      */
-    public function reply(array $history): array
+    public function reply(array $history, ?User $user = null): array
     {
         $lastQuestion = '';
         foreach (array_reverse($history) as $turn) {
@@ -47,7 +51,7 @@ class GeminiChatService
         ], $history);
 
         for ($round = 0; $round < self::MAX_TOOL_ROUNDS; $round++) {
-            $parts = $this->send($contents);
+            $parts = $this->send($contents, $user);
 
             $calls = array_values(array_filter(array_map(
                 fn (array $part) => $part['functionCall'] ?? null,
@@ -138,7 +142,7 @@ class GeminiChatService
     /**
      * One HTTP round trip. Returns the model's content parts.
      */
-    private function send(array $contents): array
+    private function send(array $contents, ?User $user = null): array
     {
         $config = config('services.gemini');
 
@@ -150,7 +154,7 @@ class GeminiChatService
             ->withHeaders(['x-goog-api-key' => $config['key']])
             ->asJson()
             ->post("{$config['base_url']}/models/{$config['model']}:generateContent", [
-                'systemInstruction' => ['parts' => [['text' => $this->systemInstruction()]]],
+                'systemInstruction' => ['parts' => [['text' => $this->systemInstruction($user)]]],
                 'contents' => $contents,
                 'tools' => [['functionDeclarations' => $this->tools->declarations()]],
                 'generationConfig' => [
@@ -268,9 +272,21 @@ class GeminiChatService
      * happily invent requirements and job listings, which on a government
      * employment portal is worse than no chatbot at all.
      */
-    private function systemInstruction(): string
+    private function systemInstruction(?User $user = null): string
     {
         $today = now()->toFormattedDateString();
+
+        $userContext = "You are talking to a visitor in the public chat widget. They do not have an account open in this conversation, and nothing here is tied to any logged-in session.";
+        
+        if ($user) {
+            if ($user instanceof JobSeeker) {
+                $userContext = "You are talking to a registered Job Seeker named {$user->first_name} {$user->last_name}. They are logged in to their dashboard.";
+            } elseif ($user instanceof Employer) {
+                $userContext = "You are talking to a registered Employer representing {$user->company_name}. They are logged in to their dashboard.";
+            } elseif ($user instanceof Administrator) {
+                $userContext = "You are talking to an Administrator of the PESO office.";
+            }
+        }
 
         return <<<PROMPT
         You are the i-PESO Virtual Assistant, the official guide for i-PESO, the online employment
@@ -278,8 +294,7 @@ class GeminiChatService
         is {$today}. You represent a government office, so stay professional, empathetic,
         encouraging, and easy to talk to — many visitors are anxious about finding work.
 
-        You are talking to a visitor in the public chat widget. They do not have an account open
-        in this conversation, and nothing here is tied to any logged-in session.
+        {$userContext}
 
         LANGUAGE
         Mirror the visitor's language exactly. Tagalog question, Tagalog answer. Taglish question,
@@ -299,10 +314,9 @@ class GeminiChatService
 
         WHAT YOU CANNOT DO
         You cannot check application status, verify or approve an account, look anything up in a
-        specific person's dashboard, reset a password, or see any personal record — that data
-        belongs to a logged-in session this chat does not have. If asked, tell them to check their
-        own Dashboard or "My Applications" tab after logging in, or direct them to a PESO
-        Administrator, who makes all final verification and approval decisions — you never
+        specific person's dashboard, reset a password, or see any personal record, unless provided by a tool.
+        If asked about something specific to their records that you don't have, tell them to check their
+        own Dashboard, or direct them to a PESO Administrator, who makes all final verification and approval decisions — you never
         promise, guarantee, or imply one yourself.
 
         Never ask the visitor for personal information — no full name, address, birth date,

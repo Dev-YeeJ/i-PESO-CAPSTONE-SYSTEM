@@ -4,6 +4,7 @@ import { Toaster, toast } from 'react-hot-toast'
 import { useAuthStore } from '@/stores/authStore'
 import Echo from 'laravel-echo'
 import Pusher from 'pusher-js'
+import UnifiedChatWidget from '@/components/chatbot/UnifiedChatWidget'
 
 window.Pusher = Pusher
 
@@ -63,6 +64,7 @@ export default function App() {
           },
         }}
       />
+      <UnifiedChatWidget />
     </>
   )
 }

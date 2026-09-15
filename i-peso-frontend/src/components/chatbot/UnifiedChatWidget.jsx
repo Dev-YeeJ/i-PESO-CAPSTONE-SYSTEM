@@ -1,13 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
 import { MapPin, MessageCircle, Send, X } from 'lucide-react'
 import { chatbotService } from '@/services/chatbotService'
+import { useAuthStore } from '@/stores/authStore'
+import AceMascot from './AceMascot'
 
 /**
- * Floating assistant for visitors without an account.
+ * Unified chat widget — appears on every screen (guest, seeker, employer).
  *
- * Mounted once in GuestLayout, so it appears on the landing page, login, and
- * every registration step. Answers come from the Laravel endpoint, which is
- * scoped to public data only — no personal records are ever in play here.
+ * Mounted once in App.jsx so it persists across navigation. The backend
+ * detects the authenticated user (if any) and adjusts the AI's context.
  */
 
 /**
@@ -22,7 +23,7 @@ const STARTERS = [
   'Libre po ba ang i-PESO?',
 ]
 
-const GREETING =
+const DEFAULT_GREETING =
   'Kumusta po! Ako ang i-PESO assistant ng Urdaneta City PESO. Maaari po kayong magtanong ' +
   'tungkol sa registration, trabaho, job fairs, at government programs.'
 
@@ -64,15 +65,17 @@ function linkifyText(text) {
   })
 }
 
-export default function PublicChatWidget() {
+export default function UnifiedChatWidget() {
   const [open, setOpen] = useState(false)
   const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
+  const user = useAuthStore((state) => state.user)
 
   const launcherRef = useRef(null)
   const inputRef = useRef(null)
   const logEndRef = useRef(null)
+  const aceRef = useRef(null)
 
   // Escape closes the panel from anywhere inside it.
   useEffect(() => {
@@ -86,16 +89,29 @@ export default function PublicChatWidget() {
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [open])
 
-  // Move focus into the panel on open, and back to the launcher on close, so
-  // keyboard users are never stranded.
+  // Play greeting when the chat panel opens; move focus into the panel on
+  // open, and back to the launcher on close, so keyboard users are never
+  // stranded.
   useEffect(() => {
-    if (open) inputRef.current?.focus()
-    else launcherRef.current?.focus({ preventScroll: true })
+    if (open) {
+      inputRef.current?.focus()
+      if (aceRef.current) { aceRef.current.play('greeting') }
+    } else {
+      launcherRef.current?.focus({ preventScroll: true })
+    }
   }, [open])
 
   useEffect(() => {
     logEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
   }, [messages, busy])
+
+  // --- Input focus/blur → Ace listening/idle ---
+  const handleInputFocus = () => {
+    if (aceRef.current && !busy) { aceRef.current.play('listening') }
+  }
+  const handleInputBlur = () => {
+    if (aceRef.current && !busy) { aceRef.current.play('idle') }
+  }
 
   const send = async (text) => {
     const question = text.trim()
@@ -109,7 +125,19 @@ export default function PublicChatWidget() {
     setInput('')
     setBusy(true)
 
-    const { reply, officeLocation } = await chatbotService.askPublic(question, history)
+    // → Ace: thinking (right before the request goes out)
+    if (aceRef.current) { aceRef.current.play('thinking') }
+
+    const { reply, officeLocation, retryable } = await chatbotService.askPublic(question, history)
+
+    // chatbotService.askPublic never throws — errors are returned as
+    // { reply: "...", retryable: true/false }. A retryable response means
+    // the backend returned a 429/503 or a network failure happened.
+    if (retryable) {
+      if (aceRef.current) { aceRef.current.play('error') }
+    } else {
+      if (aceRef.current) { aceRef.current.play('success') }
+    }
 
     setMessages((current) => [...current, { role: 'model', text: reply, officeLocation }])
     setBusy(false)
@@ -125,9 +153,12 @@ export default function PublicChatWidget() {
       {open && (
         <section className="ipeso-chat-panel" role="dialog" aria-label="i-PESO assistant">
           <header className="ipeso-chat-header">
-            <div>
-              <p className="ipeso-chat-title">i-PESO Assistant</p>
-              <p className="ipeso-chat-sub">Urdaneta City PESO</p>
+            <div className="ipeso-chat-header-left">
+              <AceMascot ref={aceRef} className="ipeso-chat-ace" />
+              <div>
+                <p className="ipeso-chat-title">Ace — i-PESO Assistant</p>
+                <p className="ipeso-chat-sub">Urdaneta City PESO</p>
+              </div>
             </div>
             <button type="button" onClick={() => setOpen(false)} className="ipeso-chat-close" aria-label="Close assistant">
               <X size={18} aria-hidden="true" />
@@ -135,7 +166,9 @@ export default function PublicChatWidget() {
           </header>
 
           <div className="ipeso-chat-log" aria-live="polite" aria-atomic="false">
-            <p className="ipeso-chat-bubble is-model">{GREETING}</p>
+            <p className="ipeso-chat-bubble is-model">
+              {user ? `Kumusta po${user.first_name || user.company_name ? ` ${user.first_name || user.company_name}` : ''}! Ako si Ace, ang i-PESO assistant. Paano ko kayo matutulungan ngayon?` : DEFAULT_GREETING}
+            </p>
 
             {messages.map((message, index) => (
               <div key={`${message.role}-${index}`}>
@@ -170,6 +203,8 @@ export default function PublicChatWidget() {
               ref={inputRef}
               value={input}
               onChange={(event) => setInput(event.target.value)}
+              onFocus={handleInputFocus}
+              onBlur={handleInputBlur}
               maxLength={500}
               placeholder="Magtanong po kayo…"
               aria-label="Your question"

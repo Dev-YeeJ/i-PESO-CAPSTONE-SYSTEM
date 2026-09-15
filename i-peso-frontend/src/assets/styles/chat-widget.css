@@ -76,6 +76,19 @@
   background: var(--chat-navy);
 }
 
+.ipeso-chat-header-left {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  min-width: 0;
+}
+
+/* Ace mascot in the header — sized to sit next to the title text */
+.ipeso-chat-ace {
+  width: 2.6rem;
+  flex: 0 0 2.6rem;
+}
+
 .ipeso-chat-title { font-size: 0.9rem; font-weight: 700; }
 
 .ipeso-chat-sub {
