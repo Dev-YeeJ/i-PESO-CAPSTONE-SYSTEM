@@ -122,6 +122,7 @@ export interface JobFilters {
   limit?: number
   compact?: boolean
   jobId?: number | string
+  employerId?: number | string
   /** Overrides the seeker's stored profile location for this search (e.g. "use current location"). */
   lat?: number
   lng?: number
@@ -315,6 +316,7 @@ export interface JobFairPass {
 
 export interface JobFairPoster {
   id: number | string
+  employer_id?: number | string | null
   company_name?: string | null
   job_fair_id?: number | string | null
   job_fair_title?: string | null
@@ -655,6 +657,8 @@ export const seekerService = {
     if (filters.canApplyOnly) params.can_apply_only = 1
     if (filters.coordinatesOnly) params.coordinates_only = 1
     if (filters.maxMissingSkills !== undefined) params.max_missing_skills = filters.maxMissingSkills
+    if (filters.jobId) params.job_id = filters.jobId
+    if (filters.employerId) params.employer_id = filters.employerId
     if (filters.lat !== undefined) params.lat = filters.lat
     if (filters.lng !== undefined) params.lng = filters.lng
     params.limit = filters.limit ?? 40

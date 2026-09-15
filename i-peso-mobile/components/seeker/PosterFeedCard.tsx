@@ -34,38 +34,42 @@ export function PosterFeedCard({ poster }: { poster: JobFairPoster }) {
 
   return (
     <Card padding="sm" style={styles.card} contentStyle={styles.content}>
-      <View style={styles.header}>
-        <View style={[styles.avatar, { backgroundColor: toneFor(poster.company_name) }]}>
-          <Text style={styles.avatarText}>{initialsFor(poster.company_name)}</Text>
-        </View>
-        <View style={styles.headerText}>
-          <Text style={styles.company} numberOfLines={1}>{poster.company_name || 'Employer'}</Text>
-          <Text style={styles.meta} numberOfLines={1}>{metaLine}</Text>
-        </View>
-        {poster.match_percentage != null ? (
-          <View style={styles.matchBadge}>
-            <Text style={styles.matchBadgeText}>{Math.round(poster.match_percentage)}% match</Text>
+      <Link href={`/(seeker)/employer-posters/${poster.id}`} asChild>
+        <TouchableOpacity activeOpacity={0.8}>
+          <View style={styles.header}>
+            <View style={[styles.avatar, { backgroundColor: toneFor(poster.company_name) }]}>
+              <Text style={styles.avatarText}>{initialsFor(poster.company_name)}</Text>
+            </View>
+            <View style={styles.headerText}>
+              <Text style={styles.company} numberOfLines={1}>{poster.company_name || 'Employer'}</Text>
+              <Text style={styles.meta} numberOfLines={1}>{metaLine}</Text>
+            </View>
+            {poster.match_percentage != null ? (
+              <View style={styles.matchBadge}>
+                <Text style={styles.matchBadgeText}>{Math.round(poster.match_percentage)}% match</Text>
+              </View>
+            ) : null}
           </View>
-        ) : null}
-      </View>
 
-      {isImage && token ? (
-        <Image
-          source={{ uri: seekerService.jobFairPosterUrl(poster.id), headers: { Authorization: `Bearer ${token}` } }}
-          style={styles.poster}
-          resizeMode="cover"
-        />
-      ) : (
-        <View style={styles.docRow}>
-          <MaterialIcons name="description" size={28} color={colors.info} />
-          <Text style={styles.docName} numberOfLines={1}>{poster.original_filename || 'Poster'}</Text>
-        </View>
-      )}
+          {isImage && token ? (
+            <Image
+              source={{ uri: seekerService.jobFairPosterUrl(poster.id), headers: { Authorization: `Bearer ${token}` } }}
+              style={styles.poster}
+              resizeMode="cover"
+            />
+          ) : (
+            <View style={styles.docRow}>
+              <MaterialIcons name="description" size={28} color={colors.info} />
+              <Text style={styles.docName} numberOfLines={1}>{poster.original_filename || 'Poster'}</Text>
+            </View>
+          )}
 
-      <View style={styles.footer}>
-        <MaterialIcons name="verified" size={14} color={colors.subtle} />
-        <Text style={styles.footerText}>PESO-approved employer posting</Text>
-      </View>
+          <View style={styles.footer}>
+            <MaterialIcons name="verified" size={14} color={colors.subtle} />
+            <Text style={styles.footerText}>PESO-approved employer posting</Text>
+          </View>
+        </TouchableOpacity>
+      </Link>
     </Card>
   )
 }

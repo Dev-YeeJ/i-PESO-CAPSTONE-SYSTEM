@@ -50,6 +50,7 @@ export default function NotificationsScreen() {
     // status update landing while this screen is open (not just backgrounded) wouldn't show
     // up until a manual pull-to-refresh or a full remount. Matches the badge's cadence.
     refetchInterval: 30000,
+    refetchOnWindowFocus: false,
   })
   const notifications = data?.notifications ?? []
   const unreadCount = data?.unread_count ?? 0
