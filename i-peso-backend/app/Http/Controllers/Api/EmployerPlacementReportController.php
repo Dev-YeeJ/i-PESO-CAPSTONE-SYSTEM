@@ -215,57 +215,48 @@ class EmployerPlacementReportController extends Controller
         $this->assertCoverageNotInFuture($validated['coverage_month'], $validated['coverage_year']);
         $this->assertNoSettledReportFor($employer, $validated['coverage_month'], $validated['coverage_year']);
 
-        $upload = PlacementReportUpload::create([
+        $upload = PlacementReportUpload::where([
             'employer_id' => $employer->employer_id,
-            'original_filename' => 'System-generated report',
-            'stored_path' => null,
-            'row_count' => 0,
-            'status' => PlacementReportUpload::STATUS_PENDING_MAPPING,
             'coverage_month' => $validated['coverage_month'],
             'coverage_year' => $validated['coverage_year'],
-        ]);
+        ])
+        ->whereNull('stored_path')
+        ->whereIn('status', [PlacementReportUpload::STATUS_PENDING_MAPPING, PlacementReportUpload::STATUS_REJECTED])
+        ->first();
 
-        $records = collect();
-
-        $applications = Application::with(['jobSeeker', 'jobVacancy'])
-            ->whereHas('jobVacancy', fn ($q) => $q->where('employer_id', $employer->employer_id))
-            ->where('status', 'hired')
-            ->whereMonth('status_changed_at', $validated['coverage_month'])
-            ->whereYear('status_changed_at', $validated['coverage_year'])
-            ->get();
-
-        foreach ($applications as $app) {
-            if (!$app->jobSeeker) continue;
-            $records->push([
-                'first_name' => $app->jobSeeker->first_name,
-                'middle_name' => $app->jobSeeker->middle_name,
-                'last_name' => $app->jobSeeker->last_name,
-                'gender' => $app->jobSeeker->sex ?? 'male',
-                'civil_status' => $app->jobSeeker->civil_status,
-                'birth_date' => $app->jobSeeker->date_of_birth?->format('Y-m-d'),
-                'address' => trim("{$app->jobSeeker->address_street}, {$app->jobSeeker->address_barangay}, {$app->jobSeeker->address_municipality_city}", ", \t\n\r\0\x0B"),
-                'educational_attainment' => $app->jobSeeker->highest_education_attained,
-                'assigned_company' => $employer->company_name ?: $employer->trade_name,
-                'age' => $app->jobSeeker->date_of_birth ? $app->jobSeeker->date_of_birth->age : null,
-                'employment_type' => $app->placement_employment_type ?? 'regular',
-                'salary_monthly' => $app->placement_salary ?? 0,
-                'position' => $app->jobVacancy?->job_title ?? 'Unknown',
-                'date_hired' => $app->status_changed_at?->format('Y-m-d') ?? null,
-                'seeker_id' => $app->jobSeeker->seeker_id,
-                'seeker_match_confidence' => \App\Models\PlacementRecord::MATCH_EXACT,
-                'seeker_match_confirmed_at' => now(),
+        $isNew = false;
+        if (! $upload) {
+            $isNew = true;
+            $upload = PlacementReportUpload::create([
+                'employer_id' => $employer->employer_id,
+                'original_filename' => 'System-generated report',
+                'stored_path' => null,
+                'row_count' => 0,
+                'status' => PlacementReportUpload::STATUS_PENDING_MAPPING,
+                'coverage_month' => $validated['coverage_month'],
+                'coverage_year' => $validated['coverage_year'],
             ]);
         }
 
-        if ($records->isNotEmpty()) {
-            $this->imports->buildManualRecords($upload, $records->toArray());
-            $upload->update(['row_count' => $records->count()]);
+        $appended = 0;
+        if ($isNew) {
+            // First time generate, we want to build even if 0 records, but we don't have to if we just do syncManualRecords
         }
+        
+        $appended = $this->syncManualRecords($upload, $employer, $isNew);
+
+        $message = $isNew
+            ? 'Placement report generated. Review the fetched hires and add any manual walk-in placements before submitting.'
+            : ($appended > 0 ? "Placement report synchronized. Added {$appended} new system-tracked hire(s)." : "Placement report ready. No new system-tracked hires since your last sync.");
+
+        $message = $isNew
+            ? 'Placement report generated. Review the fetched hires and add any manual walk-in placements before submitting.'
+            : ($appended > 0 ? "Placement report synchronized. Added {$appended} new system-tracked hire(s)." : "Placement report ready. No new system-tracked hires since your last sync.");
 
         return response()->json([
-            'message' => 'Placement report generated. Review the fetched hires and add any manual walk-in placements before submitting.',
+            'message' => $message,
             'data' => $this->detail($upload->fresh(['mappings'])),
-        ], 201);
+        ], $isNew ? 201 : 200);
     }
 
     /**
@@ -316,9 +307,15 @@ class EmployerPlacementReportController extends Controller
 
     public function show(Request $request, PlacementReportUpload $placementReport): JsonResponse
     {
+        $employer = $this->employer($request);
         $this->authorizeOwner($request, $placementReport);
 
-        return response()->json(['data' => $this->detail($placementReport->load('mappings'))]);
+        // Auto-sync live system hires if it's an editable manual draft
+        if ($placementReport->stored_path === null && in_array($placementReport->status, [PlacementReportUpload::STATUS_PENDING_MAPPING, PlacementReportUpload::STATUS_REJECTED])) {
+            $this->syncManualRecords($placementReport, $employer, false);
+        }
+
+        return response()->json(['data' => $this->detail($placementReport->fresh(['mappings']))]);
     }
 
     /**
@@ -635,6 +632,76 @@ class EmployerPlacementReportController extends Controller
                 $upload->mappings()->create(['source_column' => $sourceColumn, 'target_field' => $targetField]);
             }
         });
+    }
+
+    private function syncManualRecords(PlacementReportUpload $upload, $employer, bool $forceBuild): int
+    {
+        $existingRecords = $upload->records()->get()->map(function ($r) {
+            return [
+                'first_name' => $r->first_name,
+                'middle_name' => $r->middle_name,
+                'last_name' => $r->last_name,
+                'gender' => $r->gender,
+                'civil_status' => $r->civil_status,
+                'birth_date' => $r->birth_date?->format('Y-m-d'),
+                'address' => $r->address,
+                'educational_attainment' => $r->educational_attainment,
+                'assigned_company' => $r->assigned_company,
+                'age' => $r->age,
+                'employment_type' => $r->employment_type,
+                'salary_monthly' => $r->salary_monthly,
+                'position' => $r->position,
+                'department' => $r->department,
+                'date_hired' => $r->date_hired?->format('Y-m-d'),
+                'seeker_id' => $r->seeker_id,
+                'seeker_match_confidence' => $r->seeker_match_confidence,
+                'seeker_match_confirmed_at' => $r->seeker_match_confirmed_at,
+            ];
+        });
+
+        $existingSeekerIds = $existingRecords->pluck('seeker_id')->filter()->all();
+        $records = collect($existingRecords);
+
+        $applications = Application::with(['jobSeeker', 'jobVacancy'])
+            ->whereHas('jobVacancy', fn ($q) => $q->where('employer_id', $employer->employer_id))
+            ->where('status', 'hired')
+            ->whereMonth('status_changed_at', $upload->coverage_month)
+            ->whereYear('status_changed_at', $upload->coverage_year)
+            ->get();
+
+        $appended = 0;
+        foreach ($applications as $app) {
+            if (!$app->jobSeeker) continue;
+            if (in_array($app->jobSeeker->seeker_id, $existingSeekerIds)) continue; // Already in the draft
+
+            $records->push([
+                'first_name' => $app->jobSeeker->first_name,
+                'middle_name' => $app->jobSeeker->middle_name,
+                'last_name' => $app->jobSeeker->last_name,
+                'gender' => $app->jobSeeker->sex ?? 'male',
+                'civil_status' => $app->jobSeeker->civil_status,
+                'birth_date' => $app->jobSeeker->date_of_birth?->format('Y-m-d'),
+                'address' => trim("{$app->jobSeeker->address_street}, {$app->jobSeeker->address_barangay}, {$app->jobSeeker->address_municipality_city}", ", \t\n\r\0\x0B"),
+                'educational_attainment' => $app->jobSeeker->highest_education_attained,
+                'assigned_company' => $employer->company_name ?: $employer->trade_name,
+                'age' => $app->jobSeeker->date_of_birth ? $app->jobSeeker->date_of_birth->age : null,
+                'employment_type' => $app->placement_employment_type ?? 'regular',
+                'salary_monthly' => $app->placement_salary ?? 0,
+                'position' => $app->jobVacancy?->job_title ?? 'Unknown',
+                'date_hired' => $app->status_changed_at?->format('Y-m-d') ?? null,
+                'seeker_id' => $app->jobSeeker->seeker_id,
+                'seeker_match_confidence' => \App\Models\PlacementRecord::MATCH_EXACT,
+                'seeker_match_confirmed_at' => now(),
+            ]);
+            $appended++;
+        }
+
+        if ($records->isNotEmpty() && ($forceBuild || $appended > 0)) {
+            $this->imports->buildManualRecords($upload, $records->toArray());
+            $upload->update(['row_count' => $records->count()]);
+        }
+
+        return $appended;
     }
 
     private function assertRequiredMapped(array $mapping): void

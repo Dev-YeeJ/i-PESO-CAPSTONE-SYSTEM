@@ -112,6 +112,11 @@ export const exportPlacementReport = async (id) => {
   return response.data
 }
 
+export const exportPlacementReportPdf = async (id) => {
+  const response = await api.get(`/admin/placement-reports/${id}/export-pdf`, { responseType: 'blob' })
+  return response.data
+}
+
 // ── Admin: monthly submission compliance ──────────────────────────────────
 
 export const getPlacementCompliance = async (params = {}) => {

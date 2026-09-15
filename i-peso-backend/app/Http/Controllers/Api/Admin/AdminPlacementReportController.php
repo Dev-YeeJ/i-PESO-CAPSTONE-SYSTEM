@@ -61,47 +61,7 @@ class AdminPlacementReportController extends Controller
         return response()->json($uploads);
     }
 
-    /**
-     * Which employers still owe a report for a coverage period.
-     *
-     * This is the part PESO does by phone today: knowing who has reported,
-     * who declared no hires, and who has gone quiet past the deadline.
-     */
-    public function compliance(Request $request): JsonResponse
-    {
-        $this->admin($request);
 
-        $default = $this->compliance->latestOverduePeriod();
-
-        $validated = $request->validate([
-            'coverage_month' => ['nullable', 'integer', 'min:1', 'max:12'],
-            'coverage_year' => ['nullable', 'integer', 'min:2020', 'max:2100'],
-        ]);
-
-        $month = $validated['coverage_month'] ?? $default['month'];
-        $year = $validated['coverage_year'] ?? $default['year'];
-
-        $rows = $this->compliance->statusFor($year, $month);
-
-        return response()->json([
-            'coverage_month' => $month,
-            'coverage_year' => $year,
-            'due_date' => $this->compliance->dueDate($year, $month)->toDateString(),
-            'deadline_day' => (int) config('placement_reports.deadline_day', 10),
-            'totals' => [
-                'expected' => $rows->count(),
-                'submitted' => $rows->whereIn('state', [
-                    PlacementReportUpload::STATUS_PENDING_REVIEW,
-                    PlacementReportUpload::STATUS_APPROVED,
-                ])->count(),
-                'nil_reports' => $rows->where('is_nil_report', true)->count(),
-                'needs_revision' => $rows->where('state', 'needs_revision')->count(),
-                'overdue' => $rows->where('state', 'overdue')->count(),
-                'not_yet_due' => $rows->where('state', 'not_submitted')->count(),
-            ],
-            'data' => $rows->values(),
-        ]);
-    }
 
     public function show(Request $request, PlacementReportUpload $placementReport): JsonResponse
     {
@@ -119,80 +79,15 @@ class AdminPlacementReportController extends Controller
 
         return response()->json([
             'data' => $this->summary($placementReport),
-            'match_summary' => [
-                'linked' => $records->whereNotNull('seeker_id')->count(),
-                'ambiguous' => $records->where('seeker_match_confidence', PlacementRecord::MATCH_AMBIGUOUS)->count(),
-                'unmatched' => $records->where('seeker_match_confidence', PlacementRecord::MATCH_NONE)->count(),
-                'confirmed' => $records->whereNotNull('seeker_match_confirmed_at')->count(),
-            ],
             'records' => $records->map(fn (PlacementRecord $record) => collect($record->only(array_keys(PlacementRecord::MAPPABLE_FIELDS)))
                 ->merge([
                     'id' => $record->id,
-                    'linked_seeker_id' => $record->seeker_id,
-                    'linked_seeker_name' => $this->seekerName($seekers->get($record->seeker_id)),
-                    'seeker_match_confidence' => $record->seeker_match_confidence,
-                    'seeker_match_confirmed_at' => $record->seeker_match_confirmed_at,
                 ])
                 ->all()),
         ]);
     }
 
-    /**
-     * Candidate registered seekers for one reported row, so an admin can settle
-     * an ambiguous name match rather than the importer guessing at it.
-     */
-    public function recordCandidates(Request $request, PlacementReportUpload $placementReport, PlacementRecord $record): JsonResponse
-    {
-        $this->admin($request);
-        $this->assertSubmitted($placementReport);
-        $this->assertRecordBelongs($placementReport, $record);
 
-        $candidates = $this->imports->seekerCandidates($record->first_name, $record->last_name);
-
-        return response()->json([
-            'data' => $candidates->map(fn (JobSeeker $seeker) => [
-                'seeker_id' => $seeker->seeker_id,
-                'name' => $this->seekerName($seeker),
-                'date_of_birth' => optional($seeker->date_of_birth)->toDateString(),
-            ])->values(),
-        ]);
-    }
-
-    /**
-     * Confirm, correct, or clear the seeker a reported hire is linked to.
-     */
-    public function linkRecord(Request $request, PlacementReportUpload $placementReport, PlacementRecord $record): JsonResponse
-    {
-        $admin = $this->admin($request);
-        $this->assertSubmitted($placementReport);
-        $this->assertRecordBelongs($placementReport, $record);
-
-        $validated = $request->validate([
-            'seeker_id' => ['present', 'nullable', 'integer', 'exists:job_seekers,seeker_id'],
-        ]);
-
-        $seekerId = $validated['seeker_id'] ?? null;
-
-        $record->update([
-            'seeker_id' => $seekerId,
-            // An admin decision is the strongest signal available, including a
-            // deliberate "this is nobody we have on file".
-            'seeker_match_confidence' => $seekerId ? PlacementRecord::MATCH_EXACT : PlacementRecord::MATCH_NONE,
-            'seeker_match_confirmed_by' => $admin->admin_id,
-            'seeker_match_confirmed_at' => now(),
-        ]);
-
-        return response()->json([
-            'message' => $seekerId ? 'Placement linked to the selected job seeker.' : 'Link cleared for this row.',
-            'data' => [
-                'id' => $record->id,
-                'linked_seeker_id' => $record->seeker_id,
-                'linked_seeker_name' => $seekerId ? $this->seekerName(JobSeeker::find($seekerId)) : null,
-                'seeker_match_confidence' => $record->seeker_match_confidence,
-                'seeker_match_confirmed_at' => $record->seeker_match_confirmed_at,
-            ],
-        ]);
-    }
 
     public function approve(Request $request, PlacementReportUpload $placementReport): JsonResponse
     {
@@ -261,22 +156,46 @@ class AdminPlacementReportController extends Controller
 
         return response()->streamDownload(function () use ($placementReport, $fields) {
             $handle = fopen('php://output', 'w');
-            fputcsv($handle, array_merge(
-                array_map(fn ($f) => PlacementRecord::MAPPABLE_FIELDS[$f], $fields),
-                ['Linked Seeker ID', 'Match Confidence'],
-            ));
+            fputcsv($handle, array_map(fn ($f) => PlacementRecord::MAPPABLE_FIELDS[$f], $fields));
 
             $placementReport->records()->orderBy('id')->chunk(200, function ($records) use ($handle, $fields) {
                 foreach ($records as $record) {
-                    fputcsv($handle, array_merge(
-                        array_map(fn ($f) => (string) ($record->{$f} ?? ''), $fields),
-                        [(string) ($record->seeker_id ?? ''), (string) ($record->seeker_match_confidence ?? '')],
-                    ));
+                    fputcsv($handle, array_map(fn ($f) => (string) ($record->{$f} ?? ''), $fields));
                 }
             });
 
             fclose($handle);
         }, $filename, ['Content-Type' => 'text/csv']);
+    }
+
+    public function exportPdf(Request $request, PlacementReportUpload $placementReport)
+    {
+        $this->admin($request);
+        $this->assertSubmitted($placementReport);
+
+        $placementReport->load('employer:employer_id,company_name,trade_name');
+        $records = $placementReport->records()->orderBy('id')->get();
+
+        $html = '<style>body { font-family: sans-serif; font-size: 10px; } table { width: 100%; border-collapse: collapse; } th, td { border: 1px solid #ccc; padding: 4px; text-align: left; }</style>';
+        $html .= '<h2>Placement Report</h2>';
+        $html .= '<p><strong>Employer:</strong> ' . e($placementReport->employer?->company_name ?: $placementReport->employer?->trade_name) . '</p>';
+        $html .= '<p><strong>Coverage:</strong> ' . $placementReport->coverage_year . '-' . str_pad($placementReport->coverage_month, 2, '0', STR_PAD_LEFT) . '</p>';
+        $html .= '<table><thead><tr>';
+        foreach (PlacementRecord::MAPPABLE_FIELDS as $label) {
+            $html .= '<th>' . e($label) . '</th>';
+        }
+        $html .= '</tr></thead><tbody>';
+        foreach ($records as $record) {
+            $html .= '<tr>';
+            foreach (array_keys(PlacementRecord::MAPPABLE_FIELDS) as $field) {
+                $html .= '<td>' . e($record->{$field} ?? '') . '</td>';
+            }
+            $html .= '</tr>';
+        }
+        $html .= '</tbody></table>';
+
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadHTML($html)->setPaper('a4', 'landscape');
+        return $pdf->download('placement-report-'.$placementReport->id.'-'.now()->format('Ymd').'.pdf');
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────
