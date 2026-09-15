@@ -86,7 +86,8 @@ export function RequireRole({ role }) {
 
   if (userRole !== role) {
     if (!userRole) return <Navigate to={role === 'administrator' ? '/administrator' : '/login'} replace />
-    return <Navigate to={`/${userRole}/dashboard`} replace />
+    const basePath = userRole === 'administrator' ? 'admin' : userRole
+    return <Navigate to={`/${basePath}/dashboard`} replace />
   }
 
   return <Outlet />
@@ -105,7 +106,8 @@ export function GuestOnly() {
     if (!userRole) {
       return <Navigate to="/login" replace />
     }
-    return <Navigate to={`/${userRole}/dashboard`} replace />
+    const basePath = userRole === 'administrator' ? 'admin' : userRole
+    return <Navigate to={`/${basePath}/dashboard`} replace />
   }
 
   return <Outlet />
