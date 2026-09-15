@@ -164,9 +164,16 @@ export default function EmployerJobFairDashboard() {
     try {
       await work()
       toast.success(success, { id: toastId ?? undefined })
+      // TEMPORARY diagnostic: confirms the request truly succeeded,
+      // independent of whether the toast itself is visibly rendering.
+      window.alert(`Upload succeeded: ${success}`)
       await load()
     } catch (e) {
-      toast.error(Object.values(e.response?.data?.errors ?? {}).flat().join(' ') || e.response?.data?.message || 'Action failed.', { id: toastId ?? undefined })
+      const message = Object.values(e.response?.data?.errors ?? {}).flat().join(' ') || e.response?.data?.message || 'Action failed.'
+      toast.error(message, { id: toastId ?? undefined })
+      // TEMPORARY diagnostic: surfaces the exact failure, including cases
+      // (network error, CORS, timeout) where e.response is undefined.
+      window.alert(`Upload failed.\nStatus: ${e.response?.status ?? '(no response)'}\nMessage: ${message}\nRaw error: ${e.message}`)
     }
   }
 
@@ -386,11 +393,6 @@ export default function EmployerJobFairDashboard() {
                                 <label className="mt-3 flex w-fit cursor-pointer items-center gap-2 rounded-lg border border-dashed border-slate-300 px-3 py-2 text-xs font-bold text-slate-600 hover:border-brand-navy hover:text-brand-navy">
                                   <FileUp className="h-4 w-4" />{isGallery ? (nonRejected.length > 0 ? 'Add another photo' : 'Upload photos') : 'Upload document'}
                                   <input type="file" multiple={isGallery} accept={isGallery ? undefined : '.pdf,.jpg,.jpeg,.png'} className="hidden" onChange={(e) => {
-                                    // TEMPORARY diagnostic: a native alert() can't be hidden by CSS,
-                                    // scroll position, cache, or a rendering bug -- if this doesn't
-                                    // appear, the file input's change event genuinely never reaches
-                                    // this handler. Remove once the upload issue is confirmed fixed.
-                                    window.alert(`onChange fired. Files selected: ${e.target.files?.length ?? 0}`)
                                     const files = e.target.files; e.target.value = ''
                                     if (!files?.length) return
                                     act(() => uploadJobFairRequirement(selected.job_fair_id, req.id, files), `${req.label} submitted.`, { loading: `Uploading ${files.length > 1 ? `${files.length} photos` : files[0].name}…` })
