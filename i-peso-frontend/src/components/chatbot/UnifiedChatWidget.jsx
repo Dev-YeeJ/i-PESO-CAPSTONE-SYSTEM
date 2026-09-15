@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { MapPin, MessageCircle, Send, X } from 'lucide-react'
+import { MapPin, Send, X, Sparkles } from 'lucide-react'
 import { chatbotService } from '@/services/chatbotService'
 import { useAuthStore } from '@/stores/authStore'
 import AceMascot from './AceMascot'
@@ -11,30 +11,20 @@ import AceMascot from './AceMascot'
  * detects the authenticated user (if any) and adjusts the AI's context.
  */
 
-/**
- * Guests rarely know what a chatbot can do, so the opening move is showing
- * them. These four are the highest-frequency guest questions: what do I need,
- * is there work, when is the next event, and does this cost anything.
- */
 const STARTERS = [
-  'Paano po mag-register?',
-  'May trabaho po ba para sa welder?',
-  'Kailan po ang susunod na job fair?',
-  'Libre po ba ang i-PESO?',
+  { emoji: '📝', text: 'Paano po mag-register?' },
+  { emoji: '🔧', text: 'May trabaho po ba para sa welder?' },
+  { emoji: '🎪', text: 'Kailan po ang susunod na job fair?' },
+  { emoji: '💰', text: 'Libre po ba ang i-PESO?' },
 ]
 
 const DEFAULT_GREETING =
-  'Kumusta po! Ako ang i-PESO assistant ng Urdaneta City PESO. Maaari po kayong magtanong ' +
-  'tungkol sa registration, trabaho, job fairs, at government programs.'
+  'Kumusta po! Ako si Ace, ang i-PESO assistant ng Urdaneta City PESO. ' +
+  'Maaari po kayong magtanong tungkol sa registration, trabaho, job fairs, at government programs.'
 
 /** Matches a bare URL or email address inside otherwise plain chat text. */
 const URL_OR_EMAIL = /(https?:\/\/[^\s]+|[\w.+-]+@[\w-]+\.[\w.-]+)/g
 
-/**
- * Turns bare URLs and email addresses in the assistant's plain-text reply
- * into clickable links, without pulling in a markdown renderer the model was
- * never asked to produce output for.
- */
 function linkifyText(text) {
   return text.split(URL_OR_EMAIL).map((part, index) => {
     if (!part) return null
@@ -43,9 +33,6 @@ function linkifyText(text) {
     const isEmail = !isUrl && /^[\w.+-]+@[\w-]+\.[\w.-]+$/.test(part)
     if (!isUrl && !isEmail) return part
 
-    // The model often leaves the match butted up against sentence
-    // punctuation, e.g. "...facebook.com/page. Maaari" — that trailing
-    // punctuation is not part of the link.
     const trailing = part.match(/[.,)\]]+$/)?.[0] ?? ''
     const clean = trailing ? part.slice(0, part.length - trailing.length) : part
 
@@ -77,21 +64,13 @@ export default function UnifiedChatWidget() {
   const logEndRef = useRef(null)
   const aceRef = useRef(null)
 
-  // Escape closes the panel from anywhere inside it.
   useEffect(() => {
     if (!open) return undefined
-
-    const onKeyDown = (event) => {
-      if (event.key === 'Escape') setOpen(false)
-    }
-
+    const onKeyDown = (event) => { if (event.key === 'Escape') setOpen(false) }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [open])
 
-  // Play greeting when the chat panel opens; move focus into the panel on
-  // open, and back to the launcher on close, so keyboard users are never
-  // stranded.
   useEffect(() => {
     if (open) {
       inputRef.current?.focus()
@@ -105,7 +84,6 @@ export default function UnifiedChatWidget() {
     logEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
   }, [messages, busy])
 
-  // --- Input focus/blur → Ace listening/idle ---
   const handleInputFocus = () => {
     if (aceRef.current && !busy) { aceRef.current.play('listening') }
   }
@@ -117,22 +95,15 @@ export default function UnifiedChatWidget() {
     const question = text.trim()
     if (!question || busy) return
 
-    // Snapshot the history *before* adding the new turn — the server appends
-    // the message itself, so sending it twice would duplicate it.
     const history = messages.map(({ role, text: body }) => ({ role, text: body }))
-
     setMessages((current) => [...current, { role: 'user', text: question }])
     setInput('')
     setBusy(true)
 
-    // → Ace: thinking (right before the request goes out)
     if (aceRef.current) { aceRef.current.play('thinking') }
 
     const { reply, officeLocation, retryable } = await chatbotService.askPublic(question, history)
 
-    // chatbotService.askPublic never throws — errors are returned as
-    // { reply: "...", retryable: true/false }. A retryable response means
-    // the backend returned a 429/503 or a network failure happened.
     if (retryable) {
       if (aceRef.current) { aceRef.current.play('error') }
     } else {
@@ -148,48 +119,74 @@ export default function UnifiedChatWidget() {
     send(input)
   }
 
+  const greetingText = user
+    ? `Kumusta po${user.first_name || user.company_name ? ` ${user.first_name || user.company_name}` : ''}! Ako si Ace, ang i-PESO assistant. Paano ko kayo matutulungan ngayon?`
+    : DEFAULT_GREETING
+
   return (
     <div className="ipeso-chat">
       {open && (
-        <section className="ipeso-chat-panel" role="dialog" aria-label="i-PESO assistant">
-          <header className="ipeso-chat-header">
-            <div className="ipeso-chat-header-left">
-              <AceMascot ref={aceRef} className="ipeso-chat-ace" />
-              <div>
-                <p className="ipeso-chat-title">Ace — i-PESO Assistant</p>
-                <p className="ipeso-chat-sub">Urdaneta City PESO</p>
-              </div>
-            </div>
+        <section className="ipeso-chat-panel" role="dialog" aria-label="Ace — i-PESO assistant">
+
+          {/* ── Hero header with Ace ── */}
+          <header className="ipeso-chat-hero">
+            <div className="ipeso-chat-hero-bg" />
             <button type="button" onClick={() => setOpen(false)} className="ipeso-chat-close" aria-label="Close assistant">
               <X size={18} aria-hidden="true" />
             </button>
+            <div className="ipeso-chat-hero-content">
+              <AceMascot ref={aceRef} className="ipeso-chat-ace" />
+              <div className="ipeso-chat-hero-text">
+                <p className="ipeso-chat-hero-name">
+                  <Sparkles size={14} aria-hidden="true" />
+                  Ace
+                </p>
+                <p className="ipeso-chat-hero-role">i-PESO AI Assistant</p>
+              </div>
+            </div>
+            <div className="ipeso-chat-hero-status">
+              <span className="ipeso-chat-status-dot" />
+              Online — Urdaneta City PESO
+            </div>
           </header>
 
+          {/* ── Message log ── */}
           <div className="ipeso-chat-log" aria-live="polite" aria-atomic="false">
-            <p className="ipeso-chat-bubble is-model">
-              {user ? `Kumusta po${user.first_name || user.company_name ? ` ${user.first_name || user.company_name}` : ''}! Ako si Ace, ang i-PESO assistant. Paano ko kayo matutulungan ngayon?` : DEFAULT_GREETING}
-            </p>
+
+            {/* Greeting bubble */}
+            <div className="ipeso-chat-msg is-ace">
+              <div className="ipeso-chat-msg-avatar">A</div>
+              <p className="ipeso-chat-bubble is-model">{greetingText}</p>
+            </div>
 
             {messages.map((message, index) => (
               <div key={`${message.role}-${index}`}>
-                <p className={`ipeso-chat-bubble ${message.role === 'user' ? 'is-user' : 'is-model'}`}>
-                  {linkifyText(message.text)}
-                </p>
+                <div className={`ipeso-chat-msg ${message.role === 'user' ? 'is-user' : 'is-ace'}`}>
+                  {message.role !== 'user' && <div className="ipeso-chat-msg-avatar">A</div>}
+                  <p className={`ipeso-chat-bubble ${message.role === 'user' ? 'is-user' : 'is-model'}`}>
+                    {linkifyText(message.text)}
+                  </p>
+                </div>
                 {message.officeLocation && <InlineOfficeMap address={message.officeLocation.address} />}
               </div>
             ))}
 
             {busy && (
-              <p className="ipeso-chat-bubble is-model is-typing" aria-label="Assistant is typing">
-                <span /><span /><span />
-              </p>
+              <div className="ipeso-chat-msg is-ace">
+                <div className="ipeso-chat-msg-avatar">A</div>
+                <p className="ipeso-chat-bubble is-model is-typing" aria-label="Ace is thinking">
+                  <span /><span /><span />
+                </p>
+              </div>
             )}
 
             {messages.length === 0 && !busy && (
               <div className="ipeso-chat-starters">
-                {STARTERS.map((starter) => (
-                  <button key={starter} type="button" onClick={() => send(starter)} className="ipeso-chat-starter">
-                    {starter}
+                <p className="ipeso-chat-starters-label">Mga Madalas Itanong</p>
+                {STARTERS.map(({ emoji, text }) => (
+                  <button key={text} type="button" onClick={() => send(text)} className="ipeso-chat-starter">
+                    <span className="ipeso-chat-starter-emoji">{emoji}</span>
+                    {text}
                   </button>
                 ))}
               </div>
@@ -198,6 +195,7 @@ export default function UnifiedChatWidget() {
             <div ref={logEndRef} />
           </div>
 
+          {/* ── Composer ── */}
           <form onSubmit={onSubmit} className="ipeso-chat-form">
             <input
               ref={inputRef}
@@ -206,7 +204,7 @@ export default function UnifiedChatWidget() {
               onFocus={handleInputFocus}
               onBlur={handleInputBlur}
               maxLength={500}
-              placeholder="Magtanong po kayo…"
+              placeholder="Magtanong kay Ace…"
               aria-label="Your question"
               disabled={busy}
             />
@@ -216,30 +214,33 @@ export default function UnifiedChatWidget() {
           </form>
 
           <p className="ipeso-chat-foot">
-            Sagot batay sa impormasyon ng PESO. Huwag pong maglagay ng personal na impormasyon dito.
+            Powered by AI · Batay sa impormasyon ng PESO
           </p>
         </section>
       )}
 
+      {/* ── Launcher FAB with Ace ── */}
       <button
         ref={launcherRef}
         type="button"
         onClick={() => setOpen((value) => !value)}
-        className="ipeso-chat-launcher"
+        className={`ipeso-chat-launcher ${open ? 'is-open' : ''}`}
         aria-expanded={open}
-        aria-label={open ? 'Close i-PESO assistant' : 'Open i-PESO assistant'}
+        aria-label={open ? 'Close Ace assistant' : 'Ask Ace'}
       >
-        {open ? <X size={22} aria-hidden="true" /> : <MessageCircle size={22} aria-hidden="true" />}
+        {open ? (
+          <X size={22} aria-hidden="true" />
+        ) : (
+          <>
+            <AceMascot className="ipeso-chat-launcher-ace" />
+            <span className="ipeso-chat-launcher-pulse" />
+          </>
+        )}
       </button>
     </div>
   )
 }
 
-/**
- * Map shown right in the chat log when the visitor asked a "where" question
- * and the reply gave the office's on-record address. The embed accepts a
- * free-text address directly — no geocoding needed on our side.
- */
 function InlineOfficeMap({ address }) {
   const mapKey = import.meta.env.VITE_GOOGLE_MAPS_EMBED_API_KEY
   const mapUrl = `https://www.google.com/maps/embed/v1/place?key=${encodeURIComponent(mapKey)}&q=${encodeURIComponent(address)}`
