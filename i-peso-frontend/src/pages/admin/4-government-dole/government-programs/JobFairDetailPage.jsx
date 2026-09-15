@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import { CheckCircle2, ClipboardEdit, Download, Eye, FileText, Flame, Mail, RefreshCw, Save, Search, ShieldCheck, TrendingUp, UserCheck, Users, XCircle } from 'lucide-react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { AlertBox, Badge, Button, Card, CardHeader, LoadingSkeleton, StatCard } from '@/components/ui'
@@ -255,12 +256,13 @@ export default function JobFairDetailPage() {
           <TabsTrigger value="reports">Reports{reports.length ? ` (${reports.length})` : ''}</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="overview" className="space-y-6">
-          <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm leading-6 text-blue-900">
-            <strong>Physical event status quo:</strong> i-PESO does not force digital crowd control at the venue — employers use their normal tables and paper resumes; the system focuses on coordination before the event and report automation afterward.
-          </div>
+        <TabsContent value="overview">
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }} className="space-y-6">
+            <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm leading-6 text-blue-900 shadow-sm">
+              <strong>Physical event status quo:</strong> i-PESO does not force digital crowd control at the venue — employers use their normal tables and paper resumes; the system focuses on coordination before the event and report automation afterward.
+            </div>
 
-          <div className="grid gap-6 xl:grid-cols-2">
+            <div className="grid gap-6 xl:grid-cols-2">
             <Card>
               <CardHeader title="Announcement & invitation" subtitle={`${fair?.status?.replaceAll('_', ' ') ?? ''} · ${fair?.venue ?? ''}`} />
               <div className="flex flex-wrap gap-2">
@@ -284,30 +286,38 @@ export default function JobFairDetailPage() {
                     className="w-full rounded-lg border border-slate-300 py-2 pl-9 pr-3 text-sm focus:border-brand-navy focus:outline-none focus:ring-2 focus:ring-brand-navy/10"
                   />
                 </div>
-                {employerPickerOpen && employerQuery.trim() && (
-                  <div className="absolute z-10 mt-1.5 w-full overflow-hidden rounded-xl border border-slate-200 bg-white shadow-elevated">
-                    {employerSearching ? (
-                      <p className="px-3 py-2.5 text-xs text-slate-400">Searching…</p>
-                    ) : employerResults.length === 0 ? (
-                      <p className="px-3 py-2.5 text-xs text-slate-400">No verified employer matches.</p>
-                    ) : (
-                      <ul className="max-h-64 divide-y divide-slate-100 overflow-y-auto">
-                        {employerResults.map((employer) => (
-                          <li key={employer.employer_id}>
-                            <button
-                              type="button"
-                              onClick={() => inviteEmployer(employer)}
-                              className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm hover:bg-slate-50"
-                            >
-                              <Mail className="h-3.5 w-3.5 shrink-0 text-slate-400" />
-                              <span className="truncate font-semibold text-slate-800">{employer.company_name}</span>
-                            </button>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
-                )}
+                <AnimatePresence>
+                  {employerPickerOpen && employerQuery.trim() && (
+                    <motion.div 
+                      initial={{ opacity: 0, y: -10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -10 }}
+                      transition={{ duration: 0.2 }}
+                      className="absolute z-10 mt-1.5 w-full overflow-hidden rounded-xl border border-slate-200 bg-white/90 backdrop-blur-xl shadow-2xl"
+                    >
+                      {employerSearching ? (
+                        <p className="px-4 py-3 text-xs font-semibold text-slate-500">Searching…</p>
+                      ) : employerResults.length === 0 ? (
+                        <p className="px-4 py-3 text-xs font-semibold text-slate-500">No verified employer matches.</p>
+                      ) : (
+                        <ul className="max-h-64 divide-y divide-slate-100 overflow-y-auto">
+                          {employerResults.map((employer) => (
+                            <li key={employer.employer_id}>
+                              <button
+                                type="button"
+                                onClick={() => inviteEmployer(employer)}
+                                className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm transition hover:bg-blue-50 hover:text-blue-700"
+                              >
+                                <Mail className="h-4 w-4 shrink-0 text-slate-400" />
+                                <span className="truncate font-bold text-slate-900">{employer.company_name}</span>
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
 
               {fair?.latitude && fair?.longitude && (
@@ -317,58 +327,74 @@ export default function JobFairDetailPage() {
               )}
             </Card>
           </div>
+          </motion.div>
         </TabsContent>
 
         <TabsContent value="employers">
-          <div className="mb-4 flex items-center justify-between">
-            <p className="text-sm text-slate-500">Digital and manual confirmation channels are equally supported.</p>
-            <Button variant="outline" icon={RefreshCw} onClick={load}>Refresh</Button>
-          </div>
-
-          {!(fair?.participants ?? []).length ? (
-            <Card><p className="p-8 text-center text-sm text-slate-500">No employer participation records yet.</p></Card>
-          ) : (
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              {fair.participants.map((p) => {
-                const totalReqs = (fair.requirements ?? []).length
-                const approvedReqs = (p.requirements ?? []).filter((r) => r.status === 'approved').length
-                return (
-                  <div key={p.id} className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-slate-300 hover:shadow-md">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="truncate font-black text-slate-950">{p.company_name}</p>
-                        <p className="mt-0.5 truncate text-xs font-semibold text-slate-500">{p.source?.replaceAll('_', ' ')} · {p.confirmation_channel || 'channel not set'}</p>
-                      </div>
-                      <Badge variant={statusTones[p.status] ?? 'neutral'} icon={false} className="shrink-0">{p.status.replaceAll('_', ' ')}</Badge>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => setReviewingParticipantId(p.id)}
-                      className="flex items-center gap-1.5 self-start text-xs font-bold text-brand-navy hover:underline"
-                    >
-                      <FileText className="h-3.5 w-3.5" />
-                      {totalReqs ? `${approvedReqs}/${totalReqs} requirements approved` : 'View requirements'}
-                    </button>
-
-                    {/* Status above is computed automatically wherever possible (see
-                        syncRequirementStatus). This is only for the handful of
-                        events nothing else can detect — it always resets to the
-                        placeholder rather than mirroring the current status. */}
-                    <Select value="" onValueChange={(value) => action(() => adminService.updateJobFairParticipation(id, p.id, { status: value }), 'Participation updated.')}>
-                      <SelectTrigger className="mt-auto"><SelectValue placeholder="Record a manual event…" /></SelectTrigger>
-                      <SelectContent>
-                        {MANUAL_STATUS_ACTIONS.map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )
-              })}
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
+            <div className="mb-5 flex items-center justify-between">
+              <p className="text-sm font-medium text-slate-500">Digital and manual confirmation channels are equally supported.</p>
+              <Button variant="outline" icon={RefreshCw} onClick={load} className="shadow-sm">Refresh</Button>
             </div>
-          )}
+
+            {!(fair?.participants ?? []).length ? (
+              <Card><p className="p-8 text-center text-sm text-slate-500">No employer participation records yet.</p></Card>
+            ) : (
+              <motion.div 
+                initial="hidden"
+                animate="show"
+                variants={{ hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.05 } } }}
+                className="grid gap-4 md:grid-cols-2 xl:grid-cols-3"
+              >
+                {fair.participants.map((p) => {
+                  const totalReqs = (fair.requirements ?? []).length
+                  const approvedReqs = (p.requirements ?? []).filter((r) => r.status === 'approved').length
+                  return (
+                    <motion.div 
+                      key={p.id} 
+                      variants={{ hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0 } }}
+                      whileHover={{ y: -2 }}
+                      className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-blue-200 hover:shadow-md"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="truncate text-base font-black text-slate-950">{p.company_name}</p>
+                          <p className="mt-1 truncate text-xs font-semibold text-slate-500 uppercase tracking-wide">{p.source?.replaceAll('_', ' ')} · {p.confirmation_channel || 'channel not set'}</p>
+                        </div>
+                        <Badge variant={statusTones[p.status] ?? 'neutral'} icon={false} className="shrink-0 font-bold">{p.status.replaceAll('_', ' ')}</Badge>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => setReviewingParticipantId(p.id)}
+                        className="flex items-center gap-1.5 self-start rounded-lg bg-blue-50 px-3 py-1.5 text-xs font-bold text-blue-700 hover:bg-blue-100 transition"
+                      >
+                        <FileText className="h-3.5 w-3.5" />
+                        {totalReqs ? `${approvedReqs}/${totalReqs} requirements approved` : 'View requirements'}
+                      </button>
+
+                      {/* Status above is computed automatically wherever possible (see
+                          syncRequirementStatus). This is only for the handful of
+                          events nothing else can detect — it always resets to the
+                          placeholder rather than mirroring the current status. */}
+                      <div className="mt-auto pt-2 border-t border-slate-100">
+                        <Select value="" onValueChange={(value) => action(() => adminService.updateJobFairParticipation(id, p.id, { status: value }), 'Participation updated.')}>
+                          <SelectTrigger className="w-full bg-slate-50 hover:bg-slate-100 border-slate-200"><SelectValue placeholder="Record a manual event…" /></SelectTrigger>
+                          <SelectContent>
+                            {MANUAL_STATUS_ACTIONS.map(([value, label]) => <SelectItem key={value} value={value} className="font-semibold">{label}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </motion.div>
+                  )
+                })}
+              </motion.div>
+            )}
+          </motion.div>
         </TabsContent>
 
-        <TabsContent value="paper" className="space-y-6">
+        <TabsContent value="paper">
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }} className="space-y-6">
           <Card>
             <CardHeader title={<StepLabel step={1}>Encode walk-in employer paper form</StepLabel>} subtitle="Admin Proxy Encoding does not create an employer account." />
 
@@ -459,9 +485,11 @@ export default function JobFairDetailPage() {
               Save Confirmation
             </Button>
           </Card>
+          </motion.div>
         </TabsContent>
 
-        <TabsContent value="reports" className="space-y-6">
+        <TabsContent value="reports">
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }} className="space-y-6">
           {reports.length > 0 && (
             <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
               <StatCard label="Establishments reported" value={reports.length} icon={FileText} color="blue" />
@@ -496,6 +524,7 @@ export default function JobFairDetailPage() {
               ))}
             </div>
           </Card>
+          </motion.div>
         </TabsContent>
       </Tabs>
 

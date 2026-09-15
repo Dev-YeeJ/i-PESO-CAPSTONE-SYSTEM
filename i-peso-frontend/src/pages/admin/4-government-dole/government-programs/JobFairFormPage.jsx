@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import { ArrowLeft, Loader2, Plus, Save, X } from 'lucide-react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Button, Card, CardHeader, LoadingSkeleton } from '@/components/ui'
@@ -240,10 +241,17 @@ export default function JobFairFormPage() {
       {loading ? (
         <Card><LoadingSkeleton variant="card" rows={3} /></Card>
       ) : (
-        <form onSubmit={handleSubmit} className={`grid gap-6 ${id ? 'xl:grid-cols-[minmax(0,1fr)_320px]' : ''}`}>
-          <div className="space-y-6">
-            <Card>
-              <CardHeader title="Basic Info" subtitle="What job seekers and employers see first." />
+        <motion.form 
+          initial="hidden"
+          animate="show"
+          variants={{ hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.1 } } }}
+          onSubmit={handleSubmit} 
+          className={`grid gap-6 ${id ? 'xl:grid-cols-[minmax(0,1fr)_320px]' : ''}`}
+        >
+          <motion.div variants={{ hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.1 } } }} className="space-y-6">
+            <motion.div variants={{ hidden: { opacity: 0, y: 10 }, show: { opacity: 1, y: 0 } }}>
+              <Card>
+                <CardHeader title="Basic Info" subtitle="What job seekers and employers see first." />
               <div className="space-y-5">
                 <div>
                   <label className="block text-sm font-bold text-slate-700">Title</label>
@@ -263,9 +271,11 @@ export default function JobFairFormPage() {
                 </div>
               </div>
             </Card>
+            </motion.div>
 
-            <Card>
-              <CardHeader title="Location" subtitle="Venue address and the map pin job seekers see." />
+            <motion.div variants={{ hidden: { opacity: 0, y: 10 }, show: { opacity: 1, y: 0 } }}>
+              <Card>
+                <CardHeader title="Location" subtitle="Venue address and the map pin job seekers see." />
               <div className="space-y-5">
                 <div>
                   <label className="block text-sm font-bold text-slate-700">Venue</label>
@@ -299,9 +309,11 @@ export default function JobFairFormPage() {
                 )}
               </div>
             </Card>
+            </motion.div>
 
-            <Card>
-              <CardHeader title="Schedule" subtitle="Dates, times, and the employer submission deadline." />
+            <motion.div variants={{ hidden: { opacity: 0, y: 10 }, show: { opacity: 1, y: 0 } }}>
+              <Card>
+                <CardHeader title="Schedule" subtitle="Dates, times, and the employer submission deadline." />
               <div className="space-y-5">
                 <div>
                   <label className="flex items-center gap-2 text-sm font-bold text-slate-700">
@@ -315,12 +327,19 @@ export default function JobFairFormPage() {
                     <label className="block text-sm font-bold text-slate-700">Start Date</label>
                     <input type="date" name="start_date" value={form.start_date} onChange={handleChange} required min={id ? undefined : new Date().toISOString().slice(0, 10)} className="mt-2 w-full rounded-lg border border-slate-300 px-4 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100" />
                   </div>
-                  {multiDay && (
-                    <div>
-                      <label className="block text-sm font-bold text-slate-700">End Date</label>
-                      <input type="date" name="end_date" value={form.end_date} onChange={handleChange} required min={form.start_date || undefined} className="mt-2 w-full rounded-lg border border-slate-300 px-4 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100" />
-                    </div>
-                  )}
+                  <AnimatePresence>
+                    {multiDay && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0, overflow: 'hidden' }}
+                        animate={{ opacity: 1, height: 'auto', overflow: 'visible' }}
+                        exit={{ opacity: 0, height: 0, overflow: 'hidden' }}
+                        transition={{ duration: 0.3 }}
+                      >
+                        <label className="block text-sm font-bold text-slate-700">End Date</label>
+                        <input type="date" name="end_date" value={form.end_date} onChange={handleChange} required min={form.start_date || undefined} className="mt-2 w-full rounded-lg border border-slate-300 px-4 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100" />
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                   <div>
                     <label className="block text-sm font-bold text-slate-700">Start Time</label>
                     <input type="time" name="start_time" value={form.start_time} onChange={handleChange} required className="mt-2 w-full rounded-lg border border-slate-300 px-4 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100" />
@@ -346,9 +365,11 @@ export default function JobFairFormPage() {
                 </div>
               </div>
             </Card>
+            </motion.div>
 
-            <Card>
-              <CardHeader title="Partner Agencies" subtitle="Optional — co-organizers shown on the official bulletin." />
+            <motion.div variants={{ hidden: { opacity: 0, y: 10 }, show: { opacity: 1, y: 0 } }}>
+              <Card>
+                <CardHeader title="Partner Agencies" subtitle="Optional — co-organizers shown on the official bulletin." />
               <div className="flex flex-wrap gap-2">
                 {form.partner_agencies.map((agency, index) => (
                   <span key={agency + index} className="inline-flex items-center gap-1.5 rounded-full border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-bold text-blue-800">
@@ -369,8 +390,10 @@ export default function JobFairFormPage() {
                 <Button type="button" variant="outline" icon={Plus} onClick={addPartnerAgency}>Add</Button>
               </div>
             </Card>
+            </motion.div>
 
-            <Card>
+            <motion.div variants={{ hidden: { opacity: 0, y: 10 }, show: { opacity: 1, y: 0 } }}>
+              <Card>
               <div className="flex flex-wrap items-center gap-3">
                 {id ? (
                   <Button type="submit" icon={Save} disabled={submitting}>{submitting ? 'Saving...' : 'Save Changes'}</Button>
@@ -393,10 +416,12 @@ export default function JobFairFormPage() {
                   verified employer an invitation.
                 </p>
               )}
-            </Card>
-          </div>
+              </Card>
+            </motion.div>
+          </motion.div>
 
           {id && (
+            <motion.div variants={{ hidden: { opacity: 0, y: 10 }, show: { opacity: 1, y: 0 } }}>
             <Card className="h-fit">
               <CardHeader title="Reporting Readiness" subtitle="Participation and post-event reporting only." />
               <div className="grid grid-cols-2 gap-3">
@@ -413,8 +438,9 @@ export default function JobFairFormPage() {
                 ))}
               </div>
             </Card>
+            </motion.div>
           )}
-        </form>
+        </motion.form>
       )}
     </div>
   )
