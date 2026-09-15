@@ -197,14 +197,10 @@ export default function JobFairDetailPage() {
   }
 
   const statCards = [
-    { label: 'Approved', value: metrics.approved, icon: CheckCircle2, color: 'green' },
-    { label: 'Attended', value: metrics.attended, icon: UserCheck, color: 'blue' },
-    { label: 'Self-service reports', value: metrics.self_service_reports, icon: FileText, color: 'blue' },
-    { label: 'Admin proxy reports', value: metrics.proxy_reports, icon: ClipboardEdit, color: 'amber' },
-    { label: 'Applicants', value: metrics.total_applicants, icon: Users, color: 'blue' },
-    { label: 'Hired on the spot', value: metrics.total_hots, icon: Flame, color: 'amber' },
-    { label: 'Near hired', value: metrics.total_near_hired, icon: TrendingUp, color: 'blue' },
-    { label: 'Rejected', value: metrics.total_rejected, icon: XCircle, color: 'red' },
+    { label: 'Approved Employers', value: metrics.approved, icon: CheckCircle2, color: 'green' },
+    { label: 'Total Applicants', value: metrics.total_applicants, icon: Users, color: 'blue' },
+    { label: 'Hired on the Spot', value: metrics.total_hots, icon: Flame, color: 'amber' },
+    { label: 'Near Hired', value: metrics.total_near_hired, icon: TrendingUp, color: 'blue' },
   ]
 
   return (

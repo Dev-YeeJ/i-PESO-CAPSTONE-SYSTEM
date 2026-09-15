@@ -5,9 +5,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { Button, Card, CardHeader, LoadingSkeleton } from '@/components/ui'
 import PageHeader from '@/pages/admin/_components/PageHeader'
 import AddressPicker from '@/components/maps/AddressPicker'
-import MapPinPicker from '@/components/maps/MapPinPicker'
 import { adminService } from '@/services/adminService'
-import { resolveCoordinatesAddress } from '@/services/geoService'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import * as z from 'zod'
@@ -167,9 +165,6 @@ export default function JobFairFormPage() {
     setValue('partner_agencies', current.filter((_, i) => i !== index), { shouldValidate: true })
   }, [formValues.partner_agencies, setValue])
 
-  const [resolvingPin, setResolvingPin] = useState(false)
-  const [pinMessage, setPinMessage] = useState('')
-
   const setLocation = useCallback((location) => {
     if (location.province) setValue('province', location.province)
     if (location.province_code) setValue('province_code', location.province_code)
@@ -181,33 +176,6 @@ export default function JobFairFormPage() {
     if (location.latitude) setValue('latitude', location.latitude)
     if (location.longitude) setValue('longitude', location.longitude)
     if (location.google_place_id) setValue('google_place_id', location.google_place_id)
-  }, [setValue])
-
-  const handlePinChange = useCallback(async (coords) => {
-    setValue('latitude', coords.latitude)
-    setValue('longitude', coords.longitude)
-    setResolvingPin(true)
-    setPinMessage('Finding the PSGC address for this pin...')
-
-    try {
-      const result = await resolveCoordinatesAddress(coords.latitude, coords.longitude)
-      if (result.province?.name) setValue('province', result.province.name)
-      if (result.province?.code) setValue('province_code', result.province.code)
-      if (result.city?.name) setValue('city_municipality', result.city.name)
-      if (result.city?.code) setValue('city_code', result.city.code)
-      if (result.barangay?.name) setValue('barangay', result.barangay.name)
-      if (result.barangay?.code) setValue('barangay_code', result.barangay.code)
-      if (result.houseStreet) setValue('specific_address', result.houseStreet)
-      if (result.placeId) setValue('google_place_id', result.placeId)
-
-      setPinMessage(result.isComplete
-        ? 'Province, city, and barangay were filled from the pin.'
-        : `Pin located. Please verify${result.missingFields.length ? ` or complete: ${result.missingFields.join(', ')}` : ' the address fields'}.`)
-    } catch (pinError) {
-      setPinMessage(pinError.message ?? 'Pin saved, but its address could not be filled automatically.')
-    } finally {
-      setResolvingPin(false)
-    }
   }, [setValue])
 
   const [publishAfterSave, setPublishAfterSave] = useState(false)
@@ -343,18 +311,6 @@ export default function JobFairFormPage() {
                     google_place_id={formValues.google_place_id}
                     onChange={setLocation}
                   />
-                  <MapPinPicker
-                    latitude={formValues.latitude}
-                    longitude={formValues.longitude}
-                    addressLine={`${formValues.venue || ''} ${formValues.barangay || ''} ${formValues.city_municipality || ''}`.trim()}
-                    onChange={handlePinChange}
-                  />
-                  {(resolvingPin || pinMessage) && (
-                    <p className="text-xs font-semibold text-blue-800">
-                      {resolvingPin && <Loader2 className="mr-1.5 inline h-3.5 w-3.5 animate-spin" />}
-                      {pinMessage}
-                    </p>
-                  )}
                 </div>
               </Card>
             </motion.div>
