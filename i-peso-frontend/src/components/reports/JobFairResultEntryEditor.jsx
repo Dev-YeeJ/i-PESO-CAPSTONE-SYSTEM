@@ -78,30 +78,59 @@ export default function JobFairResultEntryEditor({ control, name, searchApplican
           <p className="mt-2 text-sm font-semibold text-slate-500">No applicants added yet.</p>
         </div>
       ) : (
-        <div className="space-y-2">
-          {entries.map((entry, index) => (
-            <div key={fields[index]?.id || index} className="group flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition-all hover:border-slate-300 hover:shadow-md sm:flex-row sm:items-center sm:justify-between">
-              <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-2">
-                  <p className="font-bold text-slate-900">{entry.applicant_name || 'Unnamed applicant'}</p>
-                  <Badge variant={STATUS_BADGE[entry.status] ?? 'neutral'} icon={false}>{statusLabel(entry.status)}</Badge>
-                  {entry.seeker_id && duplicateSeekerIds.has(entry.seeker_id) && <Badge variant="warning">Duplicate</Badge>}
-                </div>
-                <p className="mt-1 text-sm font-medium text-slate-600">{entry.position_applied_for || 'No position specified'}</p>
-                <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-[11px] font-bold uppercase tracking-wider text-slate-400">
-                  {entry.city_municipality && <span>{entry.city_municipality}</span>}
-                  {entry.contact_number && <span>{entry.contact_number}</span>}
-                  {entry.age_group && <span>Age {AGE_GROUPS.find(([code]) => code === entry.age_group)?.[1]}</span>}
-                </div>
-              </div>
-              <div className="flex shrink-0 items-center gap-2 opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100">
-                <Button type="button" variant="outline" size="sm" icon={Pencil} onClick={() => openEdit(index)} className="h-8 text-xs">Edit</Button>
-                <button type="button" onClick={() => removeEntry(index)} aria-label="Remove applicant" className="rounded-xl bg-slate-50 p-2 text-slate-400 transition-colors hover:bg-rose-100 hover:text-rose-600">
-                  <Trash2 className="h-4 w-4" />
-                </button>
-              </div>
-            </div>
-          ))}
+        <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
+          <table className="w-full text-left text-xs text-slate-600 whitespace-nowrap">
+            <thead className="bg-slate-50 border-b border-slate-200 uppercase tracking-wide text-slate-500 font-extrabold text-[10px]">
+              <tr>
+                <th className="px-3 py-3 text-center border-r border-slate-200 w-10">#</th>
+                <th className="px-4 py-3 border-r border-slate-200">Name of Jobseeker</th>
+                <th className="px-4 py-3 border-r border-slate-200">Position Applying For</th>
+                <th className="px-3 py-3 border-r border-slate-200">Sex</th>
+                <th className="px-4 py-3 border-r border-slate-200">Contact Details</th>
+                <th className="px-4 py-3 border-r border-slate-200">Classification</th>
+                <th className="px-3 py-3 border-r border-slate-200">Age Group</th>
+                <th className="px-3 py-3 border-r border-slate-200">Education</th>
+                <th className="px-4 py-3 border-r border-slate-200">Status</th>
+                <th className="px-4 py-3 border-r border-slate-200">Mismatch Reason</th>
+                <th className="px-3 py-3 text-center">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {entries.map((entry, index) => (
+                <tr key={fields[index]?.id || index} className="group hover:bg-slate-50 transition-colors">
+                  <td className="px-3 py-2 text-center border-r border-slate-100 text-slate-400 font-medium">{index + 1}</td>
+                  <td className="px-4 py-2 border-r border-slate-100">
+                    <p className="font-bold text-slate-900">{entry.applicant_name || '—'}</p>
+                    {entry.seeker_id && duplicateSeekerIds.has(entry.seeker_id) && <span className="inline-block rounded bg-amber-100 px-1.5 text-[10px] font-bold text-amber-800">Duplicate</span>}
+                  </td>
+                  <td className="px-4 py-2 border-r border-slate-100">{entry.position_applied_for || '—'}</td>
+                  <td className="px-3 py-2 border-r border-slate-100 font-semibold">{entry.gender?.[0]?.toUpperCase() || '—'}</td>
+                  <td className="px-4 py-2 border-r border-slate-100 text-[11px] leading-tight text-slate-500">
+                    {entry.city_municipality && <div className="font-medium text-slate-700">{entry.city_municipality}</div>}
+                    {entry.contact_number && <div>{entry.contact_number}</div>}
+                    {!entry.city_municipality && !entry.contact_number && '—'}
+                  </td>
+                  <td className="px-4 py-2 border-r border-slate-100">{entry.classification_codes?.join(', ') || '—'}</td>
+                  <td className="px-3 py-2 border-r border-slate-100 text-center font-semibold">{entry.age_group || '—'}</td>
+                  <td className="px-3 py-2 border-r border-slate-100 text-center">{entry.highest_education ? EDUCATION_LEVELS.find(([v]) => v === entry.highest_education)?.[2] : '—'}</td>
+                  <td className="px-4 py-2 border-r border-slate-100">
+                    <Badge variant={STATUS_BADGE[entry.status] ?? 'neutral'} icon={false} className="py-0.5 text-[10px]">{statusLabel(entry.status)}</Badge>
+                  </td>
+                  <td className="px-4 py-2 border-r border-slate-100">{entry.mismatch_code || '—'}</td>
+                  <td className="px-3 py-2">
+                    <div className="flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button type="button" onClick={() => openEdit(index)} className="rounded p-1.5 text-slate-400 hover:bg-slate-200 hover:text-slate-700 transition-colors" title="Edit">
+                        <Pencil className="h-3.5 w-3.5" />
+                      </button>
+                      <button type="button" onClick={() => removeEntry(index)} className="rounded p-1.5 text-slate-400 hover:bg-rose-100 hover:text-rose-600 transition-colors" title="Remove">
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
 

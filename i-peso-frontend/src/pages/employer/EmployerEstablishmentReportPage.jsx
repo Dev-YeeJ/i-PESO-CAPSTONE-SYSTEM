@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { ArrowLeft, ArrowRight, CalendarDays, ClipboardCheck, Clock3, Download, Save } from 'lucide-react'
+import { ArrowLeft, ArrowRight, CalendarDays, ClipboardCheck, Clock3, Download, Save, AlertCircle } from 'lucide-react'
 import { AlertBox, Badge, Button, Card, EmptyState, LoadingSkeleton } from '@/components/ui'
 import EstablishmentReportPreview from '@/components/reports/EstablishmentReportPreview'
 import JobFairResultEntryEditor from '@/components/reports/JobFairResultEntryEditor'
@@ -160,6 +160,8 @@ export default function EmployerEstablishmentReportPage() {
   }
 
   const alreadySubmitted = Boolean(selected?.participation?.result_report?.id)
+  const currentDate = new Date().toISOString().split('T')[0]
+  const isBeforeEvent = selected ? currentDate < (selected.start_date || selected.event_date) : false
 
   return (
     <div className="mx-auto max-w-7xl space-y-8 pb-12">
@@ -265,13 +267,15 @@ export default function EmployerEstablishmentReportPage() {
                   <Button
                     type="submit"
                     icon={Save}
-                    disabled={!validEntries.length}
+                    disabled={isBeforeEvent || !validEntries.length}
                   >
                     Save Establishment Report
                   </Button>
-                  {!validEntries.length && (
+                  {isBeforeEvent ? (
+                    <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-amber-600"><AlertCircle className="h-3.5 w-3.5" />You can submit this report on or after the Job Fair date ({selected.start_date}).</span>
+                  ) : !validEntries.length ? (
                     <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500"><Clock3 className="h-3.5 w-3.5" />Add at least one applicant with a name and position to save.</span>
-                  )}
+                  ) : null}
                 </div>
               </form>
             </FormProvider>

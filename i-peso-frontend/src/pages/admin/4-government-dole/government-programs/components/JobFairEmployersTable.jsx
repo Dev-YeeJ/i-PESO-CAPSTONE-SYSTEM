@@ -14,11 +14,22 @@ export default function JobFairEmployersTable({ participants, onReviewRequiremen
       accessorKey: 'company_name',
       header: 'Employer',
       cell: ({ row }) => (
-        <div className="min-w-0 py-1">
-          <p className="truncate text-sm font-bold text-slate-900">{row.original.company_name}</p>
-          <p className="mt-0.5 truncate text-[11px] font-semibold text-slate-500 uppercase tracking-wide">
-            {row.original.source?.replaceAll('_', ' ')} · {row.original.confirmation_channel || 'no channel'}
-          </p>
+        <div className="flex items-center gap-3 py-1">
+          {row.original.company_logo ? (
+            <img src={row.original.company_logo} alt={row.original.company_name} className="h-10 w-10 shrink-0 rounded-lg object-cover" />
+          ) : (
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-100 text-blue-700 font-bold">
+              {row.original.company_name.substring(0, 1).toUpperCase()}
+            </div>
+          )}
+          <div className="min-w-0">
+            <p className="truncate text-sm font-bold text-slate-900">{row.original.company_name}</p>
+            {row.original.representative_name && (
+              <p className="mt-0.5 truncate text-[11px] font-semibold text-slate-500 uppercase tracking-wide">
+                Rep: {row.original.representative_name}
+              </p>
+            )}
+          </div>
         </div>
       )
     },

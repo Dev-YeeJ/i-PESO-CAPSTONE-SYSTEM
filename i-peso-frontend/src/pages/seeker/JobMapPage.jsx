@@ -1,5 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import { AlertCircle, BriefcaseBusiness, Loader2, LocateFixed, MapPinned, PanelLeftOpen, RefreshCw, Sparkles } from 'lucide-react'
 import toast from 'react-hot-toast'
 import JobMapAssistant from '../../components/maps/JobMapAssistant'
@@ -89,6 +89,9 @@ function ApplyConfirmation({ job, onCancel, onConfirm, applying }) {
 
 export default function JobMapPage() {
   const navigate = useNavigate()
+  const { jobId: routeJobIdParam } = useParams()
+  const routeJobId = routeJobIdParam ? parseInt(routeJobIdParam, 10) : null
+
   const [jobs, setJobs] = useState([])
   const [jobFairs, setJobFairs] = useState([])
   // Seeker profile is still loaded (for other views), but applying no longer gates on it.
@@ -96,7 +99,7 @@ export default function JobMapPage() {
   const [summary, setSummary] = useState(null)
   const [seekerLocation, setSeekerLocation] = useState({ latitude: null, longitude: null, full_address: '' })
   const [filters, setFilters] = useState(DEFAULT_FILTERS)
-  const [selectedJobId, setSelectedJobId] = useState(null)
+  const [selectedJobId, setSelectedJobId] = useState(routeJobId)
   const [detailsById, setDetailsById] = useState({})
   const [detailLoadingId, setDetailLoadingId] = useState(null)
   const [detailError, setDetailError] = useState('')
@@ -132,7 +135,7 @@ export default function JobMapPage() {
       setSummary(data.summary)
       setSeekerLocation(data.seeker_location)
       setLocationRequired(false)
-      setSelectedJobId((id) => data.jobs.some((job) => job.post_id === id) ? id : null)
+      setSelectedJobId((id) => (id === routeJobId) ? id : (data.jobs.some((job) => job.post_id === id) ? id : null))
       setPopupJobId((id) => data.jobs.some((job) => job.post_id === id) ? id : null)
     } catch (fetchError) {
       if (currentRequest !== requestId.current) return
@@ -287,7 +290,7 @@ export default function JobMapPage() {
     if (id) document.getElementById(`map-job-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
 
     const listJob = jobs.find((item) => item.post_id === id)
-    if (!id || detailsById[id] || !listJob?.match_deferred) return
+    if (!id || detailsById[id]) return
 
     const currentRequest = ++detailRequestId.current
     detailAbortRef.current?.abort()
@@ -315,6 +318,14 @@ export default function JobMapPage() {
   }
 
   const hasLocation = seekerLocation?.latitude != null && seekerLocation?.longitude != null
+
+  useEffect(() => {
+    if (routeJobId) {
+      openDetails(routeJobId)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [routeJobId])
+
   const detailsJob = selectedJobId
     ? detailsById[selectedJobId] || jobs.find((job) => job.post_id === selectedJobId) || null
     : null

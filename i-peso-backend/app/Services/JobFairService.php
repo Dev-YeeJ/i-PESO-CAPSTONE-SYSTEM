@@ -218,6 +218,8 @@ class JobFairService
             'id' => $participation->id,
             'employer_id' => $participation->employer_id,
             'company_name' => $participation->employer?->company_name ?: $participation->employer?->trade_name,
+            'company_logo' => $participation->employer?->company_logo,
+            'representative_name' => $participation->employer?->representative_name,
             'status' => $participation->participation_status,
             'source' => $participation->source,
             'confirmation_channel' => $participation->confirmation_channel,
@@ -446,7 +448,7 @@ class JobFairService
         // straight to 'accepted') still gets picked up and progressed the
         // next time anything touches its requirement submissions, instead
         // of sitting stuck at 'accepted' forever.
-        if (! in_array($participation->participation_status, ['accepted', 'requirements_pending', 'requirements_submitted'], true)) {
+        if (! in_array($participation->participation_status, ['invited', 'interested', 'accepted', 'requirements_pending', 'requirements_submitted'], true)) {
             return;
         }
 

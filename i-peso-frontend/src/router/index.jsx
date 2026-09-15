@@ -247,6 +247,7 @@ export const router = createBrowserRouter([
                           { index: true, element: <Navigate to="dashboard" replace /> },
                           { path: 'dashboard', element: S(SeekerDashboard) },
                           { path: 'job-map', element: S(SeekerJobMap) },
+                          { path: 'job-map/:jobId', element: S(SeekerJobMap) },
                           { path: 'job-fairs', element: S(SeekerJobFairs) },
                           { path: 'job-fairs/:fairId/employers/:employerId', element: S(SeekerJobFairEmployerPage) },
                           { path: 'government-programs', element: S(SeekerGovernmentPrograms) },

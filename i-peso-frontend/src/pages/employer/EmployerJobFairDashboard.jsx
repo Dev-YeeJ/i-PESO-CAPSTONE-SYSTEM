@@ -4,6 +4,7 @@ import toast from 'react-hot-toast'
 import { ArrowLeft, ArrowRight, CalendarDays, CheckCircle2, ClipboardList, FileText, FileUp, Mail, MapPin, Save, ShieldCheck } from 'lucide-react'
 import { Badge, Button, Card, EmptyState, LoadingSkeleton } from '@/components/ui'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import ConfirmationSlipPreview from '@/components/reports/ConfirmationSlipPreview'
 import ConfirmationVacancyEditor, { blankConfirmationVacancy, stripBlankConfirmationVacancies } from '@/components/reports/ConfirmationVacancyEditor'
 import {
   expressJobFairInterest,
@@ -439,41 +440,56 @@ export default function EmployerJobFairDashboard() {
 
                     <TabsContent value="confirmation">
                       <Motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
-                      <p className="mb-4 text-sm text-slate-500">Maximum {selected.maximum_representatives} representative(s) for this event.</p>
-
-                      <div className="space-y-4">
-                        <div className="rounded-xl border border-slate-200 p-4">
-                          <p className="mb-3 text-xs font-extrabold uppercase tracking-wide text-slate-600">Representative 1</p>
-                          <div className="grid gap-4 sm:grid-cols-2">
-                            <FormField label="Full name" value={confirmation.representative_1_name} onChange={(v) => setConfirmation((x) => ({ ...x, representative_1_name: v }))} />
-                            <FormField label="Position/s" value={confirmation.representative_position} onChange={(v) => setConfirmation((x) => ({ ...x, representative_position: v }))} />
-                            <FormField label="Contact number" value={confirmation.representative_1_contact} onChange={(v) => setConfirmation((x) => ({ ...x, representative_1_contact: v }))} />
+                        {confirmationDone ? (
+                          <div className="space-y-6">
+                            <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-5 py-4">
+                              <div className="flex items-center gap-3">
+                                <span className="rounded-lg bg-white p-2 text-emerald-700 shadow-sm"><CheckCircle className="h-4 w-4" /></span>
+                                <div>
+                                  <p className="text-sm font-bold text-emerald-900">Confirmation Slip Submitted</p>
+                                  <p className="text-xs text-emerald-700">You have already submitted your confirmation for this Job Fair.</p>
+                                </div>
+                              </div>
+                            </div>
+                            <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+                              <ConfirmationSlipPreview slip={selected.participation?.confirmation_slip} />
+                            </div>
                           </div>
-                        </div>
-
-                        <div className="rounded-xl border border-slate-200 p-4">
-                          <p className="mb-3 text-xs font-extrabold uppercase tracking-wide text-slate-600">Representative 2 <span className="font-normal normal-case text-slate-400">(optional)</span></p>
-                          <div className="grid gap-4 sm:grid-cols-2">
-                            <FormField label="Full name" value={confirmation.representative_2_name} onChange={(v) => setConfirmation((x) => ({ ...x, representative_2_name: v }))} />
-                            <FormField label="Contact number" value={confirmation.representative_2_contact} onChange={(v) => setConfirmation((x) => ({ ...x, representative_2_contact: v }))} />
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="mt-6">
-                        <p className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500">List of Vacancies / Orders</p>
-                        <ConfirmationVacancyEditor vacancies={confirmationVacancies} onChange={setConfirmationVacancies} myVacancies={myVacancies} />
-                      </div>
-
-                      <Button
-                        className="mt-5"
-                        icon={Save}
-                        onClick={() => act(() => submitJobFairConfirmation(selected.job_fair_id, {
-                          ...confirmation, vacancies: stripBlankConfirmationVacancies(confirmationVacancies),
-                        }), 'Confirmation slip submitted.')}
-                      >
-                        Submit Confirmation
-                      </Button>
+                        ) : (
+                          <>
+                            <p className="mb-4 text-sm text-slate-500">Maximum {selected.maximum_representatives} representative(s) for this event.</p>
+                            <div className="space-y-4">
+                              <div className="rounded-xl border border-slate-200 p-4">
+                                <p className="mb-3 text-xs font-extrabold uppercase tracking-wide text-slate-600">Representative 1</p>
+                                <div className="grid gap-4 sm:grid-cols-2">
+                                  <FormField label="Full name" value={confirmation.representative_1_name} onChange={(v) => setConfirmation((x) => ({ ...x, representative_1_name: v }))} />
+                                  <FormField label="Position/s" value={confirmation.representative_position} onChange={(v) => setConfirmation((x) => ({ ...x, representative_position: v }))} />
+                                  <FormField label="Contact number" value={confirmation.representative_1_contact} onChange={(v) => setConfirmation((x) => ({ ...x, representative_1_contact: v }))} />
+                                </div>
+                              </div>
+                              <div className="rounded-xl border border-slate-200 p-4">
+                                <p className="mb-3 text-xs font-extrabold uppercase tracking-wide text-slate-600">Representative 2 <span className="font-normal normal-case text-slate-400">(optional)</span></p>
+                                <div className="grid gap-4 sm:grid-cols-2">
+                                  <FormField label="Full name" value={confirmation.representative_2_name} onChange={(v) => setConfirmation((x) => ({ ...x, representative_2_name: v }))} />
+                                  <FormField label="Contact number" value={confirmation.representative_2_contact} onChange={(v) => setConfirmation((x) => ({ ...x, representative_2_contact: v }))} />
+                                </div>
+                              </div>
+                            </div>
+                            <div className="mt-6">
+                              <p className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500">List of Vacancies / Orders</p>
+                              <ConfirmationVacancyEditor vacancies={confirmationVacancies} onChange={setConfirmationVacancies} myVacancies={myVacancies} />
+                            </div>
+                            <Button
+                              className="mt-5"
+                              icon={Save}
+                              onClick={() => act(() => submitJobFairConfirmation(selected.job_fair_id, {
+                                ...confirmation, vacancies: stripBlankConfirmationVacancies(confirmationVacancies),
+                              }), 'Confirmation slip submitted.')}
+                            >
+                              Submit Confirmation
+                            </Button>
+                          </>
+                        )}
                       </Motion.div>
                     </TabsContent>
                   </div>

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Employer;
 use App\Models\PlacementRecord;
+use App\Models\Application;
 use App\Models\PlacementReportMapping;
 use App\Models\PlacementReportUpload;
 use App\Services\PlacementImportService;
@@ -174,7 +175,7 @@ class EmployerPlacementReportController extends Controller
 
         $upload = PlacementReportUpload::create([
             'employer_id' => $employer->employer_id,
-            'original_filename' => 'Manually entered',
+            'original_filename' => 'System-generated report',
             'stored_path' => null,
             'row_count' => 0,
             'status' => PlacementReportUpload::STATUS_PENDING_MAPPING,
@@ -182,8 +183,36 @@ class EmployerPlacementReportController extends Controller
             'coverage_year' => $validated['coverage_year'],
         ]);
 
+        $records = collect();
+
+        $applications = Application::with(['jobSeeker', 'jobVacancy'])
+            ->whereHas('jobVacancy', fn ($q) => $q->where('employer_id', $employer->employer_id))
+            ->where('status', 'hired')
+            ->whereMonth('status_changed_at', $validated['coverage_month'])
+            ->whereYear('status_changed_at', $validated['coverage_year'])
+            ->get();
+
+        foreach ($applications as $app) {
+            if (!$app->jobSeeker) continue;
+            $records->push([
+                'first_name' => $app->jobSeeker->first_name,
+                'middle_name' => $app->jobSeeker->middle_name,
+                'last_name' => $app->jobSeeker->last_name,
+                'gender' => $app->jobSeeker->sex ?? 'male',
+                'employment_type' => $app->placement_employment_type ?? 'regular',
+                'salary_monthly' => $app->placement_salary ?? 0,
+                'position_title' => $app->jobVacancy?->job_title ?? 'Unknown',
+                'date_hired' => $app->status_changed_at?->format('Y-m-d') ?? null,
+            ]);
+        }
+
+        if ($records->isNotEmpty()) {
+            $this->imports->buildManualRecords($upload, $records->toArray());
+            $upload->update(['row_count' => $records->count()]);
+        }
+
         return response()->json([
-            'message' => 'Started a manual placement report. Add each hire below, then submit for review.',
+            'message' => 'Placement report generated. Review the fetched hires and add any manual walk-in placements before submitting.',
             'data' => $this->detail($upload->fresh(['mappings'])),
         ], 201);
     }
