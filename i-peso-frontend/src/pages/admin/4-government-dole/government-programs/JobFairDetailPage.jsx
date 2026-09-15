@@ -22,8 +22,8 @@ import JobFairReportsChart from './components/JobFairReportsChart'
 // requirements_submitted/approved/encoded_results/report_generated), not
 // admin picks. See MANUAL_STATUS_ACTIONS below for the ones that still are.
 const statusGroups = [
-  { label: 'Pending', tone: 'pending', statuses: ['invited', 'interested', 'called_peso', 'pending_response', 'requirements_pending'] },
-  { label: 'In review', tone: 'review', statuses: ['accepted', 'under_review', 'requirements_submitted'] },
+  { label: 'Pending', tone: 'pending', statuses: ['invited', 'requirements_pending'] },
+  { label: 'In review', tone: 'review', statuses: ['under_review'] },
   { label: 'Approved', tone: 'approved', statuses: ['approved', 'attended', 'encoded_results', 'report_generated'] },
   { label: 'Rejected', tone: 'rejected', statuses: ['declined', 'rejected', 'no_show'] },
 ]

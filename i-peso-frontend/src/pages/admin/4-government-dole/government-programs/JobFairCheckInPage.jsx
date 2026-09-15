@@ -2,7 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Html5Qrcode } from 'html5-qrcode'
 import { useNavigate, useParams } from 'react-router-dom'
-import { CheckCircle2, Clock3, Search, XCircle } from 'lucide-react'
+import { CheckCircle2, Clock3, Search, XCircle, Download, FileText, FileSpreadsheet } from 'lucide-react'
+import toast from 'react-hot-toast'
 import { AlertBox, Badge, Button, Card } from '@/components/ui'
 import PageHeader from '@/pages/admin/_components/PageHeader'
 import { adminService } from '@/services/adminService'
@@ -157,13 +158,29 @@ export default function JobFairCheckInPage() {
     return () => clearTimeout(timeout)
   }, [search, id])
 
+  const blobDownload = async (work, filename) => {
+    try {
+      const blob = await work()
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url; link.download = filename; link.click()
+      URL.revokeObjectURL(url)
+    } catch (e) {
+      toast.error(e.response?.data?.message ?? 'Download failed.')
+    }
+  }
+
   return (
     <div className="portal-page">
       <PageHeader
         title="Job Fair Check-In"
         subtitle="Scan a seeker's digital pass to verify pre-registration and mark attendance."
         eyebrow="Info Desk"
-        actions={[{ label: 'Back to event', onClick: () => navigate(`/admin/job-fairs/${id}`), variant: 'secondary' }]}
+        actions={[
+          { label: 'PDF', icon: FileText, variant: 'outline', onClick: () => blobDownload(() => adminService.downloadJobFairAttendancePdf(id), `job-fair-attendance-${id}.pdf`) },
+          { label: 'CSV', icon: FileSpreadsheet, variant: 'outline', onClick: () => blobDownload(() => adminService.downloadJobFairAttendanceExcel(id), `job-fair-attendance-${id}.csv`) },
+          { label: 'Back to event', onClick: () => navigate(`/admin/job-fairs/${id}`), variant: 'secondary' }
+        ]}
       />
 
       <section className="grid grid-cols-2 gap-3">

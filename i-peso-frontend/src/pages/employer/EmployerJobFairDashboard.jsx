@@ -326,7 +326,7 @@ export default function EmployerJobFairDashboard() {
 
             <div className="mt-5 flex flex-wrap gap-2 border-t border-slate-100 pt-5">
               {!selected.participation && (
-                <Button onClick={() => act(() => expressJobFairInterest(selected.job_fair_id), 'Interest sent to PESO.')}>Express Interest</Button>
+                <Button onClick={() => act(() => expressJobFairInterest(selected.job_fair_id), 'Successfully joined the Job Fair.')}>Join Job Fair</Button>
               )}
               {selected.participation?.status === 'invited' && (
                 <>

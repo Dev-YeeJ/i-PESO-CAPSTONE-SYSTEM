@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { CalendarCheck2, CalendarClock, CalendarDays, CheckCircle2, ClipboardEdit, Flame, MapPin, Pencil, Plus, Radio, Trash2, Users, UsersRound } from 'lucide-react'
+import { CalendarCheck2, CalendarClock, CalendarDays, CheckCircle2, ClipboardEdit, Flame, MapPin, Pencil, Plus, Radio, Trash2, Users, UsersRound, Download, FileText, FileSpreadsheet } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import { Button, EmptyState, LoadingSkeleton, StatCard } from '@/components/ui'
@@ -80,6 +80,18 @@ export default function JobFairsListPage() {
       caught?.response?.data?.message ?? 'Unable to delete this job fair.',
     ),
   })
+
+  const blobDownload = async (work, filename) => {
+    try {
+      const blob = await work()
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url; link.download = filename; link.click()
+      URL.revokeObjectURL(url)
+    } catch (e) {
+      toast.error(e.response?.data?.message ?? 'Download failed.')
+    }
+  }
 
   return (
     <div className="mx-auto max-w-7xl space-y-10 pb-12">
@@ -210,6 +222,8 @@ export default function JobFairsListPage() {
                   <h2 className="mt-4 truncate text-2xl font-black tracking-tight text-slate-950 sm:text-3xl">{fair.title}</h2>
                 </div>
                 <div className="flex shrink-0 flex-wrap items-center gap-2">
+                  <Button variant="outline" size="sm" icon={FileText} onClick={() => blobDownload(() => adminService.downloadJobFairAttendancePdf(fair.job_fair_id), `job-fair-attendance-${fair.job_fair_id}.pdf`)}>PDF</Button>
+                  <Button variant="outline" size="sm" icon={FileSpreadsheet} onClick={() => blobDownload(() => adminService.downloadJobFairAttendanceExcel(fair.job_fair_id), `job-fair-attendance-${fair.job_fair_id}.csv`)}>CSV</Button>
                   <Button variant="outline" icon={UsersRound} onClick={() => navigate(`/admin/job-fairs/${fair.job_fair_id}`)}>Manage</Button>
                   <Button variant="outline" icon={Pencil} onClick={() => navigate(`/admin/job-fairs/${fair.job_fair_id}/edit`)}>Edit</Button>
                   <button
