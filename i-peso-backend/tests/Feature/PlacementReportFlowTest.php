@@ -852,6 +852,25 @@ class PlacementReportFlowTest extends TestCase
             $table->timestamps();
         });
 
+        Schema::create('job_vacancies', function (Blueprint $table) {
+            $table->id('post_id');
+            $table->unsignedBigInteger('employer_id');
+            $table->string('job_title');
+            $table->timestamps();
+        });
+
+        Schema::create('applications', function (Blueprint $table) {
+            $table->id('apply_id');
+            $table->unsignedBigInteger('post_id');
+            $table->unsignedBigInteger('seeker_id');
+            $table->unsignedBigInteger('job_fair_id')->nullable();
+            $table->string('status')->default('pending');
+            $table->timestamp('status_changed_at')->nullable();
+            $table->string('placement_employment_type')->nullable();
+            $table->decimal('placement_salary', 10, 2)->nullable();
+            $table->timestamps();
+        });
+
         Schema::create('placement_report_uploads', function (Blueprint $table) {
             $table->id();
             $table->unsignedBigInteger('employer_id');

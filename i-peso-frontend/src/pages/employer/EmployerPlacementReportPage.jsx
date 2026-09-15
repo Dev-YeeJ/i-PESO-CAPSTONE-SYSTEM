@@ -6,9 +6,14 @@ import PageHeader from '@/pages/admin/_components/PageHeader'
 import toast from 'react-hot-toast'
 import PlacementRecordEditor, { blankPlacementRecord, stripBlankPlacementRecords } from '@/components/reports/PlacementRecordEditor'
 import HiringActivityWorkspace from '@/components/reports/HiringActivityWorkspace'
-import {
+import { 
   listEmployerPlacementReports,
-import { uploadPlacementReport, declareNoPlacements, startManualPlacementReport, getEmployerPlacementReport, deletePlacementReport } from '@/services/placementReportService'
+  uploadPlacementReport, 
+  declareNoPlacements, 
+  startManualPlacementReport, 
+  getEmployerPlacementReport, 
+  deletePlacementReport 
+} from '@/services/placementReportService'
 
 const STATUS_TONE = {
   pending_mapping: 'warning',
@@ -178,7 +183,8 @@ export default function EmployerPlacementReportPage() {
                 </Button>
               </div>
             </div>
-      <Card>
+          </Card>
+        <Card>
         <CardHeader title="My submitted reports" />
         {loading ? (
           <div className="flex items-center gap-2 py-8 text-sm text-slate-500"><Loader2 className="h-4 w-4 animate-spin" /> Loading…</div>

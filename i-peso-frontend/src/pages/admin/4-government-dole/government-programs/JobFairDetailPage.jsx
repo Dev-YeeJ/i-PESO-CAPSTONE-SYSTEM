@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { AnimatePresence } from 'framer-motion'
 import { CheckCircle2, ClipboardEdit, Download, Eye, FileText, Flame, Mail, RefreshCw, Save, Search, ShieldCheck, TrendingUp, UserCheck, Users, XCircle } from 'lucide-react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Badge, Button, Card, CardHeader, LoadingSkeleton, StatCard } from '@/components/ui'
@@ -30,14 +30,6 @@ const statusTones = Object.fromEntries(statusGroups.flatMap((g) => g.statuses.ma
 
 
 
-// Matches StatCard's own color token names, resized for a compact inline swatch.
-const statTone = {
-  blue: 'bg-blue-50 text-blue-600',
-  green: 'bg-emerald-50 text-emerald-600',
-  amber: 'bg-amber-50 text-amber-600',
-  red: 'bg-red-50 text-red-600',
-}
-
 const inputClass = 'mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-brand-navy focus:outline-none focus:ring-2 focus:ring-brand-navy/10'
 
 function StepLabel({ step, children }) {
@@ -67,6 +59,7 @@ export default function JobFairDetailPage() {
   const navigate = useNavigate()
   const [fair, setFair] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
   const [viewingReport, setViewingReport] = useState(null)
   const [reviewingParticipantId, setReviewingParticipantId] = useState(null)
   const [viewingConfirmationSlip, setViewingConfirmationSlip] = useState(null)
