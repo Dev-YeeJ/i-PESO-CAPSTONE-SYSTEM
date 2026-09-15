@@ -144,12 +144,6 @@ export default function EmployerJobFairDashboard() {
   const [justAccepted, setJustAccepted] = useState(false)
   const requirementsCardRef = useRef(null)
 
-  // TEMPORARY on-page debug log: shows up directly in a screenshot of the
-  // page itself, so diagnosing an upload issue doesn't depend on someone
-  // having DevTools open to the right tab at the right moment. Remove once
-  // the upload issue is confirmed fixed.
-  const [debugLog, setDebugLog] = useState([])
-  const logDebug = (msg) => setDebugLog((prev) => [...prev.slice(-9), `${new Date().toLocaleTimeString()} — ${msg}`])
 
   const selected = useMemo(() => fairs.find((x) => String(x.job_fair_id) === String(selectedId)), [fairs, selectedId])
 
@@ -203,16 +197,13 @@ export default function EmployerJobFairDashboard() {
   // immediate visible feedback ("Uploading…") instead of the page looking
   // like it did nothing while the request is in flight.
   const act = async (work, success, { loading } = {}) => {
-    logDebug(`act() called${loading ? ` — ${loading}` : ''}`)
     const toastId = loading ? toast.loading(loading) : null
     try {
       await work()
-      logDebug(`SUCCESS: ${success}`)
       toast.success(success, { id: toastId ?? undefined })
       await load()
     } catch (e) {
       const message = Object.values(e.response?.data?.errors ?? {}).flat().join(' ') || e.response?.data?.message || 'Action failed.'
-      logDebug(`FAILED: status=${e.response?.status ?? '(no response)'} message="${message}" raw="${e.message}"`)
       toast.error(message, { id: toastId ?? undefined })
     }
   }
@@ -269,18 +260,6 @@ export default function EmployerJobFairDashboard() {
 
   return (
     <div className="mx-auto max-w-7xl space-y-10 pb-12">
-      {
-        // TEMPORARY: on-page debug log for diagnosing the upload issue --
-        // always visible regardless of scroll, so it shows up in any
-        // screenshot without needing DevTools open at the right moment.
-        // Remove once the upload issue is confirmed fixed.
-      }
-      {debugLog.length > 0 && (
-        <div className="fixed inset-x-4 bottom-4 z-50 mx-auto max-w-xl rounded-xl border-2 border-amber-400 bg-slate-950 p-3 font-mono text-[11px] text-emerald-300 shadow-2xl sm:inset-x-auto sm:right-4">
-          <p className="mb-1 font-bold text-amber-400">DEBUG LOG (temporary)</p>
-          {debugLog.map((line, i) => <p key={i} className="whitespace-pre-wrap break-words">{line}</p>)}
-        </div>
-      )}
       <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-900 via-blue-950 to-indigo-900 px-8 py-8 text-white shadow-xl sm:px-12 sm:py-10">
         <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-blue-500/20 blur-3xl"></div>
         <div className="absolute -bottom-32 -left-20 h-80 w-80 rounded-full bg-indigo-500/20 blur-3xl"></div>
@@ -446,7 +425,6 @@ export default function EmployerJobFairDashboard() {
                                   isGallery={isGallery}
                                   hasExisting={nonRejected.length > 0}
                                   onSelect={(files) => {
-                                    logDebug(`onChange fired, ${files.length} file(s) selected`)
                                     act(() => uploadJobFairRequirement(selected.job_fair_id, req.id, files), `${req.label} submitted.`, { loading: `Uploading ${files.length > 1 ? `${files.length} photos` : files[0].name}…` })
                                   }}
                                 />
