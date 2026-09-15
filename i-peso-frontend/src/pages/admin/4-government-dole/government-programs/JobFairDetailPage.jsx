@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import PageHeader from '@/pages/admin/_components/PageHeader'
 import LocationPreviewCard from '@/components/maps/LocationPreviewCard'
 import EstablishmentReportPreview from '@/components/reports/EstablishmentReportPreview'
+import ConfirmationSlipPreview from '@/components/reports/ConfirmationSlipPreview'
 import { JobFairProxyForms } from './components/JobFairProxyForms'
 import { adminService } from '@/services/adminService'
 import { Command } from 'cmdk'
@@ -82,6 +83,7 @@ export default function JobFairDetailPage() {
   const [loading, setLoading] = useState(true)
   const [viewingReport, setViewingReport] = useState(null)
   const [reviewingParticipantId, setReviewingParticipantId] = useState(null)
+  const [viewingConfirmationSlip, setViewingConfirmationSlip] = useState(null)
 
   // Search-as-you-type employer picker for "Invite" — replaces a bare
   // numeric employer-ID text box with something an admin can actually use
@@ -423,6 +425,11 @@ export default function JobFairDetailPage() {
                           <FileText className="h-3.5 w-3.5" />View {submitted.original_filename}
                         </button>
                       )}
+                      {submitted?.original_filename === 'Digital confirmation slip' && reviewingParticipant.confirmation_slip && (
+                        <button type="button" onClick={() => setViewingConfirmationSlip(reviewingParticipant.confirmation_slip)} className="mt-2 flex items-center gap-1.5 text-xs font-semibold text-brand-navy hover:underline">
+                          <FileText className="h-3.5 w-3.5" />View Confirmation Slip
+                        </button>
+                      )}
                       {submitted?.admin_remarks && <p className="mt-2 text-xs font-semibold text-rose-700">PESO note: {submitted.admin_remarks}</p>}
 
                       {needsReview && (
@@ -442,6 +449,14 @@ export default function JobFairDetailPage() {
               </div>
             </>
           )}
+        </DialogContent>
+      </Dialog>
+      <Dialog open={Boolean(viewingConfirmationSlip)} onOpenChange={(open) => !open && setViewingConfirmationSlip(null)}>
+        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Confirmation Slip — {viewingConfirmationSlip?.company_name}</DialogTitle>
+          </DialogHeader>
+          <ConfirmationSlipPreview slip={viewingConfirmationSlip} />
         </DialogContent>
       </Dialog>
     </div>
