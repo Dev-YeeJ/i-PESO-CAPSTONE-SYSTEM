@@ -4,17 +4,36 @@ import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useQuery } from '@tanstack/react-query'
 import * as Location from 'expo-location'
 import MaterialIcons from '@expo/vector-icons/MaterialIcons'
+import * as Haptics from 'expo-haptics'
+import Animated, { FadeInDown, FadeInUp, interpolate, useAnimatedStyle, useSharedValue, withSpring, withTiming } from 'react-native-reanimated'
 import type { AxiosError } from 'axios'
 import type { JobFair, JobFilters, NearbyJob } from '@/services/seekerService'
 import { seekerService } from '@/services/seekerService'
 import { useToggleSavedJob } from '@/hooks/use-toggle-saved-job'
+import { useMotion } from '@/hooks/useMotion'
 import { mergeParsedFilters } from '@/utils/mapQueryParser'
 import { AlertBox } from '@/components/ui/AlertBox'
 import { Button } from '@/components/ui/Button'
+import { PressableScale } from '@/components/ui/PressableScale'
 import { ScreenHeader } from '@/components/ui/ScreenHeader'
 import { JobFeedCard } from '@/components/seeker/JobFeedCard'
 import { LeafletMap } from '@/components/seeker/LeafletMap'
-import { colors, radii, spacing, typography } from '@/theme'
+import { colors, radii, shadows, spacing, typography } from '@/theme'
+
+type MatchTier = 'high' | 'medium' | 'low'
+
+const TIER_THRESHOLDS: { tier: MatchTier; min: number; label: string; color: string }[] = [
+  { tier: 'high', min: 80, label: 'High', color: colors.success },
+  { tier: 'medium', min: 50, label: 'Medium', color: colors.warning },
+  { tier: 'low', min: 0, label: 'Low', color: colors.subtle },
+]
+
+function tierFor(job: NearbyJob): MatchTier {
+  const match = Math.round(Number(job.match_percentage ?? job.match?.percentage ?? 0))
+  if (match >= 80) return 'high'
+  if (match >= 50) return 'medium'
+  return 'low'
+}
 
 // Urdaneta City, Pangasinan — sensible default center when no device/profile location is available yet.
 const DEFAULT_REGION = { latitude: 15.9762, longitude: 120.5714, latitudeDelta: 0.15, longitudeDelta: 0.15 }
@@ -34,6 +53,10 @@ const JOB_TYPE_OPTIONS = [
   { label: 'Freelance', value: 'Freelance' },
 ]
 
+const EMPTY_JOBS: NearbyJob[] = []
+const SHEET_HEIGHT = 420
+const PEEK_HEIGHT = 108
+
 const DEFAULT_FILTERS: JobFilters = {
   radiusKm: 15,
   minMatch: 0,
@@ -43,10 +66,7 @@ const DEFAULT_FILTERS: JobFilters = {
 }
 
 function matchColor(job: NearbyJob) {
-  const match = Math.round(Number(job.match_percentage ?? job.match?.percentage ?? 0))
-  if (match >= 80) return colors.success
-  if (match >= 50) return colors.warning
-  return colors.subtle
+  return TIER_THRESHOLDS.find((t) => t.tier === tierFor(job))!.color
 }
 
 // Where the header's back button should land, since job-map is a flat sibling in the Tabs
@@ -70,6 +90,31 @@ export default function JobMapScreen() {
   const [locationNotice, setLocationNotice] = useState('')
   const [isLocating, setIsLocating] = useState(false)
   const [region, setRegion] = useState(DEFAULT_REGION)
+  const [activeTiers, setActiveTiers] = useState<Set<MatchTier>>(new Set(['high', 'medium', 'low']))
+  const [showJobFairPins, setShowJobFairPins] = useState(true)
+  const [listExpanded, setListExpanded] = useState(false)
+  const m = useMotion()
+  const sheetProgress = useSharedValue(0)
+
+  const toggleTier = (tier: MatchTier) => {
+    Haptics.selectionAsync()
+    setActiveTiers((current) => {
+      const next = new Set(current)
+      if (next.has(tier)) next.delete(tier)
+      else next.add(tier)
+      // Never allow the legend to filter everything out — that reads as a broken map, not a
+      // narrowed one.
+      return next.size === 0 ? current : next
+    })
+  }
+
+  const toggleListExpanded = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+    setListExpanded((current) => {
+      sheetProgress.value = withSpring(current ? 0 : 1, m.spring('snappy'))
+      return !current
+    })
+  }
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedFilters(filters), 400)
@@ -128,11 +173,13 @@ export default function JobMapScreen() {
     select: (fairs: JobFair[]) => fairs.filter((fair) => fair.map_eligible && fair.latitude != null && fair.longitude != null),
   })
 
-  const jobs = data?.jobs ?? []
+  const allJobs = data?.jobs ?? EMPTY_JOBS
+  const jobs = useMemo(() => allJobs.filter((job) => activeTiers.has(tierFor(job))), [allJobs, activeTiers])
   const jobsWithCoords = useMemo(
-    () => (pinsData ?? []).filter((job) => job.latitude != null && job.longitude != null),
-    [pinsData]
+    () => (pinsData ?? []).filter((job) => job.latitude != null && job.longitude != null && activeTiers.has(tierFor(job))),
+    [pinsData, activeTiers]
   )
+  const visibleJobFairs = showJobFairPins ? jobFairs : []
   const locationRequired = data?.locationRequired ?? false
   const errorMessage = error && !locationRequired
     ? ((error as AxiosError<{ message?: string }>).response?.data?.message || 'Unable to load nearby jobs. Please try again.')
@@ -199,40 +246,20 @@ export default function JobMapScreen() {
     filters.upskillRecommendedOnly, filters.certificateMatchOnly, filters.canApplyOnly, filters.coordinatesOnly,
   ].filter(Boolean).length
 
+  const sheetStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: interpolate(sheetProgress.value, [0, 1], [SHEET_HEIGHT - PEEK_HEIGHT, 0]) }],
+  }))
+  const chevronStyle = useAnimatedStyle(() => ({
+    transform: [{ rotate: `${interpolate(sheetProgress.value, [0, 1], [0, 180])}deg` }],
+  }))
+
   return (
     <View style={styles.flex}>
       <ScreenHeader title="Job Map" onBack={() => router.replace(backTarget as never)} />
 
-      <View style={styles.searchBar}>
-        <View style={styles.searchInputWrap}>
-          <MaterialIcons name="auto-awesome" size={16} color={colors.info} />
-          <TextInput
-            style={styles.searchInput}
-            value={aiQuery}
-            onChangeText={setAiQuery}
-            placeholder="Try: high match jobs within 10km"
-            placeholderTextColor={colors.subtle}
-            returnKeyType="search"
-            onSubmitEditing={runAiSearch}
-          />
-        </View>
-        <TouchableOpacity onPress={runAiSearch} disabled={aiLoading || !aiQuery.trim()} style={styles.iconBtn}>
-          {aiLoading ? <ActivityIndicator size="small" color={colors.white} /> : <MaterialIcons name="search" size={20} color={colors.white} />}
-        </TouchableOpacity>
-        <TouchableOpacity onPress={useCurrentLocation} disabled={isLocating} style={styles.iconBtnOutline}>
-          {isLocating ? <ActivityIndicator size="small" color={colors.info} /> : <MaterialIcons name="my-location" size={20} color={colors.info} />}
-        </TouchableOpacity>
-        <TouchableOpacity onPress={() => setFiltersOpen(true)} style={styles.iconBtnOutline}>
-          <MaterialIcons name="tune" size={20} color={colors.info} />
-          {activeToggleCount > 0 ? <View style={styles.filterDot} /> : null}
-        </TouchableOpacity>
-      </View>
-
-      {aiNotice ? <Text style={styles.noticeText}>{aiNotice}</Text> : null}
-      {locationNotice ? <Text style={styles.noticeText}>{locationNotice}</Text> : null}
-      {data?.notice ? <Text style={styles.noticeText}>{data.notice}</Text> : null}
-
-      <View style={styles.mapWrap}>
+      {/* Full-bleed map stage — every control below is an absolutely-positioned overlay on
+          top of it, rather than a stacked layout that squeezes the map into a small box. */}
+      <View style={styles.stage}>
         <LeafletMap
           region={region}
           markers={[
@@ -244,7 +271,7 @@ export default function JobMapScreen() {
             })),
             // Prefixed so onMarkerPress can tell a job-fair pin apart from a vacancy pin —
             // LeafletMap's marker id is a single shared string channel back from the WebView.
-            ...jobFairs.map((fair) => ({
+            ...visibleJobFairs.map((fair) => ({
               postId: `fair:${fair.job_fair_id}`,
               lat: Number(fair.latitude),
               lng: Number(fair.longitude),
@@ -268,41 +295,114 @@ export default function JobMapScreen() {
             <ActivityIndicator color={colors.info} />
           </View>
         ) : null}
+
+        {/* Floating search bar */}
+        <Animated.View entering={m.enabled ? FadeInDown.duration(280) : undefined} style={styles.floatingTop}>
+          <View style={styles.searchBar}>
+            <View style={styles.searchInputWrap}>
+              <MaterialIcons name="auto-awesome" size={16} color={colors.info} />
+              <TextInput
+                style={styles.searchInput}
+                value={aiQuery}
+                onChangeText={setAiQuery}
+                placeholder="Try: high match jobs within 10km"
+                placeholderTextColor={colors.subtle}
+                returnKeyType="search"
+                onSubmitEditing={runAiSearch}
+              />
+            </View>
+            <TouchableOpacity onPress={runAiSearch} disabled={aiLoading || !aiQuery.trim()} style={styles.iconBtn}>
+              {aiLoading ? <ActivityIndicator size="small" color={colors.white} /> : <MaterialIcons name="search" size={20} color={colors.white} />}
+            </TouchableOpacity>
+            <TouchableOpacity onPress={useCurrentLocation} disabled={isLocating} style={styles.iconBtnOutline}>
+              {isLocating ? <ActivityIndicator size="small" color={colors.info} /> : <MaterialIcons name="my-location" size={20} color={colors.info} />}
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => setFiltersOpen(true)} style={styles.iconBtnOutline}>
+              <MaterialIcons name="tune" size={20} color={colors.info} />
+              {activeToggleCount > 0 ? <View style={styles.filterDot} /> : null}
+            </TouchableOpacity>
+          </View>
+
+          {aiNotice ? <FloatingNotice text={aiNotice} /> : null}
+          {locationNotice ? <FloatingNotice text={locationNotice} /> : null}
+          {data?.notice ? <FloatingNotice text={data.notice} /> : null}
+          {errorMessage ? <AlertBox variant="danger" style={styles.floatingAlert}>{errorMessage}</AlertBox> : null}
+          {locationRequired ? (
+            <AlertBox variant="warning" style={styles.floatingAlert}>
+              Update your address in Profile, or use your current location, to see jobs near you.
+            </AlertBox>
+          ) : null}
+
+          {data?.summary ? (
+            <View style={styles.summaryPill}>
+              <Text style={styles.summaryText}>
+                <Text style={styles.summaryStrong}>{data.summary.total_found ?? allJobs.length} jobs</Text> found
+                {typeof data.summary.high_match_count === 'number' ? ` · ${data.summary.high_match_count} high-match` : ''}
+                {data.summary.nearest_distance_km != null ? ` · nearest ${Number(data.summary.nearest_distance_km).toFixed(1)} km` : ''}
+              </Text>
+            </View>
+          ) : null}
+        </Animated.View>
+
+        {/* Floating, interactive legend — tap a tier to filter both the pins and the list
+            below to just that match band; tap "PESO Job Fair" to toggle those pins. Mirrors
+            i-peso-frontend's JobVacancyMap.jsx MapLegend, made tappable for mobile. */}
+        <Animated.View entering={m.enabled ? FadeInUp.delay(120).duration(280) : undefined} style={styles.legendCard}>
+          <Text style={styles.legendTitle}>Match legend</Text>
+          <View style={styles.legendRow}>
+            {TIER_THRESHOLDS.map((tier) => (
+              <LegendChip
+                key={tier.tier}
+                label={tier.label}
+                color={tier.color}
+                active={activeTiers.has(tier.tier)}
+                onPress={() => toggleTier(tier.tier)}
+              />
+            ))}
+            <LegendChip label="Job Fair" color={colors.primary} active={showJobFairPins} onPress={() => setShowJobFairPins((v) => !v)} />
+          </View>
+        </Animated.View>
+
+        {/* Job list, as a sheet overlapping the bottom of the map — tap the handle to expand
+            it over the map instead of it permanently eating screen space below the map. */}
+        <Animated.View style={[styles.sheet, sheetStyle]}>
+          <PressableScale onPress={toggleListExpanded} ripple={null} style={styles.sheetHandleWrap} accessibilityRole="button" accessibilityLabel={listExpanded ? 'Collapse job list' : 'Expand job list'}>
+            <View style={styles.sheetGrip} />
+            <View style={styles.sheetHeaderRow}>
+              <Text style={styles.sheetHeaderText}>{jobs.length} job{jobs.length === 1 ? '' : 's'} on this map</Text>
+              <Animated.View style={chevronStyle}>
+                <MaterialIcons name="keyboard-arrow-up" size={22} color={colors.textSecondary} />
+              </Animated.View>
+            </View>
+          </PressableScale>
+
+          <ScrollView
+            style={styles.listWrap}
+            contentContainerStyle={styles.listContent}
+            showsVerticalScrollIndicator={false}
+            scrollEnabled={listExpanded}
+          >
+            {!isLoading && !errorMessage && !locationRequired && jobs.length === 0 ? (
+              <Text style={styles.emptyText}>
+                {allJobs.length > 0
+                  ? 'No jobs match the selected legend tiers. Tap a tier above to include it.'
+                  : `No jobs found within ${filters.radiusKm ?? 15} km. Try widening the radius.`}
+              </Text>
+            ) : null}
+            {jobs.map((job, index) => (
+              <JobFeedCard
+                key={String(job.post_id)}
+                job={job}
+                index={index}
+                saving={toggleSavedMutation.isPending && String(toggleSavedMutation.variables) === String(job.post_id)}
+                onPress={() => openJob(job)}
+                onToggleSave={() => toggleSavedMutation.mutate(String(job.post_id))}
+              />
+            ))}
+            {isFetching && !isLoading ? <ActivityIndicator color={colors.info} style={styles.footerSpinner} /> : null}
+          </ScrollView>
+        </Animated.View>
       </View>
-
-      {data?.summary ? (
-        <View style={styles.summaryBar}>
-          <Text style={styles.summaryText}>
-            <Text style={styles.summaryStrong}>{data.summary.total_found ?? jobs.length} jobs</Text> found
-            {typeof data.summary.high_match_count === 'number' ? ` · ${data.summary.high_match_count} high-match` : ''}
-            {data.summary.nearest_distance_km != null ? ` · nearest ${Number(data.summary.nearest_distance_km).toFixed(1)} km` : ''}
-          </Text>
-        </View>
-      ) : null}
-
-      {errorMessage ? <AlertBox variant="danger" style={styles.alertBox}>{errorMessage}</AlertBox> : null}
-      {locationRequired ? (
-        <AlertBox variant="warning" style={styles.alertBox}>
-          Update your address in Profile, or use your current location, to see jobs near you.
-        </AlertBox>
-      ) : null}
-
-      <ScrollView style={styles.listWrap} contentContainerStyle={styles.listContent} showsVerticalScrollIndicator={false}>
-        {!isLoading && !errorMessage && !locationRequired && jobs.length === 0 ? (
-          <Text style={styles.emptyText}>No jobs found within {filters.radiusKm ?? 15} km. Try widening the radius.</Text>
-        ) : null}
-        {jobs.map((job, index) => (
-          <JobFeedCard
-            key={String(job.post_id)}
-            job={job}
-            index={index}
-            saving={toggleSavedMutation.isPending && String(toggleSavedMutation.variables) === String(job.post_id)}
-            onPress={() => openJob(job)}
-            onToggleSave={() => toggleSavedMutation.mutate(String(job.post_id))}
-          />
-        ))}
-        {isFetching && !isLoading ? <ActivityIndicator color={colors.info} style={styles.footerSpinner} /> : null}
-      </ScrollView>
 
       <Modal visible={filtersOpen} animationType="slide" transparent onRequestClose={() => setFiltersOpen(false)}>
         <View style={styles.modalOverlay}>
@@ -400,6 +500,35 @@ export default function JobMapScreen() {
   )
 }
 
+function FloatingNotice({ text }: { text: string }) {
+  return (
+    <Animated.View entering={FadeInDown.duration(200)} style={styles.floatingNotice}>
+      <Text style={styles.floatingNoticeText}>{text}</Text>
+    </Animated.View>
+  )
+}
+
+function LegendChip({ label, color, active, onPress }: { label: string; color: string; active: boolean; onPress: () => void }) {
+  const scale = useSharedValue(1)
+  const style = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }], opacity: withTiming(active ? 1 : 0.4, { duration: 180 }) }))
+
+  return (
+    <TouchableOpacity
+      onPressIn={() => { scale.value = withSpring(0.92, { damping: 14, stiffness: 260 }) }}
+      onPressOut={() => { scale.value = withSpring(1, { damping: 14, stiffness: 260 }) }}
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityState={{ selected: active }}
+      accessibilityLabel={`${label} match tier, ${active ? 'shown' : 'hidden'}`}
+    >
+      <Animated.View style={[styles.legendChip, style]}>
+        <View style={[styles.legendDot, { backgroundColor: color }]} />
+        <Text style={styles.legendLabel}>{label}</Text>
+      </Animated.View>
+    </TouchableOpacity>
+  )
+}
+
 function FilterLabel({ children }: { children: string }) {
   return <Text style={styles.filterLabel}>{children}</Text>
 }
@@ -418,21 +547,57 @@ function Chip({ label, active, onPress }: { label: string; active: boolean; onPr
 
 const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: colors.background },
-  searchBar: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.lg, paddingTop: spacing.md },
-  searchInputWrap: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: spacing.xs, borderWidth: 1, borderColor: colors.border, borderRadius: radii.md, paddingHorizontal: spacing.md, backgroundColor: colors.surface, height: 44 },
-  searchInput: { flex: 1, color: colors.textPrimary, fontSize: typography.small },
-  iconBtn: { width: 44, height: 44, borderRadius: radii.md, backgroundColor: colors.secondary, alignItems: 'center', justifyContent: 'center' },
-  iconBtnOutline: { width: 44, height: 44, borderRadius: radii.md, borderWidth: 1, borderColor: colors.infoBorder, backgroundColor: colors.infoBackground, alignItems: 'center', justifyContent: 'center' },
-  filterDot: { position: 'absolute', top: 6, right: 6, width: 8, height: 8, borderRadius: 4, backgroundColor: colors.error },
-  noticeText: { color: colors.textSecondary, fontSize: typography.small, paddingHorizontal: spacing.lg, marginTop: spacing.xs },
-  mapWrap: { height: 220, marginTop: spacing.md, marginHorizontal: spacing.lg, borderRadius: radii.md, overflow: 'hidden' },
+  stage: { flex: 1, position: 'relative', overflow: 'hidden' },
   mapLoading: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.4)' },
-  summaryBar: { paddingHorizontal: spacing.lg, paddingTop: spacing.sm },
+
+  floatingTop: { position: 'absolute', top: spacing.md, left: spacing.lg, right: spacing.lg, gap: spacing.xs },
+  searchBar: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  searchInputWrap: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: spacing.xs, borderRadius: radii.md, paddingHorizontal: spacing.md, backgroundColor: colors.surface, height: 44, ...shadows.md },
+  searchInput: { flex: 1, color: colors.textPrimary, fontSize: typography.small },
+  iconBtn: { width: 44, height: 44, borderRadius: radii.md, backgroundColor: colors.secondary, alignItems: 'center', justifyContent: 'center', ...shadows.md },
+  iconBtnOutline: { width: 44, height: 44, borderRadius: radii.md, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center', ...shadows.md },
+  filterDot: { position: 'absolute', top: 6, right: 6, width: 8, height: 8, borderRadius: 4, backgroundColor: colors.error },
+
+  floatingNotice: { backgroundColor: colors.surface, borderRadius: radii.md, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, ...shadows.sm },
+  floatingNoticeText: { color: colors.textSecondary, fontSize: typography.small, lineHeight: 17 },
+  floatingAlert: { ...shadows.sm },
+  summaryPill: { alignSelf: 'flex-start', backgroundColor: colors.surface, borderRadius: radii.pill, paddingHorizontal: spacing.md, paddingVertical: spacing.xs, ...shadows.sm },
   summaryText: { color: colors.textSecondary, fontSize: typography.small },
   summaryStrong: { color: colors.textPrimary, fontFamily: typography.family.bold },
-  alertBox: { marginHorizontal: spacing.lg, marginTop: spacing.sm },
-  listWrap: { flex: 1, marginTop: spacing.sm },
-  listContent: { padding: spacing.lg, paddingBottom: spacing.xxxl },
+
+  legendCard: {
+    position: 'absolute',
+    left: spacing.lg,
+    bottom: PEEK_HEIGHT + spacing.md,
+    backgroundColor: 'rgba(255,255,255,0.96)',
+    borderRadius: radii.lg,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    ...shadows.md,
+  },
+  legendTitle: { color: colors.textSecondary, fontSize: 9, fontFamily: typography.family.bold, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: spacing.xs },
+  legendRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, maxWidth: 220 },
+  legendChip: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  legendDot: { width: 9, height: 9, borderRadius: 5 },
+  legendLabel: { color: colors.textPrimary, fontSize: 11, fontFamily: typography.family.medium },
+
+  sheet: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: SHEET_HEIGHT,
+    backgroundColor: colors.surface,
+    borderTopLeftRadius: radii.xl,
+    borderTopRightRadius: radii.xl,
+    ...shadows.lg,
+  },
+  sheetHandleWrap: { paddingTop: spacing.sm },
+  sheetGrip: { alignSelf: 'center', width: 36, height: 4, borderRadius: 2, backgroundColor: colors.border },
+  sheetHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.lg, paddingTop: spacing.sm, paddingBottom: spacing.xs },
+  sheetHeaderText: { color: colors.textPrimary, fontSize: typography.small, fontFamily: typography.family.bold },
+  listWrap: { flex: 1 },
+  listContent: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xxxl },
   emptyText: { color: colors.textSecondary, fontSize: typography.body, textAlign: 'center', marginTop: spacing.xl },
   footerSpinner: { marginTop: spacing.md },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(15,23,42,0.5)', justifyContent: 'flex-end' },
