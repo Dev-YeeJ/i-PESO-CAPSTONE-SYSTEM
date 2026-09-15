@@ -46,8 +46,8 @@ const SEEKER_FEATURES = [
   },
   {
     icon: MapPin,
-    title: 'Local First',
-    body: 'See jobs available within Urdaneta City and nearby towns, sorted by distance.',
+    title: 'Location-Aware',
+    body: 'See jobs available in your immediate vicinity and across the region, instantly sorted by distance.',
   },
 ];
 
@@ -69,8 +69,8 @@ const EMPLOYER_FEATURES = [
   },
   {
     icon: Briefcase,
-    title: 'Free City-wide Reach',
-    body: 'Post your openings and instantly reach thousands of registered Urdaneta citizens.',
+    title: 'Expansive Reach',
+    body: 'Post your openings and instantly connect with thousands of registered, verified job seekers.',
   },
 ];
 
@@ -101,6 +101,21 @@ const LandingPage = () => {
   const itemVariants = {
     hidden: { opacity: 0, y: 20 },
     visible: { opacity: 1, y: 0, transition: { duration: 0.6, ease: "easeOut" } }
+  };
+
+  // For the dashboard interior stagger
+  const dashContainerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: { staggerChildren: 0.1, delayChildren: 0.2 }
+    },
+    exit: { opacity: 0, transition: { duration: 0.2 } }
+  };
+
+  const dashItemVariants = {
+    hidden: { opacity: 0, x: -20 },
+    visible: { opacity: 1, x: 0, transition: { duration: 0.4, ease: "easeOut" } }
   };
 
   return (
@@ -136,12 +151,14 @@ const LandingPage = () => {
           >
             Sign In
           </button>
-          <button
+          <Motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
             onClick={() => navigate('/register')}
             className="px-5 py-2.5 text-sm font-semibold text-slate-900 bg-white hover:bg-slate-100 rounded-lg shadow-md transition-all flex items-center gap-2"
           >
             Register <span className="text-lg leading-none">→</span>
-          </button>
+          </Motion.button>
         </div>
       </Motion.nav>
 
@@ -172,12 +189,14 @@ const LandingPage = () => {
           </Motion.h1>
 
           <Motion.p variants={itemVariants} className="text-lg md:text-xl text-slate-400 max-w-3xl mb-12 leading-relaxed">
-            Browse job openings, join local job fairs, and apply to government programs like SPES and
+            Browse job openings, join local job fairs, and browse government programs like SPES and
             TUPAD — all from one <span className="text-white font-medium">i-PESO</span> account.
           </Motion.p>
 
           <Motion.div variants={itemVariants} className="flex flex-col sm:flex-row items-center gap-4 mb-14">
-            <button
+            <Motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
               onClick={() => navigate('/register/seeker')}
               className="w-full sm:w-auto px-8 py-4 bg-white text-slate-900 font-bold rounded-xl shadow-lg hover:bg-slate-100 transition-all flex items-center justify-center gap-3 text-lg"
             >
@@ -185,9 +204,11 @@ const LandingPage = () => {
                 <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
               </svg>
               Find Jobs <span className="text-xs font-medium text-slate-500 ml-1">Job Seeker</span>
-            </button>
+            </Motion.button>
 
-            <button
+            <Motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
               onClick={() => navigate('/register/employer')}
               className="w-full sm:w-auto px-8 py-4 bg-yellow-400 text-slate-900 font-bold rounded-xl shadow-[0_0_20px_rgba(250,204,21,0.3)] hover:bg-yellow-300 transition-all flex items-center justify-center gap-3 text-lg"
             >
@@ -195,7 +216,7 @@ const LandingPage = () => {
                 <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 21h16.5M4.5 3h15M5.25 3v18m13.5-18v18M9 6.75h1.5m-1.5 3h1.5m-1.5 3h1.5m3-6H15m-1.5 3H15m-1.5 3H15M9 21v-3.375c0-.621.504-1.125 1.125-1.125h3.75c.621 0 1.125.504 1.125 1.125V21" />
               </svg>
               Post Jobs <span className="text-xs font-medium text-slate-700 ml-1">Employer</span>
-            </button>
+            </Motion.button>
           </Motion.div>
 
           <Motion.div variants={itemVariants} className="flex flex-wrap justify-center gap-6 md:gap-10 text-sm font-medium text-slate-400">
@@ -246,37 +267,37 @@ const LandingPage = () => {
                    {activeTab === 'seeker' ? (
                      <Motion.div 
                        key="seeker-view"
-                       initial={{ opacity: 0, y: 10 }}
-                       animate={{ opacity: 1, y: 0 }}
-                       exit={{ opacity: 0, y: -10 }}
-                       transition={{ duration: 0.3 }}
+                       variants={dashContainerVariants}
+                       initial="hidden"
+                       animate="visible"
+                       exit="exit"
                        className="grid grid-cols-3 gap-6 text-left"
                      >
                        {/* Seeker Left Sidebar Mock */}
                        <div className="col-span-1 space-y-4">
-                          <div className="h-8 w-3/4 rounded-lg bg-white/10 mb-8"></div>
-                          <div className="flex items-center gap-3">
+                          <Motion.div variants={dashItemVariants} className="h-8 w-3/4 rounded-lg bg-white/10 mb-8"></Motion.div>
+                          <Motion.div variants={dashItemVariants} className="flex items-center gap-3">
                              <div className="w-4 h-4 rounded bg-blue-400/50"></div>
                              <div className="h-3 w-1/2 rounded bg-white/10"></div>
-                          </div>
-                          <div className="flex items-center gap-3 opacity-60">
+                          </Motion.div>
+                          <Motion.div variants={dashItemVariants} className="flex items-center gap-3 opacity-60">
                              <div className="w-4 h-4 rounded bg-white/5"></div>
                              <div className="h-3 w-2/3 rounded bg-white/5"></div>
-                          </div>
+                          </Motion.div>
                           
-                          <div className="mt-8 pt-6 border-t border-white/5">
+                          <Motion.div variants={dashItemVariants} className="mt-8 pt-6 border-t border-white/5">
                             <div className="h-28 rounded-xl bg-gradient-to-br from-blue-500/10 to-purple-500/10 border border-white/5 p-4 relative overflow-hidden flex flex-col justify-center">
                                <div className="absolute -right-4 -top-4 w-20 h-20 bg-blue-500/20 blur-2xl rounded-full"></div>
                                <div className="text-[10px] text-blue-300 font-bold mb-1 uppercase tracking-wider">Your Match Score</div>
                                <div className="text-4xl font-extrabold text-white">98<span className="text-xl text-slate-400">%</span></div>
                             </div>
-                          </div>
+                          </Motion.div>
                        </div>
                        
                        {/* Seeker Main Content Mock */}
                        <div className="col-span-2 space-y-4">
                           <div className="flex gap-4 mb-6">
-                             <div className="h-28 flex-1 rounded-xl bg-white/5 border border-white/10 p-4 flex flex-col justify-between transition-colors hover:bg-white/10">
+                             <Motion.div variants={dashItemVariants} className="h-28 flex-1 rounded-xl bg-white/5 border border-white/10 p-4 flex flex-col justify-between transition-colors hover:bg-white/10">
                                 <div className="flex justify-between items-start">
                                    <div className="h-10 w-10 rounded-lg bg-yellow-400/20 flex items-center justify-center">
                                       <Target className="text-yellow-400 w-5 h-5"/>
@@ -287,8 +308,8 @@ const LandingPage = () => {
                                   <div className="h-3 w-2/3 rounded bg-white/20 mb-2"></div>
                                   <div className="h-2 w-1/3 rounded bg-white/10"></div>
                                 </div>
-                             </div>
-                             <div className="h-28 flex-1 rounded-xl bg-white/5 border border-white/10 p-4 flex flex-col justify-between transition-colors hover:bg-white/10">
+                             </Motion.div>
+                             <Motion.div variants={dashItemVariants} className="h-28 flex-1 rounded-xl bg-white/5 border border-white/10 p-4 flex flex-col justify-between transition-colors hover:bg-white/10">
                                  <div className="flex justify-between items-start">
                                    <div className="h-10 w-10 rounded-lg bg-blue-400/20 flex items-center justify-center">
                                         <Landmark className="text-blue-400 w-5 h-5"/>
@@ -298,67 +319,67 @@ const LandingPage = () => {
                                   <div className="h-3 w-1/2 rounded bg-white/20 mb-2"></div>
                                   <div className="h-2 w-2/3 rounded bg-white/10"></div>
                                 </div>
-                             </div>
+                             </Motion.div>
                           </div>
                           
                           <div className="space-y-3">
-                             <div className="h-16 w-full rounded-xl bg-white/5 border border-white/10 flex items-center px-4 gap-4 transition-colors hover:bg-white/10">
+                             <Motion.div variants={dashItemVariants} className="h-16 w-full rounded-xl bg-white/5 border border-white/10 flex items-center px-4 gap-4 transition-colors hover:bg-white/10">
                                 <div className="h-10 w-10 rounded-full bg-slate-700"></div>
                                 <div className="space-y-2 flex-1">
                                    <div className="h-3 w-1/3 rounded bg-white/20"></div>
                                    <div className="h-2 w-1/4 rounded bg-white/10"></div>
                                 </div>
                                 <div className="px-4 py-2 rounded-lg bg-yellow-400 text-slate-900 text-xs font-bold shadow-[0_0_15px_rgba(250,204,21,0.2)]">Apply Now</div>
-                             </div>
-                             <div className="h-16 w-full rounded-xl bg-white/5 border border-white/10 flex items-center px-4 gap-4">
+                             </Motion.div>
+                             <Motion.div variants={dashItemVariants} className="h-16 w-full rounded-xl bg-white/5 border border-white/10 flex items-center px-4 gap-4">
                                 <div className="h-10 w-10 rounded-full bg-slate-700"></div>
                                 <div className="space-y-2 flex-1">
                                    <div className="h-3 w-1/4 rounded bg-white/20"></div>
                                    <div className="h-2 w-1/3 rounded bg-white/10"></div>
                                 </div>
                                 <div className="px-4 py-2 rounded-lg bg-white/5 text-slate-400 text-xs font-bold">Viewed</div>
-                             </div>
+                             </Motion.div>
                           </div>
                        </div>
                      </Motion.div>
                    ) : (
                      <Motion.div 
                        key="employer-view"
-                       initial={{ opacity: 0, y: 10 }}
-                       animate={{ opacity: 1, y: 0 }}
-                       exit={{ opacity: 0, y: -10 }}
-                       transition={{ duration: 0.3 }}
+                       variants={dashContainerVariants}
+                       initial="hidden"
+                       animate="visible"
+                       exit="exit"
                        className="grid grid-cols-3 gap-6 text-left"
                      >
                        {/* Employer Left Sidebar Mock */}
                        <div className="col-span-1 space-y-4">
-                          <div className="h-8 w-3/4 rounded-lg bg-white/10 mb-8"></div>
-                          <div className="flex items-center gap-3 opacity-60">
+                          <Motion.div variants={dashItemVariants} className="h-8 w-3/4 rounded-lg bg-white/10 mb-8"></Motion.div>
+                          <Motion.div variants={dashItemVariants} className="flex items-center gap-3 opacity-60">
                              <div className="w-4 h-4 rounded bg-white/5"></div>
                              <div className="h-3 w-1/2 rounded bg-white/5"></div>
-                          </div>
-                          <div className="flex items-center gap-3">
+                          </Motion.div>
+                          <Motion.div variants={dashItemVariants} className="flex items-center gap-3">
                              <div className="w-4 h-4 rounded bg-yellow-400/50"></div>
                              <div className="h-3 w-2/3 rounded bg-white/10"></div>
-                          </div>
+                          </Motion.div>
                           
-                          <div className="mt-8 pt-6 border-t border-white/5">
+                          <Motion.div variants={dashItemVariants} className="mt-8 pt-6 border-t border-white/5">
                             <div className="h-28 rounded-xl bg-gradient-to-br from-yellow-500/10 to-orange-500/10 border border-white/5 p-4 relative overflow-hidden flex flex-col justify-center">
                                <div className="absolute -right-4 -top-4 w-20 h-20 bg-yellow-500/20 blur-2xl rounded-full"></div>
                                <div className="text-[10px] text-yellow-300 font-bold mb-1 uppercase tracking-wider">Active Applicants</div>
                                <div className="text-4xl font-extrabold text-white">42</div>
                             </div>
-                          </div>
+                          </Motion.div>
                        </div>
                        
                        {/* Employer Main Content Mock */}
                        <div className="col-span-2 space-y-3">
-                          <div className="mb-4">
+                          <Motion.div variants={dashItemVariants} className="mb-4">
                             <div className="text-sm font-bold text-white mb-2">Top Ranked Applicants</div>
                             <div className="h-1 w-full bg-white/5 rounded"></div>
-                          </div>
+                          </Motion.div>
                           {[95, 88, 72].map((score, i) => (
-                            <div key={i} className="h-16 w-full rounded-xl bg-white/5 border border-white/10 flex items-center px-4 gap-4 transition-colors hover:bg-white/10">
+                            <Motion.div variants={dashItemVariants} key={i} className="h-16 w-full rounded-xl bg-white/5 border border-white/10 flex items-center px-4 gap-4 transition-colors hover:bg-white/10">
                               <div className="h-10 w-10 rounded-full bg-slate-700 flex items-center justify-center border border-emerald-400/30">
                                 <CheckCircle2 className="w-4 h-4 text-emerald-400" />
                               </div>
@@ -370,7 +391,7 @@ const LandingPage = () => {
                                 <div className="text-xs font-bold text-emerald-400">{score}% Match</div>
                                 <div className="px-3 py-1.5 rounded-lg bg-white/10 text-white text-xs font-bold hover:bg-white/20 cursor-pointer">Review</div>
                               </div>
-                           </div>
+                           </Motion.div>
                           ))}
                        </div>
                      </Motion.div>
@@ -452,24 +473,51 @@ const LandingPage = () => {
               Stop guessing if you are qualified.
             </h2>
             <p className="mt-5 text-base leading-relaxed text-slate-400">
-              When you complete your NSRP profile, our system scores your skills and experience against every open job in Urdaneta City. You see the highest matches first, saving you from applying to jobs that aren't a fit.
+              When you complete your NSRP profile, our system scores your skills and experience against every open job. You see the highest matches first, saving you from applying to jobs that aren't a fit.
             </p>
-            <button
+            <Motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
               onClick={() => navigate('/register/seeker')}
               className="mt-8 inline-flex items-center gap-2 rounded-xl bg-white px-6 py-3.5 text-sm font-bold text-slate-900 shadow-lg transition-all hover:bg-slate-100"
             >
               Create your profile <ArrowRight className="h-4 w-4" aria-hidden="true" />
-            </button>
+            </Motion.button>
           </div>
 
           <div className="relative mx-auto flex h-64 w-64 items-center justify-center sm:h-72 sm:w-72" aria-hidden="true">
+            {/* Animated Radar Pulses */}
+            <Motion.span 
+              animate={{ scale: [1, 2.5], opacity: [0.5, 0] }}
+              transition={{ repeat: Infinity, duration: 2.5, ease: "easeOut" }}
+              className="absolute inset-0 rounded-full border border-blue-400/40"
+            />
+            <Motion.span 
+              animate={{ scale: [1, 2.5], opacity: [0.3, 0] }}
+              transition={{ repeat: Infinity, duration: 2.5, delay: 0.8, ease: "easeOut" }}
+              className="absolute inset-0 rounded-full border border-blue-400/40"
+            />
+            <Motion.span 
+              animate={{ scale: [1, 2.5], opacity: [0.1, 0] }}
+              transition={{ repeat: Infinity, duration: 2.5, delay: 1.6, ease: "easeOut" }}
+              className="absolute inset-0 rounded-full border border-blue-400/40"
+            />
+            
+            {/* Static Radar Rings */}
             <span className="absolute inset-0 rounded-full border border-white/10" />
             <span className="absolute inset-6 rounded-full border border-white/10" />
             <span className="absolute inset-12 rounded-full border border-blue-400/20" />
-            <span className="absolute left-[30%] top-[38%] flex h-3 w-3 items-center justify-center rounded-full bg-blue-400 shadow-[0_0_16px_rgba(96,165,250,0.6)]" />
+            
+            {/* Radar Pings / Map Pins */}
+            <Motion.span 
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+              transition={{ repeat: Infinity, repeatType: "reverse", duration: 1.5 }}
+              className="absolute left-[30%] top-[38%] flex h-3 w-3 items-center justify-center rounded-full bg-blue-400 shadow-[0_0_16px_rgba(96,165,250,0.6)]" 
+            />
             <span className="absolute left-[62%] top-[58%] h-2 w-2 rounded-full bg-slate-500" />
             <span className="absolute left-[70%] top-[30%] h-2 w-2 rounded-full bg-slate-500" />
-            <MapPin className="h-8 w-8 text-blue-400" />
+            <MapPin className="h-8 w-8 text-blue-400 relative z-10" />
           </div>
         </div>
       </Motion.section>
@@ -484,19 +532,29 @@ const LandingPage = () => {
             </h2>
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <Motion.div 
+            variants={containerVariants}
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true, margin: '-50px' }}
+            className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4"
+          >
             {PROGRAMS.map((program) => (
-              <div key={program.name} className="rounded-xl border border-[#0A192F]/10 bg-white p-5 shadow-sm transition-all hover:shadow-md hover:-translate-y-1 cursor-default">
+              <Motion.div 
+                variants={itemVariants}
+                key={program.name} 
+                className="rounded-xl border border-[#0A192F]/10 bg-white p-5 shadow-sm transition-all hover:shadow-md hover:-translate-y-1 cursor-default"
+              >
                 <span className="font-mono text-[10px] font-medium tracking-wide text-[#B45309]">{program.tag}</span>
                 <h3 className="mt-2 text-sm font-bold leading-snug text-[#0A192F]">{program.name}</h3>
                 <p className="mt-2 text-xs leading-relaxed text-slate-600">{program.blurb}</p>
-              </div>
+              </Motion.div>
             ))}
-          </div>
+          </Motion.div>
 
           <p className="mt-8 text-sm text-slate-600">
             Eligibility and open slots vary by program.{' '}
-            <button onClick={() => navigate('/register/seeker')} className="font-bold text-[#0A192F] underline decoration-[#B45309] decoration-2 underline-offset-2">
+            <button onClick={() => navigate('/register/seeker')} className="font-bold text-[#0A192F] underline decoration-[#B45309] decoration-2 underline-offset-2 hover:text-[#B45309] transition-colors">
               Register to check yours
             </button>.
           </p>
