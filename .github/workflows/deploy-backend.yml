@@ -20,7 +20,16 @@ jobs:
           ssh-private-key: ${{ secrets.HOSTINGER_SSH_KEY }}
 
       - name: Trust host key
-        run: ssh-keyscan -p ${{ secrets.HOSTINGER_SSH_PORT }} ${{ secrets.HOSTINGER_SSH_HOST }} >> ~/.ssh/known_hosts
+        run: |
+          for i in 1 2 3 4 5; do
+            if ssh-keyscan -p ${{ secrets.HOSTINGER_SSH_PORT }} ${{ secrets.HOSTINGER_SSH_HOST }} >> ~/.ssh/known_hosts 2>/dev/null; then
+              exit 0
+            fi
+            echo "ssh-keyscan attempt $i failed, retrying in 5s..."
+            sleep 5
+          done
+          echo "ssh-keyscan failed after 5 attempts"
+          exit 1
 
       - name: Pull & build on server
         run: |
