@@ -11,7 +11,6 @@ import PageHeader from '@/pages/admin/_components/PageHeader'
 import LocationPreviewCard from '@/components/maps/LocationPreviewCard'
 import EstablishmentReportPreview from '@/components/reports/EstablishmentReportPreview'
 import ConfirmationSlipPreview from '@/components/reports/ConfirmationSlipPreview'
-import { JobFairProxyForms } from './components/JobFairProxyForms'
 import { adminService } from '@/services/adminService'
 import { Command } from 'cmdk'
 import JobFairEmployersTable from './components/JobFairEmployersTable'
@@ -29,20 +28,7 @@ const statusGroups = [
 ]
 const statusTones = Object.fromEntries(statusGroups.flatMap((g) => g.statuses.map((s) => [s, g.tone])))
 
-// The only participation_status values with no automatic trigger anywhere
-// in the system — a phone call, a decisive rejection, or physical
-// attendance genuinely need an admin to say so. Phrased as actions rather
-// than raw status nouns, and never pre-selected to the current status
-// (which usually isn't one of these), since this is "record an event",
-// not "edit a field".
-const MANUAL_STATUS_ACTIONS = [
-  ['called_peso', 'Log phone call'],
-  ['pending_response', 'Mark pending response'],
-  ['under_review', 'Move to under review'],
-  ['rejected', 'Reject participation'],
-  ['attended', 'Mark attended'],
-  ['no_show', 'Mark no-show'],
-]
+
 
 // Matches StatCard's own color token names, resized for a compact inline swatch.
 const statTone = {
@@ -232,7 +218,6 @@ export default function JobFairDetailPage() {
         <TabsList>
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="employers">Employers{fair?.participants?.length ? ` (${fair.participants.length})` : ''}</TabsTrigger>
-          <TabsTrigger value="paper">Paper encoding</TabsTrigger>
           <TabsTrigger value="reports">Reports{reports.length ? ` (${reports.length})` : ''}</TabsTrigger>
         </TabsList>
 
@@ -317,7 +302,7 @@ export default function JobFairDetailPage() {
         <TabsContent value="employers">
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
             <div className="mb-5 flex items-center justify-between">
-              <p className="text-sm font-medium text-slate-500">Digital and manual confirmation channels are equally supported.</p>
+              <p className="text-sm font-medium text-slate-500">Employers electronically confirm their attendance and report results.</p>
               <Button variant="outline" icon={RefreshCw} onClick={load} className="shadow-sm">Refresh</Button>
             </div>
 
@@ -334,11 +319,7 @@ export default function JobFairDetailPage() {
           </motion.div>
         </TabsContent>
 
-        <TabsContent value="paper">
-          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }} className="space-y-6">
-            <JobFairProxyForms fairId={id} onSuccess={() => load({ silent: true })} />
-          </motion.div>
-        </TabsContent>
+
 
         <TabsContent value="reports">
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }} className="space-y-6">
@@ -355,7 +336,7 @@ export default function JobFairDetailPage() {
 
           <Card padding="none">
             <div className="border-b border-slate-100 p-5">
-              <CardHeader title="Merged post-event reports" subtitle="Self-service and Admin Proxy Encoded records share one deduplicated reporting source." />
+              <CardHeader title="Merged post-event reports" subtitle="Self-service encoded records." />
             </div>
             <div className="divide-y divide-slate-100">
               {reports.length === 0 ? (
