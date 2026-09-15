@@ -12,6 +12,7 @@ export default function ConfirmationSlipPreview({ slip }) {
             <div className="grid grid-cols-3 gap-2">
               <dt className="font-semibold text-slate-500">Company Name</dt>
               <dd className="col-span-2 font-medium text-slate-900">{slip.company_name}</dd>
+            </div>
           </dl>
         </div>
 
