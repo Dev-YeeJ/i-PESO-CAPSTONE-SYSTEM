@@ -24,11 +24,18 @@ export default function NotificationBell() {
     staleTime: 60_000,
   })
 
+  // refetchOnWindowFocus is deliberately left off (inherits the app-wide
+  // default) -- it fires the instant the browser window regains focus,
+  // which is exactly what happens the moment a native OS file picker
+  // closes after choosing a file. That refetch's re-render was landing in
+  // the same tick as a requirement-upload <input>'s pending native
+  // 'change' event elsewhere on employer pages, and appeared to silently
+  // swallow it (the file dialog closed, but nothing else ever happened).
+  // The 30s poll below already keeps the badge reasonably fresh.
   const unreadQuery = useQuery({
     queryKey: ['employerNotifications', 'unreadCount'],
     queryFn: getNotificationUnreadCount,
     refetchInterval: 30000,
-    refetchOnWindowFocus: true,
   })
 
   const notifications = notificationsQuery.data?.notifications ?? []

@@ -148,7 +148,7 @@ export default function JobsScreen() {
     setAiLoading(false)
 
     if (!parsed) {
-      setAiNotice('AI search is unavailable right now. Showing plain keyword results instead.')
+      setAiNotice('Smart search is unavailable right now. Showing plain keyword results instead.')
       return
     }
 

@@ -232,7 +232,7 @@ export default function JobMapScreen() {
     setAiLoading(false)
 
     if (!parsed) {
-      setAiNotice('AI search is unavailable right now — using keyword matching instead.')
+      setAiNotice('Smart search is unavailable right now — using keyword matching instead.')
     }
     updateFilters(merged)
   }

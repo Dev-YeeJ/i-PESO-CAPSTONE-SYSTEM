@@ -88,17 +88,22 @@ class EmployerJobFairController extends Controller
         abort_unless($requirement->job_fair_id === $jobFair->job_fair_id, 404);
         $participation = $this->participation($jobFair, $employer);
 
-        // Posterized Job Vacancy is an actual photo of a flyer/poster, not a
-        // scanned document — a phone camera or export can easily produce a
-        // format outside the standard pdf/jpg/png set (webp, heic/heif from
-        // iPhones, gif, bmp). Every other requirement stays document-only.
+        // Posterized Job Vacancy accepts any file type/extension at all --
+        // no mimes/extensions restriction — since employers export flyers
+        // from a wide range of tools and formats kept tripping up an
+        // allowlist. Safe to leave unrestricted: this disk ('local') isn't
+        // web-accessible, files are only ever served back through the
+        // authenticated view/download endpoints below, never executed.
+        // Every other requirement stays document-only (pdf/jpg/jpeg/png).
         $isGallery = $requirement->code === 'posterized_vacancy';
-        $mimes = $isGallery ? 'pdf,jpg,jpeg,png,webp,gif,bmp,heic,heif' : 'pdf,jpg,jpeg,png';
+        $fileRules = $isGallery
+            ? ['file', 'max:10240']
+            : ['file', 'mimes:pdf,jpg,jpeg,png', 'max:5120'];
 
         $validated = $request->validate([
-            'document' => ['nullable', 'file', "mimes:{$mimes}", 'max:5120'],
+            'document' => array_merge(['nullable'], $fileRules),
             'documents' => ['nullable', 'array', 'max:5'],
-            'documents.*' => ['file', "mimes:{$mimes}", 'max:5120'],
+            'documents.*' => $fileRules,
         ]);
 
         $files = $validated['documents'] ?? ($validated['document'] ? [$validated['document']] : []);

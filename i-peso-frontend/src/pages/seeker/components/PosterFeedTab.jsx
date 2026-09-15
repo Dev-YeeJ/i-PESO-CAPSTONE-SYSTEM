@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { Building2, FileText, ImageOff } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { Building2, FileText, ImageOff, ArrowRight } from 'lucide-react'
 import { EmptyState, LoadingSkeleton } from '@/components/ui'
 import { listJobFairPosters, viewJobFairPoster } from '@/services/jobFairService'
 
@@ -110,14 +111,25 @@ function PosterCard({ poster }) {
         </button>
       )}
 
-      <div className="flex items-center justify-between border-t border-slate-100 p-3 text-xs font-semibold text-slate-400">
-        <div className="flex items-center gap-2">
-          <Building2 className="h-3.5 w-3.5" />PESO-approved employer posting
-        </div>
-        {poster.match_percentage !== undefined && poster.match_percentage !== null && (
-          <div className="flex items-center gap-1.5 rounded-full bg-emerald-50 px-2 py-1 text-[10px] font-black uppercase tracking-widest text-emerald-700 shadow-sm">
-            {Math.round(poster.match_percentage)}% match
+      <div className="flex flex-wrap items-center justify-between border-t border-slate-100 p-3 text-xs font-semibold text-slate-400 gap-2">
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <Building2 className="h-3.5 w-3.5" />PESO-approved employer posting
           </div>
+          {poster.match_percentage !== undefined && poster.match_percentage !== null && (
+            <div className="flex items-center gap-1.5 rounded-full bg-emerald-50 px-2 py-1 text-[10px] font-black uppercase tracking-widest text-emerald-700 shadow-sm">
+              {Math.round(poster.match_percentage)}% match
+            </div>
+          )}
+        </div>
+        
+        {poster.job_fair_id && poster.employer_id && (
+          <Link 
+            to={`/seeker/job-fairs/${poster.job_fair_id}/employers/${poster.employer_id}`}
+            className="flex items-center gap-1.5 rounded-lg bg-blue-50 px-3 py-1.5 text-xs font-bold text-blue-700 hover:bg-blue-100 transition"
+          >
+            View Booth <ArrowRight className="h-3.5 w-3.5" />
+          </Link>
         )}
       </div>
     </article>

@@ -27,9 +27,7 @@ import SkillTaxonomyTags from '@/components/form/SkillTaxonomyTags'
 import SmartSuggestionInput from '@/components/form/SmartSuggestionInput'
 import PsgcCascade from '@/pages/employer/components/PsgcCascade'
 import AddressPicker from '@/components/maps/AddressPicker'
-import MapPinPicker from '@/components/maps/MapPinPicker'
 import * as employerService from '@/services/employerService'
-import { resolveCoordinatesAddress } from '@/services/geoService'
 
 const steps = [
   { number: 1, title: 'Basic Information', shortTitle: 'Basic', icon: BriefcaseBusiness },
@@ -470,39 +468,6 @@ function BasicInformationStep({ form, errors, change }) {
 }
 
 function AlgorithmAnchorsStep({ form, errors, update, setLocation }) {
-  const [resolvingPin, setResolvingPin] = useState(false)
-  const [pinMessage, setPinMessage] = useState('')
-
-  const handlePinChange = async (coords) => {
-    update('latitude', coords.latitude)
-    update('longitude', coords.longitude)
-    update('location_accuracy', null)
-    setResolvingPin(true)
-    setPinMessage('Finding the PSGC address for this pin...')
-
-    try {
-      const result = await resolveCoordinatesAddress(coords.latitude, coords.longitude)
-      setLocation({
-        province: result.province?.name ?? form.province,
-        province_code: result.province?.code ?? form.province_code,
-        city: result.city?.name ?? form.city_municipality,
-        city_code: result.city?.code ?? form.city_code,
-        barangay: result.barangay?.name ?? form.barangay,
-        barangay_code: result.barangay?.code ?? form.barangay_code,
-      })
-      if (result.houseStreet) update('specific_address', result.houseStreet)
-      if (result.placeId) update('google_place_id', result.placeId)
-
-      setPinMessage(result.isComplete
-        ? 'Province, city, barangay, and specific address were filled from the pin.'
-        : `Pin located. Please verify${result.missingFields.length ? ` or complete: ${result.missingFields.join(', ')}` : ' the address fields'}.`)
-    } catch (error) {
-      setPinMessage(error.message ?? 'Pin saved, but its address could not be filled automatically.')
-    } finally {
-      setResolvingPin(false)
-    }
-  }
-
   const setOccupationMapping = (mapping) => {
     update('occupation_mapping', mapping)
     update('occupation_id', null)
@@ -532,58 +497,42 @@ function AlgorithmAnchorsStep({ form, errors, update, setLocation }) {
         </div>
 
         <div>
-          <div>
-            <AddressPicker
-              title="Job Location / PSGC"
-              province={form.province}
-              provinceCode={form.province_code}
-              city={form.city_municipality}
-              cityCode={form.city_code}
-              barangay={form.barangay}
-              barangayCode={form.barangay_code}
-              street={form.specific_address}
-              latitude={form.latitude}
-              longitude={form.longitude}
-              onChange={(location) => {
-                setLocation({
-                  province: location.province,
-                  province_code: location.province_code,
-                  city: location.city,
-                  city_code: location.city_code,
-                  barangay: location.barangay,
-                  barangay_code: location.barangay_code,
-                })
-                update('specific_address', location.street)
-                update('latitude', location.latitude)
-                update('longitude', location.longitude)
-                update('location_accuracy', location.location_accuracy)
-                update('google_place_id', location.google_place_id)
-              }}
-            />
-            {(errors.province || errors.city_municipality || errors.barangay) && (
-              <p className="mt-1.5 text-xs font-semibold text-red-600">
-                {errors.province || errors.city_municipality || errors.barangay}
-              </p>
-            )}
+          <AddressPicker
+            title="Job Location / PSGC"
+            province={form.province}
+            provinceCode={form.province_code}
+            city={form.city_municipality}
+            cityCode={form.city_code}
+            barangay={form.barangay}
+            barangayCode={form.barangay_code}
+            street={form.specific_address}
+            latitude={form.latitude}
+            longitude={form.longitude}
+            onChange={(location) => {
+              setLocation({
+                province: location.province,
+                province_code: location.province_code,
+                city: location.city,
+                city_code: location.city_code,
+                barangay: location.barangay,
+                barangay_code: location.barangay_code,
+              })
+              update('specific_address', location.street)
+              update('latitude', location.latitude)
+              update('longitude', location.longitude)
+              update('location_accuracy', location.location_accuracy)
+              update('google_place_id', location.google_place_id)
+            }}
+          />
+          {(errors.province || errors.city_municipality || errors.barangay) && (
+            <p className="mt-1.5 text-xs font-semibold text-red-600">
+              {errors.province || errors.city_municipality || errors.barangay}
+            </p>
+          )}
+          <div className="mt-3 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800">
+            <strong>Privacy Notice:</strong> This work location will appear to job seekers as the job site and will be used for nearby job matching.
           </div>
-
-          <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4">
-            <div className="mb-2 bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-800">
-              <strong>Privacy Notice:</strong> This work location will appear to job seekers as the job site and will be used for nearby job matching.
-            </div>
-            <MapPinPicker
-              latitude={form.latitude}
-              longitude={form.longitude}
-              addressLine={`${form.specific_address || ''} ${form.barangay || ''} ${form.city_municipality || ''}`.trim()}
-              onChange={handlePinChange}
-            />
-            {(resolvingPin || pinMessage) && (
-              <p className="mt-2 text-xs font-semibold text-blue-800">
-                {resolvingPin && <Loader2 className="mr-1.5 inline h-3.5 w-3.5 animate-spin" />}
-                {pinMessage}
-              </p>
-            )}
-          </div></div>
+        </div>
       </div>
     </StepShell>
   )

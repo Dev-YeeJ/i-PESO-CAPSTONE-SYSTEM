@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import { Html5Qrcode } from 'html5-qrcode'
 import { useNavigate, useParams } from 'react-router-dom'
 import { CheckCircle2, Clock3, Search, XCircle } from 'lucide-react'
@@ -178,36 +179,72 @@ export default function JobFairCheckInPage() {
 
       {lookupError && <AlertBox variant="danger" title="Check-in failed">{lookupError}</AlertBox>}
 
-      {!result && (
-        <Card padding="none">
-          <div id={QR_ELEMENT_ID} className="w-full overflow-hidden rounded-xl" />
-          {cameraError && <div className="p-4"><AlertBox variant="warning" title="Camera unavailable">{cameraError}</AlertBox></div>}
-        </Card>
-      )}
+      <AnimatePresence mode="wait">
+        {!result && (
+          <motion.div
+            key="scanner"
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            transition={{ duration: 0.3 }}
+          >
+            <Card padding="none" className="relative overflow-hidden border-2 border-blue-500/30 shadow-lg shadow-blue-900/5">
+              {!cameraError && (
+                <motion.div
+                  animate={{ opacity: [0.2, 0.6, 0.2], boxShadow: ['inset 0 0 0 2px rgba(96,165,250,0)', 'inset 0 0 0 4px rgba(96,165,250,0.5)', 'inset 0 0 0 2px rgba(96,165,250,0)'] }}
+                  transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+                  className="absolute inset-0 z-10 pointer-events-none rounded-xl"
+                />
+              )}
+              <div id={QR_ELEMENT_ID} className="w-full overflow-hidden rounded-xl bg-slate-950 min-h-[300px]" />
+              {cameraError && <div className="p-4 bg-white"><AlertBox variant="warning" title="Camera unavailable">{cameraError}</AlertBox></div>}
+            </Card>
+          </motion.div>
+        )}
 
-      {result?.kind === 'checked_in' && (
-        <Card className="border-emerald-200">
-          <Badge variant="approved" className="mb-3">Checked in just now</Badge>
-          <AttendeeCard attendee={result.attendee} />
-          <Button className="mt-4 w-full" onClick={scanNext}>Scan next</Button>
-        </Card>
-      )}
+        {result?.kind === 'checked_in' && (
+          <motion.div
+            key="checked_in"
+            initial={{ opacity: 0, y: 20, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            transition={{ type: 'spring', stiffness: 300, damping: 25 }}
+          >
+            <Card className="border-emerald-200 shadow-xl shadow-emerald-900/5">
+              <Badge variant="approved" className="mb-3 border-emerald-300">Checked in just now</Badge>
+              <AttendeeCard attendee={result.attendee} />
+              <Button className="mt-6 w-full shadow-md" onClick={scanNext}>Scan next</Button>
+            </Card>
+          </motion.div>
+        )}
 
-      {result?.kind === 'already_checked_in' && (
-        <Card className="border-amber-200">
-          <Badge variant="pending" className="mb-3">
-            Already checked in {result.attendee?.scanned_at ? `at ${formatTime(result.attendee.scanned_at)}` : ''}
-          </Badge>
-          <AttendeeCard attendee={result.attendee} />
-          <Button className="mt-4 w-full" onClick={scanNext}>Scan next</Button>
-        </Card>
-      )}
+        {result?.kind === 'already_checked_in' && (
+          <motion.div
+            key="already_checked_in"
+            initial={{ opacity: 0, y: 20, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            transition={{ type: 'spring', stiffness: 300, damping: 25 }}
+          >
+            <Card className="border-amber-200 shadow-xl shadow-amber-900/5">
+              <Badge variant="pending" className="mb-3 border-amber-300">
+                Already checked in {result.attendee?.scanned_at ? `at ${formatTime(result.attendee.scanned_at)}` : ''}
+              </Badge>
+              <AttendeeCard attendee={result.attendee} />
+              <Button className="mt-6 w-full shadow-md" onClick={scanNext}>Scan next</Button>
+            </Card>
+          </motion.div>
+        )}
 
-      {result?.kind === 'not_found' && (
-        <div className="space-y-4">
-          <Card className="border-red-200">
-            <Badge variant="rejected" className="mb-3">Not registered for this job fair</Badge>
-            <p className="text-sm text-slate-600">Search by name or mobile number instead — the seeker may have RSVP'd under a different phone, or a QR read may have failed.</p>
+        {result?.kind === 'not_found' && (
+          <motion.div
+            key="not_found"
+            initial={{ opacity: 0, y: 20, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            transition={{ type: 'spring', stiffness: 300, damping: 25 }}
+            className="space-y-4"
+          >
+            <Card className="border-red-200 shadow-xl shadow-red-900/5">
+              <Badge variant="rejected" className="mb-3 border-red-300">Not registered for this job fair</Badge>
+              <p className="text-sm text-slate-600">Search by name or mobile number instead — the seeker may have RSVP'd under a different phone, or a QR read may have failed.</p>
             <div className="relative mt-3">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
               <input
@@ -275,13 +312,14 @@ export default function JobFairCheckInPage() {
                 placeholder="Preferred job"
                 className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm focus:border-brand-navy focus:outline-none focus:ring-2 focus:ring-brand-navy/10"
               />
-              <Button type="submit" disabled={encoding || !walkIn.guest_name.trim()} className="w-full">
+              <Button type="submit" disabled={encoding || !walkIn.guest_name.trim()} className="w-full shadow-md mt-4">
                 {encoding ? 'Registering…' : 'Register & check in'}
               </Button>
             </form>
           </Card>
-        </div>
-      )}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }

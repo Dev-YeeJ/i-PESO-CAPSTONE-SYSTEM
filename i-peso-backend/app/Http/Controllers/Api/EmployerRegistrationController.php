@@ -438,6 +438,7 @@ class EmployerRegistrationController extends Controller
                     'representative_first_name' => $employer->representative_first_name,
                     'representative_middle_name' => $employer->representative_middle_name,
                     'representative_last_name' => $employer->representative_last_name,
+                    'representative_name' => $employer->representative_name,
                     'representative_designation' => $employer->representative_designation,
                     'representative_contact_number' => $employer->representative_contact_number,
                     'representative_is_owner' => $employer->representative_is_owner,

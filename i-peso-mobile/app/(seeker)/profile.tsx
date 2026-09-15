@@ -213,7 +213,7 @@ export default function ProfileScreen() {
     if (result?.summary) {
       setSummary(result.summary)
     } else {
-      setAiSummaryNotice('AI summary generation is unavailable right now. You can still write your own summary.')
+      setAiSummaryNotice('Smart summary generation is unavailable right now. You can still write your own summary.')
     }
     setAiSummaryBusy(false)
   }
@@ -475,14 +475,14 @@ export default function ProfileScreen() {
                     <View style={styles.dutiesPanelHeader}>
                       <View style={styles.dutiesPanelHeaderText}>
                         <Text style={styles.dutiesPanelTitle}>Resume bullet points</Text>
-                        <Text style={styles.dutiesPanelHint}>Type simple duties, then let AI polish them into stronger resume language.</Text>
+                        <Text style={styles.dutiesPanelHint}>Type simple duties, then let Smart Assistant polish them into stronger resume language.</Text>
                       </View>
                       <TouchableOpacity
                         onPress={() => setExperienceDrafts((current) => ({ ...current, [key]: enhanceResponsibilities(current[key], position) }))}
                         style={styles.aiEnhanceBtn}
                       >
                         <MaterialIcons name="auto-awesome" size={14} color={colors.info} />
-                        <Text style={styles.aiEnhanceBtnText}>AI Enhance Bullets</Text>
+                        <Text style={styles.aiEnhanceBtnText}>Smart Enhance Bullets</Text>
                       </TouchableOpacity>
                     </View>
                     <TextInput
@@ -606,7 +606,7 @@ export default function ProfileScreen() {
               maxLength={1200}
             />
             <Button variant="outline" onPress={generateSummaryWithAI} disabled={aiSummaryBusy} style={styles.aiSummaryBtn}>
-              {aiSummaryBusy ? 'Generating with AI...' : 'Generate with AI'}
+              {aiSummaryBusy ? 'Generating with Smart Assistant...' : 'Generate with Smart Assistant'}
             </Button>
             {aiSummaryNotice ? <Text style={styles.aiSummaryNotice}>{aiSummaryNotice}</Text> : null}
             {actionError ? (

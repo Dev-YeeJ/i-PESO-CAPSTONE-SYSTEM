@@ -94,7 +94,7 @@ class JobFairController extends Controller
         $this->admin($request);
         $fair = JobFair::with([
             'employerJoins.employer', 'employerJoins.requirementSubmissions.requirement',
-            'employerJoins.confirmationSlip', 'employerJoins.resultReport',
+            'employerJoins.confirmationSlip.vacancies', 'employerJoins.resultReport',
             'resultReports.mismatchTallies', 'resultReports.entries',
             'resultReports.employer:employer_id,company_name,representative_name,email',
             'resultReports.encodedByAdmin:admin_id,first_name,last_name,email',

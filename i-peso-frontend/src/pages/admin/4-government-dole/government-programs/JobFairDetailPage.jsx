@@ -1,17 +1,20 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import { CheckCircle2, ClipboardEdit, Download, Eye, FileText, Flame, Mail, RefreshCw, Save, Search, ShieldCheck, TrendingUp, UserCheck, Users, XCircle } from 'lucide-react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { AlertBox, Badge, Button, Card, CardHeader, LoadingSkeleton, StatCard } from '@/components/ui'
+import { Badge, Button, Card, CardHeader, LoadingSkeleton, StatCard } from '@/components/ui'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
+import { toast } from 'sonner'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import PageHeader from '@/pages/admin/_components/PageHeader'
 import LocationPreviewCard from '@/components/maps/LocationPreviewCard'
 import EstablishmentReportPreview from '@/components/reports/EstablishmentReportPreview'
-import JobFairResultEntryEditor from '@/components/reports/JobFairResultEntryEditor'
-import ConfirmationVacancyEditor, { blankConfirmationVacancy, stripBlankConfirmationVacancies } from '@/components/reports/ConfirmationVacancyEditor'
+import ConfirmationSlipPreview from '@/components/reports/ConfirmationSlipPreview'
 import { adminService } from '@/services/adminService'
-
+import { Command } from 'cmdk'
+import JobFairEmployersTable from './components/JobFairEmployersTable'
+import JobFairReportsChart from './components/JobFairReportsChart'
 // Every possible participation_status value, grouped only to color the
 // read-only status Badge — most of these are computed automatically
 // (invited/interested/accepted/declined/requirements_pending/
@@ -25,20 +28,7 @@ const statusGroups = [
 ]
 const statusTones = Object.fromEntries(statusGroups.flatMap((g) => g.statuses.map((s) => [s, g.tone])))
 
-// The only participation_status values with no automatic trigger anywhere
-// in the system — a phone call, a decisive rejection, or physical
-// attendance genuinely need an admin to say so. Phrased as actions rather
-// than raw status nouns, and never pre-selected to the current status
-// (which usually isn't one of these), since this is "record an event",
-// not "edit a field".
-const MANUAL_STATUS_ACTIONS = [
-  ['called_peso', 'Log phone call'],
-  ['pending_response', 'Mark pending response'],
-  ['under_review', 'Move to under review'],
-  ['rejected', 'Reject participation'],
-  ['attended', 'Mark attended'],
-  ['no_show', 'Mark no-show'],
-]
+
 
 // Matches StatCard's own color token names, resized for a compact inline swatch.
 const statTone = {
@@ -48,8 +38,6 @@ const statTone = {
   red: 'bg-red-50 text-red-600',
 }
 
-const zeroProxy = { company_name: '', employer_type: 'paper_only_employer', contact_person: '', contact_number: '', clearance_no: '', total_male: 0, total_female: 0, total_applicants: 0, total_qualified: 0, total_hots: 0, total_near_hired: 0, total_rejected: 0, total_vacancies_solicited: 0, total_vacancies_offered: 0, remarks: '' }
-const zeroProxyConfirmation = { company_name: '', representative_1_name: '', representative_1_contact: '', representative_position: '' }
 const inputClass = 'mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-brand-navy focus:outline-none focus:ring-2 focus:ring-brand-navy/10'
 
 function StepLabel({ step, children }) {
@@ -79,14 +67,9 @@ export default function JobFairDetailPage() {
   const navigate = useNavigate()
   const [fair, setFair] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
-  const [notice, setNotice] = useState('')
-  const [proxy, setProxy] = useState(zeroProxy)
-  const [proxyEntries, setProxyEntries] = useState([])
-  const [proxyConfirmation, setProxyConfirmation] = useState(zeroProxyConfirmation)
-  const [proxyConfirmationVacancies, setProxyConfirmationVacancies] = useState([blankConfirmationVacancy()])
   const [viewingReport, setViewingReport] = useState(null)
   const [reviewingParticipantId, setReviewingParticipantId] = useState(null)
+  const [viewingConfirmationSlip, setViewingConfirmationSlip] = useState(null)
 
   // Search-as-you-type employer picker for "Invite" — replaces a bare
   // numeric employer-ID text box with something an admin can actually use
@@ -163,13 +146,12 @@ export default function JobFairDetailPage() {
   const reviewingParticipant = fair?.participants?.find((p) => p.id === reviewingParticipantId) ?? null
 
   const action = async (work, success) => {
-    setError(''); setNotice('')
     try {
       await work()
-      setNotice(success)
+      toast.success(success)
       await load()
     } catch (e) {
-      setError(Object.values(e.response?.data?.errors ?? {}).flat().join(' ') || e.response?.data?.message || 'Action failed.')
+      toast.error(Object.values(e.response?.data?.errors ?? {}).flat().join(' ') || e.response?.data?.message || 'Action failed.')
     }
   }
 
@@ -181,7 +163,17 @@ export default function JobFairDetailPage() {
       link.href = url; link.download = filename; link.click()
       URL.revokeObjectURL(url)
     } catch (e) {
-      setError(e.response?.data?.message ?? 'Download failed.')
+      toast.error(e.response?.data?.message ?? 'Download failed.')
+    }
+  }
+
+  const blobPreview = async (work) => {
+    try {
+      const blob = await work()
+      const url = URL.createObjectURL(blob)
+      window.open(url, '_blank')
+    } catch (e) {
+      toast.error(e.response?.data?.message ?? 'Preview failed.')
     }
   }
 
@@ -203,14 +195,10 @@ export default function JobFairDetailPage() {
   }
 
   const statCards = [
-    { label: 'Approved', value: metrics.approved, icon: CheckCircle2, color: 'green' },
-    { label: 'Attended', value: metrics.attended, icon: UserCheck, color: 'blue' },
-    { label: 'Self-service reports', value: metrics.self_service_reports, icon: FileText, color: 'blue' },
-    { label: 'Admin proxy reports', value: metrics.proxy_reports, icon: ClipboardEdit, color: 'amber' },
-    { label: 'Applicants', value: metrics.total_applicants, icon: Users, color: 'blue' },
-    { label: 'Hired on the spot', value: metrics.total_hots, icon: Flame, color: 'amber' },
-    { label: 'Near hired', value: metrics.total_near_hired, icon: TrendingUp, color: 'blue' },
-    { label: 'Rejected', value: metrics.total_rejected, icon: XCircle, color: 'red' },
+    { label: 'Approved Employers', value: metrics.approved, icon: CheckCircle2, color: 'green' },
+    { label: 'Total Applicants', value: metrics.total_applicants, icon: Users, color: 'blue' },
+    { label: 'Hired on the Spot', value: metrics.total_hots, icon: Flame, color: 'amber' },
+    { label: 'Near Hired', value: metrics.total_near_hired, icon: TrendingUp, color: 'blue' },
   ]
 
   return (
@@ -226,41 +214,27 @@ export default function JobFairDetailPage() {
         ]}
       />
 
-      {error && <AlertBox variant="danger" title="Action failed">{error}</AlertBox>}
-      {notice && <AlertBox variant="success" title="Saved">{notice}</AlertBox>}
-
-      {/* Always-visible KPI strip — sticks below the app header while scrolling
-          any tab, so the admin never has to hop back to Overview to see it. */}
-      <div className="sticky top-0 z-10 -mx-4 border-b border-slate-200 bg-white/95 px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
-        <div className="flex flex-wrap gap-x-6 gap-y-2.5">
-          {statCards.map((card) => (
-            <div key={card.label} className="flex items-center gap-2">
-              <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${statTone[card.color] ?? statTone.blue}`}>
-                <card.icon className="h-3.5 w-3.5" />
-              </span>
-              <div>
-                <p className="text-sm font-black leading-none text-slate-900">{card.value ?? 0}</p>
-                <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">{card.label}</p>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
       <Tabs defaultValue="overview">
         <TabsList>
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="employers">Employers{fair?.participants?.length ? ` (${fair.participants.length})` : ''}</TabsTrigger>
-          <TabsTrigger value="paper">Paper encoding</TabsTrigger>
           <TabsTrigger value="reports">Reports{reports.length ? ` (${reports.length})` : ''}</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="overview" className="space-y-6">
-          <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm leading-6 text-blue-900">
-            <strong>Physical event status quo:</strong> i-PESO does not force digital crowd control at the venue — employers use their normal tables and paper resumes; the system focuses on coordination before the event and report automation afterward.
-          </div>
+        <TabsContent value="overview">
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }} className="space-y-6">
+            
+            <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-4">
+              {statCards.map((card) => (
+                <StatCard key={card.label} label={card.label} value={card.value} icon={card.icon} tone={card.color} />
+              ))}
+            </div>
 
-          <div className="grid gap-6 xl:grid-cols-2">
+            <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm leading-6 text-blue-900 shadow-sm">
+              <strong>Physical event status quo:</strong> i-PESO does not force digital crowd control at the venue — employers use their normal tables and paper resumes; the system focuses on coordination before the event and report automation afterward.
+            </div>
+
+            <div className="grid gap-6 xl:grid-cols-2">
             <Card>
               <CardHeader title="Announcement & invitation" subtitle={`${fair?.status?.replaceAll('_', ' ') ?? ''} · ${fair?.venue ?? ''}`} />
               <div className="flex flex-wrap gap-2">
@@ -273,41 +247,46 @@ export default function JobFairDetailPage() {
               </div>
 
               <div ref={employerPickerRef} className="relative mt-5">
-                <label className="text-xs font-bold uppercase tracking-wide text-slate-500">Invite a verified employer</label>
-                <div className="relative mt-1.5">
-                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                  <input
+                <label className="text-xs font-bold uppercase tracking-wide text-slate-500 mb-1.5 block">Invite a verified employer</label>
+                <Command className="rounded-xl border border-slate-300 shadow-sm overflow-visible bg-white" shouldFilter={false}>
+                  <Command.Input
                     value={employerQuery}
-                    onChange={(e) => { setEmployerQuery(e.target.value); setEmployerPickerOpen(true) }}
+                    onValueChange={(val) => { setEmployerQuery(val); setEmployerPickerOpen(true) }}
                     onFocus={() => setEmployerPickerOpen(true)}
                     placeholder="Search company name…"
-                    className="w-full rounded-lg border border-slate-300 py-2 pl-9 pr-3 text-sm focus:border-brand-navy focus:outline-none focus:ring-2 focus:ring-brand-navy/10"
+                    className="w-full border-none bg-transparent px-4 py-2.5 text-sm focus:outline-none focus:ring-0"
                   />
-                </div>
-                {employerPickerOpen && employerQuery.trim() && (
-                  <div className="absolute z-10 mt-1.5 w-full overflow-hidden rounded-xl border border-slate-200 bg-white shadow-elevated">
-                    {employerSearching ? (
-                      <p className="px-3 py-2.5 text-xs text-slate-400">Searching…</p>
-                    ) : employerResults.length === 0 ? (
-                      <p className="px-3 py-2.5 text-xs text-slate-400">No verified employer matches.</p>
-                    ) : (
-                      <ul className="max-h-64 divide-y divide-slate-100 overflow-y-auto">
-                        {employerResults.map((employer) => (
-                          <li key={employer.employer_id}>
-                            <button
-                              type="button"
-                              onClick={() => inviteEmployer(employer)}
-                              className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm hover:bg-slate-50"
-                            >
-                              <Mail className="h-3.5 w-3.5 shrink-0 text-slate-400" />
-                              <span className="truncate font-semibold text-slate-800">{employer.company_name}</span>
-                            </button>
-                          </li>
-                        ))}
-                      </ul>
+                  <AnimatePresence>
+                    {employerPickerOpen && employerQuery.trim() && (
+                      <motion.div 
+                        initial={{ opacity: 0, y: -5 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -5 }}
+                        transition={{ duration: 0.15 }}
+                        className="absolute z-10 w-full top-full mt-1 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl"
+                      >
+                        <Command.List className="max-h-64 overflow-y-auto p-1">
+                          {employerSearching ? (
+                            <Command.Loading className="px-4 py-3 text-xs font-semibold text-slate-500">Searching…</Command.Loading>
+                          ) : employerResults.length === 0 ? (
+                            <Command.Empty className="px-4 py-3 text-xs font-semibold text-slate-500">No verified employer matches.</Command.Empty>
+                          ) : (
+                            employerResults.map((employer) => (
+                              <Command.Item
+                                key={employer.employer_id}
+                                onSelect={() => inviteEmployer(employer)}
+                                className="flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition data-[selected=true]:bg-blue-50 data-[selected=true]:text-blue-700"
+                              >
+                                <Mail className="h-4 w-4 shrink-0 text-slate-400" />
+                                <span className="truncate font-bold text-slate-900">{employer.company_name}</span>
+                              </Command.Item>
+                            ))
+                          )}
+                        </Command.List>
+                      </motion.div>
                     )}
-                  </div>
-                )}
+                  </AnimatePresence>
+                </Command>
               </div>
 
               {fair?.latitude && fair?.longitude && (
@@ -317,151 +296,31 @@ export default function JobFairDetailPage() {
               )}
             </Card>
           </div>
+          </motion.div>
         </TabsContent>
 
         <TabsContent value="employers">
-          <div className="mb-4 flex items-center justify-between">
-            <p className="text-sm text-slate-500">Digital and manual confirmation channels are equally supported.</p>
-            <Button variant="outline" icon={RefreshCw} onClick={load}>Refresh</Button>
-          </div>
-
-          {!(fair?.participants ?? []).length ? (
-            <Card><p className="p-8 text-center text-sm text-slate-500">No employer participation records yet.</p></Card>
-          ) : (
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              {fair.participants.map((p) => {
-                const totalReqs = (fair.requirements ?? []).length
-                const approvedReqs = (p.requirements ?? []).filter((r) => r.status === 'approved').length
-                return (
-                  <div key={p.id} className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-slate-300 hover:shadow-md">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="truncate font-black text-slate-950">{p.company_name}</p>
-                        <p className="mt-0.5 truncate text-xs font-semibold text-slate-500">{p.source?.replaceAll('_', ' ')} · {p.confirmation_channel || 'channel not set'}</p>
-                      </div>
-                      <Badge variant={statusTones[p.status] ?? 'neutral'} icon={false} className="shrink-0">{p.status.replaceAll('_', ' ')}</Badge>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => setReviewingParticipantId(p.id)}
-                      className="flex items-center gap-1.5 self-start text-xs font-bold text-brand-navy hover:underline"
-                    >
-                      <FileText className="h-3.5 w-3.5" />
-                      {totalReqs ? `${approvedReqs}/${totalReqs} requirements approved` : 'View requirements'}
-                    </button>
-
-                    {/* Status above is computed automatically wherever possible (see
-                        syncRequirementStatus). This is only for the handful of
-                        events nothing else can detect — it always resets to the
-                        placeholder rather than mirroring the current status. */}
-                    <Select value="" onValueChange={(value) => action(() => adminService.updateJobFairParticipation(id, p.id, { status: value }), 'Participation updated.')}>
-                      <SelectTrigger className="mt-auto"><SelectValue placeholder="Record a manual event…" /></SelectTrigger>
-                      <SelectContent>
-                        {MANUAL_STATUS_ACTIONS.map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )
-              })}
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
+            <div className="mb-5 flex items-center justify-between">
+              <p className="text-sm font-medium text-slate-500">Employers electronically confirm their attendance and report results.</p>
+              <Button variant="outline" icon={RefreshCw} onClick={load} className="shadow-sm">Refresh</Button>
             </div>
-          )}
+
+            <JobFairEmployersTable 
+              participants={(fair?.participants ?? []).map(p => ({
+                ...p, 
+                total_requirements: (fair?.requirements ?? []).length
+              }))}
+              onReviewRequirements={setReviewingParticipantId}
+              statusTones={statusTones}
+            />
+          </motion.div>
         </TabsContent>
 
-        <TabsContent value="paper" className="space-y-6">
-          <Card>
-            <CardHeader title={<StepLabel step={1}>Encode walk-in employer paper form</StepLabel>} subtitle="Admin Proxy Encoding does not create an employer account." />
 
-            <div className="space-y-5">
-              <div className="rounded-xl border border-slate-200 p-4">
-                <p className="mb-3 text-xs font-extrabold uppercase tracking-wide text-slate-600">Employer Details</p>
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <Field label="Company name" value={proxy.company_name} onChange={(v) => setProxy((x) => ({ ...x, company_name: v }))} />
-                  <label className="text-xs font-bold uppercase tracking-wide text-slate-500">
-                    Employer type
-                    <select value={proxy.employer_type} onChange={(e) => setProxy((x) => ({ ...x, employer_type: e.target.value }))} className={inputClass}>
-                      <option value="paper_only_employer">Paper-only</option>
-                      <option value="walk_in_employer">Walk-in</option>
-                      <option value="out_of_town_employer">Out-of-town</option>
-                      <option value="registered_employer">Registered</option>
-                    </select>
-                  </label>
-                  <Field label="Contact person" value={proxy.contact_person} onChange={(v) => setProxy((x) => ({ ...x, contact_person: v }))} />
-                  <Field label="Contact number" value={proxy.contact_number} onChange={(v) => setProxy((x) => ({ ...x, contact_number: v }))} />
-                  <Field label="Job Fair Clearance No." value={proxy.clearance_no} onChange={(v) => setProxy((x) => ({ ...x, clearance_no: v }))} />
-                </div>
-              </div>
 
-              <div className="rounded-xl border border-slate-200 p-4">
-                <p className="mb-3 text-xs font-extrabold uppercase tracking-wide text-slate-600">Aggregate Totals</p>
-                <div className="grid gap-4 sm:grid-cols-3">
-                  <Field label="Male applicants" type="number" value={proxy.total_male} onChange={(v) => setProxy((x) => ({ ...x, total_male: v }))} />
-                  <Field label="Female applicants" type="number" value={proxy.total_female} onChange={(v) => setProxy((x) => ({ ...x, total_female: v }))} />
-                  <Field label="Total applicants" type="number" value={proxy.total_applicants} onChange={(v) => setProxy((x) => ({ ...x, total_applicants: v }))} />
-                  <Field label="Qualified" type="number" value={proxy.total_qualified} onChange={(v) => setProxy((x) => ({ ...x, total_qualified: v }))} />
-                  <Field label="Hired on the spot" type="number" value={proxy.total_hots} onChange={(v) => setProxy((x) => ({ ...x, total_hots: v }))} />
-                  <Field label="Near-hired" type="number" value={proxy.total_near_hired} onChange={(v) => setProxy((x) => ({ ...x, total_near_hired: v }))} />
-                  <Field label="Mismatched (rejected)" type="number" value={proxy.total_rejected} onChange={(v) => setProxy((x) => ({ ...x, total_rejected: v }))} />
-                  <Field label="Vacancies solicited" type="number" value={proxy.total_vacancies_solicited} onChange={(v) => setProxy((x) => ({ ...x, total_vacancies_solicited: v }))} />
-                  <Field label="Vacancies offered" type="number" value={proxy.total_vacancies_offered} onChange={(v) => setProxy((x) => ({ ...x, total_vacancies_offered: v }))} />
-                </div>
-                <Field label="Remarks" textarea value={proxy.remarks} onChange={(v) => setProxy((x) => ({ ...x, remarks: v }))} className="mt-4 block" />
-              </div>
-
-              <div>
-                <p className="mb-3 text-xs font-extrabold uppercase tracking-wide text-slate-600">
-                  Per-applicant register <span className="font-normal normal-case text-slate-400">(optional — leave empty to save aggregate totals only)</span>
-                </p>
-                <JobFairResultEntryEditor entries={proxyEntries} onChange={setProxyEntries} searchApplicants={adminService.searchApplicantSuggestions} />
-              </div>
-            </div>
-
-            <Button
-              className="mt-5"
-              icon={Save}
-              onClick={() => action(() => adminService.submitJobFairProxyResults(id, {
-                ...proxy,
-                entries: proxyEntries.filter((e) => e.applicant_name && e.position_applied_for)
-                  .map((e) => ({ ...e, mismatch_code: e.mismatch_code || null })),
-              }), 'Admin Proxy Encoded report saved.')}
-            >
-              Save Proxy Report
-            </Button>
-          </Card>
-
-          <Card>
-            <CardHeader title={<StepLabel step={2}>Encode manual confirmation slip</StepLabel>} subtitle="For confirmations received by phone, email, or paper." />
-
-            <div className="space-y-5">
-              <div className="rounded-xl border border-slate-200 p-4">
-                <p className="mb-3 text-xs font-extrabold uppercase tracking-wide text-slate-600">Company & Representative</p>
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <Field label="Company name" value={proxyConfirmation.company_name} onChange={(v) => setProxyConfirmation((x) => ({ ...x, company_name: v }))} />
-                  <Field label="Representative name" value={proxyConfirmation.representative_1_name} onChange={(v) => setProxyConfirmation((x) => ({ ...x, representative_1_name: v }))} />
-                  <Field label="Position/s" value={proxyConfirmation.representative_position} onChange={(v) => setProxyConfirmation((x) => ({ ...x, representative_position: v }))} />
-                  <Field label="Representative contact" value={proxyConfirmation.representative_1_contact} onChange={(v) => setProxyConfirmation((x) => ({ ...x, representative_1_contact: v }))} />
-                </div>
-              </div>
-
-              <div>
-                <p className="mb-2 text-xs font-extrabold uppercase tracking-wide text-slate-600">List of Vacancies / Orders</p>
-                <ConfirmationVacancyEditor vacancies={proxyConfirmationVacancies} onChange={setProxyConfirmationVacancies} />
-              </div>
-            </div>
-
-            <Button
-              className="mt-5"
-              icon={Save}
-              onClick={() => action(() => adminService.submitJobFairProxyConfirmation(id, {
-                ...proxyConfirmation, vacancies: stripBlankConfirmationVacancies(proxyConfirmationVacancies),
-              }), 'Manual confirmation slip saved.')}
-            >
-              Save Confirmation
-            </Button>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="reports" className="space-y-6">
+        <TabsContent value="reports">
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }} className="space-y-6">
           {reports.length > 0 && (
             <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
               <StatCard label="Establishments reported" value={reports.length} icon={FileText} color="blue" />
@@ -471,9 +330,11 @@ export default function JobFairDetailPage() {
             </section>
           )}
 
+          <JobFairReportsChart metrics={metrics} reports={reports} />
+
           <Card padding="none">
             <div className="border-b border-slate-100 p-5">
-              <CardHeader title="Merged post-event reports" subtitle="Self-service and Admin Proxy Encoded records share one deduplicated reporting source." />
+              <CardHeader title="Merged post-event reports" subtitle="Self-service encoded records." />
             </div>
             <div className="divide-y divide-slate-100">
               {reports.length === 0 ? (
@@ -496,6 +357,7 @@ export default function JobFairDetailPage() {
               ))}
             </div>
           </Card>
+          </motion.div>
         </TabsContent>
       </Tabs>
 
@@ -548,8 +410,13 @@ export default function JobFairDetailPage() {
                         </p>
                       )}
                       {hasViewableFile && (
-                        <button type="button" onClick={() => blobDownload(() => adminService.viewJobFairRequirement(submitted.id), submitted.original_filename || `requirement-${submitted.id}`)} className="mt-2 flex items-center gap-1.5 text-xs font-semibold text-blue-700 hover:underline">
+                        <button type="button" onClick={() => blobPreview(() => adminService.viewJobFairRequirement(submitted.id))} className="mt-2 flex items-center gap-1.5 text-xs font-semibold text-blue-700 hover:underline">
                           <FileText className="h-3.5 w-3.5" />View {submitted.original_filename}
+                        </button>
+                      )}
+                      {submitted?.original_filename === 'Digital confirmation slip' && reviewingParticipant.confirmation_slip && (
+                        <button type="button" onClick={() => setViewingConfirmationSlip(reviewingParticipant.confirmation_slip)} className="mt-2 flex items-center gap-1.5 text-xs font-semibold text-brand-navy hover:underline">
+                          <FileText className="h-3.5 w-3.5" />View Confirmation Slip
                         </button>
                       )}
                       {submitted?.admin_remarks && <p className="mt-2 text-xs font-semibold text-rose-700">PESO note: {submitted.admin_remarks}</p>}
@@ -571,6 +438,14 @@ export default function JobFairDetailPage() {
               </div>
             </>
           )}
+        </DialogContent>
+      </Dialog>
+      <Dialog open={Boolean(viewingConfirmationSlip)} onOpenChange={(open) => !open && setViewingConfirmationSlip(null)}>
+        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Confirmation Slip — {viewingConfirmationSlip?.company_name}</DialogTitle>
+          </DialogHeader>
+          <ConfirmationSlipPreview slip={viewingConfirmationSlip} />
         </DialogContent>
       </Dialog>
     </div>

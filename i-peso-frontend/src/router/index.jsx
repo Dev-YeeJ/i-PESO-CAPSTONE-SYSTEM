@@ -48,6 +48,7 @@ const SeekerProfileEdit = lazy(() => import('@/pages/seeker/SeekerProfileEdit'))
 const SeekerEmployerProfile = lazy(() => import('@/pages/seeker/EmployerProfile'))
 const SeekerJobMap      = lazy(() => import('@/pages/seeker/JobMapPage'))
 const SeekerJobFairs    = lazy(() => import('@/pages/seeker/JobFairFeed'))
+const SeekerJobFairEmployerPage = lazy(() => import('@/pages/seeker/SeekerJobFairEmployerPage'))
 const SeekerGovernmentPrograms = lazy(() => import('@/pages/seeker/GovernmentProgramsPage'))
 const SeekerProgramDetails = lazy(() => import('@/pages/seeker/ProgramDetailsPage'))
 const SeekerApplications = lazy(() => import('@/pages/seeker/MyApplications'))
@@ -246,7 +247,9 @@ export const router = createBrowserRouter([
                           { index: true, element: <Navigate to="dashboard" replace /> },
                           { path: 'dashboard', element: S(SeekerDashboard) },
                           { path: 'job-map', element: S(SeekerJobMap) },
+                          { path: 'job-map/:jobId', element: S(SeekerJobMap) },
                           { path: 'job-fairs', element: S(SeekerJobFairs) },
+                          { path: 'job-fairs/:fairId/employers/:employerId', element: S(SeekerJobFairEmployerPage) },
                           { path: 'government-programs', element: S(SeekerGovernmentPrograms) },
                           { path: 'government-programs/:id', element: S(SeekerProgramDetails) },
                           { path: 'applications', element: S(SeekerApplications) },

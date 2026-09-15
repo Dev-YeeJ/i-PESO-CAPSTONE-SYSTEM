@@ -123,6 +123,7 @@ export default function SeekerHomeScreen() {
     queryKey: ['notificationsUnreadCount'],
     queryFn: () => seekerService.getUnreadNotificationCount(),
     refetchInterval: 30000,
+    refetchOnWindowFocus: false,
   })
 
   const { data: jobFairs = [] } = useQuery({
