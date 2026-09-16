@@ -12,6 +12,7 @@ use App\Models\JobFairConfirmationSlip;
 use App\Models\JobFairRequirementSubmission;
 use App\Models\JobFairResultReport;
 use App\Models\JobSeeker;
+use App\Models\SeekerEducation;
 use App\Notifications\JobFairNotification;
 use App\Notifications\JobFairPublished;
 use App\Services\GoogleMapsService;
@@ -100,6 +101,22 @@ class JobFairController extends Controller
             'resultReports.encodedByAdmin:admin_id,first_name,last_name,email',
         ])->findOrFail($id);
         $payload = $service->eventPayload($fair, null, true);
+
+        // This list is the admin's own source of truth for each employer's
+        // participation_status, built straight off $fair->employerJoins —
+        // it bypasses eventPayload()'s single-participation self-heal
+        // entirely (that only runs for the one employer matching $user, and
+        // $user is null here), so without this it can show an employer
+        // stuck at "requirements_pending" indefinitely even after every one
+        // of their requirements has actually been approved.
+        $fair->employerJoins->each(function (JobFairEmployer $item) use ($fair, $service) {
+            if ($item->participation_status === 'declined') {
+                return;
+            }
+            $item->setRelation('jobFair', $fair);
+            $service->reuseVerifiedDocuments($fair, $item);
+            $service->syncRequirementStatus($item);
+        });
         $payload['participants'] = $fair->employerJoins->map(fn ($item) => $service->participationPayload($item))->values();
         $payload['result_reports'] = $fair->resultReports;
         $payload['proxy_confirmation_slips'] = $fair->confirmationSlips()->where('source', 'admin_proxy')->get();
@@ -522,13 +539,9 @@ class JobFairController extends Controller
     public function downloadAttendancePdf(Request $request, JobFair $jobFair)
     {
         $this->admin($request);
-        $attendees = JobFairAttendee::with(['seeker.educations'])
-            ->where('job_fair_id', $jobFair->job_fair_id)
-            ->where('is_attended', true)
-            ->orderBy('scanned_at', 'asc')
-            ->get();
+        $rows = $this->attendanceRows($jobFair);
 
-        return Pdf::loadView('pdf.job_fairs.attendance', ['fair' => $jobFair, 'attendees' => $attendees])
+        return Pdf::loadView('pdf.job_fairs.attendance', ['fair' => $jobFair, 'rows' => $rows])
             ->setPaper('a4', 'landscape')
             ->download('job-fair-attendance-'.$jobFair->job_fair_id.'.pdf');
     }
@@ -536,28 +549,21 @@ class JobFairController extends Controller
     public function downloadAttendanceExcel(Request $request, JobFair $jobFair)
     {
         $this->admin($request);
-        $attendees = JobFairAttendee::with(['seeker.educations'])
-            ->where('job_fair_id', $jobFair->job_fair_id)
-            ->where('is_attended', true)
-            ->orderBy('scanned_at', 'asc')
-            ->get();
+        $rows = $this->attendanceRows($jobFair);
 
         $csv = fopen('php://temp', 'r+');
-        fputcsv($csv, ['Time In', 'Name', 'Gender', 'Contact Number', 'Education', 'Registration Type']);
-        
-        foreach ($attendees as $att) {
-            $educ = $att->guest_educ_attainment ?? '-';
-            if ($att->seeker) {
-                $educ = $att->seeker->educations->first()?->education_level ?? '-';
-            }
-            
+        fputcsv($csv, [
+            'Time In', 'Name', 'Gender', 'Contact Number', 'Email', 'Job Preference',
+            'Preferred Work Location', 'Language', 'Education Attainment',
+            'School/College/University', 'Year Graduated/Last Attended', 'Course', 'Registration Type',
+        ]);
+
+        foreach ($rows as $row) {
             fputcsv($csv, [
-                $att->scanned_at ? $att->scanned_at->setTimezone('Asia/Manila')->format('M d, Y h:i A') : '-',
-                $att->seeker ? trim($att->seeker->first_name . ' ' . $att->seeker->last_name) : $att->guest_name,
-                $att->seeker ? ucfirst($att->seeker->sex ?? 'Unknown') : 'Unknown',
-                $att->seeker ? $att->seeker->mobile_number : $att->guest_mobile_number,
-                $educ,
-                $att->seeker ? 'App/Web' : 'Walk-in',
+                $row['time_in'], $row['name'], $row['gender'], $row['contact_number'], $row['email'],
+                $row['job_preference'], $row['preferred_work_location'], $row['language'],
+                $row['education_attainment'], $row['school'], $row['year_graduated'], $row['course'],
+                $row['type'],
             ]);
         }
         rewind($csv);
@@ -567,6 +573,98 @@ class JobFairController extends Controller
         return response($content)
             ->header('Content-Type', 'text/csv')
             ->header('Content-Disposition', 'attachment; filename="job-fair-attendance-'.$jobFair->job_fair_id.'.csv"');
+    }
+
+    /**
+     * Shared row-builder for the attendance PDF and CSV — keeps the
+     * seeker-vs-guest fallback logic (and the "best" education record pick)
+     * in one place instead of duplicated per export format.
+     *
+     * @return array<int, array<string, string>>
+     */
+    private function attendanceRows(JobFair $jobFair): array
+    {
+        $attendees = JobFairAttendee::with(['seeker.educations', 'seeker.occupations', 'seeker.languages'])
+            ->where('job_fair_id', $jobFair->job_fair_id)
+            ->where('is_attended', true)
+            ->orderBy('scanned_at', 'asc')
+            ->get();
+
+        return $attendees->map(function (JobFairAttendee $att) {
+            $seeker = $att->seeker;
+            $education = $seeker ? $this->bestEducation($seeker) : null;
+
+            return [
+                'time_in' => $att->scanned_at ? $att->scanned_at->setTimezone('Asia/Manila')->format('h:i A') : '-',
+                'name' => $seeker ? trim($seeker->first_name.' '.$seeker->last_name) : $att->guest_name,
+                'gender' => $seeker ? ucfirst($seeker->sex ?? 'Unknown') : 'Unknown',
+                'contact_number' => $seeker ? $seeker->mobile_number : $att->guest_mobile_number,
+                'email' => $seeker?->email ?? $att->guest_email ?? 'N/A',
+                'job_preference' => $this->seekerJobPreference($seeker) ?? $att->guest_preferred_job ?? 'N/A',
+                'preferred_work_location' => $this->seekerPreferredWorkLocation($seeker) ?? 'N/A',
+                'language' => $this->seekerLanguages($seeker) ?? 'N/A',
+                'education_attainment' => $seeker?->educ_attainment ?? $att->guest_educ_attainment ?? 'N/A',
+                'school' => $education?->institution_name ?: 'N/A',
+                'year_graduated' => $education?->year_graduated ?? $education?->undergrad_year_last_attended ?? 'N/A',
+                'course' => $education?->course_strand ?: 'N/A',
+                'type' => $seeker ? 'Registered' : 'Walk-in',
+            ];
+        })->all();
+    }
+
+    /**
+     * The seeker's highest-ranked education record — same level ordering
+     * JobMatchingService::seekerEducationRank uses for match scoring, refined
+     * with a distinct rank per K-12 stage since this report needs to tell
+     * junior high, senior high and vocational apart rather than bucket them.
+     */
+    private function bestEducation(JobSeeker $seeker): ?SeekerEducation
+    {
+        return $seeker->educations->sortByDesc(fn ($education) => match ($education->level) {
+            'graduate_studies', 'graduate' => 6, // 'graduate' is the pre-rename legacy value
+            'tertiary' => 5,
+            'vocational', 'senior_high_strand', 'senior_high' => 4, // 'senior_high' is legacy
+            'secondary_k12', 'secondary_non_k12', 'secondary' => 3, // 'secondary' is legacy
+            'elementary' => 1,
+            default => 0,
+        })->first();
+    }
+
+    private function seekerJobPreference(?JobSeeker $seeker): ?string
+    {
+        if (! $seeker) {
+            return null;
+        }
+        $top = $seeker->occupations->sortBy('preference_order')->first();
+
+        return $top ? ($top->occupation_title ?: $top->raw_job_title) : null;
+    }
+
+    private function seekerPreferredWorkLocation(?JobSeeker $seeker): ?string
+    {
+        if (! $seeker) {
+            return null;
+        }
+        $locations = collect($seeker->preferred_locations_details ?? [])->filter()->values();
+        if ($locations->isEmpty()) {
+            return null;
+        }
+        $sector = $seeker->preferred_work_location === 'overseas' ? 'Overseas' : 'Local';
+
+        return $sector.': '.$locations->implode(', ');
+    }
+
+    private function seekerLanguages(?JobSeeker $seeker): ?string
+    {
+        if (! $seeker || $seeker->languages->isEmpty()) {
+            return null;
+        }
+
+        return $seeker->languages
+            ->map(fn ($lang) => $lang->language === 'others' ? ($lang->language_other ?: 'Others') : ucfirst($lang->language))
+            ->filter()
+            ->unique()
+            ->implode(', ');
     }
 
     public function exportSprs(Request $request, JobFair $jobFair, JobFairReportService $reports)

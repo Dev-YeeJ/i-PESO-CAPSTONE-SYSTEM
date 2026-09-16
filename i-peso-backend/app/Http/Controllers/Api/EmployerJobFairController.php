@@ -84,7 +84,12 @@ class EmployerJobFairController extends Controller
         $employer = $this->employer($request);
         abort_unless($requirement->job_fair_id === $jobFair->job_fair_id, 404);
         $participation = $this->participation($jobFair, $employer);
-        abort_if(in_array($participation->status, ['approved', 'requirements_approved', 'attended']), 403, 'Participation is already approved. Cannot modify requirements.');
+        // Was checking $participation->status, a property JobFairEmployer
+        // doesn't have (the column is participation_status) — always null,
+        // so this guard silently never fired and employers could keep
+        // replacing requirement documents after PESO had already approved
+        // the whole participation.
+        abort_if(in_array($participation->participation_status, ['approved', 'attended', 'encoded_results', 'report_generated']), 403, 'Participation is already approved. Cannot modify requirements.');
 
         // Posterized Job Vacancy accepts any file type/extension at all --
         // no mimes/extensions restriction — since employers export flyers
@@ -183,7 +188,7 @@ class EmployerJobFairController extends Controller
     {
         $employer = $this->employer($request);
         $participation = $this->participation($jobFair, $employer);
-        abort_if(in_array($participation->status, ['approved', 'requirements_approved', 'attended']), 403, 'Participation is already approved. Cannot modify confirmation slip.');
+        abort_if(in_array($participation->participation_status, ['approved', 'attended', 'encoded_results', 'report_generated']), 403, 'Participation is already approved. Cannot modify confirmation slip.');
         $validated = $request->validate([
             'representative_1_name' => ['required', 'string', 'max:255'], 'representative_1_contact' => ['required', 'string', 'max:40'],
             'representative_position' => ['required', 'string', 'max:255'],

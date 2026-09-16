@@ -182,6 +182,17 @@ class JobFairService
             // missing, so this is safe to call unconditionally otherwise).
             if ($participation->participation_status !== 'declined') {
                 $this->reuseVerifiedDocuments($fair, $participation);
+                // reuseVerifiedDocuments() only re-syncs participation_status
+                // when it just created a submission — a participation whose
+                // requirements were already fully approved (nothing left to
+                // reuse) never hits that branch, so it can get stuck one
+                // status behind forever (e.g. a bulk data migration that
+                // overwrites participation_status without touching the
+                // underlying submissions). Re-check every time this loads
+                // instead; syncRequirementStatus() is already a cheap no-op
+                // for anything outside the requirements-gathering phase.
+                $participation->setRelation('jobFair', $fair);
+                $this->syncRequirementStatus($participation);
             }
             $payload['participation'] = $this->participationPayload($participation);
         }

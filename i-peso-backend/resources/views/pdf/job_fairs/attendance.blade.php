@@ -3,16 +3,16 @@
 <head>
   <meta charset="utf-8">
   <style>
-    body { font-family: DejaVu Sans, sans-serif; font-size: 11px; line-height: 1.4; color: #111827; margin: 30px; }
+    body { font-family: DejaVu Sans, sans-serif; font-size: 9px; line-height: 1.4; color: #111827; margin: 20px; }
     .center { text-align: center; }
-    .header { margin-bottom: 20px; text-align: center; }
+    .header { margin-bottom: 16px; text-align: center; }
     h2, h3 { margin: 0; padding: 0; }
     h2 { font-size: 16px; margin-bottom: 5px; }
     h3 { font-size: 13px; font-weight: normal; color: #475569; }
-    table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-    th, td { border: 1px solid #cbd5e1; padding: 6px 8px; text-align: left; }
-    th { background-color: #f8fafc; font-weight: bold; text-transform: uppercase; font-size: 10px; color: #475569; }
-    .small { font-size: 9px; color: #64748b; margin-top: 20px; text-align: center; }
+    table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+    th, td { border: 1px solid #cbd5e1; padding: 4px 5px; text-align: left; word-break: break-word; }
+    th { background-color: #f8fafc; font-weight: bold; text-transform: uppercase; font-size: 8px; color: #475569; }
+    .small { font-size: 9px; color: #64748b; margin-top: 16px; text-align: center; }
     .badge { border-radius: 4px; padding: 2px 4px; font-size: 9px; font-weight: bold; }
     .walk-in { background-color: #fef3c7; color: #92400e; }
     .registered { background-color: #dcfce7; color: #166534; }
@@ -22,38 +22,46 @@
   <div class="header">
     <h2>Job Fair Attendance Report</h2>
     <h3>{{ $fair->title }} &middot; {{ optional($fair->start_date ?? $fair->event_date)->format('F d, Y') }}</h3>
-    <h3>Total Checked-in: {{ $attendees->count() }}</h3>
+    <h3>Total Checked-in: {{ count($rows) }}</h3>
   </div>
 
   <table>
     <thead>
       <tr>
-        <th style="width: 50px;">#</th>
-        <th style="width: 100px;">Time In</th>
+        <th style="width: 25px;">#</th>
+        <th style="width: 55px;">Time In</th>
         <th>Name</th>
         <th>Gender</th>
         <th>Contact Number</th>
-        <th>Education</th>
-        <th>Type</th>
+        <th>Email</th>
+        <th>Job Preference</th>
+        <th>Preferred Work Location</th>
+        <th>Language</th>
+        <th>Education Attainment</th>
+        <th>School/College/University</th>
+        <th style="width: 45px;">Year Graduated/Last Attended</th>
+        <th>Course</th>
+        <th style="width: 50px;">Type</th>
       </tr>
     </thead>
     <tbody>
-      @foreach($attendees as $index => $att)
-      @php
-        $educ = $att->guest_educ_attainment ?? '-';
-        if ($att->seeker && $att->seeker->educations->first()) {
-            $educ = $att->seeker->educations->first()->education_level;
-        }
-      @endphp
+      @foreach($rows as $index => $row)
       <tr>
         <td>{{ $index + 1 }}</td>
-        <td>{{ $att->scanned_at ? $att->scanned_at->setTimezone('Asia/Manila')->format('h:i A') : '-' }}</td>
-        <td style="font-weight: bold;">{{ $att->seeker ? trim($att->seeker->first_name . ' ' . $att->seeker->last_name) : $att->guest_name }}</td>
-        <td style="text-transform: capitalize;">{{ $att->seeker ? ($att->seeker->sex ?? '-') : '-' }}</td>
-        <td>{{ $att->seeker ? $att->seeker->mobile_number : $att->guest_mobile_number }}</td>
-        <td>{{ $educ }}</td>
+        <td>{{ $row['time_in'] }}</td>
+        <td style="font-weight: bold;">{{ $row['name'] }}</td>
+        <td style="text-transform: capitalize;">{{ $row['gender'] }}</td>
+        <td>{{ $row['contact_number'] }}</td>
+        <td>{{ $row['email'] }}</td>
+        <td>{{ $row['job_preference'] }}</td>
+        <td>{{ $row['preferred_work_location'] }}</td>
+        <td>{{ $row['language'] }}</td>
+        <td>{{ $row['education_attainment'] }}</td>
+        <td>{{ $row['school'] }}</td>
+        <td>{{ $row['year_graduated'] }}</td>
+        <td>{{ $row['course'] }}</td>
         <td>
-          @if($att->seeker)
+          @if($row['type'] === 'Registered')
             <span class="badge registered">Registered</span>
           @else
             <span class="badge walk-in">Walk-in</span>
