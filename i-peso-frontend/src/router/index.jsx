@@ -15,6 +15,7 @@ import EmployerLayout from '@/layouts/EmployerLayout'
 import SeekerLayout   from '@/layouts/SeekerLayout'
 import AdminLayout    from '@/layouts/AdminLayout'
 import App            from '@/App'
+import RouteErrorBoundary from './RouteErrorBoundary'
 
 // --- LAZY LOADED PAGES ---
 const LandingPage        = lazy(() => import('@/pages/landing/LandingPage'))
@@ -109,6 +110,7 @@ const S = (Component) => (
 export const router = createBrowserRouter([
   {
     element: <App />,
+    errorElement: <RouteErrorBoundary />,
     children: [
       
       {

@@ -47,6 +47,8 @@ const COMPLIANCE_LABEL = {
 
 export default function AdminPlacementReportPage() {
   const [statusFilter, setStatusFilter] = useState('pending_review')
+  const [reports, setReports] = useState([])
+  const [loading, setLoading] = useState(true)
   const [detail, setDetail] = useState(null) // { data, records }
   const [busy, setBusy] = useState(false)
   const [rejecting, setRejecting] = useState(false)
