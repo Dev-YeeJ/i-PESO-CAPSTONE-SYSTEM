@@ -259,19 +259,11 @@
 }
 
 .ipeso-chat-msg-avatar {
-  width: 1.5rem;
-  height: 1.5rem;
-  flex: 0 0 1.5rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 9999px;
-  background: linear-gradient(135deg, var(--ace-blue) 0%, var(--ace-blue-light) 100%);
-  color: #fff;
-  font-size: 0.6rem;
-  font-weight: 800;
-  letter-spacing: 0.02em;
-  box-shadow: 0 2px 6px rgba(29, 78, 216, 0.2);
+  width: 1.6rem;
+  height: 1.6rem;
+  flex: 0 0 1.6rem;
+  display: block;
+  filter: drop-shadow(0 2px 4px rgba(29, 78, 216, 0.25));
 }
 
 /* ── Bubbles ── */
@@ -327,7 +319,7 @@
 .ipeso-chat-map-card {
   overflow: hidden;
   margin-top: 0.4rem;
-  margin-left: 1.95rem; /* Align with bubble, past avatar */
+  margin-left: 2.05rem; /* Align with bubble, past avatar */
   border: 1px solid var(--ace-border);
   border-radius: 1rem;
   background: var(--ace-surface);
@@ -442,9 +434,9 @@
 
 .ipeso-chat-starter:focus-visible { outline: 2px solid var(--ace-blue); outline-offset: 1px; }
 
-.ipeso-chat-starter-emoji {
-  font-size: 1rem;
-  line-height: 1;
+.ipeso-chat-starter-icon {
+  flex: 0 0 auto;
+  color: var(--ace-blue);
 }
 
 /* ── Composer ── */

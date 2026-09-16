@@ -1,26 +1,77 @@
 import { useEffect, useRef, useState } from 'react'
-import { MapPin, Send, X, Sparkles } from 'lucide-react'
+import {
+  MapPin, Send, X, Sparkles,
+  UserPlus, Briefcase, CalendarDays, BadgeCheck,
+  CheckCircle2, UserCog, Users, ClipboardList,
+} from 'lucide-react'
 import { chatbotService } from '@/services/chatbotService'
 import { useAuthStore } from '@/stores/authStore'
 import AceMascot from './AceMascot'
+import AceAvatarMark from './AceAvatarMark'
 
 /**
  * Unified chat widget — appears on every screen (guest, seeker, employer).
  *
  * Mounted once in App.jsx so it persists across navigation. The backend
- * detects the authenticated user (if any) and adjusts the AI's context.
+ * detects the authenticated user (if any) and adjusts the assistant's context.
  */
 
-const STARTERS = [
-  { emoji: '📝', text: 'Paano po mag-register?' },
-  { emoji: '🔧', text: 'May trabaho po ba para sa welder?' },
-  { emoji: '🎪', text: 'Kailan po ang susunod na job fair?' },
-  { emoji: '💰', text: 'Libre po ba ang i-PESO?' },
+// How long the "Ace is arriving" beat holds before the greeting bubble
+// swaps in — timed to land as the greeting rig's wave animation starts
+// (see aceWaveArm's 0.85s delay in AceMascot.css) so the text lands right
+// as Ace waves, instead of appearing the instant the panel opens.
+const GREETING_REVEAL_DELAY = 800
+
+const GUEST_STARTERS = [
+  { icon: UserPlus, text: 'Paano po mag-register?' },
+  { icon: Briefcase, text: 'Paano gumagana ang pagtugma ng trabaho?' },
+  { icon: CalendarDays, text: 'Kailan po ang susunod na job fair?' },
+  { icon: BadgeCheck, text: 'Libre po ba ang i-PESO?' },
 ]
+
+const SEEKER_STARTERS = [
+  { icon: Briefcase, text: 'May bagong job match po ba para sa akin?' },
+  { icon: CheckCircle2, text: 'Paano ko malalaman kung na-shortlist ako?' },
+  { icon: UserCog, text: 'Paano mag-update ng aking profile o resume?' },
+  { icon: CalendarDays, text: 'Kailan po ang susunod na job fair?' },
+]
+
+const EMPLOYER_STARTERS = [
+  { icon: Briefcase, text: 'Paano mag-post ng bakante?' },
+  { icon: Users, text: 'Paano ko makikita ang mga aplikante?' },
+  { icon: ClipboardList, text: 'Paano gumawa ng placement report?' },
+  { icon: CalendarDays, text: 'Paano mag-register sa job fair bilang employer?' },
+]
+
+function startersFor(user) {
+  if (!user) return GUEST_STARTERS
+  if (user.role === 'employer') return EMPLOYER_STARTERS
+  if (user.role === 'seeker') return SEEKER_STARTERS
+  return GUEST_STARTERS
+}
 
 const DEFAULT_GREETING =
   'Kumusta po! Ako si Ace, ang i-PESO assistant ng Urdaneta City PESO. ' +
   'Maaari po kayong magtanong tungkol sa registration, trabaho, job fairs, at government programs.'
+
+function greetingFor(user) {
+  if (!user) return DEFAULT_GREETING
+
+  const name = user.first_name || user.company_name
+  const hello = `Kumusta po${name ? ` ${name}` : ''}!`
+
+  if (user.role === 'employer') {
+    return `${hello} Ako si Ace, ang inyong Assistant for Career and Employment. ` +
+      'Kaya ko kayong tulungan sa job postings, mga aplikante, o job fair registration — ano po ang gagawin natin ngayon?'
+  }
+
+  if (user.role === 'seeker') {
+    return `${hello} Ako si Ace, ang inyong Assistant for Career and Employment. ` +
+      'Tanungin mo ako tungkol sa job matches, application status, o job fairs — paano kita matutulungan ngayon?'
+  }
+
+  return `${hello} Ako si Ace, ang i-PESO assistant. Paano ko kayo matutulungan ngayon?`
+}
 
 /** Matches a bare URL or email address inside otherwise plain chat text. */
 const URL_OR_EMAIL = /(https?:\/\/[^\s]+|[\w.+-]+@[\w-]+\.[\w.-]+)/g
@@ -57,6 +108,7 @@ export default function UnifiedChatWidget() {
   const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
+  const [greetingVisible, setGreetingVisible] = useState(false)
   const user = useAuthStore((state) => state.user)
 
   const launcherRef = useRef(null)
@@ -64,20 +116,31 @@ export default function UnifiedChatWidget() {
   const logEndRef = useRef(null)
   const aceRef = useRef(null)
 
+  const openPanel = () => {
+    // Reset before the open-triggered effect runs, so the panel never
+    // flashes a stale greeting bubble from a previous session.
+    setGreetingVisible(false)
+    setOpen(true)
+  }
+  const closePanel = () => setOpen(false)
+
   useEffect(() => {
     if (!open) return undefined
-    const onKeyDown = (event) => { if (event.key === 'Escape') setOpen(false) }
+    const onKeyDown = (event) => { if (event.key === 'Escape') closePanel() }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [open])
 
   useEffect(() => {
-    if (open) {
-      inputRef.current?.focus()
-      if (aceRef.current) { aceRef.current.play('greeting') }
-    } else {
+    if (!open) {
       launcherRef.current?.focus({ preventScroll: true })
+      return undefined
     }
+
+    inputRef.current?.focus()
+    if (aceRef.current) { aceRef.current.play('greeting') }
+    const revealTimer = setTimeout(() => setGreetingVisible(true), GREETING_REVEAL_DELAY)
+    return () => clearTimeout(revealTimer)
   }, [open])
 
   useEffect(() => {
@@ -119,9 +182,8 @@ export default function UnifiedChatWidget() {
     send(input)
   }
 
-  const greetingText = user
-    ? `Kumusta po${user.first_name || user.company_name ? ` ${user.first_name || user.company_name}` : ''}! Ako si Ace, ang i-PESO assistant. Paano ko kayo matutulungan ngayon?`
-    : DEFAULT_GREETING
+  const greetingText = greetingFor(user)
+  const starters = startersFor(user)
 
   return (
     <div className="ipeso-chat">
@@ -131,7 +193,7 @@ export default function UnifiedChatWidget() {
           {/* ── Hero header with Ace ── */}
           <header className="ipeso-chat-hero">
             <div className="ipeso-chat-hero-bg" />
-            <button type="button" onClick={() => setOpen(false)} className="ipeso-chat-close" aria-label="Close assistant">
+            <button type="button" onClick={closePanel} className="ipeso-chat-close" aria-label="Close assistant">
               <X size={18} aria-hidden="true" />
             </button>
             <div className="ipeso-chat-hero-content">
@@ -141,7 +203,7 @@ export default function UnifiedChatWidget() {
                   <Sparkles size={14} aria-hidden="true" />
                   Ace
                 </p>
-                <p className="ipeso-chat-hero-role">i-PESO AI Assistant</p>
+                <p className="ipeso-chat-hero-role">Assistant for Career and Employment</p>
               </div>
             </div>
             <div className="ipeso-chat-hero-status">
@@ -153,16 +215,24 @@ export default function UnifiedChatWidget() {
           {/* ── Message log ── */}
           <div className="ipeso-chat-log" aria-live="polite" aria-atomic="false">
 
-            {/* Greeting bubble */}
+            {/* Greeting bubble — holds on a typing beat until Ace's
+                greeting animation lands, so it reads as a live greeting
+                rather than static text that was just there on open. */}
             <div className="ipeso-chat-msg is-ace">
-              <div className="ipeso-chat-msg-avatar">A</div>
-              <p className="ipeso-chat-bubble is-model">{greetingText}</p>
+              <AceAvatarMark className="ipeso-chat-msg-avatar" />
+              {greetingVisible ? (
+                <p className="ipeso-chat-bubble is-model">{greetingText}</p>
+              ) : (
+                <p className="ipeso-chat-bubble is-model is-typing" aria-label="Ace is greeting you">
+                  <span /><span /><span />
+                </p>
+              )}
             </div>
 
             {messages.map((message, index) => (
               <div key={`${message.role}-${index}`}>
                 <div className={`ipeso-chat-msg ${message.role === 'user' ? 'is-user' : 'is-ace'}`}>
-                  {message.role !== 'user' && <div className="ipeso-chat-msg-avatar">A</div>}
+                  {message.role !== 'user' && <AceAvatarMark className="ipeso-chat-msg-avatar" />}
                   <p className={`ipeso-chat-bubble ${message.role === 'user' ? 'is-user' : 'is-model'}`}>
                     {linkifyText(message.text)}
                   </p>
@@ -173,19 +243,19 @@ export default function UnifiedChatWidget() {
 
             {busy && (
               <div className="ipeso-chat-msg is-ace">
-                <div className="ipeso-chat-msg-avatar">A</div>
+                <AceAvatarMark className="ipeso-chat-msg-avatar" />
                 <p className="ipeso-chat-bubble is-model is-typing" aria-label="Ace is thinking">
                   <span /><span /><span />
                 </p>
               </div>
             )}
 
-            {messages.length === 0 && !busy && (
+            {messages.length === 0 && !busy && greetingVisible && (
               <div className="ipeso-chat-starters">
                 <p className="ipeso-chat-starters-label">Mga Madalas Itanong</p>
-                {STARTERS.map(({ emoji, text }) => (
+                {starters.map(({ icon: Icon, text }) => (
                   <button key={text} type="button" onClick={() => send(text)} className="ipeso-chat-starter">
-                    <span className="ipeso-chat-starter-emoji">{emoji}</span>
+                    <Icon size={15} className="ipeso-chat-starter-icon" aria-hidden="true" />
                     {text}
                   </button>
                 ))}
@@ -214,7 +284,7 @@ export default function UnifiedChatWidget() {
           </form>
 
           <p className="ipeso-chat-foot">
-            Powered by AI · Batay sa impormasyon ng PESO
+            Powered by iChitech · Batay sa impormasyon ng PESO
           </p>
         </section>
       )}
@@ -223,7 +293,7 @@ export default function UnifiedChatWidget() {
       <button
         ref={launcherRef}
         type="button"
-        onClick={() => setOpen((value) => !value)}
+        onClick={() => (open ? closePanel() : openPanel())}
         className={`ipeso-chat-launcher ${open ? 'is-open' : ''}`}
         aria-expanded={open}
         aria-label={open ? 'Close Ace assistant' : 'Ask Ace'}

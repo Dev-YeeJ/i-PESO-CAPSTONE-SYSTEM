@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { Outlet } from 'react-router-dom'
+import { Outlet, useLocation } from 'react-router-dom'
 import { Toaster, toast } from 'react-hot-toast'
 import { useAuthStore } from '@/stores/authStore'
 import Echo from 'laravel-echo'
@@ -25,6 +25,7 @@ if (import.meta.env.VITE_REVERB_APP_KEY) {
 export default function App() {
   const initializeAuth = useAuthStore((s) => s.initializeAuth)
   const hasInitialized = useRef(false)
+  const location = useLocation()
 
   const user = useAuthStore((s) => s.user)
 
@@ -64,7 +65,7 @@ export default function App() {
           },
         }}
       />
-      <UnifiedChatWidget />
+      {!(location.pathname.startsWith('/admin') || location.pathname.startsWith('/administrator')) && <UnifiedChatWidget />}
     </>
   )
 }

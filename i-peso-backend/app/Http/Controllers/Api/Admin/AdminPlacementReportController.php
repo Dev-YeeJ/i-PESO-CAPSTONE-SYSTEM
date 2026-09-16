@@ -286,4 +286,76 @@ class AdminPlacementReportController extends Controller
 
         return $request->user();
     }
+
+    public function compliance(Request $request): JsonResponse
+    {
+        $this->admin($request);
+        $validated = $request->validate([
+            'coverage_month' => ['required', 'integer', 'min:1', 'max:12'],
+            'coverage_year' => ['required', 'integer', 'min:2020', 'max:2100'],
+        ]);
+
+        $statuses = $this->compliance->statusFor($validated['coverage_year'], $validated['coverage_month']);
+
+        return response()->json([
+            'due_date' => $this->compliance->dueDate($validated['coverage_year'], $validated['coverage_month'])->toDateString(),
+            'totals' => [
+                'expected' => $statuses->count(),
+                'submitted' => $statuses->whereIn('state', [PlacementReportUpload::STATUS_PENDING_REVIEW, PlacementReportUpload::STATUS_APPROVED])->count(),
+                'nil_reports' => $statuses->where('is_nil_report', true)->count(),
+                'overdue' => $statuses->where('state', 'overdue')->count(),
+                'needs_revision' => $statuses->where('state', 'needs_revision')->count(),
+            ],
+            'data' => $statuses->values(),
+        ]);
+    }
+
+    public function candidates(Request $request, PlacementReportUpload $placementReport, PlacementRecord $record): JsonResponse
+    {
+        $this->admin($request);
+        $this->assertSubmitted($placementReport);
+        abort_unless($record->upload_id === $placementReport->id, 404);
+
+        $query = JobSeeker::query();
+        if ($record->first_name) {
+            $query->where('first_name', 'like', "%{$record->first_name}%");
+        }
+        if ($record->last_name) {
+            $query->where('last_name', 'like', "%{$record->last_name}%");
+        }
+
+        $candidates = $query->limit(10)->get(['seeker_id', 'first_name', 'middle_name', 'last_name']);
+
+        $mapped = $candidates->map(fn($seeker) => [
+            'seeker_id' => $seeker->seeker_id,
+            'name' => trim("{$seeker->first_name} {$seeker->middle_name} {$seeker->last_name}")
+        ]);
+
+        return response()->json(['data' => $mapped]);
+    }
+
+    public function linkRecord(Request $request, PlacementReportUpload $placementReport, PlacementRecord $record): JsonResponse
+    {
+        $this->admin($request);
+        $this->assertSubmitted($placementReport);
+        abort_unless($record->upload_id === $placementReport->id, 404);
+
+        $validated = $request->validate([
+            'seeker_id' => ['nullable', 'integer', 'exists:job_seekers,seeker_id']
+        ]);
+
+        $record->update([
+            'seeker_id' => $validated['seeker_id'],
+            'seeker_match_confirmed_at' => $validated['seeker_id'] ? now() : null,
+            'seeker_match_confidence' => $validated['seeker_id'] ? PlacementRecord::MATCH_EXACT : PlacementRecord::MATCH_NONE,
+        ]);
+
+        return response()->json([
+            'message' => 'Seeker link updated.', 
+            'data' => [
+                'linked_seeker_id' => $record->seeker_id,
+                'seeker_match_confidence' => $record->seeker_match_confidence
+            ]
+        ]);
+    }
 }

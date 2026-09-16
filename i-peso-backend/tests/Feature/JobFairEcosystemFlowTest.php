@@ -435,10 +435,10 @@ class JobFairEcosystemFlowTest extends TestCase
 
         Sanctum::actingAs($employer);
         $response = $this->postJson("/api/employer/job-fairs/{$fairId}/interest")->assertOk();
-        $this->assertSame('interested', $response->json('participation.status'));
+        $this->assertSame('requirements_pending', $response->json('participation.status'));
 
         $event = $this->getJson('/api/employer/job-fairs')->assertOk()->json('data.0');
-        $this->assertSame('interested', $event['participation']['status']);
+        $this->assertSame('requirements_pending', $event['participation']['status']);
         $businessPermit = collect($event['participation']['requirements'])->firstWhere('label', 'Business Permit');
         $this->assertNotNull($businessPermit, 'Business Permit should already be reused while merely "interested".');
         $this->assertSame('approved', $businessPermit['status']);
@@ -490,7 +490,7 @@ class JobFairEcosystemFlowTest extends TestCase
         // PESO calls the employer, who verbally accepts — recorded manually,
         // with no employer self-service action at all.
         $this->patchJson("/api/admin/job-fairs/{$fairId}/participants/{$participationId}", [
-            'status' => 'accepted', 'confirmation_channel' => 'phone',
+            'status' => 'requirements_pending', 'confirmation_channel' => 'phone',
         ])->assertOk();
 
         $after = $this->getJson("/api/admin/job-fairs/{$fairId}")->assertOk()->json();
@@ -549,7 +549,7 @@ class JobFairEcosystemFlowTest extends TestCase
                 'status' => 'submitted', 'submitted_at' => now(), 'created_at' => now(), 'updated_at' => now(),
             ]);
         }
-        DB::table('job_fair_employers')->where('id', $participation->id)->update(['participation_status' => 'requirements_submitted']);
+        DB::table('job_fair_employers')->where('id', $participation->id)->update(['participation_status' => 'under_review']);
 
         Sanctum::actingAs($admin);
         $submissionIds = DB::table('job_fair_requirement_submissions')->where('job_fair_employer_id', $participation->id)->pluck('id');
@@ -559,7 +559,7 @@ class JobFairEcosystemFlowTest extends TestCase
         foreach ($submissionIds->slice(0, -1) as $submissionId) {
             $this->patchJson("/api/admin/job-fair-requirements/{$submissionId}/review", ['status' => 'approved'])->assertOk();
         }
-        $this->assertDatabaseHas('job_fair_employers', ['id' => $participation->id, 'participation_status' => 'requirements_submitted']);
+        $this->assertDatabaseHas('job_fair_employers', ['id' => $participation->id, 'participation_status' => 'under_review']);
 
         // Approving the very last required requirement should auto-complete
         // participation without any separate manual status change.

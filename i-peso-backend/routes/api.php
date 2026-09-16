@@ -322,12 +322,15 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::post('/reports/hiring-activity/export', [AdminHiringActivityReportController::class, 'export']);
 
             // Placement Report review + approval (employer-submitted spreadsheet imports)
+            Route::get('/placement-reports/compliance', [AdminPlacementReportController::class, 'compliance']);
             Route::get('/placement-reports', [AdminPlacementReportController::class, 'index']);
             Route::get('/placement-reports/{placementReport}', [AdminPlacementReportController::class, 'show']);
             Route::get('/placement-reports/{placementReport}/export', [AdminPlacementReportController::class, 'exportCsv']);
             Route::get('/placement-reports/{placementReport}/export-pdf', [AdminPlacementReportController::class, 'exportPdf']);
             Route::post('/placement-reports/{placementReport}/approve', [AdminPlacementReportController::class, 'approve']);
             Route::post('/placement-reports/{placementReport}/reject', [AdminPlacementReportController::class, 'reject']);
+            Route::get('/placement-reports/{placementReport}/records/{record}/candidates', [AdminPlacementReportController::class, 'candidates']);
+            Route::post('/placement-reports/{placementReport}/records/{record}/link', [AdminPlacementReportController::class, 'linkRecord']);
 
             Route::get('/reports', [AdminReportController::class, 'index']);
             Route::post('/reports/generate', [AdminReportController::class, 'generate']);
