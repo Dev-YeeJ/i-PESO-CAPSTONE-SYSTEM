@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { api } from '@/services/api'; // Assume they have an axios instance or similar, if not I'll just use fetch
+import api from '@/services/api';
 
 const CookieConsent = () => {
   const [isVisible, setIsVisible] = useState(false);
@@ -16,15 +16,7 @@ const CookieConsent = () => {
   const submitConsent = async (status) => {
     setIsSubmitting(true);
     try {
-      // Assuming a standard fetch if api service isn't guaranteed, but standard Laravel Sanctum setup usually uses axios
-      await fetch(import.meta.env.VITE_API_URL + '/api/cookie-consent', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-        body: JSON.stringify({ status })
-      });
+      await api.post('/cookie-consent', { status });
     } catch (error) {
       console.error('Failed to save cookie consent', error);
     } finally {
