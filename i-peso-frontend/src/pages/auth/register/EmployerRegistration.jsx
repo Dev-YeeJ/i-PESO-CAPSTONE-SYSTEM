@@ -7,8 +7,8 @@ import Field from '@/components/form/Field'
 import FormError from '@/components/form/FormError'
 import PasswordStrengthMeter from '@/components/form/PasswordStrengthMeter'
 import { Button, Card } from '@/components/ui'
-import { authService } from '@/services/authService'
 import { getPasswordStrength } from '@/services/validationHelpers'
+import DoleCertificationCheckbox from '@/components/common/DoleCertificationCheckbox'
 
 const fields = ['email', 'password', 'password_confirmation']
 
@@ -32,6 +32,7 @@ export default function EmployerRegistration() {
   const [apiError, setApiError] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmation, setShowConfirmation] = useState(false)
+  const [hasAgreed, setHasAgreed] = useState(false)
   const strength = getPasswordStrength(form.password ?? '')
 
   const change = useCallback((event) => {
@@ -47,6 +48,7 @@ export default function EmployerRegistration() {
     event.preventDefault()
     setTouched(Object.fromEntries(fields.map((field) => [field, true])))
     const nextErrors = validate(form)
+    if (!hasAgreed) nextErrors.agreement = 'You must agree to the certification to proceed.'
     setErrors(nextErrors)
     if (Object.keys(nextErrors).length) return
 
@@ -92,8 +94,11 @@ export default function EmployerRegistration() {
             </div>
             <Field label="Confirm password" name="password_confirmation" type={showConfirmation ? 'text' : 'password'} placeholder="Re-enter your password" value={form.password_confirmation ?? ''} onChange={change} onBlur={blur} error={fieldError('password_confirmation')} rightElement={<VisibilityButton shown={showConfirmation} onClick={() => setShowConfirmation((current) => !current)} />} />
           </div>
+          
+          <DoleCertificationCheckbox isChecked={hasAgreed} onChange={(e) => { setHasAgreed(e.target.checked); setErrors(current => ({ ...current, agreement: undefined })); }} />
+          {errors.agreement && <p className="text-red-500 text-sm mt-1">{errors.agreement}</p>}
 
-          <Button type="submit" disabled={loading} icon={Building2} className="w-full">{loading ? 'Creating account...' : 'Continue to Email Verification'}</Button>
+          <Button type="submit" disabled={loading || !hasAgreed} icon={Building2} className="w-full">{loading ? 'Creating account...' : 'Continue to Email Verification'}</Button>
         </form>
         <p className="registration-secondary-action">Already registered? <Link to="/login">Sign in</Link></p>
       </Card>

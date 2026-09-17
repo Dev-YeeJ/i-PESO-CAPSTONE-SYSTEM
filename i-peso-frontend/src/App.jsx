@@ -5,7 +5,7 @@ import { useAuthStore } from '@/stores/authStore'
 import Echo from 'laravel-echo'
 import Pusher from 'pusher-js'
 import UnifiedChatWidget from '@/components/chatbot/UnifiedChatWidget'
-
+import CookieConsent from '@/components/common/CookieConsent'
 window.Pusher = Pusher
 
 // Initialize Echo only if Reverb key is available
@@ -66,6 +66,7 @@ export default function App() {
         }}
       />
       {!(location.pathname.startsWith('/admin') || location.pathname.startsWith('/administrator')) && <UnifiedChatWidget />}
+      <CookieConsent />
     </>
   )
 }
