@@ -280,7 +280,7 @@ class GeminiChatService
         
         if ($user) {
             if ($user instanceof JobSeeker) {
-                $userContext = "You are talking to a registered Job Seeker named {$user->first_name} {$user->last_name}. They are logged in to their dashboard.";
+                $userContext = "You are talking to a registered Job Seeker named {$user->first_name} {$user->last_name}. They are using the mobile app or logged in to their dashboard. Focus exclusively on helping them find jobs, manage applications, and access government programs. Do NOT mention, suggest, or explain any features intended for employers (like posting jobs or employer verification) since this user is strictly a job seeker.";
             } elseif ($user instanceof Employer) {
                 $userContext = "You are talking to a registered Employer representing {$user->company_name}. They are logged in to their dashboard.";
             } elseif ($user instanceof Administrator) {
