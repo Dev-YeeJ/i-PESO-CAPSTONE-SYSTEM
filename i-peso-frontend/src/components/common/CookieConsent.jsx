@@ -1,58 +1,73 @@
 import React, { useState, useEffect } from 'react';
+import { api } from '@/services/api'; // Assume they have an axios instance or similar, if not I'll just use fetch
 
 const CookieConsent = () => {
   const [isVisible, setIsVisible] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    // Check if user has already accepted cookies
     const cookieConsent = localStorage.getItem('peso_cookie_consent');
     if (!cookieConsent) {
-      // Small delay for a nice entrance animation
-      const timer = setTimeout(() => setIsVisible(true), 1000);
+      const timer = setTimeout(() => setIsVisible(true), 1500);
       return () => clearTimeout(timer);
     }
   }, []);
 
-  const handleAccept = () => {
-    localStorage.setItem('peso_cookie_consent', 'accepted');
-    setIsVisible(false);
+  const submitConsent = async (status) => {
+    setIsSubmitting(true);
+    try {
+      // Assuming a standard fetch if api service isn't guaranteed, but standard Laravel Sanctum setup usually uses axios
+      await fetch(import.meta.env.VITE_API_URL + '/api/cookie-consent', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: JSON.stringify({ status })
+      });
+    } catch (error) {
+      console.error('Failed to save cookie consent', error);
+    } finally {
+      localStorage.setItem('peso_cookie_consent', status);
+      setIsVisible(false);
+      setIsSubmitting(false);
+    }
   };
 
-  const handleDecline = () => {
-    // Note: depending on local laws, you might need to handle actual cookie blocking here
-    localStorage.setItem('peso_cookie_consent', 'declined');
-    setIsVisible(false);
-  };
+  const handleAccept = () => submitConsent('accepted');
+  const handleDecline = () => submitConsent('declined');
 
   if (!isVisible) return null;
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-50 p-4 md:p-6 animate-fade-in-up">
-      <div className="max-w-5xl mx-auto bg-white/80 backdrop-blur-md border border-white/20 shadow-2xl rounded-2xl p-6 md:flex md:items-center md:justify-between gap-6">
+    <div className="fixed bottom-0 left-0 right-0 z-[100] p-4 md:p-6 animate-fade-in-up flex justify-center md:justify-start pointer-events-none">
+      <div className="w-full max-w-2xl bg-slate-900/95 backdrop-blur-xl border border-slate-700/50 shadow-2xl rounded-2xl p-5 md:p-6 md:flex md:items-center md:justify-between gap-6 pointer-events-auto ring-1 ring-white/10">
         
         {/* Text Section */}
-        <div className="flex-1 mb-4 md:mb-0">
-          <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2 mb-2">
+        <div className="flex-1 mb-5 md:mb-0">
+          <h3 className="text-base font-bold text-white flex items-center gap-2 mb-2 tracking-wide">
             🍪 We value your privacy
           </h3>
-          <p className="text-sm text-slate-600 leading-relaxed">
-            We use cookies to enhance your browsing experience, serve personalized content, and analyze our traffic on the PESO Employment Information System. By clicking "Accept All", you consent to our use of cookies.
+          <p className="text-sm text-slate-300 leading-relaxed pr-2">
+            We use cookies to enhance your browsing experience, serve personalized content, and analyze our traffic. By clicking <strong className="text-white">"Accept All"</strong>, you consent to our use of cookies on the PESO portal.
           </p>
         </div>
 
         {/* Buttons Section */}
-        <div className="flex flex-col sm:flex-row gap-3 min-w-[280px]">
-          <button
-            onClick={handleDecline}
-            className="px-5 py-2.5 text-sm font-medium text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 hover:text-slate-900 transition-colors focus:ring-4 focus:ring-slate-100"
-          >
-            Decline
-          </button>
+        <div className="flex flex-row gap-3 md:flex-col md:w-36 shrink-0">
           <button
             onClick={handleAccept}
-            className="px-5 py-2.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors shadow-lg shadow-blue-600/30 focus:ring-4 focus:ring-blue-100"
+            disabled={isSubmitting}
+            className="flex-1 px-4 py-2.5 text-sm font-bold text-slate-900 bg-amber-500 rounded-lg hover:bg-amber-400 transition-all shadow-lg shadow-amber-500/20 focus:ring-4 focus:ring-amber-500/30 disabled:opacity-50"
           >
             Accept All
+          </button>
+          <button
+            onClick={handleDecline}
+            disabled={isSubmitting}
+            className="flex-1 px-4 py-2.5 text-sm font-semibold text-slate-300 bg-slate-800 border border-slate-700 rounded-lg hover:bg-slate-700 hover:text-white transition-all focus:ring-4 focus:ring-slate-700 disabled:opacity-50"
+          >
+            Decline
           </button>
         </div>
         
