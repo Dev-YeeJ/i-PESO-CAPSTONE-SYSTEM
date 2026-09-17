@@ -238,16 +238,7 @@ class EmployerPlacementReportController extends Controller
             ]);
         }
 
-        $appended = 0;
-        if ($isNew) {
-            // First time generate, we want to build even if 0 records, but we don't have to if we just do syncManualRecords
-        }
-        
         $appended = $this->syncManualRecords($upload, $employer, $isNew);
-
-        $message = $isNew
-            ? 'Placement report generated. Review the fetched hires and add any manual walk-in placements before submitting.'
-            : ($appended > 0 ? "Placement report synchronized. Added {$appended} new system-tracked hire(s)." : "Placement report ready. No new system-tracked hires since your last sync.");
 
         $message = $isNew
             ? 'Placement report generated. Review the fetched hires and add any manual walk-in placements before submitting.'

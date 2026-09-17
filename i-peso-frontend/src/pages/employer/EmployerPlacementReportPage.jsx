@@ -1,19 +1,18 @@
 import { useEffect, useMemo, useState } from 'react'
-import { UploadCloud, FileSpreadsheet, ArrowLeft, CheckCircle2, Trash2, Loader2, Layers, CalendarX, PencilLine, Save } from 'lucide-react'
+import { FileSpreadsheet, ArrowLeft, CheckCircle2, Trash2, Loader2, CalendarX, PencilLine, Save } from 'lucide-react'
 import { Card, CardHeader, Button, Badge, AlertBox } from '@/components/ui'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import PageHeader from '@/pages/admin/_components/PageHeader'
 import toast from 'react-hot-toast'
 import PlacementRecordEditor, { blankPlacementRecord, stripBlankPlacementRecords } from '@/components/reports/PlacementRecordEditor'
-import HiringActivityWorkspace from '@/components/reports/HiringActivityWorkspace'
-import { 
+import {
   listEmployerPlacementReports,
-  uploadPlacementReport, 
-  declareNoPlacements, 
-  startManualPlacementReport, 
-  getEmployerPlacementReport, 
+  declareNoPlacements,
+  startManualPlacementReport,
+  saveManualPlacementRecords,
+  getEmployerPlacementReport,
+  submitPlacementReport,
   deletePlacementReport,
-  searchPlacementApplicantSuggestions
+  searchPlacementApplicantSuggestions,
 } from '@/services/placementReportService'
 
 const STATUS_TONE = {
@@ -44,7 +43,7 @@ const firstError = (err, fallback) => {
 }
 
 export default function EmployerPlacementReportPage() {
-  const [view, setView] = useState('list') // list | editor | manual-editor
+  const [view, setView] = useState('list') // list | manual-editor
   const [reports, setReports] = useState([])
   const [loading, setLoading] = useState(true)
   const [active, setActive] = useState(null) // detailed upload in the editor
@@ -54,9 +53,6 @@ export default function EmployerPlacementReportPage() {
   const lastMonth = new Date(new Date().getFullYear(), new Date().getMonth() - 1, 1)
   const [coverageMonth, setCoverageMonth] = useState(lastMonth.getMonth() + 1)
   const [coverageYear, setCoverageYear] = useState(lastMonth.getFullYear())
-  const [entryMode, setEntryMode] = useState('upload') // upload | manual
-  const [file, setFile] = useState(null)
-  const [uploading, setUploading] = useState(false)
   const [declaring, setDeclaring] = useState(false)
   const [startingManual, setStartingManual] = useState(false)
 
@@ -76,8 +72,14 @@ export default function EmployerPlacementReportPage() {
   const openEditor = async (id) => {
     try {
       const res = await getEmployerPlacementReport(id)
+      if (!res.data.is_manual_entry) {
+        // This page no longer has a spreadsheet-mapping screen — only reports
+        // created via "Generate Report" (manual entry) can be edited here.
+        toast.error('This report was built from an uploaded spreadsheet, which this page can no longer edit. Delete it and use "Generate Report" instead.')
+        return
+      }
       setActive(res.data)
-      setView(res.data.is_manual_entry ? 'manual-editor' : 'editor')
+      setView('manual-editor')
     } catch {
       toast.error('Unable to open this report.')
     }

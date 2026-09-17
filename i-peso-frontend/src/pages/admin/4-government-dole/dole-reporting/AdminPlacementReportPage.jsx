@@ -1,9 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import {
-  ArrowLeft, Download, CheckCircle2, XCircle, Loader2, FileSpreadsheet,
-  CalendarX, AlertTriangle, Link2, UserCheck, Users,
+  ArrowLeft, Download, CheckCircle2, XCircle, Loader2, FileSpreadsheet, CalendarX,
 } from 'lucide-react'
-import { Card, CardHeader, Button, Badge, AlertBox, StatCard } from '@/components/ui'
+import { Card, CardHeader, Button, Badge, AlertBox } from '@/components/ui'
 import { ConfirmModal, PageHeader } from '@/pages/admin/_components'
 import DataTable from '@/pages/admin/_components/DataTable'
 import toast from 'react-hot-toast'
@@ -29,21 +28,6 @@ const FIELD_LABELS = {
 }
 
 
-
-const COMPLIANCE_TONE = {
-  approved: 'approved',
-  pending_review: 'review',
-  needs_revision: 'warning',
-  overdue: 'rejected',
-  not_submitted: 'neutral',
-}
-const COMPLIANCE_LABEL = {
-  approved: 'Approved',
-  pending_review: 'Submitted',
-  needs_revision: 'Returned for revision',
-  overdue: 'Overdue',
-  not_submitted: 'Not yet due',
-}
 
 export default function AdminPlacementReportPage() {
   const [statusFilter, setStatusFilter] = useState('pending_review')
