@@ -1,8 +1,9 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { lazy, memo, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { MarkerClusterer } from '@googlemaps/markerclusterer'
 import { APIProvider, InfoWindow, Map as GoogleMap, Marker as GoogleMarker, useMap as useGoogleMap, useMarkerRef } from '@vis.gl/react-google-maps'
 import { GOOGLE_MAP_ID, toMapPosition } from '@/utils/mapCoordinates'
-import { Expand, Layers3, List, LocateFixed, RotateCcw, Sparkles } from 'lucide-react'
+import { ChevronDown, Expand, Layers3, List, LocateFixed, RotateCcw, Sparkles } from 'lucide-react'
+import '@/assets/styles/job-map.css'
 
 const DEFAULT_CENTER = { lat: 15.9758, lng: 120.567 }
 const LeafletFallbackMap = lazy(() => import('./LeafletFallbackMap'))
@@ -26,7 +27,7 @@ const formatSalary = (job) => {
   return format(job.salary_min || job.salary_max)
 }
 
-function CompactJobPopup({ job, onViewJob }) {
+const CompactJobPopup = memo(function CompactJobPopup({ job, onViewJob }) {
   const hasMatch = job.match_percentage !== null && job.match_percentage !== undefined
   return (
     <div className="w-[240px] p-1 font-sans text-slate-900">
@@ -45,9 +46,9 @@ function CompactJobPopup({ job, onViewJob }) {
       </div>
     </div>
   )
-}
+})
 
-function MapControls({ onRecenter, onListToggle, onFullscreen, onReset, clustersEnabled, onClustersToggle, highOnly, onHighToggle, detailsOpen }) {
+const MapControls = memo(function MapControls({ onRecenter, onListToggle, onFullscreen, onReset, clustersEnabled, onClustersToggle, highOnly, onHighToggle, detailsOpen }) {
   return (
     <div className={`absolute right-3 top-3 z-[500] flex flex-col gap-2 transition-[right] duration-300 ${detailsOpen ? 'md:right-[420px]' : 'md:right-3'}`}>
       <button type="button" onClick={onRecenter} className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-blue-950 shadow-md hover:bg-slate-50" title="Recenter to my location"><LocateFixed className="h-4 w-4" /></button>
@@ -58,20 +59,54 @@ function MapControls({ onRecenter, onListToggle, onFullscreen, onReset, clusters
       <button type="button" onClick={onHighToggle} className={`flex h-10 w-10 items-center justify-center rounded-xl border shadow-md ${highOnly ? 'border-amber-300 bg-amber-400 text-blue-950' : 'border-slate-200 bg-white text-blue-950'}`} title="Toggle high-match jobs"><Sparkles className="h-4 w-4" /></button>
     </div>
   )
+})
+
+// Mirrors the actual pin shapes on the map (teardrop for jobs/fairs, dot for
+// "you are here") instead of plain colored circles, so the legend reads as
+// the same visual language as the pins themselves — including the pulsing
+// halo that marks a selected job and a PESO job fair.
+function LegendSwatch({ shape, color, border, ring }) {
+  if (shape === 'dot') {
+    return <i className="block h-3 w-3 shrink-0 rounded-full border-2 border-white shadow" style={{ background: color }} />
+  }
+  return (
+    <span className="relative flex h-3.5 w-3.5 shrink-0 items-center justify-center">
+      {ring && <i className="jm-pin-ring absolute inset-[-3px] rounded-full" style={{ background: color, opacity: 0.4 }} />}
+      <i className="relative block h-3 w-3 rounded-[50%_50%_50%_0]" style={{ background: color, border: `1.5px solid ${border}`, transform: 'rotate(-45deg)' }} />
+    </span>
+  )
 }
 
 function MapLegend({ fallback = false, showJobFairs = false }) {
-  const entries = [['bg-emerald-600', 'High'], ['bg-amber-400', 'Medium'], ['bg-slate-400', 'Low'], ['bg-blue-600', 'Your location']]
-  if (showJobFairs) entries.push(['bg-violet-600', 'PESO Job Fair'])
+  const [collapsed, setCollapsed] = useState(false)
+  const entries = [
+    { shape: 'teardrop', color: '#16a34a', border: '#14532d', label: 'High match' },
+    { shape: 'teardrop', color: '#eab308', border: '#713f12', label: 'Medium match' },
+    { shape: 'teardrop', color: '#94a3b8', border: '#334155', label: 'Low match' },
+    { shape: 'teardrop', color: '#f59e0b', border: '#92400e', label: 'Selected', ring: true },
+    { shape: 'dot', color: '#2563eb', label: 'Your location' },
+  ]
+  if (showJobFairs) entries.push({ shape: 'teardrop', color: '#7c3aed', border: '#4c1d95', label: 'PESO Job Fair', ring: true })
+
   return (
-    <div className="absolute bottom-3 left-3 z-[500] rounded-xl border border-slate-200 bg-white/95 px-3 py-2 shadow-md backdrop-blur">
-      <div className="flex items-center justify-between gap-3">
-        <p className="text-[9px] font-black uppercase tracking-wider text-slate-500">Match legend</p>
-        {fallback && <span className="text-[9px] font-bold text-blue-700">OpenStreetMap</span>}
-      </div>
-      <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[10px] font-semibold text-slate-600">
-        {entries.map(([color, label]) => <span key={label} className="flex items-center gap-1"><i className={`h-2.5 w-2.5 rounded-full ${color}`} />{label}</span>)}
-      </div>
+    <div className="jm-legend-panel absolute bottom-3 left-3 z-[500] max-w-[190px] rounded-xl border border-slate-200 bg-white/95 shadow-md backdrop-blur">
+      <button type="button" onClick={() => setCollapsed((value) => !value)} className="flex w-full items-center justify-between gap-3 px-3 py-2" aria-expanded={!collapsed}>
+        <span className="text-[9px] font-black uppercase tracking-wider text-slate-500">Map legend</span>
+        <span className="flex items-center gap-1.5">
+          {fallback && <span className="text-[9px] font-bold text-blue-700">OSM</span>}
+          <ChevronDown className={`h-3 w-3 text-slate-400 transition-transform duration-200 ${collapsed ? '-rotate-90' : ''}`} />
+        </span>
+      </button>
+      {!collapsed && (
+        <div className="flex flex-col gap-1.5 px-3 pb-2.5 text-[10px] font-semibold text-slate-600">
+          {entries.map((entry) => (
+            <span key={entry.label} className="flex items-center gap-2">
+              <LegendSwatch {...entry} />
+              {entry.label}
+            </span>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
@@ -123,7 +158,7 @@ function GoogleClusterManager({ markers, enabled }) {
   return null
 }
 
-function GoogleJobMarker({ job, selected, onSelect, registerMarker }) {
+const GoogleJobMarker = memo(function GoogleJobMarker({ job, selected, onSelect, registerMarker }) {
   const [markerRef, marker] = useMarkerRef()
 
   useEffect(() => {
@@ -134,9 +169,9 @@ function GoogleJobMarker({ job, selected, onSelect, registerMarker }) {
   return (
     <GoogleMarker ref={markerRef} position={{ lat: Number(job.latitude), lng: Number(job.longitude) }} onClick={() => onSelect(job.post_id)} zIndex={selected ? 50 : 10} title={`${job.job_title} · ${job.match_percentage == null ? 'open to calculate match' : `${Math.round(job.match_percentage)}% match`}`} />
   )
-}
+})
 
-function GoogleJobFairMarker({ fair, onSelect }) {
+const GoogleJobFairMarker = memo(function GoogleJobFairMarker({ fair, onSelect }) {
   // google.maps.Size/Point must be real instances (not plain objects) — safe
   // to construct here since this only ever mounts inside an already-loaded
   // <APIProvider><GoogleMap>, same guarantee GoogleClusterManager relies on.
@@ -154,15 +189,25 @@ function GoogleJobFairMarker({ fair, onSelect }) {
       onClick={onSelect}
       zIndex={20}
       icon={icon}
+      // A one-time drop-in (native to classic Marker, no custom DOM needed)
+      // draws the eye to PESO job fairs as the map loads, without the
+      // constant-bounce noise a continuously-animated pin would add.
+      animation={window.google?.maps?.Animation?.DROP}
       title={`PESO Job Fair: ${fair.title} · ${fair.venue}`}
     />
   )
-}
+})
 
-export default function JobVacancyMap({ jobs, jobFairs = [], onJobFairSelect, seekerLocation, selectedJobId, popupJobId, onMarkerSelect, onPopupClose, onViewJob, detailsOpen, onListToggle, onReset, highOnly, onHighToggle }) {
+// The whole map (Google/Leaflet tiles + every marker) previously re-rendered
+// on any JobMapPage state change — applying to a job, toggling a panel, a
+// filter debounce tick — none of which need to touch the map at all as long
+// as the props below stay referentially stable. Callers must memoize the
+// handlers they pass in for this to actually skip work; see JobMapPage.jsx.
+function JobVacancyMap({ jobs, jobFairs = [], onJobFairSelect, seekerLocation, selectedJobId, popupJobId, onMarkerSelect, onPopupClose, onViewJob, detailsOpen, onListToggle, onReset, highOnly, onHighToggle }) {
   const containerRef = useRef(null)
   const [markers, setMarkers] = useState({})
   const markerRegistry = useRef({})
+  const registerFlushPending = useRef(false)
   const [recenterRequest, setRecenterRequest] = useState(0)
   const [googleFailed, setGoogleFailed] = useState(false)
   const [clustersEnabled, setClustersEnabled] = useState(true)
@@ -187,11 +232,21 @@ export default function JobVacancyMap({ jobs, jobFairs = [], onJobFairSelect, se
   const activeJobId = selectedJobId || popupJobId
   const useLeaflet = preferredProvider === 'leaflet' || !googleKey || googleFailed
 
+  // N job markers each register on mount in their own effect. Committing one
+  // setMarkers() per registration made GoogleClusterManager tear down and
+  // rebuild its entire clusterer once per marker (worst case O(N²) for N
+  // markers). Coalescing same-tick registrations into a single state update
+  // via a microtask turns that into one rebuild per batch instead.
   const registerMarker = useCallback((id, marker) => {
     if (markerRegistry.current[id] === marker) return
     if (marker) markerRegistry.current[id] = marker
     else delete markerRegistry.current[id]
-    setMarkers({ ...markerRegistry.current })
+    if (registerFlushPending.current) return
+    registerFlushPending.current = true
+    queueMicrotask(() => {
+      registerFlushPending.current = false
+      setMarkers({ ...markerRegistry.current })
+    })
   }, [])
 
   useEffect(() => {
@@ -249,3 +304,5 @@ export default function JobVacancyMap({ jobs, jobFairs = [], onJobFairSelect, se
     </div>
   )
 }
+
+export default memo(JobVacancyMap)

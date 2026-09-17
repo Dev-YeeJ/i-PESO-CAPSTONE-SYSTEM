@@ -78,6 +78,12 @@ class EmployerPlacementReportController extends Controller
                 'birth_date' => $seeker->date_of_birth?->format('Y-m-d'),
                 'address' => $seeker->address_municipality_city,
                 'educational_attainment' => $seeker->educ_attainment,
+                // Same disambiguation fields the Establishment Report's identical
+                // ApplicantNameSuggest dropdown shows under each name — without
+                // these the Placement Report's suggestions rendered with no
+                // subtitle, making same-named job seekers harder to tell apart.
+                'city_municipality' => $seeker->address_municipality_city,
+                'contact_number' => $seeker->mobile_number,
             ])
             ->all();
 

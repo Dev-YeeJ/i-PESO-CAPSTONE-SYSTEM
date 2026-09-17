@@ -1,15 +1,22 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import 'leaflet.markercluster'
 import 'leaflet.markercluster/dist/MarkerCluster.css'
 import 'leaflet.markercluster/dist/MarkerCluster.Default.css'
 import { MapContainer, Marker, Popup, TileLayer, useMap } from 'react-leaflet'
+import '@/assets/styles/job-map.css'
 
 const markerColors = (percentage) => {
   if (percentage >= 80) return { background: '#16a34a', borderColor: '#14532d' }
   if (percentage >= 50) return { background: '#eab308', borderColor: '#713f12' }
   return { background: '#94a3b8', borderColor: '#334155' }
+}
+
+const matchBucket = (percentage) => {
+  if (percentage >= 80) return 'high'
+  if (percentage >= 50) return 'medium'
+  return 'low'
 }
 
 const formatSalary = (job) => {
@@ -19,33 +26,45 @@ const formatSalary = (job) => {
   return format(job.salary_min || job.salary_max)
 }
 
+// Only a handful of (match bucket × selected) combinations ever exist, so the
+// divIcon for each is built once and reused across every marker that shares
+// it — a fresh L.divIcon per marker per rebuild was needless work repeated on
+// every render.
+const jobIconCache = new Map()
 const leafletJobIcon = (job, selected) => {
+  const bucket = matchBucket(job.match_percentage)
+  const cacheKey = `${bucket}-${selected}`
+  if (jobIconCache.has(cacheKey)) return jobIconCache.get(cacheKey)
+
   const colors = markerColors(job.match_percentage)
   const background = selected ? '#f59e0b' : colors.background
   const border = selected ? '#92400e' : colors.borderColor
   const size = selected ? 34 : 28
-  return L.divIcon({
+  const icon = L.divIcon({
     className: '',
     iconSize: [size, size],
     iconAnchor: [size / 2, size],
-    html: `<span style="display:block;width:${size}px;height:${size}px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:${background};border:3px solid ${border};box-shadow:0 3px 8px rgba(15,23,42,.28)"><i style="display:block;width:7px;height:7px;margin:${Math.round(size / 2 - 5)}px auto 0;border-radius:999px;background:#fff"></i></span>`,
+    html: `<span class="jm-marker-enter jm-pin" style="width:${size}px;height:${size}px;">${selected ? `<i class="jm-pin-ring" style="background:rgba(245,158,11,.4)"></i>` : ''}<span style="display:block;width:${size}px;height:${size}px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:${background};border:3px solid ${border};box-shadow:0 3px 8px rgba(15,23,42,.28)"><i style="display:block;width:7px;height:7px;margin:${Math.round(size / 2 - 5)}px auto 0;border-radius:999px;background:#fff"></i></span></span>`,
   })
+  jobIconCache.set(cacheKey, icon)
+  return icon
 }
 
 const leafletUserIcon = L.divIcon({
   className: '',
   iconSize: [24, 24],
   iconAnchor: [12, 12],
-  html: '<span style="display:block;width:24px;height:24px;border-radius:999px;background:#2563eb;border:4px solid #fff;box-shadow:0 0 0 2px #1e3a8a,0 3px 10px rgba(15,23,42,.3)"></span>',
+  html: '<span class="jm-marker-enter" style="display:block;width:24px;height:24px;border-radius:999px;background:#2563eb;border:4px solid #fff;box-shadow:0 0 0 2px #1e3a8a,0 3px 10px rgba(15,23,42,.3)"></span>',
 })
 
-// Violet teardrop with a small calendar glyph — visually distinct from the
-// match-colored job pins and the blue "your location" marker.
+// Violet teardrop with a small calendar glyph and a soft pulsing halo — reads
+// as distinct from the match-colored job pins and the blue "your location"
+// marker even at a glance on a busy map.
 const leafletJobFairIcon = L.divIcon({
   className: '',
   iconSize: [34, 34],
   iconAnchor: [17, 34],
-  html: '<span style="display:block;width:34px;height:34px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:#7c3aed;border:3px solid #4c1d95;box-shadow:0 3px 8px rgba(15,23,42,.3)"><i style="display:block;width:10px;height:8px;margin:12px auto 0;background:#fff;border-radius:1px;transform:rotate(45deg)"></i></span>',
+  html: '<span class="jm-marker-enter jm-pin" style="width:34px;height:34px;"><i class="jm-pin-ring" style="background:rgba(124,58,237,.4)"></i><span style="display:block;width:34px;height:34px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:#7c3aed;border:3px solid #4c1d95;box-shadow:0 3px 8px rgba(15,23,42,.3)"><i style="display:block;width:10px;height:8px;margin:12px auto 0;background:#fff;border-radius:1px;transform:rotate(45deg)"></i></span></span>',
 })
 
 function CompactJobPopup({ job, onViewJob }) {
@@ -81,16 +100,47 @@ function MapUpdater({ center, jobs, selectedJob, recenterRequest }) {
 
 function ClusterLayer({ jobs, activeJobId, onMarkerSelect, clustersEnabled }) {
   const map = useMap()
+  const markersRef = useRef(new Map())
+  // Keeps the click handler current without forcing the rebuild effect below
+  // to depend on onMarkerSelect's identity — a parent that re-renders often
+  // (applying to a job, toggling a panel, etc.) would otherwise recreate that
+  // callback and tear down every marker just to rewire a click listener.
+  const onMarkerSelectRef = useRef(onMarkerSelect)
+  useEffect(() => { onMarkerSelectRef.current = onMarkerSelect }, [onMarkerSelect])
+
+  // Rebuilds the marker layer only when the actual job set or cluster mode
+  // changes — not on every selection change, which used to tear down and
+  // recreate every marker (and its icon HTML) just to highlight one pin.
   useEffect(() => {
     const cluster = clustersEnabled ? L.markerClusterGroup({ showCoverageOnHover: false, maxClusterRadius: 48, spiderfyOnMaxZoom: true }) : L.layerGroup()
-    jobs.forEach((job) => {
-      const marker = L.marker([job.latitude, job.longitude], { icon: leafletJobIcon(job, activeJobId === job.post_id), title: job.job_title })
-      marker.on('click', () => onMarkerSelect(job.post_id))
-      cluster.addLayer(marker)
+    const markerMap = new Map()
+    const markers = jobs.map((job) => {
+      const marker = L.marker([job.latitude, job.longitude], { icon: leafletJobIcon(job, false), title: job.job_title })
+      marker.on('click', () => onMarkerSelectRef.current(job.post_id))
+      markerMap.set(job.post_id, { marker, job })
+      return marker
     })
+    // addLayers() is the bulk-insert API markercluster documents for adding
+    // many markers at once; plain L.layerGroup() (the clusters-off path)
+    // only implements the singular addLayer().
+    if (clustersEnabled) cluster.addLayers(markers)
+    else markers.forEach((marker) => cluster.addLayer(marker))
     map.addLayer(cluster)
-    return () => map.removeLayer(cluster)
-  }, [map, jobs, activeJobId, onMarkerSelect, clustersEnabled])
+    markersRef.current = markerMap
+    return () => {
+      map.removeLayer(cluster)
+      markersRef.current = new Map()
+    }
+  }, [map, jobs, clustersEnabled])
+
+  // Swaps only the affected marker icons when the active selection changes —
+  // far cheaper than tearing down and rebuilding the whole cluster group.
+  useEffect(() => {
+    markersRef.current.forEach(({ marker, job }, postId) => {
+      marker.setIcon(leafletJobIcon(job, postId === activeJobId))
+    })
+  }, [activeJobId])
+
   return null
 }
 

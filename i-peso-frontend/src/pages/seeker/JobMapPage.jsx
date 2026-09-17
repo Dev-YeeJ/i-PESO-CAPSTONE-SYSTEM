@@ -193,13 +193,18 @@ export default function JobMapPage() {
     setPopupJobId(null)
   }
 
-  const resetFilters = () => {
+  // Memoized so it stays referentially stable across the frequent re-renders
+  // this page does for unrelated state (applying, saving, panel toggles) —
+  // JobVacancyMap is memo()'d and depends on that stability to actually skip
+  // re-rendering the map (and, on the Leaflet path, avoid rebuilding every
+  // marker) when none of that unrelated state should touch it.
+  const resetFilters = useCallback(() => {
     setFilters(DEFAULT_FILTERS)
     setSelectedJobId(null)
     setPopupJobId(null)
     setLocationNotice('')
     setLocationRequired(false)
-  }
+  }, [])
 
   const updateJob = (postId, changes) => {
     setJobs((current) => current.map((job) => job.post_id === postId ? { ...job, ...changes } : job))
@@ -254,7 +259,8 @@ export default function JobMapPage() {
 
   // Tapping a standalone PESO Job Fair pin on the map goes to the same place
   // "View event details" already sends a seeker from a linked vacancy card.
-  const handleJobFairPin = () => navigate('/seeker/job-fairs')
+  // Memoized — passed straight into the memo()'d JobVacancyMap as onJobFairSelect.
+  const handleJobFairPin = useCallback(() => navigate('/seeker/job-fairs'), [navigate])
 
   const viewTraining = (job) => {
     const skill = job.upskill?.programs?.[0]?.matched_skills?.[0] || job.missing_skills?.[0]?.skill || ''
@@ -282,14 +288,16 @@ export default function JobMapPage() {
     )
   }
 
-  const openDetails = async (job) => {
+  // Memoized (deps: detailsById, seekerLocation) — passed into the memo()'d
+  // JobVacancyMap as onViewJob, so it only changes reference when a detail
+  // fetch actually needs to.
+  const openDetails = useCallback(async (job) => {
     const id = typeof job === 'object' ? job.post_id : job
     setSelectedJobId(id)
     setPopupJobId(null)
     setDetailError('')
     if (id) document.getElementById(`map-job-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
 
-    const listJob = jobs.find((item) => item.post_id === id)
     if (!id || detailsById[id]) return
 
     const currentRequest = ++detailRequestId.current
@@ -310,14 +318,36 @@ export default function JobMapPage() {
     } finally {
       if (currentRequest === detailRequestId.current) setDetailLoadingId(null)
     }
-  }
+  }, [detailsById, seekerLocation])
 
-  const previewMarkerJob = (id) => {
+  // Memoized — passed into the memo()'d JobVacancyMap as onMarkerSelect. This
+  // was previously recreated on every render, which forced the Leaflet path
+  // to tear down and rebuild every marker on the map on almost any unrelated
+  // page interaction (applying, saving, panel toggles) since it sat in the
+  // marker-cluster effect's dependency array.
+  const previewMarkerJob = useCallback((id) => {
     setSelectedJobId(null)
     setPopupJobId(id)
-  }
+  }, [])
+
+  const closePopup = useCallback((id) => {
+    setPopupJobId((current) => (current === id ? null : current))
+  }, [])
+
+  const togglePanel = useCallback(() => setPanelOpen((open) => !open), [])
 
   const hasLocation = seekerLocation?.latitude != null && seekerLocation?.longitude != null
+
+  // `hasLocation ? jobs : []` would otherwise build a brand-new empty array
+  // on every render whenever location is missing, defeating JobVacancyMap's
+  // memo() every time regardless of how stable the other props are.
+  const mapJobs = useMemo(() => (hasLocation ? jobs : []), [hasLocation, jobs])
+
+  const toggleHighMatch = useCallback(() => {
+    setFilters((current) => ({ ...current, min_match: Number(current.min_match) >= 80 ? 0 : 80 }))
+    setSelectedJobId(null)
+    setPopupJobId(null)
+  }, [])
 
   useEffect(() => {
     if (routeJobId) {
@@ -359,8 +389,13 @@ export default function JobMapPage() {
       {/* Background Map Canvas */}
       <main className="absolute inset-0 z-0">
         <Suspense fallback={<div className="h-full w-full animate-pulse bg-slate-200" />}>
-          <JobVacancyMap jobs={hasLocation ? jobs : []} jobFairs={jobFairs} onJobFairSelect={handleJobFairPin} seekerLocation={seekerLocation} selectedJobId={selectedJobId} popupJobId={popupJobId} onMarkerSelect={previewMarkerJob} onPopupClose={(id) => setPopupJobId((current) => current === id ? null : current)} onViewJob={openDetails} detailsOpen={Boolean(detailsJob)} onListToggle={() => setPanelOpen((open) => !open)} onReset={resetFilters} highOnly={Number(filters.min_match) >= 80} onHighToggle={() => updateFilters({ min_match: Number(filters.min_match) >= 80 ? 0 : 80 })} />
+          <JobVacancyMap jobs={mapJobs} jobFairs={jobFairs} onJobFairSelect={handleJobFairPin} seekerLocation={seekerLocation} selectedJobId={selectedJobId} popupJobId={popupJobId} onMarkerSelect={previewMarkerJob} onPopupClose={closePopup} onViewJob={openDetails} detailsOpen={Boolean(detailsJob)} onListToggle={togglePanel} onReset={resetFilters} highOnly={Number(filters.min_match) >= 80} onHighToggle={toggleHighMatch} />
         </Suspense>
+        <div className={`pointer-events-none absolute left-1/2 top-4 z-10 -translate-x-1/2 transition-all duration-300 ${isLoading ? 'translate-y-0 opacity-100' : '-translate-y-2 opacity-0'}`}>
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white/95 px-3 py-1.5 text-[11px] font-bold text-blue-950 shadow-lg backdrop-blur">
+            <Loader2 className="h-3.5 w-3.5 animate-spin" /> Updating map…
+          </span>
+        </div>
         {!hasLocation && !isLoading && (
           <div className="pointer-events-none absolute inset-x-4 top-16 z-10 mx-auto max-w-md rounded-xl border border-amber-200 bg-white/95 p-3 text-center text-xs font-semibold leading-5 text-amber-800 shadow-lg backdrop-blur">Update your address or use your current location to view nearby job pins.</div>
         )}
