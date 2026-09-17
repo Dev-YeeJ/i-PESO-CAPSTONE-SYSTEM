@@ -20,7 +20,7 @@ const FEATURE_MATRIX = [
   { no: 10, feature: "DOLE Reporting (PEIS / NERPS)",      role: "Administrator",    key: "Establishment & placement report generation",    priority: "High" },
   { no: 11, feature: "SMS Notifications",                  role: "Admin / Employer", key: "Template-based SMS for alerts & updates",        priority: "Medium" },
   { no: 12, feature: "Labor Analytics & Location Quality", role: "Administrator",    key: "Gender, skills, vacancy distribution charts",    priority: "Medium" },
-  { no: 13, feature: "AI Chatbot (Isko)",                  role: "All Users",        key: "Intelligent assistant for common inquiries",     priority: "Medium" },
+  { no: 13, feature: "AI Chatbot (ACE)",                   role: "All Users",        key: "Intelligent assistant for common inquiries",     priority: "Medium" },
   { no: 14, feature: "Role & Staff Management",            role: "Administrator",    key: "RBAC, staff accounts, permissions",              priority: "Medium" },
   { no: 15, feature: "Content & Announcements Module",     role: "Administrator",    key: "Portal content management, announcements",       priority: "Low" },
 ];
@@ -61,7 +61,7 @@ const INTENTS = [
   { id: "features",         keywords: ["feature","module","function","functionality","list","matrix","capabilities"] },
   { id: "adviser_system",   keywords: ["adviser","advisor","comment","suggestion","feedback","system comment","panel","application"] },
   { id: "adviser_document", keywords: ["document","manuscript","research","paper","scope","reference","formula","methodology","study"] },
-  { id: "help",             keywords: ["help","hi","hello","hey","start","what can you do","guide","isko"] },
+  { id: "help",             keywords: ["help","hi","hello","hey","start","what can you do","guide","ace"] },
 ];
 
 const CHIP_INTENT_MAP = {
@@ -84,7 +84,7 @@ function detectIntent(text) {
 function generateBotResponse(intentId) {
   const map = {
     help: {
-      text: "Hi there! 👋 I'm Isko, the i-PESO AI Assistant. Here's what I can help you with:",
+      text: "Hi there! 👋 I'm ACE, the i-PESO AI Assistant. Here's what I can help you with:",
       cardType: null,
       chips: ["System Summary", "Show Feature Matrix", "Adviser Comments (System)", "Adviser Comments (Document)"],
     },
@@ -272,7 +272,7 @@ export default function AIChatWidget() {
     {
       id: 1,
       sender: "bot",
-      text: "Hi! 👋 I'm Isko, your i-PESO Assistant. I can help you explore the system's features, objectives, and adviser feedback. What would you like to know?",
+      text: "Hi! 👋 I'm ACE, your i-PESO Assistant. I can help you explore the system's features, objectives, and adviser feedback. What would you like to know?",
       cardType: null,
       chips: ["System Summary", "Show Feature Matrix", "Adviser Comments (System)", "Adviser Comments (Document)"],
       time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
@@ -338,7 +338,7 @@ export default function AIChatWidget() {
                   <Bot size={22} className="text-white" />
                 </div>
                 <div>
-                  <h3 className="font-semibold text-base leading-tight">Isko — i-PESO Assistant</h3>
+                  <h3 className="font-semibold text-base leading-tight">ACE — Assistance for Career and Employment</h3>
                   <p className="text-xs text-primary-foreground/80 flex items-center gap-1">
                     <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse"></span>
                     Online · Ask me about i-PESO
