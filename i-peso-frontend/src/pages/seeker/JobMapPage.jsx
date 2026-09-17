@@ -7,6 +7,7 @@ import JobMapCard from '../../components/maps/JobMapCard'
 import JobMapFilters from '../../components/maps/JobMapFilters'
 import JobMapDetailsPanel from '../../components/maps/JobMapDetailsPanel'
 import ReportEmployerModal from '../../components/ReportEmployerModal'
+import JobFairInfoModal from '../../components/JobFairInfoModal'
 import { getMapJobDetail, getMapJobs } from '../../services/jobMapService'
 import { applyToJob, toggleSavedJob } from '../../services/seekerService'
 import { listJobFairs } from '../../services/jobFairService'
@@ -104,6 +105,7 @@ export default function JobMapPage() {
   const [detailLoadingId, setDetailLoadingId] = useState(null)
   const [detailError, setDetailError] = useState('')
   const [reportTarget, setReportTarget] = useState(null)
+  const [jobFairPopup, setJobFairPopup] = useState(null)
   const [popupJobId, setPopupJobId] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
@@ -251,16 +253,21 @@ export default function JobMapPage() {
     }
   }
 
+  // Previously both of these hard-navigated to the generic /seeker/job-fairs
+  // list regardless of which fair was actually clicked — a jarring, contextless
+  // redirect. They now show a popup with that specific fair's info first.
   const handleJobFair = (job) => {
     const fair = job.job_fair
     if (!fair?.job_fair_id) return
-    navigate('/seeker/job-fairs')
+    setJobFairPopup(fair)
   }
 
-  // Tapping a standalone PESO Job Fair pin on the map goes to the same place
-  // "View event details" already sends a seeker from a linked vacancy card.
-  // Memoized — passed straight into the memo()'d JobVacancyMap as onJobFairSelect.
-  const handleJobFairPin = useCallback(() => navigate('/seeker/job-fairs'), [navigate])
+  // Tapping a standalone PESO Job Fair pin on the map. Memoized — passed
+  // straight into the memo()'d JobVacancyMap as onJobFairSelect.
+  const handleJobFairPin = useCallback((fair) => {
+    if (!fair?.job_fair_id) return
+    setJobFairPopup({ job_fair_id: fair.job_fair_id, title: fair.title, date: fair.date || fair.start_date, venue: fair.venue })
+  }, [])
 
   const viewTraining = (job) => {
     const skill = job.upskill?.programs?.[0]?.matched_skills?.[0] || job.missing_skills?.[0]?.skill || ''
@@ -474,6 +481,7 @@ export default function JobMapPage() {
 
       <ApplyConfirmation job={pendingApplyJob} onCancel={() => setPendingApplyJobId(null)} onConfirm={submitApplication} applying={pendingApplyJob ? applyingIds.includes(pendingApplyJob.post_id) : false} />
       <ReportEmployerModal open={Boolean(reportTarget)} employer={reportTarget} onClose={() => setReportTarget(null)} />
+      <JobFairInfoModal fair={jobFairPopup} open={Boolean(jobFairPopup)} onClose={() => setJobFairPopup(null)} />
     </div>
   )
 }

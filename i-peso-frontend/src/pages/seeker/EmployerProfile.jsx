@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, Building2, MapPin, BriefcaseBusiness, Calendar, Users, Target, ShieldCheck } from 'lucide-react'
 import LazyImage from '@/components/common/LazyImage'
 import { Card, CardHeader, LoadingSkeleton, Badge, Button } from '@/components/ui'
+import JobDetailModal from '@/components/JobDetailModal'
 import api from '@/services/api'
 
 function formatDate(value) {
@@ -18,6 +19,7 @@ export default function EmployerProfile() {
   const [loading, setLoading] = useState(true)
   const [data, setData] = useState(null)
   const [error, setError] = useState(null)
+  const [viewingJobId, setViewingJobId] = useState(null)
 
   useEffect(() => {
     api.get(`/seeker/employers/${id}`)
@@ -137,7 +139,7 @@ export default function EmployerProfile() {
                         <span className="flex items-center gap-1"><Calendar className="h-3 w-3" />Posted {formatDate(job.created_at)}</span>
                       </div>
                     </div>
-                    <Button variant="outline" onClick={() => navigate(`/seeker/job-map/${job.post_id}`)}>
+                    <Button variant="outline" onClick={() => setViewingJobId(job.post_id)}>
                       View Details
                     </Button>
                   </div>
@@ -172,6 +174,13 @@ export default function EmployerProfile() {
           </Card>
         </aside>
       </div>
+
+      <JobDetailModal
+        postId={viewingJobId}
+        open={viewingJobId !== null}
+        onClose={() => setViewingJobId(null)}
+        sourceLabel={employer.trade_name || employer.company_name}
+      />
     </div>
   )
 }

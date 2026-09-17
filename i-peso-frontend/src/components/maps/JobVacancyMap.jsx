@@ -186,7 +186,11 @@ const GoogleJobFairMarker = memo(function GoogleJobFairMarker({ fair, onSelect }
   return (
     <GoogleMarker
       position={{ lat: Number(fair.latitude), lng: Number(fair.longitude) }}
-      onClick={onSelect}
+      // Passing onSelect straight through as onClick hands it a raw
+      // MapMouseEvent instead of the fair — harmless while the caller
+      // ignored its argument, but broke the moment the click handler needed
+      // to know *which* fair was clicked (see JobMapPage.jsx's job-fair popup).
+      onClick={() => onSelect(fair)}
       zIndex={20}
       icon={icon}
       // A one-time drop-in (native to classic Marker, no custom DOM needed)

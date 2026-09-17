@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
-import { useParams, useNavigate, Link } from 'react-router-dom'
+import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, Building2, CalendarDays, FileText, ImageOff, BriefcaseBusiness, Sparkles, MapPin } from 'lucide-react'
 import { Button, LoadingSkeleton } from '@/components/ui'
+import JobDetailModal from '@/components/JobDetailModal'
 import { getEmployerBooth, viewJobFairPoster } from '@/services/jobFairService'
 
 function timeAgo(iso) {
@@ -22,6 +23,7 @@ export default function SeekerJobFairEmployerPage() {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [viewingJobId, setViewingJobId] = useState(null)
 
   useEffect(() => {
     getEmployerBooth(fairId, employerId)
@@ -113,12 +115,20 @@ export default function SeekerJobFairEmployerPage() {
           ) : (
             <div className="grid gap-4 sm:grid-cols-2">
               {vacancies.map((v) => (
-                <VacancyCard key={v.id} vacancy={v} />
+                <VacancyCard key={v.id} vacancy={v} onView={setViewingJobId} />
               ))}
             </div>
           )}
         </section>
       </div>
+
+      <JobDetailModal
+        postId={viewingJobId}
+        open={viewingJobId !== null}
+        onClose={() => setViewingJobId(null)}
+        sourceLabel={`${displayName} · ${job_fair.title}`}
+        hideJobFairBanner
+      />
     </div>
   )
 }
@@ -181,7 +191,7 @@ function PosterRenderer({ poster, displayName }) {
   )
 }
 
-function VacancyCard({ vacancy }) {
+function VacancyCard({ vacancy, onView }) {
   const hasJobLink = !!vacancy.vacancy
   
   return (
@@ -222,16 +232,19 @@ function VacancyCard({ vacancy }) {
         )}
       </div>
 
-      {hasJobLink && (
-        <div className="mt-5 pt-4 border-t border-slate-100">
-          <Link 
-            to={`/seeker/job-map/${vacancy.vacancy.post_id}`}
+      <div className="mt-5 pt-4 border-t border-slate-100">
+        {hasJobLink ? (
+          <button
+            type="button"
+            onClick={() => onView(vacancy.vacancy.post_id)}
             className="inline-flex w-full items-center justify-center rounded-xl bg-blue-50 px-4 py-2 text-xs font-bold text-blue-700 transition hover:bg-blue-100"
           >
             View Full Job Details
-          </Link>
-        </div>
-      )}
+          </button>
+        ) : (
+          <p className="text-center text-[11px] font-semibold text-slate-400">Not linked to an online posting — ask about this role at the booth.</p>
+        )}
+      </div>
     </div>
   )
 }

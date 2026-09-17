@@ -19,6 +19,15 @@ export default function JobFairFeed() {
   const [passes, setPasses] = useState({}); const [registeringId, setRegisteringId] = useState(null); const [registerErrors, setRegisterErrors] = useState({})
   useEffect(() => { listJobFairs().then(setFairs).catch((e) => setError(e.response?.data?.message ?? 'Unable to load Job Fairs.')).finally(() => setLoading(false)) }, [])
 
+  // Lets a link elsewhere in the app (e.g. the "View full job fair page"
+  // popup for a job-fair-linked job) land directly on that fair's card
+  // instead of dumping the seeker at the top of the whole list.
+  useEffect(() => {
+    if (loading || fairs.length === 0 || !window.location.hash) return
+    const target = document.querySelector(window.location.hash)
+    target?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }, [loading, fairs])
+
   const register = async (fair) => {
     setRegisteringId(fair.job_fair_id)
     setRegisterErrors((prev) => ({ ...prev, [fair.job_fair_id]: '' }))
@@ -79,7 +88,7 @@ export default function JobFairFeed() {
             ) : (
               <div className="space-y-6">
                 {fairs.map((fair) => (
-                  <article key={fair.job_fair_id} className="rounded-3xl border border-slate-200 bg-white p-6 sm:p-8 shadow-sm transition hover:border-blue-200 hover:shadow-md">
+                  <article key={fair.job_fair_id} id={`fair-${fair.job_fair_id}`} className="scroll-mt-4 rounded-3xl border border-slate-200 bg-white p-6 sm:p-8 shadow-sm transition hover:border-blue-200 hover:shadow-md">
                     <div className="flex flex-wrap items-start justify-between gap-4">
                       <div>
                         <div className="flex flex-wrap items-center gap-2">
