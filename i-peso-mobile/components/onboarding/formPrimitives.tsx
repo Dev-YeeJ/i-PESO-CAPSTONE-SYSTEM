@@ -53,6 +53,8 @@ export function Field({
   error,
   required = false,
   autoCapitalize = 'words',
+  editable = true,
+  help,
 }: {
   label: string
   value: string
@@ -63,6 +65,10 @@ export function Field({
   error?: string
   required?: boolean
   autoCapitalize?: 'none' | 'words' | 'sentences' | 'characters'
+  /** Locked read-only, e.g. a name field that must match what was captured at registration. */
+  editable?: boolean
+  /** Helper text shown under the field when there's no error — e.g. why it's locked. */
+  help?: string
 }) {
   return (
     <View style={styles.field}>
@@ -71,7 +77,7 @@ export function Field({
         {required ? <Text style={styles.required}> *</Text> : null}
       </Text>
       <TextInput
-        style={[styles.input, multiline && styles.multiline, error && styles.inputError]}
+        style={[styles.input, multiline && styles.multiline, error && styles.inputError, !editable && styles.inputDisabled]}
         value={value}
         onChangeText={onChangeText}
         placeholder={placeholder}
@@ -79,8 +85,9 @@ export function Field({
         keyboardType={keyboardType}
         multiline={multiline}
         autoCapitalize={autoCapitalize}
+        editable={editable}
       />
-      {error ? <Text style={styles.errorText}>{error}</Text> : null}
+      {error ? <Text style={styles.errorText}>{error}</Text> : help ? <Text style={styles.helpText}>{help}</Text> : null}
     </View>
   )
 }
@@ -335,8 +342,10 @@ const styles = StyleSheet.create({
     fontSize: typography.body,
   },
   inputError: { borderColor: colors.danger },
+  inputDisabled: { backgroundColor: colors.border, color: colors.muted },
   multiline: { minHeight: 76, textAlignVertical: 'top' },
   errorText: { marginTop: spacing.xs, color: colors.danger, fontSize: typography.small, fontFamily: typography.family.medium },
+  helpText: { marginTop: spacing.xs, color: colors.muted, fontSize: typography.small, lineHeight: 16 },
   choiceRow: { flexDirection: 'row', gap: spacing.sm, flexWrap: 'wrap' },
   choiceGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   choice: { borderWidth: 1, borderColor: colors.border, borderRadius: radii.md, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, backgroundColor: colors.surface },

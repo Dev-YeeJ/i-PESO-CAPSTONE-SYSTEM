@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import { ArrowLeft, ArrowRight, CalendarDays, ClipboardCheck, Clock3, Download, Save, AlertCircle } from 'lucide-react'
 import { AlertBox, Badge, Button, Card, EmptyState, LoadingSkeleton } from '@/components/ui'
+import PageHeader from '@/pages/admin/_components/PageHeader'
 import EstablishmentReportPreview from '@/components/reports/EstablishmentReportPreview'
 import JobFairResultEntryEditor from '@/components/reports/JobFairResultEntryEditor'
 import { blankResultEntry } from '@/components/reports/jobFairResultVocab'
@@ -13,7 +15,12 @@ import {
   searchApplicantSuggestions,
   submitJobFairResults,
 } from '@/services/jobFairService'
-import { toast } from 'sonner'
+// react-hot-toast, not sonner: the app only mounts react-hot-toast's <Toaster/> (see
+// App.jsx) — this page importing from 'sonner' meant its success/error toasts were built
+// but never actually rendered anywhere. Matches every other page in the app.
+import { toast } from 'react-hot-toast'
+
+const MotionDiv = motion.div
 
 const ELIGIBLE_STATUSES = ['approved', 'attended', 'encoded_results', 'report_generated']
 const MISMATCH_STATUSES = ['employer_mismatch', 'seeker_mismatch']
@@ -75,6 +82,8 @@ export default function EmployerEstablishmentReportPage() {
   const [fairs, setFairs] = useState([])
   const [selectedId, setSelectedId] = useState('')
   const [loading, setLoading] = useState(true)
+  const [downloading, setDownloading] = useState(false)
+  const [saving, setSaving] = useState(false)
 
   const methods = useForm({
     resolver: zodResolver(formSchema),
@@ -131,6 +140,7 @@ export default function EmployerEstablishmentReportPage() {
   }
 
   const download = async () => {
+    setDownloading(true)
     try {
       const blob = await downloadJobFairResult(selected.participation.result_report.id)
       const url = URL.createObjectURL(blob)
@@ -139,10 +149,13 @@ export default function EmployerEstablishmentReportPage() {
       URL.revokeObjectURL(url)
     } catch (e) {
       toast.error(e.response?.data?.message ?? 'Unable to generate report.')
+    } finally {
+      setDownloading(false)
     }
   }
 
   const onSubmit = async (data) => {
+    setSaving(true)
     try {
       await submitJobFairResults(selected.job_fair_id, {
         ...totals,
@@ -156,6 +169,8 @@ export default function EmployerEstablishmentReportPage() {
       await load()
     } catch (e) {
       toast.error(Object.values(e.response?.data?.errors ?? {}).flat().join(' ') || e.response?.data?.message || 'Action failed.')
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -165,14 +180,11 @@ export default function EmployerEstablishmentReportPage() {
 
   return (
     <div className="mx-auto max-w-7xl space-y-8 pb-12">
-      <header className="border-b border-slate-200 pb-6">
-        <p className="text-xs font-black uppercase tracking-widest text-brand-navy">DOLE Region I Job Fair Reporting</p>
-        <h1 className="mt-2 text-3xl font-black tracking-tight text-slate-950">Establishment Report</h1>
-        <p className="mt-1.5 text-sm font-bold text-slate-500">RO1-JF Form 3</p>
-        <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">
-          Encode post-event results for every Job Fair you were approved to participate in.
-        </p>
-      </header>
+      <PageHeader
+        eyebrow="DOLE Region I Job Fair Reporting"
+        title="Establishment Report"
+        subtitle="RO1-JF Form 3 — Encode post-event results for every Job Fair you were approved to participate in."
+      />
 
       {loading ? (
         <LoadingSkeleton variant="card" rows={2} />
@@ -185,18 +197,20 @@ export default function EmployerEstablishmentReportPage() {
             action={{ label: 'Browse Job Fairs', to: '/employer/job-fairs' }}
           />
         </Card>
-      ) : !selected ? (
-        <div>
-          <h2 className="text-lg font-black tracking-tight text-slate-950">Eligible Job Fairs</h2>
-          <p className="mt-1.5 text-sm text-slate-500">Select an event to submit or review its Establishment Report.</p>
-          <div className="mt-5 grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
-            {eligibleFairs.map((fair) => (
-              <FairPickerCard key={fair.job_fair_id} fair={fair} onClick={() => setSelectedId(String(fair.job_fair_id))} />
-            ))}
-          </div>
-        </div>
       ) : (
-        <div className="space-y-6">
+        <AnimatePresence mode="wait">
+          {!selected ? (
+            <MotionDiv key="picker" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.18 }}>
+              <h2 className="text-lg font-black tracking-tight text-slate-950">Eligible Job Fairs</h2>
+              <p className="mt-1.5 text-sm text-slate-500">Select an event to submit or review its Establishment Report.</p>
+              <div className="mt-5 grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
+                {eligibleFairs.map((fair) => (
+                  <FairPickerCard key={fair.job_fair_id} fair={fair} onClick={() => setSelectedId(String(fair.job_fair_id))} />
+                ))}
+              </div>
+            </MotionDiv>
+          ) : (
+            <MotionDiv key="detail" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.18 }} className="space-y-6">
           <button type="button" onClick={() => setSelectedId('')} className="flex items-center gap-2 text-sm font-bold text-slate-500 transition-colors hover:text-slate-900">
             <ArrowLeft className="h-4 w-4" />
             Back to eligible Job Fairs
@@ -215,7 +229,9 @@ export default function EmployerEstablishmentReportPage() {
               <div className="mt-6 border-t border-slate-100 pt-6">
                 <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                   <p className="text-sm font-bold text-slate-800">Previously submitted report</p>
-                  <Button variant="outline" icon={Download} onClick={download}>Download RO1-JF Form 3</Button>
+                  <Button variant="outline" icon={Download} loading={downloading} onClick={download}>
+                    {downloading ? 'Preparing PDF…' : 'Download RO1-JF Form 3'}
+                  </Button>
                 </div>
                 <EstablishmentReportPreview report={selected.participation.result_report} jobFair={selected} />
               </div>
@@ -267,9 +283,10 @@ export default function EmployerEstablishmentReportPage() {
                   <Button
                     type="submit"
                     icon={Save}
+                    loading={saving}
                     disabled={isBeforeEvent || !validEntries.length}
                   >
-                    Save Establishment Report
+                    {saving ? 'Saving…' : 'Save Establishment Report'}
                   </Button>
                   {isBeforeEvent ? (
                     <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-amber-600"><AlertCircle className="h-3.5 w-3.5" />You can submit this report on or after the Job Fair date ({selected.start_date}).</span>
@@ -280,7 +297,9 @@ export default function EmployerEstablishmentReportPage() {
               </form>
             </FormProvider>
           </Card>
-        </div>
+            </MotionDiv>
+          )}
+        </AnimatePresence>
       )}
     </div>
   )

@@ -41,7 +41,9 @@ const FEED_MODE_OPTIONS: { label: string; value: FeedMode }[] = [
   { label: 'Latest', value: 'latest' },
 ]
 const MIN_MATCH_OPTIONS = [0, 50, 70, 80]
-const RADIUS_OPTIONS = [5, 10, 15, 25, 50]
+// Widened to match backend's actual radius_km cap of 500km (SeekerNearbyJobController) —
+// mirrors i-peso-frontend's jobMapService.js ALLOWED_RADII.
+const RADIUS_OPTIONS = [5, 10, 15, 25, 50, 100, 200, 300]
 const JOB_TYPE_OPTIONS: { label: string; value: string }[] = [
   { label: 'Permanent', value: 'Permanent/Regular' },
   { label: 'Contractual', value: 'Contractual' },

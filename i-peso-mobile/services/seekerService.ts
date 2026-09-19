@@ -552,6 +552,8 @@ export interface AiParsedJobQuery {
   certificate_match_only?: boolean
   can_apply_only?: boolean
   max_missing_skills?: number
+  salary_min?: number
+  salary_max?: number
 }
 
 export interface AiProfessionalSummary {

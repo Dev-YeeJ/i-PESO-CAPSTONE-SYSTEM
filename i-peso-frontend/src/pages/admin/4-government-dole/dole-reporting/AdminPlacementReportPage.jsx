@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import {
-  ArrowLeft, Download, CheckCircle2, XCircle, Loader2, FileSpreadsheet, CalendarX,
+  ArrowLeft, Download, CheckCircle2, XCircle, FileSpreadsheet, CalendarX,
 } from 'lucide-react'
 import { Card, CardHeader, Button, Badge, AlertBox } from '@/components/ui'
 import { ConfirmModal, PageHeader } from '@/pages/admin/_components'
@@ -15,6 +16,9 @@ import {
   exportPlacementReportPdf,
   downloadBlob,
 } from '@/services/placementReportService'
+
+const MotionDiv = motion.div
+const MotionRow = motion.tr
 
 const STATUS_TONE = { pending_review: 'review', approved: 'approved', rejected: 'rejected' }
 const STATUS_LABEL = { pending_review: 'Pending review', approved: 'Approved', rejected: 'Rejected' }
@@ -36,6 +40,7 @@ export default function AdminPlacementReportPage() {
   const [detail, setDetail] = useState(null) // { data, records }
   const [busy, setBusy] = useState(false)
   const [rejecting, setRejecting] = useState(false)
+  const [exportingId, setExportingId] = useState(null)
 
   const fetchReports = useCallback(() => {
     setLoading(true)
@@ -87,17 +92,33 @@ export default function AdminPlacementReportPage() {
   }
 
   const handleExport = async (id) => {
+    setExportingId(`${id}-csv`)
     try {
       downloadBlob(await exportPlacementReport(id), `placement-report-${id}.csv`)
+      toast.success('CSV exported.')
     } catch {
       toast.error('Export failed.')
+    } finally {
+      setExportingId(null)
+    }
+  }
+
+  const handleExportPdf = async (id) => {
+    setExportingId(`${id}-pdf`)
+    try {
+      downloadBlob(await exportPlacementReportPdf(id), `placement-report-${id}.pdf`)
+      toast.success('PDF exported.')
+    } catch {
+      toast.error('Export failed.')
+    } finally {
+      setExportingId(null)
     }
   }
 
   if (detail) {
     const d = detail.data
     return (
-      <div className="space-y-6">
+      <MotionDiv initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }} className="space-y-6">
         <PageHeader
           eyebrow="DOLE Reporting"
           title="Placement report review"
@@ -130,13 +151,22 @@ export default function AdminPlacementReportPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {detail.records.map((row) => (
-                  <tr key={row.id}>
-                    {Object.keys(FIELD_LABELS).map((key) => (
-                      <td key={key} className="py-2 pr-3 whitespace-nowrap text-slate-700">{row[key] ?? ''}</td>
-                    ))}
-                  </tr>
-                ))}
+                <AnimatePresence initial={false}>
+                  {detail.records.map((row) => (
+                    <MotionRow
+                      key={row.id}
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      transition={{ duration: 0.15 }}
+                      className="transition-colors hover:bg-slate-50"
+                    >
+                      {Object.keys(FIELD_LABELS).map((key) => (
+                        <td key={key} className="py-2 pr-3 whitespace-nowrap text-slate-700">{row[key] ?? ''}</td>
+                      ))}
+                    </MotionRow>
+                  ))}
+                </AnimatePresence>
               </tbody>
             </table>
             {detail.records.length === 0 && (
@@ -145,14 +175,16 @@ export default function AdminPlacementReportPage() {
           </div>
 
           <div className="mt-5 flex flex-wrap gap-2">
-            <Button variant="outline" icon={Download} onClick={() => handleExport(d.id)}>Export CSV</Button>
-            <Button variant="outline" icon={Download} onClick={() => {
-              exportPlacementReportPdf(d.id).then(blob => downloadBlob(blob, `placement-report-${d.id}.pdf`)).catch(() => toast.error('Export failed.'))
-            }}>Export PDF</Button>
+            <Button variant="outline" icon={Download} loading={exportingId === `${d.id}-csv`} onClick={() => handleExport(d.id)}>
+              {exportingId === `${d.id}-csv` ? 'Exporting…' : 'Export CSV'}
+            </Button>
+            <Button variant="outline" icon={Download} loading={exportingId === `${d.id}-pdf`} onClick={() => handleExportPdf(d.id)}>
+              {exportingId === `${d.id}-pdf` ? 'Exporting…' : 'Export PDF'}
+            </Button>
             {d.status === 'pending_review' && (
               <>
-                <Button variant="navy" icon={busy ? Loader2 : CheckCircle2} onClick={handleApprove} disabled={busy}>Approve</Button>
-                <Button variant="danger" icon={XCircle} onClick={() => setRejecting(true)} disabled={busy}>Reject</Button>
+                <Button variant="navy" icon={CheckCircle2} loading={busy} onClick={handleApprove}>Approve</Button>
+                <Button variant="danger" icon={XCircle} disabled={busy} onClick={() => setRejecting(true)}>Reject</Button>
               </>
             )}
           </div>
@@ -172,7 +204,7 @@ export default function AdminPlacementReportPage() {
           onCancel={() => setRejecting(false)}
           onConfirm={handleReject}
         />
-      </div>
+      </MotionDiv>
     )
   }
 
@@ -195,7 +227,7 @@ export default function AdminPlacementReportPage() {
   ]
 
   return (
-    <div className="space-y-6">
+    <MotionDiv initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }} className="space-y-6">
       <PageHeader
         eyebrow="DOLE Reporting"
         title="Placement Reports"
@@ -212,7 +244,8 @@ export default function AdminPlacementReportPage() {
           <button
             key={tab.key || 'all'}
             onClick={() => setStatusFilter(tab.key)}
-            className={`rounded-full border px-4 py-1.5 text-sm font-semibold transition ${statusFilter === tab.key ? 'border-brand-navy bg-brand-navy text-white' : 'border-slate-300 bg-white text-slate-600 hover:border-brand-navy'}`}
+            aria-pressed={statusFilter === tab.key}
+            className={`rounded-full border px-4 py-1.5 text-sm font-semibold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-navy ${statusFilter === tab.key ? 'border-brand-navy bg-brand-navy text-white' : 'border-slate-300 bg-white text-slate-600 hover:border-brand-navy'}`}
           >
             {tab.label}
           </button>
@@ -228,7 +261,7 @@ export default function AdminPlacementReportPage() {
           emptyMessage="No placement reports in this category."
         />
       </Card>
-    </div>
+    </MotionDiv>
   )
 }
 

@@ -463,7 +463,20 @@ function DateOfBirthField({ value, onChange, error }: { value: string; onChange:
 
 // ── Step 1: Personal, Address, Disability ─────────────────────────────────
 
-export function Step1Personal({ value, onChange, errors }: { value: Step1Value; onChange: (v: Step1Value) => void; errors?: ServerErrors }) {
+export function Step1Personal({
+  value,
+  onChange,
+  errors,
+  lockSurname = false,
+}: {
+  value: Step1Value
+  onChange: (v: Step1Value) => void
+  errors?: ServerErrors
+  /** Mirrors i-peso-frontend's SeekerOnboarding.jsx Step1 — surname must match what was
+   * captured at registration, so it's locked here (though not on the later Profile Edit
+   * form, which still allows correcting it). */
+  lockSurname?: boolean
+}) {
   const set = <K extends keyof Step1Value>(key: K, val: Step1Value[K]) => onChange({ ...value, [key]: val })
   const [provinces, setProvinces] = useState<{ code: string; name: string }[]>([])
   const [cities, setCities] = useState<{ code: string; name: string }[]>([])
@@ -545,7 +558,15 @@ export function Step1Personal({ value, onChange, errors }: { value: Step1Value; 
     <>
       <Field label="First Name" required value={value.first_name} onChangeText={(v) => set('first_name', v)} error={fieldError(errors, 'first_name')} />
       <Field label="Middle Name" value={value.middle_name} onChangeText={(v) => set('middle_name', v)} error={fieldError(errors, 'middle_name')} />
-      <Field label="Last Name" required value={value.last_name} onChangeText={(v) => set('last_name', v)} error={fieldError(errors, 'last_name')} />
+      <Field
+        label="Last Name"
+        required
+        value={value.last_name}
+        onChangeText={(v) => set('last_name', v)}
+        error={fieldError(errors, 'last_name')}
+        editable={!lockSurname}
+        help={lockSurname ? 'Matches your registered account. Contact PESO if this needs correcting.' : undefined}
+      />
       <SelectField label="Suffix" options={SUFFIX_OPTIONS} value={value.suffix} onChange={(v) => set('suffix', v)} placeholder="None" />
       <DateOfBirthField value={value.date_of_birth} onChange={(v) => set('date_of_birth', v)} error={fieldError(errors, 'date_of_birth')} />
       <SelectField label="Sex" required placeholder="Select sex" options={[{ label: 'Male', value: 'male' }, { label: 'Female', value: 'female' }]} value={value.sex} onChange={(v) => set('sex', v)} />

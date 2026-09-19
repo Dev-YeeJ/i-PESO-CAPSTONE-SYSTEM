@@ -176,7 +176,8 @@ export default function EmployerATSGrid() {
               <button
                 key={tab.id}
                 onClick={() => { setActiveTab(tab.id); setCurrentPage(1); setSelectedIds(new Set()) }}
-                className={`flex items-center gap-2 whitespace-nowrap border-b-2 px-5 py-3.5 text-sm font-semibold transition-all ${activeTab === tab.id ? 'border-blue-600 bg-blue-50/40 text-blue-700' : 'border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-700'}`}
+                aria-pressed={activeTab === tab.id}
+                className={`flex items-center gap-2 whitespace-nowrap border-b-2 px-5 py-3.5 text-sm font-semibold transition-all focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-blue-700 ${activeTab === tab.id ? 'border-blue-600 bg-blue-50/40 text-blue-700' : 'border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-700'}`}
               >
                 <TabIcon className="h-4 w-4" />
                 {tab.label}
@@ -192,6 +193,7 @@ export default function EmployerATSGrid() {
             <input
               type="text"
               placeholder="Search by name, skills, or job title..."
+              aria-label="Search applicants"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-10 pr-4 text-sm placeholder:text-slate-400 focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-500"
@@ -222,7 +224,7 @@ export default function EmployerATSGrid() {
                 {PAGE_SIZE_OPTIONS.map((size) => <option key={size} value={size}>{size}</option>)}
               </select>
             </div>
-            <button onClick={refresh} className="rounded-lg p-2 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700" title="Refresh data">
+            <button onClick={refresh} aria-label="Refresh applicants" className="rounded-lg p-2 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700" title="Refresh data">
               <RefreshCw className={`h-4 w-4 ${applicationsQuery.isFetching ? 'animate-spin' : ''}`} />
             </button>
             <Button to="/employer/calendar" variant="outline" size="sm" icon={CalendarIcon}>
@@ -237,7 +239,12 @@ export default function EmployerATSGrid() {
               <tr className="border-b border-slate-200 bg-slate-50/80">
                 <th className="w-12 px-4 py-3 text-center">
                   {!isTerminalTab && (
-                    <button onClick={toggleSelectAll} className="text-slate-400 transition-colors hover:text-slate-600">
+                    <button
+                      onClick={toggleSelectAll}
+                      aria-label={selectedIds.size === applications.length && applications.length > 0 ? 'Deselect all applicants' : 'Select all applicants'}
+                      aria-pressed={selectedIds.size === applications.length && applications.length > 0}
+                      className="text-slate-400 transition-colors hover:text-slate-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700"
+                    >
                       {selectedIds.size === applications.length && applications.length > 0 ? <CheckSquare className="h-4.5 w-4.5 text-blue-600" /> : <Square className="h-4.5 w-4.5" />}
                     </button>
                   )}
@@ -285,7 +292,12 @@ export default function EmployerATSGrid() {
                     <tr key={app.apply_id} className={`group transition-colors ${isSelected ? 'bg-blue-50/50' : 'hover:bg-slate-50/80'}`}>
                       <td className="px-4 py-3.5 text-center">
                         {!isTerminalTab && (
-                          <button onClick={() => toggleSelect(app.apply_id)} className="text-slate-400 transition-colors hover:text-blue-600">
+                          <button
+                            onClick={() => toggleSelect(app.apply_id)}
+                            aria-label={`${isSelected ? 'Deselect' : 'Select'} ${seeker.name || 'this applicant'}`}
+                            aria-pressed={isSelected}
+                            className="text-slate-400 transition-colors hover:text-blue-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700"
+                          >
                             {isSelected ? <CheckSquare className="h-4.5 w-4.5 text-blue-600" /> : <Square className="h-4.5 w-4.5" />}
                           </button>
                         )}
@@ -355,21 +367,29 @@ export default function EmployerATSGrid() {
               Showing <span className="font-semibold text-slate-700">{fromItem}</span> – <span className="font-semibold text-slate-700">{toItem}</span> of <span className="font-semibold text-slate-700">{totalItems}</span> applicants
             </p>
             <div className="flex items-center gap-1">
-              <button onClick={() => goToPage(1)} disabled={currentPage === 1} className="rounded-lg p-2 text-slate-400 transition-colors hover:bg-slate-200 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-30"><ChevronsLeft className="h-4 w-4" /></button>
-              <button onClick={() => goToPage(currentPage - 1)} disabled={currentPage === 1} className="rounded-lg p-2 text-slate-400 transition-colors hover:bg-slate-200 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-30"><ChevronLeft className="h-4 w-4" /></button>
+              <button onClick={() => goToPage(1)} disabled={currentPage === 1} aria-label="First page" className="rounded-lg p-2 text-slate-400 transition-colors hover:bg-slate-200 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700"><ChevronsLeft className="h-4 w-4" /></button>
+              <button onClick={() => goToPage(currentPage - 1)} disabled={currentPage === 1} aria-label="Previous page" className="rounded-lg p-2 text-slate-400 transition-colors hover:bg-slate-200 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700"><ChevronLeft className="h-4 w-4" /></button>
               {(() => {
                 const start = Math.max(1, currentPage - 2)
                 const end = Math.min(totalPages, currentPage + 2)
                 const pages = []
                 for (let i = start; i <= end; i++) {
                   pages.push(
-                    <button key={i} onClick={() => goToPage(i)} className={`h-9 min-w-[36px] rounded-lg text-sm font-semibold transition-colors ${i === currentPage ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-200'}`}>{i}</button>,
+                    <button
+                      key={i}
+                      onClick={() => goToPage(i)}
+                      aria-label={`Page ${i}`}
+                      aria-current={i === currentPage ? 'page' : undefined}
+                      className={`h-9 min-w-[36px] rounded-lg text-sm font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700 ${i === currentPage ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-200'}`}
+                    >
+                      {i}
+                    </button>,
                   )
                 }
                 return pages
               })()}
-              <button onClick={() => goToPage(currentPage + 1)} disabled={currentPage === totalPages} className="rounded-lg p-2 text-slate-400 transition-colors hover:bg-slate-200 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-30"><ChevronRight className="h-4 w-4" /></button>
-              <button onClick={() => goToPage(totalPages)} disabled={currentPage === totalPages} className="rounded-lg p-2 text-slate-400 transition-colors hover:bg-slate-200 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-30"><ChevronsRight className="h-4 w-4" /></button>
+              <button onClick={() => goToPage(currentPage + 1)} disabled={currentPage === totalPages} aria-label="Next page" className="rounded-lg p-2 text-slate-400 transition-colors hover:bg-slate-200 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700"><ChevronRight className="h-4 w-4" /></button>
+              <button onClick={() => goToPage(totalPages)} disabled={currentPage === totalPages} aria-label="Last page" className="rounded-lg p-2 text-slate-400 transition-colors hover:bg-slate-200 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700"><ChevronsRight className="h-4 w-4" /></button>
             </div>
           </div>
         )}

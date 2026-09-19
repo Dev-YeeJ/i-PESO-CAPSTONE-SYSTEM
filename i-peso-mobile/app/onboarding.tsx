@@ -237,7 +237,7 @@ export default function OnboardingScreen() {
           exiting={m.enabled ? (goingBack ? FadeOutRight.duration(160) : FadeOutLeft.duration(160)) : undefined}
           style={styles.card}
         >
-          {step === 1 && <Step1Personal value={form.step1} onChange={(step1) => setForm((f) => ({ ...f, step1 }))} errors={errors} />}
+          {step === 1 && <Step1Personal value={form.step1} onChange={(step1) => setForm((f) => ({ ...f, step1 }))} errors={errors} lockSurname />}
           {step === 2 && <Step2Employment value={form.step2} onChange={(step2) => setForm((f) => ({ ...f, step2 }))} errors={errors} />}
           {step === 3 && <Step3Preferences value={form.step3} onChange={(step3) => setForm((f) => ({ ...f, step3 }))} errors={errors} />}
           {step === 4 && <Step4Languages value={form.step4} onChange={(step4) => setForm((f) => ({ ...f, step4 }))} errors={errors} />}

@@ -38,7 +38,9 @@ function tierFor(job: NearbyJob): MatchTier {
 // Urdaneta City, Pangasinan — sensible default center when no device/profile location is available yet.
 const DEFAULT_REGION = { latitude: 15.9762, longitude: 120.5714, latitudeDelta: 0.15, longitudeDelta: 0.15 }
 
-const RADIUS_OPTIONS = [5, 10, 15, 25, 50]
+// Widened to match backend's actual radius_km cap of 500km (SeekerNearbyJobController) —
+// mirrors i-peso-frontend's jobMapService.js ALLOWED_RADII.
+const RADIUS_OPTIONS = [5, 10, 15, 25, 50, 100, 200, 300]
 const MIN_MATCH_OPTIONS = [0, 50, 70, 80]
 const SORT_OPTIONS: Array<{ label: string; value: NonNullable<JobFilters['sort']> }> = [
   { label: 'Distance', value: 'distance' },
