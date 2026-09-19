@@ -59,6 +59,7 @@ Route::get('/health', function () {
 
 Route::get('/occupations', [OccupationController::class, 'index'])->middleware('throttle:60,1');
 Route::get('/skills', [SkillCatalogController::class, 'index'])->middleware('throttle:60,1');
+Route::get('/public/government-programs', [\App\Http\Controllers\Api\PublicGovernmentProgramController::class, 'index'])->middleware('throttle:60,1');
 Route::post('/cookie-consent', [\App\Http\Controllers\Api\CookieConsentController::class, 'store'])->middleware('throttle:20,1');
 
 // Public assistant for visitors without an account (landing / login / register).

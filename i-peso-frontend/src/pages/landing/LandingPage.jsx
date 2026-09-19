@@ -1,6 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion as Motion, useReducedMotion, AnimatePresence } from 'framer-motion';
+import governmentProgramService from '@/services/governmentProgramService';
+import { categoryLabel } from '@/components/government-programs/programConstants';
 import {
   ArrowRight,
   Briefcase,
@@ -16,17 +18,6 @@ import {
   Users,
 } from 'lucide-react';
 import IPesoLogo from '@/components/branding/IPesoLogo';
-
-const PROGRAMS = [
-  { tag: 'SPES', name: 'SPES 2026 Application', blurb: 'Paid work for students and out-of-school youth during the school break.' },
-  { tag: 'TUPAD', name: 'TUPAD Assistance Program', blurb: 'Short-term emergency employment for displaced or underemployed workers.' },
-  { tag: 'GIP', name: 'Government Internship Program', blurb: 'Paid internships for youth aged 18–30 from low-income households.' },
-  { tag: 'OFW', name: 'DOLE-AKAP for OFWs', blurb: 'Cash assistance for distressed, displaced, or returning OFWs.' },
-  { tag: 'TESDA', name: 'SMAW NC II Training', blurb: 'Free welding and metal fabrication certification.' },
-  { tag: 'TESDA', name: 'Bread and Pastry Production NC II', blurb: 'Free baking certification for aspiring food entrepreneurs.' },
-  { tag: 'LIVELIHOOD', name: 'Livelihood Starter Kit', blurb: 'Starter support for a small business or livelihood project.' },
-  { tag: 'GUIDANCE', name: 'Career Guidance Seminar', blurb: 'Sessions for students, first-time job seekers, and career shifters.' },
-];
 
 const SEEKER_FEATURES = [
   {
@@ -89,6 +80,18 @@ const LandingPage = () => {
   const navigate = useNavigate();
   const sectionMotion = useSectionMotion();
   const [activeTab, setActiveTab] = useState('seeker');
+  const [programs, setPrograms] = useState([]);
+  const [programsLoading, setProgramsLoading] = useState(true);
+  const [programsFailed, setProgramsFailed] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    governmentProgramService.publicPrograms()
+      .then((data) => { if (!cancelled) setPrograms(data || []); })
+      .catch(() => { if (!cancelled) setProgramsFailed(true); })
+      .finally(() => { if (!cancelled) setProgramsLoading(false); });
+    return () => { cancelled = true; };
+  }, []);
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -532,25 +535,46 @@ const LandingPage = () => {
             </h2>
           </div>
 
-          <Motion.div 
-            variants={containerVariants}
-            initial="hidden"
-            whileInView="visible"
-            viewport={{ once: true, margin: '-50px' }}
-            className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4"
-          >
-            {PROGRAMS.map((program) => (
-              <Motion.div 
-                variants={itemVariants}
-                key={program.name} 
-                className="rounded-xl border border-[#0A192F]/10 bg-white p-5 shadow-sm transition-all hover:shadow-md hover:-translate-y-1 cursor-default"
-              >
-                <span className="font-mono text-[10px] font-medium tracking-wide text-[#B45309]">{program.tag}</span>
-                <h3 className="mt-2 text-sm font-bold leading-snug text-[#0A192F]">{program.name}</h3>
-                <p className="mt-2 text-xs leading-relaxed text-slate-600">{program.blurb}</p>
-              </Motion.div>
-            ))}
-          </Motion.div>
+          {programsLoading ? (
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              {[0, 1, 2, 3].map((key) => (
+                <div key={key} className="animate-pulse rounded-xl border border-[#0A192F]/10 bg-white p-5">
+                  <div className="h-2.5 w-12 rounded bg-slate-200" />
+                  <div className="mt-3 h-4 w-3/4 rounded bg-slate-200" />
+                  <div className="mt-3 h-3 w-full rounded bg-slate-100" />
+                  <div className="mt-1.5 h-3 w-2/3 rounded bg-slate-100" />
+                </div>
+              ))}
+            </div>
+          ) : programs.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-[#0A192F]/15 bg-white/60 p-8 text-center">
+              <p className="text-sm font-semibold text-slate-600">
+                {programsFailed
+                  ? 'Programs are temporarily unavailable — please check back shortly.'
+                  : 'No programs are open for application right now — check back soon or visit the PESO office for updates.'}
+              </p>
+            </div>
+          ) : (
+            <Motion.div
+              variants={containerVariants}
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: true, margin: '-50px' }}
+              className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4"
+            >
+              {programs.map((program) => (
+                <Motion.div
+                  variants={itemVariants}
+                  key={program.program_id}
+                  className="rounded-xl border border-[#0A192F]/10 bg-white p-5 shadow-sm transition-all hover:shadow-md hover:-translate-y-1 cursor-default"
+                >
+                  <span className="font-mono text-[10px] font-medium tracking-wide text-[#B45309]">{categoryLabel(program.category)}</span>
+                  <h3 className="mt-2 text-sm font-bold leading-snug text-[#0A192F]">{program.name}</h3>
+                  <p className="mt-2 text-xs leading-relaxed text-slate-600 line-clamp-3">{program.blurb}</p>
+                </Motion.div>
+              ))}
+            </Motion.div>
+          )}
 
           <p className="mt-8 text-sm text-slate-600">
             Eligibility and open slots vary by program.{' '}

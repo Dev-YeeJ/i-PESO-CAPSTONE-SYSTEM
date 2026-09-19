@@ -46,6 +46,11 @@ export const governmentProgramService = {
   updateCitizenCharter: async (id, payload) => (await api.put(`/admin/citizen-charter/${id}`, payload)).data,
   archiveCitizenCharter: async (id) => (await api.delete(`/admin/citizen-charter/${id}`)).data,
 
+  // Unauthenticated teaser list for the landing page — no seeker session
+  // exists yet there, so this can't reuse listSeekerPrograms (which requires
+  // login to compute per-seeker eligibility).
+  publicPrograms: async () => (await api.get('/public/government-programs')).data.data,
+
   listSeekerPrograms: async (params = {}) => (await api.get('/seeker/government-programs', { params })).data,
   seekerProgram: async (id) => (await api.get(`/seeker/government-programs/${id}`)).data.program,
   seekerProgramAttachment: async (id) => (await api.get(`/seeker/government-programs/${id}/attachment`, { responseType: 'blob' })).data,

@@ -127,6 +127,82 @@ class GovernmentProgramsFlowTest extends TestCase
         $this->assertFalse($uris->contains('api/job-fairs/scan-qr'));
     }
 
+    public function test_public_endpoint_lists_only_genuinely_open_programs_with_no_login(): void
+    {
+        $admin = Administrator::create([
+            'first_name' => 'PESO',
+            'last_name' => 'Admin',
+            'email' => 'public.programs.admin@example.test',
+            'password' => 'password123',
+            'role' => 'administrator',
+            'status' => 'active',
+            'email_verified_at' => now(),
+        ]);
+
+        Sanctum::actingAs($admin);
+
+        $basePayload = [
+            'category' => 'tupad',
+            'short_description' => 'Short-term emergency employment.',
+            'description' => 'Full description of the program.',
+            'eligibility_requirements' => ['Registered i-PESO job seeker'],
+            'required_documents' => ['Valid ID'],
+            'total_slots' => 5,
+        ];
+
+        // Should appear: open, public, future deadline, slots available.
+        $this->postJson('/api/admin/government-programs', array_merge($basePayload, [
+            'program_name' => 'TUPAD Batch 12',
+            'program_status' => 'open',
+            'visibility' => 'public',
+            'application_deadline' => now()->addWeek()->toDateString(),
+        ]))->assertCreated();
+
+        // Should NOT appear: closed.
+        $this->postJson('/api/admin/government-programs', array_merge($basePayload, [
+            'program_name' => 'TUPAD Batch 11 (Closed)',
+            'program_status' => 'closed',
+            'visibility' => 'public',
+            'application_deadline' => now()->addWeek()->toDateString(),
+        ]))->assertCreated();
+
+        // Should NOT appear: internal visibility (staff-only posting).
+        $this->postJson('/api/admin/government-programs', array_merge($basePayload, [
+            'program_name' => 'Internal Pilot Program',
+            'program_status' => 'open',
+            'visibility' => 'internal',
+            'application_deadline' => now()->addWeek()->toDateString(),
+        ]))->assertCreated();
+
+        // Should NOT appear: deadline already passed.
+        $this->postJson('/api/admin/government-programs', array_merge($basePayload, [
+            'program_name' => 'TUPAD Batch 10 (Expired)',
+            'program_status' => 'open',
+            'visibility' => 'public',
+            'application_deadline' => now()->subDay()->toDateString(),
+        ]))->assertCreated();
+
+        // Drop the admin session from earlier in this test — the whole point
+        // of this endpoint is that the landing page has no seeker/admin
+        // session yet, so the request below must be genuinely unauthenticated.
+        $this->app['auth']->forgetGuards();
+
+        $response = $this->getJson('/api/public/government-programs')->assertOk();
+
+        $names = collect($response->json('data'))->pluck('name');
+        $this->assertTrue($names->contains('TUPAD Batch 12'));
+        $this->assertFalse($names->contains('TUPAD Batch 11 (Closed)'));
+        $this->assertFalse($names->contains('Internal Pilot Program'));
+        $this->assertFalse($names->contains('TUPAD Batch 10 (Expired)'));
+
+        // Trimmed, marketing-card shape only — no internal/admin detail leaks out.
+        $entry = collect($response->json('data'))->firstWhere('name', 'TUPAD Batch 12');
+        $this->assertEqualsCanonicalizing(
+            ['program_id', 'slug', 'category', 'name', 'blurb', 'application_deadline'],
+            array_keys($entry),
+        );
+    }
+
     private function createTables(): void
     {
         if (! Schema::hasTable('administrators')) {
