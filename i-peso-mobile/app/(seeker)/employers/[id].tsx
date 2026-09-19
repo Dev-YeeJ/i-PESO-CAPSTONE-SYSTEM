@@ -21,6 +21,7 @@ import { colors, radii, spacing, typography } from '@/theme'
 function backTargetFor(from: string | undefined, fromId: string | undefined): string {
   if (from === 'job' && fromId) return `/(seeker)/jobs/${fromId}`
   if (from === 'application' && fromId) return `/(seeker)/applications/${fromId}`
+  if (from === 'poster') return '/(seeker)/employer-posters'
   return '/(seeker)'
 }
 

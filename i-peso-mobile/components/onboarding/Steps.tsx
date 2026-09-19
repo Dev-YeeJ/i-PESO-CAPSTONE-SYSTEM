@@ -28,6 +28,7 @@ import {
 } from './payloads'
 import { newEducation } from './types'
 import type {
+  EducationEntry,
   OccupationPrefEntry,
   Step1Value,
   Step2Value,
@@ -310,6 +311,45 @@ const EDUCATION_LEVEL_OPTIONS = [
   { label: 'Graduate Studies', value: 'graduate_studies' },
 ]
 const COURSE_REQUIRED_LEVELS = ['tertiary', 'senior_high_strand', 'vocational', 'graduate_studies']
+
+// Mirrors web's EducationBackgroundEditor.jsx CORE_LEVEL_ORDER — the K-12/college ladder is
+// strictly ordered so an earlier stage can never have a later year than a later stage.
+// Vocational is deliberately excluded, same as web: it's commonly taken at any point in a
+// career, so it isn't checked against the ladder. secondary_non_k12/secondary_k12 share a
+// rank since they're both "high school", same as web collapsing those into one tier.
+const CORE_LEVEL_ORDER = ['elementary', 'secondary_non_k12', 'secondary_k12', 'senior_high_strand', 'tertiary', 'graduate_studies']
+
+function educationEffectiveYear(edu: EducationEntry): number | null {
+  const year = edu.year_graduated || edu.expected_year_graduated || edu.undergrad_year_last_attended || edu.year_started
+  return year ? Number(year) : null
+}
+
+function educationLevelLabel(level: string): string {
+  return EDUCATION_LEVEL_OPTIONS.find((option) => option.value === level)?.label ?? 'This level'
+}
+
+/** Mirrors web's chronologyConflict() — flags when an earlier schooling stage has a later
+ *  effective year than a later stage (or vice versa), e.g. College graduated 2017 then
+ *  Elementary graduated 2020, which is not a possible academic timeline. */
+function educationChronologyConflict(draft: EducationEntry, others: EducationEntry[]): string {
+  const draftRank = CORE_LEVEL_ORDER.indexOf(draft.level)
+  const draftYear = educationEffectiveYear(draft)
+  if (draftRank === -1 || draftYear === null) return ''
+
+  for (const other of others) {
+    const otherRank = CORE_LEVEL_ORDER.indexOf(other.level)
+    const otherYear = educationEffectiveYear(other)
+    if (otherRank === -1 || otherYear === null || otherRank === draftRank) continue
+
+    if (draftRank < otherRank && draftYear > otherYear) {
+      return `${educationLevelLabel(draft.level)} (${draftYear}) is an earlier schooling stage than ${educationLevelLabel(other.level)} (${otherYear}), so its year can't be later. Check the years on both records.`
+    }
+    if (draftRank > otherRank && draftYear < otherYear) {
+      return `${educationLevelLabel(draft.level)} (${draftYear}) comes after ${educationLevelLabel(other.level)} (${otherYear}) in school order, so its year can't be earlier. Check the years on both records.`
+    }
+  }
+  return ''
+}
 
 // Mirrors web's EducationBackgroundEditor.jsx YearSelect ranges exactly.
 const CURRENT_YEAR = new Date().getFullYear()
@@ -1028,6 +1068,10 @@ export function Step5Education({ value, onChange, errors }: { value: Step5Value;
             setEducations(next)
           }
           const requiresCourse = COURSE_REQUIRED_LEVELS.includes(edu.level)
+          const isMeaningful = Boolean(edu.level && edu.institution_name && edu.completion_status && edu.year_started)
+          const chronologyMessage = isMeaningful
+            ? educationChronologyConflict(edu, value.educations.filter((_, idx) => idx !== i))
+            : ''
 
           return (
             <>
@@ -1074,6 +1118,7 @@ export function Step5Education({ value, onChange, errors }: { value: Step5Value;
               {edu.completion_status === 'currently_studying' ? (
                 <SelectField label="Expected Year of Graduation" placeholder="Select year" options={EXPECTED_YEAR_OPTIONS} value={edu.expected_year_graduated} onChange={(v) => update({ expected_year_graduated: v })} error={fieldError(errors, `educations.${i}.expected_year_graduated`)} />
               ) : null}
+              {chronologyMessage ? <Text style={styles.errorText}>{chronologyMessage}</Text> : null}
             </>
           )
         }}

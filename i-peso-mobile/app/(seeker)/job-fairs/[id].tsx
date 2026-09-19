@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react'
-import { ScrollView, StyleSheet, Text, View } from 'react-native'
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useQueryClient } from '@tanstack/react-query'
+import MaterialIcons from '@expo/vector-icons/MaterialIcons'
 import type { JobFair, JobFairPass } from '@/services/seekerService'
 import { seekerService } from '@/services/seekerService'
 import { apiErrorMessage } from '@/utils/apiError'
@@ -134,10 +135,21 @@ export default function JobFairDetailScreen() {
       {employers.length > 0 ? (
         <Card padding="md" style={styles.listCard}>
           {employers.map((employer, index) => (
-            <View key={String(employer.employer_id ?? index)} style={[styles.listRow, index === 0 && styles.listRowFirst]}>
+            <TouchableOpacity
+              key={String(employer.employer_id ?? index)}
+              style={[styles.listRow, index === 0 && styles.listRowFirst]}
+              disabled={employer.employer_id == null}
+              onPress={() => router.push({
+                pathname: '/(seeker)/job-fairs/booth',
+                params: { jobFairId: String(id), employerId: String(employer.employer_id), from: 'job-fair', fromId: String(id) },
+              } as never)}
+              accessibilityRole="button"
+              accessibilityLabel={`View ${textFrom(employer.company_name, 'employer')} booth`}
+            >
               <Text style={styles.listRowText}>{textFrom(employer.company_name, 'Employer')}</Text>
               {employer.status ? <Badge variant="neutral">{titleCase(employer.status, '')}</Badge> : null}
-            </View>
+              {employer.employer_id != null ? <MaterialIcons name="chevron-right" size={18} color={colors.subtle} /> : null}
+            </TouchableOpacity>
           ))}
         </Card>
       ) : (

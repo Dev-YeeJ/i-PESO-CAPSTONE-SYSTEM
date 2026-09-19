@@ -180,25 +180,36 @@ export default function SeekerHomeScreen() {
     latest: latestQuery.data?.jobs?.length ?? 0,
   }
 
-  useEffect(() => {
-    // Mirrors the website's feed fallback: if "Recommended" comes back empty (e.g. profile
-    // too new for the matching engine), fall back to the latest active vacancies instead of
-    // showing a bare empty state.
-    if (feedMode === 'recommended' && recommendedQuery.isSuccess && feedCounts.recommended === 0 && feedCounts.latest > 0) {
-      setJobsMessage('No personalized recommendations yet — showing the latest active vacancies instead.')
-    } else if (feedMode === 'nearby' && nearbyQuery.isError) {
-      setJobsMessage('Nearby jobs need your saved address location. Update onboarding if jobs do not load.')
-    } else {
-      setJobsMessage('')
-    }
-  }, [feedMode, recommendedQuery.isSuccess, nearbyQuery.isError, feedCounts.recommended, feedCounts.latest])
+  // Mirrors the website's feed fallback, generalized to every tab: if the active feed comes
+  // back empty or errored (no saved location for "Nearby", profile too new for "Recommended"),
+  // fall back to the broadest feed — Latest — instead of leaving Home showing nothing at all.
+  // Previously this only covered "Recommended", so a seeker with no saved address landed on
+  // the default "Nearby" tab and saw an empty Home with no way out short of tapping a
+  // different feed card themselves.
+  const activeQuery = feedQueries[feedMode]
+  const activeFeedEmpty = activeQuery.isSuccess && feedCounts[feedMode] === 0
+  const activeFeedFailed = activeQuery.isError
+  const shouldFallbackToLatest = feedMode !== 'latest' && (activeFeedEmpty || activeFeedFailed) && feedCounts.latest > 0
 
-  const effectiveFeedMode: FeedMode =
-    feedMode === 'recommended' && recommendedQuery.isSuccess && feedCounts.recommended === 0 && feedCounts.latest > 0
-      ? 'latest'
-      : feedMode
+  useEffect(() => {
+    if (!shouldFallbackToLatest) {
+      setJobsMessage('')
+      return
+    }
+    if (feedMode === 'nearby') {
+      setJobsMessage(
+        activeFeedFailed
+          ? 'Nearby jobs need your saved address location — showing the latest active vacancies instead.'
+          : 'No nearby jobs found in range — showing the latest active vacancies instead.'
+      )
+    } else {
+      setJobsMessage('No personalized recommendations yet — showing the latest active vacancies instead.')
+    }
+  }, [shouldFallbackToLatest, feedMode, activeFeedFailed])
+
+  const effectiveFeedMode: FeedMode = shouldFallbackToLatest ? 'latest' : feedMode
   const jobs = feedQueries[effectiveFeedMode].data?.jobs ?? EMPTY_JOBS
-  const jobsLoading = feedQueries[feedMode].isLoading
+  const jobsLoading = activeQuery.isLoading || (shouldFallbackToLatest && latestQuery.isLoading)
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true)

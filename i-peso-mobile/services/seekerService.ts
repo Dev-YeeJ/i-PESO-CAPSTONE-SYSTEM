@@ -90,6 +90,7 @@ export interface SeekerProfile {
   dole_skills?: string[]
   technical_skills?: string[]
   soft_skills?: string[]
+  professional_summary?: string | null
   profile_image_url?: string | null
   has_resume?: boolean
   has_profile_image?: boolean
@@ -301,6 +302,47 @@ export interface JobFair {
   is_rsvped?: boolean
   participating_employers?: Array<{ employer_id?: number | string; company_name?: string | null; status?: string }>
   published_vacancies?: Array<{ post_id: number | string; job_title?: string | null; vacancies_count?: number }>
+}
+
+export interface EmployerBoothVacancy {
+  id: number | string
+  number_needed?: number | null
+  position_title?: string | null
+  qualifications?: string | null
+  place_of_work?: string | null
+  job_vacancy_id?: number | string | null
+  match_percentage?: number | null
+  vacancy: {
+    post_id: number | string
+    job_title?: string | null
+    job_description?: string | null
+    location?: string | null
+    salary_range?: string | null
+    employment_type?: string | null
+  } | null
+}
+
+export interface EmployerBooth {
+  employer: {
+    employer_id: number | string
+    company_name?: string | null
+    trade_name?: string | null
+    company_description?: string | null
+  }
+  job_fair: {
+    job_fair_id: number | string
+    title: string
+    venue?: string | null
+    start_date?: string | null
+  }
+  poster: {
+    id: number | string
+    mime_type?: string | null
+    original_filename?: string | null
+    posted_at?: string | null
+    match_percentage?: number | null
+  } | null
+  vacancies: EmployerBoothVacancy[]
 }
 
 export interface JobFairPass {
@@ -755,6 +797,11 @@ export const seekerService = {
 
   jobFairPosterUrl(submissionId: number | string) {
     return `${API_BASE_URL}/job-fair-posters/${submissionId}/view`
+  },
+
+  async getEmployerBooth(jobFairId: number | string, employerId: number | string): Promise<EmployerBooth> {
+    const res = await apiClient.get(`/job-fairs/${jobFairId}/employers/${employerId}`)
+    return res.data
   },
 
   // ── Government Programs ────────────────────────────────────────────────

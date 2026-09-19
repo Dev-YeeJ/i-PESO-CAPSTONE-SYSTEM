@@ -19,7 +19,7 @@ import * as DocumentPicker from 'expo-document-picker'
 import type { ProfileStrengthItem, SeekerCertificate } from '@/services/seekerService'
 import { seekerService } from '@/services/seekerService'
 import { useAuthStore } from '@/stores/authStore'
-import { downloadAndShare, postAndDownload } from '@/utils/fileTransfer'
+import { downloadAndShare } from '@/utils/fileTransfer'
 import { apiErrorMessage } from '@/utils/apiError'
 import {
   addressLine,
@@ -33,7 +33,6 @@ import {
   enhanceResponsibilities,
   experienceKey,
   responsibilityLines,
-  resumeResponsibilityPayload,
 } from '@/utils/resumeBullets'
 import MaterialIcons from '@expo/vector-icons/MaterialIcons'
 import { AlertBox } from '@/components/ui/AlertBox'
@@ -59,11 +58,6 @@ export default function ProfileScreen() {
   const [photoBusy, setPhotoBusy] = useState(false)
   const [photoVersion, setPhotoVersion] = useState(0)
   const [certModalOpen, setCertModalOpen] = useState(false)
-  const [resumeModalOpen, setResumeModalOpen] = useState(false)
-  const [summary, setSummary] = useState('')
-  const [resumeBusy, setResumeBusy] = useState(false)
-  const [aiSummaryBusy, setAiSummaryBusy] = useState(false)
-  const [aiSummaryNotice, setAiSummaryNotice] = useState('')
   const [actionError, setActionError] = useState('')
   const [signingOut, setSigningOut] = useState(false)
   const [openExperienceEditors, setOpenExperienceEditors] = useState<Record<string, boolean>>({})
@@ -204,59 +198,6 @@ export default function ProfileScreen() {
         },
       },
     ])
-  }
-
-  const generateSummaryWithAI = async () => {
-    setAiSummaryBusy(true)
-    setAiSummaryNotice('')
-    const result = await seekerService.generateProfessionalSummaryAI(summary.trim() || undefined)
-    if (result?.summary) {
-      setSummary(result.summary)
-    } else {
-      setAiSummaryNotice('Smart summary generation is unavailable right now. You can still write your own summary.')
-    }
-    setAiSummaryBusy(false)
-  }
-
-  const generateResume = async () => {
-    // Belt-and-suspenders against a double-fire: the "Generate" button already passes
-    // disabled={resumeBusy}, but this makes it impossible even if two taps land in the
-    // same event-loop tick — resume generation is server-throttled to 5/minute
-    // (routes/api.php), so duplicate requests burn through that quota for nothing.
-    if (resumeBusy) return
-    if (!profile?.has_profile_image) {
-      Alert.alert('Photo required', 'Upload a professional 2x2 photo before generating your resume.')
-      return
-    }
-    if (!summary.trim()) {
-      setActionError('Add a short professional summary before generating your resume.')
-      return
-    }
-    setResumeBusy(true)
-    setActionError('')
-    try {
-      await postAndDownload(
-        '/seeker/resume/generate',
-        {
-          professional_summary: summary.trim(),
-          responsibility_overrides: resumeResponsibilityPayload(workExperiences, experienceResponsibilities),
-        },
-        `iPESO_Resume_${profile?.last_name || 'seeker'}.pdf`
-      )
-      setResumeModalOpen(false)
-    } catch (caught) {
-      // The 429 the backend's `throttle:5,1` returns has no JSON body (just an empty array),
-      // so apiErrorMessage's fallback used to claim a connection problem — misdiagnosing a
-      // rate limit as a network/backend outage.
-      const status = (caught as { response?: { status?: number } })?.response?.status
-      setActionError(
-        status === 429
-          ? "You're generating resumes too quickly. Please wait a minute and try again."
-          : apiErrorMessage(caught, 'Unable to generate resume. Check your backend connection.')
-      )
-    } finally {
-      setResumeBusy(false)
-    }
   }
 
   return (
@@ -562,13 +503,10 @@ export default function ProfileScreen() {
           <Button
             variant="outline"
             fullWidth
-            onPress={() => {
-              setActionError('')
-              setResumeModalOpen(true)
-            }}
+            onPress={() => router.push('/(seeker)/profile/resume-studio' as never)}
             style={styles.updateBtn}
           >
-            {profile?.has_resume ? 'Regenerate resume' : 'Generate resume'}
+            Open Resume Studio
           </Button>
         </Card>
 
@@ -591,47 +529,6 @@ export default function ProfileScreen() {
         }}
       />
 
-      <Modal visible={resumeModalOpen} animationType="slide" transparent onRequestClose={() => setResumeModalOpen(false)}>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>Generate Resume</Text>
-            <Text style={styles.modalHint}>Write a short professional summary (max 1200 characters). It will appear at the top of your generated PDF resume.</Text>
-            <TextInput
-              style={styles.modalTextarea}
-              value={summary}
-              onChangeText={setSummary}
-              placeholder="e.g. Detail-oriented administrative professional with 3 years of experience..."
-              placeholderTextColor={colors.subtle}
-              multiline
-              maxLength={1200}
-            />
-            <Button variant="outline" onPress={generateSummaryWithAI} disabled={aiSummaryBusy} style={styles.aiSummaryBtn}>
-              {aiSummaryBusy ? 'Generating with Smart Assistant...' : 'Generate with Smart Assistant'}
-            </Button>
-            {aiSummaryNotice ? <Text style={styles.aiSummaryNotice}>{aiSummaryNotice}</Text> : null}
-            {actionError ? (
-              <AlertBox variant="danger" style={styles.modalError}>
-                {actionError}
-              </AlertBox>
-            ) : null}
-            <View style={styles.modalActions}>
-              <Button
-                variant="outline"
-                onPress={() => {
-                  setActionError('')
-                  setResumeModalOpen(false)
-                }}
-                style={styles.modalBtn}
-              >
-                Cancel
-              </Button>
-              <Button variant="primary" onPress={generateResume} disabled={resumeBusy} style={styles.modalBtn}>
-                {resumeBusy ? 'Generating...' : 'Generate'}
-              </Button>
-            </View>
-          </View>
-        </View>
-      </Modal>
     </View>
   )
 }
@@ -816,11 +713,6 @@ const styles = StyleSheet.create({
   modalOverlay: { flex: 1, backgroundColor: 'rgba(15,23,42,0.5)', justifyContent: 'center', padding: spacing.xl },
   modalCard: { backgroundColor: colors.surface, borderRadius: radii.xl, padding: spacing.xl, maxHeight: '85%' },
   modalTitle: { color: colors.textPrimary, fontSize: typography.heading, fontFamily: typography.family.bold, marginBottom: spacing.sm },
-  modalHint: { color: colors.textSecondary, fontSize: typography.small, lineHeight: 18, marginBottom: spacing.md },
-  modalTextarea: { borderWidth: 1, borderColor: colors.border, borderRadius: radii.md, padding: spacing.md, minHeight: 120, textAlignVertical: 'top', color: colors.textPrimary, fontSize: typography.body },
-  aiSummaryBtn: { marginTop: spacing.md, marginBottom: 0 },
-  aiSummaryNotice: { marginTop: spacing.sm, color: colors.textSecondary, fontSize: typography.small, lineHeight: 18 },
-  modalError: { marginTop: spacing.md },
   modalActions: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.lg },
   modalBtn: { flex: 1, marginBottom: 0 },
   modalInput: { borderWidth: 1, borderColor: colors.border, borderRadius: radii.md, padding: spacing.md, color: colors.textPrimary, fontSize: typography.body, marginBottom: spacing.md },
