@@ -337,9 +337,11 @@ class AuthController extends Controller
             ], $this->localOtpPayload($otp)), 403);
         }
 
-        // Revoke previous tokens — one active session per user
-        $user->tokens()->delete();
-
+        // Each login gets its own Sanctum token rather than revoking the user's other
+        // tokens — web and mobile (and any second browser/device) are meant to stay
+        // signed in simultaneously and independently. Do not reintroduce a
+        // `$user->tokens()->delete()` here; that previously logged out every other
+        // platform/device the instant this one logged in.
         $token = $user->createToken('ipeso_access_token')->plainTextToken;
 
         \Log::info("Login successful for user {$email} with role {$role}");

@@ -1,9 +1,14 @@
-import { Image, StyleSheet, Text, View } from 'react-native'
+import { useState } from 'react'
+import { ActivityIndicator, Alert, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import { useRouter } from 'expo-router'
 import MaterialIcons from '@expo/vector-icons/MaterialIcons'
 import type { JobFairPoster } from '@/services/seekerService'
 import { seekerService } from '@/services/seekerService'
 import { useAuthStore } from '@/stores/authStore'
+import { downloadAndShare } from '@/utils/fileTransfer'
 import { Card } from '@/components/ui/Card'
+import { ImagePreviewModal } from '@/components/ui/ImagePreviewModal'
+import { PressableScale } from '@/components/ui/PressableScale'
 import { colors, radii, spacing, typography } from '@/theme'
 
 const avatarTones = [colors.info, colors.secondary, colors.success, colors.warning, colors.error]
@@ -28,9 +33,41 @@ function timeAgo(iso?: string | null): string {
 }
 
 export function PosterFeedCard({ poster }: { poster: JobFairPoster }) {
+  const router = useRouter()
   const token = useAuthStore((state) => state.token)
+  const [previewOpen, setPreviewOpen] = useState(false)
+  const [opening, setOpening] = useState(false)
   const isImage = (poster.mime_type || '').startsWith('image/')
   const metaLine = [poster.job_fair_title, poster.venue, timeAgo(poster.posted_at)].filter(Boolean).join(' · ')
+  const posterUrl = seekerService.jobFairPosterUrl(poster.id)
+  const canViewBooth = poster.job_fair_id != null && poster.employer_id != null
+
+  // React Native has no window.open — a document poster is downloaded (authenticated, same
+  // as the image thumbnail) to local cache and handed to the OS share sheet, which lets the
+  // user open it in whatever PDF/file viewer they already have. Mirrors the pattern this app
+  // already uses for resumes (utils/fileTransfer.ts).
+  const openDocument = async () => {
+    if (opening) return
+    setOpening(true)
+    try {
+      await downloadAndShare(posterUrl, poster.original_filename || `poster-${poster.id}`)
+    } catch {
+      Alert.alert('Unable to open', 'This poster could not be opened right now. Please try again.')
+    } finally {
+      setOpening(false)
+    }
+  }
+
+  const openBooth = () => {
+    // i-peso-frontend's PosterFeedTab links "View Booth" to the job-fair-scoped booth page
+    // (/seeker/job-fairs/:fairId/employers/:employerId), not a generic employer profile —
+    // it shows the vacancies confirmed for THIS fair with per-vacancy match%, which the
+    // generic employer screen has no way to scope to a specific job fair.
+    router.push({
+      pathname: '/(seeker)/job-fairs/booth',
+      params: { jobFairId: String(poster.job_fair_id), employerId: String(poster.employer_id), from: 'poster' },
+    } as never)
+  }
 
   return (
     <Card padding="sm" style={styles.card} contentStyle={styles.content}>
@@ -50,22 +87,65 @@ export function PosterFeedCard({ poster }: { poster: JobFairPoster }) {
       </View>
 
       {isImage && token ? (
-        <Image
-          source={{ uri: seekerService.jobFairPosterUrl(poster.id), headers: { Authorization: `Bearer ${token}` } }}
-          style={styles.poster}
-          resizeMode="cover"
-        />
+        <PressableScale
+          onPress={() => setPreviewOpen(true)}
+          ripple={null}
+          accessibilityRole="button"
+          accessibilityLabel={`Open ${poster.company_name || 'employer'} poster image`}
+        >
+          <Image
+            source={{ uri: posterUrl, headers: { Authorization: `Bearer ${token}` } }}
+            style={styles.poster}
+            resizeMode="cover"
+          />
+        </PressableScale>
       ) : (
-        <View style={styles.docRow}>
-          <MaterialIcons name="description" size={28} color={colors.info} />
-          <Text style={styles.docName} numberOfLines={1}>{poster.original_filename || 'Poster'}</Text>
-        </View>
+        <PressableScale
+          onPress={openDocument}
+          disabled={opening}
+          ripple={null}
+          style={styles.docRow}
+          accessibilityRole="button"
+          accessibilityLabel={`Open document ${poster.original_filename || 'poster'}`}
+        >
+          {opening ? (
+            <ActivityIndicator size="small" color={colors.info} />
+          ) : (
+            <MaterialIcons name="description" size={28} color={colors.info} />
+          )}
+          <View style={styles.docTextWrap}>
+            <Text style={styles.docName} numberOfLines={1}>{poster.original_filename || 'Poster'}</Text>
+            <Text style={styles.docHint}>{opening ? 'Opening…' : 'Tap to open'}</Text>
+          </View>
+        </PressableScale>
       )}
 
       <View style={styles.footer}>
-        <MaterialIcons name="verified" size={14} color={colors.subtle} />
-        <Text style={styles.footerText}>PESO-approved employer posting</Text>
+        <View style={styles.footerLeft}>
+          <MaterialIcons name="verified" size={14} color={colors.subtle} />
+          <Text style={styles.footerText}>PESO-approved employer posting</Text>
+        </View>
+        {canViewBooth ? (
+          <TouchableOpacity
+            style={styles.boothBtn}
+            onPress={openBooth}
+            accessibilityRole="button"
+            accessibilityLabel={`View ${poster.company_name || 'employer'} booth`}
+          >
+            <Text style={styles.boothBtnText}>View Booth</Text>
+            <MaterialIcons name="arrow-forward" size={13} color={colors.info} />
+          </TouchableOpacity>
+        ) : null}
       </View>
+
+      {isImage && token ? (
+        <ImagePreviewModal
+          visible={previewOpen}
+          uri={posterUrl}
+          headers={{ Authorization: `Bearer ${token}` }}
+          onClose={() => setPreviewOpen(false)}
+        />
+      ) : null}
     </Card>
   )
 }
@@ -83,7 +163,12 @@ const styles = StyleSheet.create({
   meta: { color: colors.textSecondary, fontSize: typography.small, marginTop: 2 },
   poster: { width: '100%', aspectRatio: 4 / 3, borderRadius: radii.md, backgroundColor: colors.background },
   docRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: spacing.lg, backgroundColor: colors.background, borderRadius: radii.md },
-  docName: { flex: 1, color: colors.textPrimary, fontSize: typography.small, fontFamily: typography.family.bold },
-  footer: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, paddingTop: spacing.sm },
+  docTextWrap: { flex: 1 },
+  docName: { color: colors.textPrimary, fontSize: typography.small, fontFamily: typography.family.bold },
+  docHint: { color: colors.subtle, fontSize: 11, marginTop: 1 },
+  footer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm, paddingTop: spacing.sm },
+  footerLeft: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, flexShrink: 1 },
   footerText: { color: colors.subtle, fontSize: typography.small },
+  boothBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.infoBackground, borderRadius: radii.pill, paddingHorizontal: spacing.sm, paddingVertical: 4 },
+  boothBtnText: { color: colors.info, fontSize: 11, fontFamily: typography.family.bold },
 })
