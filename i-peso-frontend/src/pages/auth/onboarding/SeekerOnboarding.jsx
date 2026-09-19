@@ -584,9 +584,10 @@ const Step1 = ({ form, errors, onChange, user, onGpsDetect, onAddressSelect, gps
 
       {/* Name row */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-        <FormField label="Surname" error={errors.last_name}>
-          <input style={inputStyle(!!errors.last_name)} name="last_name"
-            value={form.last_name ?? ''} onChange={onChange} placeholder="dela Cruz" />
+        <FormField label="Surname" error={errors.last_name} help="Matches your registered account. Contact PESO if this needs correcting.">
+          <input
+            style={{ ...inputStyle(!!errors.last_name), backgroundColor: '#F3F4F6', color: '#6B7280', cursor: 'not-allowed' }}
+            name="last_name" value={form.last_name ?? ''} readOnly aria-readonly="true" placeholder="dela Cruz" />
         </FormField>
         <FormField label="First Name" error={errors.first_name}>
           <input style={inputStyle(!!errors.first_name)} name="first_name"

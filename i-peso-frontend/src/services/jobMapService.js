@@ -1,11 +1,13 @@
 import apiClient from './api'
 
-const mapRequestCache = new Map()
-const MAP_CACHE_TTL_MS = 30_000
-const MAP_CACHE_LIMIT = 12
-
-const ALLOWED_RADII = [5, 10, 15, 25, 50]
-const ALLOWED_MATCHES = [0, 50, 70, 80]
+// Widened from the old 5–50km cap — backend allows up to 500km
+// (SeekerNearbyJobController's radius_km validation), so a seeker outside a
+// dense city isn't stuck unable to see jobs a realistic commute away.
+// Exported so JobMapFilters and the page's "Increase radius" quick action
+// read from this single list instead of maintaining their own copies that
+// can silently drift out of sync with each other.
+export const ALLOWED_RADII = [5, 10, 15, 25, 50, 100, 200, 300]
+export const ALLOWED_MATCHES = [0, 50, 70, 80]
 const ALLOWED_SORTS = ['distance', 'match', 'newest', 'salary']
 const BOOLEAN_FILTERS = ['hide_applied', 'saved_only', 'job_fair_only', 'upskill_recommended_only', 'certificate_match_only', 'can_apply_only']
 const JOB_TYPE_MAP = {
@@ -69,11 +71,12 @@ const compactParams = (filters) => Object.fromEntries(
     .map(([key, value]) => [key, typeof value === 'boolean' ? Number(value) : value]),
 )
 
-export const getMapJobs = async (filters = {}, { signal, force = false } = {}) => {
+// No hand-rolled cache here anymore — the sole caller (JobMapPage) now reads
+// this through react-query, which already caches/dedupes by query key. A
+// second cache layer underneath it risked serving a stale response even
+// after react-query itself decided the data was stale enough to refetch.
+export const getMapJobs = async (filters = {}, { signal } = {}) => {
   const params = { ...compactParams(filters), compact: 1 }
-  const cacheKey = JSON.stringify(params)
-  const cached = mapRequestCache.get(cacheKey)
-  if (!force && cached && Date.now() - cached.savedAt < MAP_CACHE_TTL_MS) return cached.data
 
   const response = await apiClient.get('/seeker/job-map', {
     params,
@@ -92,7 +95,7 @@ export const getMapJobs = async (filters = {}, { signal, force = false } = {}) =
     full_address: '',
   }
 
-  const result = {
+  return {
     ...response.data,
     seeker_location: {
       ...seekerLocation,
@@ -103,12 +106,6 @@ export const getMapJobs = async (filters = {}, { signal, force = false } = {}) =
     seeker: response.data.seeker || null,
     summary: response.data.summary || null,
   }
-
-  if (mapRequestCache.size >= MAP_CACHE_LIMIT) {
-    mapRequestCache.delete(mapRequestCache.keys().next().value)
-  }
-  mapRequestCache.set(cacheKey, { data: result, savedAt: Date.now() })
-  return result
 }
 
 export const getMapJobDetail = async (postId, location = {}, { signal } = {}) => {
@@ -147,6 +144,11 @@ export const validateMapFilters = (input = {}) => {
   const locationKeyword = String(input.location_keyword || '').trim().slice(0, 100)
   if (locationKeyword) filters.location_keyword = locationKeyword
 
+  const salaryMin = asNumber(input.salary_min)
+  if (salaryMin !== null && salaryMin >= 0) filters.salary_min = salaryMin
+  const salaryMax = asNumber(input.salary_max)
+  if (salaryMax !== null && salaryMax >= 0) filters.salary_max = salaryMax
+
   return filters
 }
 
@@ -175,6 +177,9 @@ export const parseRuleBasedMapQuery = (rawQuery) => {
   const missingSkillMatch = lower.match(/(?:only\s+)?(\d{1,2})\s+missing\s+skills?/)
   if (missingSkillMatch) parsed.max_missing_skills = Number(missingSkillMatch[1])
 
+  const salaryMinMatch = lower.match(/salary\s*(?:above|over|at least|from|min(?:imum)?)?\s*(?:of\s*)?[₱p]?\s*(\d{1,3}(?:,\d{3})*|\d+)/)
+  if (salaryMinMatch) parsed.salary_min = Number(salaryMinMatch[1].replace(/,/g, ''))
+
   const type = Object.keys(JOB_TYPE_MAP).find((candidate) => lower.includes(candidate))
   if (type) parsed.job_type = JOB_TYPE_MAP[type]
 
@@ -186,6 +191,7 @@ export const parseRuleBasedMapQuery = (rawQuery) => {
       .replace(/\b(show|find|give|me|please|jobs?|vacancies|positions?|near me|matching my skills)\b/gi, ' ')
       .replace(/\b(within|inside|under)\s*\d{1,3}\s*(km|kilometers?)\b/gi, ' ')
       .replace(/\b\d{1,3}\s*%\s*(match|and above|\+)?\b/gi, ' ')
+      .replace(/\bsalary\s*(above|over|at least|from|min(?:imum)?)?\s*(of\s*)?[₱p]?\s*\d{1,3}(?:,\d{3})*\b/gi, ' ')
       .replace(/\b(high(?:ly)?[-\s]?match(?:ed)?|nearest|closest|newest|latest|recent|high(?:est)? salary|best pay|highest pay|and above)\b/gi, ' ')
       .replace(/\b(saved|hide applied|job fairs?|upcoming fair|training|upskill|certificates?|certifications?|apply to now|can apply|ready to apply|with only \d+ missing skills?)\b/gi, ' ')
       .replace(/\b(i|my|that|with|available|at|to|now|already|recommendations?|match)\b/gi, ' ')

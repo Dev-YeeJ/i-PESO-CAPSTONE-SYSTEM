@@ -562,8 +562,15 @@ function QualificationsStep({ form, errors, update }) {
         if (cancelled) return
         setAiSkills({ technical: data?.suggested_technical_skills ?? [], soft: data?.suggested_soft_skills ?? [] })
       })
-      .catch(() => {
-        if (!cancelled) setAiSkills({ technical: [], soft: [] })
+      .catch((err) => {
+        if (cancelled) return
+        // The AI draft can fail (unconfigured/unavailable) while the
+        // backend still resolved this job title against the same skill
+        // catalog job seekers see — those ride along on the error response
+        // under catalog_skills so this step isn't stuck with nothing
+        // connected to the job title just because the LLM call failed.
+        const fallback = err.response?.data?.catalog_skills
+        setAiSkills({ technical: fallback?.technical ?? [], soft: fallback?.soft ?? [] })
       })
 
     return () => {

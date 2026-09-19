@@ -20,12 +20,20 @@ export default function JobMapDetailsPanel({ job, isLoading = false, loadError =
   const [expandedJobId, setExpandedJobId] = useState(null)
   const contentRef = useRef(null)
   const descriptionRef = useRef(null)
+  const closeButtonRef = useRef(null)
   const isOpen = Boolean(job)
   const renderedJob = job || { match_breakdown: {}, match_percentage: 0, job_title: '', employer_name: '', distance_km: null }
   const showFullDescription = expandedJobId === renderedJob.post_id
 
   useEffect(() => {
     contentRef.current?.scrollTo({ top: 0, behavior: 'smooth' })
+    // Moves focus into the panel for keyboard users opening it — without
+    // this, focus stays wherever it was on the page behind a panel that
+    // just visually took over, which is disorienting with a screen reader.
+    // Keyed on post_id (not the Escape-listener effect below, whose deps
+    // include the freshly-recreated-every-render onClose) so this only
+    // fires on an actual open/job-change, not every unrelated re-render.
+    if (job?.post_id) closeButtonRef.current?.focus()
   }, [job?.post_id])
 
   useEffect(() => {
@@ -56,7 +64,9 @@ export default function JobMapDetailsPanel({ job, isLoading = false, loadError =
   return (
     <aside
       className={`fixed inset-x-0 bottom-0 z-[700] flex max-h-[78vh] flex-col overflow-hidden rounded-t-3xl border border-slate-200 bg-white shadow-[0_-20px_60px_rgba(15,23,42,0.22)] transition-transform duration-300 ease-out md:absolute md:inset-y-3 md:left-auto md:right-3 md:max-h-none md:w-[400px] md:rounded-2xl md:shadow-[0_20px_60px_rgba(15,23,42,0.24)] ${isOpen ? 'pointer-events-auto translate-y-0 md:translate-x-0' : 'pointer-events-none translate-y-full md:translate-y-0 md:translate-x-[110%]'}`}
-      aria-label="Selected job details"
+      role="dialog"
+      aria-modal={isOpen}
+      aria-labelledby="job-details-title"
       aria-hidden={!isOpen}
     >
       <div className="mx-auto mt-2 h-1 w-10 rounded-full bg-slate-300 md:hidden" />
@@ -66,7 +76,7 @@ export default function JobMapDetailsPanel({ job, isLoading = false, loadError =
             <span className={`rounded-full px-2.5 py-1 text-[10px] font-black ring-1 ring-inset ${hasMatch ? matchTone(matchPercentage) : 'bg-blue-50 text-blue-700 ring-blue-200'}`}>{hasMatch ? `${matchPercentage}% match` : 'Match pending'}</span>
             {renderedJob.distance_km !== null && <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2.5 py-1 text-[10px] font-bold text-blue-700"><Navigation className="h-3 w-3" />{Number(renderedJob.distance_km).toFixed(1)} km away</span>}
           </div>
-          <h2 className="text-lg font-black leading-6 text-slate-950">{renderedJob.job_title}</h2>
+          <h2 id="job-details-title" className="text-lg font-black leading-6 text-slate-950">{renderedJob.job_title}</h2>
           <div className="mt-1 flex items-center gap-1.5">
             <p className="flex items-center gap-1.5 text-xs font-semibold text-slate-500"><BriefcaseBusiness className="h-3.5 w-3.5" />{renderedJob.employer_name}</p>
             {onReport && (renderedJob.employer_id || renderedJob.employer?.employer_id) ? (
@@ -82,7 +92,7 @@ export default function JobMapDetailsPanel({ job, isLoading = false, loadError =
             ) : null}
           </div>
         </div>
-        <button type="button" onClick={onClose} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900" aria-label="Close job details"><X className="h-4 w-4" /></button>
+        <button ref={closeButtonRef} type="button" onClick={onClose} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700" aria-label="Close job details"><X className="h-4 w-4" /></button>
       </header>
 
       <div ref={contentRef} className="flex-1 overflow-y-auto overscroll-contain px-5 py-5">

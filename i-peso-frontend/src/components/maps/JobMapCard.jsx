@@ -21,11 +21,24 @@ export default function JobMapCard({ job, isActive, isApplying, isSaving, onClic
 
   return (
     <article
+      role="button"
+      tabIndex={0}
       onClick={onClick}
-      className={`group relative cursor-pointer overflow-hidden rounded-2xl border bg-white p-4 transition-all duration-300 hover:shadow-lg ${
+      onKeyDown={(event) => {
+        // Only react when the card itself is focused — otherwise pressing
+        // Enter/Space on a nested Details/Apply/Save button would open the
+        // card AND trigger that button's own action at the same time.
+        if (event.target !== event.currentTarget) return
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault()
+          onClick()
+        }
+      }}
+      className={`group relative cursor-pointer overflow-hidden rounded-2xl border bg-white p-4 transition-all duration-300 hover:shadow-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700 ${
         isActive ? 'border-blue-400 bg-blue-50/50 shadow-md ring-4 ring-blue-400/20' : 'border-slate-200 shadow-sm hover:border-blue-300 hover:-translate-y-0.5'
       }`}
       aria-current={isActive ? 'true' : undefined}
+      aria-label={`${job.job_title} at ${job.employer_name}${hasMatch ? `, ${matchPercentage}% match` : ''}`}
     >
       {isActive && <span className="absolute inset-y-0 left-0 w-1.5 bg-amber-400" aria-hidden="true" />}
       <div className="flex items-start justify-between gap-3">
@@ -65,26 +78,26 @@ export default function JobMapCard({ job, isActive, isApplying, isSaving, onClic
       </div>
 
       <div className="mt-3 flex items-center gap-1.5 border-t border-slate-100 pt-3">
-        <button type="button" onClick={(event) => { event.stopPropagation(); onView(job) }} className="inline-flex flex-1 items-center justify-center gap-1 rounded-lg border border-slate-200 px-2 py-2 text-[11px] font-bold text-slate-700 hover:border-blue-300 hover:text-blue-800">
+        <button type="button" onClick={(event) => { event.stopPropagation(); onView(job) }} className="inline-flex flex-1 items-center justify-center gap-1 rounded-lg border border-slate-200 px-2 py-2 text-[11px] font-bold text-slate-700 transition hover:border-blue-300 hover:text-blue-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700">
           <Eye className="h-3.5 w-3.5" /> Details
         </button>
-        <button type="button" disabled={job.has_applied || isApplying} onClick={(event) => { event.stopPropagation(); onApply(job) }} className="inline-flex flex-1 items-center justify-center gap-1 rounded-lg bg-blue-950 px-2 py-2 text-[11px] font-bold text-white hover:bg-blue-900 disabled:cursor-not-allowed disabled:bg-slate-300">
+        <button type="button" disabled={job.has_applied || isApplying} onClick={(event) => { event.stopPropagation(); onApply(job) }} className="inline-flex flex-1 items-center justify-center gap-1 rounded-lg bg-blue-950 px-2 py-2 text-[11px] font-bold text-white transition hover:bg-blue-900 disabled:cursor-not-allowed disabled:bg-slate-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700">
           {isApplying ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : job.has_applied ? <Check className="h-3.5 w-3.5" /> : null}
           {job.has_applied ? 'Applied' : isApplying ? 'Applying' : 'Apply'}
         </button>
-        <button type="button" disabled={isSaving} onClick={(event) => { event.stopPropagation(); onSave(job) }} className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border transition ${job.is_saved ? 'border-amber-300 bg-amber-50 text-amber-700' : 'border-slate-200 text-slate-500 hover:border-amber-300 hover:text-amber-700'}`} aria-label={job.is_saved ? 'Remove saved job' : 'Save job'}>
+        <button type="button" disabled={isSaving} onClick={(event) => { event.stopPropagation(); onSave(job) }} className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700 ${job.is_saved ? 'border-amber-300 bg-amber-50 text-amber-700' : 'border-slate-200 text-slate-500 hover:border-amber-300 hover:text-amber-700'}`} aria-label={job.is_saved ? 'Remove saved job' : 'Save job'}>
           {isSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Bookmark className={`h-3.5 w-3.5 ${job.is_saved ? 'fill-current' : ''}`} />}
         </button>
         {job.google_maps_url && (
-          <a href={job.google_maps_url} target="_blank" rel="noreferrer" onClick={(event) => event.stopPropagation()} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:border-blue-300 hover:text-blue-700" aria-label="Open in Google Maps">
+          <a href={job.google_maps_url} target="_blank" rel="noreferrer" onClick={(event) => event.stopPropagation()} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-slate-500 transition hover:border-blue-300 hover:text-blue-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700" aria-label="Open in Google Maps">
             <ExternalLink className="h-3.5 w-3.5" />
           </a>
         )}
       </div>
       {(job.upskill?.recommended || job.job_fair?.is_available_at_job_fair) && (
         <div className="mt-2 flex flex-wrap gap-1.5">
-          {job.upskill?.recommended && <button type="button" onClick={(event) => { event.stopPropagation(); onTraining(job) }} className="inline-flex items-center gap-1 rounded-lg bg-violet-50 px-2.5 py-1.5 text-[10px] font-bold text-violet-800 hover:bg-violet-100"><GraduationCap className="h-3 w-3" /> View training</button>}
-          {job.job_fair?.is_available_at_job_fair && <button type="button" onClick={(event) => { event.stopPropagation(); onJobFair(job) }} className="inline-flex items-center gap-1 rounded-lg bg-blue-50 px-2.5 py-1.5 text-[10px] font-bold text-blue-800 hover:bg-blue-100"><CalendarDays className="h-3 w-3" /> View event details</button>}
+          {job.upskill?.recommended && <button type="button" onClick={(event) => { event.stopPropagation(); onTraining(job) }} className="inline-flex items-center gap-1 rounded-lg bg-violet-50 px-2.5 py-1.5 text-[10px] font-bold text-violet-800 transition hover:bg-violet-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-700"><GraduationCap className="h-3 w-3" /> View training</button>}
+          {job.job_fair?.is_available_at_job_fair && <button type="button" onClick={(event) => { event.stopPropagation(); onJobFair(job) }} className="inline-flex items-center gap-1 rounded-lg bg-blue-50 px-2.5 py-1.5 text-[10px] font-bold text-blue-800 transition hover:bg-blue-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700"><CalendarDays className="h-3 w-3" /> View event details</button>}
         </div>
       )}
     </article>

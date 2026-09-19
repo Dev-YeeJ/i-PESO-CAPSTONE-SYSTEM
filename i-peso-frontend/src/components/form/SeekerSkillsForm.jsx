@@ -70,6 +70,43 @@ const LOCAL_SOFT_SKILLS = [
   'Service Orientation',
 ]
 
+// Keyed by the exact broad_field categories OccupationCombobox already
+// classifies every occupation into (see components/form/OccupationCombobox.jsx)
+// — a seeker's Job Preferences selection carries this field, so matching on
+// it directly is far more reliable than the handful of keyword buckets this
+// used to fall back to for everything outside four hardcoded trades.
+const BROAD_FIELD_SKILLS = {
+  'Office and Administration': { hard: ['Data Entry', 'Records Management', 'Microsoft Office', 'Filing Systems'], soft: ['Organization', 'Attention to Detail', 'Communication'] },
+  'Education and Teaching': { hard: ['Lesson Planning', 'Classroom Management', 'Computer Literate'], soft: ['Communication', 'Patience', 'Leadership'] },
+  'IT and Computer Work': { hard: ['Web Development', 'Programming', 'Data Analysis', 'Troubleshooting'], soft: ['Problem Solving', 'Attention to Detail'] },
+  'Healthcare': { hard: ['Patient Care', 'Basic Life Support', 'Medical Recordkeeping'], soft: ['Empathy', 'Communication', 'Attention to Detail'] },
+  'Caregiving and Personal Care': { hard: ['Patient Care', 'First Aid'], soft: ['Patience', 'Empathy', 'Reliability'] },
+  'Engineering and Architecture': { hard: ['Technical Drawing', 'AutoCAD', 'Project Planning'], soft: ['Problem Solving', 'Critical Thinking'] },
+  'Construction': { hard: ['Carpentry Work', 'Masonry', 'Blueprint Reading'], soft: ['Safety Awareness', 'Teamwork'] },
+  'Skilled Trades and Repair': { hard: ['Electrician', 'Plumbing', 'Equipment Maintenance'], soft: ['Problem Solving', 'Attention to Detail'] },
+  'Food Service and Restaurants': { hard: ['Food Preparation', 'Food Safety', 'Point of Sale Systems'], soft: ['Customer Service', 'Teamwork', 'Time Management'] },
+  'BPO and Customer Service': { hard: ['Customer Relationship Management', 'Computer Literate'], soft: ['Communication', 'Customer Service', 'Patience'] },
+  'Retail and Store Work': { hard: ['Point of Sale Systems', 'Cash Handling', 'Inventory Management'], soft: ['Customer Service', 'Communication'] },
+  'Marketing and Communications': { hard: ['Social Media Management', 'Content Writing', 'Graphic Design'], soft: ['Creativity', 'Communication'] },
+  'Accounting and Finance': { hard: ['Bookkeeping', 'Microsoft Excel', 'Financial Reporting'], soft: ['Attention to Detail', 'Organization'] },
+  'Human Resources and Recruitment': { hard: ['Records Management', 'Interviewing'], soft: ['Communication', 'Organization'] },
+  'Security and Protective Services': { hard: ['Security Protocols', 'Surveillance Monitoring'], soft: ['Vigilance', 'Reliability'] },
+  'Driving and Transportation': { hard: ['Driver', 'Defensive Driving'], soft: ['Time Management', 'Attention to Detail'] },
+  'Delivery and Courier Work': { hard: ['Driver', 'Route Planning'], soft: ['Time Management', 'Reliability'] },
+  'Warehouse and Logistics': { hard: ['Inventory Management', 'Forklift Operation', 'Records Management'], soft: ['Organization', 'Teamwork'] },
+  'Manufacturing and Factory Work': { hard: ['Quality Control', 'Machine Operation', 'Equipment Maintenance'], soft: ['Attention to Detail', 'Safety Awareness'] },
+  'Agriculture and Farming': { hard: ['Gardening', 'Crop Management'], soft: ['Physical Stamina', 'Reliability'] },
+  'Fishing and Fish Processing': { hard: ['Fish Processing', 'Food Safety'], soft: ['Physical Stamina', 'Teamwork'] },
+  'Household and Domestic Services': { hard: ['Domestic Chores', 'Food Preparation'], soft: ['Reliability', 'Time Management'] },
+  'Beauty and Wellness': { hard: ['Beautician', 'Customer Service'], soft: ['Creativity', 'Communication'] },
+  'Hospitality and Hotels': { hard: ['Customer Service', 'Housekeeping', 'Food Preparation'], soft: ['Communication', 'Teamwork'] },
+  'Online and Digital Work': { hard: ['Data Entry', 'Social Media Management', 'Computer Literate'], soft: ['Time Management', 'Communication'] },
+  'Media Arts and Design': { hard: ['Graphic Design', 'Photography', 'Video Editing'], soft: ['Creativity', 'Attention to Detail'] },
+  'Legal and Justice': { hard: ['Records Management', 'Legal Documentation'], soft: ['Attention to Detail', 'Confidentiality'] },
+  'Public Administration': { hard: ['Records Management', 'Computer Literate'], soft: ['Communication', 'Organization'] },
+  'Armed Forces and Defense': { hard: ['Security Protocols', 'First Aid'], soft: ['Discipline', 'Teamwork'] },
+}
+
 const SKILL_CLASSIFICATION_RULES = [
   { patterns: ['excell', 'spreadsheet'], skill: 'Microsoft Excel', type: 'hard' },
   { patterns: ['drive', 'driver', 'driving'], skill: 'Driver', type: 'hard', is_dole: true },
@@ -625,55 +662,74 @@ function buildSmartSuggestions({
 }
 
 function buildRecommendations(preferredOccupations) {
+  // Primary signal: exact broad_field category match — reliable, since it's
+  // the same classification OccupationCombobox already assigned when the
+  // seeker picked (or typed, then got auto-classified into) their occupation.
+  const categorySkills = [...new Set(preferredOccupations.map((occupation) => occupation?.broad_field).filter(Boolean))]
+    .flatMap((field) => {
+      const category = BROAD_FIELD_SKILLS[field]
+      if (!category) return []
+      return [
+        ...category.hard.map((name) => skill(name, 'hard', OFFICIAL_DOLE_SKILLS.some((doleSkill) => normalizeText(doleSkill) === normalizeText(name)))),
+        ...category.soft.map((name) => skill(name, 'soft')),
+      ]
+    })
+
+  // Keyword fallback for a preference row with no broad_field resolved yet
+  // (e.g. saved before this field existed, or entered through a path that
+  // never set it) — the old, narrower matching this used to rely on alone.
   const text = normalizeText(
     preferredOccupations
       .map((occupation) => [
         occupation?.title,
         occupation?.general_term,
         occupation?.raw_job_title,
-        occupation?.broadField,
+        occupation?.role_function,
       ].filter(Boolean).join(' '))
       .join(' '),
   )
 
-  const occupationSkills = []
-  if (matchesAny(text, ['teacher', 'education', 'instructor', 'tutor'])) {
-    occupationSkills.push(
-      skill('Lesson Planning', 'hard'),
-      skill('Classroom Management', 'hard'),
-      skill('Computer Literate', 'hard', true),
-      skill('Communication', 'soft'),
-      skill('Patience', 'soft'),
-    )
-  }
-  if (matchesAny(text, ['driver', 'transport', 'delivery', 'logistics'])) {
-    occupationSkills.push(
-      skill('Driver', 'hard', true),
-      skill('Defensive Driving', 'hard'),
-      skill('Time Management', 'soft'),
-      skill('Attention to Detail', 'soft'),
-    )
-  }
-  if (matchesAny(text, ['ict', 'information', 'developer', 'programmer', 'web', 'computer'])) {
-    occupationSkills.push(
-      skill('Web Development', 'hard'),
-      skill('Programming', 'hard'),
-      skill('Data Analysis', 'hard'),
-      skill('Problem Solving', 'soft'),
-      skill('Attention to Detail', 'soft'),
-    )
-  }
-  if (matchesAny(text, ['cashier', 'sales', 'retail', 'customer'])) {
-    occupationSkills.push(
-      skill('Point of Sale Systems', 'hard'),
-      skill('Cash Handling', 'hard'),
-      skill('Customer Service', 'soft'),
-      skill('Communication', 'soft'),
-    )
+  const keywordSkills = []
+  if (categorySkills.length === 0) {
+    if (matchesAny(text, ['teacher', 'education', 'instructor', 'tutor'])) {
+      keywordSkills.push(
+        skill('Lesson Planning', 'hard'),
+        skill('Classroom Management', 'hard'),
+        skill('Computer Literate', 'hard', true),
+        skill('Communication', 'soft'),
+        skill('Patience', 'soft'),
+      )
+    }
+    if (matchesAny(text, ['driver', 'transport', 'delivery', 'logistics'])) {
+      keywordSkills.push(
+        skill('Driver', 'hard', true),
+        skill('Defensive Driving', 'hard'),
+        skill('Time Management', 'soft'),
+        skill('Attention to Detail', 'soft'),
+      )
+    }
+    if (matchesAny(text, ['ict', 'information', 'developer', 'programmer', 'web', 'computer'])) {
+      keywordSkills.push(
+        skill('Web Development', 'hard'),
+        skill('Programming', 'hard'),
+        skill('Data Analysis', 'hard'),
+        skill('Problem Solving', 'soft'),
+        skill('Attention to Detail', 'soft'),
+      )
+    }
+    if (matchesAny(text, ['cashier', 'sales', 'retail', 'customer'])) {
+      keywordSkills.push(
+        skill('Point of Sale Systems', 'hard'),
+        skill('Cash Handling', 'hard'),
+        skill('Customer Service', 'soft'),
+        skill('Communication', 'soft'),
+      )
+    }
   }
 
   return uniqueSkills([
-    ...occupationSkills,
+    ...categorySkills,
+    ...keywordSkills,
     skill('Data Entry', 'hard'),
     skill('Microsoft Office', 'hard'),
     skill('Critical Thinking', 'soft'),

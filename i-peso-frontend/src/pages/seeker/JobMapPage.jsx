@@ -1,5 +1,6 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { AlertCircle, BriefcaseBusiness, Loader2, LocateFixed, MapPinned, PanelLeftOpen, RefreshCw, Sparkles } from 'lucide-react'
 import toast from 'react-hot-toast'
 import JobMapAssistant from '../../components/maps/JobMapAssistant'
@@ -8,10 +9,15 @@ import JobMapFilters from '../../components/maps/JobMapFilters'
 import JobMapDetailsPanel from '../../components/maps/JobMapDetailsPanel'
 import ReportEmployerModal from '../../components/ReportEmployerModal'
 import JobFairInfoModal from '../../components/JobFairInfoModal'
-import { getMapJobDetail, getMapJobs } from '../../services/jobMapService'
+import { ALLOWED_RADII, getMapJobDetail, getMapJobs } from '../../services/jobMapService'
 import { applyToJob, toggleSavedJob } from '../../services/seekerService'
 import { listJobFairs } from '../../services/jobFairService'
 
+// hide_low_match and coordinates_only used to live here too, but neither had
+// a manual control, wasn't reachable via Smart Search, and min_match's own
+// "50% and above" option already covers the same need — dead filters that
+// only added confusing "active filter" chips no click path could ever
+// produce. Removed rather than wired up, since they were pure redundancy.
 const DEFAULT_FILTERS = {
   radius_km: 15,
   min_match: 0,
@@ -20,9 +26,7 @@ const DEFAULT_FILTERS = {
   job_type: '',
   salary_min: '',
   salary_max: '',
-  hide_low_match: false,
   hide_applied: false,
-  coordinates_only: false,
   location_keyword: '',
   saved_only: false,
   job_fair_only: false,
@@ -32,6 +36,9 @@ const DEFAULT_FILTERS = {
   max_missing_skills: '',
   limit: 30,
 }
+
+const EMPTY_SEEKER_LOCATION = { latitude: null, longitude: null, full_address: '' }
+const EMPTY_LIST = []
 
 const JobVacancyMap = lazy(() => import('../../components/maps/JobVacancyMap'))
 
@@ -61,16 +68,33 @@ function SmartSummary({ summary }) {
 }
 
 function ApplyConfirmation({ job, onCancel, onConfirm, applying }) {
+  const isOpen = Boolean(job)
+
+  // Escape-to-close and a background scroll lock — this is a true blocking
+  // modal (unlike the map's floating panels, which stay reachable behind
+  // the details drawer), so it needs both to behave like one.
+  useEffect(() => {
+    if (!isOpen) return undefined
+    const handleKeyDown = (event) => { if (event.key === 'Escape') onCancel() }
+    window.addEventListener('keydown', handleKeyDown)
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown)
+      document.body.style.overflow = previousOverflow
+    }
+  }, [isOpen, onCancel])
+
   if (!job) return null
   return (
-    <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-sm rounded-3xl bg-white p-5 shadow-2xl ring-1 ring-slate-200">
+    <div role="dialog" aria-modal="true" aria-labelledby="apply-confirmation-title" className="fixed inset-0 z-[1000] flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm" onClick={onCancel}>
+      <div className="w-full max-w-sm rounded-3xl bg-white p-5 shadow-2xl ring-1 ring-slate-200" onClick={(event) => event.stopPropagation()}>
         <div className="flex items-center gap-3">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-50 text-blue-900">
             <BriefcaseBusiness className="h-5 w-5" />
           </div>
           <div>
-            <h2 className="text-sm font-black text-slate-900">Confirm Application</h2>
+            <h2 id="apply-confirmation-title" className="text-sm font-black text-slate-900">Confirm Application</h2>
             <p className="text-xs font-medium text-slate-500">Apply using your i-PESO profile.</p>
           </div>
         </div>
@@ -78,8 +102,8 @@ function ApplyConfirmation({ job, onCancel, onConfirm, applying }) {
           Apply to <strong className="text-slate-900">{job.job_title}</strong> at <strong className="text-slate-900">{job.employer_name}</strong>?
         </div>
         <div className="mt-5 flex gap-2">
-          <button type="button" onClick={onCancel} className="flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 transition hover:bg-slate-50 hover:border-slate-300">Cancel</button>
-          <button type="button" disabled={applying} onClick={() => onConfirm(job)} className="flex-1 rounded-xl bg-blue-950 px-3 py-2 text-xs font-bold text-white transition hover:bg-blue-900 disabled:opacity-50">
+          <button type="button" autoFocus onClick={onCancel} className="flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 transition hover:bg-slate-50 hover:border-slate-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700">Cancel</button>
+          <button type="button" disabled={applying} onClick={() => onConfirm(job)} className="flex-1 rounded-xl bg-blue-950 px-3 py-2 text-xs font-bold text-white transition hover:bg-blue-900 disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700">
             {applying ? 'Applying…' : 'Confirm Apply'}
           </button>
         </div>
@@ -90,16 +114,12 @@ function ApplyConfirmation({ job, onCancel, onConfirm, applying }) {
 
 export default function JobMapPage() {
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const { jobId: routeJobIdParam } = useParams()
   const routeJobId = routeJobIdParam ? parseInt(routeJobIdParam, 10) : null
 
-  const [jobs, setJobs] = useState([])
-  const [jobFairs, setJobFairs] = useState([])
-  // Seeker profile is still loaded (for other views), but applying no longer gates on it.
-  const [, setSeeker] = useState(null)
-  const [summary, setSummary] = useState(null)
-  const [seekerLocation, setSeekerLocation] = useState({ latitude: null, longitude: null, full_address: '' })
   const [filters, setFilters] = useState(DEFAULT_FILTERS)
+  const [debouncedFilters, setDebouncedFilters] = useState(DEFAULT_FILTERS)
   const [selectedJobId, setSelectedJobId] = useState(routeJobId)
   const [detailsById, setDetailsById] = useState({})
   const [detailLoadingId, setDetailLoadingId] = useState(null)
@@ -107,87 +127,92 @@ export default function JobMapPage() {
   const [reportTarget, setReportTarget] = useState(null)
   const [jobFairPopup, setJobFairPopup] = useState(null)
   const [popupJobId, setPopupJobId] = useState(null)
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState('')
   const [locationNotice, setLocationNotice] = useState('')
-  const [locationRequired, setLocationRequired] = useState(false)
   const [isLocating, setIsLocating] = useState(false)
   const [panelOpen, setPanelOpen] = useState(true)
   const [applyingIds, setApplyingIds] = useState([])
   const [savingIds, setSavingIds] = useState([])
   const [pendingApplyJobId, setPendingApplyJobId] = useState(null)
   const [assistantOpen, setAssistantOpen] = useState(false)
-  const requestId = useRef(0)
-  const abortRef = useRef(null)
   const detailAbortRef = useRef(null)
   const detailRequestId = useRef(0)
+  const filtersRef = useRef(filters)
+  useEffect(() => { filtersRef.current = filters }, [filters])
 
-  const fetchJobs = useCallback(async () => {
-    const currentRequest = ++requestId.current
-    abortRef.current?.abort()
-    const controller = new AbortController()
-    abortRef.current = controller
-    setIsLoading(true)
-    setError('')
-    try {
-      const data = await getMapJobs(filters, { signal: controller.signal })
-      if (currentRequest !== requestId.current) return
-      setJobs(data.jobs)
-      setSeeker(data.seeker)
-      setSummary(data.summary)
-      setSeekerLocation(data.seeker_location)
-      setLocationRequired(false)
-      setSelectedJobId((id) => (id === routeJobId) ? id : (data.jobs.some((job) => job.post_id === id) ? id : null))
-      setPopupJobId((id) => data.jobs.some((job) => job.post_id === id) ? id : null)
-    } catch (fetchError) {
-      if (currentRequest !== requestId.current) return
-      if (fetchError?.code === 'ERR_CANCELED' || fetchError?.name === 'AbortError') return
-      if (fetchError?.response?.data?.code === 'location_required') {
-        try {
-          const fallback = await getMapJobs({ ...filters, feed_mode: 'latest', sort: 'newest', limit: 30 }, { signal: controller.signal })
-          if (currentRequest !== requestId.current) return
-          setJobs(fallback.jobs)
-          setSeeker(fallback.seeker || fetchError.response.data.seeker || null)
-          setSummary(fallback.summary)
-          setSeekerLocation(fetchError.response.data.seeker_location || { latitude: null, longitude: null, full_address: '' })
-          setLocationRequired(false)
-          setLocationNotice('Showing latest active vacancies. Add your location to enable nearby map pins.')
-          setError('')
-          return
-        } catch (fallbackError) {
-          if (fallbackError?.code === 'ERR_CANCELED' || fallbackError?.name === 'AbortError') return
-          setJobs([])
-          setSeeker(fetchError.response.data.seeker || null)
-          setSummary(null)
-          setSeekerLocation(fetchError.response.data.seeker_location || { latitude: null, longitude: null, full_address: '' })
-          setLocationRequired(true)
-          setError('')
-          return
-        }
-      }
-      setError(errorMessage(fetchError, 'Unable to load nearby jobs. Please try again.'))
-      setJobs([])
-    } finally {
-      if (currentRequest === requestId.current) setIsLoading(false)
-    }
+  // Filter changes debounce into this before becoming the query key, so a
+  // burst of changes (Smart Search setting several filters at once, quick
+  // successive dropdown clicks) settles into one request instead of one per
+  // change — react-query itself then handles caching, de-duping, and
+  // cancelling a superseded in-flight request automatically.
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedFilters(filters), 400)
+    return () => window.clearTimeout(timer)
   }, [filters])
 
-  useEffect(() => {
-    const timer = window.setTimeout(fetchJobs, 400)
-    return () => {
-      window.clearTimeout(timer)
-      abortRef.current?.abort()
-    }
-  }, [fetchJobs])
+  const jobsQuery = useQuery({
+    queryKey: ['jobMap', debouncedFilters],
+    queryFn: async ({ signal }) => {
+      try {
+        const data = await getMapJobs(debouncedFilters, { signal })
+        return { ...data, locationRequired: false, locationFallbackNotice: '' }
+      } catch (fetchError) {
+        if (fetchError?.response?.data?.code !== 'location_required') throw fetchError
 
-  // Independent of filters/location — PESO job fairs are a small, fixed set
-  // of events, not something to re-fetch every time the seeker adjusts a
-  // vacancy search. A failure here shouldn't block the primary job map.
+        try {
+          const fallback = await getMapJobs({ ...debouncedFilters, feed_mode: 'latest', sort: 'newest', limit: 30 }, { signal })
+          return {
+            ...fallback,
+            seeker_location: fetchError.response.data.seeker_location || EMPTY_SEEKER_LOCATION,
+            locationRequired: false,
+            locationFallbackNotice: 'Showing latest active vacancies. Add your location to enable nearby map pins.',
+          }
+        } catch (fallbackError) {
+          if (fallbackError?.code === 'ERR_CANCELED' || fallbackError?.name === 'AbortError') throw fallbackError
+          return {
+            jobs: [],
+            seeker: fetchError.response.data.seeker || null,
+            summary: null,
+            seeker_location: fetchError.response.data.seeker_location || EMPTY_SEEKER_LOCATION,
+            locationRequired: true,
+            locationFallbackNotice: '',
+          }
+        }
+      }
+    },
+    placeholderData: (previous) => previous,
+  })
+
+  const jobs = jobsQuery.data?.jobs ?? EMPTY_LIST
+  const summary = jobsQuery.data?.summary ?? null
+  const seekerLocation = jobsQuery.data?.seeker_location ?? EMPTY_SEEKER_LOCATION
+  const locationRequired = jobsQuery.data?.locationRequired ?? false
+  // isLoading is only true before the very first result ever lands;
+  // isFetching covers every subsequent re-fetch too (used for the
+  // non-blocking "Updating map…" pill instead of re-showing skeletons and
+  // wiping out perfectly good results already on screen).
+  const isLoading = jobsQuery.isLoading
+  const isFetching = jobsQuery.isFetching
+  const error = jobsQuery.isError ? errorMessage(jobsQuery.error, 'Unable to load nearby jobs. Please try again.') : ''
+
+  // Keep the selected/previewed job in step with what the query actually
+  // returned — e.g. a job that drops out of a narrower radius shouldn't stay
+  // "selected" with stale details still on screen.
   useEffect(() => {
-    listJobFairs()
-      .then((fairs) => setJobFairs(fairs.filter((fair) => fair.map_eligible)))
-      .catch(() => {})
-  }, [])
+    if (!jobsQuery.data) return
+    const currentJobs = jobsQuery.data.jobs || []
+    setSelectedJobId((id) => (id === routeJobId) ? id : (currentJobs.some((job) => job.post_id === id) ? id : null))
+    setPopupJobId((id) => currentJobs.some((job) => job.post_id === id) ? id : null)
+  }, [jobsQuery.data, routeJobId])
+
+  // Independent of filters/location — PESO job fairs are a small, slow-moving
+  // set of events, not something to re-fetch every time the seeker adjusts a
+  // vacancy search. A failure here shouldn't block the primary job map.
+  const jobFairsQuery = useQuery({
+    queryKey: ['jobMapFairs'],
+    queryFn: async () => (await listJobFairs()).filter((fair) => fair.map_eligible),
+    staleTime: 5 * 60_000,
+  })
+  const jobFairs = jobFairsQuery.data ?? EMPTY_LIST
 
   const updateFilters = (changes) => {
     setFilters((current) => ({ ...current, ...changes }))
@@ -200,16 +225,26 @@ export default function JobMapPage() {
   // JobVacancyMap is memo()'d and depends on that stability to actually skip
   // re-rendering the map (and, on the Leaflet path, avoid rebuilding every
   // marker) when none of that unrelated state should touch it.
+  //
+  // Resetting used to silently drop a live "Use current location" override
+  // back to the seeker's saved profile address with no indication that's
+  // what happened — confusing, since Reset is framed as "clear my filters,"
+  // not "forget where I said I am." It now keeps an active lat/lng override
+  // (read via a ref so this can stay a zero-dependency, stable callback).
   const resetFilters = useCallback(() => {
-    setFilters(DEFAULT_FILTERS)
+    const { lat, lng } = filtersRef.current
+    const hasLocationOverride = lat !== undefined
+    setFilters(hasLocationOverride ? { ...DEFAULT_FILTERS, lat, lng } : DEFAULT_FILTERS)
     setSelectedJobId(null)
     setPopupJobId(null)
-    setLocationNotice('')
-    setLocationRequired(false)
+    if (!hasLocationOverride) setLocationNotice('')
   }, [])
 
   const updateJob = (postId, changes) => {
-    setJobs((current) => current.map((job) => job.post_id === postId ? { ...job, ...changes } : job))
+    queryClient.setQueryData(['jobMap', debouncedFilters], (current) => current && {
+      ...current,
+      jobs: current.jobs.map((job) => job.post_id === postId ? { ...job, ...changes } : job),
+    })
     setDetailsById((current) => current[postId]
       ? { ...current, [postId]: { ...current[postId], ...changes } }
       : current)
@@ -295,9 +330,9 @@ export default function JobMapPage() {
     )
   }
 
-  // Memoized (deps: detailsById, seekerLocation) — passed into the memo()'d
-  // JobVacancyMap as onViewJob, so it only changes reference when a detail
-  // fetch actually needs to.
+  // Memoized (deps: detailsById, seekerLocation, debouncedFilters, queryClient)
+  // — passed into the memo()'d JobVacancyMap as onViewJob, so it only changes
+  // reference when a detail fetch actually needs to.
   const openDetails = useCallback(async (job) => {
     const id = typeof job === 'object' ? job.post_id : job
     setSelectedJobId(id)
@@ -316,7 +351,10 @@ export default function JobMapPage() {
       const detailedJob = await getMapJobDetail(id, seekerLocation, { signal: controller.signal })
       if (currentRequest !== detailRequestId.current) return
       setDetailsById((current) => ({ ...current, [id]: detailedJob }))
-      setJobs((current) => current.map((item) => item.post_id === id ? { ...item, ...detailedJob } : item))
+      queryClient.setQueryData(['jobMap', debouncedFilters], (current) => current && {
+        ...current,
+        jobs: current.jobs.map((item) => item.post_id === id ? { ...item, ...detailedJob } : item),
+      })
     } catch (requestError) {
       if (requestError?.code === 'ERR_CANCELED' || requestError?.name === 'AbortError') return
       if (currentRequest === detailRequestId.current) {
@@ -325,7 +363,7 @@ export default function JobMapPage() {
     } finally {
       if (currentRequest === detailRequestId.current) setDetailLoadingId(null)
     }
-  }, [detailsById, seekerLocation])
+  }, [detailsById, seekerLocation, debouncedFilters, queryClient])
 
   // Memoized — passed into the memo()'d JobVacancyMap as onMarkerSelect. This
   // was previously recreated on every render, which forced the Leaflet path
@@ -380,15 +418,18 @@ export default function JobMapPage() {
   const activeFilters = [
     filters.job_type && { key: 'job_type', label: filters.job_type },
     filters.hide_applied && { key: 'hide_applied', label: 'Hide applied' },
-    filters.hide_low_match && { key: 'hide_low_match', label: '50%+ match only' },
-    filters.coordinates_only && { key: 'coordinates_only', label: 'Has coordinates' },
     filters.saved_only && { key: 'saved_only', label: 'Saved jobs' },
     filters.job_fair_only && { key: 'job_fair_only', label: 'Job Fairs' },
     filters.upskill_recommended_only && { key: 'upskill_recommended_only', label: 'Upskill matches' },
     filters.certificate_match_only && { key: 'certificate_match_only', label: 'Certificate matches' },
     filters.can_apply_only && { key: 'can_apply_only', label: 'Can apply now' },
     filters.location_keyword && { key: 'location_keyword', label: `Near: ${filters.location_keyword}` },
-    filters.salary_min && { key: 'salary_min', label: `Min ₱${filters.salary_min}` },
+    filters.salary_min && { key: 'salary_min', label: `Min ₱${Number(filters.salary_min).toLocaleString()}` },
+    filters.salary_max && { key: 'salary_max', label: `Max ₱${Number(filters.salary_max).toLocaleString()}` },
+    // Smart Search can set this with no manual control and no other visual
+    // trace of it — without a chip here, it could silently be narrowing
+    // results with zero way for the seeker to notice or undo it.
+    filters.max_missing_skills !== '' && { key: 'max_missing_skills', label: `≤${filters.max_missing_skills} missing skills` },
   ].filter(Boolean)
 
   return (
@@ -398,12 +439,12 @@ export default function JobMapPage() {
         <Suspense fallback={<div className="h-full w-full animate-pulse bg-slate-200" />}>
           <JobVacancyMap jobs={mapJobs} jobFairs={jobFairs} onJobFairSelect={handleJobFairPin} seekerLocation={seekerLocation} selectedJobId={selectedJobId} popupJobId={popupJobId} onMarkerSelect={previewMarkerJob} onPopupClose={closePopup} onViewJob={openDetails} detailsOpen={Boolean(detailsJob)} onListToggle={togglePanel} onReset={resetFilters} highOnly={Number(filters.min_match) >= 80} onHighToggle={toggleHighMatch} />
         </Suspense>
-        <div className={`pointer-events-none absolute left-1/2 top-4 z-10 -translate-x-1/2 transition-all duration-300 ${isLoading ? 'translate-y-0 opacity-100' : '-translate-y-2 opacity-0'}`}>
+        <div role="status" aria-live="polite" className={`pointer-events-none absolute left-1/2 top-4 z-10 -translate-x-1/2 transition-all duration-300 ${isFetching ? 'translate-y-0 opacity-100' : '-translate-y-2 opacity-0'}`}>
           <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white/95 px-3 py-1.5 text-[11px] font-bold text-blue-950 shadow-lg backdrop-blur">
-            <Loader2 className="h-3.5 w-3.5 animate-spin" /> Updating map…
+            <Loader2 className="h-3.5 w-3.5 animate-spin" /> {isLoading ? 'Loading map…' : 'Updating map…'}
           </span>
         </div>
-        {!hasLocation && !isLoading && (
+        {!hasLocation && !isFetching && (
           <div className="pointer-events-none absolute inset-x-4 top-16 z-10 mx-auto max-w-md rounded-xl border border-amber-200 bg-white/95 p-3 text-center text-xs font-semibold leading-5 text-amber-800 shadow-lg backdrop-blur">Update your address or use your current location to view nearby job pins.</div>
         )}
       </main>
@@ -417,7 +458,7 @@ export default function JobMapPage() {
           </div>
           <div className="flex items-center gap-1.5">
             <button type="button" onClick={() => setAssistantOpen((open) => !open)} aria-expanded={assistantOpen} className={`flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-[10px] font-bold shadow-sm transition ${assistantOpen ? 'border-blue-900 bg-blue-950 text-white' : 'border-slate-200 bg-white text-blue-950 hover:bg-slate-50'}`} title="Smart-assisted search"><Sparkles className="h-3.5 w-3.5" /> Smart Search</button>
-            <button type="button" onClick={useCurrentLocation} disabled={isLocating} className="flex h-8 w-8 items-center justify-center rounded-md border border-slate-200 bg-white text-blue-950 shadow-sm transition hover:bg-slate-50 hover:text-blue-700 disabled:opacity-50" title="Use current location">{isLocating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <LocateFixed className="h-3.5 w-3.5" />}</button>
+            <button type="button" onClick={useCurrentLocation} disabled={isLocating} className="flex h-8 w-8 items-center justify-center rounded-md border border-slate-200 bg-white text-blue-950 shadow-sm transition hover:bg-slate-50 hover:text-blue-700 disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700" aria-label={isLocating ? 'Locating…' : 'Use current location'} title="Use current location">{isLocating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <LocateFixed className="h-3.5 w-3.5" />}</button>
           </div>
         </header>
 
@@ -446,21 +487,33 @@ export default function JobMapPage() {
 
         <div className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain bg-slate-50/70 p-3 [scrollbar-gutter:stable]">
           {isLoading ? <><JobSkeleton /><JobSkeleton /><JobSkeleton /></> : error ? (
-            <div className="rounded-2xl border border-red-200 bg-white p-5 text-center shadow-sm"><AlertCircle className="mx-auto h-7 w-7 text-red-500" /><h2 className="mt-2 text-sm font-black text-slate-800">Unable to load jobs</h2><p className="mt-1 text-xs leading-5 text-slate-500">{error}</p><button type="button" onClick={fetchJobs} className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-blue-950 px-3 py-2 text-xs font-bold text-white shadow hover:bg-blue-900"><RefreshCw className="h-3.5 w-3.5" /> Try again</button></div>
+            <div className="rounded-2xl border border-red-200 bg-white p-5 text-center shadow-sm"><AlertCircle className="mx-auto h-7 w-7 text-red-500" /><h2 className="mt-2 text-sm font-black text-slate-800">Unable to load jobs</h2><p className="mt-1 text-xs leading-5 text-slate-500">{error}</p><button type="button" onClick={() => jobsQuery.refetch()} className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-blue-950 px-3 py-2 text-xs font-bold text-white shadow transition hover:bg-blue-900"><RefreshCw className="h-3.5 w-3.5" /> Try again</button></div>
           ) : locationRequired ? (
-            <div className="rounded-2xl border border-amber-200 bg-white p-6 text-center shadow-sm"><LocateFixed className="mx-auto h-8 w-8 text-amber-500" /><h2 className="mt-3 text-sm font-black text-slate-800">Location needed for nearby jobs</h2><p className="mt-1 text-xs leading-5 text-slate-500">Update your profile address or allow your current location for this search.</p><button type="button" onClick={useCurrentLocation} disabled={isLocating} className="mt-4 inline-flex items-center gap-1.5 rounded-lg bg-blue-950 px-3 py-2 text-xs font-bold text-white shadow hover:bg-blue-900 disabled:opacity-50">{isLocating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <LocateFixed className="h-3.5 w-3.5" />} Use current location</button></div>
+            <div className="rounded-2xl border border-amber-200 bg-white p-6 text-center shadow-sm"><LocateFixed className="mx-auto h-8 w-8 text-amber-500" /><h2 className="mt-3 text-sm font-black text-slate-800">Location needed for nearby jobs</h2><p className="mt-1 text-xs leading-5 text-slate-500">Update your profile address or allow your current location for this search.</p><button type="button" onClick={useCurrentLocation} disabled={isLocating} className="mt-4 inline-flex items-center gap-1.5 rounded-lg bg-blue-950 px-3 py-2 text-xs font-bold text-white shadow transition hover:bg-blue-900 disabled:opacity-50">{isLocating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <LocateFixed className="h-3.5 w-3.5" />} Use current location</button></div>
           ) : jobs.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-6 text-center shadow-sm"><BriefcaseBusiness className="mx-auto h-8 w-8 text-slate-300" /><h2 className="mt-3 text-sm font-black text-slate-800">{highMatchEmpty ? 'No high-match jobs found nearby' : `No jobs found within ${filters.radius_km} km`}</h2><p className="mt-1 text-xs leading-5 text-slate-500">{highMatchEmpty ? 'Try widening the radius or lowering the match filter.' : 'Try widening the radius or clearing your search filters.'}</p><div className="mt-4 flex flex-wrap justify-center gap-2"><button type="button" onClick={() => updateFilters({ radius_km: Math.min(50, Number(filters.radius_km) + 10) })} className="rounded-lg bg-blue-950 px-3 py-2 text-xs font-bold text-white shadow hover:bg-blue-900">Increase radius</button>{highMatchEmpty && <button type="button" onClick={() => updateFilters({ min_match: 0 })} className="rounded-lg border border-blue-900 px-3 py-2 text-xs font-bold text-blue-950 hover:bg-blue-50">Lower match filter</button>}<button type="button" onClick={() => navigate('/seeker/government-programs')} className="rounded-lg border border-violet-300 px-3 py-2 text-xs font-bold text-violet-800 hover:bg-violet-50">Open Programs</button></div></div>
+            <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-6 text-center shadow-sm">
+              <BriefcaseBusiness className="mx-auto h-8 w-8 text-slate-300" />
+              <h2 className="mt-3 text-sm font-black text-slate-800">{highMatchEmpty ? 'No high-match jobs found nearby' : `No jobs found within ${filters.radius_km} km`}</h2>
+              <p className="mt-1 text-xs leading-5 text-slate-500">{highMatchEmpty ? 'Try widening the radius or lowering the match filter.' : 'Try widening the radius or clearing your search filters.'}</p>
+              {/* One consistent visual language for every secondary action here — solid
+                  for the single recommended next step, matching outline treatment for
+                  the rest, regardless of where each one navigates to. */}
+              <div className="mt-4 flex flex-wrap justify-center gap-2">
+                <button type="button" onClick={() => updateFilters({ radius_km: Math.max(...ALLOWED_RADII) })} className="rounded-lg bg-blue-950 px-3 py-2 text-xs font-bold text-white shadow transition hover:bg-blue-900">Search a wider area</button>
+                {highMatchEmpty && <button type="button" onClick={() => updateFilters({ min_match: 0 })} className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-bold text-slate-700 transition hover:border-blue-300 hover:text-blue-900">Lower match filter</button>}
+                <button type="button" onClick={() => navigate('/seeker/government-programs')} className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-bold text-slate-700 transition hover:border-blue-300 hover:text-blue-900">Explore Government Programs</button>
+              </div>
+            </div>
           ) : jobs.map((job) => (
             <div id={`map-job-${job.post_id}`} key={job.post_id}>
               <JobMapCard job={job} isActive={selectedJobId === job.post_id} isApplying={applyingIds.includes(job.post_id)} isSaving={savingIds.includes(job.post_id)} onClick={() => openDetails(job)} onView={openDetails} onApply={requestApply} onSave={handleSave} onTraining={viewTraining} onJobFair={handleJobFair} />
             </div>
           ))}
-          {!isLoading && !error && jobs.length >= Number(filters.limit) && Number(filters.limit) < 100 && (
+          {!isFetching && !error && jobs.length >= Number(filters.limit) && Number(filters.limit) < 100 && (
             <button
               type="button"
               onClick={() => updateFilters({ limit: Math.min(100, Number(filters.limit) + 20) })}
-              className="w-full rounded-xl border border-blue-200 bg-white px-4 py-3 text-xs font-black text-blue-900 shadow-sm transition hover:bg-blue-50"
+              className="w-full rounded-xl border border-blue-200 bg-white px-4 py-3 text-xs font-black text-blue-900 shadow-sm transition hover:bg-blue-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700"
             >
               Load more vacancies
             </button>

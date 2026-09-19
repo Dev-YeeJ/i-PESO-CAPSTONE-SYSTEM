@@ -19,7 +19,8 @@ class SkillRecommendationService
 {
     public function __construct(
         private readonly SkillNormalizationService $normalizer,
-        private readonly MatchingProfileService $profiles
+        private readonly MatchingProfileService $profiles,
+        private readonly OccupationTitleMatcher $titleMatcher,
     ) {}
 
     /**
@@ -82,44 +83,39 @@ class SkillRecommendationService
      */
     private function getOccupationSkills(JobSeeker $seeker, int $limit): array
     {
-        if (!$seeker->occupations->isNotEmpty()) {
+        if ($seeker->occupations->isEmpty()) {
             return [];
         }
 
-        $occupationIds = $seeker->occupations->pluck('occupation_id')->toArray();
-        $occupationIds = array_values(array_filter($occupationIds));
+        $occupationIds = $seeker->occupations->pluck('occupation_id')->filter()->values();
+
+        // A preference set during onboarding's Job Preferences step often has
+        // no catalog occupation_id — the seeker typed a free-text job title,
+        // or picked an AI-suggested broad field/general term instead of a
+        // catalog entry. Without resolving those too, only seekers who picked
+        // straight from the catalog ever get occupation-tied suggestions;
+        // everyone else silently fell through to the generic "in demand"
+        // list below regardless of what they actually entered.
+        foreach ($seeker->occupations->whereNull('occupation_id') as $preference) {
+            $candidateTitle = $preference->general_term
+                ?? $preference->role_function
+                ?? $preference->occupation_title
+                ?? $preference->raw_job_title;
+
+            if (! $candidateTitle) {
+                continue;
+            }
+
+            $match = $this->titleMatcher->match($candidateTitle);
+            if ($match) {
+                $occupationIds->push($match['occupation']->id);
+            }
+        }
+
+        $occupationIds = $occupationIds->unique()->values()->all();
 
         if ($occupationIds && Schema::hasTable('skill_occupation_evidence')) {
-            $skills = SkillCatalogEntry::query()
-                ->join('skill_occupation_evidence as evidence', 'skill_catalog_entries.id', '=', 'evidence.skill_id')
-                ->whereIn('evidence.occupation_id', $occupationIds)
-                ->groupBy(
-                    'skill_catalog_entries.id',
-                    'skill_catalog_entries.name',
-                    'skill_catalog_entries.category',
-                    'skill_catalog_entries.is_in_demand',
-                    'skill_catalog_entries.is_hot',
-                    'skill_catalog_entries.occupation_count'
-                )
-                ->orderByDesc(DB::raw('MAX(COALESCE(evidence.importance, 0))'))
-                ->orderByDesc('skill_catalog_entries.occupation_count')
-                ->limit($limit)
-                ->get([
-                    'skill_catalog_entries.id',
-                    'skill_catalog_entries.name',
-                    'skill_catalog_entries.category',
-                    'skill_catalog_entries.is_in_demand',
-                    'skill_catalog_entries.is_hot',
-                ])
-                ->map(fn ($skill) => [
-                    'id' => $skill->id,
-                    'name' => $skill->name,
-                    'category' => $skill->category,
-                    'is_hot' => $skill->is_hot,
-                    'demand_level' => $skill->is_in_demand ? 'high' : 'medium',
-                    'reason' => 'Commonly linked to your preferred occupation',
-                ])
-                ->toArray();
+            $skills = $this->skillsForOccupationIds($occupationIds, $limit, 'Commonly linked to your preferred occupation');
 
             if ($skills) {
                 return $skills;
@@ -162,6 +158,87 @@ class SkillRecommendationService
                 'reason' => 'Required in your field',
             ])
             ->toArray();
+    }
+
+    /**
+     * Catalog-grounded skills tied to one or more resolved occupations —
+     * shared by getOccupationSkills() (seeker path) and
+     * suggestSkillsForJobTitle() (employer job-posting path) so both pull
+     * from the same skill_occupation_evidence data instead of maintaining
+     * two separate ideas of "skills for this occupation".
+     */
+    private function skillsForOccupationIds(array $occupationIds, int $limit, string $reason): array
+    {
+        if (! $occupationIds) {
+            return [];
+        }
+
+        return SkillCatalogEntry::query()
+            ->join('skill_occupation_evidence as evidence', 'skill_catalog_entries.id', '=', 'evidence.skill_id')
+            ->whereIn('evidence.occupation_id', $occupationIds)
+            ->groupBy(
+                'skill_catalog_entries.id',
+                'skill_catalog_entries.name',
+                'skill_catalog_entries.category',
+                'skill_catalog_entries.is_in_demand',
+                'skill_catalog_entries.is_hot',
+                'skill_catalog_entries.occupation_count'
+            )
+            ->orderByDesc(DB::raw('MAX(COALESCE(evidence.importance, 0))'))
+            ->orderByDesc('skill_catalog_entries.occupation_count')
+            ->limit($limit)
+            ->get([
+                'skill_catalog_entries.id',
+                'skill_catalog_entries.name',
+                'skill_catalog_entries.category',
+                'skill_catalog_entries.is_in_demand',
+                'skill_catalog_entries.is_hot',
+            ])
+            ->map(fn ($skill) => [
+                'id' => $skill->id,
+                'name' => $skill->name,
+                'category' => $skill->category,
+                'is_hot' => $skill->is_hot,
+                'demand_level' => $skill->is_in_demand ? 'high' : 'medium',
+                'reason' => $reason,
+            ])
+            ->toArray();
+    }
+
+    /**
+     * Catalog-grounded hard/soft skill suggestions for an employer job
+     * posting, keyed off the job title alone (there is no seeker/profile
+     * here — just whatever the employer typed as the position title).
+     *
+     * This exists because the job-posting wizard's "suggested skills" used
+     * to come entirely from an ungrounded LLM call (VertexAiSuggestionService
+     * ::suggestJobPosting) with no connection to the same skill catalog job
+     * seekers see, and it silently fell back to one static generic skill
+     * list whenever the AI was unavailable or misconfigured — regardless of
+     * what job title the employer actually entered. Resolving the title via
+     * the same OccupationTitleMatcher used on the seeker side gives a
+     * deterministic, occupation-tied floor that doesn't depend on an LLM at
+     * all, and stays consistent with the vocabulary seekers pick from.
+     */
+    public function suggestSkillsForJobTitle(string $title, int $limit = 15): array
+    {
+        $empty = ['technical' => [], 'soft' => []];
+
+        if (! Schema::hasTable('skill_catalog_entries') || ! Schema::hasTable('skill_occupation_evidence')) {
+            return $empty;
+        }
+
+        $match = $this->titleMatcher->match($title);
+        if (! $match) {
+            return $empty;
+        }
+
+        $skills = $this->skillsForOccupationIds([$match['occupation']->id], $limit, 'Commonly required for this occupation');
+
+        return [
+            'technical' => collect($skills)->where('category', 'technical')->pluck('name')->values()->all(),
+            'soft' => collect($skills)->where('category', 'soft')->pluck('name')->values()->all(),
+        ];
     }
 
     /**

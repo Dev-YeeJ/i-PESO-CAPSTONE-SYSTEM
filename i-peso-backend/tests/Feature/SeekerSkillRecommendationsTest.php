@@ -108,6 +108,65 @@ class SeekerSkillRecommendationsTest extends TestCase
         $this->assertFalse($skillNames->contains('Driver'));
     }
 
+    public function test_recommendations_resolve_a_free_text_preference_with_no_occupation_id(): void
+    {
+        // Job Preferences lets a seeker type their own job title or accept an
+        // AI-suggested general term instead of picking a catalog occupation —
+        // that preference row is saved with occupation_id = null. Recommendations
+        // must still connect to it by resolving the typed title, not just fall
+        // back to the generic "in demand" list as if nothing was entered.
+        $occupation = Occupation::create([
+            'psoc_code' => 'TEST-003',
+            'title' => 'Registered Nurse',
+            'source' => 'esco',
+            'is_active' => true,
+        ]);
+
+        $occupationSkill = DB::table('skill_catalog_entries')->insertGetId([
+            'name' => 'Patient Care',
+            'normalized_name' => 'patient care',
+            'category' => 'technical',
+            'source' => 'onet',
+            'occupation_count' => 5,
+            'is_hot' => false,
+            'is_in_demand' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        DB::table('skill_occupation_evidence')->insert([
+            'skill_id' => $occupationSkill,
+            'occupation_id' => $occupation->id,
+            'source' => 'onet',
+            'external_occupation_code' => '29-1141.00',
+            'evidence_type' => 'essential',
+            'importance' => 4.5,
+            'is_hot' => false,
+            'is_in_demand' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $seeker = $this->createSeeker();
+        DB::table('seeker_occupations')->insert([
+            'seeker_id' => $seeker->getKey(),
+            'occupation_id' => null,
+            'general_term' => 'Registered Nurse',
+            'occupation_title' => 'Registered Nurse',
+            'status' => 'ai_generated',
+            'preference_order' => 1,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        Sanctum::actingAs($seeker);
+
+        $response = $this->getJson('/api/seeker/skill-recommendations')->assertOk();
+        $skillNames = collect($response->json('data.occupation_skills.skills'))->pluck('name');
+
+        $this->assertTrue($skillNames->contains('Patient Care'));
+    }
+
     private function createSeeker(): JobSeeker
     {
         return JobSeeker::create([
