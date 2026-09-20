@@ -48,15 +48,15 @@ export default function DOLEReportingPage() {
   const [previewSignatories, setPreviewSignatories] = useState(emptySignatories())
   const [isSaving, setIsSaving] = useState(false)
 
-  const fetchReports = () => {
-    setLoading(true)
-    adminService.getReports({ per_page: 15 }).then(d => {
-      setReports(d.data || [])
+  const fetchReports = async () => {
+    try {
+      const data = await adminService.getReports({ per_page: 15, report_category: 'sprs' })
+      setReports(data.data)
+    } catch (err) {
+      console.error(err)
+    } finally {
       setLoading(false)
-    }).catch(e => {
-      console.error(e)
-      setLoading(false)
-    })
+    }
   }
 
   useEffect(() => {
@@ -247,77 +247,105 @@ export default function DOLEReportingPage() {
 
       {/* GENERATE MODAL */}
       {showGenerateModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm print:hidden">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-bold text-slate-900">Generate SPRS</h3>
-              <button onClick={() => setShowGenerateModal(false)} className="text-slate-400 hover:text-slate-600">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm print:hidden p-4 sm:p-0">
+          <div className="w-full max-w-lg rounded-xl bg-white shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="flex items-center justify-between p-6 border-b border-slate-100 shrink-0">
+              <div>
+                <h3 className="text-xl font-bold text-slate-900">Generate SPRS Report</h3>
+                <p className="text-sm text-slate-500 mt-1">Select the reporting period to extract data.</p>
+              </div>
+              <button onClick={() => setShowGenerateModal(false)} className="text-slate-400 hover:text-slate-600 rounded-full p-2 hover:bg-slate-100 transition-colors">
                 <X className="h-5 w-5" />
               </button>
             </div>
-            <form onSubmit={handleGenerate}>
-              <div className="grid grid-cols-2 gap-4 mb-6">
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Month</label>
-                  <select
-                    className="w-full rounded-lg border border-slate-300 p-2.5"
-                    value={selectedMonth}
-                    onChange={(e) => setSelectedMonth(Number(e.target.value))}
-                  >
-                    {Array.from({length: 12}, (_, i) => i + 1).map(m => (
-                      <option key={m} value={m}>{new Date(0, m - 1).toLocaleString('default', { month: 'long' })}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Year</label>
-                  <input
-                    type="number"
-                    className="w-full rounded-lg border border-slate-300 p-2.5"
-                    value={selectedYear}
-                    onChange={(e) => setSelectedYear(Number(e.target.value))}
-                    min="2020"
-                    max="2100"
-                  />
-                </div>
-              </div>
-              <div className="mb-5 space-y-3">
-                <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Signatories (optional)</p>
-                {SIGNATORY_ROLES.map(([role, label]) => (
-                  <div key={role} className="grid grid-cols-2 gap-2">
+            
+            <div className="p-6 overflow-y-auto grow">
+              <form id="generate-sprs-form" onSubmit={handleGenerate} className="space-y-6">
+                
+                {/* Primary Data */}
+                <div className="grid grid-cols-2 gap-5 p-5 bg-slate-50 rounded-lg border border-slate-100">
+                  <div className="space-y-2">
+                    <label className="text-sm font-bold text-slate-700">Reporting Month</label>
+                    <select
+                      className="w-full rounded-md border border-slate-300 p-2.5 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+                      value={selectedMonth}
+                      onChange={(e) => setSelectedMonth(Number(e.target.value))}
+                    >
+                      {Array.from({length: 12}, (_, i) => i + 1).map(m => (
+                        <option key={m} value={m}>{new Date(0, m - 1).toLocaleString('default', { month: 'long' })}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-bold text-slate-700">Reporting Year</label>
                     <input
-                      className="rounded-lg border border-slate-300 p-2 text-sm"
-                      placeholder={`${label} — name`}
-                      value={signatories[role].name}
-                      onChange={(e) => setSigner(role, 'name', e.target.value)}
-                    />
-                    <input
-                      className="rounded-lg border border-slate-300 p-2 text-sm"
-                      placeholder="Position"
-                      value={signatories[role].position}
-                      onChange={(e) => setSigner(role, 'position', e.target.value)}
+                      type="number"
+                      className="w-full rounded-md border border-slate-300 p-2.5 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+                      value={selectedYear}
+                      onChange={(e) => setSelectedYear(Number(e.target.value))}
+                      min="2020"
+                      max="2100"
                     />
                   </div>
-                ))}
+                </div>
+
+                {/* Optional Configuration */}
+                <div className="space-y-5 border-t border-slate-100 pt-5">
+                  <div>
+                    <h4 className="text-sm font-bold text-slate-900 mb-3">Signatories <span className="text-slate-400 font-normal">(Optional)</span></h4>
+                    <div className="space-y-3">
+                      {SIGNATORY_ROLES.map(([role, label]) => (
+                        <div key={role} className="flex gap-3">
+                          <input
+                            className="flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+                            placeholder={`${label} — name`}
+                            value={signatories[role].name}
+                            onChange={(e) => setSigner(role, 'name', e.target.value)}
+                          />
+                          <input
+                            className="w-1/3 rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+                            placeholder="Position"
+                            value={signatories[role].position}
+                            onChange={(e) => setSigner(role, 'position', e.target.value)}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-bold text-slate-900 mb-2">
+                      Issues / Concerns <span className="text-slate-400 font-normal">(Optional)</span>
+                    </label>
+                    <textarea
+                      className="w-full rounded-md border border-slate-300 p-3 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+                      rows={3}
+                      placeholder="Note anything DOLE needs to see for this reporting month..."
+                      value={issuesConcerns}
+                      onChange={(e) => setIssuesConcerns(e.target.value)}
+                    />
+                  </div>
+                </div>
+              </form>
+            </div>
+            
+            <div className="p-6 border-t border-slate-100 bg-slate-50 shrink-0">
+              <div className="flex items-center gap-3">
+                <Button variant="secondary" onClick={() => setShowGenerateModal(false)} className="flex-1">
+                  Cancel
+                </Button>
+                <Button form="generate-sprs-form" type="submit" disabled={isGenerating} className="flex-1 font-bold">
+                  {isGenerating ? (
+                    <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Extracting...</>
+                  ) : (
+                    'Generate SPRS'
+                  )}
+                </Button>
               </div>
-              <div className="mb-5">
-                <label className="block text-xs font-bold uppercase tracking-wide text-slate-500 mb-1">Issues / Concerns (optional)</label>
-                <textarea
-                  className="w-full rounded-lg border border-slate-300 p-2.5 text-sm"
-                  rows={3}
-                  placeholder="Note anything DOLE needs to see for this reporting month..."
-                  value={issuesConcerns}
-                  onChange={(e) => setIssuesConcerns(e.target.value)}
-                />
-              </div>
-              <p className="mb-4 text-xs text-slate-500">
-                Everything the system can't compute — LMI, Career Guidance, AIR-TIP, and the local/overseas
-                breakdowns — opens as blank, editable cells after generation, so you can fill them in by hand.
+              <p className="mt-4 text-[11px] text-center text-slate-500 leading-tight max-w-[85%] mx-auto">
+                After generation, you will be able to review the document and manually encode missing metrics before finalizing.
               </p>
-              <Button type="submit" disabled={isGenerating} className="w-full">
-                {isGenerating ? <Loader2 className="h-5 w-5 animate-spin" /> : 'Generate & Extract Data'}
-              </Button>
-            </form>
+            </div>
           </div>
         </div>
       )}
