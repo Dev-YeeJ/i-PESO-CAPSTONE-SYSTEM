@@ -1,8 +1,23 @@
-import { BriefcaseBusiness, CalendarClock, CheckCircle2, Compass, MapPin } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { BriefcaseBusiness, CalendarClock, CheckCircle2, Compass, MapPin, Search } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
+import toast from 'react-hot-toast'
 import { Button, EmptyState, LoadingSkeleton } from '@/components/ui'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { getSeekerApplicationDetail, getSeekerApplications, withdrawSeekerApplication } from '@/services/seekerService'
+
+const MotionArticle = motion.article
+
+const STATUS_TABS = [
+  { key: '', label: 'All' },
+  { key: 'pending', label: 'Pending' },
+  { key: 'reviewed', label: 'Reviewed' },
+  { key: 'shortlisted', label: 'Shortlisted' },
+  { key: 'interview', label: 'Interview' },
+  { key: 'hired', label: 'Hired' },
+  { key: 'rejected', label: 'Rejected' },
+  { key: 'withdrawn', label: 'Withdrawn' },
+]
 
 const statusTone = {
   pending: 'border-amber-200 bg-amber-50 text-amber-800',
@@ -33,6 +48,8 @@ export default function MyApplications() {
   const [withdrawingId, setWithdrawingId] = useState(null)
   const [pendingWithdraw, setPendingWithdraw] = useState(null)
   const [queuedWithdraw, setQueuedWithdraw] = useState(null)
+  const [statusFilter, setStatusFilter] = useState('')
+  const [searchQuery, setSearchQuery] = useState('')
 
   const loadApplications = async () => {
     setError('')
@@ -75,8 +92,9 @@ export default function MyApplications() {
       const data = await withdrawSeekerApplication(application.apply_id)
       setApplications((current) => current.map((item) => item.apply_id === application.apply_id ? data.application : item))
       setActiveApplication((current) => current?.apply_id === application.apply_id ? data.application : current)
+      toast.success(`Withdrew your application for ${application.job?.job_title || 'this vacancy'}.`)
     } catch (requestError) {
-      setError(requestError.response?.data?.message || 'Unable to withdraw this application.')
+      toast.error(requestError.response?.data?.message || 'Unable to withdraw this application.')
     } finally {
       setWithdrawingId(null)
       setPendingWithdraw(null)
@@ -102,6 +120,23 @@ export default function MyApplications() {
     setQueuedWithdraw(null)
   }
 
+  const statusCounts = useMemo(() => {
+    const counts = {}
+    applications.forEach((app) => { counts[app.status] = (counts[app.status] || 0) + 1 })
+    return counts
+  }, [applications])
+
+  const visibleApplications = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase()
+    return applications.filter((app) => {
+      if (statusFilter && app.status !== statusFilter) return false
+      if (!query) return true
+      return [app.job?.job_title, app.job?.employer?.company_name, app.job?.location]
+        .filter(Boolean)
+        .some((field) => field.toLowerCase().includes(query))
+    })
+  }, [applications, statusFilter, searchQuery])
+
   return (
     <div className="space-y-10 pb-12 max-w-7xl mx-auto">
       {/* Hero Header */}
@@ -122,7 +157,41 @@ export default function MyApplications() {
         {error && (
           <div className="flex items-center justify-between gap-4 rounded-2xl border border-red-200 bg-red-50 p-5 text-sm font-semibold text-red-700 shadow-sm">
             <span>{error}</span>
-            <button type="button" onClick={loadApplications} className="font-extrabold hover:underline rounded-md px-3 py-1 bg-red-100">Try again</button>
+            <Button variant="danger" size="sm" onClick={loadApplications} className="rounded-lg">Try again</Button>
+          </div>
+        )}
+
+        {!loading && applications.length > 0 && (
+          <div className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-wrap gap-2">
+              {STATUS_TABS.map((tab) => {
+                const count = tab.key ? statusCounts[tab.key] || 0 : applications.length
+                if (tab.key && count === 0) return null
+                return (
+                  <button
+                    key={tab.key || 'all'}
+                    type="button"
+                    onClick={() => setStatusFilter(tab.key)}
+                    aria-pressed={statusFilter === tab.key}
+                    className={`inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-xs font-bold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700 ${statusFilter === tab.key ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-400'}`}
+                  >
+                    {tab.label}
+                    <span className={`rounded-full px-1.5 py-0.5 text-[10px] ${statusFilter === tab.key ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'}`}>{count}</span>
+                  </button>
+                )
+              })}
+            </div>
+            <div className="relative sm:w-64">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" aria-hidden="true" />
+              <input
+                type="search"
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
+                placeholder="Search job or employer…"
+                aria-label="Search your applications"
+                className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-10 pr-4 text-sm placeholder:text-slate-400 outline-none transition focus:border-blue-600 focus:bg-white focus:ring-2 focus:ring-blue-100"
+              />
+            </div>
           </div>
         )}
 
@@ -137,10 +206,27 @@ export default function MyApplications() {
               action={{ label: 'Open Smart Job Map', icon: Compass, to: '/seeker/job-map' }}
             />
           </div>
+        ) : visibleApplications.length === 0 ? (
+          <div className="rounded-3xl border border-dashed border-slate-300 bg-white p-12 shadow-sm">
+            <EmptyState
+              filtered
+              icon={BriefcaseBusiness}
+              title="No applications match this filter"
+              description="Try a different status or clear your search."
+            />
+          </div>
         ) : (
           <div className="grid gap-6 lg:grid-cols-2">
-            {applications.map((application) => (
-              <article key={application.apply_id} className="group rounded-3xl border border-slate-200 bg-white p-6 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-blue-200 hover:shadow-xl hover:shadow-blue-900/10 flex flex-col h-full">
+            <AnimatePresence initial={false}>
+            {visibleApplications.map((application) => (
+              <MotionArticle
+                key={application.apply_id}
+                layout
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.18 }}
+                className="group rounded-3xl border border-slate-200 bg-white p-6 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-blue-200 hover:shadow-xl hover:shadow-blue-900/10 flex flex-col h-full">
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex items-start gap-4">
                     {application.job?.employer?.company_logo_url && (
@@ -182,17 +268,24 @@ export default function MyApplications() {
                 )}
 
                 <div className="mt-auto pt-6 flex flex-wrap gap-3">
-                  <button onClick={() => openDetails(application)} className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-3 text-sm font-extrabold text-white transition hover:bg-blue-900 shadow-md">
+                  <button
+                    onClick={() => openDetails(application)}
+                    className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-3 text-sm font-extrabold text-white transition hover:bg-blue-900 shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700"
+                  >
                     {detailLoading && activeApplication?.apply_id === application.apply_id ? 'Loading…' : 'View full details'}
                   </button>
                   {application.can_withdraw && (
-                    <button onClick={() => askWithdraw(application)} className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-red-600 transition hover:border-red-200 hover:bg-red-50 hover:text-red-700 shadow-sm">
+                    <button
+                      onClick={() => askWithdraw(application)}
+                      className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-red-600 transition hover:border-red-200 hover:bg-red-50 hover:text-red-700 shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-600"
+                    >
                       Withdraw
                     </button>
                   )}
                 </div>
-              </article>
+              </MotionArticle>
             ))}
+            </AnimatePresence>
           </div>
         )}
       </div>

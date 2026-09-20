@@ -12,7 +12,11 @@ const JOB_TYPE_MAP: Record<string, string> = {
   freelance: 'Freelance',
 }
 
-const ALLOWED_RADII = [5, 10, 15, 25, 50]
+// Widened from the old 5-50km cap — backend allows up to 500km
+// (SeekerNearbyJobController's radius_km validation), so a seeker outside a
+// dense city isn't stuck unable to see jobs a realistic commute away.
+// Mirrors i-peso-frontend's jobMapService.js ALLOWED_RADII.
+const ALLOWED_RADII = [5, 10, 15, 25, 50, 100, 200, 300]
 const ALLOWED_MATCHES = [0, 50, 70, 80]
 const ALLOWED_SORTS: readonly NonNullable<JobFilters['sort']>[] = ['distance', 'match', 'newest', 'salary']
 const BOOLEAN_FILTER_KEYS = [
@@ -63,6 +67,11 @@ function validateMapFilters(input: Partial<Record<keyof JobFilters, unknown>>): 
   const locationKeyword = String(input.locationKeyword ?? '').trim().slice(0, 100)
   if (locationKeyword) filters.locationKeyword = locationKeyword
 
+  const salaryMin = asNumber(input.salaryMin)
+  if (salaryMin !== null && salaryMin >= 0) filters.salaryMin = salaryMin
+  const salaryMax = asNumber(input.salaryMax)
+  if (salaryMax !== null && salaryMax >= 0) filters.salaryMax = salaryMax
+
   return filters
 }
 
@@ -96,6 +105,9 @@ export function parseRuleBasedMapQuery(rawQuery: string): Partial<JobFilters> {
   const missingSkillMatch = lower.match(/(?:only\s+)?(\d{1,2})\s+missing\s+skills?/)
   if (missingSkillMatch) parsed.maxMissingSkills = Number(missingSkillMatch[1])
 
+  const salaryMinMatch = lower.match(/salary\s*(?:above|over|at least|from|min(?:imum)?)?\s*(?:of\s*)?[₱p]?\s*(\d{1,3}(?:,\d{3})*|\d+)/)
+  if (salaryMinMatch) parsed.salaryMin = Number(salaryMinMatch[1].replace(/,/g, ''))
+
   const type = Object.keys(JOB_TYPE_MAP).find((candidate) => lower.includes(candidate))
   if (type) parsed.jobType = JOB_TYPE_MAP[type]
 
@@ -106,6 +118,7 @@ export function parseRuleBasedMapQuery(rawQuery: string): Partial<JobFilters> {
     .replace(/\b(show|find|give|me|please|jobs?|vacancies|positions?|near me|matching my skills)\b/gi, ' ')
     .replace(/\b(within|inside|under)\s*\d{1,3}\s*(km|kilometers?)\b/gi, ' ')
     .replace(/\b\d{1,3}\s*%\s*(match|and above|\+)?\b/gi, ' ')
+    .replace(/\bsalary\s*(above|over|at least|from|min(?:imum)?)?\s*(of\s*)?[₱p]?\s*\d{1,3}(?:,\d{3})*\b/gi, ' ')
     .replace(/\b(high(?:ly)?[-\s]?match(?:ed)?|nearest|closest|newest|latest|recent|high(?:est)? salary|best pay|highest pay|and above)\b/gi, ' ')
     .replace(/\b(saved|hide applied|job fairs?|upcoming fair|training|upskill|certificates?|certifications?|apply to now|can apply|ready to apply|with only \d+ missing skills?)\b/gi, ' ')
     .replace(/\b(i|my|that|with|available|at|to|now|already|recommendations?|match)\b/gi, ' ')
@@ -136,6 +149,8 @@ export function mergeParsedFilters(aiParsed: AiParsedJobQuery | null, rawQuery: 
     certificateMatchOnly: aiParsed.certificate_match_only,
     canApplyOnly: aiParsed.can_apply_only,
     maxMissingSkills: aiParsed.max_missing_skills,
+    salaryMin: aiParsed.salary_min,
+    salaryMax: aiParsed.salary_max,
   })
 
   return {
@@ -151,5 +166,7 @@ export function mergeParsedFilters(aiParsed: AiParsedJobQuery | null, rawQuery: 
     certificateMatchOnly: validatedAi.certificateMatchOnly ?? fallback.certificateMatchOnly,
     canApplyOnly: validatedAi.canApplyOnly ?? fallback.canApplyOnly,
     maxMissingSkills: validatedAi.maxMissingSkills ?? fallback.maxMissingSkills,
+    salaryMin: validatedAi.salaryMin ?? fallback.salaryMin,
+    salaryMax: validatedAi.salaryMax ?? fallback.salaryMax,
   }
 }

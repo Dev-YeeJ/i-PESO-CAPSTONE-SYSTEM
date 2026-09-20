@@ -54,6 +54,8 @@ export function Field({
   error,
   required = false,
   autoCapitalize = 'words',
+  editable = true,
+  help,
 }: {
   label: string
   value: string
@@ -64,6 +66,10 @@ export function Field({
   error?: string
   required?: boolean
   autoCapitalize?: 'none' | 'words' | 'sentences' | 'characters'
+  /** Locked read-only, e.g. a name field that must match what was captured at registration. */
+  editable?: boolean
+  /** Helper text shown under the field when there's no error — e.g. why it's locked. */
+  help?: string
 }) {
   return (
     <TextField
@@ -75,6 +81,8 @@ export function Field({
       multiline={multiline}
       autoCapitalize={autoCapitalize}
       error={error}
+      editable={editable}
+      help={help}
     />
   )
 }

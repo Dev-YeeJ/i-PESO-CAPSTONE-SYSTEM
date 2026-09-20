@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
-import { FileSpreadsheet, ArrowLeft, CheckCircle2, Trash2, Loader2, CalendarX, PencilLine, Save } from 'lucide-react'
-import { Card, CardHeader, Button, Badge, AlertBox } from '@/components/ui'
+import { motion, AnimatePresence } from 'framer-motion'
+import { FileSpreadsheet, ArrowLeft, CheckCircle2, Trash2, CalendarX, PencilLine, Save } from 'lucide-react'
+import { Card, CardHeader, Button, Badge, AlertBox, ConfirmDialog, LoadingSkeleton } from '@/components/ui'
 import PageHeader from '@/pages/admin/_components/PageHeader'
 import toast from 'react-hot-toast'
 import PlacementRecordEditor, { blankPlacementRecord, stripBlankPlacementRecords } from '@/components/reports/PlacementRecordEditor'
@@ -14,6 +15,8 @@ import {
   deletePlacementReport,
   searchPlacementApplicantSuggestions,
 } from '@/services/placementReportService'
+
+const MotionDiv = motion.div
 
 const STATUS_TONE = {
   pending_mapping: 'warning',
@@ -55,6 +58,9 @@ export default function EmployerPlacementReportPage() {
   const [coverageYear, setCoverageYear] = useState(lastMonth.getFullYear())
   const [declaring, setDeclaring] = useState(false)
   const [startingManual, setStartingManual] = useState(false)
+  const [nilConfirmOpen, setNilConfirmOpen] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState(null)
+  const [deleting, setDeleting] = useState(false)
 
   const fetchReports = () => {
     setLoading(true)
@@ -102,9 +108,9 @@ export default function EmployerPlacementReportPage() {
     }
   }
 
+  const period = `${MONTHS[coverageMonth - 1]} ${coverageYear}`
+
   const handleDeclareNil = async () => {
-    const period = `${MONTHS[coverageMonth - 1]} ${coverageYear}`
-    if (!window.confirm(`Tell PESO that you hired nobody in ${period}?`)) return
     setDeclaring(true)
     try {
       const res = await declareNoPlacements({ month: coverageMonth, year: coverageYear })
@@ -114,17 +120,22 @@ export default function EmployerPlacementReportPage() {
       toast.error(firstError(err, 'Unable to record that.'))
     } finally {
       setDeclaring(false)
+      setNilConfirmOpen(false)
     }
   }
 
-  const handleDelete = async (id) => {
-    if (!window.confirm('Delete this placement report? This cannot be undone.')) return
+  const handleDelete = async () => {
+    if (!deleteTarget) return
+    setDeleting(true)
     try {
-      await deletePlacementReport(id)
+      await deletePlacementReport(deleteTarget)
       toast.success('Report deleted.')
       fetchReports()
     } catch (err) {
       toast.error(err.response?.data?.message || 'Unable to delete.')
+    } finally {
+      setDeleting(false)
+      setDeleteTarget(null)
     }
   }
 
@@ -141,7 +152,7 @@ export default function EmployerPlacementReportPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <MotionDiv initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }} className="space-y-6">
       <PageHeader
         eyebrow="Employer Reporting"
         title="Monthly Placement Report"
@@ -169,10 +180,10 @@ export default function EmployerPlacementReportPage() {
                 </label>
               </div>
               <div className="flex flex-wrap items-center gap-3">
-                <Button type="button" icon={startingManual ? Loader2 : FileSpreadsheet} onClick={handleStartManual} disabled={startingManual}>
+                <Button type="button" icon={FileSpreadsheet} loading={startingManual} onClick={handleStartManual}>
                   {startingManual ? 'Generating…' : 'Generate Report'}
                 </Button>
-                <Button type="button" variant="outline" icon={declaring ? Loader2 : CalendarX} onClick={handleDeclareNil} disabled={declaring}>
+                <Button type="button" variant="outline" icon={CalendarX} loading={declaring} onClick={() => setNilConfirmOpen(true)}>
                   {declaring ? 'Submitting…' : `No hires in ${MONTHS[coverageMonth - 1]}`}
                 </Button>
               </div>
@@ -181,13 +192,22 @@ export default function EmployerPlacementReportPage() {
         <Card>
         <CardHeader title="My submitted reports" />
         {loading ? (
-          <div className="flex items-center gap-2 py-8 text-sm text-slate-500"><Loader2 className="h-4 w-4 animate-spin" /> Loading reports…</div>
+          <LoadingSkeleton variant="card" rows={2} />
         ) : reports.length === 0 ? (
           <p className="py-8 text-center text-sm text-slate-500">No placement reports submitted yet.</p>
         ) : (
           <div className="divide-y divide-slate-100">
+            <AnimatePresence initial={false}>
             {reports.map((r) => (
-              <div key={r.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
+              <MotionDiv
+                key={r.id}
+                layout
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.18 }}
+                className="flex flex-wrap items-center justify-between gap-3 py-3"
+              >
                 <div className="flex items-center gap-3">
                   {r.is_nil_report
                     ? <CalendarX className="h-5 w-5 text-slate-400" />
@@ -209,16 +229,38 @@ export default function EmployerPlacementReportPage() {
                     <Button size="sm" variant="outline" onClick={() => openEditor(r.id)}>Edit</Button>
                   )}
                   {r.status !== 'approved' && (
-                    <Button size="sm" variant="ghost" icon={Trash2} onClick={() => handleDelete(r.id)} aria-label="Delete" />
+                    <Button size="sm" variant="ghost" icon={Trash2} onClick={() => setDeleteTarget(r.id)} aria-label="Delete" />
                   )}
                 </div>
-              </div>
+              </MotionDiv>
             ))}
+            </AnimatePresence>
           </div>
         )}
       </Card>
 
-    </div>
+      <ConfirmDialog
+        open={nilConfirmOpen}
+        onOpenChange={setNilConfirmOpen}
+        title="Declare no hires?"
+        description={`This tells PESO that you hired nobody in ${period}. You can still submit a report later if that changes.`}
+        confirmLabel="Yes, no hires"
+        variant="primary"
+        busy={declaring}
+        onConfirm={handleDeclareNil}
+      />
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        onOpenChange={(next) => !next && setDeleteTarget(null)}
+        title="Delete this placement report?"
+        description="This cannot be undone."
+        confirmLabel="Delete"
+        variant="danger"
+        busy={deleting}
+        onConfirm={handleDelete}
+      />
+    </MotionDiv>
   )
 }
 
@@ -269,7 +311,7 @@ function ManualEntryEditor({ upload, onBack, onChange }) {
   }
 
   return (
-    <div className="space-y-6">
+    <MotionDiv initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }} className="space-y-6">
       <PageHeader
         eyebrow="Employer Reporting"
         title="Enter hires manually"
@@ -285,7 +327,7 @@ function ManualEntryEditor({ upload, onBack, onChange }) {
         <CardHeader title="Hires this month" subtitle="Add one row per person hired. Fields marked * are required before submitting. Save as often as you like — nothing is sent to PESO until you submit below." />
         <PlacementRecordEditor records={records} onChange={setRecords} searchApplicants={searchPlacementApplicantSuggestions} />
         <div className="mt-4">
-          <Button variant="outline" icon={saving ? Loader2 : Save} onClick={handleSave} disabled={saving}>
+          <Button variant="outline" icon={Save} loading={saving} onClick={handleSave}>
             {saving ? 'Saving…' : 'Save records'}
           </Button>
         </div>
@@ -301,12 +343,12 @@ function ManualEntryEditor({ upload, onBack, onChange }) {
           className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm"
         />
         <div className="mt-4">
-          <Button icon={submitting ? Loader2 : CheckCircle2} onClick={handleSubmit} disabled={submitting || !hasSaved}>
+          <Button icon={CheckCircle2} loading={submitting} disabled={!hasSaved} onClick={handleSubmit}>
             {submitting ? 'Submitting…' : 'Submit for Review'}
           </Button>
           {!hasSaved && <p className="mt-2 text-xs text-slate-500">Save at least one hire before submitting.</p>}
         </div>
       </Card>
-    </div>
+    </MotionDiv>
   )
 }

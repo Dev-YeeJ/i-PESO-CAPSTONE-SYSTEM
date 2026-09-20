@@ -16,6 +16,10 @@ interface TextFieldProps {
   multiline?: boolean
   labelRight?: ReactNode
   style?: object
+  /** Locked read-only, e.g. a name field that must match what was captured at registration. */
+  editable?: boolean
+  /** Helper text shown under the field when there's no error — e.g. why it's locked. */
+  help?: string
 }
 
 export function TextField({
@@ -32,6 +36,8 @@ export function TextField({
   multiline = false,
   labelRight,
   style,
+  editable = true,
+  help,
 }: TextFieldProps) {
   const [focused, setFocused] = useState(false)
 
@@ -47,6 +53,7 @@ export function TextField({
           multiline ? styles.inputMultiline : null,
           focused ? styles.inputFocused : null,
           error ? styles.inputError : null,
+          !editable ? styles.inputDisabled : null,
         ]}
         value={value}
         onChangeText={onChangeText}
@@ -62,8 +69,13 @@ export function TextField({
         autoCorrect={autoCorrect}
         autoFocus={autoFocus}
         multiline={multiline}
+        editable={editable}
       />
-      {error ? <Text style={styles.errorText}>{error}</Text> : null}
+      {error ? (
+        <Text style={styles.errorText}>{error}</Text>
+      ) : help ? (
+        <Text style={styles.helpText}>{help}</Text>
+      ) : null}
     </View>
   )
 }
@@ -106,10 +118,19 @@ const styles = StyleSheet.create({
     borderColor: colors.errorBorder,
     backgroundColor: colors.errorBackground,
   },
+  inputDisabled: {
+    backgroundColor: colors.border,
+    color: colors.muted,
+  },
   errorText: {
     color: colors.danger,
     fontSize: typography.label,
     fontFamily: typography.family.medium,
+    marginTop: spacing.xs,
+  },
+  helpText: {
+    color: colors.muted,
+    fontSize: typography.label,
     marginTop: spacing.xs,
   },
 })

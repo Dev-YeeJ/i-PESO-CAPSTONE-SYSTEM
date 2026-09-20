@@ -1,5 +1,6 @@
 import { createElement } from 'react'
 import { Link } from 'react-router-dom'
+import { Loader2 } from 'lucide-react'
 
 const variants = {
   primary: 'border border-amber-500 bg-brand-gold text-brand-navy shadow-sm hover:border-amber-400 hover:bg-amber-400',
@@ -23,9 +24,15 @@ export default function Button({
   variant = 'primary',
   size = 'md',
   icon,
+  // Renders a spinning Loader2 in place of `icon` and disables the button — the one place
+  // this lives so every "busy" button in the app actually animates instead of the common
+  // copy-pasted `icon={busy ? Loader2 : X}` pattern, which swaps in Loader2 but never
+  // applies `animate-spin`, so it just sits there looking frozen while a request is in flight.
+  loading = false,
   to,
   className = '',
   type = 'button',
+  disabled = false,
   ...props
 }) {
   const classes = [
@@ -34,9 +41,16 @@ export default function Button({
     sizes[size] ?? sizes.md,
     className,
   ].join(' ')
-  const content = <>{icon && createElement(icon, { className: 'h-4 w-4 shrink-0' })}{children}</>
+  const resolvedIcon = loading ? Loader2 : icon
+  const content = (
+    <>
+      {resolvedIcon && createElement(resolvedIcon, { className: `h-4 w-4 shrink-0 ${loading ? 'animate-spin' : ''}` })}
+      {children}
+    </>
+  )
+  const isDisabled = disabled || loading
 
   return to
-    ? <Link to={to} className={classes} {...props}>{content}</Link>
-    : <button type={type} className={classes} {...props}>{content}</button>
+    ? <Link to={to} className={classes} aria-disabled={isDisabled} {...props}>{content}</Link>
+    : <button type={type} className={classes} disabled={isDisabled} {...props}>{content}</button>
 }

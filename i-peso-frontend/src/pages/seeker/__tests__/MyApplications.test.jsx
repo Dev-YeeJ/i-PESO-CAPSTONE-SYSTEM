@@ -44,7 +44,9 @@ describe('MyApplications (seeker application tracking)', () => {
 
     expect(await screen.findByText('Data Encoder')).toBeInTheDocument()
     expect(screen.getByText('Acme Corp')).toBeInTheDocument()
-    expect(screen.getByText('Shortlisted')).toBeInTheDocument()
+    // "Shortlisted" now also appears in the status-filter chip introduced alongside the
+    // card's own status badge, so at least one (not exactly one) is the correct assertion.
+    expect(screen.getAllByText('Shortlisted').length).toBeGreaterThan(0)
     // The brief: explain what the status means and what to do next.
     expect(screen.getByText(/on the shortlist/i)).toBeInTheDocument()
   })
