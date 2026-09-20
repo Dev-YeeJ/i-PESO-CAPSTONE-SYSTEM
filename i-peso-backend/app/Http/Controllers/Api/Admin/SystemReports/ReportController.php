@@ -33,7 +33,13 @@ class ReportController extends Controller
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
-        $reports = AnalyticsReport::paginate($request->get('per_page', 15));
+        $query = AnalyticsReport::query();
+
+        if ($request->has('report_category')) {
+            $query->where('report_category', $request->get('report_category'));
+        }
+
+        $reports = $query->latest('created_at')->paginate($request->get('per_page', 15));
 
         return response()->json($reports);
     }
