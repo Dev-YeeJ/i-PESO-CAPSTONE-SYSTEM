@@ -452,13 +452,14 @@ class JobFairService
      */
     public function syncRequirementStatus(JobFairEmployer $participation): void
     {
-        // 'accepted' is included so a participation that hasn't been moved
-        // into the requirements pipeline yet (e.g. legacy rows from before
-        // processAcceptance() existed, or any future call site that flips
-        // straight to 'accepted') still gets picked up and progressed the
-        // next time anything touches its requirement submissions, instead
-        // of sitting stuck at 'accepted' forever.
-        if (! in_array($participation->participation_status, ['invited', 'requirements_pending', 'under_review'], true)) {
+        // 'invited' is deliberately excluded even though reuseVerifiedDocuments()
+        // already runs (and can create approved submissions) at invite time —
+        // an employer's standing accreditation should be visible to the admin
+        // immediately, but the participation itself must stay 'invited' until
+        // the employer actually accepts. respond()/processAcceptance() are the
+        // only things that move a participation out of 'invited', and both set
+        // participation_status to 'requirements_pending' before this ever runs.
+        if (! in_array($participation->participation_status, ['requirements_pending', 'under_review'], true)) {
             return;
         }
 
