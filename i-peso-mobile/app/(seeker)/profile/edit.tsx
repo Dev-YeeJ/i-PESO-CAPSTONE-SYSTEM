@@ -1,22 +1,26 @@
-import { memo, useEffect, useState } from 'react'
+import { memo, useEffect, useRef, useState } from 'react'
 import {
-  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
   StyleSheet,
   Text,
-  TouchableOpacity,
   View,
 } from 'react-native'
+import Animated, { FadeInLeft, FadeInRight } from 'react-native-reanimated'
 import type { AxiosError } from 'axios'
 import { router, useLocalSearchParams } from 'expo-router'
 import { seekerService } from '@/services/seekerService'
 import { resolvePsgcCodes } from '@/services/psgcService'
 import { useAuthStore } from '@/stores/authStore'
+import { useMotion } from '@/hooks/useMotion'
+import { useToast } from '@/stores/toastStore'
 import { colors, radii, spacing, typography } from '@/theme'
 import { AlertBox } from '@/components/ui/AlertBox'
+import { Button } from '@/components/ui/Button'
+import { PressableScale } from '@/components/ui/PressableScale'
 import { ScreenHeader } from '@/components/ui/ScreenHeader'
+import { Skeleton, SkeletonGroup } from '@/components/ui/Skeleton'
 import { firstServerError, type ServerErrors } from '@/components/onboarding/formPrimitives'
 import { buildAddressString, buildStepPayload, mapProfileToForm, validateStep } from '@/components/onboarding/payloads'
 import { emptyOnboardingForm, type OnboardingFormValue } from '@/components/onboarding/types'
@@ -53,13 +57,17 @@ const SectionTabs = memo(function SectionTabs({ activeStep, onChange }: { active
       style={styles.tabScroll}
     >
       {SECTIONS.map((section) => (
-        <TouchableOpacity
+        <PressableScale
           key={section.step}
+          scaleTo="buttonPress"
+          ripple={null}
           style={[styles.tab, activeStep === section.step && styles.tabActive]}
           onPress={() => onChange(section.step)}
+          accessibilityRole="button"
+          accessibilityState={{ selected: activeStep === section.step }}
         >
           <Text style={[styles.tabText, activeStep === section.step && styles.tabTextActive]}>{section.label}</Text>
-        </TouchableOpacity>
+        </PressableScale>
       ))}
     </ScrollView>
   )
@@ -68,13 +76,19 @@ const SectionTabs = memo(function SectionTabs({ activeStep, onChange }: { active
 export default function ProfileEditScreen() {
   const params = useLocalSearchParams<{ section?: string }>()
   const updateUser = useAuthStore((state) => state.updateUser)
+  const m = useMotion()
+  const { showToast } = useToast()
   const [activeStep, setActiveStep] = useState(() => Number(params.section) || 1)
   const [form, setForm] = useState<OnboardingFormValue>(emptyOnboardingForm)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
-  const [success, setSuccess] = useState('')
   const [errors, setErrors] = useState<ServerErrors>({})
+  // Drives which direction the section content animates in from — these tabs are a
+  // jump-to-any-section list, not a linear wizard, so direction is derived by comparing
+  // section numbers rather than tracked via explicit forward/back buttons.
+  const [goingBack, setGoingBack] = useState(false)
+  const scrollRef = useRef<ScrollView>(null)
 
   useEffect(() => {
     let active = true
@@ -87,10 +101,17 @@ export default function ProfileEditScreen() {
     return () => { active = false }
   }, [])
 
+  // Every section change returns the seeker to the top of the form — otherwise a short
+  // section (e.g. Languages) can open scrolled halfway down where a longer section's
+  // content happened to end.
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ y: 0, animated: m.enabled })
+  }, [activeStep, m.enabled])
+
   const changeSection = (step: number) => {
+    setGoingBack(step < activeStep)
     setActiveStep(step)
     setError('')
-    setSuccess('')
     setErrors({})
   }
 
@@ -98,13 +119,11 @@ export default function ProfileEditScreen() {
     const validationError = validateStep(activeStep, form)
     if (validationError) {
       setError(validationError)
-      setSuccess('')
       return
     }
 
     setSaving(true)
     setError('')
-    setSuccess('')
     setErrors({})
 
     try {
@@ -130,7 +149,7 @@ export default function ProfileEditScreen() {
 
       const data = await seekerService.saveStep(activeStep, payload)
       if (data.user) updateUser(data.user)
-      setSuccess('Saved successfully.')
+      showToast('Saved successfully.', 'success')
     } catch (caught: unknown) {
       const err = caught as AxiosError<{ message?: string; errors?: ServerErrors }>
       const body = err.response?.data
@@ -145,10 +164,10 @@ export default function ProfileEditScreen() {
     return (
       <View style={styles.flex}>
         <ScreenHeader title="Edit Profile" onBack={() => router.replace('/(seeker)/profile')} backLabel="Close" />
-        <View style={styles.loading}>
-          <ActivityIndicator color={colors.info} />
-          <Text style={styles.loadingText}>Loading your profile...</Text>
-        </View>
+        <SkeletonGroup label="Loading your profile" style={styles.loadingWrap}>
+          <Skeleton width="50%" height={14} />
+          <Skeleton width="100%" height={300} radius={radii.xl} style={styles.loadingBlock} />
+        </SkeletonGroup>
       </View>
     )
   }
@@ -159,11 +178,14 @@ export default function ProfileEditScreen() {
 
       <SectionTabs activeStep={activeStep} onChange={changeSection} />
 
-      <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
+      <ScrollView ref={scrollRef} contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
         {error ? <AlertBox variant="danger" style={styles.alertBox}>{error}</AlertBox> : null}
-        {success ? <AlertBox variant="success" style={styles.alertBox}>{success}</AlertBox> : null}
 
-        <View style={styles.card}>
+        <Animated.View
+          key={activeStep}
+          entering={m.enabled ? (goingBack ? FadeInLeft.duration(260) : FadeInRight.duration(260)) : undefined}
+          style={styles.card}
+        >
           {activeStep === 1 && <Step1Personal value={form.step1} onChange={(step1) => setForm((f) => ({ ...f, step1 }))} errors={errors} />}
           {activeStep === 2 && <Step2Employment value={form.step2} onChange={(step2) => setForm((f) => ({ ...f, step2 }))} errors={errors} />}
           {activeStep === 3 && <Step3Preferences value={form.step3} onChange={(step3) => setForm((f) => ({ ...f, step3 }))} errors={errors} />}
@@ -171,11 +193,11 @@ export default function ProfileEditScreen() {
           {activeStep === 5 && <Step5Education value={form.step5} onChange={(step5) => setForm((f) => ({ ...f, step5 }))} errors={errors} />}
           {activeStep === 6 && <Step6Training value={form.step6} onChange={(step6) => setForm((f) => ({ ...f, step6 }))} errors={errors} />}
           {activeStep === 7 && <Step7Experience value={form.step7} onChange={(step7) => setForm((f) => ({ ...f, step7 }))} errors={errors} />}
-        </View>
+        </Animated.View>
 
-        <TouchableOpacity style={styles.saveButton} onPress={save} disabled={saving} activeOpacity={0.85}>
-          {saving ? <ActivityIndicator color={colors.white} size="small" /> : <Text style={styles.saveButtonText}>Save {SECTIONS.find((s) => s.step === activeStep)?.label}</Text>}
-        </TouchableOpacity>
+        <Button size="lg" fullWidth onPress={save} loading={saving} style={styles.saveButton}>
+          Save {SECTIONS.find((s) => s.step === activeStep)?.label}
+        </Button>
       </ScrollView>
     </KeyboardAvoidingView>
   )
@@ -183,8 +205,8 @@ export default function ProfileEditScreen() {
 
 const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: colors.background },
-  loading: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background },
-  loadingText: { marginTop: spacing.sm, color: colors.secondaryText, fontSize: typography.small },
+  loadingWrap: { paddingHorizontal: spacing.xl, paddingTop: spacing.xl },
+  loadingBlock: { marginTop: spacing.xl },
   // Explicit height (not just minHeight) so this horizontal ScrollView can never lock in a
   // too-short auto-measured height from before the custom bold font finished loading, then
   // clip the taller post-font-load glyphs — that stale-measurement was the actual cause of
@@ -231,6 +253,5 @@ const styles = StyleSheet.create({
   container: { paddingHorizontal: spacing.xl, paddingTop: spacing.lg, paddingBottom: spacing.xxxl },
   alertBox: { marginBottom: spacing.lg },
   card: { borderRadius: radii.xl, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, padding: spacing.lg },
-  saveButton: { marginTop: spacing.lg, backgroundColor: colors.info, borderRadius: radii.lg, paddingVertical: spacing.lg, alignItems: 'center' },
-  saveButtonText: { color: colors.white, fontSize: typography.body, fontFamily: typography.family.bold },
+  saveButton: { marginTop: spacing.lg },
 })

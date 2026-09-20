@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useQueryClient, useQuery } from '@tanstack/react-query'
 import MaterialIcons from '@expo/vector-icons/MaterialIcons'
@@ -24,6 +24,7 @@ import { Badge } from '@/components/ui/Badge'
 import { BottomSheet } from '@/components/ui/BottomSheet'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
+import { EmptyState } from '@/components/ui/EmptyState'
 import { PressableScale } from '@/components/ui/PressableScale'
 import { ScreenHeader } from '@/components/ui/ScreenHeader'
 import { MatchRing } from '@/components/ui/MatchRing'
@@ -112,9 +113,12 @@ export default function JobDetailsScreen() {
       <View style={styles.flex}>
         <ScreenHeader title="Job Details" onBack={() => router.replace(backTarget as never)} />
         <View style={styles.center}>
-          <Text style={styles.notFoundTitle}>Job not found</Text>
-          {error ? <AlertBox variant="warning" style={styles.notFoundAlert}>This job may no longer be active.</AlertBox> : null}
-          <Button variant="outline" onPress={() => router.replace(backTarget as never)}>Go back</Button>
+          <EmptyState
+            icon="search-off"
+            title="Job not found"
+            message={error ? 'This job may no longer be active.' : undefined}
+            action={<Button variant="outline" onPress={() => router.replace(backTarget as never)}>Go back</Button>}
+          />
         </View>
       </View>
     )
@@ -186,12 +190,14 @@ export default function JobDetailsScreen() {
             <View style={styles.jobTitleWrap}>
               <Text style={styles.jobTitle}>{textFrom(job.job_title, 'Untitled job')}</Text>
               {job.employer?.employer_id ? (
-                <TouchableOpacity
+                <PressableScale
+                  scaleTo="buttonPress"
+                  ripple={null}
                   onPress={() => router.push({ pathname: '/(seeker)/employers/[id]', params: { id: String(job.employer!.employer_id), from: 'job', fromId: String(id) } })}
                   accessibilityRole="link"
                 >
                   <Text style={[styles.company, styles.companyLink]}>{jobCompany(job)}</Text>
-                </TouchableOpacity>
+                </PressableScale>
               ) : (
                 <Text style={styles.company}>{jobCompany(job)}</Text>
               )}
@@ -313,10 +319,10 @@ export default function JobDetailsScreen() {
         </Card>
 
         {job.employer?.employer_id ? (
-          <TouchableOpacity style={styles.reportLink} onPress={() => setReportOpen(true)} accessibilityRole="button">
+          <PressableScale scaleTo="buttonPress" ripple={null} style={styles.reportLink} onPress={() => setReportOpen(true)} accessibilityRole="button">
             <MaterialIcons name="flag" size={16} color={colors.textSecondary} />
             <Text style={styles.reportLinkText}>Report this employer</Text>
-          </TouchableOpacity>
+          </PressableScale>
         ) : null}
       </ScrollView>
 
@@ -397,7 +403,11 @@ export default function JobDetailsScreen() {
               ) : null}
             </>
           ) : (
-            <Text style={styles.modalEmptyText}>No resources available for this skill right now.</Text>
+            <EmptyState
+              icon="menu-book"
+              title="No resources yet"
+              message="No learning resources are available for this skill right now."
+            />
           )}
         </ScrollView>
       </BottomSheet>
@@ -495,9 +505,6 @@ const styles = StyleSheet.create({
   loadingWrap: { padding: spacing.lg },
   loadingGap: { marginTop: spacing.sm },
   loadingBlock: { marginTop: spacing.lg },
-  notFoundTitle: { ...textStyles.title, color: colors.textPrimary },
-  notFoundAlert: { marginVertical: spacing.md },
-
   hero: {
     borderRadius: radii.xl,
     padding: spacing.xl,
@@ -606,5 +613,4 @@ const styles = StyleSheet.create({
   resourceLabel: { ...textStyles.smallBold, color: colors.textPrimary, marginBottom: spacing.xs },
   resourceText: { ...textStyles.small, color: colors.textSecondary, lineHeight: 19 },
   resourceMeta: { ...textStyles.small, color: colors.subtle, marginTop: spacing.xs },
-  modalEmptyText: { ...textStyles.body, color: colors.textSecondary, marginVertical: spacing.lg, textAlign: 'center' },
 })

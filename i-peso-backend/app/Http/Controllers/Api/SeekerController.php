@@ -1541,6 +1541,24 @@ class SeekerController extends Controller
     }
 
     /**
+     * GET /api/seeker/learning-resources/{skill}   [auth:sanctum]
+     *
+     * Backs the "view learning resources" action on a job's missing-skill
+     * list. SkillRecommendationService::getLearningResources() already
+     * existed but was never routed — every mobile-app call to this path 404'd
+     * silently (caught client-side, so it just always showed an empty state).
+     */
+    public function getLearningResources(Request $request, SkillRecommendationService $recommendations, string $skill): JsonResponse
+    {
+        $seeker = $this->getSeeker($request);
+        if ($seeker instanceof JsonResponse) {
+            return $seeker;
+        }
+
+        return response()->json(['resources' => $recommendations->getLearningResources($skill)]);
+    }
+
+    /**
      * POST /api/seeker/step-6   [auth:sanctum]
      *
      * Saves: Vocational/Technical Trainings (writes to seeker_trainings table) and

@@ -1,15 +1,18 @@
 import { useState } from 'react'
-import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { SeekerApplicationsResponse } from '@/services/seekerService'
 import { seekerService } from '@/services/seekerService'
 import { apiErrorMessage } from '@/utils/apiError'
-import { formatDate, formatSalary, jobCompany, jobLocation, textFrom, titleCase } from '@/utils/seekerView'
+import { applicationStatusVariant, formatDate, formatSalary, jobCompany, jobLocation, textFrom, titleCase } from '@/utils/seekerView'
+import { useToast } from '@/stores/toastStore'
 import { AlertBox } from '@/components/ui/AlertBox'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
+import { EmptyState } from '@/components/ui/EmptyState'
+import { PressableScale } from '@/components/ui/PressableScale'
 import { ScreenHeader } from '@/components/ui/ScreenHeader'
 import { ScreenSkeleton } from '@/components/ui/ScreenSkeleton'
 import { colors, spacing, typography } from '@/theme'
@@ -18,6 +21,7 @@ export default function ApplicationDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>()
   const router = useRouter()
   const queryClient = useQueryClient()
+  const { showToast } = useToast()
   const [withdrawError, setWithdrawError] = useState('')
 
   const { data: application, isLoading, error } = useQuery({
@@ -42,6 +46,7 @@ export default function ApplicationDetailScreen() {
           : current
       )
       queryClient.invalidateQueries({ queryKey: ['jobs'] })
+      showToast('Application withdrawn.', 'success')
     },
     onError: (caught: unknown) => {
       setWithdrawError(apiErrorMessage(caught, 'Unable to withdraw this application.'))
@@ -49,10 +54,14 @@ export default function ApplicationDetailScreen() {
   })
 
   const confirmWithdraw = () => {
-    Alert.alert('Withdraw application?', 'This action cannot be undone.', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Withdraw', style: 'destructive', onPress: () => withdrawMutation.mutate() },
-    ])
+    Alert.alert(
+      'Withdraw application?',
+      `This will withdraw your application for ${textFrom(application?.job?.job_title, 'this job')}. This action cannot be undone.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Withdraw', style: 'destructive', onPress: () => withdrawMutation.mutate() },
+      ]
+    )
   }
 
   if (isLoading) {
@@ -69,8 +78,12 @@ export default function ApplicationDetailScreen() {
       <View style={styles.flex}>
         <ScreenHeader title="Application Details" onBack={() => router.replace('/(seeker)/applications')} />
         <View style={styles.center}>
-          <Text style={styles.notFoundTitle}>Application Not Found</Text>
-          <Button variant="outline" onPress={() => router.replace('/(seeker)/applications')}>Go Back</Button>
+          <EmptyState
+            icon="search-off"
+            title="Application Not Found"
+            message="This application may no longer be available."
+            action={<Button variant="outline" onPress={() => router.replace('/(seeker)/applications')}>Go Back</Button>}
+          />
         </View>
       </View>
     )
@@ -90,13 +103,18 @@ export default function ApplicationDetailScreen() {
 
         <Text style={styles.jobTitle}>{textFrom(job?.job_title, 'Untitled job')}</Text>
         {job?.employer?.employer_id ? (
-          <TouchableOpacity onPress={() => router.push({ pathname: '/(seeker)/employers/[id]', params: { id: String(job.employer!.employer_id), from: 'application', fromId: String(id) } })}>
+          <PressableScale
+            scaleTo="buttonPress"
+            ripple={null}
+            onPress={() => router.push({ pathname: '/(seeker)/employers/[id]', params: { id: String(job.employer!.employer_id), from: 'application', fromId: String(id) } })}
+            accessibilityRole="link"
+          >
             <Text style={[styles.company, styles.companyLink]}>{jobCompany(job)}</Text>
-          </TouchableOpacity>
+          </PressableScale>
         ) : (
           <Text style={styles.company}>{job ? jobCompany(job) : 'Employer not listed'}</Text>
         )}
-        <Badge variant={statusVariant(application.status)} style={styles.statusBadge}>
+        <Badge variant={applicationStatusVariant(application.status)} style={styles.statusBadge}>
           {application.status_label ?? titleCase(application.status)}
         </Badge>
 
@@ -183,36 +201,27 @@ function Detail({ label, value }: { label: string; value: string }) {
   )
 }
 
-function statusVariant(status: string): 'neutral' | 'info' | 'success' | 'warning' | 'danger' {
-  if (status === 'hired') return 'success'
-  if (status === 'rejected' || status === 'withdrawn') return 'danger'
-  if (status === 'interview' || status === 'shortlisted') return 'warning'
-  if (status === 'pending' || status === 'reviewed') return 'info'
-  return 'neutral'
-}
-
 const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: colors.background },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: spacing.md, padding: spacing.xl },
-  notFoundTitle: { color: colors.primary, fontSize: typography.title, fontFamily: typography.family.bold },
   content: { padding: spacing.xl, paddingBottom: spacing.xxxl },
   alertBox: { marginBottom: spacing.lg },
-  jobTitle: { color: colors.primary, fontSize: typography.heading, lineHeight: 30, fontFamily: typography.family.bold },
+  jobTitle: { color: colors.textPrimary, fontSize: typography.heading, lineHeight: 30, fontFamily: typography.family.bold },
   company: { color: colors.secondaryText, fontSize: typography.title, fontFamily: typography.family.bold, marginTop: spacing.xs },
   companyLink: { color: colors.info, textDecorationLine: 'underline' },
   statusBadge: { alignSelf: 'flex-start', marginTop: spacing.md },
   infoCard: { marginTop: spacing.lg },
   detailRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: spacing.xs, borderBottomWidth: 1, borderBottomColor: colors.border },
   detailLabel: { color: colors.secondaryText, fontSize: typography.small, fontFamily: typography.family.bold },
-  detailValue: { color: colors.primary, fontSize: typography.small, fontFamily: typography.family.bold, textAlign: 'right', flex: 1, marginLeft: spacing.md },
-  sectionTitle: { color: colors.primary, fontSize: typography.title, fontFamily: typography.family.bold, marginTop: spacing.lg, marginBottom: spacing.md },
+  detailValue: { color: colors.textPrimary, fontSize: typography.small, fontFamily: typography.family.bold, textAlign: 'right', flex: 1, marginLeft: spacing.md },
+  sectionTitle: { color: colors.textPrimary, fontSize: typography.title, fontFamily: typography.family.bold, marginTop: spacing.lg, marginBottom: spacing.md },
   timelineCard: {},
   timelineRow: { flexDirection: 'row', gap: spacing.md },
   timelineDotColumn: { alignItems: 'center', width: 16 },
   timelineDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.info, marginTop: 4 },
   timelineLine: { flex: 1, width: 2, backgroundColor: colors.border, marginTop: 2 },
   timelineTextColumn: { flex: 1, paddingBottom: spacing.lg },
-  timelineTitle: { color: colors.primary, fontSize: typography.body, fontFamily: typography.family.bold },
+  timelineTitle: { color: colors.textPrimary, fontSize: typography.body, fontFamily: typography.family.bold },
   timelineDescription: { color: colors.secondaryText, fontSize: typography.small, lineHeight: 18, marginTop: spacing.xs },
   timelineTimestamp: { color: colors.subtle, fontSize: 11, marginTop: spacing.xs },
   warningCard: { marginTop: 0, backgroundColor: colors.warningBackground, borderColor: colors.warningBorder },

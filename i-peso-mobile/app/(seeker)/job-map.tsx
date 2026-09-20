@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ActivityIndicator, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native'
+import { ActivityIndicator, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useQuery } from '@tanstack/react-query'
 import * as Location from 'expo-location'
@@ -14,6 +14,8 @@ import { useMotion } from '@/hooks/useMotion'
 import { mergeParsedFilters } from '@/utils/mapQueryParser'
 import { AlertBox } from '@/components/ui/AlertBox'
 import { Button } from '@/components/ui/Button'
+import { BottomSheet } from '@/components/ui/BottomSheet'
+import { EmptyState } from '@/components/ui/EmptyState'
 import { PressableScale } from '@/components/ui/PressableScale'
 import { ScreenHeader } from '@/components/ui/ScreenHeader'
 import { JobFeedCard } from '@/components/seeker/JobFeedCard'
@@ -311,16 +313,39 @@ export default function JobMapScreen() {
                 onSubmitEditing={runAiSearch}
               />
             </View>
-            <TouchableOpacity onPress={runAiSearch} disabled={aiLoading || !aiQuery.trim()} style={styles.iconBtn}>
+            <PressableScale
+              scaleTo="buttonPress"
+              ripple={null}
+              onPress={runAiSearch}
+              disabled={aiLoading || !aiQuery.trim()}
+              style={styles.iconBtn}
+              accessibilityRole="button"
+              accessibilityLabel="Run smart search"
+            >
               {aiLoading ? <ActivityIndicator size="small" color={colors.white} /> : <MaterialIcons name="search" size={20} color={colors.white} />}
-            </TouchableOpacity>
-            <TouchableOpacity onPress={useCurrentLocation} disabled={isLocating} style={styles.iconBtnOutline}>
+            </PressableScale>
+            <PressableScale
+              scaleTo="buttonPress"
+              ripple={null}
+              onPress={useCurrentLocation}
+              disabled={isLocating}
+              style={styles.iconBtnOutline}
+              accessibilityRole="button"
+              accessibilityLabel="Use current location"
+            >
               {isLocating ? <ActivityIndicator size="small" color={colors.info} /> : <MaterialIcons name="my-location" size={20} color={colors.info} />}
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => setFiltersOpen(true)} style={styles.iconBtnOutline}>
+            </PressableScale>
+            <PressableScale
+              scaleTo="buttonPress"
+              ripple={null}
+              onPress={() => setFiltersOpen(true)}
+              style={styles.iconBtnOutline}
+              accessibilityRole="button"
+              accessibilityLabel="Open filters"
+            >
               <MaterialIcons name="tune" size={20} color={colors.info} />
               {activeToggleCount > 0 ? <View style={styles.filterDot} /> : null}
-            </TouchableOpacity>
+            </PressableScale>
           </View>
 
           {aiNotice ? <FloatingNotice text={aiNotice} /> : null}
@@ -383,11 +408,15 @@ export default function JobMapScreen() {
             scrollEnabled={listExpanded}
           >
             {!isLoading && !errorMessage && !locationRequired && jobs.length === 0 ? (
-              <Text style={styles.emptyText}>
-                {allJobs.length > 0
-                  ? 'No jobs match the selected legend tiers. Tap a tier above to include it.'
-                  : `No jobs found within ${filters.radiusKm ?? 15} km. Try widening the radius.`}
-              </Text>
+              <EmptyState
+                icon="work-outline"
+                title="No jobs on this map"
+                message={
+                  allJobs.length > 0
+                    ? 'No jobs match the selected legend tiers. Tap a tier above to include it.'
+                    : `No jobs found within ${filters.radiusKm ?? 15} km. Try widening the radius.`
+                }
+              />
             ) : null}
             {jobs.map((job, index) => (
               <JobFeedCard
@@ -404,98 +433,104 @@ export default function JobMapScreen() {
         </Animated.View>
       </View>
 
-      <Modal visible={filtersOpen} animationType="slide" transparent onRequestClose={() => setFiltersOpen(false)}>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Filters</Text>
-              <TouchableOpacity onPress={resetFilters}><Text style={styles.resetText}>Reset</Text></TouchableOpacity>
-            </View>
-            <ScrollView>
-              <FilterLabel>Radius</FilterLabel>
-              <ChipRow>
-                {RADIUS_OPTIONS.map((value) => (
-                  <Chip key={value} label={`${value} km`} active={filters.radiusKm === value} onPress={() => updateFilters({ radiusKm: value })} />
-                ))}
-              </ChipRow>
-
-              <FilterLabel>Minimum Match</FilterLabel>
-              <ChipRow>
-                {MIN_MATCH_OPTIONS.map((value) => (
-                  <Chip key={value} label={value === 0 ? 'Any' : `${value}%+`} active={filters.minMatch === value} onPress={() => updateFilters({ minMatch: value })} />
-                ))}
-              </ChipRow>
-
-              <FilterLabel>Sort by</FilterLabel>
-              <ChipRow>
-                {SORT_OPTIONS.map((item) => (
-                  <Chip key={item.value} label={item.label} active={filters.sort === item.value} onPress={() => updateFilters({ sort: item.value })} />
-                ))}
-              </ChipRow>
-
-              <FilterLabel>Employment Type</FilterLabel>
-              <ChipRow>
-                <Chip label="All" active={!filters.jobType} onPress={() => updateFilters({ jobType: undefined })} />
-                {JOB_TYPE_OPTIONS.map((item) => (
-                  <Chip key={item.value} label={item.label} active={filters.jobType === item.value} onPress={() => updateFilters({ jobType: item.value })} />
-                ))}
-              </ChipRow>
-
-              <FilterLabel>Minimum Salary</FilterLabel>
-              <TextInput
-                style={styles.numberInput}
-                value={filters.salaryMin ? String(filters.salaryMin) : ''}
-                onChangeText={(v) => updateFilters({ salaryMin: v ? Number(v.replace(/\D/g, '')) : undefined })}
-                placeholder="e.g. 15000"
-                placeholderTextColor={colors.subtle}
-                keyboardType="number-pad"
-              />
-
-              <FilterLabel>Maximum Salary</FilterLabel>
-              <TextInput
-                style={styles.numberInput}
-                value={filters.salaryMax ? String(filters.salaryMax) : ''}
-                onChangeText={(v) => updateFilters({ salaryMax: v ? Number(v.replace(/\D/g, '')) : undefined })}
-                placeholder="e.g. 30000"
-                placeholderTextColor={colors.subtle}
-                keyboardType="number-pad"
-              />
-
-              <FilterLabel>Location Keyword</FilterLabel>
-              <TextInput
-                style={styles.numberInput}
-                value={filters.locationKeyword ?? ''}
-                onChangeText={(v) => updateFilters({ locationKeyword: v || undefined })}
-                placeholder="e.g. Urdaneta City"
-                placeholderTextColor={colors.subtle}
-              />
-
-              <FilterLabel>Max Missing Skills</FilterLabel>
-              <TextInput
-                style={styles.numberInput}
-                value={filters.maxMissingSkills !== undefined ? String(filters.maxMissingSkills) : ''}
-                onChangeText={(v) => updateFilters({ maxMissingSkills: v ? Number(v.replace(/\D/g, '')) : undefined })}
-                placeholder="e.g. 2"
-                placeholderTextColor={colors.subtle}
-                keyboardType="number-pad"
-              />
-
-              <FilterLabel>Toggles</FilterLabel>
-              <ChipRow>
-                <Chip label="50%+ match only" active={Boolean(filters.hideLowMatch)} onPress={() => updateFilters({ hideLowMatch: !filters.hideLowMatch })} />
-                <Chip label="Hide applied" active={Boolean(filters.hideApplied)} onPress={() => updateFilters({ hideApplied: !filters.hideApplied })} />
-                <Chip label="Saved jobs" active={Boolean(filters.savedOnly)} onPress={() => updateFilters({ savedOnly: !filters.savedOnly })} />
-                <Chip label="Job fairs" active={Boolean(filters.jobFairOnly)} onPress={() => updateFilters({ jobFairOnly: !filters.jobFairOnly })} />
-                <Chip label="Upskill matches" active={Boolean(filters.upskillRecommendedOnly)} onPress={() => updateFilters({ upskillRecommendedOnly: !filters.upskillRecommendedOnly })} />
-                <Chip label="Certificate matches" active={Boolean(filters.certificateMatchOnly)} onPress={() => updateFilters({ certificateMatchOnly: !filters.certificateMatchOnly })} />
-                <Chip label="Can apply now" active={Boolean(filters.canApplyOnly)} onPress={() => updateFilters({ canApplyOnly: !filters.canApplyOnly })} />
-                <Chip label="Has coordinates" active={Boolean(filters.coordinatesOnly)} onPress={() => updateFilters({ coordinatesOnly: !filters.coordinatesOnly })} />
-              </ChipRow>
-            </ScrollView>
-            <Button onPress={() => setFiltersOpen(false)} style={styles.applyBtn}>Apply Filters</Button>
+      <BottomSheet
+        visible={filtersOpen}
+        onClose={() => setFiltersOpen(false)}
+        title="Filters"
+        heightRatio={0.85}
+        footer={
+          <View style={styles.sheetFooter}>
+            <Button variant="outline" size="lg" onPress={resetFilters} style={styles.resetBtn}>
+              Reset
+            </Button>
+            <Button size="lg" onPress={() => setFiltersOpen(false)} style={styles.applyBtn}>
+              {isLoading ? 'Show jobs' : `Show ${jobs.length} ${jobs.length === 1 ? 'job' : 'jobs'}`}
+            </Button>
           </View>
-        </View>
-      </Modal>
+        }
+      >
+        <ScrollView contentContainerStyle={styles.sheetBody} showsVerticalScrollIndicator={false}>
+          <FilterLabel>Radius</FilterLabel>
+          <ChipRow>
+            {RADIUS_OPTIONS.map((value) => (
+              <Chip key={value} label={`${value} km`} active={filters.radiusKm === value} onPress={() => updateFilters({ radiusKm: value })} />
+            ))}
+          </ChipRow>
+
+          <FilterLabel>Minimum Match</FilterLabel>
+          <ChipRow>
+            {MIN_MATCH_OPTIONS.map((value) => (
+              <Chip key={value} label={value === 0 ? 'Any' : `${value}%+`} active={filters.minMatch === value} onPress={() => updateFilters({ minMatch: value })} />
+            ))}
+          </ChipRow>
+
+          <FilterLabel>Sort by</FilterLabel>
+          <ChipRow>
+            {SORT_OPTIONS.map((item) => (
+              <Chip key={item.value} label={item.label} active={filters.sort === item.value} onPress={() => updateFilters({ sort: item.value })} />
+            ))}
+          </ChipRow>
+
+          <FilterLabel>Employment Type</FilterLabel>
+          <ChipRow>
+            <Chip label="All" active={!filters.jobType} onPress={() => updateFilters({ jobType: undefined })} />
+            {JOB_TYPE_OPTIONS.map((item) => (
+              <Chip key={item.value} label={item.label} active={filters.jobType === item.value} onPress={() => updateFilters({ jobType: item.value })} />
+            ))}
+          </ChipRow>
+
+          <FilterLabel>Minimum Salary</FilterLabel>
+          <TextInput
+            style={styles.numberInput}
+            value={filters.salaryMin ? String(filters.salaryMin) : ''}
+            onChangeText={(v) => updateFilters({ salaryMin: v ? Number(v.replace(/\D/g, '')) : undefined })}
+            placeholder="e.g. 15000"
+            placeholderTextColor={colors.subtle}
+            keyboardType="number-pad"
+          />
+
+          <FilterLabel>Maximum Salary</FilterLabel>
+          <TextInput
+            style={styles.numberInput}
+            value={filters.salaryMax ? String(filters.salaryMax) : ''}
+            onChangeText={(v) => updateFilters({ salaryMax: v ? Number(v.replace(/\D/g, '')) : undefined })}
+            placeholder="e.g. 30000"
+            placeholderTextColor={colors.subtle}
+            keyboardType="number-pad"
+          />
+
+          <FilterLabel>Location Keyword</FilterLabel>
+          <TextInput
+            style={styles.numberInput}
+            value={filters.locationKeyword ?? ''}
+            onChangeText={(v) => updateFilters({ locationKeyword: v || undefined })}
+            placeholder="e.g. Urdaneta City"
+            placeholderTextColor={colors.subtle}
+          />
+
+          <FilterLabel>Max Missing Skills</FilterLabel>
+          <TextInput
+            style={styles.numberInput}
+            value={filters.maxMissingSkills !== undefined ? String(filters.maxMissingSkills) : ''}
+            onChangeText={(v) => updateFilters({ maxMissingSkills: v ? Number(v.replace(/\D/g, '')) : undefined })}
+            placeholder="e.g. 2"
+            placeholderTextColor={colors.subtle}
+            keyboardType="number-pad"
+          />
+
+          <FilterLabel>Toggles</FilterLabel>
+          <ChipRow>
+            <Chip label="50%+ match only" active={Boolean(filters.hideLowMatch)} onPress={() => updateFilters({ hideLowMatch: !filters.hideLowMatch })} />
+            <Chip label="Hide applied" active={Boolean(filters.hideApplied)} onPress={() => updateFilters({ hideApplied: !filters.hideApplied })} />
+            <Chip label="Saved jobs" active={Boolean(filters.savedOnly)} onPress={() => updateFilters({ savedOnly: !filters.savedOnly })} />
+            <Chip label="Job fairs" active={Boolean(filters.jobFairOnly)} onPress={() => updateFilters({ jobFairOnly: !filters.jobFairOnly })} />
+            <Chip label="Upskill matches" active={Boolean(filters.upskillRecommendedOnly)} onPress={() => updateFilters({ upskillRecommendedOnly: !filters.upskillRecommendedOnly })} />
+            <Chip label="Certificate matches" active={Boolean(filters.certificateMatchOnly)} onPress={() => updateFilters({ certificateMatchOnly: !filters.certificateMatchOnly })} />
+            <Chip label="Can apply now" active={Boolean(filters.canApplyOnly)} onPress={() => updateFilters({ canApplyOnly: !filters.canApplyOnly })} />
+            <Chip label="Has coordinates" active={Boolean(filters.coordinatesOnly)} onPress={() => updateFilters({ coordinatesOnly: !filters.coordinatesOnly })} />
+          </ChipRow>
+        </ScrollView>
+      </BottomSheet>
     </View>
   )
 }
@@ -509,23 +544,22 @@ function FloatingNotice({ text }: { text: string }) {
 }
 
 function LegendChip({ label, color, active, onPress }: { label: string; color: string; active: boolean; onPress: () => void }) {
-  const scale = useSharedValue(1)
-  const style = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }], opacity: withTiming(active ? 1 : 0.4, { duration: 180 }) }))
+  const m = useMotion()
+  const style = useAnimatedStyle(() => ({ opacity: withTiming(active ? 1 : 0.4, { duration: m.duration('quick') }) }))
 
   return (
-    <TouchableOpacity
-      onPressIn={() => { scale.value = withSpring(0.92, { damping: 14, stiffness: 260 }) }}
-      onPressOut={() => { scale.value = withSpring(1, { damping: 14, stiffness: 260 }) }}
+    <PressableScale
+      scaleTo="buttonPress"
+      ripple={null}
+      style={[styles.legendChip, style]}
       onPress={onPress}
       accessibilityRole="button"
       accessibilityState={{ selected: active }}
       accessibilityLabel={`${label} match tier, ${active ? 'shown' : 'hidden'}`}
     >
-      <Animated.View style={[styles.legendChip, style]}>
-        <View style={[styles.legendDot, { backgroundColor: color }]} />
-        <Text style={styles.legendLabel}>{label}</Text>
-      </Animated.View>
-    </TouchableOpacity>
+      <View style={[styles.legendDot, { backgroundColor: color }]} />
+      <Text style={styles.legendLabel}>{label}</Text>
+    </PressableScale>
   )
 }
 
@@ -539,9 +573,16 @@ function ChipRow({ children }: { children: React.ReactNode }) {
 
 function Chip({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
   return (
-    <TouchableOpacity style={[styles.chip, active && styles.chipActive]} onPress={onPress}>
+    <PressableScale
+      scaleTo="buttonPress"
+      ripple={null}
+      style={[styles.chip, active && styles.chipActive]}
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityState={{ selected: active }}
+    >
       <Text style={[styles.chipText, active && styles.chipTextActive]}>{label}</Text>
-    </TouchableOpacity>
+    </PressableScale>
   )
 }
 
@@ -593,18 +634,15 @@ const styles = StyleSheet.create({
     ...shadows.lg,
   },
   sheetHandleWrap: { paddingTop: spacing.sm },
-  sheetGrip: { alignSelf: 'center', width: 36, height: 4, borderRadius: 2, backgroundColor: colors.border },
+  sheetGrip: { alignSelf: 'center', width: 40, height: 4, borderRadius: radii.pill, backgroundColor: colors.borderStrong },
   sheetHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.lg, paddingTop: spacing.sm, paddingBottom: spacing.xs },
   sheetHeaderText: { color: colors.textPrimary, fontSize: typography.small, fontFamily: typography.family.bold },
   listWrap: { flex: 1 },
   listContent: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xxxl },
-  emptyText: { color: colors.textSecondary, fontSize: typography.body, textAlign: 'center', marginTop: spacing.xl },
   footerSpinner: { marginTop: spacing.md },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(15,23,42,0.5)', justifyContent: 'flex-end' },
-  modalCard: { backgroundColor: colors.surface, borderTopLeftRadius: radii.xl, borderTopRightRadius: radii.xl, padding: spacing.xl, maxHeight: '85%' },
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.md },
-  modalTitle: { color: colors.textPrimary, fontSize: typography.title, fontFamily: typography.family.bold },
-  resetText: { color: colors.info, fontSize: typography.small, fontFamily: typography.family.bold },
+  sheetBody: { paddingBottom: spacing.xl },
+  sheetFooter: { flexDirection: 'row', gap: spacing.md },
+  resetBtn: { flex: 1 },
   filterLabel: { color: colors.textSecondary, fontSize: typography.small, fontFamily: typography.family.bold, marginTop: spacing.md, marginBottom: spacing.sm },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   chip: { borderWidth: 1, borderColor: colors.border, backgroundColor: colors.background, borderRadius: radii.pill, paddingVertical: spacing.sm, paddingHorizontal: spacing.md },
@@ -612,5 +650,5 @@ const styles = StyleSheet.create({
   chipText: { color: colors.textSecondary, fontSize: typography.small, fontFamily: typography.family.medium },
   chipTextActive: { color: colors.white },
   numberInput: { borderWidth: 1, borderColor: colors.border, borderRadius: radii.md, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, color: colors.textPrimary, fontSize: typography.body },
-  applyBtn: { marginTop: spacing.lg, marginBottom: 0 },
+  applyBtn: { flex: 2 },
 })

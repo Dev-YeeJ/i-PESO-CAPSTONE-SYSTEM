@@ -1,16 +1,19 @@
 import { useEffect, useState } from 'react'
-import { RefreshControl, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native'
+import { RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native'
+import Animated, { FadeInUp } from 'react-native-reanimated'
 import { useQuery } from '@tanstack/react-query'
 import { useRouter } from 'expo-router'
 import MaterialIcons from '@expo/vector-icons/MaterialIcons'
 import type { GovernmentProgram } from '@/services/seekerService'
 import { seekerService } from '@/services/seekerService'
 import { formatDate, textFrom, titleCase } from '@/utils/seekerView'
+import { useMotion } from '@/hooks/useMotion'
 import { EligibilityBadge } from '@/components/EligibilityBadge'
 import { AlertBox } from '@/components/ui/AlertBox'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
+import { PressableScale } from '@/components/ui/PressableScale'
 import { SectionHeader } from '@/components/ui/SectionHeader'
 import { ScreenHeader } from '@/components/ui/ScreenHeader'
 import { QueryState } from '@/components/ui/QueryState'
@@ -57,6 +60,7 @@ export default function GovernmentProgramsScreen() {
   const [page, setPage] = useState(1)
   const [programItems, setProgramItems] = useState<GovernmentProgram[]>([])
   const [refreshing, setRefreshing] = useState(false)
+  const m = useMotion()
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(search.trim()), 300)
@@ -159,6 +163,19 @@ export default function GovernmentProgramsScreen() {
         </Button>
       </Card>
 
+      <Card padding="md" style={styles.bulletinCard}>
+        <View style={styles.bulletinRow}>
+          <MaterialIcons name="fact-check" size={22} color={colors.info} />
+          <View style={styles.bulletinText}>
+            <Text style={styles.bulletinTitle}>Citizen Charter</Text>
+            <Text style={styles.bulletinSub}>Official PESO service standards, requirements, and processing times</Text>
+          </View>
+        </View>
+        <Button variant="secondary" onPress={() => router.push('/(seeker)/citizen-charter')} style={styles.bulletinBtn}>
+          View Citizen Charter
+        </Button>
+      </Card>
+
       <SectionHeader title="All Programs" />
 
       <QueryState
@@ -168,30 +185,37 @@ export default function GovernmentProgramsScreen() {
         emptyTitle="No programs found"
         emptyMessage="Try a different search term or category."
       >
-        {programItems.map((program) => (
-          <TouchableOpacity
+        {programItems.map((program, index) => (
+          <Animated.View
             key={String(program.program_id)}
-            activeOpacity={0.9}
-            onPress={() => router.push(`/(seeker)/government-programs/${program.program_id}`)}
+            entering={m.enabled ? FadeInUp.delay(m.stagger(index)).duration(240) : undefined}
           >
-            <Card padding="md" style={styles.programCard}>
-              <View style={styles.programHeader}>
-                <Text style={styles.programTitle} numberOfLines={2}>{textFrom(program.title, 'Untitled program')}</Text>
-                <Badge variant={statusVariant(program.status)}>{titleCase(program.status, 'Open')}</Badge>
-              </View>
-              <View style={styles.badgeRow}>
-                <Badge variant="neutral" style={styles.categoryBadge}>{categoryLabel(program.category)}</Badge>
-                <EligibilityBadge eligibility={program.eligibility} />
-              </View>
-              {program.short_description ? (
-                <Text style={styles.programDescription} numberOfLines={2}>{program.short_description}</Text>
-              ) : null}
-              <View style={styles.programMetaRow}>
-                <Text style={styles.programMeta}>Deadline: {formatDate(program.application_deadline)}</Text>
-                <Text style={styles.programMeta}>{slotsLabel(program)}</Text>
-              </View>
-            </Card>
-          </TouchableOpacity>
+            <PressableScale
+              scaleTo="cardPress"
+              ripple={null}
+              onPress={() => router.push(`/(seeker)/government-programs/${program.program_id}`)}
+              accessibilityRole="button"
+              accessibilityLabel={`View ${textFrom(program.title, 'program')} details`}
+            >
+              <Card padding="md" style={styles.programCard}>
+                <View style={styles.programHeader}>
+                  <Text style={styles.programTitle} numberOfLines={2}>{textFrom(program.title, 'Untitled program')}</Text>
+                  <Badge variant={statusVariant(program.status)}>{titleCase(program.status, 'Open')}</Badge>
+                </View>
+                <View style={styles.badgeRow}>
+                  <Badge variant="neutral" style={styles.categoryBadge}>{categoryLabel(program.category)}</Badge>
+                  <EligibilityBadge eligibility={program.eligibility} />
+                </View>
+                {program.short_description ? (
+                  <Text style={styles.programDescription} numberOfLines={2}>{program.short_description}</Text>
+                ) : null}
+                <View style={styles.programMetaRow}>
+                  <Text style={styles.programMeta}>Deadline: {formatDate(program.application_deadline)}</Text>
+                  <Text style={styles.programMeta}>{slotsLabel(program)}</Text>
+                </View>
+              </Card>
+            </PressableScale>
+          </Animated.View>
         ))}
 
         {hasMore ? (
@@ -212,9 +236,16 @@ export default function GovernmentProgramsScreen() {
 
 function CategoryChip({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
   return (
-    <TouchableOpacity style={[styles.chip, active && styles.chipActive]} onPress={onPress}>
+    <PressableScale
+      scaleTo="buttonPress"
+      ripple={null}
+      style={[styles.chip, active && styles.chipActive]}
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityState={{ selected: active }}
+    >
       <Text style={[styles.chipText, active && styles.chipTextActive]}>{label}</Text>
-    </TouchableOpacity>
+    </PressableScale>
   )
 }
 

@@ -42,6 +42,14 @@ export function useResumeGeneration(
     const result = await seekerService.generateProfessionalSummaryAI(summary.trim() || undefined)
     if (result?.summary) {
       setSummary(result.summary)
+      // Persist immediately — generateProfessionalSummaryAI only *drafts*
+      // text, it doesn't save it, and resume generation below only reads
+      // professional_summary as a fallback rather than writing it back
+      // (confirmed in SeekerResumeController::generate()). Without this,
+      // an AI-drafted summary the seeker never turns into a PDF this
+      // session would just vanish. Best-effort — a save hiccup shouldn't
+      // block using the freshly drafted text right now.
+      seekerService.saveProfessionalSummary(result.summary).catch(() => {})
     } else {
       setAiSummaryNotice('Smart summary generation is unavailable right now. You can still write your own summary.')
     }
@@ -74,6 +82,12 @@ export function useResumeGeneration(
         },
         `iPESO_Resume_${profile?.last_name || 'seeker'}.pdf`
       )
+      // The summary just baked into that PDF is also worth keeping on the
+      // profile record itself — best-effort, a save hiccup here shouldn't
+      // undo a resume the seeker already successfully downloaded.
+      if (summary.trim()) {
+        seekerService.saveProfessionalSummary(summary.trim()).catch(() => {})
+      }
       onSuccess?.()
     } catch (caught) {
       // The 429 the backend's `throttle:5,1` returns has no JSON body (just an empty array),

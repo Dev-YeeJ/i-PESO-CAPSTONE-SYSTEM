@@ -29,6 +29,7 @@ import { PressableScale } from '@/components/ui/PressableScale'
 import { StatCard } from '@/components/ui/StatCard'
 import { SectionHeader } from '@/components/ui/SectionHeader'
 import { MatchRing } from '@/components/ui/MatchRing'
+import { AceMascot } from '@/components/chat/AceMascot'
 import { Skeleton, SkeletonGroup } from '@/components/ui/Skeleton'
 import { JobFeedCard } from '@/components/seeker/JobFeedCard'
 import { colors, gradients, radii, shadows, spacing, textStyles, typography } from '@/theme'
@@ -57,9 +58,10 @@ const PRIMARY_ACTIONS: { icon: QuickActionIcon; label: string; path: string }[] 
   { icon: 'assignment', label: 'Applications', path: '/(seeker)/applications' },
 ]
 
+// "Ask i-PESO" used to live here too — it now has its own highlighted banner
+// (see AceBanner below) rather than sharing this dense row as a same-weight icon.
 const MORE_ACTIONS: { icon: QuickActionIcon; label: string; path: string }[] = [
   { icon: 'event', label: 'Job Fairs', path: '/(seeker)/job-fairs' },
-  { icon: 'chat', label: 'Ask i-PESO', path: '/(seeker)/assistant' },
   { icon: 'school', label: 'Gov. Programs', path: '/(seeker)/government-programs' },
   { icon: 'person', label: 'My Profile', path: '/(seeker)/profile' },
   { icon: 'edit-note', label: 'Complete Profile', path: '/onboarding' },
@@ -431,6 +433,9 @@ export default function SeekerHomeScreen() {
             />
           ))}
         </View>
+
+        <AceBanner />
+
         <View style={styles.secondaryActionsRow}>
           {MORE_ACTIONS.map((action) => (
             <PressableScale
@@ -652,6 +657,45 @@ function QuickAction({
   )
 }
 
+/**
+ * Ace's one prominent entry point on Home — previously just a same-weight icon lost in the
+ * secondary actions row (see the comment on MORE_ACTIONS above). Uses `gradients.brand`
+ * rather than `gradients.hero` (already spent on the header just above) or a gold gradient
+ * (the theme rations amber to single accent touches, never gradients — see theme/index.ts).
+ * Ace's own antenna mark already carries that one gold touch.
+ */
+function AceBanner() {
+  const m = useMotion()
+
+  return (
+    <Animated.View
+      style={styles.aceBannerWrap}
+      entering={m.enabled ? FadeInUp.delay(m.stagger(PRIMARY_ACTIONS.length)).duration(240) : undefined}
+    >
+      <PressableScale
+        scaleTo="buttonPress"
+        ripple={null}
+        onPress={() => router.push('/(seeker)/assistant')}
+        accessibilityRole="button"
+        accessibilityLabel="Ask Ace, your i-PESO assistant"
+      >
+        <LinearGradient colors={[...gradients.brand]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.aceBanner}>
+          <View style={styles.aceMascotWrap}>
+            <AceMascot state="idle" size={64} />
+          </View>
+          <View style={styles.aceBannerText}>
+            <Text style={styles.aceBannerTitle}>Ask Ace</Text>
+            <Text style={styles.aceBannerSubtitle} numberOfLines={2}>
+              Get instant help with your job search
+            </Text>
+          </View>
+          <MaterialIcons name="chevron-right" size={22} color={colors.white} />
+        </LinearGradient>
+      </PressableScale>
+    </Animated.View>
+  )
+}
+
 const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: colors.background },
   flexOne: { flex: 1 },
@@ -667,10 +711,10 @@ const styles = StyleSheet.create({
   heroTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   headerLeft: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, flex: 1 },
   headerText: { flex: 1 },
-  bellBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.16)', alignItems: 'center', justifyContent: 'center' },
+  bellBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.heroChip, alignItems: 'center', justifyContent: 'center' },
   bellBadge: { position: 'absolute', top: -4, right: -4, minWidth: 18, height: 18, borderRadius: 9, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4, borderWidth: 2, borderColor: colors.blue700 },
   bellBadgeText: { ...textStyles.smallBold, color: colors.accentText, fontSize: 10, lineHeight: undefined },
-  avatarCircle: { width: 48, height: 48, borderRadius: 24, backgroundColor: 'rgba(255,255,255,0.16)', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.32)', justifyContent: 'center', alignItems: 'center', overflow: 'hidden' },
+  avatarCircle: { width: 48, height: 48, borderRadius: 24, backgroundColor: colors.heroChip, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.32)', justifyContent: 'center', alignItems: 'center', overflow: 'hidden' },
   avatarImage: { width: '100%', height: '100%' },
   avatarText: { ...textStyles.title, color: colors.white, fontSize: 20, lineHeight: undefined },
   greetingText: { ...textStyles.small, color: colors.blue200 },
@@ -715,6 +759,13 @@ const styles = StyleSheet.create({
   actionIconCircle: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.blue50, alignItems: 'center', justifyContent: 'center' },
   actionLabel: { color: colors.textPrimary, ...textStyles.smallBold, lineHeight: undefined, textAlign: 'center' },
 
+  aceBannerWrap: { marginHorizontal: spacing.lg, marginTop: spacing.md },
+  aceBanner: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, borderRadius: radii.lg, padding: spacing.lg, ...shadows.md },
+  aceMascotWrap: { width: 64, height: 64, alignItems: 'center', justifyContent: 'center' },
+  aceBannerText: { flex: 1 },
+  aceBannerTitle: { ...textStyles.titleMedium, color: colors.white },
+  aceBannerSubtitle: { ...textStyles.small, color: colors.blue100, marginTop: 2 },
+
   secondaryActionsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, paddingHorizontal: spacing.lg, marginTop: spacing.sm },
   secondaryAction: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, backgroundColor: colors.blue50, borderRadius: radii.pill, paddingVertical: spacing.sm, paddingHorizontal: spacing.md },
   secondaryActionLabel: { color: colors.blue700, ...textStyles.smallMedium, lineHeight: undefined },
@@ -728,7 +779,7 @@ const styles = StyleSheet.create({
   feedSelectorTitle: { ...textStyles.smallBold, color: colors.textPrimary, flexShrink: 1 },
   feedSelectorTitleActive: { color: colors.white },
   feedSelectorCount: { minWidth: 22, borderRadius: radii.pill, backgroundColor: colors.background, paddingHorizontal: 6, paddingVertical: 2, alignItems: 'center' },
-  feedSelectorCountActive: { backgroundColor: 'rgba(255,255,255,0.2)' },
+  feedSelectorCountActive: { backgroundColor: colors.heroChipActive },
   feedSelectorCountText: { ...textStyles.label, fontSize: 10, color: colors.textSecondary },
   feedSelectorCountTextActive: { color: colors.white },
   feedSelectorDesc: { ...textStyles.small, fontSize: 11, color: colors.textSecondary, marginTop: spacing.xs },
@@ -741,7 +792,7 @@ const styles = StyleSheet.create({
   tabBtnText: { ...textStyles.smallBold, color: colors.textSecondary },
   tabBtnTextActive: { color: colors.white },
   tabBtnCount: { minWidth: 18, borderRadius: radii.pill, backgroundColor: colors.background, paddingHorizontal: 5, alignItems: 'center' },
-  tabBtnCountActive: { backgroundColor: 'rgba(255,255,255,0.2)' },
+  tabBtnCountActive: { backgroundColor: colors.heroChipActive },
   tabBtnCountText: { ...textStyles.label, fontSize: 10, color: colors.textSecondary },
   tabBtnCountTextActive: { color: colors.white },
 

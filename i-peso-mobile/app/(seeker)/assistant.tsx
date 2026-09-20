@@ -7,7 +7,6 @@ import {
   StyleSheet,
   Text,
   TextInput,
-  TouchableOpacity,
   View,
   type TextStyle,
 } from 'react-native'
@@ -160,9 +159,9 @@ export default function AssistantScreen() {
           {/* router.replace, not router.back(): assistant is a flat sibling in the Tabs
               navigator (see job-fairs.tsx for the same reasoning) — back() only happens
               to land on Home today because Home is assistant's one entry point. */}
-          <TouchableOpacity onPress={() => router.replace('/(seeker)')} hitSlop={12} style={styles.backBtn} accessibilityRole="button" accessibilityLabel="Back">
+          <PressableScale scaleTo="buttonPress" ripple={null} onPress={() => router.replace('/(seeker)')} hitSlop={12} style={styles.backBtn} accessibilityRole="button" accessibilityLabel="Back">
             <MaterialIcons name="arrow-back" size={22} color={colors.white} />
-          </TouchableOpacity>
+          </PressableScale>
 
           <View style={styles.heroContent}>
             <View style={styles.mascotWrap}>
@@ -217,10 +216,10 @@ export default function AssistantScreen() {
                   <View style={[styles.bubble, item.role === 'user' ? styles.userBubble : styles.modelBubble]}>
                     <Text style={textStyle}>{renderLinkedText(item.text, textStyle)}</Text>
                     {item.retryable ? (
-                      <TouchableOpacity onPress={retryLastMessage} disabled={sending} style={styles.retryBtn}>
+                      <PressableScale scaleTo="buttonPress" ripple={null} onPress={retryLastMessage} disabled={sending} style={styles.retryBtn} accessibilityRole="button">
                         <MaterialIcons name="refresh" size={14} color={colors.info} />
                         <Text style={styles.retryText}>Subukan ulit</Text>
-                      </TouchableOpacity>
+                      </PressableScale>
                     ) : null}
                   </View>
                   {item.officeLocation ? <OfficeLocationCard address={item.officeLocation.address} /> : null}
@@ -242,10 +241,10 @@ export default function AssistantScreen() {
                 <Animated.View entering={m.enabled ? FadeInUp.delay(150).duration(280) : undefined} style={styles.chipGrid}>
                   <Text style={styles.chipGridLabel}>Mga Madalas Itanong</Text>
                   {SEEKER_STARTERS.map((chip) => (
-                    <TouchableOpacity key={chip.text} style={styles.chip} onPress={() => sendMessage(chip.text)}>
+                    <PressableScale key={chip.text} scaleTo="buttonPress" ripple={null} style={styles.chip} onPress={() => sendMessage(chip.text)} accessibilityRole="button">
                       <MaterialIcons name={chip.icon} size={16} color={colors.info} />
                       <Text style={styles.chipText}>{chip.text}</Text>
-                    </TouchableOpacity>
+                    </PressableScale>
                   ))}
                 </Animated.View>
               ) : null}
@@ -302,10 +301,10 @@ function OfficeLocationCard({ address }: { address: string }) {
         <Text style={styles.mapCardLabel}>PESO Urdaneta City</Text>
       </View>
       <Text style={styles.mapCardAddress}>{address}</Text>
-      <TouchableOpacity style={styles.mapCardButton} onPress={() => Linking.openURL(directionsUrl)}>
+      <PressableScale scaleTo="buttonPress" ripple={null} style={styles.mapCardButton} onPress={() => Linking.openURL(directionsUrl)} accessibilityRole="button">
         <MaterialIcons name="map" size={15} color={colors.white} />
         <Text style={styles.mapCardButtonText}>Buksan sa Google Maps</Text>
-      </TouchableOpacity>
+      </PressableScale>
     </View>
   )
 }
@@ -314,7 +313,7 @@ const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: colors.background },
 
   hero: { paddingTop: spacing.xxl, paddingBottom: spacing.lg, paddingHorizontal: spacing.lg, borderBottomLeftRadius: radii.xl, borderBottomRightRadius: radii.xl, ...shadows.md },
-  backBtn: { position: 'absolute', top: spacing.xxl, left: spacing.lg, zIndex: 1, width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.16)', alignItems: 'center', justifyContent: 'center' },
+  backBtn: { position: 'absolute', top: spacing.xxl, left: spacing.lg, zIndex: 1, width: 36, height: 36, borderRadius: 18, backgroundColor: colors.heroChip, alignItems: 'center', justifyContent: 'center' },
   heroContent: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginTop: spacing.xl, paddingLeft: spacing.xxl + spacing.md },
   mascotWrap: { width: 72, height: 72, alignItems: 'center', justifyContent: 'center' },
   heroText: { flex: 1 },
@@ -323,7 +322,7 @@ const styles = StyleSheet.create({
   heroRole: { color: colors.blue200, fontSize: typography.small, marginTop: 2 },
   statusRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: spacing.md, alignSelf: 'flex-start', backgroundColor: 'rgba(255,255,255,0.12)', borderRadius: radii.pill, paddingHorizontal: spacing.sm, paddingVertical: 4 },
   statusDot: { width: 7, height: 7, borderRadius: 3.5, backgroundColor: colors.success },
-  statusText: { color: colors.blue100 ?? colors.blue200, fontSize: 11, fontFamily: typography.family.medium },
+  statusText: { color: colors.blue100, fontSize: 11, fontFamily: typography.family.medium },
 
   messageList: { padding: spacing.lg, paddingBottom: spacing.md, flexGrow: 1 },
   bubbleRow: { flexDirection: 'row', alignItems: 'flex-end', gap: spacing.xs, marginBottom: spacing.sm },

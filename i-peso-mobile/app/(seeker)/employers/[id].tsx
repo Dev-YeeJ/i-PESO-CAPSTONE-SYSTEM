@@ -1,15 +1,18 @@
 import { useState } from 'react'
-import { Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import { Image, ScrollView, StyleSheet, Text, View } from 'react-native'
+import Animated, { FadeInUp } from 'react-native-reanimated'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useQuery } from '@tanstack/react-query'
 import MaterialIcons from '@expo/vector-icons/MaterialIcons'
 import { seekerService } from '@/services/seekerService'
 import { formatDate, textFrom, titleCase } from '@/utils/seekerView'
 import { apiErrorMessage } from '@/utils/apiError'
-import { AlertBox } from '@/components/ui/AlertBox'
+import { useMotion } from '@/hooks/useMotion'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
+import { EmptyState } from '@/components/ui/EmptyState'
+import { PressableScale } from '@/components/ui/PressableScale'
 import { ScreenHeader } from '@/components/ui/ScreenHeader'
 import { ScreenSkeleton } from '@/components/ui/ScreenSkeleton'
 import { ReportEmployerModal } from '@/components/ReportEmployerModal'
@@ -30,6 +33,7 @@ export default function EmployerProfileScreen() {
   const router = useRouter()
   const backTarget = backTargetFor(from, fromId)
   const [reportOpen, setReportOpen] = useState(false)
+  const m = useMotion()
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['employerProfile', id],
@@ -51,12 +55,12 @@ export default function EmployerProfileScreen() {
       <View style={styles.flex}>
         <ScreenHeader title="Employer Profile" onBack={() => router.replace(backTarget as never)} />
         <View style={styles.center}>
-          <MaterialIcons name="business" size={48} color={colors.subtle} />
-          <Text style={styles.notFoundTitle}>Employer Not Found</Text>
-          <AlertBox variant="warning" style={styles.alertBox}>
-            {error ? apiErrorMessage(error, 'Unable to load this employer profile.') : 'Unable to load this employer profile.'}
-          </AlertBox>
-          <Button variant="outline" onPress={() => router.replace(backTarget as never)}>Go Back</Button>
+          <EmptyState
+            icon="business"
+            title="Employer Not Found"
+            message={error ? apiErrorMessage(error, 'Unable to load this employer profile.') : 'Unable to load this employer profile.'}
+            action={<Button variant="outline" onPress={() => router.replace(backTarget as never)}>Go Back</Button>}
+          />
         </View>
       </View>
     )
@@ -110,44 +114,56 @@ export default function EmployerProfileScreen() {
 
         <Text style={styles.sectionTitle}>Active Job Vacancies</Text>
         {vacancies.length > 0 ? (
-          vacancies.map((job) => (
-            <TouchableOpacity key={String(job.post_id)} activeOpacity={0.9} onPress={() => router.push(`/(seeker)/jobs/${job.post_id}`)}>
-              <Card padding="md" style={styles.jobCard}>
-                <Text style={styles.jobTitle} numberOfLines={2}>{textFrom(job.job_title, 'Untitled job')}</Text>
-                <View style={styles.jobMetaRow}>
-                  {job.location ? (
-                    <View style={styles.jobMetaItem}>
-                      <MaterialIcons name="place" size={14} color={colors.subtle} />
-                      <Text style={styles.jobMeta}>{job.location}</Text>
-                    </View>
-                  ) : null}
-                  {job.employment_type ? (
-                    <View style={styles.jobMetaItem}>
-                      <MaterialIcons name="work" size={14} color={colors.subtle} />
-                      <Text style={styles.jobMeta}>{titleCase(job.employment_type)}</Text>
-                    </View>
-                  ) : null}
-                  {job.created_at ? (
-                    <View style={styles.jobMetaItem}>
-                      <MaterialIcons name="event" size={14} color={colors.subtle} />
-                      <Text style={styles.jobMeta}>Posted {formatDate(job.created_at)}</Text>
-                    </View>
-                  ) : null}
-                </View>
-              </Card>
-            </TouchableOpacity>
+          vacancies.map((job, index) => (
+            <Animated.View
+              key={String(job.post_id)}
+              entering={m.enabled ? FadeInUp.delay(m.stagger(index)).duration(240) : undefined}
+            >
+              <PressableScale
+                scaleTo="cardPress"
+                ripple={null}
+                onPress={() => router.push(`/(seeker)/jobs/${job.post_id}`)}
+                accessibilityRole="button"
+                accessibilityLabel={`View ${textFrom(job.job_title, 'job')} details`}
+              >
+                <Card padding="md" style={styles.jobCard}>
+                  <Text style={styles.jobTitle} numberOfLines={2}>{textFrom(job.job_title, 'Untitled job')}</Text>
+                  <View style={styles.jobMetaRow}>
+                    {job.location ? (
+                      <View style={styles.jobMetaItem}>
+                        <MaterialIcons name="place" size={14} color={colors.subtle} />
+                        <Text style={styles.jobMeta}>{job.location}</Text>
+                      </View>
+                    ) : null}
+                    {job.employment_type ? (
+                      <View style={styles.jobMetaItem}>
+                        <MaterialIcons name="work" size={14} color={colors.subtle} />
+                        <Text style={styles.jobMeta}>{titleCase(job.employment_type)}</Text>
+                      </View>
+                    ) : null}
+                    {job.created_at ? (
+                      <View style={styles.jobMetaItem}>
+                        <MaterialIcons name="event" size={14} color={colors.subtle} />
+                        <Text style={styles.jobMeta}>Posted {formatDate(job.created_at)}</Text>
+                      </View>
+                    ) : null}
+                  </View>
+                </Card>
+              </PressableScale>
+            </Animated.View>
           ))
         ) : (
-          <Card padding="md" style={styles.emptyCard}>
-            <MaterialIcons name="work-off" size={32} color={colors.subtle} />
-            <Text style={styles.emptyText}>No active job vacancies at the moment.</Text>
-          </Card>
+          <EmptyState
+            icon="work-off"
+            title="No active vacancies"
+            message="This employer has no active job vacancies at the moment."
+          />
         )}
 
-        <TouchableOpacity style={styles.reportLink} onPress={() => setReportOpen(true)}>
+        <PressableScale scaleTo="buttonPress" ripple={null} style={styles.reportLink} onPress={() => setReportOpen(true)} accessibilityRole="button">
           <MaterialIcons name="flag" size={16} color={colors.error} />
           <Text style={styles.reportLinkText}>Report this employer</Text>
-        </TouchableOpacity>
+        </PressableScale>
       </ScrollView>
 
       <ReportEmployerModal
@@ -172,8 +188,6 @@ function Detail({ label, value }: { label: string; value: string }) {
 const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: colors.background },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: spacing.md, padding: spacing.xl },
-  notFoundTitle: { color: colors.textPrimary, fontSize: typography.title, fontFamily: typography.family.bold },
-  alertBox: { marginVertical: spacing.md },
   content: { padding: spacing.lg, paddingBottom: spacing.xxxl },
   header: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginBottom: spacing.lg },
   logoWrap: { width: 64, height: 64, borderRadius: radii.md, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
@@ -196,8 +210,6 @@ const styles = StyleSheet.create({
   jobMetaRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md, marginTop: spacing.sm },
   jobMetaItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   jobMeta: { color: colors.textSecondary, fontSize: typography.small },
-  emptyCard: { alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.xl },
-  emptyText: { color: colors.textSecondary, fontSize: typography.small },
   reportLink: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs, marginTop: spacing.xl, paddingVertical: spacing.md },
   reportLinkText: { color: colors.error, fontSize: typography.small, fontFamily: typography.family.bold },
 })

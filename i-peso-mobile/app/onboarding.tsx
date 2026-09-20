@@ -217,7 +217,7 @@ export default function OnboardingScreen() {
           Step {step + 2} of {JOURNEY_STAGES.length} · Account and email already verified
         </Text>
 
-        <StepRail current={step} total={steps.length} />
+        <StepRail current={step + 2} total={JOURNEY_STAGES.length} />
       </LinearGradient>
 
       <ScrollView

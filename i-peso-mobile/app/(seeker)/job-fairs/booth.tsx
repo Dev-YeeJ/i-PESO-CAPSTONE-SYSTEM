@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ActivityIndicator, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import { ActivityIndicator, Image, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useQuery } from '@tanstack/react-query'
 import MaterialIcons from '@expo/vector-icons/MaterialIcons'
@@ -230,9 +230,9 @@ function VacancyCard({ vacancy, onView }: { vacancy: EmployerBoothVacancy; onVie
 
       <View style={styles.vacancyFooter}>
         {hasJobLink ? (
-          <TouchableOpacity style={styles.viewJobBtn} onPress={() => onView(vacancy.vacancy!.post_id)}>
+          <PressableScale scaleTo="buttonPress" ripple={null} style={styles.viewJobBtn} onPress={() => onView(vacancy.vacancy!.post_id)} accessibilityRole="button">
             <Text style={styles.viewJobBtnText}>View Full Job Details</Text>
-          </TouchableOpacity>
+          </PressableScale>
         ) : (
           <Text style={styles.unlinkedText}>Not linked to an online posting — ask about this role at the booth.</Text>
         )}

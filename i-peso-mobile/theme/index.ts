@@ -70,12 +70,21 @@ export const colors = {
   borderStrong: '#C6D6EC',
   overlay: 'rgba(11, 34, 66, 0.04)',
   scrim: 'rgba(11, 34, 66, 0.45)',
+  // Translucent-white chip fill for icon buttons/pills sitting on a saturated gradient
+  // hero (Home, Job Listings, Assistant) — the same literal was independently hand-typed
+  // in four different files before being consolidated here.
+  heroChip: 'rgba(255,255,255,0.16)',
+  heroChipActive: 'rgba(255,255,255,0.2)',
 
   // Text
-  textPrimary: blue[900],
+  // textPrimary/neutralText anchor on blue800, not blue900 — that's the website's exact
+  // brand-navy (tailwind.config.js), so the app's most-seen color (body/heading text) is
+  // pixel-identical to the web platform's structural navy rather than one shade darker.
+  // Still ~12.2:1 against white, well past WCAG AAA.
+  textPrimary: blue[800],
   textSecondary: '#5A6B85',
   secondaryText: '#5A6B85',
-  neutralText: blue[900],
+  neutralText: blue[800],
   subtle: '#8697AE',
 
   // Utility colors

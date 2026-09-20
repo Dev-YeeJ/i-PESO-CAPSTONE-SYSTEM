@@ -1,31 +1,35 @@
-import { useCallback } from 'react'
+import { useCallback, useState } from 'react'
 import {  Alert,
   RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
-  TouchableOpacity,
   View,
 } from 'react-native'
 import { router } from 'expo-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import Animated, { FadeInUp } from 'react-native-reanimated'
 import type { SeekerApplication, SeekerApplicationsResponse } from '@/services/seekerService'
 import { seekerService } from '@/services/seekerService'
 import { apiErrorMessage } from '@/utils/apiError'
-import { formatDate, formatSalary, jobCompany, jobLocation, seekerName, textFrom, titleCase } from '@/utils/seekerView'
+import { applicationStatusVariant, formatDate, formatSalary, jobCompany, jobLocation, seekerName, textFrom, titleCase } from '@/utils/seekerView'
+import { useMotion } from '@/hooks/useMotion'
+import { useToast } from '@/stores/toastStore'
 import { AlertBox } from '@/components/ui/AlertBox'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
+import { EmptyState } from '@/components/ui/EmptyState'
+import { PressableScale } from '@/components/ui/PressableScale'
 import { StatCard } from '@/components/ui/StatCard'
 import { SectionHeader } from '@/components/ui/SectionHeader'
 import { ScreenSkeleton } from '@/components/ui/ScreenSkeleton'
 import { colors, radii, spacing, typography } from '@/theme'
 
-type StatusBadgeVariant = 'neutral' | 'info' | 'success' | 'warning' | 'danger'
-
 export default function ApplicationsScreen() {
   const queryClient = useQueryClient()
+  const { showToast } = useToast()
+  const [withdrawError, setWithdrawError] = useState('')
 
   const { data: profile } = useQuery({ queryKey: ['seekerProfile'], queryFn: () => seekerService.getProfile() })
   const {
@@ -43,6 +47,7 @@ export default function ApplicationsScreen() {
   const withdrawMutation = useMutation({
     mutationFn: (id: number | string) => seekerService.withdrawApplication(id),
     onSuccess: ({ application: withdrawn }) => {
+      setWithdrawError('')
       queryClient.setQueryData<SeekerApplicationsResponse>(['applications'], (current) =>
         current
           ? {
@@ -55,15 +60,17 @@ export default function ApplicationsScreen() {
       )
       queryClient.setQueryData(['application', String(withdrawn.apply_id)], withdrawn)
       queryClient.invalidateQueries({ queryKey: ['jobs'] })
+      showToast('Application withdrawn.', 'success')
     },
-    onError: (caught: unknown) =>
-      Alert.alert('Unable to withdraw', apiErrorMessage(caught, 'Please check your connection and try again.')),
+    onError: (caught: unknown) => {
+      setWithdrawError(apiErrorMessage(caught, 'Unable to withdraw this application.'))
+    },
   })
 
   const confirmWithdraw = (application: SeekerApplication) => {
     Alert.alert(
       'Withdraw application?',
-      `This will withdraw your application for ${textFrom(application.job?.job_title, 'this job')}.`,
+      `This will withdraw your application for ${textFrom(application.job?.job_title, 'this job')}. This action cannot be undone.`,
       [
         { text: 'Cancel', style: 'cancel' },
         { text: 'Withdraw', style: 'destructive', onPress: () => withdrawMutation.mutate(application.apply_id) },
@@ -99,6 +106,12 @@ export default function ApplicationsScreen() {
           </AlertBox>
         ) : null}
 
+        {withdrawError ? (
+          <AlertBox variant="danger" style={styles.alertBox}>
+            {withdrawError}
+          </AlertBox>
+        ) : null}
+
         <Card style={styles.summaryCard} padding="md">
           <Text style={styles.summaryLabel}>{seekerName(profile)}</Text>
           <Text style={styles.summaryTitle}>
@@ -124,21 +137,23 @@ export default function ApplicationsScreen() {
         <SectionHeader title="Application History" />
 
         {!isLoading && !applications.length ? (
-          <Card style={styles.emptyStateCard} padding="md">
-            <Text style={styles.sectionTitle}>Start Applying</Text>
-            <Text style={styles.bodyText}>
-              Open Find Jobs, choose a matching vacancy, and tap Apply now. Your application will appear here and on the employer ATS board.
-            </Text>
-            <Button variant="outline" fullWidth onPress={() => router.push('/(seeker)/jobs')} style={styles.emptyButton}>
-              Find jobs
-            </Button>
-          </Card>
+          <EmptyState
+            icon="work-outline"
+            title="Start Applying"
+            message="Open Find Jobs, choose a matching vacancy, and tap Apply now. Your application will appear here and on the employer ATS board."
+            action={
+              <Button variant="outline" fullWidth onPress={() => router.push('/(seeker)/jobs')}>
+                Find jobs
+              </Button>
+            }
+          />
         ) : null}
 
-        {applications.map((application) => (
+        {applications.map((application, index) => (
           <ApplicationCard
             key={String(application.apply_id)}
             application={application}
+            index={index}
             onWithdraw={() => confirmWithdraw(application)}
             withdrawing={withdrawMutation.isPending && withdrawMutation.variables === application.apply_id}
           />
@@ -150,75 +165,81 @@ export default function ApplicationsScreen() {
 
 function ApplicationCard({
   application,
+  index,
   onWithdraw,
   withdrawing,
 }: {
   application: SeekerApplication
+  index: number
   onWithdraw: () => void
   withdrawing: boolean
 }) {
   const job = application.job
+  const m = useMotion()
 
   return (
-    <TouchableOpacity activeOpacity={0.9} onPress={() => router.push(`/(seeker)/applications/${application.apply_id}`)}>
-      <Card style={styles.applicationCard} padding="md">
-        <View style={styles.applicationHeader}>
-          <View style={styles.applicationTitleWrap}>
-            <Text style={styles.jobTitle}>{textFrom(job?.job_title, 'Untitled job')}</Text>
-            <Text style={styles.company}>{job ? jobCompany(job) : 'Employer not listed'}</Text>
+    <Animated.View entering={m.enabled ? FadeInUp.delay(m.stagger(index)).duration(240) : undefined}>
+      <PressableScale
+        scaleTo="cardPress"
+        ripple={null}
+        onPress={() => router.push(`/(seeker)/applications/${application.apply_id}`)}
+        accessibilityRole="button"
+        accessibilityLabel={`View details for ${textFrom(job?.job_title, 'this application')}`}
+      >
+        <Card style={styles.applicationCard} padding="md">
+          <View style={styles.applicationHeader}>
+            <View style={styles.applicationTitleWrap}>
+              <Text style={styles.jobTitle}>{textFrom(job?.job_title, 'Untitled job')}</Text>
+              <Text style={styles.company}>{job ? jobCompany(job) : 'Employer not listed'}</Text>
+            </View>
+            <Badge variant={applicationStatusVariant(application.status)} style={styles.statusBadge}>
+              {application.status_label ?? titleCase(application.status)}
+            </Badge>
           </View>
-          <Badge variant={statusVariant(application.status)} style={styles.statusBadge}>
-            {application.status_label ?? titleCase(application.status)}
-          </Badge>
-        </View>
 
-        <View style={styles.jobMetaContainer}>
-          {job ? <Text style={styles.meta}>{jobLocation(job)}</Text> : null}
-          {job ? <Text style={styles.meta}>•</Text> : null}
-          {job ? <Text style={styles.meta}>{formatSalary(job)}</Text> : null}
-        </View>
-
-        <View style={styles.detailGrid}>
-          <Detail label="Applied" value={formatDate(application.applied_at)} />
-          <Detail label="Match" value={`${Math.round(Number(application.match_percentage ?? 0))}%`} />
-        </View>
-
-        {application.interview ? (
-          <View style={styles.infoBox}>
-            <Text style={styles.infoTitle}>Interview Schedule</Text>
-            <Text style={styles.infoText}>{titleCase(application.interview.mode_of_interview, 'Interview')}</Text>
-            <Text style={styles.infoText}>{formatDate(application.interview.schedule)}</Text>
-            <Text style={styles.infoText}>{textFrom(application.interview.venue_or_link, 'Venue or link to follow')}</Text>
+          <View style={styles.jobMetaContainer}>
+            {job ? <Text style={styles.meta}>{jobLocation(job)}</Text> : null}
+            {job ? <Text style={styles.meta}>•</Text> : null}
+            {job ? <Text style={styles.meta}>{formatSalary(job)}</Text> : null}
           </View>
-        ) : null}
 
-        {application.placement ? (
-          <View style={styles.successBox}>
-            <Text style={styles.successTitle}>Placement Captured</Text>
-            <Text style={styles.successText}>Start date: {formatDate(application.placement.start_date)}</Text>
-            <Text style={styles.successText}>Salary: PHP {Number(application.placement.salary ?? 0).toLocaleString()}</Text>
+          <View style={styles.detailGrid}>
+            <Detail label="Applied" value={formatDate(application.applied_at)} />
+            <Detail label="Match" value={`${Math.round(Number(application.match_percentage ?? 0))}%`} />
           </View>
-        ) : null}
 
-        {application.employer_remarks ? (
-          <View style={styles.noteBox}>
-            <Text style={styles.noteTitle}>Employer Remarks</Text>
-            <Text style={styles.noteText}>{application.employer_remarks}</Text>
-          </View>
-        ) : null}
-
-        <View style={styles.cardActions}>
-          <Button variant="outline" size="sm" onPress={() => router.push(`/(seeker)/applications/${application.apply_id}`)} style={styles.cardActionBtn}>
-            View details
-          </Button>
-          {application.can_withdraw ? (
-            <Button variant="danger" size="sm" onPress={onWithdraw} disabled={withdrawing} style={styles.cardActionBtn}>
-              {withdrawing ? 'Withdrawing...' : 'Withdraw'}
-            </Button>
+          {application.interview ? (
+            <AlertBox variant="warning" title="Interview Schedule" style={styles.infoAlert}>
+              {`${titleCase(application.interview.mode_of_interview, 'Interview')}\n${formatDate(application.interview.schedule)}\n${textFrom(application.interview.venue_or_link, 'Venue or link to follow')}`}
+            </AlertBox>
           ) : null}
-        </View>
-      </Card>
-    </TouchableOpacity>
+
+          {application.placement ? (
+            <AlertBox variant="success" title="Placement Captured" style={styles.infoAlert}>
+              {`Start date: ${formatDate(application.placement.start_date)}\nSalary: PHP ${Number(application.placement.salary ?? 0).toLocaleString()}`}
+            </AlertBox>
+          ) : null}
+
+          {application.employer_remarks ? (
+            <View style={styles.noteBox}>
+              <Text style={styles.noteTitle}>Employer Remarks</Text>
+              <Text style={styles.noteText}>{application.employer_remarks}</Text>
+            </View>
+          ) : null}
+
+          <View style={styles.cardActions}>
+            <Button variant="outline" size="sm" onPress={() => router.push(`/(seeker)/applications/${application.apply_id}`)} style={styles.cardActionBtn}>
+              View details
+            </Button>
+            {application.can_withdraw ? (
+              <Button variant="danger" size="sm" onPress={onWithdraw} disabled={withdrawing} style={styles.cardActionBtn}>
+                {withdrawing ? 'Withdrawing...' : 'Withdraw'}
+              </Button>
+            ) : null}
+          </View>
+        </Card>
+      </PressableScale>
+    </Animated.View>
   )
 }
 
@@ -229,14 +250,6 @@ function Detail({ label, value }: { label: string; value: string }) {
       <Text style={styles.detailValue}>{value}</Text>
     </View>
   )
-}
-
-function statusVariant(status: string): StatusBadgeVariant {
-  if (status === 'hired') return 'success'
-  if (status === 'rejected' || status === 'withdrawn') return 'danger'
-  if (status === 'interview' || status === 'shortlisted') return 'warning'
-  if (status === 'pending' || status === 'reviewed') return 'info'
-  return 'neutral'
 }
 
 const styles = StyleSheet.create({
@@ -254,10 +267,6 @@ const styles = StyleSheet.create({
   summaryTitle: { color: colors.textPrimary, fontSize: typography.heading, fontFamily: typography.family.bold, marginBottom: spacing.xs },
   summaryText: { color: colors.textSecondary, fontSize: typography.body, lineHeight: 20 },
   statsRow: { flexDirection: 'row', gap: spacing.sm },
-  emptyStateCard: { marginBottom: spacing.lg },
-  sectionTitle: { color: colors.textPrimary, fontSize: typography.title, fontFamily: typography.family.bold, marginBottom: spacing.sm },
-  bodyText: { color: colors.textSecondary, fontSize: typography.body, lineHeight: 20, marginBottom: spacing.lg },
-  emptyButton: { marginTop: spacing.md, borderColor: colors.secondary },
   applicationCard: { marginBottom: spacing.sm },
   applicationHeader: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: spacing.sm },
   applicationTitleWrap: { flex: 1 },
@@ -270,12 +279,7 @@ const styles = StyleSheet.create({
   detailItem: { flex: 1, backgroundColor: colors.background, borderRadius: radii.md, padding: spacing.sm },
   detailLabel: { color: colors.textSecondary, fontSize: typography.small, fontFamily: typography.family.bold, textTransform: 'uppercase', marginBottom: spacing.xs },
   detailValue: { color: colors.textPrimary, fontSize: typography.body, fontFamily: typography.family.medium },
-  infoBox: { backgroundColor: colors.warningBackground, borderWidth: 1, borderColor: colors.warningBorder, borderRadius: radii.md, padding: spacing.md, marginTop: spacing.md },
-  infoTitle: { color: colors.warning, fontSize: typography.body, fontFamily: typography.family.bold, marginBottom: spacing.xs },
-  infoText: { color: colors.warning, fontSize: typography.small, lineHeight: 20 },
-  successBox: { backgroundColor: colors.successBackground, borderWidth: 1, borderColor: colors.successBorder, borderRadius: radii.md, padding: spacing.md, marginTop: spacing.md },
-  successTitle: { color: colors.success, fontSize: typography.body, fontFamily: typography.family.bold, marginBottom: spacing.xs },
-  successText: { color: colors.success, fontSize: typography.small, lineHeight: 20 },
+  infoAlert: { marginTop: spacing.md },
   noteBox: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radii.md, padding: spacing.md, marginTop: spacing.md },
   noteTitle: { color: colors.textPrimary, fontSize: typography.body, fontFamily: typography.family.bold, marginBottom: spacing.xs },
   noteText: { color: colors.textSecondary, fontSize: typography.small, lineHeight: 20 },

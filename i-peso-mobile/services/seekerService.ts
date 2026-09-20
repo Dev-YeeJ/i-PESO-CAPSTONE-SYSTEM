@@ -567,6 +567,29 @@ export interface LearningResources {
   estimated_learning_time?: string
 }
 
+/** One catalog-grounded skill, from SkillRecommendationService — shares the
+ *  {name, reason} shape AiSuggestionItem already uses so it can be rendered
+ *  through the same AiSuggestChips component the AI-suggestion flow uses. */
+export interface CatalogSkillItem extends AiSuggestionItem {
+  id?: number | string | null
+  category?: string
+  is_hot?: boolean
+  demand_level?: string
+}
+
+export interface SkillRecommendationGroup {
+  title: string
+  description: string
+  skills: CatalogSkillItem[]
+}
+
+export interface SkillRecommendations {
+  occupation_skills?: SkillRecommendationGroup
+  trending_skills?: SkillRecommendationGroup
+  complementary_skills?: SkillRecommendationGroup
+  soft_skills?: SkillRecommendationGroup
+}
+
 export interface PublicEmployerProfile {
   employer_id: number | string
   company_name: string
@@ -938,9 +961,33 @@ export const seekerService = {
     }
   },
 
+  /**
+   * Persists a professional summary to the seeker's profile record —
+   * distinct from generateProfessionalSummaryAI (which only *drafts* text)
+   * and from resume generation (which only reads professional_summary as a
+   * fallback, it never writes it back). Without calling this, an edited or
+   * AI-generated summary only ever lives inside one resume-generation
+   * request and never shows up again anywhere else that reads the profile.
+   */
+  async saveProfessionalSummary(summary: string): Promise<void> {
+    await apiClient.put('/seeker/professional-summary', { professional_summary: summary.trim() || null })
+  },
+
   async getLearningResources(skill: string): Promise<LearningResources> {
     const res = await apiClient.get(`/seeker/learning-resources/${encodeURIComponent(skill)}`)
     return res.data?.resources ?? {}
+  },
+
+  /**
+   * Deterministic, catalog-grounded skill suggestions tied to the seeker's
+   * preferred occupation(s) via SkillRecommendationService — unlike
+   * getAiProfileSuggestions below, this never depends on Gemini being
+   * available, so it's usable as the reliable default; the AI endpoint
+   * stays available as a supplementary "get more/different ideas" action.
+   */
+  async getSkillRecommendations(): Promise<SkillRecommendations> {
+    const res = await apiClient.get('/seeker/skill-recommendations')
+    return res.data?.data ?? {}
   },
 
   /** Returns null if Vertex AI is unavailable/unconfigured — callers should fall back to manual entry, not show an error. */

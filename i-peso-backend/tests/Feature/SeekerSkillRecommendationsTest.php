@@ -167,6 +167,27 @@ class SeekerSkillRecommendationsTest extends TestCase
         $this->assertTrue($skillNames->contains('Patient Care'));
     }
 
+    public function test_learning_resources_endpoint_is_reachable_for_an_authenticated_seeker(): void
+    {
+        // Previously 404'd for every caller — SkillRecommendationService::
+        // getLearningResources() existed but was never wired to a route, so
+        // the mobile app's "view learning resources" action on a missing
+        // skill always silently came back empty.
+        $seeker = $this->createSeeker();
+        Sanctum::actingAs($seeker);
+
+        $response = $this->getJson('/api/seeker/learning-resources/'.urlencode('React'))->assertOk();
+
+        $response->assertJsonStructure([
+            'resources' => ['online_courses', 'certifications', 'practice_sites', 'estimated_learning_time'],
+        ]);
+    }
+
+    public function test_learning_resources_endpoint_requires_authentication(): void
+    {
+        $this->getJson('/api/seeker/learning-resources/'.urlencode('React'))->assertUnauthorized();
+    }
+
     private function createSeeker(): JobSeeker
     {
         return JobSeeker::create([

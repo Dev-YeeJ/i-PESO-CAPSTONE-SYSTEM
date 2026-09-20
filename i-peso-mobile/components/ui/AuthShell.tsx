@@ -3,7 +3,7 @@ import { Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, To
 import MaterialIcons from '@expo/vector-icons/MaterialIcons'
 import { AlertBox } from './AlertBox'
 import { Card } from './Card'
-import { colors, radii, spacing, typography } from '@/theme'
+import { colors, radii, spacing, textStyles, typography } from '@/theme'
 
 interface AuthShellProps {
   title: string
@@ -108,11 +108,9 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
   },
   subtitle: {
-    fontSize: typography.body,
-    fontFamily: typography.family.regular,
+    ...textStyles.body,
     color: colors.textSecondary,
     textAlign: 'center',
-    lineHeight: 20,
     marginBottom: spacing.xl,
     paddingHorizontal: spacing.sm,
   },

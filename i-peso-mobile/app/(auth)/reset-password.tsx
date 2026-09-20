@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
-import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import { StyleSheet, Text, View } from 'react-native'
 import { router, useLocalSearchParams } from 'expo-router'
 import type { AxiosError } from 'axios'
-import MaterialIcons from '@expo/vector-icons/MaterialIcons'
 import { authService } from '@/services/authService'
 import { API_BASE_URL } from '@/services/api'
 import { useAuthStore } from '@/stores/authStore'
 import { AuthShell } from '@/components/ui/AuthShell'
+import { IconBadge } from '@/components/ui/IconBadge'
 import { PasswordField } from '@/components/ui/PasswordField'
 import { PasswordStrengthMeter } from '@/components/ui/PasswordStrengthMeter'
 import { OtpInput, type OtpInputHandle } from '@/components/ui/OtpInput'
@@ -188,18 +188,17 @@ export default function ResetPasswordScreen() {
 
   if (success) {
     return (
-      <View style={s.successContainer}>
+      <AuthShell
+        title="Password reset!"
+        subtitle="Your password has been updated successfully. You can now sign in with your new password."
+      >
         <View style={s.successIconWrap}>
-          <MaterialIcons name="check" size={36} color={colors.success} />
+          <IconBadge tone="success" icon="check" />
         </View>
-        <Text style={s.successTitle}>Password reset!</Text>
-        <Text style={s.successSub}>
-          Your password has been updated successfully.{'\n'}You can now sign in with your new password.
-        </Text>
         <Button fullWidth onPress={() => router.replace('/(auth)/login')}>
           Back to Sign In
         </Button>
-      </View>
+      </AuthShell>
     )
   }
 
@@ -233,13 +232,9 @@ export default function ResetPasswordScreen() {
 
       <View style={s.resendRow}>
         {canResend ? (
-          <TouchableOpacity onPress={handleResend} disabled={isResending}>
-            {isResending ? (
-              <ActivityIndicator size="small" color={colors.info} />
-            ) : (
-              <Text style={s.resendLink}>Resend reset code</Text>
-            )}
-          </TouchableOpacity>
+          <Button variant="ghost" size="sm" loading={isResending} onPress={handleResend}>
+            Resend reset code
+          </Button>
         ) : (
           <Text style={s.resendTimer}>
             Resend available in <Text style={s.resendCount}>{resendCooldown}s</Text>
@@ -269,8 +264,8 @@ export default function ResetPasswordScreen() {
         <Text style={s.matchText}>Passwords match</Text>
       ) : null}
 
-      <Button fullWidth onPress={handleSubmit} disabled={isSubmitting || expired} style={s.submit}>
-        {isSubmitting ? 'Resetting...' : expired ? 'Code expired — resend to continue' : 'Reset Password'}
+      <Button fullWidth onPress={handleSubmit} loading={isSubmitting} disabled={expired} style={s.submit}>
+        {expired ? 'Code expired — resend to continue' : 'Reset Password'}
       </Button>
     </AuthShell>
   )
@@ -284,15 +279,11 @@ const s = StyleSheet.create({
   otpLabel       : { fontSize: typography.small, fontFamily: typography.family.bold, color: colors.muted, marginBottom: spacing.md, textAlign: 'center' },
   otpError       : { color: colors.danger, fontSize: typography.label, marginTop: spacing.xs, marginBottom: spacing.sm, fontFamily: typography.family.medium, textAlign: 'center' },
   resendRow      : { alignItems: 'center', marginTop: spacing.sm, marginBottom: spacing.sm },
-  resendLink     : { color: colors.info, fontSize: typography.small, fontFamily: typography.family.bold },
   resendTimer    : { fontSize: typography.small, color: colors.subtle },
   resendCount    : { fontFamily: typography.family.bold, color: colors.muted },
   divider        : { borderTopWidth: 1, borderTopColor: colors.border, marginTop: spacing.md, marginBottom: spacing.lg },
   matchText      : { color: colors.success, fontSize: typography.small, fontFamily: typography.family.bold, marginTop: -spacing.sm, marginBottom: spacing.md },
   submit         : { marginTop: spacing.xs },
 
-  successContainer: { flex: 1, backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center', paddingHorizontal: spacing.xxl },
-  successIconWrap : { width: 76, height: 76, borderRadius: radii.xl, backgroundColor: colors.successBackground, borderWidth: 2, borderColor: colors.successBorder, justifyContent: 'center', alignItems: 'center', marginBottom: spacing.xl },
-  successTitle    : { fontSize: typography.hero, fontFamily: typography.family.display, color: colors.primary, marginBottom: spacing.md, textAlign: 'center' },
-  successSub      : { fontSize: typography.body, color: colors.secondaryText, textAlign: 'center', lineHeight: 21, marginBottom: spacing.xxl },
+  successIconWrap : { alignItems: 'center', marginBottom: spacing.xl },
 })

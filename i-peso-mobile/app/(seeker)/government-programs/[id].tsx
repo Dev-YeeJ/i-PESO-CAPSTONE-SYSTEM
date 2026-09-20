@@ -1,8 +1,9 @@
 import { useCallback, useState } from 'react'
-import { Alert, BackHandler, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { BackHandler, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useFocusEffect } from '@react-navigation/native'
 import { useQuery } from '@tanstack/react-query'
+import MaterialIcons from '@expo/vector-icons/MaterialIcons'
 import { getCitizenCharterSteps, seekerService } from '@/services/seekerService'
 import { downloadAndShare } from '@/utils/fileTransfer'
 import { formatDate, textFrom, titleCase } from '@/utils/seekerView'
@@ -13,8 +14,9 @@ import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { ScreenHeader } from '@/components/ui/ScreenHeader'
 import { ScreenSkeleton } from '@/components/ui/ScreenSkeleton'
+import { SectionHeader } from '@/components/ui/SectionHeader'
 import { apiErrorMessage } from '@/utils/apiError'
-import { colors, radii, spacing, typography } from '@/theme'
+import { colors, spacing, typography } from '@/theme'
 
 const CATEGORY_LABELS: Record<string, string> = {
   job_fair: 'Job Fair',
@@ -153,13 +155,15 @@ export default function ProgramDetailScreen() {
 
         {program.eligibility?.breakdown?.length ? (
           <>
-            <Text style={styles.sectionTitle}>Your Eligibility</Text>
+            <SectionHeader title="Your Eligibility" />
             <Card padding="md" style={styles.infoCard}>
               {program.eligibility.breakdown.map((item, index) => (
                 <View key={index} style={styles.eligRow}>
-                  <Text style={[styles.eligIcon, { color: item.met ? colors.success : colors.error }]}>
-                    {item.met ? '✓' : '✗'}
-                  </Text>
+                  <MaterialIcons
+                    name={item.met ? 'check-circle' : 'cancel'}
+                    size={18}
+                    color={item.met ? colors.success : colors.error}
+                  />
                   <View style={styles.eligBody}>
                     <Text style={styles.eligLabel}>
                       {item.label}{item.required && !item.met ? '  (required)' : ''}
@@ -174,7 +178,7 @@ export default function ProgramDetailScreen() {
 
         {eligibility.length > 0 && (
           <>
-            <Text style={styles.sectionTitle}>Eligibility Requirements</Text>
+            <SectionHeader title="Eligibility Requirements" />
             {eligibility.map((item, index) => (
               <BulletRow key={`${item}-${index}`} text={item} />
             ))}
@@ -183,24 +187,24 @@ export default function ProgramDetailScreen() {
 
         {requiredDocs.length > 0 && (
           <>
-            <Text style={styles.sectionTitle}>Required Documents</Text>
+            <SectionHeader title="Required Documents" />
             {requiredDocs.map((item, index) => (
               <BulletRow key={`${item}-${index}`} text={item} />
             ))}
           </>
         )}
 
-        <Text style={styles.sectionTitle}>How to Apply (In-Person)</Text>
+        <SectionHeader title="How to Apply (In-Person)" />
         {charterSteps.map((step, index) => (
           <BulletRow key={`${step}-${index}`} text={`${index + 1}. ${step}`} />
         ))}
 
         {skills.length > 0 && (
           <>
-            <Text style={styles.sectionTitle}>Related Skills</Text>
+            <SectionHeader title="Related Skills" />
             <View style={styles.tagRow}>
               {skills.map((skill) => (
-                <Text key={String(skill.id)} style={styles.tag}>{textFrom(skill.name, 'Skill')}</Text>
+                <Badge key={String(skill.id)} variant="info">{textFrom(skill.name, 'Skill')}</Badge>
               ))}
             </View>
           </>
@@ -208,7 +212,7 @@ export default function ProgramDetailScreen() {
 
         {(program.contact_person || program.contact_email || program.contact_phone) && (
           <>
-            <Text style={styles.sectionTitle}>Contact</Text>
+            <SectionHeader title="Contact" />
             <Card padding="md" style={styles.infoCard}>
               {program.contact_person ? <Detail label="Person" value={textFrom(program.contact_person, '')} /> : null}
               {program.contact_email ? <Detail label="Email" value={textFrom(program.contact_email, '')} /> : null}
@@ -266,24 +270,21 @@ const styles = StyleSheet.create({
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: spacing.md, padding: spacing.xl },
   content: { padding: spacing.xl, paddingBottom: spacing.xxxl },
   header: { marginBottom: spacing.lg },
-  programTitle: { color: colors.primary, fontSize: typography.heading, lineHeight: 30, fontFamily: typography.family.bold },
+  programTitle: { color: colors.textPrimary, fontSize: typography.heading, lineHeight: 30, fontFamily: typography.family.bold },
   badgeRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md },
   description: { color: colors.secondaryText, fontSize: typography.body, lineHeight: 22, marginBottom: spacing.lg },
   infoCard: { marginBottom: spacing.lg },
   detailRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: spacing.xs, borderBottomWidth: 1, borderBottomColor: colors.border },
   detailLabel: { color: colors.secondaryText, fontSize: typography.small, fontFamily: typography.family.bold },
-  detailValue: { color: colors.primary, fontSize: typography.small, fontFamily: typography.family.bold, textAlign: 'right', flex: 1, marginLeft: spacing.md },
-  sectionTitle: { color: colors.primary, fontSize: typography.title, fontFamily: typography.family.bold, marginTop: spacing.lg, marginBottom: spacing.md },
-  eligRow: { flexDirection: 'row', gap: spacing.sm, paddingVertical: spacing.xs },
-  eligIcon: { fontSize: typography.body, fontFamily: typography.family.bold, width: 18 },
+  detailValue: { color: colors.textPrimary, fontSize: typography.small, fontFamily: typography.family.bold, textAlign: 'right', flex: 1, marginLeft: spacing.md },
+  eligRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.xs },
   eligBody: { flex: 1 },
-  eligLabel: { color: colors.primary, fontSize: typography.small, fontFamily: typography.family.bold },
+  eligLabel: { color: colors.textPrimary, fontSize: typography.small, fontFamily: typography.family.bold },
   eligDetail: { color: colors.secondaryText, fontSize: typography.small, marginTop: 2 },
   bulletRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.xs },
   bulletDot: { color: colors.info, fontSize: typography.body },
   bulletText: { color: colors.secondaryText, fontSize: typography.body, lineHeight: 20, flex: 1 },
   tagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  tag: { backgroundColor: colors.infoBackground, color: colors.info, borderRadius: radii.pill, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, fontSize: typography.small, fontFamily: typography.family.bold },
   attachmentBtn: { marginTop: spacing.lg },
   alertBox: { marginTop: spacing.lg },
 })

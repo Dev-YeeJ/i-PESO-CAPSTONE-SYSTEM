@@ -1,11 +1,14 @@
 import { useState } from 'react'
-import { FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import { FlatList, StyleSheet, Text, View } from 'react-native'
+import Animated, { FadeInUp } from 'react-native-reanimated'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useRouter } from 'expo-router'
 import MaterialIcons from '@expo/vector-icons/MaterialIcons'
 import type { SeekerNotification } from '@/services/seekerService'
 import { seekerService } from '@/services/seekerService'
+import { useMotion } from '@/hooks/useMotion'
 import { Card } from '@/components/ui/Card'
+import { PressableScale } from '@/components/ui/PressableScale'
 import { ScreenHeader } from '@/components/ui/ScreenHeader'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { ScreenSkeleton } from '@/components/ui/ScreenSkeleton'
@@ -41,6 +44,7 @@ function iconForNotification(data?: SeekerNotification['data']): React.Component
 export default function NotificationsScreen() {
   const router = useRouter()
   const queryClient = useQueryClient()
+  const m = useMotion()
   const [refreshing, setRefreshing] = useState(false)
 
   const { data, isLoading, refetch } = useQuery({
@@ -101,9 +105,9 @@ export default function NotificationsScreen() {
         onBack={() => router.back()}
         right={
           unreadCount > 0 ? (
-            <TouchableOpacity onPress={() => markAllReadMutation.mutate()} disabled={markAllReadMutation.isPending}>
+            <PressableScale scaleTo="buttonPress" ripple={null} onPress={() => markAllReadMutation.mutate()} disabled={markAllReadMutation.isPending} accessibilityRole="button">
               <Text style={styles.markAllText}>Mark all read</Text>
-            </TouchableOpacity>
+            </PressableScale>
           ) : null
         }
       />
@@ -124,32 +128,40 @@ export default function NotificationsScreen() {
               message="We'll let you know when employers update your applications or when matching jobs are posted."
             />
           }
-          renderItem={({ item }) => {
+          renderItem={({ item, index }) => {
             const isUnread = !item.read_at
-            
+
             return (
-              <TouchableOpacity activeOpacity={0.8} onPress={() => handleNotificationPress(item)}>
-                <Card style={[styles.notificationCard, isUnread && styles.unreadCard]} padding="md">
-                  <View style={styles.notificationHeader}>
-                    <View style={styles.iconContainer}>
-                      <MaterialIcons
-                        name={iconForNotification(item.data)}
-                        size={20}
-                        color={isUnread ? colors.secondary : colors.muted}
-                      />
-                    </View>
-                    <View style={styles.contentContainer}>
-                      <View style={styles.titleRow}>
-                        <Text style={[styles.itemTitle, isUnread && styles.unreadText]}>{item.data?.title || 'Notification'}</Text>
-                        <Text style={styles.timeText}>
-                          {item.created_at ? formatDistanceToNow(new Date(item.created_at), { addSuffix: true }) : ''}
-                        </Text>
+              <Animated.View entering={m.enabled ? FadeInUp.delay(m.stagger(index)).duration(240) : undefined}>
+                <PressableScale
+                  scaleTo="cardPress"
+                  ripple={null}
+                  onPress={() => handleNotificationPress(item)}
+                  accessibilityRole="button"
+                  accessibilityLabel={item.data?.title || 'Notification'}
+                >
+                  <Card style={[styles.notificationCard, isUnread && styles.unreadCard]} padding="md">
+                    <View style={styles.notificationHeader}>
+                      <View style={styles.iconContainer}>
+                        <MaterialIcons
+                          name={iconForNotification(item.data)}
+                          size={20}
+                          color={isUnread ? colors.secondary : colors.muted}
+                        />
                       </View>
-                      <Text style={styles.itemMessage}>{item.data?.message}</Text>
+                      <View style={styles.contentContainer}>
+                        <View style={styles.titleRow}>
+                          <Text style={[styles.itemTitle, isUnread && styles.unreadText]}>{item.data?.title || 'Notification'}</Text>
+                          <Text style={styles.timeText}>
+                            {item.created_at ? formatDistanceToNow(new Date(item.created_at), { addSuffix: true }) : ''}
+                          </Text>
+                        </View>
+                        <Text style={styles.itemMessage}>{item.data?.message}</Text>
+                      </View>
                     </View>
-                  </View>
-                </Card>
-              </TouchableOpacity>
+                  </Card>
+                </PressableScale>
+              </Animated.View>
             )
           }}
         />

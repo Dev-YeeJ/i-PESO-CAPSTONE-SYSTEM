@@ -6,7 +6,6 @@ import {
   StyleSheet,
   Text,
   TextInput,
-  TouchableOpacity,
   View,
 } from 'react-native'
 import MaterialIcons from '@expo/vector-icons/MaterialIcons'
@@ -20,7 +19,7 @@ import { seekerService } from '@/services/seekerService'
 import { useToggleSavedJob } from '@/hooks/use-toggle-saved-job'
 import { AlertBox } from '@/components/ui/AlertBox'
 import { BottomSheet } from '@/components/ui/BottomSheet'
-import { Card } from '@/components/ui/Card'
+import { EmptyState } from '@/components/ui/EmptyState'
 import { PressableScale } from '@/components/ui/PressableScale'
 import { SegmentedControl } from '@/components/ui/SegmentedControl'
 import { JobFeedCard } from '@/components/seeker/JobFeedCard'
@@ -356,7 +355,9 @@ function JobsHeader({
               onSubmitEditing={onAiSearch}
             />
           </View>
-          <TouchableOpacity
+          <PressableScale
+            scaleTo="buttonPress"
+            ripple={null}
             onPress={onAiSearch}
             disabled={aiLoading || !query.trim()}
             style={[styles.aiSearchBtn, (!query.trim() || aiLoading) && styles.aiSearchBtnDisabled]}
@@ -365,7 +366,7 @@ function JobsHeader({
           >
             <MaterialIcons name="auto-awesome" size={16} color={colors.blue700} />
             <Text style={styles.aiSearchBtnText}>{aiLoading ? '…' : 'AI'}</Text>
-          </TouchableOpacity>
+          </PressableScale>
         </View>
       </LinearGradient>
 
@@ -411,9 +412,9 @@ function JobsHeader({
           </PressableScale>
 
           {activeFilterCount > 0 ? (
-            <TouchableOpacity onPress={onClearFilters} hitSlop={8} accessibilityRole="button">
+            <PressableScale scaleTo="buttonPress" ripple={null} onPress={onClearFilters} hitSlop={8} accessibilityRole="button">
               <Text style={styles.clearText}>Clear</Text>
-            </TouchableOpacity>
+            </PressableScale>
           ) : null}
         </View>
 
@@ -461,22 +462,22 @@ function Chip({ label, active, onPress }: { label: string; active: boolean; onPr
 
 function EmptyJobs({ onClearFilters, hasFilters }: { onClearFilters: () => void; hasFilters: boolean }) {
   return (
-    <Card style={styles.emptyCard} padding="md">
-      <View style={styles.emptyIcon}>
-        <MaterialIcons name="work-outline" size={28} color={colors.blue600} />
-      </View>
-      <Text style={styles.emptyTitle}>No jobs match this search</Text>
-      <Text style={styles.emptySub}>
-        {hasFilters
+    <EmptyState
+      icon="work-outline"
+      title="No jobs match this search"
+      message={
+        hasFilters
           ? 'Clear your filters, widen the distance, or switch to Latest to see more.'
-          : 'Try another search term, or switch to Latest to see the newest postings.'}
-      </Text>
-      {hasFilters ? (
-        <Button variant="outline" size="sm" onPress={onClearFilters} style={styles.emptyAction}>
-          Clear filters
-        </Button>
-      ) : null}
-    </Card>
+          : 'Try another search term, or switch to Latest to see the newest postings.'
+      }
+      action={
+        hasFilters ? (
+          <Button variant="outline" size="sm" onPress={onClearFilters}>
+            Clear filters
+          </Button>
+        ) : undefined
+      }
+    />
   )
 }
 
@@ -525,7 +526,7 @@ const styles = StyleSheet.create({
   resultPill: {
     minWidth: 62,
     borderRadius: radii.md,
-    backgroundColor: 'rgba(255,255,255,0.16)',
+    backgroundColor: colors.heroChip,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     alignItems: 'center',
@@ -702,33 +703,6 @@ const styles = StyleSheet.create({
   },
   alertBox: {
     marginTop: spacing.xs,
-  },
-  emptyCard: {
-    alignItems: 'center',
-    marginTop: spacing.lg,
-  },
-  emptyIcon: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.blue50,
-    marginBottom: spacing.md,
-  },
-  emptyTitle: {
-    ...textStyles.title,
-    color: colors.textPrimary,
-    marginBottom: spacing.xs,
-    textAlign: 'center',
-  },
-  emptySub: {
-    ...textStyles.body,
-    color: colors.textSecondary,
-    textAlign: 'center',
-  },
-  emptyAction: {
-    marginTop: spacing.lg,
   },
   footerSpace: {
     height: spacing.xxl,

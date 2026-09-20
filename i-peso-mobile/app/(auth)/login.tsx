@@ -1,12 +1,15 @@
 import { useEffect, useState } from 'react'
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { router } from 'expo-router'
+import { Controller, useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
 import { authService } from '@/services/authService'
 import { useAuthStore } from '@/stores/authStore'
 import { AuthShell } from '@/components/ui/AuthShell'
 import { TextField } from '@/components/ui/TextField'
 import { PasswordField } from '@/components/ui/PasswordField'
 import { Button } from '@/components/ui/Button'
+import { loginSchema, type LoginFormValues } from '@/schemas/authSchemas'
 import { colors, spacing, typography } from '@/theme'
 
 interface AuthState {
@@ -15,26 +18,22 @@ interface AuthState {
   clearSessionMessage: () => void
 }
 
-const validate = (email: string, password: string) => {
-  const e: Record<string, string> = {}
-  if (!email.trim())                    e.email    = 'Email is required.'
-  else if (!/\S+@\S+\.\S+/.test(email)) e.email    = 'Enter a valid email.'
-  if (!password)                        e.password = 'Password is required.'
-  else if (password.length < 8)         e.password = 'Minimum 8 characters.'
-  return e
-}
-
 export default function LoginScreen() {
   const setAuth = useAuthStore((s: AuthState) => s.setAuth)
   const sessionMessage = useAuthStore((s: AuthState) => s.sessionMessage)
   const clearSessionMessage = useAuthStore((s: AuthState) => s.clearSessionMessage)
 
-  const [email, setEmail]         = useState('')
-  const [password, setPassword]   = useState('')
-  const [isLoading, setIsLoading] = useState(false)
-  const [errors, setErrors]       = useState<Record<string, string>>({})
-  const [apiError, setApiError]   = useState('')
-  const [touched, setTouched]     = useState<Record<string, boolean>>({})
+  const [apiError, setApiError] = useState('')
+
+  const {
+    control,
+    handleSubmit,
+    formState: { isSubmitting },
+  } = useForm<LoginFormValues>({
+    resolver: zodResolver(loginSchema),
+    mode: 'onBlur',
+    defaultValues: { email: '', password: '' },
+  })
 
   // Landing here because a stored session was evicted (e.g. this account
   // signed in on another device) shows that reason once, then clears it —
@@ -46,24 +45,11 @@ export default function LoginScreen() {
     }
   }, [sessionMessage, clearSessionMessage])
 
-  const getError = (field: string) => touched[field] ? errors[field] : ''
-
-  const handleBlur = (field: string) => {
-    setTouched((t) => ({ ...t, [field]: true }))
-    setErrors(validate(email, password))
-  }
-
-  const handleLogin = async () => {
-    setTouched({ email: true, password: true })
-    const errs = validate(email, password)
-    setErrors(errs)
-    if (Object.keys(errs).length) return
-
-    setIsLoading(true)
+  const onSubmit = async (values: LoginFormValues) => {
     setApiError('')
 
     try {
-      const data = await authService.login(email, password)
+      const data = await authService.login(values.email, values.password)
       if (data.user.role !== 'seeker') {
         setApiError('This app is for Job Seekers only. Use the web portal.')
         return
@@ -91,8 +77,6 @@ export default function LoginScreen() {
         return
       }
       setApiError(err.response?.data?.message ?? 'Login failed. Check your credentials.')
-    } finally {
-      setIsLoading(false)
     }
   }
 
@@ -113,39 +97,49 @@ export default function LoginScreen() {
         </View>
       }
     >
-      <TextField
-        label="Email Address"
-        value={email}
-        onChangeText={(v) => {
-          setEmail(v)
-          setApiError('')
-          setErrors((e) => ({ ...e, email: '' }))
-        }}
-        onBlur={() => handleBlur('email')}
-        placeholder="you@example.com"
-        keyboardType="email-address"
-        error={getError('email')}
+      <Controller
+        control={control}
+        name="email"
+        render={({ field: { value, onChange, onBlur }, fieldState: { error } }) => (
+          <TextField
+            label="Email Address"
+            value={value}
+            onChangeText={(v) => {
+              onChange(v)
+              setApiError('')
+            }}
+            onBlur={onBlur}
+            placeholder="you@example.com"
+            keyboardType="email-address"
+            error={error?.message}
+          />
+        )}
       />
 
-      <PasswordField
-        label="Password"
-        value={password}
-        onChangeText={(v) => {
-          setPassword(v)
-          setApiError('')
-          setErrors((e) => ({ ...e, password: '' }))
-        }}
-        onBlur={() => handleBlur('password')}
-        placeholder="Enter your password"
-        error={getError('password')}
-        labelRight={
-          <TouchableOpacity onPress={() => router.push('/(auth)/forgot-password')}>
-            <Text style={styles.forgotLink}>Forgot password?</Text>
-          </TouchableOpacity>
-        }
+      <Controller
+        control={control}
+        name="password"
+        render={({ field: { value, onChange, onBlur }, fieldState: { error } }) => (
+          <PasswordField
+            label="Password"
+            value={value}
+            onChangeText={(v) => {
+              onChange(v)
+              setApiError('')
+            }}
+            onBlur={onBlur}
+            placeholder="Enter your password"
+            error={error?.message}
+            labelRight={
+              <TouchableOpacity onPress={() => router.push('/(auth)/forgot-password')}>
+                <Text style={styles.forgotLink}>Forgot password?</Text>
+              </TouchableOpacity>
+            }
+          />
+        )}
       />
 
-      <Button fullWidth onPress={handleLogin} loading={isLoading} style={styles.submit}>
+      <Button fullWidth onPress={handleSubmit(onSubmit)} loading={isSubmitting} style={styles.submit}>
         Sign In
       </Button>
     </AuthShell>
@@ -178,7 +172,7 @@ const styles = StyleSheet.create({
   },
   adminNote: {
     textAlign: 'center',
-    fontSize: 11,
+    fontSize: typography.label,
     color: colors.subtle,
   },
 })

@@ -3,7 +3,7 @@ import { StyleSheet, Text, TextInput, View, type KeyboardTypeOptions } from 'rea
 import { colors, radii, spacing, typography } from '@/theme'
 
 interface TextFieldProps {
-  label: string
+  label: ReactNode
   value: string
   onChangeText: (value: string) => void
   onBlur?: () => void
@@ -13,6 +13,7 @@ interface TextFieldProps {
   autoCapitalize?: 'none' | 'sentences' | 'words' | 'characters'
   autoCorrect?: boolean
   autoFocus?: boolean
+  multiline?: boolean
   labelRight?: ReactNode
   style?: object
 }
@@ -28,6 +29,7 @@ export function TextField({
   autoCapitalize = 'none',
   autoCorrect = false,
   autoFocus = false,
+  multiline = false,
   labelRight,
   style,
 }: TextFieldProps) {
@@ -40,7 +42,12 @@ export function TextField({
         {labelRight}
       </View>
       <TextInput
-        style={[styles.input, focused ? styles.inputFocused : null, error ? styles.inputError : null]}
+        style={[
+          styles.input,
+          multiline ? styles.inputMultiline : null,
+          focused ? styles.inputFocused : null,
+          error ? styles.inputError : null,
+        ]}
         value={value}
         onChangeText={onChangeText}
         onFocus={() => setFocused(true)}
@@ -54,6 +61,7 @@ export function TextField({
         autoCapitalize={autoCapitalize}
         autoCorrect={autoCorrect}
         autoFocus={autoFocus}
+        multiline={multiline}
       />
       {error ? <Text style={styles.errorText}>{error}</Text> : null}
     </View>
@@ -85,6 +93,10 @@ const styles = StyleSheet.create({
     fontFamily: typography.family.regular,
     color: colors.textPrimary,
     backgroundColor: colors.background,
+  },
+  inputMultiline: {
+    minHeight: 76,
+    textAlignVertical: 'top',
   },
   inputFocused: {
     borderColor: colors.secondary,

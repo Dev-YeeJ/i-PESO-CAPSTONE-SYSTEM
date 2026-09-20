@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { ActivityIndicator, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native'
+import { Button } from '@/components/ui/Button'
 import { colors, radii, spacing, typography } from '@/theme'
 import { seekerService, type AiSuggestionItem, type OccupationClassificationSuggestion, type SkillOption } from '@/services/seekerService'
 import { Combobox } from './Combobox'
@@ -175,19 +176,18 @@ function OccupationAiSuggestions({ value, onAdd }: { value: Step3Value; onAdd: (
 
   if (!opened) {
     return (
-      <TouchableOpacity onPress={() => setOpened(true)} style={styles.aiToggle} activeOpacity={0.85}>
-        <Text style={styles.aiToggleText}>Need ideas? Ask AI</Text>
-      </TouchableOpacity>
+      <Button variant="secondary" size="sm" style={styles.aiToggle} onPress={() => setOpened(true)}>
+        Need ideas? Ask AI
+      </Button>
     )
   }
 
   return (
     <View style={styles.aiPanel}>
       <Field label="Describe your ideal job (optional)" value={description} onChangeText={setDescription} placeholder="e.g. Something in customer service, entry level" multiline autoCapitalize="sentences" />
-      <TouchableOpacity onPress={fetchSuggestions} disabled={loading} style={styles.aiFetchBtn} activeOpacity={0.85}>
-        <Text style={styles.aiFetchBtnText}>{loading ? 'Thinking...' : 'Get AI Suggestions'}</Text>
-      </TouchableOpacity>
-      {loading ? <ActivityIndicator color={colors.info} style={styles.aiLoading} /> : null}
+      <Button size="sm" style={styles.aiFetchBtn} loading={loading} onPress={fetchSuggestions}>
+        Get AI Suggestions
+      </Button>
       {notice ? <Text style={styles.aiNotice}>{notice}</Text> : null}
       {suggestions.length ? (
         <AiSuggestChips items={suggestions} addedNames={value.occupation_preferences.map((p) => p.raw_job_title)} onAdd={onAdd} />
@@ -197,44 +197,81 @@ function OccupationAiSuggestions({ value, onAdd }: { value: Step3Value; onAdd: (
 }
 
 function SkillAiSuggestions({ category, currentSkills, onAdd }: { category: 'technical' | 'soft'; currentSkills: string[]; onAdd: (item: AiSuggestionItem) => void }) {
-  const [opened, setOpened] = useState(false)
-  const [loading, setLoading] = useState(false)
-  const [suggestions, setSuggestions] = useState<AiSuggestionItem[]>([])
-  const [notice, setNotice] = useState('')
+  // Deterministic, catalog-grounded suggestions (SkillRecommendationService,
+  // tied to the seeker's preferred occupations) — loads automatically and
+  // never depends on Gemini being available, so there's always something
+  // useful here. Mirrors i-peso-frontend's SeekerSkillsForm.jsx, which
+  // fetches this same endpoint on mount rather than gating it behind a tap.
+  const [catalogLoading, setCatalogLoading] = useState(true)
+  const [catalogSuggestions, setCatalogSuggestions] = useState<AiSuggestionItem[]>([])
 
-  const fetchSuggestions = async () => {
-    setLoading(true)
-    setNotice('')
+  useEffect(() => {
+    let cancelled = false
+    setCatalogLoading(true)
+    seekerService
+      .getSkillRecommendations()
+      .then((data) => {
+        if (cancelled) return
+        const group = category === 'technical' ? data.occupation_skills : data.soft_skills
+        setCatalogSuggestions(group?.skills ?? [])
+      })
+      .catch(() => {
+        if (!cancelled) setCatalogSuggestions([])
+      })
+      .finally(() => {
+        if (!cancelled) setCatalogLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [category])
+
+  // Generative AI suggestions stay available as a supplementary "get more
+  // ideas" action — still useful when it works, just no longer the only
+  // source, so a Gemini outage doesn't leave this section empty.
+  const [aiOpened, setAiOpened] = useState(false)
+  const [aiLoading, setAiLoading] = useState(false)
+  const [aiSuggestions, setAiSuggestions] = useState<AiSuggestionItem[]>([])
+  const [aiNotice, setAiNotice] = useState('')
+
+  const fetchAiSuggestions = async () => {
+    setAiLoading(true)
+    setAiNotice('')
     const result = await seekerService.getAiProfileSuggestions({
       technical_skills: category === 'technical' ? currentSkills : undefined,
       soft_skills: category === 'soft' ? currentSkills : undefined,
     })
-    setLoading(false)
+    setAiLoading(false)
+    setAiOpened(true)
     const list = category === 'technical' ? result?.technical_skills : result?.soft_skills
     if (list?.length) {
-      setSuggestions(list)
+      setAiSuggestions(list)
     } else {
-      setSuggestions([])
-      setNotice('AI suggestions are unavailable right now.')
+      setAiSuggestions([])
+      setAiNotice('AI suggestions are unavailable right now.')
     }
-    setOpened(true)
-  }
-
-  if (!opened) {
-    return (
-      <TouchableOpacity onPress={fetchSuggestions} disabled={loading} style={styles.aiToggle} activeOpacity={0.85}>
-        <Text style={styles.aiToggleText}>{loading ? 'Thinking...' : 'Suggest skills with AI'}</Text>
-      </TouchableOpacity>
-    )
   }
 
   return (
     <View style={styles.aiPanel}>
-      {notice ? <Text style={styles.aiNotice}>{notice}</Text> : null}
-      {suggestions.length ? <AiSuggestChips items={suggestions} addedNames={currentSkills} onAdd={onAdd} /> : null}
-      <TouchableOpacity onPress={fetchSuggestions} disabled={loading} style={styles.aiRefreshBtn} activeOpacity={0.85}>
-        <Text style={styles.aiToggleText}>{loading ? 'Thinking...' : 'Refresh suggestions'}</Text>
-      </TouchableOpacity>
+      {catalogLoading ? (
+        <ActivityIndicator color={colors.info} style={styles.aiLoading} />
+      ) : catalogSuggestions.length ? (
+        <AiSuggestChips items={catalogSuggestions} addedNames={currentSkills} onAdd={onAdd} />
+      ) : null}
+
+      {aiOpened && aiNotice ? <Text style={styles.aiNotice}>{aiNotice}</Text> : null}
+      {aiOpened && aiSuggestions.length ? <AiSuggestChips items={aiSuggestions} addedNames={currentSkills} onAdd={onAdd} /> : null}
+
+      <Button
+        variant={aiOpened ? 'ghost' : 'secondary'}
+        size="sm"
+        style={aiOpened ? styles.aiRefreshBtn : styles.aiToggle}
+        loading={aiLoading}
+        onPress={fetchAiSuggestions}
+      >
+        {aiOpened ? 'Refresh AI suggestions' : 'Get more ideas with AI'}
+      </Button>
     </View>
   )
 }
@@ -1263,11 +1300,9 @@ const styles = StyleSheet.create({
   helperText: { marginTop: -spacing.sm, marginBottom: spacing.md, color: colors.subtle, fontSize: typography.small },
   addressHint: { marginTop: -spacing.xs, marginBottom: spacing.sm, color: colors.subtle, fontSize: typography.small, lineHeight: 16 },
   errorText: { marginTop: -spacing.sm, marginBottom: spacing.md, color: colors.danger, fontSize: typography.small, fontFamily: typography.family.medium },
-  aiToggle: { alignSelf: 'flex-start', borderWidth: 1, borderColor: colors.infoBorder, backgroundColor: colors.infoBackground, borderRadius: radii.pill, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, marginTop: spacing.xs, marginBottom: spacing.lg },
-  aiToggleText: { color: colors.info, fontSize: typography.small, fontFamily: typography.family.bold },
+  aiToggle: { alignSelf: 'flex-start', marginTop: spacing.xs, marginBottom: spacing.lg },
   aiPanel: { borderWidth: 1, borderColor: colors.infoBorder, backgroundColor: colors.infoBackground, borderRadius: radii.lg, padding: spacing.lg, marginBottom: spacing.lg },
-  aiFetchBtn: { alignSelf: 'flex-start', backgroundColor: colors.info, borderRadius: radii.pill, paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, marginTop: spacing.xs },
-  aiFetchBtnText: { color: colors.white, fontSize: typography.small, fontFamily: typography.family.bold },
+  aiFetchBtn: { alignSelf: 'flex-start', marginTop: spacing.xs },
   aiRefreshBtn: { alignSelf: 'flex-start', marginTop: spacing.sm },
   aiLoading: { marginTop: spacing.md },
   aiNotice: { marginTop: spacing.sm, color: colors.secondaryText, fontSize: typography.small, lineHeight: 18 },

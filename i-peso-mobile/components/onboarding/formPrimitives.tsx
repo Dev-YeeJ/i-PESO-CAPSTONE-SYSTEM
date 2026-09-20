@@ -4,12 +4,13 @@ import {
   Modal,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
   type KeyboardTypeOptions,
 } from 'react-native'
 import MaterialIcons from '@expo/vector-icons/MaterialIcons'
+import { TextField } from '@/components/ui/TextField'
+import { Button } from '@/components/ui/Button'
 import { colors, radii, spacing, typography } from '@/theme'
 
 // ── Server error helpers ───────────────────────────────────────────────────
@@ -65,23 +66,16 @@ export function Field({
   autoCapitalize?: 'none' | 'words' | 'sentences' | 'characters'
 }) {
   return (
-    <View style={styles.field}>
-      <Text style={styles.label}>
-        {label}
-        {required ? <Text style={styles.required}> *</Text> : null}
-      </Text>
-      <TextInput
-        style={[styles.input, multiline && styles.multiline, error && styles.inputError]}
-        value={value}
-        onChangeText={onChangeText}
-        placeholder={placeholder}
-        placeholderTextColor={colors.subtle}
-        keyboardType={keyboardType}
-        multiline={multiline}
-        autoCapitalize={autoCapitalize}
-      />
-      {error ? <Text style={styles.errorText}>{error}</Text> : null}
-    </View>
+    <TextField
+      label={required ? <>{label}<Text style={styles.required}> *</Text></> : label}
+      value={value}
+      onChangeText={onChangeText}
+      placeholder={placeholder}
+      keyboardType={keyboardType}
+      multiline={multiline}
+      autoCapitalize={autoCapitalize}
+      error={error}
+    />
   )
 }
 
@@ -287,9 +281,7 @@ export function RepeatableSection({
     <View style={styles.repeatableSection}>
       <View style={styles.repeatableHeader}>
         <Text style={styles.sectionTitle}>{title}</Text>
-        <TouchableOpacity onPress={onAdd} style={styles.addBtn} activeOpacity={0.85}>
-          <Text style={styles.addBtnText}>+ {addLabel}</Text>
-        </TouchableOpacity>
+        <Button variant="secondary" size="sm" onPress={onAdd}>+ {addLabel}</Button>
       </View>
       {hint ? <Text style={styles.hint}>{hint}</Text> : null}
 
@@ -335,7 +327,6 @@ const styles = StyleSheet.create({
     fontSize: typography.body,
   },
   inputError: { borderColor: colors.danger },
-  multiline: { minHeight: 76, textAlignVertical: 'top' },
   errorText: { marginTop: spacing.xs, color: colors.danger, fontSize: typography.small, fontFamily: typography.family.medium },
   choiceRow: { flexDirection: 'row', gap: spacing.sm, flexWrap: 'wrap' },
   choiceGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
@@ -347,8 +338,6 @@ const styles = StyleSheet.create({
   hint: { color: colors.secondaryText, fontSize: typography.small, lineHeight: 18, marginBottom: spacing.md },
   repeatableSection: { marginTop: spacing.sm, marginBottom: spacing.lg },
   repeatableHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.sm },
-  addBtn: { paddingHorizontal: spacing.md, paddingVertical: spacing.xs, borderRadius: radii.pill, backgroundColor: colors.infoBackground, borderWidth: 1, borderColor: colors.infoBorder },
-  addBtnText: { color: colors.info, fontSize: typography.small, fontFamily: typography.family.bold },
   emptyText: { color: colors.secondaryText, fontSize: typography.small, fontStyle: 'italic', marginBottom: spacing.sm },
   repeatableItem: { borderWidth: 1, borderColor: colors.border, borderRadius: radii.lg, padding: spacing.lg, backgroundColor: colors.surface, marginBottom: spacing.md },
   repeatableItemHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.sm },

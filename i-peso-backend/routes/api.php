@@ -188,6 +188,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/certificates/{certificate}/view', [SeekerCertificateController::class, 'view']);
         Route::delete('/certificates/{certificate}', [SeekerCertificateController::class, 'destroy']);
         Route::get('/skill-recommendations', [SeekerController::class, 'getSkillRecommendations']);
+        Route::get('/learning-resources/{skill}', [SeekerController::class, 'getLearningResources']);
         Route::post('/ai-profile-suggestions', [SeekerAiSuggestionController::class, 'suggest'])
             ->middleware('throttle:10,1');
         Route::post('/ai-professional-summary', [SeekerAiSuggestionController::class, 'professionalSummary'])

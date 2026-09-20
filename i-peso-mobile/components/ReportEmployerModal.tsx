@@ -1,12 +1,15 @@
 import { useState } from 'react'
-import { Alert, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native'
+import { ScrollView, StyleSheet, Text, TextInput, View } from 'react-native'
 import { useMutation } from '@tanstack/react-query'
 import type { EmployerReportReason } from '@/services/seekerService'
 import { seekerService } from '@/services/seekerService'
 import { apiErrorMessage } from '@/utils/apiError'
+import { useToast } from '@/stores/toastStore'
 import { AlertBox } from '@/components/ui/AlertBox'
+import { BottomSheet } from '@/components/ui/BottomSheet'
 import { Button } from '@/components/ui/Button'
-import { colors, radii, spacing, typography } from '@/theme'
+import { PressableScale } from '@/components/ui/PressableScale'
+import { colors, radii, spacing, textStyles } from '@/theme'
 
 const REASONS: Array<{ value: EmployerReportReason; label: string }> = [
   { value: 'fake_job', label: 'Fake job posting' },
@@ -27,6 +30,7 @@ interface ReportEmployerModalProps {
 export function ReportEmployerModal({ visible, employerId, employerName, onClose }: ReportEmployerModalProps) {
   const [reason, setReason] = useState<EmployerReportReason | null>(null)
   const [description, setDescription] = useState('')
+  const { showToast } = useToast()
 
   const reset = () => {
     setReason(null)
@@ -42,7 +46,7 @@ export function ReportEmployerModal({ visible, employerId, employerName, onClose
     mutationFn: () => seekerService.reportEmployer(employerId as number | string, { reason: reason as EmployerReportReason, description: description.trim() }),
     onSuccess: (data) => {
       closeModal()
-      Alert.alert('Report submitted', data.message)
+      showToast(data.message, 'success')
     },
   })
 
@@ -50,78 +54,81 @@ export function ReportEmployerModal({ visible, employerId, employerName, onClose
   const canSubmit = Boolean(reason) && descriptionValid && !reportMutation.isPending
 
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={closeModal}>
-      <View style={styles.overlay}>
-        <View style={styles.card}>
-          <Text style={styles.title}>Report {employerName || 'this employer'}</Text>
-          <Text style={styles.subtitle}>PESO will review your report. This does not withdraw any application you&apos;ve submitted.</Text>
-
-          <ScrollView style={styles.scroll}>
-            <Text style={styles.label}>Reason</Text>
-            <View style={styles.reasonList}>
-              {REASONS.map((item) => (
-                <TouchableOpacity
-                  key={item.value}
-                  style={[styles.reasonChip, reason === item.value && styles.reasonChipActive]}
-                  onPress={() => setReason(item.value)}
-                >
-                  <Text style={[styles.reasonText, reason === item.value && styles.reasonTextActive]}>{item.label}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            <Text style={styles.label}>Details</Text>
-            <TextInput
-              style={styles.textArea}
-              value={description}
-              onChangeText={setDescription}
-              placeholder="Describe what happened (minimum 10 characters)"
-              placeholderTextColor={colors.subtle}
-              multiline
-              numberOfLines={5}
-              maxLength={2000}
-            />
-            <Text style={styles.counter}>{description.trim().length}/2000</Text>
-
-            {reportMutation.isError ? (
-              <AlertBox variant="danger" style={styles.alertBox}>
-                {apiErrorMessage(reportMutation.error, 'Unable to submit your report. Please try again.')}
-              </AlertBox>
-            ) : null}
-          </ScrollView>
-
-          <View style={styles.actions}>
-            <Button variant="outline" onPress={closeModal} style={styles.actionBtn}>Cancel</Button>
-            <Button
-              variant="danger"
-              onPress={() => reportMutation.mutate()}
-              disabled={!canSubmit}
-              style={styles.actionBtn}
-            >
-              {reportMutation.isPending ? 'Submitting...' : 'Submit Report'}
-            </Button>
-          </View>
+    <BottomSheet
+      visible={visible}
+      onClose={closeModal}
+      title={`Report ${employerName || 'this employer'}`}
+      heightRatio={0.75}
+      footer={
+        <View style={styles.actions}>
+          <Button variant="outline" onPress={closeModal} style={styles.actionBtn}>Cancel</Button>
+          <Button
+            variant="danger"
+            onPress={() => reportMutation.mutate()}
+            disabled={!canSubmit}
+            loading={reportMutation.isPending}
+            style={styles.actionBtn}
+          >
+            Submit Report
+          </Button>
         </View>
-      </View>
-    </Modal>
+      }
+    >
+      <ScrollView contentContainerStyle={styles.sheetBody} showsVerticalScrollIndicator={false}>
+        <Text style={styles.subtitle}>PESO will review your report. This does not withdraw any application you&apos;ve submitted.</Text>
+
+        <Text style={styles.label}>Reason</Text>
+        <View style={styles.reasonList}>
+          {REASONS.map((item) => (
+            <PressableScale
+              key={item.value}
+              scaleTo="buttonPress"
+              ripple={null}
+              style={[styles.reasonChip, reason === item.value && styles.reasonChipActive]}
+              onPress={() => setReason(item.value)}
+              accessibilityRole="button"
+              accessibilityState={{ selected: reason === item.value }}
+            >
+              <Text style={[styles.reasonText, reason === item.value && styles.reasonTextActive]}>{item.label}</Text>
+            </PressableScale>
+          ))}
+        </View>
+
+        <Text style={styles.label}>Details</Text>
+        <TextInput
+          style={styles.textArea}
+          value={description}
+          onChangeText={setDescription}
+          placeholder="Describe what happened (minimum 10 characters)"
+          placeholderTextColor={colors.subtle}
+          multiline
+          numberOfLines={5}
+          maxLength={2000}
+        />
+        <Text style={styles.counter}>{description.trim().length}/2000</Text>
+
+        {reportMutation.isError ? (
+          <AlertBox variant="danger" style={styles.alertBox}>
+            {apiErrorMessage(reportMutation.error, 'Unable to submit your report. Please try again.')}
+          </AlertBox>
+        ) : null}
+      </ScrollView>
+    </BottomSheet>
   )
 }
 
 const styles = StyleSheet.create({
-  overlay: { flex: 1, backgroundColor: 'rgba(15,23,42,0.5)', justifyContent: 'flex-end' },
-  card: { backgroundColor: colors.surface, borderTopLeftRadius: radii.xl, borderTopRightRadius: radii.xl, padding: spacing.xl, maxHeight: '85%' },
-  title: { color: colors.textPrimary, fontSize: typography.title, fontFamily: typography.family.bold },
-  subtitle: { color: colors.textSecondary, fontSize: typography.small, lineHeight: 18, marginTop: spacing.xs, marginBottom: spacing.md },
-  scroll: { flexGrow: 0 },
-  label: { color: colors.textPrimary, fontSize: typography.small, fontFamily: typography.family.bold, marginTop: spacing.md, marginBottom: spacing.sm },
+  sheetBody: { paddingBottom: spacing.xl },
+  subtitle: { ...textStyles.small, color: colors.textSecondary, marginBottom: spacing.md },
+  label: { ...textStyles.smallBold, color: colors.textPrimary, marginTop: spacing.md, marginBottom: spacing.sm },
   reasonList: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   reasonChip: { borderWidth: 1, borderColor: colors.border, backgroundColor: colors.background, borderRadius: radii.pill, paddingVertical: spacing.sm, paddingHorizontal: spacing.md },
   reasonChipActive: { backgroundColor: colors.errorBackground, borderColor: colors.error },
-  reasonText: { color: colors.textSecondary, fontSize: typography.small, fontFamily: typography.family.medium },
-  reasonTextActive: { color: colors.error, fontFamily: typography.family.bold },
-  textArea: { borderWidth: 1, borderColor: colors.border, borderRadius: radii.md, padding: spacing.md, color: colors.textPrimary, fontSize: typography.body, minHeight: 100, textAlignVertical: 'top' },
-  counter: { color: colors.subtle, fontSize: typography.small, textAlign: 'right', marginTop: spacing.xs },
+  reasonText: { ...textStyles.smallMedium, color: colors.textSecondary },
+  reasonTextActive: { ...textStyles.smallBold, color: colors.error },
+  textArea: { ...textStyles.body, borderWidth: 1, borderColor: colors.border, borderRadius: radii.md, padding: spacing.md, color: colors.textPrimary, minHeight: 100, textAlignVertical: 'top' },
+  counter: { ...textStyles.small, color: colors.subtle, textAlign: 'right', marginTop: spacing.xs },
   alertBox: { marginTop: spacing.md },
-  actions: { flexDirection: 'row', gap: spacing.md, marginTop: spacing.lg },
+  actions: { flexDirection: 'row', gap: spacing.md },
   actionBtn: { flex: 1, marginBottom: 0 },
 })

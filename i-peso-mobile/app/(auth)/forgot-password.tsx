@@ -7,7 +7,7 @@ import { API_BASE_URL } from '@/services/api'
 import { AuthShell } from '@/components/ui/AuthShell'
 import { TextField } from '@/components/ui/TextField'
 import { Button } from '@/components/ui/Button'
-import { colors, typography } from '@/theme'
+import { colors, spacing, typography } from '@/theme'
 
 interface ApiErrorBody {
   message?: string
@@ -102,7 +102,7 @@ export default function ForgotPasswordScreen() {
 
 const styles = StyleSheet.create({
   submit: {
-    marginTop: 4,
+    marginTop: spacing.xs,
   },
   footer: {
     flexDirection: 'row',

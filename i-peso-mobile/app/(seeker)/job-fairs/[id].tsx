@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import { ScrollView, StyleSheet, Text, View } from 'react-native'
+import Animated, { FadeInUp } from 'react-native-reanimated'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useQueryClient } from '@tanstack/react-query'
 import MaterialIcons from '@expo/vector-icons/MaterialIcons'
@@ -7,10 +8,13 @@ import type { JobFair, JobFairPass } from '@/services/seekerService'
 import { seekerService } from '@/services/seekerService'
 import { apiErrorMessage } from '@/utils/apiError'
 import { formatDate, textFrom, titleCase } from '@/utils/seekerView'
+import { useMotion } from '@/hooks/useMotion'
 import { AlertBox } from '@/components/ui/AlertBox'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
+import { EmptyState } from '@/components/ui/EmptyState'
+import { PressableScale } from '@/components/ui/PressableScale'
 import { ScreenHeader } from '@/components/ui/ScreenHeader'
 import { DigitalQrPass } from '@/components/seeker/DigitalQrPass'
 import { colors, radii, spacing, typography } from '@/theme'
@@ -30,6 +34,7 @@ export default function JobFairDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>()
   const router = useRouter()
   const queryClient = useQueryClient()
+  const m = useMotion()
   const [pass, setPass] = useState<JobFairPass | null>(null)
   const [registering, setRegistering] = useState(false)
   const [registerError, setRegisterError] = useState('')
@@ -58,13 +63,16 @@ export default function JobFairDetailScreen() {
       <View style={styles.flex}>
         <ScreenHeader title="Job Fair" onBack={() => router.replace('/(seeker)/job-fairs')} />
         <View style={styles.center}>
-          <Text style={styles.notFoundTitle}>Job fair not found</Text>
-          <Text style={styles.notFoundSub}>
-            This can happen if you opened a link before the job fairs list finished loading.
-          </Text>
-          <Button variant="outline" onPress={() => router.replace('/(seeker)/job-fairs')}>
-            Back to Job Fairs
-          </Button>
+          <EmptyState
+            icon="event-busy"
+            title="Job fair not found"
+            message="This can happen if you opened a link before the job fairs list finished loading."
+            action={
+              <Button variant="outline" onPress={() => router.replace('/(seeker)/job-fairs')}>
+                Back to Job Fairs
+              </Button>
+            }
+          />
         </View>
       </View>
     )
@@ -104,9 +112,12 @@ export default function JobFairDetailScreen() {
       </Card>
 
       {pass ? (
-        <View style={styles.passWrap}>
+        <Animated.View
+          style={styles.passWrap}
+          entering={m.enabled ? FadeInUp.duration(m.duration('slow')) : undefined}
+        >
           <DigitalQrPass pass={pass} />
-        </View>
+        </Animated.View>
       ) : registrableStatuses.includes(textFrom(fair.status, '').toLowerCase()) ? (
         <Card padding="md" style={styles.registerCard}>
           <Text style={styles.registerTitle}>{fair.is_rsvped ? 'You’re registered' : 'Reserve your spot'}</Text>
@@ -135,8 +146,10 @@ export default function JobFairDetailScreen() {
       {employers.length > 0 ? (
         <Card padding="md" style={styles.listCard}>
           {employers.map((employer, index) => (
-            <TouchableOpacity
+            <PressableScale
               key={String(employer.employer_id ?? index)}
+              scaleTo="buttonPress"
+              ripple={null}
               style={[styles.listRow, index === 0 && styles.listRowFirst]}
               disabled={employer.employer_id == null}
               onPress={() => router.push({
@@ -149,7 +162,7 @@ export default function JobFairDetailScreen() {
               <Text style={styles.listRowText}>{textFrom(employer.company_name, 'Employer')}</Text>
               {employer.status ? <Badge variant="neutral">{titleCase(employer.status, '')}</Badge> : null}
               {employer.employer_id != null ? <MaterialIcons name="chevron-right" size={18} color={colors.subtle} /> : null}
-            </TouchableOpacity>
+            </PressableScale>
           ))}
         </Card>
       ) : (
@@ -187,29 +200,27 @@ const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: colors.background },
   content: { padding: spacing.xl, paddingBottom: spacing.xxxl },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: spacing.md, padding: spacing.xl, backgroundColor: colors.background },
-  notFoundTitle: { color: colors.primary, fontSize: typography.title, fontFamily: typography.family.bold },
-  notFoundSub: { color: colors.secondaryText, fontSize: typography.body, textAlign: 'center', lineHeight: 20, marginBottom: spacing.md },
   passWrap: { marginBottom: spacing.lg },
   registerCard: { marginBottom: spacing.lg, backgroundColor: colors.infoBackground, borderColor: colors.infoBorder },
-  registerTitle: { color: colors.primary, fontSize: typography.title, fontFamily: typography.family.bold },
+  registerTitle: { color: colors.textPrimary, fontSize: typography.title, fontFamily: typography.family.bold },
   registerSubtitle: { marginTop: spacing.xs, color: colors.secondaryText, fontSize: typography.small, lineHeight: 18 },
   registerAlert: { marginTop: spacing.md },
   registerButton: { marginTop: spacing.md },
   header: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: spacing.md, marginBottom: spacing.sm },
-  title: { flex: 1, color: colors.primary, fontSize: typography.heading, lineHeight: 30, fontFamily: typography.family.bold },
+  title: { flex: 1, color: colors.textPrimary, fontSize: typography.heading, lineHeight: 30, fontFamily: typography.family.bold },
   statusBadge: { marginTop: spacing.xs },
   description: { color: colors.secondaryText, fontSize: typography.body, lineHeight: 22, marginBottom: spacing.lg },
   infoCard: { marginBottom: spacing.lg },
   detailRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: spacing.xs, borderBottomWidth: 1, borderBottomColor: colors.border },
   detailLabel: { color: colors.secondaryText, fontSize: typography.small, fontFamily: typography.family.bold },
-  detailValue: { color: colors.primary, fontSize: typography.small, fontFamily: typography.family.bold, textAlign: 'right', flex: 1, marginLeft: spacing.md },
-  sectionTitle: { color: colors.primary, fontSize: typography.title, fontFamily: typography.family.bold, marginTop: spacing.lg, marginBottom: spacing.md },
+  detailValue: { color: colors.textPrimary, fontSize: typography.small, fontFamily: typography.family.bold, textAlign: 'right', flex: 1, marginLeft: spacing.md },
+  sectionTitle: { color: colors.textPrimary, fontSize: typography.title, fontFamily: typography.family.bold, marginTop: spacing.lg, marginBottom: spacing.md },
   tagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   tag: { backgroundColor: colors.infoBackground, color: colors.info, borderRadius: radii.pill, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, fontSize: typography.small, fontFamily: typography.family.bold },
   listCard: { gap: 0 },
   listRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: spacing.sm, borderTopWidth: 1, borderTopColor: colors.border },
   listRowFirst: { borderTopWidth: 0, paddingTop: 0 },
-  listRowText: { color: colors.primary, fontSize: typography.body, fontFamily: typography.family.bold, flex: 1, marginRight: spacing.sm },
+  listRowText: { color: colors.textPrimary, fontSize: typography.body, fontFamily: typography.family.bold, flex: 1, marginRight: spacing.sm },
   listRowSub: { color: colors.secondaryText, fontSize: typography.small },
   emptyText: { color: colors.secondaryText, fontSize: typography.body },
 })

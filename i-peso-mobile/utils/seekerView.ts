@@ -16,6 +16,14 @@ export function titleCase(value: unknown, fallback = 'Not set') {
     .replace(/\b\w/g, (char) => char.toUpperCase())
 }
 
+export function applicationStatusVariant(status: string): 'neutral' | 'info' | 'success' | 'warning' | 'danger' {
+  if (status === 'hired') return 'success'
+  if (status === 'rejected' || status === 'withdrawn') return 'danger'
+  if (status === 'interview' || status === 'shortlisted') return 'warning'
+  if (status === 'pending' || status === 'reviewed') return 'info'
+  return 'neutral'
+}
+
 export function seekerName(profile?: SeekerProfile | null, fallback = 'Job Seeker') {
   const fromName = textFrom(profile?.name, '')
   if (fromName) return fromName

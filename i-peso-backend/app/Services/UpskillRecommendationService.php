@@ -12,6 +12,10 @@ use Illuminate\Support\Str;
 
 class UpskillRecommendationService
 {
+    public function __construct(private readonly EligibilityMatchingService $eligibility)
+    {
+    }
+
     public function recommend(JobSeeker $seeker, int $limit = 8): Collection
     {
         $seeker->loadMissing('seekerSkills.skill', 'occupations');
@@ -65,16 +69,47 @@ class UpskillRecommendationService
             ->values();
     }
 
+    /**
+     * Job seekers eligible to be notified that this program just opened.
+     *
+     * Gated on the seeker's actual eligibility (via EligibilityMatchingService — the same
+     * scoring that drives the "Eligible/Partially Eligible/Not Eligible" badge the seeker
+     * sees on the program's own detail screen), not just an occupation match. A seeker whose
+     * status comes back `not_eligible` (failed a `required` rule) or `low_match` (<60%) is
+     * excluded — being occupation-matched alone used to be enough to get notified about a
+     * program the seeker couldn't actually qualify for.
+     *
+     * Occupation stays a relevance pre-filter when the program specifies a target_occupation
+     * (unchanged from before), but is no longer a hard requirement: a program with eligibility
+     * rules and no target occupation used to notify nobody at all; now eligibility alone does
+     * the narrowing for it, same as an occupation-targeted program that has no rules is simply
+     * open to everyone in its occupation (EligibilityMatchingService::evaluate() already treats
+     * "no rules" as eligible for everyone).
+     *
+     * $limit caps how many are *notified*, applied after the eligibility filter — not how many
+     * are considered.
+     */
     public function recipientsForProgram(GovernmentProgram $program, int $limit = 200): EloquentCollection
     {
-        if (! $program->target_occupation_id) {
-            return new EloquentCollection();
-        }
-
-        return JobSeeker::query()
-            ->whereHas('occupations', fn ($query) => $query->where('occupation_id', $program->target_occupation_id))
-            ->limit($limit)
+        $candidates = JobSeeker::query()
+            ->where('profile_completed', true)
+            ->when(
+                $program->target_occupation_id,
+                fn ($query) => $query->whereHas(
+                    'occupations',
+                    fn ($occupations) => $occupations->where('occupation_id', $program->target_occupation_id)
+                )
+            )
             ->get();
+
+        return $candidates
+            ->filter(function (JobSeeker $seeker) use ($program) {
+                $status = $this->eligibility->evaluate($seeker, $program)['status'];
+
+                return in_array($status, ['eligible', 'highly_eligible', 'partially_eligible'], true);
+            })
+            ->take($limit)
+            ->values();
     }
 
     private function missingSkills(Collection $ownedIds, Collection $ownedNames, Collection $occupationIds): Collection

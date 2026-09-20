@@ -48,7 +48,7 @@ export default function EmployerPostersScreen() {
           emptyTitle="No employer posters yet"
           emptyMessage="No employer posters are available right now."
         >
-          {posters.map((poster) => <PosterFeedCard key={String(poster.id)} poster={poster} />)}
+          {posters.map((poster, index) => <PosterFeedCard key={String(poster.id)} poster={poster} index={index} />)}
         </QueryState>
       </ScrollView>
     </View>

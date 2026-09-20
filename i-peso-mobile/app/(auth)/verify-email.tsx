@@ -1,13 +1,13 @@
 import { useState, useRef, useEffect } from 'react'
-import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native'
+import { View, Text, StyleSheet } from 'react-native'
 import { router, useLocalSearchParams } from 'expo-router'
-import MaterialIcons from '@expo/vector-icons/MaterialIcons'
 import { authService } from '@/services/authService'
 import { useAuthStore } from '@/stores/authStore'
-import { AlertBox } from '@/components/ui/AlertBox'
+import { AuthShell } from '@/components/ui/AuthShell'
+import { IconBadge } from '@/components/ui/IconBadge'
 import { OtpInput, type OtpInputHandle } from '@/components/ui/OtpInput'
 import { Button } from '@/components/ui/Button'
-import { colors, radii, spacing, typography } from '@/theme'
+import { colors, spacing, typography } from '@/theme'
 
 interface AuthState {
   setAuth: (user: any, token: string) => Promise<void>
@@ -105,64 +105,47 @@ export default function VerifyEmailScreen() {
   const otpComplete = digits.join('').length === 6
 
   return (
-    <View style={s.container}>
+    <AuthShell
+      title="Check your email"
+      subtitle={
+        <>
+          We sent a 6-digit code to{'\n'}
+          <Text style={s.emailHighlight}>{maskedEmail}</Text>
+        </>
+      }
+      onBack={() => router.push('/(auth)/register')}
+      apiError={apiError}
+    >
       <View style={s.iconWrap}>
-        <View style={s.iconBox}>
-          <MaterialIcons name="mark-email-read" size={34} color={colors.info} />
-        </View>
+        <IconBadge tone="info" icon="mark-email-read" />
       </View>
-
-      <Text style={s.title}>Check your email</Text>
-      <Text style={s.sub}>
-        We sent a 6-digit code to{'\n'}
-        <Text style={s.emailHighlight}>{maskedEmail}</Text>
-      </Text>
-
-      {apiError ? <AlertBox variant="danger" style={s.errorBox}>{apiError}</AlertBox> : null}
 
       <OtpInput ref={otpRef} digits={digits} onChangeDigits={handleDigitsChange} error={Boolean(apiError)} />
 
-      <Button fullWidth disabled={!otpComplete || isVerifying} onPress={handleVerify} style={s.button}>
-        {isVerifying ? 'Verifying...' : 'Verify Email'}
+      <Button fullWidth disabled={!otpComplete} loading={isVerifying} onPress={handleVerify} style={s.button}>
+        Verify Email
       </Button>
 
       <View style={s.resendRow}>
         {canResend ? (
-          <TouchableOpacity onPress={handleResend} disabled={isResending}>
-            {isResending ? (
-              <ActivityIndicator size="small" color={colors.info} />
-            ) : (
-              <Text style={s.resendLink}>Resend verification code</Text>
-            )}
-          </TouchableOpacity>
+          <Button variant="ghost" size="sm" loading={isResending} onPress={handleResend}>
+            Resend verification code
+          </Button>
         ) : (
           <Text style={s.resendTimer}>
             Resend in <Text style={s.resendCount}>{countdown}s</Text>
           </Text>
         )}
       </View>
-
-      <TouchableOpacity onPress={() => router.push('/(auth)/register')} style={s.backBtn}>
-        <MaterialIcons name="arrow-back" size={14} color={colors.subtle} />
-        <Text style={s.backText}>Wrong email? Go back</Text>
-      </TouchableOpacity>
-    </View>
+    </AuthShell>
   )
 }
 
 const s = StyleSheet.create({
-  container      : { flex: 1, backgroundColor: colors.background, paddingHorizontal: spacing.xxl + spacing.xs, justifyContent: 'center', alignItems: 'center' },
-  iconWrap       : { marginBottom: spacing.xl },
-  iconBox        : { width: 76, height: 76, backgroundColor: colors.infoBackground, borderWidth: 1, borderColor: colors.infoBorder, borderRadius: radii.xl - 2, justifyContent: 'center', alignItems: 'center' },
-  title          : { fontSize: typography.hero, fontFamily: typography.family.display, color: colors.primary, textAlign: 'center', marginBottom: spacing.sm },
-  sub            : { fontSize: typography.body, color: colors.secondaryText, textAlign: 'center', lineHeight: 22, marginBottom: spacing.xl },
+  iconWrap       : { alignItems: 'center', marginBottom: spacing.lg },
   emailHighlight : { fontFamily: typography.family.bold, color: colors.primary, fontSize: typography.body },
-  errorBox       : { width: '100%', marginBottom: spacing.lg },
-  button         : { width: '100%', marginTop: spacing.xl, marginBottom: spacing.lg },
-  resendRow      : { marginBottom: spacing.xl, alignItems: 'center' },
-  resendLink     : { color: colors.info, fontSize: typography.body, fontFamily: typography.family.bold },
+  button         : { marginTop: spacing.md },
+  resendRow      : { alignItems: 'center' },
   resendTimer    : { fontSize: typography.small, color: colors.subtle },
   resendCount    : { fontFamily: typography.family.bold, color: colors.muted, fontSize: typography.small },
-  backBtn        : { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: spacing.xs },
-  backText       : { color: colors.subtle, fontSize: typography.label, fontFamily: typography.family.medium },
 })

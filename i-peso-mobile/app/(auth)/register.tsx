@@ -1,6 +1,8 @@
 import { useCallback, useState } from 'react'
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { router } from 'expo-router'
+import { Controller, useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
 import type { AxiosError } from 'axios'
 import { authService } from '@/services/authService'
 import type { SeekerRegisterPayload } from '@/services/authService'
@@ -10,20 +12,13 @@ import { TextField } from '@/components/ui/TextField'
 import { PasswordField } from '@/components/ui/PasswordField'
 import { PasswordStrengthMeter } from '@/components/ui/PasswordStrengthMeter'
 import { Button } from '@/components/ui/Button'
+import { registerSchema, type RegisterFormValues } from '@/schemas/authSchemas'
 import { colors, spacing, typography } from '@/theme'
 
 interface ApiErrorBody {
   message?: string
   errors?: Record<string, string[]>
 }
-
-// Mirrors AuthController::register — regex:/^[\pL\s.'-]+$/u, min:2, max:100
-const NAME_PATTERN = /^[\p{L}\s.'-]{2,100}$/u
-
-// Mirrors Password::min(8)->numbers()->symbols() (vendor/laravel/framework
-// .../Validation/Rules/Password.php) — numbers: \pN, symbols: \p{Z}|\p{S}|\p{P}
-const HAS_NUMBER = /\p{N}/u
-const HAS_SYMBOL = /\p{Z}|\p{S}|\p{P}/u
 
 const normalizeMobileNumber = (value: string) => {
   let digits = value.replace(/\D/g, '')
@@ -41,93 +36,52 @@ const formatName = (value: string) =>
     .toLowerCase()
     .replace(/(^|[\s'-])([a-z])/g, (_match, separator: string, letter: string) => `${separator}${letter.toUpperCase()}`)
 
-// Mirrors i-peso-frontend's email regex exactly (stricter than a bare \S+@\S+\.\S+).
-const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/
-
 const firstServerError = (errors: Record<string, string[]> = {}) => {
   const firstKey = Object.keys(errors)[0]
   return firstKey ? errors[firstKey]?.[0] : ''
 }
 
+const DEFAULT_VALUES: RegisterFormValues = {
+  first_name: '',
+  last_name: '',
+  email: '',
+  mobile_number: '',
+  password: '',
+  password_confirmation: '',
+}
+
 export default function RegisterScreen() {
-  const [form, setForm] = useState<Record<string, string>>({})
-  const [errors, setErrors] = useState<Record<string, string>>({})
   const [apiError, setApiError] = useState('')
-  const [isLoading, setIsLoading] = useState(false)
 
-  const handleChange = useCallback((name: string, value: string) => {
-    let nextValue = value
-    if (name === 'mobile_number') nextValue = normalizeMobileNumber(value)
-    // Mirrors i-peso-frontend's SeekerRegistration.jsx change() — lowercase and strip
-    // whitespace live as the user types, not just on blur.
-    else if (name === 'email') nextValue = value.replace(/\s/g, '').toLowerCase()
-    setForm((current) => ({ ...current, [name]: nextValue }))
-    setErrors((current) => ({ ...current, [name]: '' }))
-    setApiError('')
-  }, [])
+  const {
+    control,
+    handleSubmit,
+    setError,
+    watch,
+    formState: { isSubmitting },
+  } = useForm<RegisterFormValues>({
+    resolver: zodResolver(registerSchema),
+    mode: 'onBlur',
+    defaultValues: DEFAULT_VALUES,
+  })
 
-  const validate = () => {
-    const nextErrors: Record<string, string> = {}
+  const password = watch('password')
+  const passwordConfirmation = watch('password_confirmation')
+  const passwordsMatch = Boolean(password && passwordConfirmation && password === passwordConfirmation)
 
-    if (!form.first_name?.trim()) {
-      nextErrors.first_name = 'First name is required.'
-    } else if (!NAME_PATTERN.test(form.first_name.trim())) {
-      nextErrors.first_name = 'Use letters, spaces, periods, apostrophes, or hyphens only (2-100 characters).'
-    }
+  const clearApiError = useCallback(() => setApiError(''), [])
 
-    if (!form.last_name?.trim()) {
-      nextErrors.last_name = 'Last name is required.'
-    } else if (!NAME_PATTERN.test(form.last_name.trim())) {
-      nextErrors.last_name = 'Use letters, spaces, periods, apostrophes, or hyphens only (2-100 characters).'
-    }
-
-    if (!form.email?.trim()) {
-      nextErrors.email = 'Email is required.'
-    } else if (!EMAIL_PATTERN.test(form.email.trim().toLowerCase())) {
-      nextErrors.email = 'Enter a valid email address.'
-    }
-
-    if (!form.mobile_number?.trim()) {
-      nextErrors.mobile_number = 'Mobile number is required.'
-    } else if (!/^09\d{9}$/.test(normalizeMobileNumber(form.mobile_number))) {
-      nextErrors.mobile_number = 'Use a valid PH mobile number, e.g. 09XXXXXXXXX.'
-    }
-
-    if (!form.password) {
-      nextErrors.password = 'Password is required.'
-    } else if (form.password.length < 8) {
-      nextErrors.password = 'Minimum 8 characters.'
-    } else if (!HAS_NUMBER.test(form.password) || !HAS_SYMBOL.test(form.password)) {
-      nextErrors.password = 'Password must include at least one number and one symbol.'
-    }
-
-    if (!form.password_confirmation) {
-      nextErrors.password_confirmation = 'Please confirm password.'
-    } else if (form.password !== form.password_confirmation) {
-      nextErrors.password_confirmation = 'Passwords do not match.'
-    }
-
-    return nextErrors
-  }
-
-  const handleSubmit = async () => {
-    const validationErrors = validate()
-    if (Object.keys(validationErrors).length) {
-      setErrors(validationErrors)
-      return
-    }
-
+  const onSubmit = async (values: RegisterFormValues) => {
     const payload: SeekerRegisterPayload = {
       role: 'seeker',
-      first_name: formatName(form.first_name),
-      last_name: formatName(form.last_name),
-      email: form.email.trim().toLowerCase(),
-      mobile_number: normalizeMobileNumber(form.mobile_number),
-      password: form.password,
-      password_confirmation: form.password_confirmation,
+      first_name: formatName(values.first_name),
+      last_name: formatName(values.last_name),
+      email: values.email.trim().toLowerCase(),
+      mobile_number: normalizeMobileNumber(values.mobile_number),
+      password: values.password,
+      password_confirmation: values.password_confirmation,
     }
 
-    setIsLoading(true)
     setApiError('')
 
     try {
@@ -144,11 +98,11 @@ export default function RegisterScreen() {
 
       if (response?.status === 422) {
         const serverErrors = response.data?.errors ?? {}
-        const mappedErrors: Record<string, string> = {}
         Object.keys(serverErrors).forEach((key) => {
-          mappedErrors[key] = serverErrors[key][0]
+          if (key in DEFAULT_VALUES) {
+            setError(key as keyof RegisterFormValues, { type: 'server', message: serverErrors[key][0] })
+          }
         })
-        setErrors(mappedErrors)
         setApiError(firstServerError(serverErrors) || response.data?.message || 'Please check the highlighted fields.')
       } else if (!response) {
         const reason = err.code === 'ECONNABORTED' ? 'The request timed out.' : 'The backend could not be reached.'
@@ -159,12 +113,8 @@ export default function RegisterScreen() {
       } else {
         setApiError(response?.data?.message ?? 'Registration failed. Check your connection to the i-PESO backend.')
       }
-    } finally {
-      setIsLoading(false)
     }
   }
-
-  const passwordsMatch = Boolean(form.password && form.password_confirmation && form.password === form.password_confirmation)
 
   return (
     <AuthShell
@@ -183,65 +133,130 @@ export default function RegisterScreen() {
     >
       <View style={styles.nameRow}>
         <View style={styles.nameHalf}>
-          <TextField
-            label="First Name"
-            value={form.first_name ?? ''}
-            onChangeText={(v) => handleChange('first_name', v)}
-            onBlur={() => setForm((current) => ({ ...current, first_name: formatName(current.first_name ?? '') }))}
-            placeholder="Juan"
-            error={errors.first_name}
+          <Controller
+            control={control}
+            name="first_name"
+            render={({ field: { value, onChange, onBlur }, fieldState: { error } }) => (
+              <TextField
+                label="First Name"
+                value={value}
+                onChangeText={(v) => {
+                  onChange(v)
+                  clearApiError()
+                }}
+                onBlur={() => {
+                  onChange(formatName(value))
+                  onBlur()
+                }}
+                placeholder="Juan"
+                error={error?.message}
+              />
+            )}
           />
         </View>
         <View style={styles.nameHalf}>
-          <TextField
-            label="Last Name"
-            value={form.last_name ?? ''}
-            onChangeText={(v) => handleChange('last_name', v)}
-            onBlur={() => setForm((current) => ({ ...current, last_name: formatName(current.last_name ?? '') }))}
-            placeholder="Dela Cruz"
-            error={errors.last_name}
+          <Controller
+            control={control}
+            name="last_name"
+            render={({ field: { value, onChange, onBlur }, fieldState: { error } }) => (
+              <TextField
+                label="Last Name"
+                value={value}
+                onChangeText={(v) => {
+                  onChange(v)
+                  clearApiError()
+                }}
+                onBlur={() => {
+                  onChange(formatName(value))
+                  onBlur()
+                }}
+                placeholder="Dela Cruz"
+                error={error?.message}
+              />
+            )}
           />
         </View>
       </View>
 
-      <TextField
-        label="Email Address"
-        value={form.email ?? ''}
-        onChangeText={(v) => handleChange('email', v)}
-        onBlur={() => setForm((current) => ({ ...current, email: (current.email ?? '').trim().toLowerCase() }))}
-        placeholder="you@example.com"
-        keyboardType="email-address"
-        error={errors.email}
+      <Controller
+        control={control}
+        name="email"
+        render={({ field: { value, onChange, onBlur }, fieldState: { error } }) => (
+          <TextField
+            label="Email Address"
+            value={value}
+            // Mirrors i-peso-frontend's SeekerRegistration.jsx change() — lowercase and strip
+            // whitespace live as the user types, not just on blur.
+            onChangeText={(v) => {
+              onChange(v.replace(/\s/g, '').toLowerCase())
+              clearApiError()
+            }}
+            onBlur={onBlur}
+            placeholder="you@example.com"
+            keyboardType="email-address"
+            error={error?.message}
+          />
+        )}
       />
 
-      <TextField
-        label="Mobile Number"
-        value={form.mobile_number ?? ''}
-        onChangeText={(v) => handleChange('mobile_number', v)}
-        placeholder="09XXXXXXXXX"
-        keyboardType="phone-pad"
-        error={errors.mobile_number}
+      <Controller
+        control={control}
+        name="mobile_number"
+        render={({ field: { value, onChange, onBlur }, fieldState: { error } }) => (
+          <TextField
+            label="Mobile Number"
+            value={value}
+            onChangeText={(v) => {
+              onChange(normalizeMobileNumber(v))
+              clearApiError()
+            }}
+            onBlur={onBlur}
+            placeholder="09XXXXXXXXX"
+            keyboardType="phone-pad"
+            error={error?.message}
+          />
+        )}
       />
 
-      <PasswordField
-        label="Password"
-        value={form.password ?? ''}
-        onChangeText={(v) => handleChange('password', v)}
-        placeholder="Minimum 8 characters"
-        error={errors.password}
+      <Controller
+        control={control}
+        name="password"
+        render={({ field: { value, onChange, onBlur }, fieldState: { error } }) => (
+          <PasswordField
+            label="Password"
+            value={value}
+            onChangeText={(v) => {
+              onChange(v)
+              clearApiError()
+            }}
+            onBlur={onBlur}
+            placeholder="Minimum 8 characters"
+            error={error?.message}
+          />
+        )}
       />
-      <PasswordStrengthMeter password={form.password ?? ''} />
+      <PasswordStrengthMeter password={password ?? ''} />
 
-      <PasswordField
-        label="Confirm Password"
-        value={form.password_confirmation ?? ''}
-        onChangeText={(v) => handleChange('password_confirmation', v)}
-        placeholder="Re-enter your password"
-        error={errors.password_confirmation}
+      <Controller
+        control={control}
+        name="password_confirmation"
+        render={({ field: { value, onChange, onBlur }, fieldState: { error } }) => (
+          <PasswordField
+            label="Confirm Password"
+            value={value}
+            onChangeText={(v) => {
+              onChange(v)
+              clearApiError()
+            }}
+            onBlur={onBlur}
+            placeholder="Re-enter your password"
+            error={error?.message}
+          />
+        )}
       />
       {passwordsMatch ? <Text style={styles.matchText}>Passwords match</Text> : null}
 
-      <Button fullWidth onPress={handleSubmit} loading={isLoading} style={styles.submit}>
+      <Button fullWidth onPress={handleSubmit(onSubmit)} loading={isSubmitting} style={styles.submit}>
         Create Account
       </Button>
     </AuthShell>

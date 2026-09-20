@@ -1,13 +1,16 @@
 import { useState } from 'react'
-import { RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native'
+import Animated, { FadeInUp } from 'react-native-reanimated'
 import { useQuery } from '@tanstack/react-query'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import MaterialIcons from '@expo/vector-icons/MaterialIcons'
 import type { JobFair } from '@/services/seekerService'
 import { seekerService } from '@/services/seekerService'
 import { formatDate, textFrom, titleCase } from '@/utils/seekerView'
+import { useMotion } from '@/hooks/useMotion'
 import { Badge } from '@/components/ui/Badge'
 import { Card } from '@/components/ui/Card'
+import { PressableScale } from '@/components/ui/PressableScale'
 import { ScreenHeader } from '@/components/ui/ScreenHeader'
 import { QueryState } from '@/components/ui/QueryState'
 import { colors, spacing, typography } from '@/theme'
@@ -36,6 +39,7 @@ export default function JobFairsScreen() {
   const { from } = useLocalSearchParams<{ from?: string }>()
   const backTarget = BACK_DESTINATIONS[from ?? ''] ?? '/(seeker)'
   const [refreshing, setRefreshing] = useState(false)
+  const m = useMotion()
 
   const { data: jobFairs = [], isLoading, error, refetch } = useQuery({
     queryKey: ['jobFairs'],
@@ -71,15 +75,22 @@ export default function JobFairsScreen() {
           emptyTitle="No upcoming job fairs right now"
           emptyMessage="Check back later or pull down to refresh."
         >
-          {jobFairs.map((fair: JobFair) => {
+          {jobFairs.map((fair: JobFair, index: number) => {
             const employerCount = fair.participating_employers?.length ?? 0
             const vacancyCount = fair.published_vacancies?.length ?? 0
 
             return (
-              <Card key={String(fair.job_fair_id)} style={styles.fairCard} padding="md">
-                <TouchableOpacity
-                  activeOpacity={0.9}
+              <Animated.View
+                key={String(fair.job_fair_id)}
+                entering={m.enabled ? FadeInUp.delay(m.stagger(index)).duration(240) : undefined}
+              >
+              <Card style={styles.fairCard} padding="md">
+                <PressableScale
+                  scaleTo="cardPress"
+                  ripple={null}
                   onPress={() => router.push(`/(seeker)/job-fairs/${fair.job_fair_id}`)}
+                  accessibilityRole="button"
+                  accessibilityLabel={`View ${textFrom(fair.title, 'job fair')} details`}
                 >
                   <View style={styles.fairHeader}>
                     <Text style={styles.fairTitle} numberOfLines={2}>{textFrom(fair.title, 'Untitled job fair')}</Text>
@@ -115,8 +126,9 @@ export default function JobFairsScreen() {
                     <MaterialIcons name="work" size={16} color={colors.subtle} />
                     <Text style={styles.meta}>{vacancyCount} vacanc{vacancyCount === 1 ? 'y' : 'ies'} published</Text>
                   </View>
-                </TouchableOpacity>
+                </PressableScale>
               </Card>
+              </Animated.View>
             )
           })}
         </QueryState>

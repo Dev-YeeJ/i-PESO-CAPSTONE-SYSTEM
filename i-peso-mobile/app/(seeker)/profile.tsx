@@ -3,13 +3,11 @@ import {
   ActivityIndicator,
   Alert,
   Image,
-  Modal,
   RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
-  TouchableOpacity,
   View,
 } from 'react-native'
 import { router } from 'expo-router'
@@ -36,9 +34,11 @@ import {
 } from '@/utils/resumeBullets'
 import MaterialIcons from '@expo/vector-icons/MaterialIcons'
 import { AlertBox } from '@/components/ui/AlertBox'
+import { BottomSheet } from '@/components/ui/BottomSheet'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
+import { PressableScale } from '@/components/ui/PressableScale'
 import { SectionHeader } from '@/components/ui/SectionHeader'
 import { MatchRing } from '@/components/ui/MatchRing'
 import { ScreenSkeleton } from '@/components/ui/ScreenSkeleton'
@@ -175,10 +175,11 @@ export default function ProfileScreen() {
   }
 
   const viewCertificate = async (certificate: SeekerCertificate) => {
+    setActionError('')
     try {
       await downloadAndShare(seekerService.certificateViewUrl(certificate.certificate_id), certificate.original_filename || `${certificate.title}.pdf`)
     } catch {
-      Alert.alert('Unable to open certificate', 'Please check your connection and try again.')
+      setActionError('Unable to open the certificate. Please check your connection and try again.')
     }
   }
 
@@ -189,11 +190,12 @@ export default function ProfileScreen() {
         text: 'Delete',
         style: 'destructive',
         onPress: async () => {
+          setActionError('')
           try {
             await seekerService.deleteCertificate(certificate.certificate_id)
             await invalidateProfile()
           } catch (caught) {
-            Alert.alert('Unable to delete', apiErrorMessage(caught, 'Please try again.'))
+            setActionError(apiErrorMessage(caught, 'Unable to delete this certificate. Please try again.'))
           }
         },
       },
@@ -231,7 +233,14 @@ export default function ProfileScreen() {
 
         <Card padding="md" style={styles.profileHeaderCard}>
           <View style={styles.profileHeaderInner}>
-            <TouchableOpacity onPress={pickAndUploadPhoto} disabled={photoBusy} activeOpacity={0.85}>
+            <PressableScale
+              scaleTo="buttonPress"
+              ripple={null}
+              onPress={pickAndUploadPhoto}
+              disabled={photoBusy}
+              accessibilityRole="button"
+              accessibilityLabel={imageSource ? 'Change profile photo' : 'Add profile photo'}
+            >
               <View style={styles.avatar}>
                 {photoBusy ? (
                   <ActivityIndicator color={colors.surface} />
@@ -242,7 +251,7 @@ export default function ProfileScreen() {
                 )}
               </View>
               <Text style={styles.avatarEditLabel}>{imageSource ? 'Change' : 'Add photo'}</Text>
-            </TouchableOpacity>
+            </PressableScale>
             <View style={styles.profileHeaderText}>
               <Text style={styles.name}>{seekerName(profile)}</Text>
               <Text style={styles.muted}>{textFrom(profile?.email, 'Email not listed')}</Text>
@@ -253,9 +262,9 @@ export default function ProfileScreen() {
                   <Text style={styles.savingText}>Saving photo...</Text>
                 </View>
               ) : imageSource ? (
-                <TouchableOpacity onPress={deletePhoto} disabled={photoBusy}>
+                <PressableScale scaleTo="buttonPress" ripple={null} onPress={deletePhoto} disabled={photoBusy} accessibilityRole="button">
                   <Text style={styles.removePhotoText}>Remove photo</Text>
-                </TouchableOpacity>
+                </PressableScale>
               ) : null}
             </View>
           </View>
@@ -406,10 +415,10 @@ export default function ProfileScreen() {
                   </View>
                 ) : null}
 
-                <TouchableOpacity onPress={toggleEditor} style={styles.dutiesToggle}>
+                <PressableScale scaleTo="buttonPress" ripple={null} onPress={toggleEditor} style={styles.dutiesToggle} accessibilityRole="button">
                   <MaterialIcons name="add" size={16} color={colors.secondary} />
                   <Text style={styles.dutiesToggleText}>{savedResponsibilities ? 'Edit Job Duties / Responsibilities' : 'Add Job Duties / Responsibilities'}</Text>
-                </TouchableOpacity>
+                </PressableScale>
 
                 {isOpen ? (
                   <View style={styles.dutiesPanel}>
@@ -418,13 +427,16 @@ export default function ProfileScreen() {
                         <Text style={styles.dutiesPanelTitle}>Resume bullet points</Text>
                         <Text style={styles.dutiesPanelHint}>Type simple duties, then let Smart Assistant polish them into stronger resume language.</Text>
                       </View>
-                      <TouchableOpacity
+                      <PressableScale
+                        scaleTo="buttonPress"
+                        ripple={null}
                         onPress={() => setExperienceDrafts((current) => ({ ...current, [key]: enhanceResponsibilities(current[key], position) }))}
                         style={styles.aiEnhanceBtn}
+                        accessibilityRole="button"
                       >
                         <MaterialIcons name="auto-awesome" size={14} color={colors.info} />
                         <Text style={styles.aiEnhanceBtnText}>Smart Enhance Bullets</Text>
-                      </TouchableOpacity>
+                      </PressableScale>
                     </View>
                     <TextInput
                       style={styles.dutiesTextarea}
@@ -478,9 +490,9 @@ export default function ProfileScreen() {
         <SectionHeader
           title="Certificates"
           action={
-            <TouchableOpacity onPress={() => setCertModalOpen(true)}>
+            <PressableScale scaleTo="buttonPress" ripple={null} onPress={() => setCertModalOpen(true)} accessibilityRole="button">
               <Text style={styles.editLinkText}>+ Add</Text>
-            </TouchableOpacity>
+            </PressableScale>
           }
         />
         <View style={styles.cardList}>
@@ -535,9 +547,14 @@ export default function ProfileScreen() {
 
 function EditLink({ section }: { section: number }) {
   return (
-    <TouchableOpacity onPress={() => router.push({ pathname: '/(seeker)/profile/edit', params: { section: String(section) } })}>
+    <PressableScale
+      scaleTo="buttonPress"
+      ripple={null}
+      onPress={() => router.push({ pathname: '/(seeker)/profile/edit', params: { section: String(section) } })}
+      accessibilityRole="button"
+    >
       <Text style={styles.editLinkText}>Edit</Text>
-    </TouchableOpacity>
+    </PressableScale>
   )
 }
 
@@ -595,35 +612,47 @@ function CertificateUploadModal({
   }
 
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
-      <View style={styles.modalOverlay}>
-        <ScrollView style={styles.modalCard} contentContainerStyle={{ paddingBottom: spacing.lg }}>
-          <Text style={styles.modalTitle}>Upload Certificate</Text>
-          {error ? <AlertBox variant="danger" style={{ marginBottom: spacing.md }}>{error}</AlertBox> : null}
-          <Text style={styles.label}>Title</Text>
-          <TextInput style={styles.modalInput} value={title} onChangeText={setTitle} placeholder="e.g. NC II Housekeeping" placeholderTextColor={colors.subtle} />
-          <Text style={styles.label}>Issuing Body</Text>
-          <TextInput style={styles.modalInput} value={issuingBody} onChangeText={setIssuingBody} placeholder="e.g. TESDA" placeholderTextColor={colors.subtle} />
-          <Text style={styles.label}>Category</Text>
-          <View style={styles.tagRow}>
-            {CERTIFICATE_CATEGORIES.map((c) => (
-              <TouchableOpacity key={c} onPress={() => setCategory(c)} style={[styles.categoryChip, category === c && styles.categoryChipActive]}>
-                <Text style={[styles.categoryChipText, category === c && styles.categoryChipTextActive]}>{c.replace(/_/g, ' ')}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-          <Text style={styles.label}>Issued Date (YYYY-MM-DD)</Text>
-          <TextInput style={styles.modalInput} value={issuedAt} onChangeText={setIssuedAt} placeholder="2024-06-15" placeholderTextColor={colors.subtle} />
-          <Button variant="outline" onPress={pickFile} style={{ marginTop: spacing.sm, marginBottom: spacing.md }}>
-            {file ? file.name : 'Choose file (PDF, JPG, PNG)'}
-          </Button>
-          <View style={styles.modalActions}>
-            <Button variant="outline" onPress={() => { reset(); onClose() }} style={styles.modalBtn}>Cancel</Button>
-            <Button variant="primary" onPress={submit} disabled={busy} style={styles.modalBtn}>{busy ? 'Uploading...' : 'Upload'}</Button>
-          </View>
-        </ScrollView>
-      </View>
-    </Modal>
+    <BottomSheet
+      visible={visible}
+      onClose={() => { reset(); onClose() }}
+      title="Upload Certificate"
+      heightRatio={0.85}
+      footer={
+        <View style={styles.modalActions}>
+          <Button variant="outline" onPress={() => { reset(); onClose() }} style={styles.modalBtn}>Cancel</Button>
+          <Button variant="primary" onPress={submit} disabled={busy} loading={busy} style={styles.modalBtn}>Upload</Button>
+        </View>
+      }
+    >
+      <ScrollView contentContainerStyle={{ paddingBottom: spacing.lg }} showsVerticalScrollIndicator={false}>
+        {error ? <AlertBox variant="danger" style={{ marginBottom: spacing.md }}>{error}</AlertBox> : null}
+        <Text style={styles.label}>Title</Text>
+        <TextInput style={styles.modalInput} value={title} onChangeText={setTitle} placeholder="e.g. NC II Housekeeping" placeholderTextColor={colors.subtle} />
+        <Text style={styles.label}>Issuing Body</Text>
+        <TextInput style={styles.modalInput} value={issuingBody} onChangeText={setIssuingBody} placeholder="e.g. TESDA" placeholderTextColor={colors.subtle} />
+        <Text style={styles.label}>Category</Text>
+        <View style={styles.tagRow}>
+          {CERTIFICATE_CATEGORIES.map((c) => (
+            <PressableScale
+              key={c}
+              scaleTo="buttonPress"
+              ripple={null}
+              onPress={() => setCategory(c)}
+              style={[styles.categoryChip, category === c && styles.categoryChipActive]}
+              accessibilityRole="button"
+              accessibilityState={{ selected: category === c }}
+            >
+              <Text style={[styles.categoryChipText, category === c && styles.categoryChipTextActive]}>{c.replace(/_/g, ' ')}</Text>
+            </PressableScale>
+          ))}
+        </View>
+        <Text style={styles.label}>Issued Date (YYYY-MM-DD)</Text>
+        <TextInput style={styles.modalInput} value={issuedAt} onChangeText={setIssuedAt} placeholder="2024-06-15" placeholderTextColor={colors.subtle} />
+        <Button variant="outline" onPress={pickFile} style={{ marginTop: spacing.sm, marginBottom: spacing.md }}>
+          {file ? file.name : 'Choose file (PDF, JPG, PNG)'}
+        </Button>
+      </ScrollView>
+    </BottomSheet>
   )
 }
 
@@ -710,9 +739,6 @@ const styles = StyleSheet.create({
   dutiesTextarea: { marginTop: spacing.sm, borderWidth: 1, borderColor: colors.border, borderRadius: radii.md, backgroundColor: colors.surface, padding: spacing.md, minHeight: 80, textAlignVertical: 'top', color: colors.textPrimary, fontSize: typography.small },
   certActions: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md },
   certActionBtn: { flex: 1, marginBottom: 0 },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(15,23,42,0.5)', justifyContent: 'center', padding: spacing.xl },
-  modalCard: { backgroundColor: colors.surface, borderRadius: radii.xl, padding: spacing.xl, maxHeight: '85%' },
-  modalTitle: { color: colors.textPrimary, fontSize: typography.heading, fontFamily: typography.family.bold, marginBottom: spacing.sm },
   modalActions: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.lg },
   modalBtn: { flex: 1, marginBottom: 0 },
   modalInput: { borderWidth: 1, borderColor: colors.border, borderRadius: radii.md, padding: spacing.md, color: colors.textPrimary, fontSize: typography.body, marginBottom: spacing.md },

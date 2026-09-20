@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import { StyleSheet } from 'react-native'
 import WebView from 'react-native-webview'
+import { colors } from '@/theme'
 
 export interface LeafletMarker {
   postId: string
@@ -28,7 +29,7 @@ function buildHtml(region: LeafletMapProps['region'], markers: LeafletMarker[]) 
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-<style>html,body,#map{height:100%;margin:0;padding:0;background:#EEF1F6;}.leaflet-control-attribution{font-size:9px;}</style>
+<style>html,body,#map{height:100%;margin:0;padding:0;background:${colors.sunken};}.leaflet-control-attribution{font-size:9px;}</style>
 </head>
 <body>
 <div id="map"></div>
@@ -39,10 +40,10 @@ function buildHtml(region: LeafletMapProps['region'], markers: LeafletMarker[]) 
     attribution: '&copy; OpenStreetMap contributors',
     maxZoom: 19
   }).addTo(map);
-  L.circleMarker([${region.latitude}, ${region.longitude}], { radius: 8, fillColor: '#2563EB', color: '#fff', weight: 2, fillOpacity: 1 }).addTo(map);
+  L.circleMarker([${region.latitude}, ${region.longitude}], { radius: 8, fillColor: '${colors.secondary}', color: '${colors.white}', weight: 2, fillOpacity: 1 }).addTo(map);
   var markers = ${markersJson};
   markers.forEach(function (item) {
-    var marker = L.circleMarker([item.lat, item.lng], { radius: 9, fillColor: item.color, color: '#fff', weight: 2, fillOpacity: 1 }).addTo(map);
+    var marker = L.circleMarker([item.lat, item.lng], { radius: 9, fillColor: item.color, color: '${colors.white}', weight: 2, fillOpacity: 1 }).addTo(map);
     marker.on('click', function () {
       window.ReactNativeWebView.postMessage(item.postId);
     });

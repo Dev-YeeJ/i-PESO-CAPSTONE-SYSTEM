@@ -9,6 +9,7 @@ import * as Notifications from 'expo-notifications'
 import { useAuthStore } from '@/stores/authStore'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { syncPushToken, routeForPushData } from '@/services/pushNotifications'
+import { Toast } from '@/components/ui/Toast'
 
 const queryClient = new QueryClient()
 SplashScreen.preventAutoHideAsync()
@@ -78,6 +79,7 @@ export default function RootLayout() {
           <Stack.Screen name="(auth)" />
           <Stack.Screen name="(seeker)" />
         </Stack>
+        <Toast />
       </QueryClientProvider>
     </GestureHandlerRootView>
   )

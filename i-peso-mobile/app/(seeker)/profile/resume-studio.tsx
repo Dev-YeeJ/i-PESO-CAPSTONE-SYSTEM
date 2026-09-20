@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react'
-import { BackHandler, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import { BackHandler, Image, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { useRouter } from 'expo-router'
 import { useFocusEffect } from '@react-navigation/native'
 import { useQuery } from '@tanstack/react-query'
@@ -25,6 +25,7 @@ import {
 import { AlertBox } from '@/components/ui/AlertBox'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
+import { PressableScale } from '@/components/ui/PressableScale'
 import { ScreenHeader } from '@/components/ui/ScreenHeader'
 import { ScreenSkeleton } from '@/components/ui/ScreenSkeleton'
 import { GenerateResumeModal } from '@/components/seeker/GenerateResumeModal'
@@ -160,8 +161,10 @@ export default function ResumeStudioScreen() {
               <Text style={styles.readinessCount}>{completedCount} of {readiness.length} complete</Text>
             </View>
             {readiness.map((item) => (
-              <TouchableOpacity
+              <PressableScale
                 key={item.key}
+                scaleTo="cardPress"
+                ripple={null}
                 style={styles.checkRow}
                 onPress={item.onPress}
                 disabled={item.complete}
@@ -176,7 +179,7 @@ export default function ResumeStudioScreen() {
                   {!item.complete ? <Text style={styles.checkHint}>{item.hint}</Text> : null}
                 </View>
                 {!item.complete ? <MaterialIcons name="chevron-right" size={18} color={colors.subtle} /> : null}
-              </TouchableOpacity>
+              </PressableScale>
             ))}
           </Card>
 

@@ -1,11 +1,14 @@
 import { useState } from 'react'
-import { ActivityIndicator, Alert, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import { ActivityIndicator, Image, StyleSheet, Text, View } from 'react-native'
+import Animated, { FadeInUp } from 'react-native-reanimated'
 import { useRouter } from 'expo-router'
 import MaterialIcons from '@expo/vector-icons/MaterialIcons'
 import type { JobFairPoster } from '@/services/seekerService'
 import { seekerService } from '@/services/seekerService'
 import { useAuthStore } from '@/stores/authStore'
 import { downloadAndShare } from '@/utils/fileTransfer'
+import { useMotion } from '@/hooks/useMotion'
+import { useToast } from '@/stores/toastStore'
 import { Card } from '@/components/ui/Card'
 import { ImagePreviewModal } from '@/components/ui/ImagePreviewModal'
 import { PressableScale } from '@/components/ui/PressableScale'
@@ -32,9 +35,11 @@ function timeAgo(iso?: string | null): string {
   return 'just now'
 }
 
-export function PosterFeedCard({ poster }: { poster: JobFairPoster }) {
+export function PosterFeedCard({ poster, index }: { poster: JobFairPoster; index?: number }) {
   const router = useRouter()
   const token = useAuthStore((state) => state.token)
+  const m = useMotion()
+  const { showToast } = useToast()
   const [previewOpen, setPreviewOpen] = useState(false)
   const [opening, setOpening] = useState(false)
   const isImage = (poster.mime_type || '').startsWith('image/')
@@ -52,7 +57,7 @@ export function PosterFeedCard({ poster }: { poster: JobFairPoster }) {
     try {
       await downloadAndShare(posterUrl, poster.original_filename || `poster-${poster.id}`)
     } catch {
-      Alert.alert('Unable to open', 'This poster could not be opened right now. Please try again.')
+      showToast('This poster could not be opened right now. Please try again.', 'error')
     } finally {
       setOpening(false)
     }
@@ -70,6 +75,7 @@ export function PosterFeedCard({ poster }: { poster: JobFairPoster }) {
   }
 
   return (
+    <Animated.View entering={m.enabled ? FadeInUp.delay(m.stagger(index ?? 0)).duration(240) : undefined}>
     <Card padding="sm" style={styles.card} contentStyle={styles.content}>
       <View style={styles.header}>
         <View style={[styles.avatar, { backgroundColor: toneFor(poster.company_name) }]}>
@@ -126,7 +132,9 @@ export function PosterFeedCard({ poster }: { poster: JobFairPoster }) {
           <Text style={styles.footerText}>PESO-approved employer posting</Text>
         </View>
         {canViewBooth ? (
-          <TouchableOpacity
+          <PressableScale
+            scaleTo="buttonPress"
+            ripple={null}
             style={styles.boothBtn}
             onPress={openBooth}
             accessibilityRole="button"
@@ -134,7 +142,7 @@ export function PosterFeedCard({ poster }: { poster: JobFairPoster }) {
           >
             <Text style={styles.boothBtnText}>View Booth</Text>
             <MaterialIcons name="arrow-forward" size={13} color={colors.info} />
-          </TouchableOpacity>
+          </PressableScale>
         ) : null}
       </View>
 
@@ -147,6 +155,7 @@ export function PosterFeedCard({ poster }: { poster: JobFairPoster }) {
         />
       ) : null}
     </Card>
+    </Animated.View>
   )
 }
 
