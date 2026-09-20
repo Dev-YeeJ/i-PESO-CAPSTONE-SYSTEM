@@ -79,6 +79,7 @@ trait FormatsApplications
                 'work_experiences' => $seeker->workExperiences,
                 'occupations' => $seeker->occupations,
                 'profile_completed' => (bool) $seeker->profile_completed,
+                'has_profile_image' => filled($seeker->profile_image),
             ] : null,
             'interview' => $application->interviewSchedule ? [
                 'interview_id' => $application->interviewSchedule->interview_id,

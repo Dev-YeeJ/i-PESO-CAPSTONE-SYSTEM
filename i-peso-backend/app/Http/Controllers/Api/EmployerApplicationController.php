@@ -14,7 +14,9 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class EmployerApplicationController extends Controller
 {
@@ -102,6 +104,28 @@ class EmployerApplicationController extends Controller
 
         return response()->json([
             'application' => $this->formatApplication($application),
+        ]);
+    }
+
+    /**
+     * Streams the applicant's 2x2 photo for the ATS grid / applicant profile modal.
+     * Gated on the same ownership check as show() — an employer may only view a
+     * seeker's photo through an application actually made to one of their vacancies.
+     */
+    public function seekerProfileImage(Request $request, Application $application): StreamedResponse
+    {
+        $this->ensureOwnership($request, $application);
+
+        $seeker = $application->jobSeeker;
+        abort_unless($seeker && filled($seeker->profile_image), 404, 'Profile photo not found.');
+
+        $disk = Storage::disk('local')->exists($seeker->profile_image) ? 'local' : 'public';
+        abort_unless(Storage::disk($disk)->exists($seeker->profile_image), 404, 'Profile photo not found.');
+
+        return Storage::disk($disk)->response($seeker->profile_image, 'profile-photo', [
+            'Content-Disposition' => 'inline',
+            'X-Content-Type-Options' => 'nosniff',
+            'Cache-Control' => 'private, no-store, no-cache, must-revalidate',
         ]);
     }
 
@@ -281,6 +305,8 @@ class EmployerApplicationController extends Controller
                 $vacancy->decrement('vacancies_count');
 
                 if ($vacancy->vacancies_count === 0) {
+                    $vacancy->update(['status' => 'closed']);
+
                     $activeStatuses = ['pending', 'reviewed', 'shortlisted', 'interview'];
                     $swepts = Application::where('post_id', $vacancy->post_id)
                         ->where('apply_id', '!=', $application->apply_id)

@@ -975,6 +975,17 @@ export const seekerService = {
     await apiClient.put('/seeker/professional-summary', { professional_summary: summary.trim() || null })
   },
 
+  /**
+   * Persists one work experience's bullet text — e.g. after "Smart Enhance Bullets".
+   * Without this, an enhanced bullet only ever lived in that screen's local state and
+   * was gone on the next refresh, same reasoning as saveProfessionalSummary above.
+   */
+  async updateWorkExperienceResponsibilities(workExperienceId: number | string, responsibilities: string): Promise<void> {
+    await apiClient.patch(`/seeker/work-experiences/${workExperienceId}/responsibilities`, {
+      responsibilities: responsibilities.trim() || null,
+    })
+  },
+
   async getLearningResources(skill: string): Promise<LearningResources> {
     const res = await apiClient.get(`/seeker/learning-resources/${encodeURIComponent(skill)}`)
     return res.data?.resources ?? {}

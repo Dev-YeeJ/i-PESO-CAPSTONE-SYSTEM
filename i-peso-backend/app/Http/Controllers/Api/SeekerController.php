@@ -553,7 +553,7 @@ class SeekerController extends Controller
      * Scoring:
      * - Core items (required): Photo, Personal Info, Address, Skills, Occupations = 50%
      * - Work Profile items (important): Education, Work Experience = 30%
-     * - Enhancement items (optional): Training/Certificates, Languages = 20%
+     * - Enhancement items (optional): Training/Certificates, Languages, Professional Summary = 30%
      */
     private function profileStrength(JobSeeker $seeker): array
     {
@@ -576,6 +576,7 @@ class SeekerController extends Controller
         $enhancementItems = [
             ['key' => 'training', 'label' => 'Training & certificates', 'weight' => 10, 'complete' => $seeker->trainings->isNotEmpty() || $seeker->certificates->isNotEmpty()],
             ['key' => 'languages', 'label' => 'Language proficiency', 'weight' => 10, 'complete' => $seeker->languages->isNotEmpty()],
+            ['key' => 'professional_summary', 'label' => 'Professional summary', 'weight' => 10, 'complete' => filled($seeker->professional_summary)],
         ];
 
         $allItems = array_merge($coreItems, $workItems, $enhancementItems);
@@ -1774,6 +1775,49 @@ class SeekerController extends Controller
         return response()->json([
             'message' => 'Profile completed! Welcome to i-PESO.',
             'user' => $this->buildPayload($seeker),
+        ]);
+    }
+
+    /**
+     * PATCH /api/seeker/work-experiences/{workExperience}/responsibilities   [auth:sanctum]
+     *
+     * A targeted update for a single work experience's bullet text — used by the
+     * "Smart Enhance Bullets" quick-edit flow, which shouldn't require re-submitting
+     * the entire Step 7 work history (saveStep7() deletes and recreates every record
+     * on every save) just to persist one improved sentence.
+     */
+    public function updateWorkExperienceResponsibilities(Request $request, SeekerWorkExperience $workExperience): JsonResponse
+    {
+        $seeker = $this->getSeeker($request);
+        if ($seeker instanceof JsonResponse) {
+            return $seeker;
+        }
+
+        abort_unless($workExperience->seeker_id === $seeker->seeker_id, 404);
+
+        $validated = $request->validate([
+            'responsibilities' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        // Str::squish() (used elsewhere for single-line fields) would collapse the
+        // newlines that separate each bullet into one run-on sentence — trim per
+        // line and drop blanks instead, preserving the line breaks responsibilityLines()
+        // on both web and mobile split back on when rendering the bullet list.
+        $responsibilities = collect(preg_split('/\r\n|\r|\n/', (string) ($validated['responsibilities'] ?? '')))
+            ->map(fn ($line) => trim($line))
+            ->filter(fn ($line) => $line !== '')
+            ->implode("\n");
+
+        $workExperience->update([
+            'responsibilities' => filled($responsibilities) ? $responsibilities : null,
+        ]);
+
+        return response()->json([
+            'message' => 'Responsibilities updated.',
+            'work_experience' => [
+                'id' => $workExperience->id,
+                'responsibilities' => $workExperience->responsibilities,
+            ],
         ]);
     }
 

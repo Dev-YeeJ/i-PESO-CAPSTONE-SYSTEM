@@ -63,6 +63,7 @@ export default function ProfileScreen() {
   const [openExperienceEditors, setOpenExperienceEditors] = useState<Record<string, boolean>>({})
   const [experienceDrafts, setExperienceDrafts] = useState<Record<string, string>>({})
   const [experienceResponsibilities, setExperienceResponsibilities] = useState<Record<string, string>>({})
+  const [savingBulletsFor, setSavingBulletsFor] = useState<string | null>(null)
 
   const confirmSignOut = () => {
     Alert.alert('Sign out?', 'You will need to log in again to access your account.', [
@@ -200,6 +201,31 @@ export default function ProfileScreen() {
         },
       },
     ])
+  }
+
+  // Persists the enhanced/edited bullet text to the actual work experience record —
+  // without this it only ever lived in experienceResponsibilities' local state and
+  // was gone on the next refresh (and never reached the generated resume either,
+  // since that reads work_experiences[].responsibilities from the saved profile).
+  // A work experience with no real id yet (not saved via Step 7) has nothing to
+  // PATCH, so it falls back to the old local-only behavior for that case.
+  const saveBullets = async (key: string, workExperienceId: number | string | undefined, text: string) => {
+    const trimmed = text.trim()
+    setExperienceResponsibilities((current) => ({ ...current, [key]: trimmed }))
+    setOpenExperienceEditors((current) => ({ ...current, [key]: false }))
+
+    if (workExperienceId === undefined || workExperienceId === null) return
+
+    setSavingBulletsFor(key)
+    setActionError('')
+    try {
+      await seekerService.updateWorkExperienceResponsibilities(workExperienceId, trimmed)
+      await invalidateProfile()
+    } catch (caught) {
+      setActionError(apiErrorMessage(caught, 'Unable to save these bullets. Please try again.'))
+    } finally {
+      setSavingBulletsFor(null)
+    }
   }
 
   return (
@@ -389,6 +415,7 @@ export default function ProfileScreen() {
         <View style={styles.cardList}>
           {workExperiences.length ? workExperiences.map((work, index) => {
             const key = experienceKey(work, index)
+            const workExperienceId = (work.id ?? work.work_experience_id) as number | string | undefined
             const isOpen = Boolean(openExperienceEditors[key])
             const savedResponsibilities = experienceResponsibilities[key] ?? (work.responsibilities as string | undefined) ?? ''
             const position = recordText(work, ['position'], 'assigned')
@@ -451,10 +478,9 @@ export default function ProfileScreen() {
                       <Button
                         variant="primary"
                         size="sm"
-                        onPress={() => {
-                          setExperienceResponsibilities((current) => ({ ...current, [key]: experienceDrafts[key]?.trim() ?? '' }))
-                          setOpenExperienceEditors((current) => ({ ...current, [key]: false }))
-                        }}
+                        loading={savingBulletsFor === key}
+                        disabled={savingBulletsFor === key}
+                        onPress={() => saveBullets(key, workExperienceId, experienceDrafts[key] ?? '')}
                         style={styles.modalBtn}
                       >
                         Save Bullets

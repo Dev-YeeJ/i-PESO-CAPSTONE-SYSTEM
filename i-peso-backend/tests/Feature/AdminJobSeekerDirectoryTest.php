@@ -10,6 +10,7 @@ use App\Models\SeekerSkill;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
@@ -48,6 +49,7 @@ class AdminJobSeekerDirectoryTest extends TestCase
             $table->decimal('latitude', 10, 7)->nullable();
             $table->decimal('longitude', 10, 7)->nullable();
             $table->boolean('profile_completed')->default(false);
+            $table->string('profile_image')->nullable();
             $table->timestamps();
         });
 
@@ -210,6 +212,38 @@ class AdminJobSeekerDirectoryTest extends TestCase
             ->assertJsonPath('data_quality_flags.no_contact_number', true)
             ->assertJsonPath('data_quality_flags.no_applications', true)
             ->assertJsonMissingPath('certificates.0.file_path');
+    }
+
+    public function test_admin_can_stream_a_seekers_profile_photo_when_one_exists(): void
+    {
+        Storage::fake('local');
+        $admin = Administrator::create([
+            'first_name' => 'PESO', 'last_name' => 'Administrator', 'email' => 'admin-photo@example.com',
+            'mobile_number' => '09170000004', 'password' => 'password', 'role' => 'administrator', 'status' => 'active',
+        ]);
+        Sanctum::actingAs($admin);
+
+        $withPhoto = JobSeeker::create([
+            'first_name' => 'Has', 'last_name' => 'Photo', 'email' => 'has-photo@example.com',
+            'password' => 'password', 'profile_completed' => true,
+            'profile_image' => 'seeker_profile_images/1/profile.jpg',
+        ]);
+        Storage::disk('local')->put($withPhoto->profile_image, 'fake-jpeg-bytes');
+
+        $withoutPhoto = JobSeeker::create([
+            'first_name' => 'No', 'last_name' => 'Photo', 'email' => 'no-photo@example.com',
+            'password' => 'password', 'profile_completed' => true,
+        ]);
+
+        $this->getJson('/api/admin/seekers/'.$withPhoto->getKey())
+            ->assertOk()
+            ->assertJsonPath('profile.has_profile_image', true);
+        $this->get('/api/admin/seekers/'.$withPhoto->getKey().'/profile-image')->assertOk();
+
+        $this->getJson('/api/admin/seekers/'.$withoutPhoto->getKey())
+            ->assertOk()
+            ->assertJsonPath('profile.has_profile_image', false);
+        $this->getJson('/api/admin/seekers/'.$withoutPhoto->getKey().'/profile-image')->assertNotFound();
     }
 
     public function test_directory_summaries_are_returned_by_single_aggregate_endpoints(): void

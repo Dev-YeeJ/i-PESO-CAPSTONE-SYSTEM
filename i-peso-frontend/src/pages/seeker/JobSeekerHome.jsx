@@ -26,7 +26,7 @@ import {
 import toast from 'react-hot-toast'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { StatCard } from '@/components/ui'
-import { applyToJob, toggleSavedJob as toggleSavedJobApi } from '@/services/seekerService'
+import { applyToJob, getProfileImage, toggleSavedJob as toggleSavedJobApi } from '@/services/seekerService'
 
 const feedTabs = [
   { key: 'smart', label: 'Jobs', icon: Star },
@@ -71,7 +71,31 @@ export default function JobSeekerHome({
     }
   }, [profile])
 
-  const seeker = useMemo(() => buildSeekerView(profile, user), [profile, user])
+  const [photoUrl, setPhotoUrl] = useState(null)
+  useEffect(() => {
+    if (!profile?.has_profile_image) return undefined
+
+    let active = true
+    let objectUrl
+    getProfileImage()
+      .then((file) => {
+        objectUrl = URL.createObjectURL(file)
+        if (active) setPhotoUrl(objectUrl)
+      })
+      .catch(() => {
+        if (active) setPhotoUrl(null)
+      })
+
+    return () => {
+      active = false
+      if (objectUrl) URL.revokeObjectURL(objectUrl)
+    }
+  }, [profile?.has_profile_image])
+
+  const seeker = useMemo(
+    () => buildSeekerView(profile, user, profile?.has_profile_image ? photoUrl : null),
+    [profile, user, photoUrl],
+  )
   const feedJobs = useMemo(() => ({
     recommended: normalizeApiJobs(recommendedJobsData?.jobs ?? []),
     nearby: normalizeApiJobs(nearbyJobsData?.jobs ?? []),
@@ -1022,7 +1046,7 @@ function Notice({ message, tone }) {
   )
 }
 
-function buildSeekerView(profile, user) {
+function buildSeekerView(profile, user, photoUrl = null) {
   const preferredOccupation = profile?.occupations?.find((occupation) => (
     occupation?.occupation_title
     || occupation?.general_term
@@ -1034,7 +1058,7 @@ function buildSeekerView(profile, user) {
   return {
     name,
     firstName: profile?.first_name || user?.name?.split(' ')[0] || name.split(' ')[0] || 'there',
-    profilePhoto: createAvatarDataUrl(name),
+    profilePhoto: photoUrl || createAvatarDataUrl(name),
     headline: preferredOccupation?.occupation_title
       || preferredOccupation?.general_term
       || preferredOccupation?.raw_job_title

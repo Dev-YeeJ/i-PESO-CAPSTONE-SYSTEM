@@ -141,7 +141,7 @@ export default function EmployerDashboard() {
                 <div className="flex items-center gap-2">
                   <h1 className="truncate text-2xl font-black text-slate-950 sm:text-3xl">{company}</h1>
                 </div>
-                <p className="text-sm font-semibold text-slate-500 mt-1">{profile?.employer?.industry || 'Employer Account'}</p>
+                <p className="text-sm font-semibold text-slate-500 mt-1">{Array.isArray(profile?.employer?.industry) ? profile.employer.industry.join(', ') || 'Employer Account' : profile?.employer?.industry || 'Employer Account'}</p>
               </div>
             </div>
             <div className="mt-4 flex flex-col gap-3 sm:mt-0 sm:mb-4 sm:flex-row sm:items-center">

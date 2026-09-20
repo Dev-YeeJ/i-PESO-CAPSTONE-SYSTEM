@@ -884,6 +884,7 @@ export function Step3Preferences({ value, onChange, errors }: { value: Step3Valu
           <Combobox<OccupationClassificationSuggestion>
             label={`Job Title ${i + 1}`}
             placeholder="e.g. Administrative Assistant"
+            requireExplicitCommit
             value={value.occupation_preferences[i].raw_job_title}
             onChangeText={(v) => {
               const next = [...value.occupation_preferences]

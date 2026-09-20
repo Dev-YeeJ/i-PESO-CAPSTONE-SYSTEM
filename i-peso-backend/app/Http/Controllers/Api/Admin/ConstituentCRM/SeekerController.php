@@ -10,10 +10,32 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class SeekerController extends Controller
 {
+    /**
+     * Streams a seeker's 2x2 photo for the admin seeker directory/detail views.
+     * Mirrors SeekerProfileImageController::show()'s dual-disk lookup.
+     */
+    public function profileImage(int $id): StreamedResponse
+    {
+        abort_unless(auth()->user() instanceof Administrator, 403, 'Unauthorized');
+
+        $seeker = JobSeeker::query()->select(['seeker_id', 'profile_image'])->findOrFail($id);
+        abort_unless(filled($seeker->profile_image), 404, 'Profile photo not found.');
+
+        $disk = Storage::disk('local')->exists($seeker->profile_image) ? 'local' : 'public';
+        abort_unless(Storage::disk($disk)->exists($seeker->profile_image), 404, 'Profile photo not found.');
+
+        return Storage::disk($disk)->response($seeker->profile_image, 'profile-photo', [
+            'Content-Disposition' => 'inline',
+            'X-Content-Type-Options' => 'nosniff',
+            'Cache-Control' => 'private, no-store, no-cache, must-revalidate',
+        ]);
+    }
+
     public function summary(): JsonResponse
     {
         abort_unless(auth()->user() instanceof Administrator, 403, 'Unauthorized');
@@ -115,6 +137,7 @@ class SeekerController extends Controller
             $seeker->profile_completion_status = $seeker->profile_completed ? 'complete' : 'incomplete';
             $seeker->missing_gps = empty($seeker->latitude) || empty($seeker->longitude);
             $seeker->account_status = $seeker->is_verified ? 'verified' : ($seeker->verification_status ?: 'pending');
+            $seeker->has_profile_image = filled($seeker->profile_image);
 
             return $seeker;
         });
@@ -253,6 +276,7 @@ class SeekerController extends Controller
             ]))),
             'email' => $seeker->email,
             'mobile_number' => $seeker->mobile_number,
+            'has_profile_image' => filled($seeker->profile_image),
             'location_summary' => trim(implode(', ', array_filter([
                 $seeker->address_barangay,
                 $seeker->address_municipality_city,

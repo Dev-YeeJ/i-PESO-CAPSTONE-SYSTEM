@@ -31,3 +31,13 @@ export const getEmployerCalendarEvents = async (params) => {
   const response = await apiClient.get('/employer/calendar/events', { params })
   return response.data
 }
+
+// Fetches the applicant's 2x2 photo as a blob — only ever call this when
+// application.seeker.has_profile_image is true, mirroring seekerService's
+// own getProfileImage() pattern.
+export const getApplicantProfileImage = async (applicationId) => {
+  const response = await apiClient.get(`/employer/applications/${applicationId}/seeker-profile-image`, {
+    responseType: 'blob',
+  })
+  return response.data
+}

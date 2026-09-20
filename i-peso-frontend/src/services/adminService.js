@@ -47,6 +47,13 @@ export const adminService = {
     return data
   },
 
+  // Only ever call this when the seeker's own record shows profile_image is set —
+  // mirrors seekerService's getProfileImage() pattern.
+  getSeekerProfileImage: async (id) => {
+    const { data } = await api.get(`/admin/seekers/${id}/profile-image`, { responseType: 'blob' })
+    return data
+  },
+
   // ── EMPLOYERS ──────────────────────────────────────────────────
   getEmployers: async (params = {}) => {
     const { data } = await api.get('/admin/employers', { params: cleanParams(params) })

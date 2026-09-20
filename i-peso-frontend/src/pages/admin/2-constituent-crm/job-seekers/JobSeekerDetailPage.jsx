@@ -50,6 +50,7 @@ export default function JobSeekerDetailPage() {
   const [seeker, setSeeker] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [photoUrl, setPhotoUrl] = useState(null)
 
   const loadSeeker = useCallback(async () => {
     try {
@@ -66,6 +67,27 @@ export default function JobSeekerDetailPage() {
   useEffect(() => {
     loadSeeker()
   }, [loadSeeker])
+
+  const hasProfileImage = seeker?.profile?.has_profile_image
+  useEffect(() => {
+    if (!hasProfileImage || !id) return undefined
+
+    let active = true
+    let objectUrl
+    adminService.getSeekerProfileImage(id)
+      .then((file) => {
+        objectUrl = URL.createObjectURL(file)
+        if (active) setPhotoUrl(objectUrl)
+      })
+      .catch(() => {
+        if (active) setPhotoUrl(null)
+      })
+
+    return () => {
+      active = false
+      if (objectUrl) URL.revokeObjectURL(objectUrl)
+    }
+  }, [hasProfileImage, id])
 
   const profileScore = useMemo(() => {
     if (!seeker) return 0
@@ -153,9 +175,13 @@ export default function JobSeekerDetailPage() {
         padding="none"
         heroContent={(
           <div className="flex flex-col gap-6 lg:flex-row lg:items-center">
-            <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-2xl border border-white/20 bg-white/10 text-2xl font-black text-amber-300">
-              {seeker.first_name?.[0] ?? profile.first_name?.[0] ?? 'J'}{seeker.last_name?.[0] ?? profile.last_name?.[0] ?? 'S'}
-            </div>
+            {hasProfileImage && photoUrl ? (
+              <img src={photoUrl} alt={name} className="h-20 w-20 shrink-0 rounded-2xl border border-white/20 object-cover" />
+            ) : (
+              <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-2xl border border-white/20 bg-white/10 text-2xl font-black text-amber-300">
+                {seeker.first_name?.[0] ?? profile.first_name?.[0] ?? 'J'}{seeker.last_name?.[0] ?? profile.last_name?.[0] ?? 'S'}
+              </div>
+            )}
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2">
                 <p className="text-xs font-bold uppercase tracking-[0.18em] text-blue-200">DOLE NSRP Case Profile</p>

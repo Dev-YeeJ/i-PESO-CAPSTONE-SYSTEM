@@ -15,6 +15,16 @@ interface ComboboxProps<T> {
   error?: string
   required?: boolean
   minChars?: number
+  /**
+   * When true, typing no longer commits on every keystroke — onChangeText only
+   * fires when the seeker taps a real suggestion or explicitly confirms their
+   * typed text via the "Use ... as-is" row. Without this, whatever's on screen
+   * the moment the form saves becomes the stored value even if it was still
+   * mid-search (e.g. "PROG" typed while aiming for "Programmer") — fine for a
+   * free-text field like Institution, but wrong for something that gets
+   * classified into a catalog occupation and shown back on a resume.
+   */
+  requireExplicitCommit?: boolean
 }
 
 export function Combobox<T>({
@@ -30,14 +40,26 @@ export function Combobox<T>({
   error,
   required = false,
   minChars = 2,
+  requireExplicitCommit = false,
 }: ComboboxProps<T>) {
   const [suggestions, setSuggestions] = useState<T[]>([])
   const [loading, setLoading] = useState(false)
   const [open, setOpen] = useState(false)
+  const [draft, setDraft] = useState(value)
   const requestId = useRef(0)
 
+  // Keeps the draft in sync whenever the committed value changes from outside
+  // (a real selection, a reset, switching records) — only relevant in
+  // requireExplicitCommit mode, where typing no longer drives `value` itself.
   useEffect(() => {
-    if (!open || value.trim().length < minChars) {
+    if (requireExplicitCommit) setDraft(value)
+  }, [value, requireExplicitCommit])
+
+  const displayValue = requireExplicitCommit ? draft : value
+  const trimmedDisplayValue = displayValue.trim()
+
+  useEffect(() => {
+    if (!open || trimmedDisplayValue.length < minChars) {
       setSuggestions([])
       return
     }
@@ -45,7 +67,7 @@ export function Combobox<T>({
     const currentRequest = ++requestId.current
     const timer = setTimeout(() => {
       setLoading(true)
-      search(value.trim())
+      search(trimmedDisplayValue)
         .then((results) => {
           if (requestId.current === currentRequest) setSuggestions(results)
         })
@@ -58,7 +80,7 @@ export function Combobox<T>({
     }, 300)
 
     return () => clearTimeout(timer)
-  }, [value, open, minChars, search])
+  }, [trimmedDisplayValue, open, minChars, search])
 
   return (
     <View style={styles.field}>
@@ -68,9 +90,10 @@ export function Combobox<T>({
       </Text>
       <TextInput
         style={[styles.input, error && styles.inputError]}
-        value={value}
+        value={displayValue}
         onChangeText={(text) => {
-          onChangeText(text)
+          if (requireExplicitCommit) setDraft(text)
+          else onChangeText(text)
           setOpen(true)
         }}
         onFocus={() => setOpen(true)}
@@ -80,7 +103,7 @@ export function Combobox<T>({
       />
       {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
-      {open && value.trim().length >= minChars ? (
+      {open && trimmedDisplayValue.length >= minChars ? (
         <View style={styles.dropdown}>
           {loading ? (
             <View style={styles.loadingRow}>
@@ -102,6 +125,17 @@ export function Combobox<T>({
                 {renderSubLabel?.(item) ? <Text style={styles.suggestionSub}>{renderSubLabel(item)}</Text> : null}
               </TouchableOpacity>
             ))
+          ) : requireExplicitCommit ? (
+            <TouchableOpacity
+              style={styles.suggestionRow}
+              onPress={() => {
+                onChangeText(trimmedDisplayValue)
+                setOpen(false)
+              }}
+            >
+              <Text style={styles.suggestionLabel}>Use &quot;{trimmedDisplayValue}&quot; as your job title</Text>
+              <Text style={styles.suggestionSub}>No catalog match — this will be reviewed by PESO staff.</Text>
+            </TouchableOpacity>
           ) : (
             <View style={styles.suggestionRow}>
               <Text style={styles.noResultsText}>No catalog matches — your typed text will be used as-is.</Text>

@@ -79,10 +79,15 @@ export default function ResumeStudioScreen() {
 
   const resume = useResumeGeneration(profile, workExperiences, allSkills)
 
+  // This screen has no upload action of its own to bump a photoVersion counter from
+  // (unlike profile.tsx/index.tsx) — instead, a fresh timestamp is captured once per
+  // mount so a re-upload made elsewhere and then navigated back to here isn't served
+  // a stale cached image under the same unchanging URL.
+  const [mountedAt] = useState(() => Date.now())
   const imageSource = useMemo(() => {
     if (!profile?.has_profile_image || !token) return null
-    return { uri: seekerService.profileImageUrl(String(profile.id)), headers: { Authorization: `Bearer ${token}` } }
-  }, [profile?.has_profile_image, profile?.id, token])
+    return { uri: seekerService.profileImageUrl(`${profile.id}-${mountedAt}`), headers: { Authorization: `Bearer ${token}` } }
+  }, [profile?.has_profile_image, profile?.id, token, mountedAt])
 
   // Sorted most-recent-first, same as the generated PDF (mirrors web's resumeSortValue).
   const sortedExperiences = useMemo(

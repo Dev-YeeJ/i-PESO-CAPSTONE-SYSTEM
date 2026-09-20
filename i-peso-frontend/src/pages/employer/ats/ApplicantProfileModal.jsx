@@ -1,6 +1,7 @@
 import { Briefcase, CheckCircle2, FileText, Mail, MapPin, Phone, Sparkles } from 'lucide-react'
 import { Badge, Button, LoadingSkeleton } from '@/components/ui'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import ApplicantAvatar from './ApplicantAvatar'
 import { TERMINAL_STATUSES } from './atsConstants'
 import { formatDate, formatDateTime } from './atsFormatters'
 
@@ -33,8 +34,13 @@ export default function ApplicantProfileModal({ open, onClose, application, deta
 
         <div className="p-6 sm:p-8">
           <DialogHeader>
-            <DialogTitle className="text-2xl">{seeker.name || 'Applicant'}</DialogTitle>
-            <p className="font-medium text-blue-600">Applying for: {jobTitle || data?.job?.job_title}</p>
+            <div className="flex items-center gap-4">
+              <ApplicantAvatar applicationId={data?.apply_id} hasPhoto={seeker.has_profile_image} name={seeker.name} size="lg" />
+              <div>
+                <DialogTitle className="text-2xl">{seeker.name || 'Applicant'}</DialogTitle>
+                <p className="font-medium text-blue-600">Applying for: {jobTitle || data?.job?.job_title}</p>
+              </div>
+            </div>
           </DialogHeader>
 
           {loading ? (
