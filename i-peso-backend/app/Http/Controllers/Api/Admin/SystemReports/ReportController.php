@@ -518,17 +518,17 @@ class ReportController extends Controller
                 'indent' => $indent,
                 'section' => false,
                 'auto' => $auto,
-                'target' => null,
-                'prev_total' => null, 'prev_female' => null,
-                'curr_total' => null, 'curr_female' => null,
-                'cum_total' => null, 'cum_female' => null,
+                'target' => 0,
+                'prev_total' => 0, 'prev_female' => 0,
+                'curr_total' => 0, 'curr_female' => 0,
+                'cum_total' => 0, 'cum_female' => 0,
             ], $values);
         };
         $section = fn (string $key, string $label) => [
             'key' => $key, 'label' => $label, 'indent' => 0, 'section' => true, 'auto' => false,
-            'target' => null,
-            'prev_total' => null, 'prev_female' => null, 'curr_total' => null, 'curr_female' => null,
-            'cum_total' => null, 'cum_female' => null,
+            'target' => 0,
+            'prev_total' => 0, 'prev_female' => 0, 'curr_total' => 0, 'curr_female' => 0,
+            'cum_total' => 0, 'cum_female' => 0,
         ];
 
         $jf = fn (array $set, string $field) => $set['job_fairs'][$field] ?? null;

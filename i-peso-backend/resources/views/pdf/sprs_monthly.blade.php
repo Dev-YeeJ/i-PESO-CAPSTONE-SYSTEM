@@ -22,7 +22,7 @@ th{background:#e2e8f0;font-size:7.5px;text-transform:uppercase}
 @php
   $v = fn($k, $d = null) => data_get($data, $k, $d);
   $rows = $data['rows'] ?? [];
-  $cell = fn($value) => $value === null || $value === '' ? '<span class="blank">&nbsp;</span>' : e($value);
+  $cell = fn($value) => $value === null || $value === '' ? '0' : e($value);
 @endphp
 <div class="formno">SPRS Form 2018</div>
 <table class="letterhead"><tr>

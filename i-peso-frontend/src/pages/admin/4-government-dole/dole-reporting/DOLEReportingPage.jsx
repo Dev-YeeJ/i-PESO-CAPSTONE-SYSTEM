@@ -134,7 +134,7 @@ export default function DOLEReportingPage() {
 
   const updateRow = (key, field, value) => {
     setEditableRows((rows) => rows.map((r) => (
-      r.key === key ? { ...r, [field]: value === '' ? null : Number(value) } : r
+      r.key === key ? { ...r, [field]: value === '' ? 0 : Number(value) } : r
     )))
   }
 
@@ -506,9 +506,9 @@ function NumCell({ value, onChange, auto = false }) {
     <td className={`border border-black p-0 text-center ${auto ? 'bg-blue-50' : 'bg-white'}`}>
       <input
         type="number"
-        value={value ?? ''}
+        value={value ?? 0}
         onChange={(e) => onChange(e.target.value)}
-        placeholder="—"
+        placeholder="0"
         className="w-full min-w-[52px] bg-transparent px-1.5 py-1.5 text-center text-xs outline-none focus:bg-amber-50"
       />
     </td>
