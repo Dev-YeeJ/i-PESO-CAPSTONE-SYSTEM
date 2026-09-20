@@ -15,4 +15,10 @@ export const smsService = {
     const { data } = await api.post(`/admin/sms-notifications/${id}/retry`)
     return data
   },
+
+  // Permanently deletes every SMS log entry. Irreversible.
+  clearAll: async () => {
+    const { data } = await api.delete('/admin/sms-notifications')
+    return data
+  },
 }

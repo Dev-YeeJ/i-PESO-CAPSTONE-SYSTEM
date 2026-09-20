@@ -235,6 +235,27 @@ class SmsGatewayTest extends TestCase
             ->assertJsonPath('logs.data.0.purpose', 'application_status');
     }
 
+    public function test_admin_can_clear_all_sms_logs(): void
+    {
+        $admin = $this->admin();
+        $service = app(SmsService::class);
+        $service->send($admin, '09171234567', 'Application update', 'application_status');
+        $service->send($admin, 'invalid', 'Verification update', 'employer_verification');
+        $this->assertDatabaseCount('sms_notifications', 2);
+        Sanctum::actingAs($admin);
+
+        $this->deleteJson('/api/admin/sms-notifications')
+            ->assertOk()
+            ->assertJsonPath('deleted', 2);
+
+        $this->assertDatabaseCount('sms_notifications', 0);
+    }
+
+    public function test_clearing_sms_logs_requires_an_administrator(): void
+    {
+        $this->deleteJson('/api/admin/sms-notifications')->assertUnauthorized();
+    }
+
     public function test_existing_notification_flows_add_sms_without_duplicate_interview_status_sms(): void
     {
         $seeker = new JobSeeker(['mobile_number' => '09171234567']);

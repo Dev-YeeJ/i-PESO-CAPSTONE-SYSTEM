@@ -225,6 +225,7 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::get('/analytics/options', [AdminAnalyticsController::class, 'options']);
             Route::get('/analytics', [AdminAnalyticsController::class, 'index']);
             Route::get('/sms-notifications', [AdminSmsNotificationController::class, 'index']);
+            Route::delete('/sms-notifications', [AdminSmsNotificationController::class, 'clearAll']);
             Route::post('/sms-notifications/{smsNotification}/retry', [AdminSmsNotificationController::class, 'retry']);
             Route::get('/location-data-quality/metrics', [LocationDataQualityController::class, 'metrics']);
             Route::get('/location-data-quality/analytics', [LocationDataQualityController::class, 'analytics']);

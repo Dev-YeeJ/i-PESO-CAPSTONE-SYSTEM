@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { AlertTriangle, CheckCircle2, Clock3, MessageSquareText, RefreshCw, RotateCcw, Send, ShieldCheck, SkipForward } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, Clock3, MessageSquareText, RefreshCw, RotateCcw, Send, ShieldCheck, Trash2 } from 'lucide-react'
 import toast from 'react-hot-toast'
-import { Button, Card, EmptyState, StatCard } from '@/components/ui'
+import { Button, Card, ConfirmDialog, EmptyState, StatCard } from '@/components/ui'
 import PageHeader from '@/pages/admin/_components/PageHeader'
 import { smsService } from '@/services/smsService'
 
@@ -15,6 +15,8 @@ export default function SMSNotificationsPage() {
   const [error, setError] = useState('')
   const requestSequence = useRef(0)
   const [retryingId, setRetryingId] = useState(null)
+  const [clearConfirmOpen, setClearConfirmOpen] = useState(false)
+  const [clearing, setClearing] = useState(false)
 
   const load = useCallback(async (nextFilters) => {
     const requestId = ++requestSequence.current
@@ -70,6 +72,22 @@ export default function SMSNotificationsPage() {
     await load(initialFilters)
   }
 
+  const clearLogs = async () => {
+    setClearing(true)
+    try {
+      const result = await smsService.clearAll()
+      toast.success(result?.message ?? 'SMS logs cleared.')
+      setClearConfirmOpen(false)
+      setFilters(initialFilters)
+      setDraftFilters({ status: '', purpose: '' })
+      await load(initialFilters)
+    } catch (requestError) {
+      toast.error(requestError.response?.data?.message || 'Could not clear SMS logs.')
+    } finally {
+      setClearing(false)
+    }
+  }
+
   const gateway = data?.gateway || {}
   const summary = data?.summary || {}
   const logs = data?.logs?.data || []
@@ -77,7 +95,15 @@ export default function SMSNotificationsPage() {
 
   return (
     <div className="portal-page">
-      <PageHeader title="SMS Gateway" subtitle="Delivery status and recent SMS activity." eyebrow="System & Reports" actions={[{ label: 'Refresh', icon: RefreshCw, variant: 'outline', onClick: () => load() }]} />
+      <PageHeader
+        title="SMS Gateway"
+        subtitle="Delivery status and recent SMS activity."
+        eyebrow="System & Reports"
+        actions={[
+          { label: 'Refresh', icon: RefreshCw, variant: 'outline', onClick: () => load() },
+          { label: 'Clear logs', icon: Trash2, variant: 'danger', onClick: () => setClearConfirmOpen(true) },
+        ]}
+      />
 
       <section className={`rounded-xl border p-5 sm:p-6 ${gateway.log_only ? 'border-amber-200 bg-amber-50' : 'border-emerald-200 bg-emerald-50'}`}>
         <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
@@ -96,12 +122,10 @@ export default function SMSNotificationsPage() {
 
       {error && <div className="flex items-center gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700"><AlertTriangle className="h-5 w-5" />{error}</div>}
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard icon={MessageSquareText} color="blue" label="Total Logged" value={num(summary.total)} />
         <StatCard icon={CheckCircle2} color="green" label="Sent" value={num(summary.sent)} />
         <StatCard icon={Clock3} color="blue" label="Pending / Retrying" value={num((summary.pending || 0) + (summary.retrying || 0))} />
-        <StatCard icon={SkipForward} color="slate" label="Skipped" value={num(summary.skipped)} />
-        <StatCard icon={ShieldCheck} color="amber" label="Log Only" value={num(summary.log_only)} />
         <StatCard icon={AlertTriangle} color="red" label="Failed" value={num(summary.failed)} />
       </div>
 
@@ -175,6 +199,17 @@ export default function SMSNotificationsPage() {
           <Pagination page={data.logs.current_page} lastPage={data.logs.last_page} onChange={goToPage} loading={loading} />
         </> : <EmptyState filtered title="No SMS records match your filters" description="Try adjusting the status or purpose filters above." />}
       </Card>
+
+      <ConfirmDialog
+        open={clearConfirmOpen}
+        onOpenChange={setClearConfirmOpen}
+        title="Clear all SMS logs?"
+        description={`This permanently deletes all ${num(summary.total)} SMS log record(s), including delivery history and error details. This cannot be undone.`}
+        confirmLabel="Delete all"
+        variant="danger"
+        busy={clearing}
+        onConfirm={clearLogs}
+      />
     </div>
   )
 }

@@ -72,6 +72,25 @@ class AdminSmsNotificationController extends Controller
         ], $result->status === 'failed' ? 422 : 200);
     }
 
+    /**
+     * Permanently delete every SMS log entry.
+     * DELETE /api/admin/sms-notifications
+     *
+     * This is a destructive, unrecoverable clear of the delivery history — not a status
+     * reset. It doesn't touch anything about the gateway configuration or in-flight sends.
+     */
+    public function clearAll(Request $request): JsonResponse
+    {
+        abort_unless($request->user() instanceof Administrator, 403, 'Unauthorized');
+
+        $count = SmsNotification::query()->count();
+        SmsNotification::query()->delete();
+
+        ActivityLogger::log('cleared_sms_logs', "Cleared all SMS logs ({$count} record(s) deleted).");
+
+        return response()->json(['message' => "Deleted {$count} SMS log record(s).", 'deleted' => $count]);
+    }
+
     private function resolveRecipient(SmsNotification $log): ?Model
     {
         $type = $log->recipient_type;
