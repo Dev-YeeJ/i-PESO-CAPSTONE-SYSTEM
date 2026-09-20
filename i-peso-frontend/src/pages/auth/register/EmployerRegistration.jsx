@@ -7,6 +7,7 @@ import Field from '@/components/form/Field'
 import FormError from '@/components/form/FormError'
 import PasswordStrengthMeter from '@/components/form/PasswordStrengthMeter'
 import { Button, Card } from '@/components/ui'
+import { authService } from '@/services/authService'
 import { getPasswordStrength } from '@/services/validationHelpers'
 import DoleCertificationCheckbox from '@/components/common/DoleCertificationCheckbox'
 
