@@ -1,10 +1,10 @@
 <style>
-@page { margin: 20px 30px; }
-body{font-family:DejaVu Sans,sans-serif;font-size:8px;color:#111827}
-.formno{text-align:right;font-size:8px;font-style:italic;margin-bottom:2px;font-weight:bold;}
+@page { margin: 15px 25px; }
+body{font-family:Helvetica,Arial,sans-serif;font-size:7px;color:#111827;line-height:1.1;}
+.formno{text-align:right;font-size:7px;font-style:italic;margin-bottom:2px;font-weight:bold;}
 table{width:100%;border-collapse:collapse;border:1.5px solid #111827;}
-th,td{border:1px solid #111827;padding:2px 4px;vertical-align:top}
-th{background:#b8d1f3;font-size:7px;text-transform:uppercase;text-align:center;vertical-align:middle;}
+th,td{border:1px solid #111827;padding:1px 3px;vertical-align:top;}
+th{background:#b8d1f3;font-size:6.5px;text-transform:uppercase;text-align:center;vertical-align:middle;}
 .num{text-align:center}
 .muted{color:#475569}
 .dgray { background: #ffffff !important; }
@@ -21,19 +21,19 @@ th{background:#b8d1f3;font-size:7px;text-transform:uppercase;text-align:center;v
   <thead>
     <!-- Header Row 1 (Letterhead) -->
     <tr>
-      <th colspan="3" style="text-align:left; background: #ffffff; text-transform:none; font-size:9px; font-weight:normal; padding: 10px;">
+      <th colspan="3" style="text-align:left; background: #ffffff; text-transform:none; font-size:8px; font-weight:normal; padding: 4px 6px;">
         <span style="font-weight:bold;">LGU/PESO:</span> {{ $v('lgu_name', 'Urdaneta City') }}<br>
         <span style="font-weight:bold;">Province:</span> <span style="text-transform:uppercase;">{{ $v('province', 'Pangasinan') }}</span>
       </th>
-      <th colspan="5" style="text-align:center; background: #ffffff; text-transform:none; font-size:10px; font-weight:bold; padding: 10px;">
+      <th colspan="5" style="text-align:center; background: #ffffff; text-transform:none; font-size:9px; font-weight:bold; padding: 4px 6px;">
         DEPARTMENT OF LABOR AND EMPLOYMENT<br>
-        <span style="font-size:9px; font-weight:normal;">Regional Office No. 1</span><br>
-        <span style="font-size:9px; font-weight:normal;">San Fernando City, La Union</span><br><br>
+        <span style="font-size:8px; font-weight:normal;">Regional Office No. 1</span><br>
+        <span style="font-size:8px; font-weight:normal;">San Fernando City, La Union</span><br>
         STATISTICAL PERFORMANCE REPORTING SYSTEM (SPRS)<br>
-        <span style="font-size:8px;">PESO MONTHLY OPERATIONS STATISTICAL REPORT (PESO OpS)</span>
+        <span style="font-size:7px;">PESO MONTHLY OPERATIONS STATISTICAL REPORT (PESO OpS)</span>
       </th>
-      <th colspan="2" style="text-align:center; background: #ffffff; text-transform:none; font-size:9px; padding: 10px; vertical-align:middle;">
-        <span style="font-weight:bold;">{{ $v('period_short', $v('period', $report->title)) }}</span><br><br>
+      <th colspan="2" style="text-align:center; background: #ffffff; text-transform:none; font-size:8px; padding: 4px 6px; vertical-align:middle;">
+        <span style="font-weight:bold;">{{ $v('period_short', $v('period', $report->title)) }}</span><br>
         Reference<br>Month/Year
       </th>
     </tr>
@@ -49,7 +49,7 @@ th{background:#b8d1f3;font-size:7px;text-transform:uppercase;text-align:center;v
     <!-- Header Row 3 -->
     <tr>
       <th colspan="2">CURRENT<br>REPORTING<br>MONTH</th>
-      <th colspan="2">CUMULATIVE<br><span style="text-transform:none; font-size:6px;">(Jan to current<br>reporting month)</span></th>
+      <th colspan="2">CUMULATIVE<br><span style="text-transform:none; font-size:5.5px;">(Jan to current<br>reporting month)</span></th>
     </tr>
     <!-- Header Row 4 -->
     <tr>
@@ -130,7 +130,7 @@ th{background:#b8d1f3;font-size:7px;text-transform:uppercase;text-align:center;v
       <td colspan="10" style="font-weight:bold;text-transform:uppercase">OTHER ACCOMPLISHMENTS:</td>
     </tr>
     <tr>
-      <td colspan="3" style="text-transform:uppercase; font-size:7px;">FIRST TIME JOBSEEKER ACT (Attachment Included)</td>
+      <td colspan="3" style="text-transform:uppercase; font-size:6.5px;">FIRST TIME JOBSEEKER ACT (Attachment Included)</td>
       <td class="dgray"></td>
       <td class="num" colspan="2">{!! $cell($v('other_accomplishments.previous_ftja_total')) !!}</td>
       <td class="num" colspan="2">{!! $cell($v('other_accomplishments.ftja_total')) !!}</td>
@@ -144,9 +144,8 @@ th{background:#b8d1f3;font-size:7px;text-transform:uppercase;text-align:center;v
       </td>
     </tr>
     <tr>
-      <td colspan="10" style="white-space:pre-wrap; min-height: 40px; border-top: none;">
+      <td colspan="10" style="white-space:pre-wrap; min-height: 20px; border-top: none;">
         {!! $cell($v('issues_concerns')) !!}
-        <br><br><br>
       </td>
     </tr>
 
@@ -155,62 +154,62 @@ th{background:#b8d1f3;font-size:7px;text-transform:uppercase;text-align:center;v
       <td colspan="10" style="padding: 0;">
         <table style="width: 100%; border: none;">
           <tr>
-            <td style="width: 33.33%; border: none; border-right: 1px solid #111827; padding: 10px;">
-              <div style="font-weight: bold; text-align: center; margin-bottom: 25px;">PREPARED BY:</div>
+            <td style="width: 33.33%; border: none; border-right: 1px solid #111827; padding: 4px 10px;">
+              <div style="font-weight: bold; text-align: center; margin-bottom: 12px;">PREPARED BY:</div>
               <table style="width: 100%; border: none;">
                 <tr>
-                  <td style="width: 30%; border: none; padding: 2px;">NAME:</td>
-                  <td style="width: 70%; border: none; border-bottom: 1px solid #111827; text-align: center; padding: 2px;">{{ data_get($signatories, 'prepared_by.name', '') }}</td>
+                  <td style="width: 30%; border: none; padding: 1px;">NAME:</td>
+                  <td style="width: 70%; border: none; border-bottom: 1px solid #111827; text-align: center; padding: 1px;">{{ data_get($signatories, 'prepared_by.name', '') }}</td>
                 </tr>
                 <tr>
-                  <td style="border: none; padding: 2px;">SIGNATURE:</td>
-                  <td style="border: none; border-bottom: 1px solid #111827; padding: 2px;"></td>
+                  <td style="border: none; padding: 1px;">SIGNATURE:</td>
+                  <td style="border: none; border-bottom: 1px solid #111827; padding: 1px;"></td>
                 </tr>
                 <tr>
-                  <td colspan="2" style="border: none; text-align: center; padding: 4px;">SLEO/PESO Coordinator</td>
+                  <td colspan="2" style="border: none; text-align: center; padding: 2px;">SLEO/PESO Coordinator</td>
                 </tr>
                 <tr>
-                  <td style="border: none; padding: 2px;">DATE:</td>
-                  <td style="border: none; border-bottom: 1px solid #111827; padding: 2px;"></td>
+                  <td style="border: none; padding: 1px;">DATE:</td>
+                  <td style="border: none; border-bottom: 1px solid #111827; padding: 1px;"></td>
                 </tr>
               </table>
             </td>
             
-            <td style="width: 33.33%; border: none; border-right: 1px solid #111827; padding: 10px;">
-              <div style="font-weight: bold; text-align: center; margin-bottom: 25px;">CHECKED BY:</div>
+            <td style="width: 33.33%; border: none; border-right: 1px solid #111827; padding: 4px 10px;">
+              <div style="font-weight: bold; text-align: center; margin-bottom: 12px;">CHECKED BY:</div>
               <table style="width: 100%; border: none;">
                 <tr>
-                  <td style="border: none; padding: 2px; text-align: center; border-bottom: 1px solid #111827; min-height: 12px;">{{ data_get($signatories, 'checked_by.name', '') }}</td>
+                  <td style="border: none; padding: 1px; text-align: center; border-bottom: 1px solid #111827; min-height: 10px;">{{ data_get($signatories, 'checked_by.name', '') }}</td>
                 </tr>
                 <tr>
-                  <td style="border: none; padding: 2px; text-align: center; color: white;">.</td>
+                  <td style="border: none; padding: 1px; text-align: center; color: white;">.</td>
                 </tr>
                 <tr>
-                  <td style="border: none; text-align: center; padding: 4px;">CGADH1/PESO Manager</td>
+                  <td style="border: none; text-align: center; padding: 2px;">CGADH1/PESO Manager</td>
                 </tr>
                 <tr>
-                  <td style="border: none; padding: 2px; text-align: center; color: white;">.</td>
+                  <td style="border: none; padding: 1px; text-align: center; color: white;">.</td>
                 </tr>
               </table>
             </td>
             
-            <td style="width: 33.33%; border: none; padding: 10px;">
-              <div style="font-weight: bold; text-align: center; margin-bottom: 25px;">APPROVED BY:</div>
+            <td style="width: 33.33%; border: none; padding: 4px 10px;">
+              <div style="font-weight: bold; text-align: center; margin-bottom: 12px;">APPROVED BY:</div>
               <table style="width: 100%; border: none;">
                 <tr>
-                  <td style="width: 30%; border: none; padding: 2px; color: white;">NAME:</td>
-                  <td style="width: 70%; border: none; border-bottom: 1px solid #111827; text-align: center; padding: 2px;">{{ data_get($signatories, 'approved_by.name', '') }}</td>
+                  <td style="width: 30%; border: none; padding: 1px; color: white;">NAME:</td>
+                  <td style="width: 70%; border: none; border-bottom: 1px solid #111827; text-align: center; padding: 1px;">{{ data_get($signatories, 'approved_by.name', '') }}</td>
                 </tr>
                 <tr>
-                  <td style="border: none; padding: 2px; color: white;">SIGNATURE:</td>
-                  <td style="border: none; border-bottom: 1px solid #111827; padding: 2px;"></td>
+                  <td style="border: none; padding: 1px; color: white;">SIGNATURE:</td>
+                  <td style="border: none; border-bottom: 1px solid #111827; padding: 1px;"></td>
                 </tr>
                 <tr>
-                  <td colspan="2" style="border: none; text-align: center; padding: 4px;">City Mayor</td>
+                  <td colspan="2" style="border: none; text-align: center; padding: 2px;">City Mayor</td>
                 </tr>
                 <tr>
-                  <td style="border: none; padding: 2px; color: white;">DATE:</td>
-                  <td style="border: none; border-bottom: 1px solid #111827; padding: 2px;"></td>
+                  <td style="border: none; padding: 1px; color: white;">DATE:</td>
+                  <td style="border: none; border-bottom: 1px solid #111827; padding: 1px;"></td>
                 </tr>
               </table>
             </td>
