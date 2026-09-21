@@ -13,6 +13,12 @@ const SIGNATORY_ROLES = [
   ['approved_by', 'Approved by', 'City Mayor'],
 ]
 
+const defaultPositions = {
+  prepared_by: 'SLEO/PESO Coordinator',
+  checked_by: 'CGADH1/PESO Manager',
+  approved_by: 'City Mayor'
+}
+
 const emptySignatories = () => ({
   prepared_by: { name: '', position: '' },
   checked_by: { name: '', position: '' },
