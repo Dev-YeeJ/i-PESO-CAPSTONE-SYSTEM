@@ -17,6 +17,8 @@ const emptySignatories = () => ({
   prepared_by: { name: '', position: '' },
   checked_by: { name: '', position: '' },
   approved_by: { name: '', position: '' },
+})
+
 export default function DOLEReportingPage() {
   const navigate = useNavigate()
   const [reports, setReports] = useState([])
