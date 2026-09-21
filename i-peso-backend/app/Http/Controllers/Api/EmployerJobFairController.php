@@ -28,7 +28,20 @@ class EmployerJobFairController extends Controller
     {
         $employer = $this->employer($request);
         $fairs = JobFair::query()
-            ->where(fn ($query) => $query->where(fn ($public) => $public->where('is_public', true)->whereIn('status', JobFairService::PUBLIC_STATUSES)->has('employerJoins'))
+            // Deliberately NOT filtered by ->has('employerJoins') the way the
+            // seeker-facing JobFairController::index() is. Hiding an
+            // employer-less fair makes sense on the public bulletin (nothing
+            // to browse yet), but on the employer's own module it was a
+            // chicken-and-egg lock: the people who would make the fair
+            // non-empty were the only ones not allowed to see it. A freshly
+            // published fair was invisible to every employer, and any
+            // employer accredited after the publish-time invitation blast
+            // saw an empty module indefinitely.
+            //
+            // Visible = publicly announced, or already tracked on this
+            // employer's own participation record (which keeps a declined or
+            // long-finished fair in their history rather than vanishing it).
+            ->where(fn ($query) => $query->where(fn ($public) => $public->where('is_public', true)->whereNotNull('published_at')->whereIn('status', JobFairService::PUBLIC_STATUSES))
                 ->orWhereHas('employerJoins', fn ($joins) => $joins->where('employer_id', $employer->employer_id)))
             ->orderByRaw('COALESCE(start_date, event_date) asc')
             // Same relations eventPayload() requests via loadMissing() — see
@@ -47,7 +60,13 @@ class EmployerJobFairController extends Controller
     public function interest(Request $request, JobFair $jobFair, JobFairService $service): JsonResponse
     {
         $employer = $this->employer($request);
-        abort_unless($jobFair->is_public && in_array($jobFair->status, ['published', 'accepting_employers', 'upcoming'], true), 422, 'This event is not accepting employer interest.');
+        // Was a hardcoded status check that ignored submission_deadline
+        // entirely — an employer could join a fair whose requirements
+        // deadline had already passed, then be unable to file anything.
+        // employerRegistrationState() is the same gate the list payload and
+        // the dashboard's Join button now use, so all three agree.
+        $registration = $service->employerRegistrationState($jobFair);
+        abort_unless($registration['open'], 422, $registration['reason'] ?? 'This event is not accepting employer interest.');
 
         $participation = JobFairEmployer::updateOrCreate(
             ['job_fair_id' => $jobFair->job_fair_id, 'employer_id' => $employer->employer_id],

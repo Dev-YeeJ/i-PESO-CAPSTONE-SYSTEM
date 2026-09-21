@@ -307,6 +307,7 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::put('/job-fairs/{id}', [AdminJobFairController::class, 'update']);
             Route::delete('/job-fairs/{id}', [AdminJobFairController::class, 'destroy']);
             Route::post('/job-fairs/{jobFair}/publish', [AdminJobFairController::class, 'publish']);
+            Route::post('/job-fairs/{jobFair}/resend-invitations', [AdminJobFairController::class, 'resendInvitations']);
             Route::post('/job-fairs/{jobFair}/invite', [AdminJobFairController::class, 'invite']);
             Route::patch('/job-fairs/{jobFair}/participants/{participation}', [AdminJobFairController::class, 'participationStatus']);
             Route::post('/job-fairs/{jobFair}/check-in', [AdminJobFairController::class, 'checkIn']);

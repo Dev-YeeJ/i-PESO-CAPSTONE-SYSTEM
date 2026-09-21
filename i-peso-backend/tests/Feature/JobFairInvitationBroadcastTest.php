@@ -84,11 +84,187 @@ class JobFairInvitationBroadcastTest extends TestCase
         // re-notify every seeker.
         $this->postJson("/api/admin/job-fairs/{$fair->job_fair_id}/publish")
             ->assertOk()
-            ->assertJsonPath('message', 'Job Fair announcement published.');
+            ->assertJsonPath('message', 'Job Fair announcement updated. Use "Invite new employers" to reach employers accredited since the announcement.');
 
         Notification::assertSentToTimes($employer, JobFairNotification::class, 1);
         Notification::assertSentToTimes($seeker, JobFairPublished::class, 1);
         $this->assertSame(1, JobFairEmployer::where('job_fair_id', $fair->job_fair_id)->count());
+    }
+
+    /**
+     * published_at is the announcement date the invitation letter prints and
+     * the audit trail reads. A second publish used to overwrite it with
+     * now(), so the record of when a fair was actually announced was lost the
+     * moment anyone pressed the button again.
+     */
+    public function test_republishing_preserves_the_original_announcement_date_and_status(): void
+    {
+        Notification::fake();
+        $this->employer('preserve@example.test', 'sole_proprietorship');
+        $admin = $this->admin();
+        Sanctum::actingAs($admin);
+        $fair = $this->createFair($admin);
+
+        $this->postJson("/api/admin/job-fairs/{$fair->job_fair_id}/publish")->assertOk();
+        $originalPublishedAt = $fair->fresh()->published_at;
+
+        // Staff wrap the event up, then someone presses the old always-on
+        // Publish button again. That must not silently re-open the fair.
+        $fair->fresh()->update(['status' => 'completed']);
+
+        $this->postJson("/api/admin/job-fairs/{$fair->job_fair_id}/publish", ['status' => 'accepting_employers'])
+            ->assertOk();
+
+        $reloaded = $fair->fresh();
+        $this->assertSame('completed', $reloaded->status);
+        $this->assertSame(
+            $originalPublishedAt->toDateTimeString(),
+            $reloaded->published_at->toDateTimeString(),
+        );
+    }
+
+    /**
+     * The gap this whole change exists to close: invitations were a one-shot
+     * blast over whoever was verified at the instant of first publish.
+     */
+    public function test_an_employer_verified_after_publish_can_be_invited_on_demand(): void
+    {
+        Notification::fake();
+        $earlyBird = $this->employer('early@example.test', 'sole_proprietorship');
+        $admin = $this->admin();
+        Sanctum::actingAs($admin);
+        $fair = $this->createFair($admin);
+
+        $this->postJson("/api/admin/job-fairs/{$fair->job_fair_id}/publish")->assertOk();
+        Notification::assertSentToTimes($earlyBird, JobFairNotification::class, 1);
+
+        $latecomer = $this->employer('late@example.test', 'sole_proprietorship');
+        Notification::assertNotSentTo($latecomer, JobFairNotification::class);
+
+        $this->postJson("/api/admin/job-fairs/{$fair->job_fair_id}/resend-invitations")
+            ->assertOk()
+            ->assertJsonPath('message', '1 newly accredited employer(s) invited.');
+
+        Notification::assertSentToTimes($latecomer, JobFairNotification::class, 1);
+        // Nobody already tracked gets a duplicate letter.
+        Notification::assertSentToTimes($earlyBird, JobFairNotification::class, 1);
+        $this->assertDatabaseHas('job_fair_employers', [
+            'job_fair_id' => $fair->job_fair_id,
+            'employer_id' => $latecomer->employer_id,
+            'participation_status' => 'invited',
+        ]);
+
+        // Safe to press again — everyone is tracked now.
+        $this->postJson("/api/admin/job-fairs/{$fair->job_fair_id}/resend-invitations")
+            ->assertOk()
+            ->assertJsonPath('message', 'Every verified employer is already tracked on this event.');
+        Notification::assertSentToTimes($latecomer, JobFairNotification::class, 1);
+    }
+
+    /**
+     * The employer-facing list used to require ->has('employerJoins'), i.e. a
+     * fair was only visible to employers once some employer was already
+     * participating — the people who would make it non-empty were the only
+     * ones barred from seeing it. A just-published fair with nobody on it was
+     * invisible to everyone.
+     */
+    public function test_a_published_fair_with_no_participants_is_visible_to_every_verified_employer(): void
+    {
+        Notification::fake();
+        $admin = $this->admin();
+        Sanctum::actingAs($admin);
+        $fair = $this->createFair($admin);
+        // Published while no employer is verified, so the broadcast creates
+        // no participation rows at all.
+        $this->postJson("/api/admin/job-fairs/{$fair->job_fair_id}/publish")->assertOk();
+        $this->assertSame(0, JobFairEmployer::where('job_fair_id', $fair->job_fair_id)->count());
+
+        $newcomer = $this->employer('newcomer@example.test', 'sole_proprietorship');
+        Sanctum::actingAs($newcomer);
+
+        $this->getJson('/api/employer/job-fairs')
+            ->assertOk()
+            ->assertJsonPath('data.0.job_fair_id', $fair->job_fair_id)
+            ->assertJsonPath('data.0.employer_registration_open', true);
+    }
+
+    /** An unpublished draft must still never leak to the employer module. */
+    public function test_a_draft_fair_is_not_visible_to_employers(): void
+    {
+        Notification::fake();
+        $admin = $this->admin();
+        $this->createFair($admin);
+
+        Sanctum::actingAs($this->employer('draft-watcher@example.test', 'sole_proprietorship'));
+
+        $this->getJson('/api/employer/job-fairs')
+            ->assertOk()
+            ->assertJsonCount(0, 'data');
+    }
+
+    /**
+     * submission_deadline was required at creation and printed on every card,
+     * but nothing enforced it — an employer could join the night before a
+     * fair whose requirements window had long closed.
+     */
+    public function test_an_employer_cannot_join_after_the_submission_deadline(): void
+    {
+        Notification::fake();
+        $admin = $this->admin();
+        Sanctum::actingAs($admin);
+        $fair = $this->createFair($admin);
+        $this->postJson("/api/admin/job-fairs/{$fair->job_fair_id}/publish")->assertOk();
+
+        $fair->fresh()->update(['submission_deadline' => now()->subDay()]);
+
+        $employer = $this->employer('too-late@example.test', 'sole_proprietorship');
+        Sanctum::actingAs($employer);
+
+        // Still listed — the event stays visible as a record …
+        $this->getJson('/api/employer/job-fairs')
+            ->assertOk()
+            ->assertJsonPath('data.0.employer_registration_open', false)
+            ->assertJsonPath(
+                'data.0.employer_registration_closed_reason',
+                'The deadline for employer registration closed on '.now()->subDay()->format('F j, Y').'.'
+            );
+
+        // … but joining is refused, with the reason the UI already showed.
+        $this->postJson("/api/employer/job-fairs/{$fair->job_fair_id}/interest")
+            ->assertStatus(422);
+
+        $this->assertSame(0, JobFairEmployer::where('job_fair_id', $fair->job_fair_id)->count());
+    }
+
+    /**
+     * Approval is the moment an account becomes eligible, so it is the
+     * natural second invitation trigger alongside first publish.
+     */
+    public function test_verifying_an_employer_invites_them_to_open_fairs(): void
+    {
+        Notification::fake();
+        $admin = $this->admin();
+        Sanctum::actingAs($admin);
+        $fair = $this->createFair($admin);
+        $this->postJson("/api/admin/job-fairs/{$fair->job_fair_id}/publish")->assertOk();
+
+        $pending = $this->employer('pending-approval@example.test', 'sole_proprietorship', 'pending');
+        Notification::assertNotSentTo($pending, JobFairNotification::class);
+
+        app(JobFairService::class)->inviteEmployerToOpenFairs($pending->fresh());
+        // Still pending — nothing should happen yet.
+        $this->assertSame(0, JobFairEmployer::where('employer_id', $pending->employer_id)->count());
+
+        $pending->update(['verification_status' => 'verified']);
+        $invited = app(JobFairService::class)->inviteEmployerToOpenFairs($pending->fresh());
+
+        $this->assertSame(1, $invited);
+        Notification::assertSentToTimes($pending, JobFairNotification::class, 1);
+        $this->assertDatabaseHas('job_fair_employers', [
+            'job_fair_id' => $fair->job_fair_id,
+            'employer_id' => $pending->employer_id,
+            'participation_status' => 'invited',
+        ]);
     }
 
     public function test_an_employer_manually_invited_before_publish_is_not_double_invited(): void

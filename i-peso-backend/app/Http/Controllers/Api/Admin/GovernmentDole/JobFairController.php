@@ -157,7 +157,26 @@ class JobFairController extends Controller
         // after a later status change must not re-email every employer.
         $isFirstPublish = $jobFair->published_at === null;
 
-        $jobFair->update(['status' => $validated['status'] ?? 'published', 'is_public' => true, 'published_at' => now(), 'published_by' => $admin->admin_id]);
+        $attributes = ['is_public' => true];
+
+        if ($isFirstPublish) {
+            $attributes['status'] = $validated['status'] ?? 'published';
+            $attributes['published_at'] = now();
+            $attributes['published_by'] = $admin->admin_id;
+        } else {
+            // A second publish used to overwrite published_at with now()
+            // (losing the real announcement date, which the invitation
+            // letter and the audit trail both read) and force the status
+            // back to whatever the button sent — silently re-opening a fair
+            // staff had already moved to closed/completed. Re-publishing now
+            // only changes the status when one was explicitly asked for, and
+            // only ever from another still-open status.
+            if (($validated['status'] ?? null) !== null && in_array($jobFair->status, JobFairService::EMPLOYER_OPEN_STATUSES, true)) {
+                $attributes['status'] = $validated['status'];
+            }
+        }
+
+        $jobFair->update($attributes);
 
         $invited = 0;
         $seekersNotified = 0;
@@ -175,7 +194,36 @@ class JobFairController extends Controller
         return response()->json([
             'message' => $isFirstPublish
                 ? "Job Fair announcement published. {$invited} verified employer(s) notified by email, {$seekersNotified} job seeker(s) notified."
-                : 'Job Fair announcement published.',
+                : 'Job Fair announcement updated. Use "Invite new employers" to reach employers accredited since the announcement.',
+            'job_fair' => $service->eventPayload($jobFair->fresh(), null, true),
+        ]);
+    }
+
+    /**
+     * The deliberate second half of what the old always-visible "Publish"
+     * button was silently being asked to do. broadcastInvitations() only ever
+     * ran on first publish and only ever covered employers verified in that
+     * instant, so a company accredited the following week was never invited
+     * to an ongoing fair. This re-runs it on demand: employers already
+     * tracked on the fair are skipped, so it is safe to press repeatedly and
+     * never re-mails anyone who was already invited.
+     */
+    public function resendInvitations(Request $request, JobFair $jobFair, JobFairService $service): JsonResponse
+    {
+        $this->admin($request);
+        abort_if($jobFair->published_at === null, 422, 'Publish the announcement before inviting employers.');
+        $registration = $service->employerRegistrationState($jobFair);
+        abort_unless($registration['open'], 422, $registration['reason'] ?? 'This event is no longer accepting employer participation.');
+
+        $service->seedRequirements($jobFair);
+        set_time_limit(0);
+        $invited = $this->broadcastInvitations($jobFair, $service);
+
+        return response()->json([
+            'message' => $invited > 0
+                ? "{$invited} newly accredited employer(s) invited."
+                : 'Every verified employer is already tracked on this event.',
+            'invited' => $invited,
             'job_fair' => $service->eventPayload($jobFair->fresh(), null, true),
         ]);
     }
@@ -340,7 +388,21 @@ class JobFairController extends Controller
                         'invited_at' => now(),
                     ]);
                     $service->reuseVerifiedDocuments($jobFair, $participation);
-                    $employer->notify(new JobFairNotification($jobFair, 'invited', $participation, $service->outstandingRequirementsFor($jobFair, $employer)));
+
+                    // These notifications go out over SMTP and SMS, inline,
+                    // one employer at a time. A single bad address or a
+                    // gateway hiccup used to throw straight out of the
+                    // chunk callback and abandon the rest of the blast
+                    // mid-list, leaving the remaining employers with no
+                    // invitation at all. The participation row above is
+                    // what actually makes the fair actionable for them, and
+                    // it is already committed, so log and keep going.
+                    try {
+                        $employer->notify(new JobFairNotification($jobFair, 'invited', $participation, $service->outstandingRequirementsFor($jobFair, $employer)));
+                    } catch (\Throwable $exception) {
+                        report($exception);
+                    }
+
                     $invited++;
                 }
             }, 'employer_id');

@@ -231,14 +231,38 @@ export default function JobFairDetailPage() {
             <div className="grid gap-6 xl:grid-cols-2">
             <Card>
               <CardHeader title="Announcement & invitation" subtitle={`${fair?.status?.replaceAll('_', ' ') ?? ''} · ${fair?.venue ?? ''}`} />
-              <div className="flex flex-wrap gap-2">
-                <Button icon={ShieldCheck} onClick={() => action(() => adminService.publishJobFair(id, 'accepting_employers'), 'Announcement published and accepting employers.')}>
-                  Publish
-                </Button>
+              {/* Publishing is a one-time announcement, not a toggle. The
+                  button used to render unconditionally, so every already-
+                  published fair still showed a "Publish" that looked like it
+                  would re-notify everyone but silently did nothing except
+                  reset published_at. Once published, the only invitation work
+                  left is reaching employers accredited since — which is now
+                  its own explicitly labelled action. */}
+              <div className="flex flex-wrap items-center gap-2">
+                {!fair?.published_at ? (
+                  <Button icon={ShieldCheck} onClick={() => action(() => adminService.publishJobFair(id, 'accepting_employers'), 'Announcement published. Employers and job seekers notified.')}>
+                    Publish & Invite Employers
+                  </Button>
+                ) : (
+                  <>
+                    <Badge status="approved" className="shrink-0">
+                      Published {new Date(fair.published_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}
+                    </Badge>
+                    {fair?.employer_registration_open && (
+                      <Button variant="outline" icon={Mail} onClick={() => action(() => adminService.resendJobFairInvitations(id), 'Invitations sent to newly accredited employers.')}>
+                        Invite new employers
+                      </Button>
+                    )}
+                  </>
+                )}
                 <Button variant="outline" icon={FileText} onClick={() => blobDownload(() => adminService.downloadJobFairInvitation(id), `job-fair-invitation-${id}.pdf`)}>
                   Invitation PDF
                 </Button>
               </div>
+
+              {fair?.published_at && !fair?.employer_registration_open && fair?.employer_registration_closed_reason && (
+                <p className="mt-2 text-xs font-semibold text-slate-500">{fair.employer_registration_closed_reason}</p>
+              )}
 
               <div ref={employerPickerRef} className="relative mt-5">
                 <label className="text-xs font-bold uppercase tracking-wide text-slate-500 mb-1.5 block">Invite a verified employer</label>

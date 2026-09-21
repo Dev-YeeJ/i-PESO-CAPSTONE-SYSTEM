@@ -214,6 +214,7 @@ export const adminService = {
   },
 
   publishJobFair: async (id, status = 'published') => (await api.post(`/admin/job-fairs/${id}/publish`, { status })).data,
+  resendJobFairInvitations: async (id) => (await api.post(`/admin/job-fairs/${id}/resend-invitations`)).data,
   inviteJobFairEmployer: async (id, payload) => (await api.post(`/admin/job-fairs/${id}/invite`, payload)).data,
   updateJobFairParticipation: async (fairId, participationId, payload) => (await api.patch(`/admin/job-fairs/${fairId}/participants/${participationId}`, payload)).data,
   checkInJobFairAttendee: async (fairId, payload) => (await api.post(`/admin/job-fairs/${fairId}/check-in`, payload)).data,

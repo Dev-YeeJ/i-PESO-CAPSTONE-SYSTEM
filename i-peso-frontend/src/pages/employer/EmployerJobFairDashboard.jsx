@@ -23,6 +23,16 @@ const blankConfirmation = {
 
 const inputClass = 'w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-brand-navy focus:outline-none focus:ring-2 focus:ring-brand-navy/10'
 
+// submission_deadline arrives as an ISO-8601 datetime; employers only ever
+// care about the day.
+function formatDeadline(value) {
+  if (!value) return ''
+  const parsed = new Date(value)
+  return Number.isNaN(parsed.getTime())
+    ? ''
+    : parsed.toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })
+}
+
 const PARTICIPATION_BADGE = {
   invited: 'pending',
   interested: 'review',
@@ -90,6 +100,19 @@ function JobFairCard({ fair, onClick }) {
       <div className="mt-auto flex w-full flex-col gap-1.5 border-t border-slate-100 pt-3 text-xs text-slate-500">
         <span className="flex items-center gap-1.5"><CalendarDays className="h-3.5 w-3.5 shrink-0 text-slate-400" />{fair.start_date} · {fair.start_time}–{fair.end_time}</span>
         <span className="flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5 shrink-0 text-slate-400" /><span className="truncate">{fair.venue}</span></span>
+        {/* The registration deadline is the single most time-sensitive fact
+            on this card and it was nowhere in the list — an employer had to
+            open the event to find out they were already too late. */}
+        {!fair.participation && (
+          <span className={`flex items-center gap-1.5 font-bold ${fair.employer_registration_open ? 'text-emerald-700' : 'text-slate-400'}`}>
+            <ClipboardList className="h-3.5 w-3.5 shrink-0" />
+            <span className="truncate">
+              {fair.employer_registration_open
+                ? (fair.submission_deadline ? `Register until ${formatDeadline(fair.submission_deadline)}` : 'Open for registration')
+                : 'Registration closed'}
+            </span>
+          </span>
+        )}
       </div>
       <span className="mt-1 inline-flex items-center gap-1 text-xs font-bold text-brand-navy opacity-0 transition-opacity group-hover:opacity-100">
         View details <ArrowRight className="h-3.5 w-3.5" />
@@ -142,6 +165,12 @@ export default function EmployerJobFairDashboard() {
   const [myVacancies, setMyVacancies] = useState([])
   const [myProfile, setMyProfile] = useState(null)
   const [loading, setLoading] = useState(true)
+  // The whole employer job-fair API sits behind the verified.employer
+  // middleware, so a still-pending account gets a 403 for the list itself.
+  // That used to surface as a toast and then the generic "no job fairs
+  // announced yet" empty state, which reads as "PESO hasn't posted anything"
+  // when the real answer is "your accreditation isn't approved yet".
+  const [accessBlockedReason, setAccessBlockedReason] = useState('')
   const [justAccepted, setJustAccepted] = useState(false)
   const requirementsCardRef = useRef(null)
 
@@ -153,8 +182,13 @@ export default function EmployerJobFairDashboard() {
     try {
       const data = await listEmployerJobFairs()
       setFairs(data)
+      setAccessBlockedReason('')
     } catch (e) {
-      toast.error(e.response?.data?.message ?? 'Unable to load Job Fairs.')
+      if (e.response?.status === 403) {
+        setAccessBlockedReason(e.response?.data?.message ?? 'Your employer account must be approved by PESO before you can join job fairs.')
+      } else {
+        toast.error(e.response?.data?.message ?? 'Unable to load Job Fairs.')
+      }
     } finally {
       setLoading(false)
     }
@@ -274,8 +308,10 @@ export default function EmployerJobFairDashboard() {
 
       {loading ? (
         <LoadingSkeleton variant="card" rows={2} />
+      ) : accessBlockedReason ? (
+        <Card><EmptyState icon={ShieldCheck} title="Accreditation pending" description={`${accessBlockedReason} Once PESO approves your account you'll be invited to every open job fair automatically.`} /></Card>
       ) : !fairs.length ? (
-        <Card><EmptyState icon={CalendarDays} title="No job fairs announced yet" description="Published PESO job fair announcements will appear here." /></Card>
+        <Card><EmptyState icon={CalendarDays} title="No job fairs announced yet" description="Every job fair PESO publishes appears here automatically — you don't need an invitation to see one. You'll also be emailed when a new event is announced." /></Card>
       ) : !selected ? (
         <div>
           <h2 className="text-base font-extrabold text-slate-950">All Job Fairs</h2>
@@ -322,11 +358,27 @@ export default function EmployerJobFairDashboard() {
                 ) : null}
               />
               <DetailChip icon={Mail} label="PESO contact" value={selected.contact_email} />
+              <DetailChip
+                icon={ClipboardList}
+                label="Registration deadline"
+                value={selected.submission_deadline ? formatDeadline(selected.submission_deadline) : 'Not specified'}
+              />
             </div>
 
-            <div className="mt-5 flex flex-wrap gap-2 border-t border-slate-100 pt-5">
-              {!selected.participation && (
+            <div className="mt-5 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-5">
+              {/* employer_registration_open comes straight from the backend
+                  gate that /interest enforces (status + submission deadline +
+                  event date), so the button can't offer a join the API will
+                  refuse. Previously any fair without a participation record
+                  showed "Join Job Fair", including closed and past ones, and
+                  the click just returned a 422. */}
+              {!selected.participation && selected.employer_registration_open && (
                 <Button onClick={() => act(() => expressJobFairInterest(selected.job_fair_id), 'Successfully joined the Job Fair.')}>Join Job Fair</Button>
+              )}
+              {!selected.participation && !selected.employer_registration_open && (
+                <p className="text-sm font-semibold text-slate-500">
+                  {selected.employer_registration_closed_reason ?? 'This event is no longer accepting employer participation.'}
+                </p>
               )}
               {selected.participation?.status === 'invited' && (
                 <>
