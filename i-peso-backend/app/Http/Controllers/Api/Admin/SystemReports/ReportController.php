@@ -730,7 +730,7 @@ class ReportController extends Controller
             'data' => $data,
             'signatories' => $data['signatories'] ?? [],
             'manualAdjustments' => $data['manual_adjustments'] ?? [],
-        ])->setPaper('a4', 'portrait');
+        ])->setPaper('legal', 'portrait');
 
         return $pdf->download('sprs-' . str_replace(' ', '-', strtolower($data['period'] ?? $report->report_id)) . '.pdf');
     }

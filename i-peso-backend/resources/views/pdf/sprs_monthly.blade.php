@@ -4,7 +4,7 @@ h1{text-align:center;font-size:14px;margin:0}
 .sub{text-align:center;margin:2px 0 10px;font-size:10px}
 .muted{color:#475569}
 table{width:100%;border-collapse:collapse;margin-top:8px}
-th,td{border:1px solid #111827;padding:3px 5px;vertical-align:top}
+th,td{border:1px solid #111827;padding:2px 4px;vertical-align:top}
 th{background:#e2e8f0;font-size:7.5px;text-transform:uppercase;text-align:center;}
 .num{text-align:center}
 .sec{background:#cbd5e1;font-weight:bold;text-transform:uppercase}
@@ -18,7 +18,7 @@ th{background:#e2e8f0;font-size:7.5px;text-transform:uppercase;text-align:center
 .letterhead .ref{width:28%;text-align:right;font-size:9px}
 .letterhead .ref .box{display:inline-block;border:1px solid #111827;padding:4px 10px;font-weight:bold;margin-top:2px}
 .formno{text-align:right;font-size:7.5px;font-style:italic;margin-bottom:2px;font-weight:bold;}
-.dgray { background: #6b7280 !important; }
+.dgray { background: #ffffff !important; }
 </style></head><body>
 @php
   $v = fn($k, $d = null) => data_get($data, $k, $d);
