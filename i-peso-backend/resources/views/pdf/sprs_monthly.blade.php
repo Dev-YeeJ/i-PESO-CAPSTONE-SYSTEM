@@ -1,74 +1,63 @@
 <style>
-body{font-family:DejaVu Sans,sans-serif;font-size:8.5px;color:#111827}
-h1{text-align:center;font-size:14px;margin:0}
-.sub{text-align:center;margin:2px 0 10px;font-size:10px}
-.muted{color:#475569}
-table{width:100%;border-collapse:collapse;margin-top:8px}
+@page { margin: 20px 30px; }
+body{font-family:DejaVu Sans,sans-serif;font-size:8px;color:#111827}
+.formno{text-align:right;font-size:8px;font-style:italic;margin-bottom:2px;font-weight:bold;}
+table{width:100%;border-collapse:collapse;border:1.5px solid #111827;}
 th,td{border:1px solid #111827;padding:2px 4px;vertical-align:top}
-th{background:#e2e8f0;font-size:7.5px;text-transform:uppercase;text-align:center;}
+th{background:#b8d1f3;font-size:7px;text-transform:uppercase;text-align:center;vertical-align:middle;}
 .num{text-align:center}
-.sec{background:#cbd5e1;font-weight:bold;text-transform:uppercase}
-.blank{color:#94a3b8}
-.sign td{border:none;padding-top:26px;width:33%;text-align:center;font-size:9px}
-.sign .line{border-top:1px solid #111827;padding-top:3px}
-.letterhead{width:100%;margin-bottom:4px}
-.letterhead td{border:none;padding:0;vertical-align:top}
-.letterhead .id{font-size:9px;width:28%}
-.letterhead .center{text-align:center;width:44%}
-.letterhead .ref{width:28%;text-align:right;font-size:9px}
-.letterhead .ref .box{display:inline-block;border:1px solid #111827;padding:4px 10px;font-weight:bold;margin-top:2px}
-.formno{text-align:right;font-size:7.5px;font-style:italic;margin-bottom:2px;font-weight:bold;}
+.muted{color:#475569}
 .dgray { background: #ffffff !important; }
+.header-table td { border: 1px solid #111827; }
 </style></head><body>
 @php
   $v = fn($k, $d = null) => data_get($data, $k, $d);
   $rows = $data['rows'] ?? [];
-  $cell = fn($value) => $value === null || $value === '' ? '0' : e($value);
-
-  $noFemaleKeys = [
-      '1_1', '1_1_1', '1_1_2',
-      '1_6', '1_6_1', '1_6_2', '1_6_3',
-      '1_6_4', '1_6_4_1', '1_6_4_2',
-      '1_6_5', '1_6_5_1', '1_6_5_2',
-      'lmi_1', 'lmi_1_1', 'lmi_1_1_1', 'lmi_1_1_2', 'lmi_1_1_3', 'lmi_1_1_4', 'lmi_1_2', 'lmi_1_2_1', 'lmi_1_2_2',
-      'cg_1', 'cg_1_1', 'cg_1_2',
-      'peis_1'
-  ];
+  $cell = fn($value) => $value === null || $value === '' ? '' : e($value);
 @endphp
 <div class="formno">SPRS Form 2018</div>
-<table class="letterhead"><tr>
-  <td class="id">
-    LGU/PESO: <strong>{{ $v('lgu_name', 'Urdaneta City') }}</strong><br>
-    Province: <strong>{{ $v('province', 'Pangasinan') }}</strong>
-  </td>
-  <td class="center">
-    <div style="font-weight:bold">DEPARTMENT OF LABOR AND EMPLOYMENT</div>
-    <div>Regional Office No. 1</div>
-    <div>San Fernando City, La Union</div>
-    <h1 style="margin-top:6px">STATISTICAL PERFORMANCE REPORTING SYSTEM (SPRS)</h1>
-    <div class="sub">PESO MONTHLY OPERATIONS STATISTICAL REPORT (PESO OpS)</div>
-  </td>
-  <td class="ref">
-    Reference<br>Month/Year<br>
-    <span class="box">{{ $v('period_short', $v('period', $report->title)) }}</span>
-  </td>
-</tr></table>
 
 <table>
   <thead>
+    <!-- Header Row 1 (Letterhead) -->
     <tr>
-      <th rowspan="2" colspan="2" style="width:26%">PROGRAMS</th>
-      <th rowspan="2" style="width:25%">SUCCESS INDICATORS</th>
-      <th rowspan="2" style="width:7%">WHOLE<br>YEAR<br>TARGET</th>
-      <th colspan="2">PREVIOUS<br>REPORTING<br>MONTH</th>
+      <th colspan="3" style="text-align:left; background: #ffffff; text-transform:none; font-size:9px; font-weight:normal; padding: 10px;">
+        <span style="font-weight:bold;">LGU/PESO:</span> {{ $v('lgu_name', 'Urdaneta City') }}<br>
+        <span style="font-weight:bold;">Province:</span> <span style="text-transform:uppercase;">{{ $v('province', 'Pangasinan') }}</span>
+      </th>
+      <th colspan="5" style="text-align:center; background: #ffffff; text-transform:none; font-size:10px; font-weight:bold; padding: 10px;">
+        DEPARTMENT OF LABOR AND EMPLOYMENT<br>
+        <span style="font-size:9px; font-weight:normal;">Regional Office No. 1</span><br>
+        <span style="font-size:9px; font-weight:normal;">San Fernando City, La Union</span><br><br>
+        STATISTICAL PERFORMANCE REPORTING SYSTEM (SPRS)<br>
+        <span style="font-size:8px;">PESO MONTHLY OPERATIONS STATISTICAL REPORT (PESO OpS)</span>
+      </th>
+      <th colspan="2" style="text-align:center; background: #ffffff; text-transform:none; font-size:9px; padding: 10px; vertical-align:middle;">
+        <span style="font-weight:bold;">{{ $v('period_short', $v('period', $report->title)) }}</span><br><br>
+        Reference<br>Month/Year
+      </th>
+    </tr>
+
+    <!-- Header Row 2 -->
+    <tr>
+      <th rowspan="3" colspan="2" style="width:16%">PROGRAMS</th>
+      <th rowspan="3" style="width:26%">SUCCESS INDICATORS</th>
+      <th rowspan="3" style="width:7%">WHOLE<br>YEAR<br>TARGET</th>
+      <th rowspan="2" colspan="2">PREVIOUS<br>REPORTING<br>MONTH</th>
+      <th colspan="4" style="border-bottom: 1px solid #111827;">Actual Performance</th>
+    </tr>
+    <!-- Header Row 3 -->
+    <tr>
       <th colspan="2">CURRENT<br>REPORTING<br>MONTH</th>
-      <th colspan="2">CUMULATIVE<br>(Jan to current<br>reporting month)</th>
+      <th colspan="2">CUMULATIVE<br><span style="text-transform:none; font-size:6px;">(Jan to current<br>reporting month)</span></th>
     </tr>
+    <!-- Header Row 4 -->
     <tr>
-      <th class="num" style="width:7%">Total</th><th class="num" style="width:7%">Female</th>
-      <th class="num" style="width:7%">Total</th><th class="num" style="width:7%">Female</th>
-      <th class="num" style="width:7%">Total</th><th class="num" style="width:7%">Female</th>
+      <th class="num" style="width:8.5%">Total</th><th class="num" style="width:8.5%">Female</th>
+      <th class="num" style="width:8.5%">Total</th><th class="num" style="width:8.5%">Female</th>
+      <th class="num" style="width:8.5%">Total</th><th class="num" style="width:8.5%">Female</th>
     </tr>
+    <!-- Header Row 5 (Numbers) -->
     <tr>
       <th class="num">(1)</th>
       <th class="num">(2)</th>
@@ -89,8 +78,8 @@ th{background:#e2e8f0;font-size:7.5px;text-transform:uppercase;text-align:center
     @foreach($rows as $row)
       @if($row['section'] ?? false)
         @if($row['key'] === 'sec_efcbs')
-          <tr>
-            <td colspan="3" style="font-weight:bold;">{{ $row['label'] }}</td>
+          <tr style="background:#e2e8f0;">
+            <td colspan="3" style="font-weight:bold; text-transform:uppercase;">{{ $row['label'] }}</td>
             <td class="dgray"></td>
             <td class="dgray"></td><td class="dgray"></td>
             <td class="dgray"></td><td class="dgray"></td>
@@ -119,119 +108,116 @@ th{background:#e2e8f0;font-size:7.5px;text-transform:uppercase;text-align:center
         @endif
       @else
         @php 
-          $pad = 2 + (($row['indent'] ?? 0) * 10); 
-          $isNoFemale = in_array($row['key'], $noFemaleKeys);
-          $hasTarget = strlen(trim($row['target'] ?? '')) > 0 || (isset($row['target']) && $row['target'] !== null);
-          // Only show target if it has a value, or for main indicators we might want to default to 0. 
-          // Let's just use what's passed, or dark gray if no target applies. 
-          // Actually, in the DB, targets might just be 0 for everything, so we display it.
-          // In DOLE form, targets are only on top-level indicators. Let's make target dark gray for sub-indicators.
-          $isSubIndicator = ($row['indent'] ?? 0) > 1;
+          $pad = 2 + (($row['indent'] ?? 0) * 8); 
         @endphp
         <tr>
           <td></td>
           <td></td>
           <td style="padding-left:{{ $pad }}px">{{ $row['label'] }}</td>
-          @if($isSubIndicator)
-            <td class="dgray"></td>
-          @else
-            <td class="num">{!! $cell($row['target'] ?? null) !!}</td>
-          @endif
-          
+          <td class="num">{!! $cell($row['target'] ?? null) !!}</td>
           <td class="num">{!! $cell($row['prev_total'] ?? null) !!}</td>
-          @if($isNoFemale)
-            <td class="dgray"></td>
-          @else
-            <td class="num">{!! $cell($row['prev_female'] ?? null) !!}</td>
-          @endif
-          
+          <td class="num">{!! $cell($row['prev_female'] ?? null) !!}</td>
           <td class="num">{!! $cell($row['curr_total'] ?? null) !!}</td>
-          @if($isNoFemale)
-            <td class="dgray"></td>
-          @else
-            <td class="num">{!! $cell($row['curr_female'] ?? null) !!}</td>
-          @endif
-          
+          <td class="num">{!! $cell($row['curr_female'] ?? null) !!}</td>
           <td class="num">{!! $cell($row['cum_total'] ?? null) !!}</td>
-          @if($isNoFemale)
-            <td class="dgray"></td>
-          @else
-            <td class="num">{!! $cell($row['cum_female'] ?? null) !!}</td>
-          @endif
+          <td class="num">{!! $cell($row['cum_female'] ?? null) !!}</td>
         </tr>
       @endif
     @endforeach
-  </tbody>
-</table>
 
-<table style="margin-top:10px">
-  <tbody>
-    <tr>
-      <td colspan="10" style="background:#cbd5e1;font-weight:bold;text-transform:uppercase">OTHER ACCOMPLISHMENTS</td>
+    <!-- Other Accomplishments -->
+    <tr style="background:#e2e8f0;">
+      <td colspan="10" style="font-weight:bold;text-transform:uppercase">OTHER ACCOMPLISHMENTS:</td>
     </tr>
     <tr>
-      <td colspan="3">First Time Jobseeker Act (RA 11261) <span class="muted">(Attachment Included: {!! $cell($v('other_accomplishments.ftja_with_attachment')) !!})</span></td>
+      <td colspan="3" style="text-transform:uppercase; font-size:7px;">FIRST TIME JOBSEEKER ACT (Attachment Included)</td>
       <td class="dgray"></td>
       <td class="num" colspan="2">{!! $cell($v('other_accomplishments.previous_ftja_total')) !!}</td>
       <td class="num" colspan="2">{!! $cell($v('other_accomplishments.ftja_total')) !!}</td>
       <td class="num" colspan="2">{!! $cell($v('other_accomplishments.cumulative_ftja_total')) !!}</td>
     </tr>
-  </tbody>
-</table>
 
-<table style="margin-top:10px; border: 2px solid #111827;">
-  <tbody>
-    <tr><td style="border:none; padding: 5px; font-weight: bold;" colspan="3">ISSUES / CONCERNS: (Indicate the issues and/or concerns that were encountered by the PESO in the delivery/provision of services, particularly those needing immediate action.)</td></tr>
-    <tr><td style="border:none; border-bottom: 2px solid #111827; padding: 5px; white-space:pre-wrap; min-height: 40px;" colspan="3">{!! $cell($v('issues_concerns')) !!}</td></tr>
+    <!-- Issues and Concerns -->
     <tr>
-      <td style="border:none; border-right: 2px solid #111827; padding: 10px; width: 33.33%; vertical-align: top;">
-        <div style="text-align: center; font-weight: bold; margin-bottom: 20px;">PREPARED BY:</div>
-        <div style="margin-bottom: 10px; margin-top: 30px;">
-          <div style="width: 200px; border-bottom: 1px solid #000; text-align: center; margin: 0 auto; min-height: 12px;">{{ data_get($signatories, 'prepared_by.name', '') }}</div>
-          <div style="text-align: center; font-size: 8px;">NAME / SIGNATURE</div>
-        </div>
-        <div style="text-align: center; margin-bottom: 20px;">
-          <div style="width: 200px; text-align: center; margin: 0 auto; min-height: 12px; font-weight: bold;">SLEO / PESO Coordinator</div>
-          <div style="text-align: center; font-size: 8px;">POSITION</div>
-        </div>
-        <div style="margin-bottom: 5px; text-align: center;">
-           <span style="display:inline-block; width: 150px; border-bottom: 1px solid #000;"></span>
-           <div style="text-align: center; font-size: 8px;">DATE</div>
-        </div>
+      <td colspan="10" style="font-weight: bold; border-bottom: none;">
+        ISSUES / CONCERNS: (Indicate the issues and/or concerns that were encountered by the PESO in the delivery/provision of services, particularly those needing immediate action.)
       </td>
-      <td style="border:none; border-right: 2px solid #111827; padding: 10px; width: 33.33%; vertical-align: top;">
-        <div style="text-align: center; font-weight: bold; margin-bottom: 20px;">CHECKED BY:</div>
-        <div style="margin-bottom: 10px; margin-top: 30px;">
-          <div style="width: 200px; border-bottom: 1px solid #000; text-align: center; margin: 0 auto; min-height: 12px;">{{ data_get($signatories, 'checked_by.name', '') }}</div>
-          <div style="text-align: center; font-size: 8px;">NAME / SIGNATURE</div>
-        </div>
-        <div style="text-align: center; margin-bottom: 20px;">
-          <div style="width: 200px; text-align: center; margin: 0 auto; min-height: 12px; font-weight: bold;">CGADH1 / PESO Manager</div>
-          <div style="text-align: center; font-size: 8px;">POSITION</div>
-        </div>
-        <div style="margin-bottom: 5px; text-align: center;">
-           <span style="display:inline-block; width: 150px; border-bottom: 1px solid #000;"></span>
-           <div style="text-align: center; font-size: 8px;">DATE</div>
-        </div>
+    </tr>
+    <tr>
+      <td colspan="10" style="white-space:pre-wrap; min-height: 40px; border-top: none;">
+        {!! $cell($v('issues_concerns')) !!}
+        <br><br><br>
       </td>
-      <td style="border:none; padding: 10px; width: 33.33%; vertical-align: top;">
-        <div style="text-align: center; font-weight: bold; margin-bottom: 20px;">APPROVED BY:</div>
-        <div style="margin-bottom: 10px; margin-top: 30px;">
-          <div style="width: 200px; border-bottom: 1px solid #000; text-align: center; margin: 0 auto; min-height: 12px;">{{ data_get($signatories, 'approved_by.name', '') }}</div>
-          <div style="text-align: center; font-size: 8px;">NAME / SIGNATURE</div>
-        </div>
-        <div style="text-align: center; margin-bottom: 20px;">
-          <div style="width: 200px; text-align: center; margin: 0 auto; min-height: 12px; font-weight: bold;">City Mayor</div>
-          <div style="text-align: center; font-size: 8px;">POSITION</div>
-        </div>
-        <div style="margin-bottom: 5px; text-align: center;">
-           <span style="display:inline-block; width: 150px; border-bottom: 1px solid #000;"></span>
-           <div style="text-align: center; font-size: 8px;">DATE</div>
-        </div>
+    </tr>
+
+    <!-- Signatories -->
+    <tr>
+      <td colspan="10" style="padding: 0;">
+        <table style="width: 100%; border: none;">
+          <tr>
+            <td style="width: 33.33%; border: none; border-right: 1px solid #111827; padding: 10px;">
+              <div style="font-weight: bold; text-align: center; margin-bottom: 25px;">PREPARED BY:</div>
+              <table style="width: 100%; border: none;">
+                <tr>
+                  <td style="width: 30%; border: none; padding: 2px;">NAME:</td>
+                  <td style="width: 70%; border: none; border-bottom: 1px solid #111827; text-align: center; padding: 2px;">{{ data_get($signatories, 'prepared_by.name', '') }}</td>
+                </tr>
+                <tr>
+                  <td style="border: none; padding: 2px;">SIGNATURE:</td>
+                  <td style="border: none; border-bottom: 1px solid #111827; padding: 2px;"></td>
+                </tr>
+                <tr>
+                  <td colspan="2" style="border: none; text-align: center; padding: 4px;">SLEO/PESO Coordinator</td>
+                </tr>
+                <tr>
+                  <td style="border: none; padding: 2px;">DATE:</td>
+                  <td style="border: none; border-bottom: 1px solid #111827; padding: 2px;"></td>
+                </tr>
+              </table>
+            </td>
+            
+            <td style="width: 33.33%; border: none; border-right: 1px solid #111827; padding: 10px;">
+              <div style="font-weight: bold; text-align: center; margin-bottom: 25px;">CHECKED BY:</div>
+              <table style="width: 100%; border: none;">
+                <tr>
+                  <td style="border: none; padding: 2px; text-align: center; border-bottom: 1px solid #111827; min-height: 12px;">{{ data_get($signatories, 'checked_by.name', '') }}</td>
+                </tr>
+                <tr>
+                  <td style="border: none; padding: 2px; text-align: center; color: white;">.</td>
+                </tr>
+                <tr>
+                  <td style="border: none; text-align: center; padding: 4px;">CGADH1/PESO Manager</td>
+                </tr>
+                <tr>
+                  <td style="border: none; padding: 2px; text-align: center; color: white;">.</td>
+                </tr>
+              </table>
+            </td>
+            
+            <td style="width: 33.33%; border: none; padding: 10px;">
+              <div style="font-weight: bold; text-align: center; margin-bottom: 25px;">APPROVED BY:</div>
+              <table style="width: 100%; border: none;">
+                <tr>
+                  <td style="width: 30%; border: none; padding: 2px; color: white;">NAME:</td>
+                  <td style="width: 70%; border: none; border-bottom: 1px solid #111827; text-align: center; padding: 2px;">{{ data_get($signatories, 'approved_by.name', '') }}</td>
+                </tr>
+                <tr>
+                  <td style="border: none; padding: 2px; color: white;">SIGNATURE:</td>
+                  <td style="border: none; border-bottom: 1px solid #111827; padding: 2px;"></td>
+                </tr>
+                <tr>
+                  <td colspan="2" style="border: none; text-align: center; padding: 4px;">City Mayor</td>
+                </tr>
+                <tr>
+                  <td style="border: none; padding: 2px; color: white;">DATE:</td>
+                  <td style="border: none; border-bottom: 1px solid #111827; padding: 2px;"></td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+        </table>
       </td>
     </tr>
   </tbody>
 </table>
-
-<p class="muted" style="margin-top:14px">Generated by i-PESO. Blank cells (shown grey) are not computed by the system and were left for manual encoding or correction before submission.</p>
 </body></html>
