@@ -132,8 +132,9 @@ class ReportController extends Controller
 
         // Compute the same indicator set for current month, previous month, and
         // year-to-date cumulative — the three column groups on the DOLE SPRS form.
+        // DOLE logic: "Previous Reporting Month" means year-to-date accumulation up to the previous month.
         $current = $this->computeSprsFigures($start, $end, $jobFairReports);
-        $previous = $this->computeSprsFigures($prevMonth->copy()->startOfMonth(), $prevMonth->copy()->endOfMonth(), $jobFairReports);
+        $previous = $this->computeSprsFigures($yearStart, $prevMonth->copy()->endOfMonth(), $jobFairReports);
         $cumulative = $this->computeSprsFigures($yearStart, $end, $jobFairReports);
 
         $data = [

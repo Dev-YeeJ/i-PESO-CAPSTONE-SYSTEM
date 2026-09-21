@@ -19,6 +19,22 @@ const emptySignatories = () => ({
   approved_by: { name: '', position: '' },
 })
 
+function NumCell({ value, onChange, auto }) {
+  return (
+    <td className="border border-black p-0">
+      <input
+        type="number"
+        value={value ?? ''}
+        onChange={(e) => onChange(e.target.value)}
+        disabled={auto}
+        className={`w-full px-1.5 py-1 text-center text-sm outline-none ${
+          auto ? 'bg-blue-50 text-slate-700' : 'bg-white'
+        }`}
+      />
+    </td>
+  )
+}
+
 export default function DOLEReportingPage() {
   const navigate = useNavigate()
   const [reports, setReports] = useState([])
@@ -77,9 +93,9 @@ export default function DOLEReportingPage() {
     setPreviewIssuesConcerns(generatedReport.issues_concerns || '')
     const sig = generatedReport.signatories || {}
     setPreviewSignatories({
-      prepared_by: { name: sig.prepared_by?.name || '', position: sig.prepared_by?.position || '' },
-      checked_by: { name: sig.checked_by?.name || '', position: sig.checked_by?.position || '' },
-      approved_by: { name: sig.approved_by?.name || '', position: sig.approved_by?.position || '' },
+      prepared_by: { name: sig.prepared_by?.name || '', position: defaultPositions.prepared_by },
+      checked_by: { name: sig.checked_by?.name || '', position: defaultPositions.checked_by },
+      approved_by: { name: sig.approved_by?.name || '', position: defaultPositions.approved_by },
     })
   }, [generatedReport])
 
@@ -133,9 +149,17 @@ export default function DOLEReportingPage() {
   const setPreviewSigner = (role, field, value) => setPreviewSignatories((s) => ({ ...s, [role]: { ...s[role], [field]: value } }))
 
   const updateRow = (key, field, value) => {
-    setEditableRows((rows) => rows.map((r) => (
-      r.key === key ? { ...r, [field]: value === '' ? 0 : Number(value) } : r
-    )))
+    setEditableRows((rows) => rows.map((r) => {
+      if (r.key !== key) return r
+      const updated = { ...r, [field]: value === '' ? 0 : Number(value) }
+      if (['prev_total', 'curr_total'].includes(field)) {
+        updated.cum_total = (Number(updated.prev_total) || 0) + (Number(updated.curr_total) || 0)
+      }
+      if (['prev_female', 'curr_female'].includes(field)) {
+        updated.cum_female = (Number(updated.prev_female) || 0) + (Number(updated.curr_female) || 0)
+      }
+      return updated
+    }))
   }
 
   const handleSaveSprs = async () => {
@@ -294,22 +318,25 @@ export default function DOLEReportingPage() {
                   <div>
                     <h4 className="text-sm font-bold text-slate-900 mb-3">Signatories <span className="text-slate-400 font-normal">(Optional)</span></h4>
                     <div className="space-y-3">
-                      {SIGNATORY_ROLES.map(([role, label]) => (
-                        <div key={role} className="flex gap-3">
-                          <input
-                            className="flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
-                            placeholder={`${label} — name`}
-                            value={signatories[role].name}
-                            onChange={(e) => setSigner(role, 'name', e.target.value)}
-                          />
-                          <input
-                            className="w-1/3 rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
-                            placeholder="Position"
-                            value={signatories[role].position}
-                            onChange={(e) => setSigner(role, 'position', e.target.value)}
-                          />
-                        </div>
-                      ))}
+                      {['prepared_by', 'checked_by', 'approved_by'].map((role) => {
+                        const labels = { prepared_by: 'Prepared by', checked_by: 'Checked by', approved_by: 'Approved by' }
+                        const label = labels[role]
+                        return (
+                          <div key={role} className="flex gap-2">
+                            <input
+                              className="flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+                              placeholder={`${label} — name`}
+                              value={signatories[role].name}
+                              onChange={(e) => setSigner(role, 'name', e.target.value)}
+                            />
+                            <input
+                              className="w-1/3 rounded-md border border-slate-300 px-3 py-2 text-sm bg-slate-50 text-slate-500 cursor-not-allowed"
+                              value={defaultPositions[role]}
+                              disabled
+                            />
+                          </div>
+                        )
+                      })}
                     </div>
                   </div>
 
@@ -368,8 +395,8 @@ export default function DOLEReportingPage() {
                 <Button variant="secondary" onClick={handleSaveSprs} disabled={isSaving} className="gap-2">
                   {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Save Changes
                 </Button>
-                <Button onClick={() => window.print()} className="gap-2">
-                  <Printer className="h-4 w-4" /> Print Document
+                <Button onClick={() => window.open(import.meta.env.VITE_API_BASE_URL.replace('/api', '') + `/api/admin/reports/${generatedReport.report_id}/export-sprs-pdf`, '_blank')} className="gap-2">
+                  <Printer className="h-4 w-4" /> Download PDF
                 </Button>
               </div>
             </div>
