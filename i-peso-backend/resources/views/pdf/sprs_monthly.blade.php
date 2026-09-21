@@ -25,25 +25,25 @@ th{background:#9bc2e6;font-size:6px;text-transform:uppercase;text-align:center;v
         <span style="font-weight:bold;">LGU/PESO:</span> {{ $v('lgu_name', 'Urdaneta City') }}<br>
         <span style="font-weight:bold;">Province:</span> <span style="text-transform:uppercase;">{{ $v('province', 'Pangasinan') }}</span>
       </th>
-      <th colspan="6" style="text-align:center; background: #ffffff; text-transform:none; font-size:8.5px; font-weight:bold; padding: 2px 4px;">
-        DEPARTMENT OF LABOR AND EMPLOYMENT<br>
+      <th colspan="6" style="text-align:center; background: #ffffff; text-transform:none; font-size:8.5px; padding: 2px 4px;">
+        <span style="font-weight:bold; font-size: 9px;">DEPARTMENT OF LABOR AND EMPLOYMENT</span><br>
         <span style="font-size:7px; font-weight:normal;">Regional Office No. 1</span><br>
         <span style="font-size:7px; font-weight:normal;">San Fernando City, La Union</span><br>
-        STATISTICAL PERFORMANCE REPORTING SYSTEM (SPRS)<br>
-        <span style="font-size:6.5px;">PESO MONTHLY OPERATIONS STATISTICAL REPORT (PESO OpS)</span>
+        <span style="font-weight:bold; font-size: 8px;">STATISTICAL PERFORMANCE REPORTING SYSTEM (SPRS)</span><br>
+        <span style="font-weight:bold; font-size: 6.5px;">PESO MONTHLY OPERATIONS STATISTICAL REPORT (PESO OpS)</span>
       </th>
       <th colspan="2" style="text-align:center; background: #ffffff; text-transform:none; font-size:7.5px; padding: 2px 4px; vertical-align:middle;">
-        <span style="font-weight:bold;">{{ $v('period_short', $v('period', $report->title)) }}</span><br>
-        Reference<br>Month/Year
+        <span style="font-weight:bold; font-size: 8.5px;">{{ $v('period_short', $v('period', $report->title)) }}</span><br>
+        <span style="font-weight:bold;">Reference<br>Month/Year</span>
       </th>
     </tr>
 
     <!-- Header Row 2 -->
     <tr>
-      <th rowspan="3" style="width:5%">PROGRAMS</th>
-      <th rowspan="3" style="width:8%"></th>
-      <th rowspan="3" style="width:34%">SUCCESS INDICATORS</th>
-      <th rowspan="3" style="width:5%">WHOLE<br>YEAR<br>TARGET</th>
+      <th rowspan="3" style="width:4%">PROGRAMS</th>
+      <th rowspan="3" style="width:6.5%"></th>
+      <th rowspan="3" style="width:35.5%">SUCCESS INDICATORS</th>
+      <th rowspan="3" style="width:6%">WHOLE<br>YEAR<br>TARGET</th>
       <th rowspan="2" colspan="2">PREVIOUS<br>REPORTING<br>MONTH</th>
       <th colspan="4" style="border-bottom: 1px solid #111827; text-transform:none; font-weight:bold;">Actual Performance</th>
     </tr>
@@ -54,22 +54,22 @@ th{background:#9bc2e6;font-size:6px;text-transform:uppercase;text-align:center;v
     </tr>
     <!-- Header Row 4 -->
     <tr>
-      <th class="num" style="width:8%">Total</th><th class="num" style="width:8%">Female</th>
-      <th class="num" style="width:8%">Total</th><th class="num" style="width:8%">Female</th>
-      <th class="num" style="width:8%">Total</th><th class="num" style="width:8%">Female</th>
+      <th class="num" style="width:8%; text-transform:none;">Total</th><th class="num" style="width:8%; text-transform:none;">Female</th>
+      <th class="num" style="width:8%; text-transform:none;">Total</th><th class="num" style="width:8%; text-transform:none;">Female</th>
+      <th class="num" style="width:8%; text-transform:none;">Total</th><th class="num" style="width:8%; text-transform:none;">Female</th>
     </tr>
     <!-- Header Row 5 (Numbers) -->
     <tr>
-      <th class="num">(1)</th>
-      <th class="num">(2)</th>
-      <th class="num">(3)</th>
-      <th class="num">(4)</th>
-      <th class="num">(5)</th>
-      <th class="num">(6)</th>
-      <th class="num">(7)</th>
-      <th class="num">(8)</th>
-      <th class="num">(9)</th>
-      <th class="num">(10)</th>
+      <th class="num" style="font-weight:normal;">(1)</th>
+      <th class="num" style="font-weight:normal;">(2)</th>
+      <th class="num" style="font-weight:normal;">(3)</th>
+      <th class="num" style="font-weight:normal;">(4)</th>
+      <th class="num" style="font-weight:normal;">(5)</th>
+      <th class="num" style="font-weight:normal;">(6)</th>
+      <th class="num" style="font-weight:normal;">(7)</th>
+      <th class="num" style="font-weight:normal;">(8)</th>
+      <th class="num" style="font-weight:normal;">(9)</th>
+      <th class="num" style="font-weight:normal;">(10)</th>
     </tr>
   </thead>
   <tbody>
@@ -79,6 +79,7 @@ th{background:#9bc2e6;font-size:6px;text-transform:uppercase;text-align:center;v
     @php
       $col1 = '';
       $col2 = '';
+      $pending_jsap = false;
       
       // Helper to fix title case for specific strings
       $formatLabel = function($label) {
@@ -99,19 +100,32 @@ th{background:#9bc2e6;font-size:6px;text-transform:uppercase;text-align:center;v
             <td class="dgray"></td><td class="dgray"></td>
           </tr>
         @elseif(in_array($row['key'], ['sec_jsap', 'sec_lmi', 'sec_cg', 'sec_airtip', 'sec_peis']))
-          @php $col1 = $formatLabel($row['label']); @endphp
+          @php 
+            $col1 = $formatLabel($row['label']); 
+            if($row['key'] === 'sec_jsap') $pending_jsap = true;
+          @endphp
         @elseif($row['key'] === 'sec_pes')
           @php $col2 = $formatLabel($row['label']); @endphp
         @endif
       @else
         @php 
           $pad = 1 + (($row['indent'] ?? 0) * 6); 
-          
-          // Exception: in original DOLE, "1. Public Employment Services through PESO" 
-          // does not exist in our DB as an indicator, but we have "1.1 Job vacancies...".
-          // If we want it to look EXACTLY like the DOLE, we just print the indicator.
-          // The $col1 and $col2 will be printed in the same row as the first indicator in that section!
         @endphp
+        
+        @if($pending_jsap)
+          <tr>
+            <td style="font-weight:bold;">{{ $col1 }}</td>
+            <td style="font-weight:bold;">{{ $col2 }}</td>
+            <td style="padding-left:1px;">1. Public Employment Services through PESO</td>
+            <td class="dgray"></td><td class="dgray"></td><td class="dgray"></td><td class="dgray"></td><td class="dgray"></td><td class="dgray"></td><td class="dgray"></td>
+          </tr>
+          @php 
+            $col1 = ''; 
+            $col2 = ''; 
+            $pending_jsap = false;
+          @endphp
+        @endif
+
         <tr>
           <td style="font-weight:bold;">{{ $col1 }}</td>
           <td style="font-weight:bold;">{{ $col2 }}</td>
@@ -162,7 +176,7 @@ th{background:#9bc2e6;font-size:6px;text-transform:uppercase;text-align:center;v
         <table style="width: 100%; border: none;">
           <tr>
             <td style="width: 33.33%; border: none; padding: 4px 8px;">
-              <div style="font-weight: bold; text-align: left; margin-bottom: 8px;">PREPARED BY:</div>
+              <div style="font-weight: bold; text-align: left; margin-bottom: 12px;">PREPARED BY:</div>
               <table style="width: 100%; border: none;">
                 <tr>
                   <td style="width: 25%; border: none; padding: 1px;">NAME:</td>
@@ -170,7 +184,7 @@ th{background:#9bc2e6;font-size:6px;text-transform:uppercase;text-align:center;v
                 </tr>
                 <tr>
                   <td style="border: none; padding: 1px;">SIGNATURE:</td>
-                  <td style="border: none; border-bottom: 1px solid #111827; padding: 1px;"></td>
+                  <td style="border: none; border-bottom: 1px solid #111827; padding: 1px; height: 12px;"></td>
                 </tr>
                 <tr>
                   <td colspan="2" style="border: none; text-align: center; padding: 2px;">SLEO/PESO Coordinator</td>
@@ -183,13 +197,15 @@ th{background:#9bc2e6;font-size:6px;text-transform:uppercase;text-align:center;v
             </td>
             
             <td style="width: 33.33%; border: none; padding: 4px 8px; vertical-align:top;">
-              <div style="font-weight: bold; text-align: left; margin-bottom: 8px;">CHECKED BY:</div>
+              <div style="font-weight: bold; text-align: left; margin-bottom: 12px;">CHECKED BY:</div>
               <table style="width: 100%; border: none;">
                 <tr>
+                  <!-- Empty row to match the height of NAME: in the left block -->
                   <td style="border: none; padding: 1px; height: 11px;"></td>
                 </tr>
                 <tr>
-                  <td style="border: none; border-bottom: 1px solid #111827; text-align: center; padding: 1px; font-weight:bold;">{{ data_get($signatories, 'checked_by.name', '') }}</td>
+                  <!-- This underline aligns with SIGNATURE: in the left block -->
+                  <td style="border: none; border-bottom: 1px solid #111827; text-align: center; padding: 1px; height: 12px; font-weight:bold;">{{ data_get($signatories, 'checked_by.name', '') }}</td>
                 </tr>
                 <tr>
                   <td style="border: none; text-align: center; padding: 2px;">CGADH1/PESO Manager</td>
@@ -201,7 +217,7 @@ th{background:#9bc2e6;font-size:6px;text-transform:uppercase;text-align:center;v
             </td>
             
             <td style="width: 33.33%; border: none; padding: 4px 8px;">
-              <div style="font-weight: bold; text-align: left; margin-bottom: 8px;">APPROVED BY:</div>
+              <div style="font-weight: bold; text-align: left; margin-bottom: 12px;">APPROVED BY:</div>
               <table style="width: 100%; border: none;">
                 <tr>
                   <td style="width: 25%; border: none; padding: 1px;">NAME:</td>
@@ -209,7 +225,7 @@ th{background:#9bc2e6;font-size:6px;text-transform:uppercase;text-align:center;v
                 </tr>
                 <tr>
                   <td style="border: none; padding: 1px;">SIGNATURE:</td>
-                  <td style="border: none; border-bottom: 1px solid #111827; padding: 1px;"></td>
+                  <td style="border: none; border-bottom: 1px solid #111827; padding: 1px; height: 12px;"></td>
                 </tr>
                 <tr>
                   <td colspan="2" style="border: none; text-align: center; padding: 2px;">City Mayor</td>
