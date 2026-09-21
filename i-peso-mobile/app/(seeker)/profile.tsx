@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   ActivityIndicator,
   Alert,
@@ -63,6 +63,11 @@ export default function ProfileScreen() {
   const [openExperienceEditors, setOpenExperienceEditors] = useState<Record<string, boolean>>({})
   const [experienceDrafts, setExperienceDrafts] = useState<Record<string, string>>({})
   const [experienceResponsibilities, setExperienceResponsibilities] = useState<Record<string, string>>({})
+  const [professionalSummary, setProfessionalSummary] = useState('')
+  const [summaryDraft, setSummaryDraft] = useState('')
+  const [summaryEditing, setSummaryEditing] = useState(false)
+  const [summaryGenerating, setSummaryGenerating] = useState(false)
+  const [summarySaving, setSummarySaving] = useState(false)
 
   const confirmSignOut = () => {
     Alert.alert('Sign out?', 'You will need to log in again to access your account.', [
@@ -100,6 +105,14 @@ export default function ProfileScreen() {
     await refetch()
     setRefreshing(false)
   }, [refetch])
+
+  useEffect(() => {
+    if (!profile) return
+    const savedSummary = profile.professional_summary ?? ''
+    setProfessionalSummary(savedSummary)
+    setSummaryDraft(savedSummary)
+    setSummaryEditing(false)
+  }, [profile?.id])
 
   const strength = profile?.profile_strength?.percentage ?? 0
   const checklist = arrayFrom<ProfileStrengthItem>(profile?.profile_strength?.items)
@@ -172,6 +185,39 @@ export default function ProfileScreen() {
         },
       },
     ])
+  }
+
+  const generateProfessionalSummary = async () => {
+    setActionError('')
+    setSummaryGenerating(true)
+    try {
+      const result = await seekerService.generateProfessionalSummaryAI(summaryDraft.trim() || professionalSummary.trim())
+      if (result?.summary) {
+        setSummaryDraft(result.summary)
+        setSummaryEditing(true)
+      } else {
+        setActionError('Smart summary generation is unavailable right now. You can still write your own summary.')
+      }
+    } catch (caught) {
+      setActionError(apiErrorMessage(caught, 'Unable to generate your professional summary.'))
+    } finally {
+      setSummaryGenerating(false)
+    }
+  }
+
+  const saveProfessionalSummary = async () => {
+    const trimmed = summaryDraft.trim()
+    setActionError('')
+    setSummarySaving(true)
+    try {
+      await seekerService.saveProfessionalSummary(trimmed)
+      setProfessionalSummary(trimmed)
+      setSummaryEditing(false)
+    } catch (caught) {
+      setActionError(apiErrorMessage(caught, 'Unable to save your professional summary.'))
+    } finally {
+      setSummarySaving(false)
+    }
   }
 
   const viewCertificate = async (certificate: SeekerCertificate) => {
@@ -253,7 +299,12 @@ export default function ProfileScreen() {
               <Text style={styles.avatarEditLabel}>{imageSource ? 'Change' : 'Add photo'}</Text>
             </PressableScale>
             <View style={styles.profileHeaderText}>
-              <Text style={styles.name}>{seekerName(profile)}</Text>
+              <View style={styles.nameRow}>
+                <Text style={styles.name}>{seekerName(profile)}</Text>
+                <Badge variant={profile?.profile_completed ? 'success' : 'warning'} style={styles.completionBadge}>
+                  {profile?.profile_completed ? 'NSRP Verified' : 'Needs Completion'}
+                </Badge>
+              </View>
               <Text style={styles.muted}>{textFrom(profile?.email, 'Email not listed')}</Text>
               <Text style={styles.muted}>{addressLine(profile)}</Text>
               {photoBusy ? (
@@ -280,6 +331,23 @@ export default function ProfileScreen() {
           </View>
         </Card>
 
+        <View style={styles.heroStatsRow}>
+          <View style={[styles.heroStat, styles.heroStatEmerald]}>
+            <MaterialIcons name="work-outline" size={18} color={colors.success} />
+            <View>
+              <Text style={styles.heroStatValue}>{profile?.dashboard_stats?.active_applications ?? 0}</Text>
+              <Text style={styles.heroStatLabel}>Applications</Text>
+            </View>
+          </View>
+          <View style={[styles.heroStat, styles.heroStatIndigo]}>
+            <MaterialIcons name="auto-awesome" size={18} color={colors.info} />
+            <View>
+              <Text style={styles.heroStatValue}>{profile?.dashboard_stats?.skills ?? hardSkills.length + softSkills.length}</Text>
+              <Text style={styles.heroStatLabel}>Skills</Text>
+            </View>
+          </View>
+        </View>
+
         <Card padding="md" style={styles.checklistCard}>
           {checklist.map((item) => (
             <View key={item.key ?? item.label} style={styles.checkRow}>
@@ -287,6 +355,80 @@ export default function ProfileScreen() {
               <Text style={[styles.checkText, item.complete && styles.checkTextDone]}>{item.label}</Text>
             </View>
           ))}
+        </Card>
+
+        <SectionHeader
+          title="About"
+          action={
+            <PressableScale
+              scaleTo="buttonPress"
+              ripple={null}
+              onPress={generateProfessionalSummary}
+              disabled={summaryGenerating}
+              accessibilityRole="button"
+            >
+              <View style={styles.summaryGenerateAction}>
+                {summaryGenerating ? (
+                  <ActivityIndicator size="small" color={colors.info} />
+                ) : (
+                  <MaterialIcons name="auto-awesome" size={14} color={colors.info} />
+                )}
+                <Text style={styles.editLinkText}>
+                  {summaryGenerating ? 'Generating...' : professionalSummary || summaryDraft ? 'Regenerate' : 'Generate'}
+                </Text>
+              </View>
+            </PressableScale>
+          }
+        />
+        <Card padding="md">
+          {summaryEditing ? (
+            <>
+              <TextInput
+                style={styles.dutiesTextarea}
+                value={summaryDraft}
+                onChangeText={setSummaryDraft}
+                placeholder="Write a short summary of your career goals, top skills, and preferred work."
+                placeholderTextColor={colors.subtle}
+                multiline
+                maxLength={1200}
+              />
+              <View style={styles.modalActions}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onPress={() => { setSummaryDraft(professionalSummary); setSummaryEditing(false) }}
+                  style={styles.modalBtn}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onPress={saveProfessionalSummary}
+                  disabled={!summaryDraft.trim() || summarySaving}
+                  loading={summarySaving}
+                  style={styles.modalBtn}
+                >
+                  Save Summary
+                </Button>
+              </View>
+            </>
+          ) : professionalSummary ? (
+            <>
+              <Text style={styles.summaryText}>{professionalSummary}</Text>
+              <PressableScale
+                scaleTo="buttonPress"
+                ripple={null}
+                onPress={() => { setSummaryDraft(professionalSummary); setSummaryEditing(true) }}
+                accessibilityRole="button"
+                style={styles.summaryEditLink}
+              >
+                <Text style={styles.editLinkText}>Edit summary</Text>
+              </PressableScale>
+            </>
+          ) : (
+            <EmptyLine text="Create an employer-ready introduction from your verified profile. Use Generate above, or write your own." />
+          )}
         </Card>
 
         {analytics && (analytics.total_views_30_days > 0 || analytics.recent_viewers.length > 0) ? (
@@ -372,17 +514,33 @@ export default function ProfileScreen() {
 
         <SectionHeader title="Education" action={<EditLink section={5} />} />
         <View style={styles.cardList}>
-          {educations.length ? educations.map((education, index) => (
-            <Card key={index} padding="md">
-              <Text style={styles.itemTitle}>{recordText(education, ['institution_name'], 'School not listed')}</Text>
-              <Text style={styles.itemMeta}>{titleCase(recordText(education, ['level']))}</Text>
-              <Text style={styles.itemMeta}>{recordText(education, ['course_strand'], 'Course or strand not listed')}</Text>
-              <Text style={styles.itemMeta}>
-                {textFrom(education.year_started, '')}
-                {education.year_graduated ? ` - ${textFrom(education.year_graduated, '')}` : ''}
-              </Text>
-            </Card>
-          )) : <Card padding="md"><EmptyLine text="No education records listed yet." /></Card>}
+          {educations.length ? educations.map((education, index) => {
+            const yearRange = [
+              textFrom(education.year_started, ''),
+              textFrom(education.year_graduated, '') || (education.completion_status === 'currently_studying' ? 'Present' : ''),
+            ].filter(Boolean).join(' - ')
+            const statusLabel = education.completion_status === 'currently_studying'
+              ? 'Currently Studying'
+              : education.completion_status === 'undergraduate'
+                ? 'Undergraduate / Did Not Finish'
+                : education.completion_status === 'graduated' || education.year_graduated
+                  ? 'Graduated'
+                  : 'Status not specified'
+
+            return (
+              <Card key={index} padding="md">
+                <Text style={styles.itemTitle}>{recordText(education, ['institution_name'], 'School not listed')}</Text>
+                <Text style={styles.itemMeta}>{titleCase(recordText(education, ['level']))}</Text>
+                <Text style={styles.itemMeta}>{recordText(education, ['course_strand'], 'Course or strand not listed')}</Text>
+                <View style={styles.tagRow}>
+                  <Badge variant="neutral" style={styles.metaBadge}>{statusLabel}</Badge>
+                  {yearRange ? <Badge variant="info" style={styles.metaBadge}>{yearRange}</Badge> : null}
+                  {education.undergrad_level_reached ? <Badge variant="warning" style={styles.metaBadge}>{textFrom(education.undergrad_level_reached)}</Badge> : null}
+                  {education.current_level ? <Badge variant="success" style={styles.metaBadge}>{textFrom(education.current_level)}</Badge> : null}
+                </View>
+              </Card>
+            )
+          }) : <Card padding="md"><EmptyLine text="No education records listed yet." /></Card>}
         </View>
 
         <SectionHeader title="Work Experience" action={<EditLink section={7} />} />
@@ -402,6 +560,7 @@ export default function ProfileScreen() {
               <Card key={key} padding="md">
                 <Text style={styles.itemTitle}>{recordText(work, ['position'], 'Position not listed')}</Text>
                 <Text style={styles.itemMeta}>{recordText(work, ['company_name'], 'Company not listed')}</Text>
+                <Text style={styles.itemMeta}>{recordText(work, ['company_address'], 'Address not specified')}</Text>
                 <Text style={styles.itemMeta}>{textFrom(work.number_of_months, 'Duration not listed')} months · {titleCase(recordText(work, ['employment_status']))}</Text>
 
                 {savedResponsibilities && !isOpen ? (
@@ -474,7 +633,16 @@ export default function ProfileScreen() {
               {trainings.map((training, index) => (
                 <Card key={`t${index}`} padding="md">
                   <Text style={styles.itemTitle}>{recordText(training, ['course'], 'Training not listed')}</Text>
-                  <Text style={styles.itemMeta}>{recordText(training, ['training_institution'], 'Institution not listed')}</Text>
+                  <Text style={styles.itemMeta}>
+                    {recordText(training, ['training_institution'], 'Institution not listed')}
+                    {training.hours_of_training ? ` · ${textFrom(training.hours_of_training)} hours` : ''}
+                  </Text>
+                  {training.certificates_received ? (
+                    <Badge variant="success" style={styles.metaBadge}>{textFrom(training.certificates_received)}</Badge>
+                  ) : null}
+                  {training.skills_acquired ? (
+                    <Text style={styles.itemMeta}>{textFrom(training.skills_acquired)}</Text>
+                  ) : null}
                 </Card>
               ))}
               {eligibilities.map((elig, index) => (
@@ -496,17 +664,29 @@ export default function ProfileScreen() {
           }
         />
         <View style={styles.cardList}>
-          {certificates.length ? certificates.map((certificate) => (
-            <Card key={String(certificate.certificate_id)} padding="md">
-              <Text style={styles.itemTitle}>{certificate.title}</Text>
-              <Text style={styles.itemMeta}>{certificate.issuing_body} · {titleCase(certificate.category)}</Text>
-              <Text style={styles.itemMeta}>Issued {textFrom(certificate.issued_at)}</Text>
-              <View style={styles.certActions}>
-                <Button variant="outline" size="sm" onPress={() => viewCertificate(certificate)} style={styles.certActionBtn}>View</Button>
-                <Button variant="danger" size="sm" onPress={() => deleteCertificate(certificate)} style={styles.certActionBtn}>Delete</Button>
-              </View>
-            </Card>
-          )) : <Card padding="md"><EmptyLine text="No certificates uploaded yet." /></Card>}
+          {certificates.length ? certificates.map((certificate) => {
+            const expired = Boolean(certificate.expires_at && certificate.expires_at < new Date().toISOString().slice(0, 10))
+
+            return (
+              <Card key={String(certificate.certificate_id)} padding="md">
+                <Text style={styles.itemTitle}>{certificate.title}</Text>
+                <Text style={styles.itemMeta}>{certificate.issuing_body} · {titleCase(certificate.category)}</Text>
+                <Text style={styles.itemMeta}>Issued {textFrom(certificate.issued_at)}</Text>
+                {certificate.credential_number ? <Text style={styles.itemMeta}>Credential no.: {certificate.credential_number}</Text> : null}
+                {certificate.training?.course ? <Text style={styles.itemMeta}>Related training: {certificate.training.course}</Text> : null}
+                {certificate.description ? <Text style={styles.itemMeta}>Remarks: {certificate.description}</Text> : null}
+                <View style={styles.tagRow}>
+                  <Badge variant={expired ? 'danger' : 'neutral'} style={styles.metaBadge}>
+                    {expired ? 'Expired' : certificate.expires_at ? `Expires ${textFrom(certificate.expires_at)}` : 'No expiration'}
+                  </Badge>
+                </View>
+                <View style={styles.certActions}>
+                  <Button variant="outline" size="sm" onPress={() => viewCertificate(certificate)} style={styles.certActionBtn}>View</Button>
+                  <Button variant="danger" size="sm" onPress={() => deleteCertificate(certificate)} style={styles.certActionBtn}>Delete</Button>
+                </View>
+              </Card>
+            )
+          }) : <Card padding="md"><EmptyLine text="No certificates uploaded yet." /></Card>}
         </View>
 
         <SectionHeader title="Resume" />
@@ -689,13 +869,25 @@ const styles = StyleSheet.create({
   removePhotoText: { marginTop: spacing.xs, color: colors.error, fontSize: typography.small, fontFamily: typography.family.bold },
   savingRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: spacing.xs },
   savingText: { color: colors.info, fontSize: typography.small, fontFamily: typography.family.bold },
-  name: { color: colors.textPrimary, fontSize: typography.title, fontFamily: typography.family.bold, marginBottom: spacing.xs },
+  nameRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.xs },
+  name: { color: colors.textPrimary, fontSize: typography.title, fontFamily: typography.family.bold },
+  completionBadge: { paddingVertical: 3 },
+  heroStatsRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md },
+  heroStat: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: spacing.xs, borderRadius: radii.md, paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
+  heroStatEmerald: { backgroundColor: colors.successBackground },
+  heroStatIndigo: { backgroundColor: colors.infoBackground },
+  heroStatValue: { color: colors.textPrimary, fontSize: typography.title, fontFamily: typography.family.bold },
+  heroStatLabel: { color: colors.textSecondary, fontSize: 11, fontFamily: typography.family.medium },
+  metaBadge: { marginTop: spacing.sm },
   muted: { color: colors.textSecondary, fontSize: typography.small, lineHeight: 18 },
   strengthCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.lg },
   strengthText: { flex: 1 },
   strengthTitle: { fontSize: typography.title, fontFamily: typography.family.bold, color: colors.textPrimary, marginBottom: spacing.xs },
   strengthSub: { fontSize: typography.small, color: colors.textSecondary, lineHeight: 18 },
   checklistCard: { marginTop: spacing.md, marginBottom: spacing.lg },
+  summaryGenerateAction: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  summaryText: { color: colors.textPrimary, fontSize: typography.body, lineHeight: 20 },
+  summaryEditLink: { marginTop: spacing.md, alignSelf: 'flex-start' },
   analyticsCard: {},
   analyticsStatsRow: { flexDirection: 'row', gap: spacing.lg },
   analyticsStat: { flex: 1, alignItems: 'center', backgroundColor: colors.background, borderRadius: radii.md, paddingVertical: spacing.md },

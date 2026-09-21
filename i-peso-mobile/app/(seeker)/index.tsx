@@ -336,7 +336,7 @@ export default function SeekerHomeScreen() {
               nextAction
                 ? router.push(
                     nextAction.section
-                      ? { pathname: '/(seeker)/profile/edit', params: { section: String(nextAction.section) } }
+                      ? { pathname: '/(seeker)/profile/edit', params: { section: String(nextAction.section), from: 'home' } }
                       : '/(seeker)/profile'
                   )
                 : router.push(strength < 100 ? '/(seeker)/profile' : '/(seeker)/jobs')
@@ -448,10 +448,11 @@ export default function SeekerHomeScreen() {
                 // straight back here the instant profile_completed is already true —
                 // which looks exactly like the tap did nothing. Send an already-complete
                 // profile to the edit screen instead, so the button always goes somewhere.
-                const target = action.path === '/onboarding' && user?.profile_completed
-                  ? '/(seeker)/profile/edit'
-                  : action.path
-                router.push(target as never)
+                if (action.path === '/onboarding' && user?.profile_completed) {
+                  router.push({ pathname: '/(seeker)/profile/edit', params: { from: 'home' } })
+                  return
+                }
+                router.push(action.path as never)
               }}
               accessibilityRole="button"
               accessibilityLabel={action.label}
@@ -479,7 +480,7 @@ export default function SeekerHomeScreen() {
           ) : null}
         </View>
 
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.feedSelectorRow}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.feedSelectorScroll} contentContainerStyle={styles.feedSelectorRow}>
           {FEED_SELECTOR_ITEMS.map((item) => {
             const active = feedMode === item.value
             return (
@@ -772,8 +773,13 @@ const styles = StyleSheet.create({
 
   viewAllText: { color: colors.blue600, ...textStyles.smallBold, lineHeight: undefined },
 
-  feedSelectorRow: { flexDirection: 'row', gap: spacing.sm, paddingHorizontal: spacing.lg, marginTop: spacing.lg },
-  feedSelectorCard: { width: 190, borderRadius: radii.md, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, padding: spacing.md },
+  // A horizontal ScrollView nested inside this screen's outer vertical ScrollView has no
+  // intrinsic height of its own on Android unless the ScrollView itself (not just its
+  // contentContainerStyle) is given one — without this it collapses to near-zero height and
+  // the cards bleed into whatever renders next instead of occupying their own row.
+  feedSelectorScroll: { marginTop: spacing.lg, height: 92 },
+  feedSelectorRow: { flexDirection: 'row', gap: spacing.sm, paddingHorizontal: spacing.lg },
+  feedSelectorCard: { width: 190, borderRadius: radii.md, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, padding: spacing.md, justifyContent: 'center' },
   feedSelectorCardActive: { backgroundColor: colors.blue700, borderColor: colors.blue700 },
   feedSelectorTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
   feedSelectorTitle: { ...textStyles.smallBold, color: colors.textPrimary, flexShrink: 1 },

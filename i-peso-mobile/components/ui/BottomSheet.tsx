@@ -119,7 +119,7 @@ export function BottomSheet({
 
             {title ? (
               <View style={styles.header}>
-                <Text style={styles.title}>{title}</Text>
+                <Text style={styles.title} numberOfLines={2}>{title}</Text>
                 <Pressable
                   onPress={dismiss}
                   hitSlop={12}
@@ -182,6 +182,8 @@ const styles = StyleSheet.create({
   title: {
     ...textStyles.title,
     color: colors.textPrimary,
+    flex: 1,
+    marginRight: spacing.md,
   },
   closeButton: {
     width: 32,
@@ -190,6 +192,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: colors.sunken,
+    flexShrink: 0,
   },
   body: {
     flex: 1,

@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react'
 import { ActivityIndicator, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native'
+import MaterialIcons from '@expo/vector-icons/MaterialIcons'
 import { Button } from '@/components/ui/Button'
 import { colors, radii, spacing, typography } from '@/theme'
-import { seekerService, type AiSuggestionItem, type OccupationClassificationSuggestion, type SkillOption } from '@/services/seekerService'
+import { seekerService, type AiSuggestionItem, type GeocodedLocation, type OccupationClassificationSuggestion, type SkillOption } from '@/services/seekerService'
 import { Combobox } from './Combobox'
 import { AddressSearchField } from './AddressSearchField'
 import { AddressPinMap } from './AddressPinMap'
-import type { GeocodedLocation } from '@/services/seekerService'
+import { LocationPickerModal, type LocationPickerValue } from './LocationPickerModal'
 import { getBarangaysByCity, getCitiesByProvince, getProvinces, matchPsgcLocation } from '@/services/psgcService'
 import {
   Choice,
@@ -427,6 +428,48 @@ function SubLabel({ children }: { children: string }) {
   return <Text style={styles.subLabel}>{children}</Text>
 }
 
+function presentAddressError(errors?: ServerErrors) {
+  return collapsedFieldError(errors, ['address_province', 'address_municipality_city', 'address_barangay', 'address_house_street'])
+}
+
+/** Compact "Present Address" card shown in place of the full inline search/map/cascade
+ * when Step1Personal is used with compactAddress (Profile Edit) — see that prop for why. */
+function PresentAddressSummary({
+  value,
+  onPress,
+  error,
+}: {
+  value: Step1Value
+  onPress: () => void
+  error?: string
+}) {
+  const readableAddress = [value.address_barangay, value.address_municipality_city, value.address_province]
+    .map((part) => part?.trim())
+    .filter(Boolean)
+    .join(', ')
+
+  return (
+    <View style={[styles.addressSummaryCard, error && styles.inputError]}>
+      <View style={styles.addressSummaryRow}>
+        <MaterialIcons name="place" size={18} color={colors.info} />
+        <Text style={styles.addressSummaryText} numberOfLines={2}>
+          {readableAddress || 'Add your present address'}
+        </Text>
+      </View>
+      {value.latitude != null && value.longitude != null ? (
+        <Text style={styles.addressSummaryCoords}>
+          {Number(value.latitude).toFixed(5)}, {Number(value.longitude).toFixed(5)}
+        </Text>
+      ) : null}
+      <TouchableOpacity style={styles.changeLocationBtn} onPress={onPress} activeOpacity={0.85} accessibilityRole="button">
+        <MaterialIcons name="edit-location-alt" size={16} color={colors.info} />
+        <Text style={styles.changeLocationBtnText}>{readableAddress ? 'Change Location' : 'Set Location'}</Text>
+      </TouchableOpacity>
+      {error ? <Text style={styles.errorText}>{error}</Text> : null}
+    </View>
+  )
+}
+
 // height_ft on the wire is decimal feet (backend: between:2.5,8.5) — the UI
 // collects it as a feet/inches pair and converts, per the NSRP form's units.
 const FEET_OPTIONS = [{ label: 'Feet', value: '0' }, ...[2, 3, 4, 5, 6, 7, 8].map((f) => ({ label: `${f} ft`, value: String(f) }))]
@@ -505,6 +548,7 @@ export function Step1Personal({
   onChange,
   errors,
   lockSurname = false,
+  compactAddress = false,
 }: {
   value: Step1Value
   onChange: (v: Step1Value) => void
@@ -513,6 +557,14 @@ export function Step1Personal({
    * captured at registration, so it's locked here (though not on the later Profile Edit
    * form, which still allows correcting it). */
   lockSurname?: boolean
+  /** Profile Edit reuses this same step for Personal info, but the address search/map/
+   * Province-City-Barangay cascade made that already-long form feel crowded (reported
+   * against a real screenshot of the Edit Profile page). When true, address editing is
+   * collapsed to a compact "Present Address" summary + "Change Location" button that
+   * opens LocationPickerModal instead of rendering everything inline. Onboarding leaves
+   * this false — first-time setup is a single linear pass, where the inline flow reads
+   * fine and doesn't need to be reduced further. */
+  compactAddress?: boolean
 }) {
   const set = <K extends keyof Step1Value>(key: K, val: Step1Value[K]) => onChange({ ...value, [key]: val })
   const [provinces, setProvinces] = useState<{ code: string; name: string }[]>([])
@@ -520,6 +572,7 @@ export function Step1Personal({
   const [barangays, setBarangays] = useState<{ code: string; name: string }[]>([])
   const [addressListsLoading, setAddressListsLoading] = useState(false)
   const [locationNotice, setLocationNotice] = useState('')
+  const [locationPickerOpen, setLocationPickerOpen] = useState(false)
 
   const applyResolvedLocation = async (place: GeocodedLocation) => {
     setLocationNotice('')
@@ -549,6 +602,7 @@ export function Step1Personal({
   }
 
   useEffect(() => {
+    if (compactAddress) return undefined
     let active = true
     setAddressListsLoading(true)
     getProvinces()
@@ -556,9 +610,10 @@ export function Step1Personal({
       .catch(() => active && setProvinces([]))
       .finally(() => active && setAddressListsLoading(false))
     return () => { active = false }
-  }, [])
+  }, [compactAddress])
 
   useEffect(() => {
+    if (compactAddress) return undefined
     let active = true
     setCities([])
     setBarangays([])
@@ -567,9 +622,10 @@ export function Step1Personal({
       .then((items) => active && setCities(items))
       .catch(() => active && setCities([]))
     return () => { active = false }
-  }, [value.address_province_code])
+  }, [compactAddress, value.address_province_code])
 
   useEffect(() => {
+    if (compactAddress) return undefined
     let active = true
     if (!value.address_city_code) {
       setBarangays([])
@@ -579,7 +635,7 @@ export function Step1Personal({
       .then((items) => active && setBarangays(items))
       .catch(() => active && setBarangays([]))
     return () => { active = false }
-  }, [value.address_city_code])
+  }, [compactAddress, value.address_city_code])
 
   const toggleDisability = (option: string) => {
     if (option === 'none') {
@@ -640,59 +696,84 @@ export function Step1Personal({
       <Field label="TIN (Tax Identification No.)" value={value.tin} onChangeText={(v) => set('tin', v)} keyboardType="number-pad" error={fieldError(errors, 'tin')} />
 
       <SubLabel>Present Address</SubLabel>
-      <Text style={styles.addressHint}>Search or use your current location, then select the Province, City / Municipality, and Barangay below.</Text>
-      <AddressSearchField
-        onError={setLocationNotice}
-        onAddressSelected={applyResolvedLocation}
-      />
-      {locationNotice ? <Text style={styles.errorText}>{locationNotice}</Text> : null}
-      {value.latitude != null && value.longitude != null ? (
+      {compactAddress ? (
+        <PresentAddressSummary value={value} onPress={() => setLocationPickerOpen(true)} error={presentAddressError(errors)} />
+      ) : (
         <>
-          <Text style={styles.helperText}>Drag the pin to adjust the exact spot.</Text>
-          <AddressPinMap
-            latitude={value.latitude}
-            longitude={value.longitude}
-            onPinMoved={(lat, lng) => onChange({ ...value, latitude: lat, longitude: lng })}
+          <Text style={styles.addressHint}>Search or use your current location, then select the Province, City / Municipality, and Barangay below.</Text>
+          <AddressSearchField
+            onError={setLocationNotice}
+            onAddressSelected={applyResolvedLocation}
           />
+          {locationNotice ? <Text style={styles.errorText}>{locationNotice}</Text> : null}
+          {value.latitude != null && value.longitude != null ? (
+            <>
+              <Text style={styles.helperText}>Drag the pin to adjust the exact spot.</Text>
+              <AddressPinMap
+                latitude={value.latitude}
+                longitude={value.longitude}
+                onPinMoved={(lat, lng) => onChange({ ...value, latitude: lat, longitude: lng })}
+              />
+            </>
+          ) : null}
+          <SelectField
+            label="Province"
+            required
+            placeholder={addressListsLoading ? 'Loading provinces...' : 'Select province'}
+            options={provinces.map((province) => ({ label: province.name, value: province.code }))}
+            value={value.address_province_code}
+            onChange={(code) => {
+              const province = provinces.find((item) => item.code === code)
+              onChange({ ...value, address_province_code: code, address_province: province?.name ?? '', address_city_code: '', address_municipality_city: '', address_barangay_code: '', address_barangay: '' })
+            }}
+            error={fieldError(errors, 'address_province')}
+          />
+          <SelectField
+            label="City / Municipality"
+            required
+            placeholder={value.address_province_code ? 'Select city / municipality' : 'Select province first'}
+            options={cities.map((city) => ({ label: city.name, value: city.code }))}
+            value={value.address_city_code}
+            onChange={(code) => {
+              const city = cities.find((item) => item.code === code)
+              onChange({ ...value, address_city_code: code, address_municipality_city: city?.name ?? '', address_barangay_code: '', address_barangay: '' })
+            }}
+            error={fieldError(errors, 'address_municipality_city')}
+          />
+          <SelectField
+            label="Barangay"
+            required
+            placeholder={value.address_city_code ? 'Select barangay' : 'Select city first'}
+            options={barangays.map((barangay) => ({ label: barangay.name, value: barangay.code }))}
+            value={value.address_barangay_code}
+            onChange={(code) => {
+              const barangay = barangays.find((item) => item.code === code)
+              onChange({ ...value, address_barangay_code: code, address_barangay: barangay?.name ?? '' })
+            }}
+            error={fieldError(errors, 'address_barangay')}
+          />
+          <Field label="House No. / Street" required value={value.address_house_street} onChangeText={(v) => set('address_house_street', v)} error={fieldError(errors, 'address_house_street')} />
         </>
+      )}
+
+      {compactAddress ? (
+        <LocationPickerModal
+          visible={locationPickerOpen}
+          initialValue={{
+            address_province: value.address_province,
+            address_province_code: value.address_province_code,
+            address_municipality_city: value.address_municipality_city,
+            address_city_code: value.address_city_code,
+            address_barangay: value.address_barangay,
+            address_barangay_code: value.address_barangay_code,
+            address_house_street: value.address_house_street,
+            latitude: value.latitude,
+            longitude: value.longitude,
+          }}
+          onClose={() => setLocationPickerOpen(false)}
+          onConfirm={(picked: LocationPickerValue) => onChange({ ...value, ...picked })}
+        />
       ) : null}
-      <SelectField
-        label="Province"
-        required
-        placeholder={addressListsLoading ? 'Loading provinces...' : 'Select province'}
-        options={provinces.map((province) => ({ label: province.name, value: province.code }))}
-        value={value.address_province_code}
-        onChange={(code) => {
-          const province = provinces.find((item) => item.code === code)
-          onChange({ ...value, address_province_code: code, address_province: province?.name ?? '', address_city_code: '', address_municipality_city: '', address_barangay_code: '', address_barangay: '' })
-        }}
-        error={fieldError(errors, 'address_province')}
-      />
-      <SelectField
-        label="City / Municipality"
-        required
-        placeholder={value.address_province_code ? 'Select city / municipality' : 'Select province first'}
-        options={cities.map((city) => ({ label: city.name, value: city.code }))}
-        value={value.address_city_code}
-        onChange={(code) => {
-          const city = cities.find((item) => item.code === code)
-          onChange({ ...value, address_city_code: code, address_municipality_city: city?.name ?? '', address_barangay_code: '', address_barangay: '' })
-        }}
-        error={fieldError(errors, 'address_municipality_city')}
-      />
-      <SelectField
-        label="Barangay"
-        required
-        placeholder={value.address_city_code ? 'Select barangay' : 'Select city first'}
-        options={barangays.map((barangay) => ({ label: barangay.name, value: barangay.code }))}
-        value={value.address_barangay_code}
-        onChange={(code) => {
-          const barangay = barangays.find((item) => item.code === code)
-          onChange({ ...value, address_barangay_code: code, address_barangay: barangay?.name ?? '' })
-        }}
-        error={fieldError(errors, 'address_barangay')}
-      />
-      <Field label="House No. / Street" required value={value.address_house_street} onChangeText={(v) => set('address_house_street', v)} error={fieldError(errors, 'address_house_street')} />
 
       <SubLabel>Disability Disclosure</SubLabel>
       <View style={styles.choiceGrid}>
@@ -1321,6 +1402,13 @@ const styles = StyleSheet.create({
   helperText: { marginTop: -spacing.sm, marginBottom: spacing.md, color: colors.subtle, fontSize: typography.small },
   addressHint: { marginTop: -spacing.xs, marginBottom: spacing.sm, color: colors.subtle, fontSize: typography.small, lineHeight: 16 },
   errorText: { marginTop: -spacing.sm, marginBottom: spacing.md, color: colors.danger, fontSize: typography.small, fontFamily: typography.family.medium },
+  addressSummaryCard: { borderWidth: 1, borderColor: colors.border, borderRadius: radii.lg, backgroundColor: colors.surface, padding: spacing.lg, marginBottom: spacing.lg },
+  addressSummaryRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
+  addressSummaryText: { flex: 1, color: colors.primary, fontSize: typography.body, fontFamily: typography.family.medium, lineHeight: 20 },
+  addressSummaryCoords: { marginTop: spacing.xs, marginLeft: 26, color: colors.subtle, fontSize: typography.small },
+  changeLocationBtn: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, alignSelf: 'flex-start', marginTop: spacing.md, borderWidth: 1, borderColor: colors.infoBorder, backgroundColor: colors.infoBackground, borderRadius: radii.md, paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
+  changeLocationBtnText: { color: colors.info, fontSize: typography.small, fontFamily: typography.family.bold },
+  inputError: { borderColor: colors.danger },
   aiToggle: { alignSelf: 'flex-start', marginTop: spacing.xs, marginBottom: spacing.lg },
   aiPanel: { borderWidth: 1, borderColor: colors.infoBorder, backgroundColor: colors.infoBackground, borderRadius: radii.lg, padding: spacing.lg, marginBottom: spacing.lg },
   aiFetchBtn: { alignSelf: 'flex-start', marginTop: spacing.xs },

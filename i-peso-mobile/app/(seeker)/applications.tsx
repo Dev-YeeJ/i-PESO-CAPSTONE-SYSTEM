@@ -21,7 +21,6 @@ import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { PressableScale } from '@/components/ui/PressableScale'
-import { StatCard } from '@/components/ui/StatCard'
 import { SectionHeader } from '@/components/ui/SectionHeader'
 import { ScreenSkeleton } from '@/components/ui/ScreenSkeleton'
 import { colors, radii, spacing, typography } from '@/theme'
@@ -79,9 +78,6 @@ export default function ApplicationsScreen() {
   }
 
   const activeApplications = applications.filter((application) => !['hired', 'rejected', 'withdrawn'].includes(application.status)).length
-  const hiredApplications = applications.filter((application) => application.status === 'hired').length
-  const savedCount = profile?.dashboard_stats?.saved_jobs?.length ?? 0
-  const strength = profile?.profile_strength?.percentage ?? 0
 
   return (
     <View style={styles.flex}>
@@ -123,16 +119,6 @@ export default function ApplicationsScreen() {
             Employers can move your application from pending review to interview, hired, or rejected.
           </Text>
         </Card>
-
-        <SectionHeader title="Overview" />
-        <View style={styles.statsRow}>
-          <StatCard title="Active" value={activeApplications} />
-          <StatCard title="Hired" value={hiredApplications} />
-        </View>
-        <View style={[styles.statsRow, { marginTop: spacing.sm }]}>
-          <StatCard title="Saved Jobs" value={savedCount} />
-          <StatCard title="Profile" value={`${strength}%`} />
-        </View>
 
         <SectionHeader title="Application History" />
 
@@ -266,7 +252,6 @@ const styles = StyleSheet.create({
   summaryLabel: { color: colors.secondary, fontSize: typography.small, fontFamily: typography.family.bold, marginBottom: spacing.xs },
   summaryTitle: { color: colors.textPrimary, fontSize: typography.heading, fontFamily: typography.family.bold, marginBottom: spacing.xs },
   summaryText: { color: colors.textSecondary, fontSize: typography.body, lineHeight: 20 },
-  statsRow: { flexDirection: 'row', gap: spacing.sm },
   applicationCard: { marginBottom: spacing.sm },
   applicationHeader: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: spacing.sm },
   applicationTitleWrap: { flex: 1 },

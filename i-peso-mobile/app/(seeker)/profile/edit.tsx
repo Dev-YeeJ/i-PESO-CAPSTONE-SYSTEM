@@ -1,5 +1,6 @@
-import { memo, useEffect, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useRef, useState } from 'react'
 import {
+  BackHandler,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -8,6 +9,7 @@ import {
   View,
 } from 'react-native'
 import Animated, { FadeInLeft, FadeInRight } from 'react-native-reanimated'
+import { useFocusEffect } from '@react-navigation/native'
 import type { AxiosError } from 'axios'
 import { router, useLocalSearchParams } from 'expo-router'
 import { seekerService } from '@/services/seekerService'
@@ -74,7 +76,7 @@ const SectionTabs = memo(function SectionTabs({ activeStep, onChange }: { active
 })
 
 export default function ProfileEditScreen() {
-  const params = useLocalSearchParams<{ section?: string }>()
+  const params = useLocalSearchParams<{ section?: string; from?: string }>()
   const updateUser = useAuthStore((state) => state.updateUser)
   const m = useMotion()
   const { showToast } = useToast()
@@ -89,6 +91,29 @@ export default function ProfileEditScreen() {
   // section numbers rather than tracked via explicit forward/back buttons.
   const [goingBack, setGoingBack] = useState(false)
   const scrollRef = useRef<ScrollView>(null)
+
+  // profile/edit is a flat sibling in the Tabs navigator (href: null in _layout.tsx), so
+  // router.back() has no reliable history to pop and falls through to the first tab (Home)
+  // rather than wherever the seeker actually came from. Home's "Update Work Experience"
+  // (and similar profile-strength suggestions) links here directly, bypassing Profile — so
+  // unlike resume-studio.tsx (which only has one entry point), this screen needs to know
+  // which one it was opened from to send the seeker back to the right place.
+  const goBack = useCallback(() => {
+    router.replace(params.from === 'home' ? '/(seeker)' : '/(seeker)/profile')
+  }, [params.from])
+
+  // The ScreenHeader back button above only covers a tap on its own arrow — Android's
+  // hardware/system back key bypasses that and goes straight to React Navigation, which
+  // (same flat-sibling reasoning) would otherwise fall through to Home regardless of entry.
+  useFocusEffect(
+    useCallback(() => {
+      const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+        goBack()
+        return true
+      })
+      return () => subscription.remove()
+    }, [goBack])
+  )
 
   useEffect(() => {
     let active = true
@@ -163,7 +188,7 @@ export default function ProfileEditScreen() {
   if (loading) {
     return (
       <View style={styles.flex}>
-        <ScreenHeader title="Edit Profile" onBack={() => router.replace('/(seeker)/profile')} backLabel="Close" />
+        <ScreenHeader title="Edit Profile" onBack={goBack} backLabel="Close" />
         <SkeletonGroup label="Loading your profile" style={styles.loadingWrap}>
           <Skeleton width="50%" height={14} />
           <Skeleton width="100%" height={300} radius={radii.xl} style={styles.loadingBlock} />
@@ -174,7 +199,7 @@ export default function ProfileEditScreen() {
 
   return (
     <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <ScreenHeader title="Edit Profile" onBack={() => router.replace('/(seeker)/profile')} backLabel="Close" />
+      <ScreenHeader title="Edit Profile" onBack={goBack} backLabel="Close" />
 
       <SectionTabs activeStep={activeStep} onChange={changeSection} />
 
@@ -186,7 +211,7 @@ export default function ProfileEditScreen() {
           entering={m.enabled ? (goingBack ? FadeInLeft.duration(260) : FadeInRight.duration(260)) : undefined}
           style={styles.card}
         >
-          {activeStep === 1 && <Step1Personal value={form.step1} onChange={(step1) => setForm((f) => ({ ...f, step1 }))} errors={errors} />}
+          {activeStep === 1 && <Step1Personal value={form.step1} onChange={(step1) => setForm((f) => ({ ...f, step1 }))} errors={errors} compactAddress />}
           {activeStep === 2 && <Step2Employment value={form.step2} onChange={(step2) => setForm((f) => ({ ...f, step2 }))} errors={errors} />}
           {activeStep === 3 && <Step3Preferences value={form.step3} onChange={(step3) => setForm((f) => ({ ...f, step3 }))} errors={errors} />}
           {activeStep === 4 && <Step4Languages value={form.step4} onChange={(step4) => setForm((f) => ({ ...f, step4 }))} errors={errors} />}
