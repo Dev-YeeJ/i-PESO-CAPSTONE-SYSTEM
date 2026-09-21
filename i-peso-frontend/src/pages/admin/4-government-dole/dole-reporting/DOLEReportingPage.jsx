@@ -6,6 +6,7 @@ import DataTable from '@/pages/admin/_components/DataTable'
 import { adminService } from '@/services/adminService'
 import toast from 'react-hot-toast'
 import { useNavigate } from 'react-router-dom'
+import api from '@/services/api'
 
 const SIGNATORY_ROLES = [
   ['prepared_by', 'Prepared by', 'SLEO/PESO Coordinator'],
@@ -107,14 +108,15 @@ export default function DOLEReportingPage() {
     }
   }
 
-  const handleExportPdf = async (row) => {
-    setExportingId(row.report_id)
+  const handleExportPdf = async (reportOrId) => {
+    const rId = reportOrId?.report_id || reportOrId
+    setExportingId(rId)
     try {
-      const blob = await adminService.exportSprsPdf(row.report_id)
+      const blob = await adminService.exportSprsPdf(rId)
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = `sprs-${row.report_id}.pdf`
+      a.download = `sprs-${rId}.pdf`
       a.click()
       URL.revokeObjectURL(url)
     } catch (err) {
@@ -180,6 +182,7 @@ export default function DOLEReportingPage() {
       setIsSaving(false)
     }
   }
+
 
   const columns = [
     { key: 'month', label: 'Report Period', render: (val, row) => new Date(row.coverage_start || row.report_date).toLocaleDateString(undefined, { month: 'long', year: 'numeric' }) },
@@ -385,8 +388,8 @@ export default function DOLEReportingPage() {
                 <Button variant="secondary" onClick={handleSaveSprs} disabled={isSaving} className="gap-2">
                   {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Save Changes
                 </Button>
-                <Button onClick={() => window.open(import.meta.env.VITE_API_BASE_URL.replace('/api', '') + `/api/admin/reports/${generatedReport.report_id}/export-sprs-pdf`, '_blank')} className="gap-2">
-                  <Printer className="h-4 w-4" /> Download PDF
+                <Button onClick={() => handleExportPdf(generatedReport.report_id)} disabled={exportingId === generatedReport.report_id} className="gap-2">
+                  {exportingId === generatedReport.report_id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Printer className="h-4 w-4" />} Download PDF
                 </Button>
               </div>
             </div>
