@@ -388,8 +388,8 @@ export default function DOLEReportingPage() {
                 <Button variant="secondary" onClick={handleSaveSprs} disabled={isSaving} className="gap-2">
                   {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Save Changes
                 </Button>
-                <Button onClick={() => handleExportPdf(generatedReport.report_id)} disabled={exportingId === generatedReport.report_id} className="gap-2">
-                  {exportingId === generatedReport.report_id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Printer className="h-4 w-4" />} Download PDF
+                <Button onClick={() => handleExportPdf(generatedReportId)} disabled={exportingId === generatedReportId} className="gap-2">
+                  {exportingId === generatedReportId ? <Loader2 className="h-4 w-4 animate-spin" /> : <Printer className="h-4 w-4" />} Download PDF
                 </Button>
               </div>
             </div>
