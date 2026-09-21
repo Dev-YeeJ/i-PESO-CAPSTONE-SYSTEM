@@ -21,30 +21,31 @@ th{background:#b8d1f3;font-size:6.5px;text-transform:uppercase;text-align:center
   <thead>
     <!-- Header Row 1 (Letterhead) -->
     <tr>
-      <th colspan="3" style="text-align:left; background: #ffffff; text-transform:none; font-size:8px; font-weight:normal; padding: 4px 6px;">
+      <th colspan="2" style="text-align:left; background: #ffffff; text-transform:none; font-size:8px; font-weight:normal; padding: 4px 6px;">
         <span style="font-weight:bold;">LGU/PESO:</span> {{ $v('lgu_name', 'Urdaneta City') }}<br>
         <span style="font-weight:bold;">Province:</span> <span style="text-transform:uppercase;">{{ $v('province', 'Pangasinan') }}</span>
       </th>
-      <th colspan="5" style="text-align:center; background: #ffffff; text-transform:none; font-size:9px; font-weight:bold; padding: 4px 6px;">
+      <th colspan="6" style="text-align:center; background: #ffffff; text-transform:none; font-size:9.5px; font-weight:bold; padding: 4px 6px;">
         DEPARTMENT OF LABOR AND EMPLOYMENT<br>
         <span style="font-size:8px; font-weight:normal;">Regional Office No. 1</span><br>
-        <span style="font-size:8px; font-weight:normal;">San Fernando City, La Union</span><br>
+        <span style="font-size:8px; font-weight:normal;">San Fernando City, La Union</span><br><br>
         STATISTICAL PERFORMANCE REPORTING SYSTEM (SPRS)<br>
-        <span style="font-size:7px;">PESO MONTHLY OPERATIONS STATISTICAL REPORT (PESO OpS)</span>
+        <span style="font-size:7.5px;">PESO MONTHLY OPERATIONS STATISTICAL REPORT (PESO OpS)</span>
       </th>
       <th colspan="2" style="text-align:center; background: #ffffff; text-transform:none; font-size:8px; padding: 4px 6px; vertical-align:middle;">
-        <span style="font-weight:bold;">{{ $v('period_short', $v('period', $report->title)) }}</span><br>
+        <span style="font-weight:bold;">{{ $v('period_short', $v('period', $report->title)) }}</span><br><br>
         Reference<br>Month/Year
       </th>
     </tr>
 
     <!-- Header Row 2 -->
     <tr>
-      <th rowspan="3" colspan="2" style="width:16%">PROGRAMS</th>
+      <th rowspan="3" style="width:6%">PROGRAMS</th>
+      <th rowspan="3" style="width:10%"></th>
       <th rowspan="3" style="width:26%">SUCCESS INDICATORS</th>
       <th rowspan="3" style="width:7%">WHOLE<br>YEAR<br>TARGET</th>
       <th rowspan="2" colspan="2">PREVIOUS<br>REPORTING<br>MONTH</th>
-      <th colspan="4" style="border-bottom: 1px solid #111827;">Actual Performance</th>
+      <th colspan="4" style="border-bottom: 1px solid #111827; text-transform:none; font-weight:bold;">Actual Performance</th>
     </tr>
     <!-- Header Row 3 -->
     <tr>
@@ -78,7 +79,7 @@ th{background:#b8d1f3;font-size:6.5px;text-transform:uppercase;text-align:center
     @foreach($rows as $row)
       @if($row['section'] ?? false)
         @if($row['key'] === 'sec_efcbs')
-          <tr style="background:#e2e8f0;">
+          <tr>
             <td colspan="3" style="font-weight:bold; text-transform:uppercase;">{{ $row['label'] }}</td>
             <td class="dgray"></td>
             <td class="dgray"></td><td class="dgray"></td>
@@ -126,7 +127,7 @@ th{background:#b8d1f3;font-size:6.5px;text-transform:uppercase;text-align:center
     @endforeach
 
     <!-- Other Accomplishments -->
-    <tr style="background:#e2e8f0;">
+    <tr>
       <td colspan="10" style="font-weight:bold;text-transform:uppercase">OTHER ACCOMPLISHMENTS:</td>
     </tr>
     <tr>
@@ -154,12 +155,12 @@ th{background:#b8d1f3;font-size:6.5px;text-transform:uppercase;text-align:center
       <td colspan="10" style="padding: 0;">
         <table style="width: 100%; border: none;">
           <tr>
-            <td style="width: 33.33%; border: none; border-right: 1px solid #111827; padding: 4px 10px;">
-              <div style="font-weight: bold; text-align: center; margin-bottom: 12px;">PREPARED BY:</div>
+            <td style="width: 33.33%; border: none; padding: 10px 15px;">
+              <div style="font-weight: bold; text-align: left; margin-bottom: 12px;">PREPARED BY:</div>
               <table style="width: 100%; border: none;">
                 <tr>
-                  <td style="width: 30%; border: none; padding: 1px;">NAME:</td>
-                  <td style="width: 70%; border: none; border-bottom: 1px solid #111827; text-align: center; padding: 1px;">{{ data_get($signatories, 'prepared_by.name', '') }}</td>
+                  <td style="width: 25%; border: none; padding: 1px;">NAME:</td>
+                  <td style="width: 75%; border: none; border-bottom: 1px solid #111827; text-align: center; padding: 1px; font-weight:bold;">{{ data_get($signatories, 'prepared_by.name', '') }}</td>
                 </tr>
                 <tr>
                   <td style="border: none; padding: 1px;">SIGNATURE:</td>
@@ -170,16 +171,16 @@ th{background:#b8d1f3;font-size:6.5px;text-transform:uppercase;text-align:center
                 </tr>
                 <tr>
                   <td style="border: none; padding: 1px;">DATE:</td>
-                  <td style="border: none; border-bottom: 1px solid #111827; padding: 1px;"></td>
+                  <td style="border: none; padding: 1px;">{{ date('m/d/Y') }}</td>
                 </tr>
               </table>
             </td>
             
-            <td style="width: 33.33%; border: none; border-right: 1px solid #111827; padding: 4px 10px;">
-              <div style="font-weight: bold; text-align: center; margin-bottom: 12px;">CHECKED BY:</div>
+            <td style="width: 33.33%; border: none; padding: 10px 15px;">
+              <div style="font-weight: bold; text-align: left; margin-bottom: 12px;">CHECKED BY:</div>
               <table style="width: 100%; border: none;">
                 <tr>
-                  <td style="border: none; padding: 1px; text-align: center; border-bottom: 1px solid #111827; min-height: 10px;">{{ data_get($signatories, 'checked_by.name', '') }}</td>
+                  <td style="border: none; padding: 1px; text-align: center; border-bottom: 1px solid #111827; min-height: 10px; font-weight:bold;">{{ data_get($signatories, 'checked_by.name', '') }}</td>
                 </tr>
                 <tr>
                   <td style="border: none; padding: 1px; text-align: center; color: white;">.</td>
@@ -188,28 +189,28 @@ th{background:#b8d1f3;font-size:6.5px;text-transform:uppercase;text-align:center
                   <td style="border: none; text-align: center; padding: 2px;">CGADH1/PESO Manager</td>
                 </tr>
                 <tr>
-                  <td style="border: none; padding: 1px; text-align: center; color: white;">.</td>
+                  <td style="border: none; padding: 1px; text-align: center;">DATE: {{ date('m/d/Y') }}</td>
                 </tr>
               </table>
             </td>
             
-            <td style="width: 33.33%; border: none; padding: 4px 10px;">
-              <div style="font-weight: bold; text-align: center; margin-bottom: 12px;">APPROVED BY:</div>
+            <td style="width: 33.33%; border: none; padding: 10px 15px;">
+              <div style="font-weight: bold; text-align: left; margin-bottom: 12px;">APPROVED BY:</div>
               <table style="width: 100%; border: none;">
                 <tr>
-                  <td style="width: 30%; border: none; padding: 1px; color: white;">NAME:</td>
-                  <td style="width: 70%; border: none; border-bottom: 1px solid #111827; text-align: center; padding: 1px;">{{ data_get($signatories, 'approved_by.name', '') }}</td>
+                  <td style="width: 25%; border: none; padding: 1px;">NAME:</td>
+                  <td style="width: 75%; border: none; border-bottom: 1px solid #111827; text-align: center; padding: 1px; font-weight:bold;">{{ data_get($signatories, 'approved_by.name', '') }}</td>
                 </tr>
                 <tr>
-                  <td style="border: none; padding: 1px; color: white;">SIGNATURE:</td>
+                  <td style="border: none; padding: 1px;">SIGNATURE:</td>
                   <td style="border: none; border-bottom: 1px solid #111827; padding: 1px;"></td>
                 </tr>
                 <tr>
                   <td colspan="2" style="border: none; text-align: center; padding: 2px;">City Mayor</td>
                 </tr>
                 <tr>
-                  <td style="border: none; padding: 1px; color: white;">DATE:</td>
-                  <td style="border: none; border-bottom: 1px solid #111827; padding: 1px;"></td>
+                  <td style="border: none; padding: 1px;">DATE:</td>
+                  <td style="border: none; padding: 1px;"></td>
                 </tr>
               </table>
             </td>
