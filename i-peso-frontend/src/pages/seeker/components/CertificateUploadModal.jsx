@@ -14,6 +14,11 @@ const categories = [
   ['other', 'Other'],
 ]
 
+// A Training Certificate / TESDA NC credential is, by definition, a training's
+// output — everything else (academic, professional, employment, etc.) may
+// stand alone. Mirrors SeekerCertificateController::CATEGORIES_REQUIRING_TRAINING.
+const CATEGORIES_REQUIRING_TRAINING = ['training_certificate', 'tesda_nc_certificate']
+
 const initialForm = {
   title: '',
   issuingBody: '',
@@ -41,6 +46,8 @@ export default function CertificateUploadModal({ open, trainings = [], onClose, 
     () => trainings.find((training) => String(training.id) === String(form.trainingId)),
     [form.trainingId, trainings],
   )
+  const requiresTraining = CATEGORIES_REQUIRING_TRAINING.includes(form.category)
+  const blockedByNoTrainings = requiresTraining && trainings.length === 0
 
   if (!open) return null
 
@@ -67,7 +74,7 @@ export default function CertificateUploadModal({ open, trainings = [], onClose, 
     event.preventDefault()
     if (saving) return
 
-    const errors = validate(form)
+    const errors = validate(form, trainings)
     setFieldErrors(errors)
     setGeneralError('')
     if (Object.keys(errors).length) {
@@ -154,9 +161,9 @@ export default function CertificateUploadModal({ open, trainings = [], onClose, 
                   {categories.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
                 </select>
               </Field>
-              <Field label="Related Training Record" hint="Optional" error={fieldErrors.trainingId}>
-                <select value={form.trainingId} onChange={(event) => update('trainingId', event.target.value)} className={inputClass}>
-                  <option value="">Standalone certificate</option>
+              <Field label="Related Training Record" required={requiresTraining} hint={requiresTraining ? '' : 'Optional'} error={fieldErrors.trainingId}>
+                <select value={form.trainingId} onChange={(event) => update('trainingId', event.target.value)} disabled={blockedByNoTrainings} className={inputClass}>
+                  <option value="">{requiresTraining ? 'Select a training' : 'Standalone certificate'}</option>
                   {trainings.map((training) => (
                     <option key={training.id} value={training.id}>{training.course}{training.training_institution ? ` — ${training.training_institution}` : ''}</option>
                   ))}
@@ -192,6 +199,9 @@ export default function CertificateUploadModal({ open, trainings = [], onClose, 
             {form.file && !detailsComplete && (
               <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs font-semibold text-amber-800">Please complete the certificate details before saving.</p>
             )}
+            {blockedByNoTrainings && (
+              <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs font-semibold text-amber-800">This category needs a training record on file. Add one under the Trainings section first, then come back to link it here.</p>
+            )}
             {selectedTraining && <p className="mt-3 text-xs font-semibold text-blue-800">This proof will be linked to: {selectedTraining.course}.</p>}
             {saving && (
               <div className="mt-4" aria-live="polite">
@@ -205,7 +215,7 @@ export default function CertificateUploadModal({ open, trainings = [], onClose, 
 
         <footer className="flex flex-col-reverse gap-3 border-t border-slate-200 bg-slate-50 px-5 py-4 sm:flex-row sm:justify-end sm:px-7">
           <button type="button" disabled={saving} onClick={close} className="min-h-11 rounded-xl border border-slate-300 bg-white px-5 text-sm font-bold text-slate-700 hover:bg-slate-100 disabled:opacity-50">Cancel</button>
-          <button type="submit" disabled={saving} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-blue-950 px-6 text-sm font-black text-white shadow-sm hover:bg-blue-900 disabled:cursor-not-allowed disabled:opacity-60">
+          <button type="submit" disabled={saving || blockedByNoTrainings} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-blue-950 px-6 text-sm font-black text-white shadow-sm hover:bg-blue-900 disabled:cursor-not-allowed disabled:opacity-60">
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Award className="h-4 w-4 text-amber-300" />}
             {saving ? 'Saving Certificate…' : 'Save Certificate'}
           </button>
@@ -227,11 +237,16 @@ function Field({ label, required = false, hint = '', error, children }) {
   )
 }
 
-function validate(form) {
+function validate(form, trainings = []) {
   const errors = {}
   if (!form.title.trim()) errors.title = 'Certificate title is required.'
   if (!form.issuingBody.trim()) errors.issuingBody = 'Issuing organization is required.'
   if (!form.category) errors.category = 'Select a certificate category.'
+  if (CATEGORIES_REQUIRING_TRAINING.includes(form.category) && !form.trainingId) {
+    errors.trainingId = trainings.length === 0
+      ? 'Add a training record first, then link it here.'
+      : 'Link this certificate to one of your trainings.'
+  }
   if (!form.issuedAt) errors.issuedAt = 'Issue date is required.'
   else if (form.issuedAt > today) errors.issuedAt = 'Issue date cannot be in the future.'
   if (form.expiresAt && form.issuedAt && form.expiresAt <= form.issuedAt) errors.expiresAt = 'Expiration date must be after the issue date.'

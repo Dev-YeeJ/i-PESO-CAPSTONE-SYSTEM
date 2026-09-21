@@ -139,6 +139,7 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::apiResource('vacancies', EmployerJobVacancyController::class);
             Route::get('/applications', [EmployerApplicationController::class, 'index']);
             Route::get('/applications/{application}', [EmployerApplicationController::class, 'show']);
+            Route::get('/applications/{application}/seeker-profile-image', [EmployerApplicationController::class, 'seekerProfileImage']);
             Route::patch('/applications/bulk-status', [EmployerApplicationController::class, 'updateStatusBulk'])->middleware('throttle:20,1');
             Route::patch('/applications/{application}/status', [EmployerApplicationController::class, 'updateStatus'])->middleware('throttle:30,1');
 
@@ -175,6 +176,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/step-5', [SeekerController::class, 'saveStep5']);
         Route::post('/step-6', [SeekerController::class, 'saveStep6']);
         Route::post('/step-7', [SeekerController::class, 'saveStep7']);
+        Route::patch('/work-experiences/{workExperience}/responsibilities', [SeekerController::class, 'updateWorkExperienceResponsibilities']);
         Route::post('/profile', [SeekerController::class, 'saveProfile']); // Legacy single-submit endpoint
         Route::post('/profile-image', [SeekerProfileImageController::class, 'store']);
         Route::get('/profile-image', [SeekerProfileImageController::class, 'show']);
@@ -238,6 +240,7 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::get('/seekers/export', [AdminSeekerController::class, 'export']);
             Route::get('/seekers', [AdminSeekerController::class, 'index']);
             Route::get('/seekers/{id}', [AdminSeekerController::class, 'show']);
+            Route::get('/seekers/{id}/profile-image', [AdminSeekerController::class, 'profileImage']);
             Route::get('/job-seekers/{id}/export-nsrp-pdf', [NSRPPdfExportController::class, 'exportNSRPPdf']);
             Route::get('/occupation-mappings/pending', [OccupationMappingController::class, 'pending']);
             Route::post('/occupation-mappings/{preference}/map', [OccupationMappingController::class, 'map']);
@@ -304,6 +307,7 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::put('/job-fairs/{id}', [AdminJobFairController::class, 'update']);
             Route::delete('/job-fairs/{id}', [AdminJobFairController::class, 'destroy']);
             Route::post('/job-fairs/{jobFair}/publish', [AdminJobFairController::class, 'publish']);
+            Route::post('/job-fairs/{jobFair}/resend-invitations', [AdminJobFairController::class, 'resendInvitations']);
             Route::post('/job-fairs/{jobFair}/invite', [AdminJobFairController::class, 'invite']);
             Route::patch('/job-fairs/{jobFair}/participants/{participation}', [AdminJobFairController::class, 'participationStatus']);
             Route::post('/job-fairs/{jobFair}/check-in', [AdminJobFairController::class, 'checkIn']);

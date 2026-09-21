@@ -28,6 +28,15 @@ class JobFairService
      */
     public const MAP_STATUSES = ['published', 'accepting_employers', 'upcoming', 'ongoing'];
 
+    /**
+     * Statuses in which a fair is still soliciting employer participation.
+     * Deliberately narrower than PUBLIC_STATUSES: a closed/completed fair
+     * stays *visible* to an employer (so their own history, requirements and
+     * reports don't vanish from the module) but can no longer be joined.
+     * Single source of truth for the list interest() used to hardcode.
+     */
+    public const EMPLOYER_OPEN_STATUSES = ['published', 'accepting_employers', 'upcoming'];
+
     public const PARTICIPATION_STATUSES = [
         'invited', 'requirements_pending', 'under_review', 'approved', 'declined', 'rejected',
         'attended', 'no_show', 'encoded_results', 'report_generated',
@@ -92,6 +101,119 @@ class JobFairService
         }
     }
 
+    /**
+     * Single source of truth for "can an employer still join this fair?".
+     *
+     * Three independent gates, checked in the order an admin would explain
+     * them: the fair has to be publicly announced, still in a soliciting
+     * status, and the requirements deadline (plus the event itself) must not
+     * have passed. Previously interest() hardcoded only the status half of
+     * this and the submission_deadline column — required at creation time,
+     * shown on every card — was never actually enforced anywhere, so an
+     * employer could join the night before a fair they had no chance of
+     * filing requirements for.
+     *
+     * Returns the reason as well as the verdict so the employer UI can say
+     * why the Join button is gone instead of just hiding it.
+     *
+     * @return array{open: bool, reason: ?string}
+     */
+    public function employerRegistrationState(JobFair $fair): array
+    {
+        $closed = fn (string $reason) => ['open' => false, 'reason' => $reason];
+
+        if (! $fair->is_public || $fair->published_at === null) {
+            return $closed('This event has not been published yet.');
+        }
+
+        if (! in_array($fair->status, self::EMPLOYER_OPEN_STATUSES, true)) {
+            return $closed('This event is no longer accepting employer participation.');
+        }
+
+        if ($fair->submission_deadline !== null && $fair->submission_deadline->isPast()) {
+            return $closed('The deadline for employer registration closed on '.$fair->submission_deadline->format('F j, Y').'.');
+        }
+
+        // Legacy rows may only carry event_date; new ones always have
+        // start_date/end_date (both required by the create form).
+        $lastDay = $fair->end_date ?? $fair->start_date ?? $fair->event_date;
+        if ($lastDay !== null && $lastDay->copy()->endOfDay()->isPast()) {
+            return $closed('This event has already taken place.');
+        }
+
+        return ['open' => true, 'reason' => null];
+    }
+
+    /** Query-level twin of employerRegistrationState() for list endpoints. */
+    public function scopeOpenToEmployers(\Illuminate\Database\Eloquent\Builder $query): \Illuminate\Database\Eloquent\Builder
+    {
+        return $query
+            ->where('is_public', true)
+            ->whereNotNull('published_at')
+            ->whereIn('status', self::EMPLOYER_OPEN_STATUSES)
+            ->where(fn ($deadline) => $deadline->whereNull('submission_deadline')->orWhere('submission_deadline', '>=', now()))
+            ->where(fn ($ended) => $ended
+                ->whereRaw('COALESCE(end_date, start_date, event_date) IS NULL')
+                ->orWhereRaw('COALESCE(end_date, start_date, event_date) >= ?', [now()->toDateString()]));
+    }
+
+    /**
+     * Catches an employer up on every fair that is still open to them but
+     * that they carry no participation row for — creating the same "invited"
+     * record and sending the same invitation letter publish()'s broadcast
+     * would have, had they been verified at the time.
+     *
+     * Without this, invitations were a one-shot event fired at first publish
+     * over whoever happened to be verified in that instant: an employer
+     * accredited a day later was never invited, never notified, and (before
+     * the list query was fixed alongside this) often couldn't even see the
+     * fair to join it themselves.
+     *
+     * @return int number of fairs the employer was newly invited to
+     */
+    public function inviteEmployerToOpenFairs(Employer $employer): int
+    {
+        if ($employer->verification_status !== 'verified') {
+            return 0;
+        }
+
+        $alreadyTracked = JobFairEmployer::query()
+            ->where('employer_id', $employer->employer_id)
+            ->pluck('job_fair_id');
+
+        $invited = 0;
+
+        $this->scopeOpenToEmployers(JobFair::query())
+            ->whereNotIn('job_fair_id', $alreadyTracked)
+            ->get()
+            ->each(function (JobFair $fair) use ($employer, &$invited) {
+                $this->seedRequirements($fair);
+                $participation = JobFairEmployer::create([
+                    'job_fair_id' => $fair->job_fair_id,
+                    'employer_id' => $employer->employer_id,
+                    'participation_status' => 'invited',
+                    'source' => 'peso_broadcast',
+                    'confirmation_channel' => 'digital',
+                    'invited_at' => now(),
+                ]);
+                $this->reuseVerifiedDocuments($fair, $participation);
+
+                // One employer's mail/SMS must never be what stops their
+                // accreditation from being approved — the participation row
+                // (which is what makes the fair actionable for them) is
+                // already committed above either way.
+                try {
+                    $employer->notify(new JobFairNotification($fair, 'invited', $participation, $this->outstandingRequirementsFor($fair, $employer)));
+                } catch (\Throwable $exception) {
+                    report($exception);
+                }
+
+                $invited++;
+            });
+
+        return $invited;
+    }
+
     public function eventPayload(JobFair $fair, mixed $user = null, bool $admin = false): array
     {
         $fair->loadMissing([
@@ -111,6 +233,8 @@ class JobFairService
                 'company_name' => $item->employer?->company_name ?: $item->employer?->trade_name,
                 'status' => $item->participation_status,
             ])->filter(fn (array $item) => filled($item['company_name']))->values();
+
+        $registration = $this->employerRegistrationState($fair);
 
         $payload = [
             'job_fair_id' => $fair->job_fair_id,
@@ -153,6 +277,13 @@ class JobFairService
             'status' => $fair->status,
             'is_public' => (bool) $fair->is_public,
             'published_at' => $fair->published_at?->toIso8601String(),
+            // Whether an employer can still join, decided here rather than
+            // re-derived in the employer dashboard from status strings — the
+            // old UI showed a "Join Job Fair" button for any fair with no
+            // participation row, including closed/past ones, and the click
+            // just 422'd.
+            'employer_registration_open' => $registration['open'],
+            'employer_registration_closed_reason' => $registration['reason'],
             'requirements' => $fair->requirements->map(fn ($requirement) => [
                 'id' => $requirement->id,
                 'code' => $requirement->code,

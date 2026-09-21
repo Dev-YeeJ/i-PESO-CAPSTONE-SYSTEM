@@ -144,6 +144,57 @@ class SeekerProfileFeaturesTest extends TestCase
         ]);
     }
 
+    public function test_seeker_can_update_a_single_work_experiences_responsibilities(): void
+    {
+        $seeker = $this->createSeeker();
+        $occupation = $this->createOccupation('3512', 'Computer Technician');
+        Sanctum::actingAs($seeker);
+
+        $this->postJson('/api/seeker/step-7', [
+            'work_experiences' => [[
+                'company_name' => 'Jaime Computer Shop',
+                'occupation_id' => $occupation->id,
+                'position' => 'Computer Technician',
+                'responsibilities' => 'fixed computers',
+            ]],
+        ])->assertOk();
+
+        $experience = \App\Models\SeekerWorkExperience::where('seeker_id', $seeker->getKey())->firstOrFail();
+
+        $this->patchJson("/api/seeker/work-experiences/{$experience->id}/responsibilities", [
+            'responsibilities' => "- Diagnosed and repaired desktop and laptop hardware faults.\n- Reimaged and configured Windows workstations for walk-in customers.",
+        ])
+            ->assertOk()
+            ->assertJsonPath('work_experience.id', $experience->id);
+
+        $this->assertDatabaseHas('seeker_work_experiences', [
+            'id' => $experience->id,
+            'responsibilities' => "- Diagnosed and repaired desktop and laptop hardware faults.\n- Reimaged and configured Windows workstations for walk-in customers.",
+        ]);
+    }
+
+    public function test_seeker_cannot_update_another_seekers_work_experience_responsibilities(): void
+    {
+        $owner = $this->createSeeker();
+        $intruder = $this->createSeeker();
+        $occupation = $this->createOccupation('3512', 'Computer Technician');
+
+        Sanctum::actingAs($owner);
+        $this->postJson('/api/seeker/step-7', [
+            'work_experiences' => [[
+                'company_name' => 'Jaime Computer Shop',
+                'occupation_id' => $occupation->id,
+                'position' => 'Computer Technician',
+            ]],
+        ])->assertOk();
+        $experience = \App\Models\SeekerWorkExperience::where('seeker_id', $owner->getKey())->firstOrFail();
+
+        Sanctum::actingAs($intruder);
+        $this->patchJson("/api/seeker/work-experiences/{$experience->id}/responsibilities", [
+            'responsibilities' => 'Attempted takeover.',
+        ])->assertNotFound();
+    }
+
     public function test_admin_can_download_the_official_two_page_nsrp_form(): void
     {
         $seeker = $this->createSeeker();
@@ -813,6 +864,23 @@ class SeekerProfileFeaturesTest extends TestCase
             ->assertJsonPath('certificate.training_id', null);
     }
 
+    public function test_training_certificate_categories_require_a_linked_training(): void
+    {
+        Storage::fake('local');
+        $seeker = $this->createSeeker();
+        Sanctum::actingAs($seeker);
+
+        foreach (['training_certificate', 'tesda_nc_certificate'] as $category) {
+            $this->withHeader('Accept', 'application/json')->post('/api/seeker/certificates', [
+                'title' => 'Welding NC II',
+                'issuing_body' => 'TESDA',
+                'category' => $category,
+                'issued_at' => '2025-06-01',
+                'certificate_file' => $this->fakePng("{$category}.png"),
+            ])->assertUnprocessable()->assertJsonValidationErrors('training_id');
+        }
+    }
+
     public function test_certificate_upload_requires_complete_record_details(): void
     {
         Storage::fake('local');
@@ -1320,6 +1388,7 @@ class SeekerProfileFeaturesTest extends TestCase
             $table->string('company_address')->nullable();
             $table->string('position');
             $table->string('normalized_position')->nullable();
+            $table->string('responsibilities')->nullable();
             $table->unsignedInteger('number_of_months')->nullable();
             $table->string('employment_status')->nullable();
         });

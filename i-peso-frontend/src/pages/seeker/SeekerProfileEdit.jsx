@@ -154,6 +154,7 @@ export default function SeekerProfileEdit() {
   const [uploadOpen, setUploadOpen] = useState(false)
   const [openingCertificate, setOpeningCertificate] = useState(null)
   const [activeSection, setActiveSection] = useState(() => sectionFromHash())
+  const [justSaved, setJustSaved] = useState({})
 
   useEffect(() => {
     let active = true
@@ -253,12 +254,14 @@ export default function SeekerProfileEdit() {
     }
 
     setSaving(section)
+    setJustSaved((current) => ({ ...current, [section]: false }))
     try {
       await saveSeekerProfileStep(step, payload)
       const refreshed = await getSeekerProfile()
       setProfile(refreshed)
       setForm(buildProfileEditForm(refreshed))
       updateUser({ name: fullName(refreshed), profile_completed: refreshed.profile_completed })
+      setJustSaved((current) => ({ ...current, [section]: Date.now() }))
       toast.success('Profile section updated.')
     } catch (error) {
       const nextErrors = error.response?.data?.errors ?? {}
@@ -367,7 +370,10 @@ export default function SeekerProfileEdit() {
                   }`}
                 >
                   {createElement(icon, { className: 'h-4 w-4' })}
-                  {label}
+                  <span className="flex-1">{label}</span>
+                  {justSaved[id] && (
+                    <CheckCircle2 className={`h-4 w-4 shrink-0 ${activeSection === id ? 'text-white' : 'text-emerald-600'}`} aria-label="Saved this session" />
+                  )}
                 </button>
               ))}
             </nav>
@@ -382,6 +388,7 @@ export default function SeekerProfileEdit() {
                 subtitle="Keep core NSRP identity data consistent with job seeker onboarding."
                 onSave={() => save('identity', 1, () => buildStep1Payload(form.identity), validateIdentity)}
                 saving={saving === 'identity'}
+                justSaved={Boolean(justSaved.identity)}
               >
                 <div className="grid gap-4 md:grid-cols-2">
                   <TextInput label="Surname" value={form.identity.last_name} error={errors.last_name} onChange={(value) => updateSection('identity', { last_name: value })} />
@@ -445,6 +452,7 @@ export default function SeekerProfileEdit() {
                 subtitle="This preserves the government NSRP employment classification while keeping the UI simple."
                 onSave={() => save('employment', 2, () => buildStep2Payload(form.employment), validateEmployment)}
                 saving={saving === 'employment'}
+                justSaved={Boolean(justSaved.employment)}
               >
                 <div className="grid gap-4 md:grid-cols-2">
                   <SelectInput label="Current status" value={form.employment.employment_status} error={errors.employment_status} onChange={(value) => updateSection('employment', { employment_status: value })} options={[
@@ -515,6 +523,7 @@ export default function SeekerProfileEdit() {
                 subtitle="Update preferred roles and locations without going back to registration."
                 onSave={() => save('preferences', 3, () => buildStep3Payload(form.preferences), validatePreferences)}
                 saving={saving === 'preferences'}
+                justSaved={Boolean(justSaved.preferences)}
               >
                 <div className="grid gap-4 md:grid-cols-2">
                   <SelectInput label="Work type preference" value={form.preferences.work_type_preference} error={errors.work_type_preference} onChange={(value) => updateSection('preferences', { work_type_preference: value })} options={[
@@ -560,6 +569,7 @@ export default function SeekerProfileEdit() {
                 subtitle="Keep the same education records and completion logic used during onboarding."
                 onSave={() => save('education', 5, () => buildStep5Payload(form.education), validateEducationAndSkills)}
                 saving={saving === 'education'}
+                justSaved={Boolean(justSaved.education)}
               >
                 <div className="mb-5 grid gap-4 md:grid-cols-2">
                   <SelectInput label="Educational attainment" value={form.education.educ_attainment} onChange={(value) => updateSection('education', { educ_attainment: value })} options={[{ value: '', label: 'Auto infer from records' }, ...EDUC_ATTAINMENT_OPTIONS.map((value) => ({ value, label: value }))]} />
@@ -580,6 +590,7 @@ export default function SeekerProfileEdit() {
                 subtitle="Maintain the present address and map coordinates used for nearby job matching."
                 onSave={() => save('address', 1, () => buildStep1Payload(form.identity), validateIdentity)}
                 saving={saving === 'address'}
+                justSaved={Boolean(justSaved.address)}
               >
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                   <SingleAddressInput
@@ -642,6 +653,7 @@ export default function SeekerProfileEdit() {
                 subtitle="Maintain hard and soft skills without mixing them into education records."
                 onSave={() => save('skills', 5, () => buildStep5Payload(form.education), validateEducationAndSkills)}
                 saving={saving === 'skills'}
+                justSaved={Boolean(justSaved.skills)}
               >
                 <div>
                   <SeekerSkillsForm
@@ -661,6 +673,7 @@ export default function SeekerProfileEdit() {
                 subtitle="Training records come from the NSRP registration inputs. Certificate files are optional proof attachments."
                 onSave={() => save('training', 6, () => buildStep6Payload(form.training), validateTraining)}
                 saving={saving === 'training'}
+                justSaved={Boolean(justSaved.training)}
               >
                 <div className="space-y-4">
                   <ArrayHeader title="Training records" onAdd={() => addListItem('training', 'trainings', emptyTraining())} addLabel="Add training" />
@@ -786,6 +799,7 @@ export default function SeekerProfileEdit() {
                 subtitle="Record what the seeker can read, write, speak, or understand."
                 onSave={() => save('languages', 4, () => buildStep4Payload(form.languages), validateLanguages)}
                 saving={saving === 'languages'}
+                justSaved={Boolean(justSaved.languages)}
               >
                 <div className="space-y-3">
                   <ArrayHeader title="Language records" onAdd={() => addListItem('languages', 'languages', emptyLanguage())} addLabel="Add language" />
@@ -825,6 +839,7 @@ export default function SeekerProfileEdit() {
                 subtitle="Maintain work history and resume-ready responsibilities in one place."
                 onSave={() => save('work', 7, () => buildStep7Payload(form.work), validateWorkExperience)}
                 saving={saving === 'work'}
+                justSaved={Boolean(justSaved.work)}
               >
                 <div className="space-y-4">
                   <ArrayHeader title="Work experience records" onAdd={() => addListItem('work', 'work_experiences', emptyExperience())} addLabel="Add experience" />
@@ -892,17 +907,23 @@ export default function SeekerProfileEdit() {
   )
 }
 
-function SectionCard({ icon, title, subtitle, children, onSave, saving }) {
+function SectionCard({ icon, title, subtitle, children, onSave, saving, justSaved }) {
   return (
     <section className={cardClass}>
-      <div className="mb-5 flex gap-3 border-b border-slate-100 pb-5">
+      <div className="mb-5 flex items-start gap-3 border-b border-slate-100 pb-5">
         <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-blue-50 text-blue-700">
           {createElement(icon, { className: 'h-5 w-5' })}
         </span>
-        <div>
+        <div className="flex-1">
           <h2 className="text-lg font-black text-slate-950">{title}</h2>
           <p className="mt-1 text-sm leading-6 text-slate-500">{subtitle}</p>
         </div>
+        {justSaved && !saving && (
+          <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-black text-emerald-700">
+            <CheckCircle2 className="h-4 w-4" />
+            Saved
+          </span>
+        )}
       </div>
       {children}
       {onSave && (

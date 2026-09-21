@@ -33,7 +33,13 @@ class ReportController extends Controller
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
-        $reports = AnalyticsReport::paginate($request->get('per_page', 15));
+        $query = AnalyticsReport::query();
+
+        if ($request->has('report_category')) {
+            $query->where('report_category', $request->get('report_category'));
+        }
+
+        $reports = $query->latest('created_at')->paginate($request->get('per_page', 15));
 
         return response()->json($reports);
     }
@@ -126,8 +132,9 @@ class ReportController extends Controller
 
         // Compute the same indicator set for current month, previous month, and
         // year-to-date cumulative — the three column groups on the DOLE SPRS form.
+        // DOLE logic: "Previous Reporting Month" means year-to-date accumulation up to the previous month.
         $current = $this->computeSprsFigures($start, $end, $jobFairReports);
-        $previous = $this->computeSprsFigures($prevMonth->copy()->startOfMonth(), $prevMonth->copy()->endOfMonth(), $jobFairReports);
+        $previous = $this->computeSprsFigures($yearStart, $prevMonth->copy()->endOfMonth(), $jobFairReports);
         $cumulative = $this->computeSprsFigures($yearStart, $end, $jobFairReports);
 
         $data = [
@@ -518,17 +525,17 @@ class ReportController extends Controller
                 'indent' => $indent,
                 'section' => false,
                 'auto' => $auto,
-                'target' => null,
-                'prev_total' => null, 'prev_female' => null,
-                'curr_total' => null, 'curr_female' => null,
-                'cum_total' => null, 'cum_female' => null,
+                'target' => 0,
+                'prev_total' => 0, 'prev_female' => 0,
+                'curr_total' => 0, 'curr_female' => 0,
+                'cum_total' => 0, 'cum_female' => 0,
             ], $values);
         };
         $section = fn (string $key, string $label) => [
             'key' => $key, 'label' => $label, 'indent' => 0, 'section' => true, 'auto' => false,
-            'target' => null,
-            'prev_total' => null, 'prev_female' => null, 'curr_total' => null, 'curr_female' => null,
-            'cum_total' => null, 'cum_female' => null,
+            'target' => 0,
+            'prev_total' => 0, 'prev_female' => 0, 'curr_total' => 0, 'curr_female' => 0,
+            'cum_total' => 0, 'cum_female' => 0,
         ];
 
         $jf = fn (array $set, string $field) => $set['job_fairs'][$field] ?? null;
@@ -723,7 +730,7 @@ class ReportController extends Controller
             'data' => $data,
             'signatories' => $data['signatories'] ?? [],
             'manualAdjustments' => $data['manual_adjustments'] ?? [],
-        ])->setPaper('a4', 'portrait');
+        ])->setPaper('legal', 'portrait');
 
         return $pdf->download('sprs-' . str_replace(' ', '-', strtolower($data['period'] ?? $report->report_id)) . '.pdf');
     }

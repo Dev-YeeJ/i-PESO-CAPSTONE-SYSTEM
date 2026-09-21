@@ -30,6 +30,7 @@ import PageHeader from '@/pages/admin/_components/PageHeader'
 import StatCard from '@/pages/admin/_components/StatCard'
 import { adminService } from '@/services/adminService'
 import { downloadBlob } from '@/services/placementReportService'
+import SeekerAvatar from './SeekerAvatar'
 import toast from 'react-hot-toast'
 
 const PER_PAGE = 15
@@ -169,7 +170,7 @@ export default function JobSeekersListPage() {
         const location = [row.address_barangay, row.address_municipality_city, row.address_province].filter(Boolean).join(', ')
         return (
           <div className="flex min-w-64 items-start gap-3">
-            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-brand-navy text-xs font-black text-white">{initials}</span>
+            <SeekerAvatar seekerId={row.seeker_id} hasPhoto={row.has_profile_image} initials={initials} />
             <div className="min-w-0">
               <p className="truncate font-extrabold text-slate-950">{name || 'Unnamed seeker'}</p>
               <p className="truncate text-xs text-slate-500">{row.email || 'No email on file'}</p>

@@ -1,11 +1,12 @@
 import { createElement, useEffect, useState } from 'react'
-import { FileText, FileBarChart, CalendarDays, CheckCircle2, Printer, Save, X, Loader2 } from 'lucide-react'
+import { FileText, FileBarChart, CalendarDays, CheckCircle2, Printer, Save, X, Loader2, Edit, FileDown } from 'lucide-react'
 import { Card, Button } from '@/components/ui'
 import PageHeader from '@/pages/admin/_components/PageHeader'
 import DataTable from '@/pages/admin/_components/DataTable'
 import { adminService } from '@/services/adminService'
 import toast from 'react-hot-toast'
 import { useNavigate } from 'react-router-dom'
+import api from '@/services/api'
 
 const SIGNATORY_ROLES = [
   ['prepared_by', 'Prepared by', 'SLEO/PESO Coordinator'],
@@ -13,10 +14,16 @@ const SIGNATORY_ROLES = [
   ['approved_by', 'Approved by', 'City Mayor'],
 ]
 
+const defaultPositions = {
+  prepared_by: 'SLEO/PESO Coordinator',
+  checked_by: 'CGADH1/PESO Manager',
+  approved_by: 'City Mayor'
+}
+
 const emptySignatories = () => ({
-  prepared_by: { name: '', position: '' },
-  checked_by: { name: '', position: '' },
-  approved_by: { name: '', position: '' },
+  prepared_by: { name: '', position: defaultPositions.prepared_by },
+  checked_by: { name: 'Mr. Virgilio C. Pasion', position: defaultPositions.checked_by },
+  approved_by: { name: 'Julio RAMMY Parayno III', position: defaultPositions.approved_by },
 })
 
 export default function DOLEReportingPage() {
@@ -41,6 +48,7 @@ export default function DOLEReportingPage() {
   const [generatedReport, setGeneratedReport] = useState(null)
   const [generatedReportId, setGeneratedReportId] = useState(null)
   const [editableRows, setEditableRows] = useState([])
+  const [originalRows, setOriginalRows] = useState([])
   const [previewLguName, setPreviewLguName] = useState('Urdaneta City')
   const [previewProvince, setPreviewProvince] = useState('Pangasinan')
   const [previewOther, setPreviewOther] = useState({ ftja_total: '', ftja_with_attachment: '' })
@@ -48,15 +56,15 @@ export default function DOLEReportingPage() {
   const [previewSignatories, setPreviewSignatories] = useState(emptySignatories())
   const [isSaving, setIsSaving] = useState(false)
 
-  const fetchReports = () => {
-    setLoading(true)
-    adminService.getReports({ per_page: 15 }).then(d => {
-      setReports(d.data || [])
+  const fetchReports = async () => {
+    try {
+      const data = await adminService.getReports({ per_page: 15, report_category: 'sprs' })
+      setReports(data.data)
+    } catch (err) {
+      console.error(err)
+    } finally {
       setLoading(false)
-    }).catch(e => {
-      console.error(e)
-      setLoading(false)
-    })
+    }
   }
 
   useEffect(() => {
@@ -67,7 +75,8 @@ export default function DOLEReportingPage() {
   // opened from history), seed the editable copies from it.
   useEffect(() => {
     if (!generatedReport) return
-    setEditableRows(generatedReport.rows || [])
+    setEditableRows(JSON.parse(JSON.stringify(generatedReport.rows || [])))
+    setOriginalRows(JSON.parse(JSON.stringify(generatedReport.rows || [])))
     setPreviewLguName(generatedReport.lgu_name || 'Urdaneta City')
     setPreviewProvince(generatedReport.province || 'Pangasinan')
     setPreviewOther({
@@ -77,9 +86,9 @@ export default function DOLEReportingPage() {
     setPreviewIssuesConcerns(generatedReport.issues_concerns || '')
     const sig = generatedReport.signatories || {}
     setPreviewSignatories({
-      prepared_by: { name: sig.prepared_by?.name || '', position: sig.prepared_by?.position || '' },
-      checked_by: { name: sig.checked_by?.name || '', position: sig.checked_by?.position || '' },
-      approved_by: { name: sig.approved_by?.name || '', position: sig.approved_by?.position || '' },
+      prepared_by: { name: sig.prepared_by?.name || '', position: defaultPositions.prepared_by },
+      checked_by: { name: sig.checked_by?.name || 'Mr. Virgilio C. Pasion', position: defaultPositions.checked_by },
+      approved_by: { name: sig.approved_by?.name || 'Julio RAMMY Parayno III', position: defaultPositions.approved_by },
     })
   }, [generatedReport])
 
@@ -101,14 +110,15 @@ export default function DOLEReportingPage() {
     }
   }
 
-  const handleExportPdf = async (row) => {
-    setExportingId(row.report_id)
+  const handleExportPdf = async (reportOrId) => {
+    const rId = reportOrId?.report_id || reportOrId
+    setExportingId(rId)
     try {
-      const blob = await adminService.exportSprsPdf(row.report_id)
+      const blob = await adminService.exportSprsPdf(rId)
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = `sprs-${row.report_id}.pdf`
+      a.download = `sprs-${rId}.pdf`
       a.click()
       URL.revokeObjectURL(url)
     } catch (err) {
@@ -133,9 +143,25 @@ export default function DOLEReportingPage() {
   const setPreviewSigner = (role, field, value) => setPreviewSignatories((s) => ({ ...s, [role]: { ...s[role], [field]: value } }))
 
   const updateRow = (key, field, value) => {
-    setEditableRows((rows) => rows.map((r) => (
-      r.key === key ? { ...r, [field]: value === '' ? null : Number(value) } : r
-    )))
+    setEditableRows((rows) => rows.map((r) => {
+      if (r.key !== key) return r
+      const originalRow = originalRows.find(orig => orig.key === key)
+      const minVal = (r.auto && originalRow) ? Number(originalRow[field] || 0) : 0
+      
+      let parsedValue = value === '' ? 0 : Number(value)
+      if (parsedValue < minVal) {
+        parsedValue = minVal
+      }
+
+      const updated = { ...r, [field]: parsedValue }
+      if (['prev_total', 'curr_total'].includes(field)) {
+        updated.cum_total = (Number(updated.prev_total) || 0) + (Number(updated.curr_total) || 0)
+      }
+      if (['prev_female', 'curr_female'].includes(field)) {
+        updated.cum_female = (Number(updated.prev_female) || 0) + (Number(updated.curr_female) || 0)
+      }
+      return updated
+    }))
   }
 
   const handleSaveSprs = async () => {
@@ -167,6 +193,7 @@ export default function DOLEReportingPage() {
     }
   }
 
+
   const columns = [
     { key: 'month', label: 'Report Period', render: (val, row) => new Date(row.coverage_start || row.report_date).toLocaleDateString(undefined, { month: 'long', year: 'numeric' }) },
     { key: 'category', label: 'Category', render: (val, row) => row.report_category?.toUpperCase() || 'SPRS' },
@@ -189,18 +216,18 @@ export default function DOLEReportingPage() {
       render: (val, row) => (
         <div className="flex items-center gap-3">
           <button
-            onClick={() => openReport(row)}
-            className="text-brand-600 hover:text-brand-900 text-sm font-bold"
-          >
-            View / Edit
-          </button>
-          <button
             onClick={() => handleExportPdf(row)}
             disabled={exportingId === row.report_id}
             className="inline-flex items-center gap-1 text-slate-600 hover:text-slate-900 text-sm font-bold disabled:opacity-50"
           >
-            {exportingId === row.report_id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Printer className="h-4 w-4" />}
-            PDF
+            {exportingId === row.report_id ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
+            View PDF
+          </button>
+          <button
+            onClick={() => openReport(row)}
+            className="inline-flex items-center gap-1 text-brand-600 hover:text-brand-900 text-sm font-bold"
+          >
+            <Edit className="h-4 w-4" /> Edit Data
           </button>
         </div>
       ),
@@ -247,77 +274,108 @@ export default function DOLEReportingPage() {
 
       {/* GENERATE MODAL */}
       {showGenerateModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm print:hidden">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-bold text-slate-900">Generate SPRS</h3>
-              <button onClick={() => setShowGenerateModal(false)} className="text-slate-400 hover:text-slate-600">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm print:hidden p-4 sm:p-0">
+          <div className="w-full max-w-lg rounded-xl bg-white shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="flex items-center justify-between p-6 border-b border-slate-100 shrink-0">
+              <div>
+                <h3 className="text-xl font-bold text-slate-900">Generate SPRS Report</h3>
+                <p className="text-sm text-slate-500 mt-1">Select the reporting period to extract data.</p>
+              </div>
+              <button onClick={() => setShowGenerateModal(false)} className="text-slate-400 hover:text-slate-600 rounded-full p-2 hover:bg-slate-100 transition-colors">
                 <X className="h-5 w-5" />
               </button>
             </div>
-            <form onSubmit={handleGenerate}>
-              <div className="grid grid-cols-2 gap-4 mb-6">
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Month</label>
-                  <select
-                    className="w-full rounded-lg border border-slate-300 p-2.5"
-                    value={selectedMonth}
-                    onChange={(e) => setSelectedMonth(Number(e.target.value))}
-                  >
-                    {Array.from({length: 12}, (_, i) => i + 1).map(m => (
-                      <option key={m} value={m}>{new Date(0, m - 1).toLocaleString('default', { month: 'long' })}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Year</label>
-                  <input
-                    type="number"
-                    className="w-full rounded-lg border border-slate-300 p-2.5"
-                    value={selectedYear}
-                    onChange={(e) => setSelectedYear(Number(e.target.value))}
-                    min="2020"
-                    max="2100"
-                  />
-                </div>
-              </div>
-              <div className="mb-5 space-y-3">
-                <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Signatories (optional)</p>
-                {SIGNATORY_ROLES.map(([role, label]) => (
-                  <div key={role} className="grid grid-cols-2 gap-2">
+            
+            <div className="p-6 overflow-y-auto grow">
+              <form id="generate-sprs-form" onSubmit={handleGenerate} className="space-y-6">
+                
+                {/* Primary Data */}
+                <div className="grid grid-cols-2 gap-5 p-5 bg-slate-50 rounded-lg border border-slate-100">
+                  <div className="space-y-2">
+                    <label className="text-sm font-bold text-slate-700">Reporting Month</label>
+                    <select
+                      className="w-full rounded-md border border-slate-300 p-2.5 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+                      value={selectedMonth}
+                      onChange={(e) => setSelectedMonth(Number(e.target.value))}
+                    >
+                      {Array.from({length: 12}, (_, i) => i + 1).map(m => (
+                        <option key={m} value={m}>{new Date(0, m - 1).toLocaleString('default', { month: 'long' })}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-bold text-slate-700">Reporting Year</label>
                     <input
-                      className="rounded-lg border border-slate-300 p-2 text-sm"
-                      placeholder={`${label} — name`}
-                      value={signatories[role].name}
-                      onChange={(e) => setSigner(role, 'name', e.target.value)}
-                    />
-                    <input
-                      className="rounded-lg border border-slate-300 p-2 text-sm"
-                      placeholder="Position"
-                      value={signatories[role].position}
-                      onChange={(e) => setSigner(role, 'position', e.target.value)}
+                      type="number"
+                      className="w-full rounded-md border border-slate-300 p-2.5 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+                      value={selectedYear}
+                      onChange={(e) => setSelectedYear(Number(e.target.value))}
+                      min="2020"
+                      max="2100"
                     />
                   </div>
-                ))}
+                </div>
+
+                {/* Optional Configuration */}
+                <div className="space-y-5 border-t border-slate-100 pt-5">
+                  <div>
+                    <h4 className="text-sm font-bold text-slate-900 mb-3">Signatories <span className="text-slate-400 font-normal">(Optional)</span></h4>
+                    <div className="space-y-3">
+                      {['prepared_by', 'checked_by', 'approved_by'].map((role) => {
+                        const labels = { prepared_by: 'Prepared by', checked_by: 'Checked by', approved_by: 'Approved by' }
+                        const label = labels[role]
+                        return (
+                          <div key={role} className="flex gap-2">
+                            <input
+                              className="flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+                              placeholder={`${label} — name`}
+                              value={signatories[role].name}
+                              onChange={(e) => setSigner(role, 'name', e.target.value)}
+                            />
+                            <input
+                              className="w-1/3 rounded-md border border-slate-300 px-3 py-2 text-sm bg-slate-50 text-slate-500 cursor-not-allowed"
+                              value={defaultPositions[role]}
+                              disabled
+                            />
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-bold text-slate-900 mb-2">
+                      Issues / Concerns <span className="text-slate-400 font-normal">(Optional)</span>
+                    </label>
+                    <textarea
+                      className="w-full rounded-md border border-slate-300 p-3 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+                      rows={3}
+                      placeholder="Note anything DOLE needs to see for this reporting month..."
+                      value={issuesConcerns}
+                      onChange={(e) => setIssuesConcerns(e.target.value)}
+                    />
+                  </div>
+                </div>
+              </form>
+            </div>
+            
+            <div className="p-6 border-t border-slate-100 bg-slate-50 shrink-0">
+              <div className="flex items-center gap-3">
+                <Button variant="secondary" onClick={() => setShowGenerateModal(false)} className="flex-1">
+                  Cancel
+                </Button>
+                <Button form="generate-sprs-form" type="submit" disabled={isGenerating} className="flex-1 font-bold">
+                  {isGenerating ? (
+                    <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Extracting...</>
+                  ) : (
+                    'Generate SPRS'
+                  )}
+                </Button>
               </div>
-              <div className="mb-5">
-                <label className="block text-xs font-bold uppercase tracking-wide text-slate-500 mb-1">Issues / Concerns (optional)</label>
-                <textarea
-                  className="w-full rounded-lg border border-slate-300 p-2.5 text-sm"
-                  rows={3}
-                  placeholder="Note anything DOLE needs to see for this reporting month..."
-                  value={issuesConcerns}
-                  onChange={(e) => setIssuesConcerns(e.target.value)}
-                />
-              </div>
-              <p className="mb-4 text-xs text-slate-500">
-                Everything the system can't compute — LMI, Career Guidance, AIR-TIP, and the local/overseas
-                breakdowns — opens as blank, editable cells after generation, so you can fill them in by hand.
+              <p className="mt-4 text-[11px] text-center text-slate-500 leading-tight max-w-[85%] mx-auto">
+                After generation, you will be able to review the document and manually encode missing metrics before finalizing.
               </p>
-              <Button type="submit" disabled={isGenerating} className="w-full">
-                {isGenerating ? <Loader2 className="h-5 w-5 animate-spin" /> : 'Generate & Extract Data'}
-              </Button>
-            </form>
+            </div>
           </div>
         </div>
       )}
@@ -340,8 +398,8 @@ export default function DOLEReportingPage() {
                 <Button variant="secondary" onClick={handleSaveSprs} disabled={isSaving} className="gap-2">
                   {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Save Changes
                 </Button>
-                <Button onClick={() => window.print()} className="gap-2">
-                  <Printer className="h-4 w-4" /> Print Document
+                <Button onClick={() => handleExportPdf(generatedReportId)} disabled={exportingId === generatedReportId} className="gap-2">
+                  {exportingId === generatedReportId ? <Loader2 className="h-4 w-4 animate-spin" /> : <Printer className="h-4 w-4" />} Download PDF
                 </Button>
               </div>
             </div>
@@ -362,17 +420,17 @@ export default function DOLEReportingPage() {
                   <p className="flex items-center gap-1.5">
                     <span className="font-bold">LGU/PESO:</span>
                     <input
-                      className="rounded border border-slate-300 px-1.5 py-0.5 text-sm print:border-none"
+                      className="rounded border border-transparent px-1.5 py-0.5 text-sm bg-slate-50 text-slate-700 cursor-not-allowed"
                       value={previewLguName}
-                      onChange={(e) => setPreviewLguName(e.target.value)}
+                      readOnly
                     />
                   </p>
                   <p className="flex items-center gap-1.5">
                     <span className="font-bold">Province:</span>
                     <input
-                      className="rounded border border-slate-300 px-1.5 py-0.5 text-sm print:border-none"
+                      className="rounded border border-transparent px-1.5 py-0.5 text-sm bg-slate-50 text-slate-700 cursor-not-allowed"
                       value={previewProvince}
-                      onChange={(e) => setPreviewProvince(e.target.value)}
+                      readOnly
                     />
                   </p>
                 </div>
@@ -408,22 +466,31 @@ export default function DOLEReportingPage() {
                         </td>
                       </tr>
                     )}
-                    {editableRows.map((row) => row.section ? (
-                      <tr key={row.key} className="bg-slate-200">
-                        <td colSpan={8} className="border border-black p-1.5 font-bold uppercase">{row.label}</td>
-                      </tr>
-                    ) : (
-                      <tr key={row.key}>
-                        <td className="border border-black p-1.5" style={{ paddingLeft: `${8 + (row.indent || 0) * 14}px` }}>{row.label}</td>
-                        <NumCell value={row.target} onChange={(v) => updateRow(row.key, 'target', v)} />
-                        <NumCell value={row.prev_total} onChange={(v) => updateRow(row.key, 'prev_total', v)} auto={row.auto} />
-                        <NumCell value={row.prev_female} onChange={(v) => updateRow(row.key, 'prev_female', v)} auto={row.auto} />
-                        <NumCell value={row.curr_total} onChange={(v) => updateRow(row.key, 'curr_total', v)} auto={row.auto} />
-                        <NumCell value={row.curr_female} onChange={(v) => updateRow(row.key, 'curr_female', v)} auto={row.auto} />
-                        <NumCell value={row.cum_total} onChange={(v) => updateRow(row.key, 'cum_total', v)} auto={row.auto} />
-                        <NumCell value={row.cum_female} onChange={(v) => updateRow(row.key, 'cum_female', v)} auto={row.auto} />
-                      </tr>
-                    ))}
+                    {editableRows.map((row) => {
+                      if (row.section) {
+                        return (
+                          <tr key={row.key} className="bg-slate-200">
+                            <td colSpan={8} className="border border-black p-1.5 font-bold uppercase">{row.label}</td>
+                          </tr>
+                        )
+                      }
+                      
+                      const originalRow = originalRows.find(orig => orig.key === row.key)
+                      const getMin = (field) => (row.auto && originalRow) ? Number(originalRow[field] || 0) : 0
+                      
+                      return (
+                        <tr key={row.key}>
+                          <td className="border border-black p-1.5" style={{ paddingLeft: `${8 + (row.indent || 0) * 14}px` }}>{row.label}</td>
+                          <NumCell value={row.target} min={0} onChange={(v) => updateRow(row.key, 'target', v)} />
+                          <NumCell value={row.prev_total} min={getMin('prev_total')} onChange={(v) => updateRow(row.key, 'prev_total', v)} auto={row.auto} />
+                          <NumCell value={row.prev_female} min={getMin('prev_female')} onChange={(v) => updateRow(row.key, 'prev_female', v)} auto={row.auto} />
+                          <NumCell value={row.curr_total} min={getMin('curr_total')} onChange={(v) => updateRow(row.key, 'curr_total', v)} auto={row.auto} />
+                          <NumCell value={row.curr_female} min={getMin('curr_female')} onChange={(v) => updateRow(row.key, 'curr_female', v)} auto={row.auto} />
+                          <NumCell value={row.cum_total} min={getMin('cum_total')} onChange={(v) => updateRow(row.key, 'cum_total', v)} auto={row.auto} />
+                          <NumCell value={row.cum_female} min={getMin('cum_female')} onChange={(v) => updateRow(row.key, 'cum_female', v)} auto={row.auto} />
+                        </tr>
+                      )
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -441,7 +508,8 @@ export default function DOLEReportingPage() {
                         <input
                           type="number"
                           value={previewOther.ftja_total}
-                          onChange={(e) => setPreviewOther((o) => ({ ...o, ftja_total: e.target.value }))}
+                          min="0"
+                          onChange={(e) => setPreviewOther((o) => ({ ...o, ftja_total: Math.max(0, e.target.value) }))}
                           placeholder="—"
                           className="w-full bg-blue-50 px-1.5 py-1 text-center text-sm outline-none"
                         />
@@ -451,7 +519,8 @@ export default function DOLEReportingPage() {
                         <input
                           type="number"
                           value={previewOther.ftja_with_attachment}
-                          onChange={(e) => setPreviewOther((o) => ({ ...o, ftja_with_attachment: e.target.value }))}
+                          min="0"
+                          onChange={(e) => setPreviewOther((o) => ({ ...o, ftja_with_attachment: Math.max(0, e.target.value) }))}
                           placeholder="—"
                           className="w-full bg-blue-50 px-1.5 py-1 text-center text-sm outline-none"
                         />
@@ -477,16 +546,16 @@ export default function DOLEReportingPage() {
                   <div key={role} className="text-center">
                     <p className="text-xs text-slate-500 mb-1">{label}:</p>
                     <input
-                      className="w-full border-b border-black text-center font-bold py-1 outline-none"
+                      className="w-full border-b border-black text-center font-bold py-1 outline-none focus:bg-amber-50"
                       placeholder="Name"
                       value={previewSignatories[role].name}
                       onChange={(e) => setPreviewSigner(role, 'name', e.target.value)}
                     />
                     <input
-                      className="w-full text-center text-xs text-slate-500 mt-1 outline-none"
+                      className="w-full text-center text-xs text-slate-500 mt-1 outline-none bg-transparent cursor-not-allowed"
                       placeholder={defaultPosition}
                       value={previewSignatories[role].position}
-                      onChange={(e) => setPreviewSigner(role, 'position', e.target.value)}
+                      readOnly
                     />
                   </div>
                 ))}
@@ -501,14 +570,23 @@ export default function DOLEReportingPage() {
   )
 }
 
-function NumCell({ value, onChange, auto = false }) {
+function NumCell({ value, onChange, auto = false, min = 0 }) {
+  const handleChange = (e) => {
+    let val = e.target.value
+    if (val !== '' && Number(val) < min) {
+      val = min // enforce minimum value
+    }
+    onChange(val)
+  }
+
   return (
     <td className={`border border-black p-0 text-center ${auto ? 'bg-blue-50' : 'bg-white'}`}>
       <input
         type="number"
-        value={value ?? ''}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder="—"
+        value={value ?? 0}
+        min={min}
+        onChange={handleChange}
+        placeholder="0"
         className="w-full min-w-[52px] bg-transparent px-1.5 py-1.5 text-center text-xs outline-none focus:bg-amber-50"
       />
     </td>

@@ -580,7 +580,7 @@ export default function OccupationCombobox({
         confidence:      item.confidence     ?? null,
         source:          item.source         || null,
         occupation_title: item.occupation_title,
-        raw_job_title:   normalizedQuery,
+        raw_job_title:   item.occupation_title,
         is_custom_pending: !item.occupation_id,
       }
       if (multiple) onChange([...values, payload].slice(0, limit))
@@ -603,7 +603,7 @@ export default function OccupationCombobox({
     setFallbackMode(false)
     setHighlighted(-1)
     setOpen(false)
-  }, [isClassify, multiple, values, limit, onChange, normalizedQuery])
+  }, [isClassify, multiple, values, limit, onChange])
 
   const handleFallbackSelect = useCallback((field) => {
     handleSelect({

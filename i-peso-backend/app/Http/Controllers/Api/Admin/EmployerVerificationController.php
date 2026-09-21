@@ -8,6 +8,7 @@ use App\Models\EmployerDocument;
 use App\Notifications\EmployerVerificationProgressUpdated;
 use App\Notifications\EmployerVerificationStatusChanged;
 use App\Services\ActivityLogger;
+use App\Services\JobFairService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -271,6 +272,8 @@ class EmployerVerificationController extends Controller
                 $validated['remarks'] ?? null,
             );
 
+            $this->inviteToOpenJobFairs($employer);
+
             return response()->json([
                 'message' => 'Employer approved successfully and notification queued.',
                 'employer_id' => $employer->employer_id,
@@ -449,6 +452,10 @@ class EmployerVerificationController extends Controller
                 $isRejection ? 'rejected' : 'verified',
                 $isRejection ? $rejectionReason : ($validated['remarks'] ?? null),
             );
+
+            if (! $isRejection) {
+                $this->inviteToOpenJobFairs($employer);
+            }
 
             return response()->json([
                 'message' => $isRejection
@@ -666,6 +673,35 @@ class EmployerVerificationController extends Controller
             return response()->json($stats, 200);
         } catch (\Exception $e) {
             return response()->json(['error' => $this->safeErrorMessage($e, 'Unable to load verification statistics.')], 500);
+        }
+    }
+
+    /**
+     * Catches a freshly accredited employer up on job fairs that are already
+     * announced and still accepting participants.
+     *
+     * Invitations used to be a one-shot blast fired the moment a fair was
+     * first published, covering only the employers verified in that instant.
+     * Anyone approved afterwards was never invited and never notified, so
+     * their Job Fair module stayed empty for events they were perfectly
+     * eligible to join. Approval is the natural second trigger: it is the
+     * exact moment an account becomes eligible.
+     *
+     * Never allowed to fail the approval itself — the employer is already
+     * verified and committed by this point, and a mail/SMS problem on an
+     * unrelated job fair must not turn that into an error response. The
+     * admin's "Invite new employers" button on the fair is the manual
+     * fallback if this logs a failure.
+     */
+    private function inviteToOpenJobFairs(Employer $employer): void
+    {
+        try {
+            app(JobFairService::class)->inviteEmployerToOpenFairs($employer);
+        } catch (\Throwable $exception) {
+            Log::error('Unable to invite newly verified employer to open job fairs.', [
+                'employer_id' => $employer->getKey(),
+                'error' => $exception->getMessage(),
+            ]);
         }
     }
 

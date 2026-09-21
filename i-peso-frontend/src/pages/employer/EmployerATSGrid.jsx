@@ -13,9 +13,10 @@ import {
 } from '@/services/employerApplicationService'
 import { Button, EmptyState, ErrorState } from '@/components/ui'
 import { PIPELINE_TABS, SORT_OPTIONS, PAGE_SIZE_OPTIONS, TERMINAL_STATUSES } from './ats/atsConstants'
-import { formatDate, getInitials, getMatchTone, timeAgo } from './ats/atsFormatters'
+import { formatDate, getMatchTone, timeAgo } from './ats/atsFormatters'
 import useDebouncedValue from './ats/useDebouncedValue'
 import useApplicationStatusActions from './ats/useApplicationStatusActions'
+import ApplicantAvatar from './ats/ApplicantAvatar'
 import ApplicantProfileModal from './ats/ApplicantProfileModal'
 import InterviewModal from './ats/InterviewModal'
 import HireModal from './ats/HireModal'
@@ -304,9 +305,7 @@ export default function EmployerATSGrid() {
                       </td>
                       <td className="px-4 py-3.5">
                         <div className="flex items-center gap-3">
-                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-xs font-bold text-white shadow-sm">
-                            {getInitials(seeker.name)}
-                          </div>
+                          <ApplicantAvatar applicationId={app.apply_id} hasPhoto={seeker.has_profile_image} name={seeker.name} />
                           <div className="min-w-0">
                             <button onClick={() => openProfileModal(app)} className="block max-w-[220px] truncate text-left text-sm font-bold text-slate-900 transition-colors hover:text-blue-600">
                               {seeker.name}

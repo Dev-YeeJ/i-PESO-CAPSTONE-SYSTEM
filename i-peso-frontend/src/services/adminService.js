@@ -47,6 +47,13 @@ export const adminService = {
     return data
   },
 
+  // Only ever call this when the seeker's own record shows profile_image is set —
+  // mirrors seekerService's getProfileImage() pattern.
+  getSeekerProfileImage: async (id) => {
+    const { data } = await api.get(`/admin/seekers/${id}/profile-image`, { responseType: 'blob' })
+    return data
+  },
+
   // ── EMPLOYERS ──────────────────────────────────────────────────
   getEmployers: async (params = {}) => {
     const { data } = await api.get('/admin/employers', { params: cleanParams(params) })
@@ -207,6 +214,7 @@ export const adminService = {
   },
 
   publishJobFair: async (id, status = 'published') => (await api.post(`/admin/job-fairs/${id}/publish`, { status })).data,
+  resendJobFairInvitations: async (id) => (await api.post(`/admin/job-fairs/${id}/resend-invitations`)).data,
   inviteJobFairEmployer: async (id, payload) => (await api.post(`/admin/job-fairs/${id}/invite`, payload)).data,
   updateJobFairParticipation: async (fairId, participationId, payload) => (await api.patch(`/admin/job-fairs/${fairId}/participants/${participationId}`, payload)).data,
   checkInJobFairAttendee: async (fairId, payload) => (await api.post(`/admin/job-fairs/${fairId}/check-in`, payload)).data,

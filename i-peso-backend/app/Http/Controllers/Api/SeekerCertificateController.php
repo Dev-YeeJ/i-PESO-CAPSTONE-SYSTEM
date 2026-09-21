@@ -30,6 +30,9 @@ class SeekerCertificateController extends Controller
         'other',
     ];
 
+    /** Categories that are, by definition, a training's output — everything else may stand alone. */
+    private const CATEGORIES_REQUIRING_TRAINING = ['training_certificate', 'tesda_nc_certificate'];
+
     public function store(Request $request): JsonResponse
     {
         $seeker = $this->seeker($request);
@@ -43,12 +46,15 @@ class SeekerCertificateController extends Controller
             'credential_number' => ['nullable', 'string', 'max:100'],
             'description' => ['nullable', 'string', 'max:2000'],
             'training_id' => [
+                Rule::requiredIf(in_array($request->input('category'), self::CATEGORIES_REQUIRING_TRAINING, true)),
                 'nullable',
                 'integer',
                 Rule::exists('seeker_trainings', 'id')
                     ->where(fn ($query) => $query->where('seeker_id', $seeker->getKey())),
             ],
             'certificate_file' => ['required', File::types(['pdf', 'jpg', 'jpeg', 'png'])->max(5 * 1024)],
+        ], [
+            'training_id.required' => 'Link this certificate to one of your trainings, or add the training first.',
         ]);
 
         $file = $request->file('certificate_file');

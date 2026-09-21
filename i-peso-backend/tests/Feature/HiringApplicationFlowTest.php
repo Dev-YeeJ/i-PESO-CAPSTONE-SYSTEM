@@ -13,6 +13,7 @@ use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
@@ -89,6 +90,55 @@ class HiringApplicationFlowTest extends TestCase
             ->assertOk()
             ->assertJsonPath('data.0.status', 'hired')
             ->assertJsonPath('data.0.job.employer.company_name', 'Verified Employer Inc.');
+    }
+
+    public function test_hiring_the_last_open_slot_closes_the_vacancy(): void
+    {
+        $employer = $this->createEmployer();
+        $seeker = $this->createSeeker();
+        $vacancy = $this->createVacancy($employer);
+
+        Sanctum::actingAs($seeker);
+        $this->postJson("/api/seeker/jobs/{$vacancy->post_id}/apply")->assertCreated();
+        $application = Application::firstOrFail();
+
+        Sanctum::actingAs($employer);
+        $this->patchJson("/api/employer/applications/{$application->apply_id}/status", [
+            'status' => 'hired',
+            'employer_remarks' => 'Accepted for onboarding.',
+            'placement_start_date' => now()->addWeek()->toDateString(),
+            'placement_salary' => 28000,
+            'employment_type' => 'regular',
+        ])->assertOk();
+
+        $vacancy->refresh();
+        $this->assertSame(0, $vacancy->vacancies_count);
+        $this->assertSame('closed', $vacancy->status);
+    }
+
+    public function test_employer_can_view_applicant_photo_only_through_their_own_applications(): void
+    {
+        Storage::fake('local');
+        $employer = $this->createEmployer();
+        $otherEmployer = $this->createEmployer();
+        $seeker = $this->createSeeker();
+        $vacancy = $this->createVacancy($employer);
+
+        $seeker->forceFill(['profile_image' => "seeker_profile_images/{$seeker->getKey()}/profile.jpg"])->save();
+        Storage::disk('local')->put($seeker->profile_image, 'fake-jpeg-bytes');
+
+        Sanctum::actingAs($seeker);
+        $this->postJson("/api/seeker/jobs/{$vacancy->post_id}/apply")->assertCreated();
+        $application = Application::firstOrFail();
+
+        Sanctum::actingAs($employer);
+        $this->getJson("/api/employer/applications/{$application->apply_id}")
+            ->assertOk()
+            ->assertJsonPath('application.seeker.has_profile_image', true);
+        $this->get("/api/employer/applications/{$application->apply_id}/seeker-profile-image")->assertOk();
+
+        Sanctum::actingAs($otherEmployer);
+        $this->getJson("/api/employer/applications/{$application->apply_id}/seeker-profile-image")->assertNotFound();
     }
 
     public function test_employer_scheduling_interview_sends_immediate_notifications_to_both_parties(): void
@@ -345,6 +395,7 @@ class HiringApplicationFlowTest extends TestCase
                 $table->decimal('longitude', 10, 7)->nullable();
                 $table->json('preferred_locations_details')->nullable();
                 $table->boolean('profile_completed')->default(false);
+                $table->string('profile_image')->nullable();
                 $table->timestamps();
             });
         }
