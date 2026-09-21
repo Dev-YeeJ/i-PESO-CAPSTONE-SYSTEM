@@ -17,24 +17,6 @@ const emptySignatories = () => ({
   prepared_by: { name: '', position: '' },
   checked_by: { name: '', position: '' },
   approved_by: { name: '', position: '' },
-})
-
-function NumCell({ value, onChange, auto }) {
-  return (
-    <td className="border border-black p-0">
-      <input
-        type="number"
-        value={value ?? ''}
-        onChange={(e) => onChange(e.target.value)}
-        disabled={auto}
-        className={`w-full px-1.5 py-1 text-center text-sm outline-none ${
-          auto ? 'bg-blue-50 text-slate-700' : 'bg-white'
-        }`}
-      />
-    </td>
-  )
-}
-
 export default function DOLEReportingPage() {
   const navigate = useNavigate()
   const [reports, setReports] = useState([])
