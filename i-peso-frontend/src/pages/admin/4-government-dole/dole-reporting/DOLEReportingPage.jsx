@@ -1,5 +1,5 @@
 import { createElement, useEffect, useState } from 'react'
-import { FileText, FileBarChart, CalendarDays, CheckCircle2, Printer, Save, X, Loader2 } from 'lucide-react'
+import { FileText, FileBarChart, CalendarDays, CheckCircle2, Printer, Save, X, Loader2, Edit, FileDown } from 'lucide-react'
 import { Card, Button } from '@/components/ui'
 import PageHeader from '@/pages/admin/_components/PageHeader'
 import DataTable from '@/pages/admin/_components/DataTable'
@@ -21,9 +21,9 @@ const defaultPositions = {
 }
 
 const emptySignatories = () => ({
-  prepared_by: { name: '', position: '' },
-  checked_by: { name: '', position: '' },
-  approved_by: { name: '', position: '' },
+  prepared_by: { name: '', position: defaultPositions.prepared_by },
+  checked_by: { name: 'Mr. Virgilio C. Pasion', position: defaultPositions.checked_by },
+  approved_by: { name: 'Julio RAMMY Parayno III', position: defaultPositions.approved_by },
 })
 
 export default function DOLEReportingPage() {
@@ -48,6 +48,7 @@ export default function DOLEReportingPage() {
   const [generatedReport, setGeneratedReport] = useState(null)
   const [generatedReportId, setGeneratedReportId] = useState(null)
   const [editableRows, setEditableRows] = useState([])
+  const [originalRows, setOriginalRows] = useState([])
   const [previewLguName, setPreviewLguName] = useState('Urdaneta City')
   const [previewProvince, setPreviewProvince] = useState('Pangasinan')
   const [previewOther, setPreviewOther] = useState({ ftja_total: '', ftja_with_attachment: '' })
@@ -74,7 +75,8 @@ export default function DOLEReportingPage() {
   // opened from history), seed the editable copies from it.
   useEffect(() => {
     if (!generatedReport) return
-    setEditableRows(generatedReport.rows || [])
+    setEditableRows(JSON.parse(JSON.stringify(generatedReport.rows || [])))
+    setOriginalRows(JSON.parse(JSON.stringify(generatedReport.rows || [])))
     setPreviewLguName(generatedReport.lgu_name || 'Urdaneta City')
     setPreviewProvince(generatedReport.province || 'Pangasinan')
     setPreviewOther({
@@ -85,8 +87,8 @@ export default function DOLEReportingPage() {
     const sig = generatedReport.signatories || {}
     setPreviewSignatories({
       prepared_by: { name: sig.prepared_by?.name || '', position: defaultPositions.prepared_by },
-      checked_by: { name: sig.checked_by?.name || '', position: defaultPositions.checked_by },
-      approved_by: { name: sig.approved_by?.name || '', position: defaultPositions.approved_by },
+      checked_by: { name: sig.checked_by?.name || 'Mr. Virgilio C. Pasion', position: defaultPositions.checked_by },
+      approved_by: { name: sig.approved_by?.name || 'Julio RAMMY Parayno III', position: defaultPositions.approved_by },
     })
   }, [generatedReport])
 
@@ -143,7 +145,15 @@ export default function DOLEReportingPage() {
   const updateRow = (key, field, value) => {
     setEditableRows((rows) => rows.map((r) => {
       if (r.key !== key) return r
-      const updated = { ...r, [field]: value === '' ? 0 : Number(value) }
+      const originalRow = originalRows.find(orig => orig.key === key)
+      const minVal = (r.auto && originalRow) ? Number(originalRow[field] || 0) : 0
+      
+      let parsedValue = value === '' ? 0 : Number(value)
+      if (parsedValue < minVal) {
+        parsedValue = minVal
+      }
+
+      const updated = { ...r, [field]: parsedValue }
       if (['prev_total', 'curr_total'].includes(field)) {
         updated.cum_total = (Number(updated.prev_total) || 0) + (Number(updated.curr_total) || 0)
       }
@@ -206,18 +216,18 @@ export default function DOLEReportingPage() {
       render: (val, row) => (
         <div className="flex items-center gap-3">
           <button
-            onClick={() => openReport(row)}
-            className="text-brand-600 hover:text-brand-900 text-sm font-bold"
-          >
-            View / Edit
-          </button>
-          <button
             onClick={() => handleExportPdf(row)}
             disabled={exportingId === row.report_id}
             className="inline-flex items-center gap-1 text-slate-600 hover:text-slate-900 text-sm font-bold disabled:opacity-50"
           >
-            {exportingId === row.report_id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Printer className="h-4 w-4" />}
-            PDF
+            {exportingId === row.report_id ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
+            View PDF
+          </button>
+          <button
+            onClick={() => openReport(row)}
+            className="inline-flex items-center gap-1 text-brand-600 hover:text-brand-900 text-sm font-bold"
+          >
+            <Edit className="h-4 w-4" /> Edit Data
           </button>
         </div>
       ),
@@ -410,17 +420,17 @@ export default function DOLEReportingPage() {
                   <p className="flex items-center gap-1.5">
                     <span className="font-bold">LGU/PESO:</span>
                     <input
-                      className="rounded border border-slate-300 px-1.5 py-0.5 text-sm print:border-none"
+                      className="rounded border border-transparent px-1.5 py-0.5 text-sm bg-slate-50 text-slate-700 cursor-not-allowed"
                       value={previewLguName}
-                      onChange={(e) => setPreviewLguName(e.target.value)}
+                      readOnly
                     />
                   </p>
                   <p className="flex items-center gap-1.5">
                     <span className="font-bold">Province:</span>
                     <input
-                      className="rounded border border-slate-300 px-1.5 py-0.5 text-sm print:border-none"
+                      className="rounded border border-transparent px-1.5 py-0.5 text-sm bg-slate-50 text-slate-700 cursor-not-allowed"
                       value={previewProvince}
-                      onChange={(e) => setPreviewProvince(e.target.value)}
+                      readOnly
                     />
                   </p>
                 </div>
@@ -456,22 +466,31 @@ export default function DOLEReportingPage() {
                         </td>
                       </tr>
                     )}
-                    {editableRows.map((row) => row.section ? (
-                      <tr key={row.key} className="bg-slate-200">
-                        <td colSpan={8} className="border border-black p-1.5 font-bold uppercase">{row.label}</td>
-                      </tr>
-                    ) : (
-                      <tr key={row.key}>
-                        <td className="border border-black p-1.5" style={{ paddingLeft: `${8 + (row.indent || 0) * 14}px` }}>{row.label}</td>
-                        <NumCell value={row.target} onChange={(v) => updateRow(row.key, 'target', v)} />
-                        <NumCell value={row.prev_total} onChange={(v) => updateRow(row.key, 'prev_total', v)} auto={row.auto} />
-                        <NumCell value={row.prev_female} onChange={(v) => updateRow(row.key, 'prev_female', v)} auto={row.auto} />
-                        <NumCell value={row.curr_total} onChange={(v) => updateRow(row.key, 'curr_total', v)} auto={row.auto} />
-                        <NumCell value={row.curr_female} onChange={(v) => updateRow(row.key, 'curr_female', v)} auto={row.auto} />
-                        <NumCell value={row.cum_total} onChange={(v) => updateRow(row.key, 'cum_total', v)} auto={row.auto} />
-                        <NumCell value={row.cum_female} onChange={(v) => updateRow(row.key, 'cum_female', v)} auto={row.auto} />
-                      </tr>
-                    ))}
+                    {editableRows.map((row) => {
+                      if (row.section) {
+                        return (
+                          <tr key={row.key} className="bg-slate-200">
+                            <td colSpan={8} className="border border-black p-1.5 font-bold uppercase">{row.label}</td>
+                          </tr>
+                        )
+                      }
+                      
+                      const originalRow = originalRows.find(orig => orig.key === row.key)
+                      const getMin = (field) => (row.auto && originalRow) ? Number(originalRow[field] || 0) : 0
+                      
+                      return (
+                        <tr key={row.key}>
+                          <td className="border border-black p-1.5" style={{ paddingLeft: `${8 + (row.indent || 0) * 14}px` }}>{row.label}</td>
+                          <NumCell value={row.target} min={0} onChange={(v) => updateRow(row.key, 'target', v)} />
+                          <NumCell value={row.prev_total} min={getMin('prev_total')} onChange={(v) => updateRow(row.key, 'prev_total', v)} auto={row.auto} />
+                          <NumCell value={row.prev_female} min={getMin('prev_female')} onChange={(v) => updateRow(row.key, 'prev_female', v)} auto={row.auto} />
+                          <NumCell value={row.curr_total} min={getMin('curr_total')} onChange={(v) => updateRow(row.key, 'curr_total', v)} auto={row.auto} />
+                          <NumCell value={row.curr_female} min={getMin('curr_female')} onChange={(v) => updateRow(row.key, 'curr_female', v)} auto={row.auto} />
+                          <NumCell value={row.cum_total} min={getMin('cum_total')} onChange={(v) => updateRow(row.key, 'cum_total', v)} auto={row.auto} />
+                          <NumCell value={row.cum_female} min={getMin('cum_female')} onChange={(v) => updateRow(row.key, 'cum_female', v)} auto={row.auto} />
+                        </tr>
+                      )
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -489,7 +508,8 @@ export default function DOLEReportingPage() {
                         <input
                           type="number"
                           value={previewOther.ftja_total}
-                          onChange={(e) => setPreviewOther((o) => ({ ...o, ftja_total: e.target.value }))}
+                          min="0"
+                          onChange={(e) => setPreviewOther((o) => ({ ...o, ftja_total: Math.max(0, e.target.value) }))}
                           placeholder="—"
                           className="w-full bg-blue-50 px-1.5 py-1 text-center text-sm outline-none"
                         />
@@ -499,7 +519,8 @@ export default function DOLEReportingPage() {
                         <input
                           type="number"
                           value={previewOther.ftja_with_attachment}
-                          onChange={(e) => setPreviewOther((o) => ({ ...o, ftja_with_attachment: e.target.value }))}
+                          min="0"
+                          onChange={(e) => setPreviewOther((o) => ({ ...o, ftja_with_attachment: Math.max(0, e.target.value) }))}
                           placeholder="—"
                           className="w-full bg-blue-50 px-1.5 py-1 text-center text-sm outline-none"
                         />
@@ -525,16 +546,16 @@ export default function DOLEReportingPage() {
                   <div key={role} className="text-center">
                     <p className="text-xs text-slate-500 mb-1">{label}:</p>
                     <input
-                      className="w-full border-b border-black text-center font-bold py-1 outline-none"
+                      className="w-full border-b border-black text-center font-bold py-1 outline-none focus:bg-amber-50"
                       placeholder="Name"
                       value={previewSignatories[role].name}
                       onChange={(e) => setPreviewSigner(role, 'name', e.target.value)}
                     />
                     <input
-                      className="w-full text-center text-xs text-slate-500 mt-1 outline-none"
+                      className="w-full text-center text-xs text-slate-500 mt-1 outline-none bg-transparent cursor-not-allowed"
                       placeholder={defaultPosition}
                       value={previewSignatories[role].position}
-                      onChange={(e) => setPreviewSigner(role, 'position', e.target.value)}
+                      readOnly
                     />
                   </div>
                 ))}
@@ -549,13 +570,22 @@ export default function DOLEReportingPage() {
   )
 }
 
-function NumCell({ value, onChange, auto = false }) {
+function NumCell({ value, onChange, auto = false, min = 0 }) {
+  const handleChange = (e) => {
+    let val = e.target.value
+    if (val !== '' && Number(val) < min) {
+      val = min // enforce minimum value
+    }
+    onChange(val)
+  }
+
   return (
     <td className={`border border-black p-0 text-center ${auto ? 'bg-blue-50' : 'bg-white'}`}>
       <input
         type="number"
         value={value ?? 0}
-        onChange={(e) => onChange(e.target.value)}
+        min={min}
+        onChange={handleChange}
         placeholder="0"
         className="w-full min-w-[52px] bg-transparent px-1.5 py-1.5 text-center text-xs outline-none focus:bg-amber-50"
       />
