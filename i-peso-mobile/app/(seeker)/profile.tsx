@@ -33,6 +33,7 @@ import {
   responsibilityLines,
 } from '@/utils/resumeBullets'
 import MaterialIcons from '@expo/vector-icons/MaterialIcons'
+import { SelectField } from '@/components/onboarding/formPrimitives'
 import { AlertBox } from '@/components/ui/AlertBox'
 import { BottomSheet } from '@/components/ui/BottomSheet'
 import { Button } from '@/components/ui/Button'
@@ -49,6 +50,11 @@ const CERTIFICATE_CATEGORIES = [
   'seminar_certificate', 'workshop_certificate', 'employment_certificate',
   'academic_certificate', 'other',
 ]
+
+// A Training Certificate / TESDA NC credential is, by definition, a training's output —
+// everything else may stand alone. Mirrors SeekerCertificateController::CATEGORIES_REQUIRING_TRAINING
+// and i-peso-frontend's CertificateUploadModal.jsx.
+const CATEGORIES_REQUIRING_TRAINING = ['training_certificate', 'tesda_nc_certificate']
 
 export default function ProfileScreen() {
   const token = useAuthStore((state) => state.token)
@@ -779,12 +785,17 @@ function CertificateUploadModal({
   const [issuingBody, setIssuingBody] = useState('')
   const [category, setCategory] = useState(CERTIFICATE_CATEGORIES[0])
   const [issuedAt, setIssuedAt] = useState('')
+  const [trainingId, setTrainingId] = useState('')
   const [file, setFile] = useState<{ uri: string; name: string; mimeType: string } | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
 
+  const requiresTraining = CATEGORIES_REQUIRING_TRAINING.includes(category)
+  const blockedByNoTrainings = requiresTraining && trainings.length === 0
+  const selectedTraining = trainings.find((training) => String(training.id) === trainingId)
+
   const reset = () => {
-    setTitle(''); setIssuingBody(''); setCategory(CERTIFICATE_CATEGORIES[0]); setIssuedAt(''); setFile(null); setError('')
+    setTitle(''); setIssuingBody(''); setCategory(CERTIFICATE_CATEGORIES[0]); setIssuedAt(''); setTrainingId(''); setFile(null); setError('')
   }
 
   const pickFile = async () => {
@@ -799,6 +810,10 @@ function CertificateUploadModal({
       setError('Title, issuing body, issued date, and a file are required.')
       return
     }
+    if (requiresTraining && !trainingId) {
+      setError('Link this certificate to one of your trainings, or add the training first.')
+      return
+    }
     setBusy(true)
     setError('')
     try {
@@ -807,6 +822,7 @@ function CertificateUploadModal({
         issuing_body: issuingBody.trim(),
         category,
         issued_at: issuedAt.trim(),
+        training_id: trainingId || null,
       })
       reset()
       onUploaded()
@@ -826,7 +842,7 @@ function CertificateUploadModal({
       footer={
         <View style={styles.modalActions}>
           <Button variant="outline" onPress={() => { reset(); onClose() }} style={styles.modalBtn}>Cancel</Button>
-          <Button variant="primary" onPress={submit} disabled={busy} loading={busy} style={styles.modalBtn}>Upload</Button>
+          <Button variant="primary" onPress={submit} disabled={busy || blockedByNoTrainings} loading={busy} style={styles.modalBtn}>Upload</Button>
         </View>
       }
     >
@@ -854,6 +870,26 @@ function CertificateUploadModal({
         </View>
         <Text style={styles.label}>Issued Date (YYYY-MM-DD)</Text>
         <TextInput style={styles.modalInput} value={issuedAt} onChangeText={setIssuedAt} placeholder="2024-06-15" placeholderTextColor={colors.subtle} />
+
+        <SelectField
+          label={`Related Training Record${requiresTraining ? '' : ' (Optional)'}`}
+          required={requiresTraining}
+          placeholder={requiresTraining ? 'Select a training' : 'Standalone certificate'}
+          options={trainings.map((training, index) => ({
+            value: String(training.id ?? index),
+            label: [textFrom(training.course, ''), textFrom(training.training_institution, '')].filter(Boolean).join(' — ') || 'Untitled training',
+          }))}
+          value={trainingId}
+          onChange={setTrainingId}
+        />
+        {blockedByNoTrainings ? (
+          <AlertBox variant="warning" style={{ marginBottom: spacing.md }}>
+            This category needs a training record on file. Add one under the Trainings section first, then come back to link it here.
+          </AlertBox>
+        ) : selectedTraining ? (
+          <Text style={styles.trainingHint}>This proof will be linked to: {textFrom(selectedTraining.course)}.</Text>
+        ) : null}
+
         <Button variant="outline" onPress={pickFile} style={{ marginTop: spacing.sm, marginBottom: spacing.md }}>
           {file ? file.name : 'Choose file (PDF, JPG, PNG)'}
         </Button>
@@ -961,6 +997,7 @@ const styles = StyleSheet.create({
   modalBtn: { flex: 1, marginBottom: 0 },
   modalInput: { borderWidth: 1, borderColor: colors.border, borderRadius: radii.md, padding: spacing.md, color: colors.textPrimary, fontSize: typography.body, marginBottom: spacing.md },
   label: { marginBottom: spacing.xs, color: colors.textSecondary, fontSize: typography.small, fontFamily: typography.family.bold },
+  trainingHint: { marginBottom: spacing.md, color: colors.secondary, fontSize: typography.small, fontFamily: typography.family.medium },
   categoryChip: { borderWidth: 1, borderColor: colors.border, borderRadius: radii.pill, paddingHorizontal: spacing.md, paddingVertical: spacing.xs, marginBottom: spacing.sm },
   categoryChipActive: { borderColor: colors.blue600, backgroundColor: colors.blue50 },
   categoryChipText: { fontSize: 11, color: colors.textSecondary, textTransform: 'capitalize' },

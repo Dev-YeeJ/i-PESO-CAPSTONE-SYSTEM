@@ -22,6 +22,7 @@ import {
 import { AlertBox } from '@/components/ui/AlertBox'
 import { Badge } from '@/components/ui/Badge'
 import { BottomSheet } from '@/components/ui/BottomSheet'
+import { EmployerPreferenceChip } from '@/components/ui/EmployerPreferenceChip'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { EmptyState } from '@/components/ui/EmptyState'
@@ -231,6 +232,8 @@ export default function JobDetailsScreen() {
           {job.upskill?.recommended ? <Badge variant="info">Upskill recommended</Badge> : null}
           {applied ? <Badge variant="info">{titleCase(job.application_status, 'Applied')}</Badge> : null}
         </View>
+
+        <EmployerPreferenceChip job={job} style={styles.preferenceChip} />
 
         {applyError ? <AlertBox variant="danger" style={styles.applyErrorBox}>{applyError}</AlertBox> : null}
 
@@ -533,6 +536,7 @@ const styles = StyleSheet.create({
   heroFactText: { flex: 1, ...textStyles.small, color: colors.blue200 },
 
   badgeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.lg },
+  preferenceChip: { marginTop: spacing.md },
   applyErrorBox: { marginTop: spacing.lg },
   infoCard: { marginBottom: spacing.xs },
   detailRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.border },

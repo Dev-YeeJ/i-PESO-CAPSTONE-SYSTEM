@@ -9,6 +9,7 @@ import { formatDate, textFrom, titleCase } from '@/utils/seekerView'
 import { apiErrorMessage } from '@/utils/apiError'
 import { useMotion } from '@/hooks/useMotion'
 import { Badge } from '@/components/ui/Badge'
+import { EmployerPreferenceChip } from '@/components/ui/EmployerPreferenceChip'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { EmptyState } from '@/components/ui/EmptyState'
@@ -148,6 +149,7 @@ export default function EmployerProfileScreen() {
                       </View>
                     ) : null}
                   </View>
+                  <EmployerPreferenceChip job={job} style={styles.preferenceChip} />
                 </Card>
               </PressableScale>
             </Animated.View>
@@ -208,6 +210,7 @@ const styles = StyleSheet.create({
   jobCard: { marginBottom: spacing.sm },
   jobTitle: { color: colors.textPrimary, fontSize: typography.body, fontFamily: typography.family.bold },
   jobMetaRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md, marginTop: spacing.sm },
+  preferenceChip: { marginTop: spacing.sm },
   jobMetaItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   jobMeta: { color: colors.textSecondary, fontSize: typography.small },
   reportLink: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs, marginTop: spacing.xl, paddingVertical: spacing.md },

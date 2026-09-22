@@ -50,12 +50,12 @@ export default function ProgramDetailScreen() {
   const [attachmentError, setAttachmentError] = useState('')
 
   // government-programs/[id] is a flat sibling in the Tabs navigator (not nested under
-  // Government Programs' own stack — same architecture as job-fairs.tsx/citizen-charter.tsx),
-  // so a plain router.back() has no real history to unwind to and falls through to the first
-  // tab (Home) instead of Government Programs. router.canGoBack() was tried here first, but it
+  // Government Programs' own stack — same architecture as job-fairs.tsx), so a plain
+  // router.back() has no real history to unwind to and falls through to the first tab
+  // (Home) instead of Government Programs. router.canGoBack() was tried here first, but it
   // reports true off the root Stack's own history rather than this Tabs navigator's, so back()
   // still landed on Home — same unconditional replace() already proven to work for this exact
-  // architecture in job-fairs.tsx/citizen-charter.tsx is used instead.
+  // architecture in job-fairs.tsx is used instead.
   const goBackToPrograms = useCallback(() => {
     router.replace('/(seeker)/government-programs')
   }, [router])

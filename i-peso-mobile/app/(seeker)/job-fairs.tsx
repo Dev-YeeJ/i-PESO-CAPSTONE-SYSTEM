@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { Image, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native'
 import Animated, { FadeInUp } from 'react-native-reanimated'
 import { useQuery } from '@tanstack/react-query'
 import { useLocalSearchParams, useRouter } from 'expo-router'
@@ -13,7 +13,7 @@ import { Card } from '@/components/ui/Card'
 import { PressableScale } from '@/components/ui/PressableScale'
 import { ScreenHeader } from '@/components/ui/ScreenHeader'
 import { QueryState } from '@/components/ui/QueryState'
-import { colors, spacing, typography } from '@/theme'
+import { colors, radii, spacing, typography } from '@/theme'
 
 function statusVariant(status?: string | null): 'info' | 'success' | 'neutral' {
   const value = textFrom(status, '').toLowerCase()
@@ -84,7 +84,8 @@ export default function JobFairsScreen() {
                 key={String(fair.job_fair_id)}
                 entering={m.enabled ? FadeInUp.delay(m.stagger(index)).duration(240) : undefined}
               >
-              <Card style={styles.fairCard} padding="md">
+              {fair.banner_url ? <Image source={{ uri: fair.banner_url }} style={styles.fairBanner} resizeMode="cover" /> : null}
+              <Card style={[styles.fairCard, fair.banner_url && styles.fairCardWithBanner]} padding="md">
                 <PressableScale
                   scaleTo="cardPress"
                   ripple={null}
@@ -143,6 +144,8 @@ const styles = StyleSheet.create({
   kicker: { color: colors.secondary, fontSize: typography.small, fontFamily: typography.family.bold, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: spacing.xs },
   subtitle: { color: colors.textSecondary, fontSize: typography.body, lineHeight: 20, marginBottom: spacing.lg },
   fairCard: { marginBottom: spacing.md },
+  fairBanner: { width: '100%', height: 140, borderTopLeftRadius: radii.lg, borderTopRightRadius: radii.lg, backgroundColor: colors.background },
+  fairCardWithBanner: { borderTopLeftRadius: 0, borderTopRightRadius: 0, marginTop: 0 },
   fairHeader: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: spacing.md, marginBottom: spacing.sm },
   badgeStack: { alignItems: 'flex-end', gap: spacing.xs },
   fairTitle: { flex: 1, color: colors.textPrimary, fontSize: typography.title, lineHeight: 22, fontFamily: typography.family.bold },

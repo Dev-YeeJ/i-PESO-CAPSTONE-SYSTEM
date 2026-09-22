@@ -163,19 +163,6 @@ export default function GovernmentProgramsScreen() {
         </Button>
       </Card>
 
-      <Card padding="md" style={styles.bulletinCard}>
-        <View style={styles.bulletinRow}>
-          <MaterialIcons name="fact-check" size={22} color={colors.info} />
-          <View style={styles.bulletinText}>
-            <Text style={styles.bulletinTitle}>Citizen Charter</Text>
-            <Text style={styles.bulletinSub}>Official PESO service standards, requirements, and processing times</Text>
-          </View>
-        </View>
-        <Button variant="secondary" onPress={() => router.push('/(seeker)/citizen-charter')} style={styles.bulletinBtn}>
-          View Citizen Charter
-        </Button>
-      </Card>
-
       <SectionHeader title="All Programs" />
 
       <QueryState
