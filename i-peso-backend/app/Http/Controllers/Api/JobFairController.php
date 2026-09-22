@@ -66,7 +66,7 @@ class JobFairController extends Controller
         $user = $request->user();
         $isSeeker = $user instanceof JobSeeker;
 
-        $posters = JobFairRequirementSubmission::query()
+        $submissions = JobFairRequirementSubmission::query()
             ->where('status', 'approved')
             ->whereHas('requirement', fn ($query) => $query->where('code', 'posterized_vacancy'))
             ->with([
@@ -74,58 +74,63 @@ class JobFairController extends Controller
                 'participation.jobFair:job_fair_id,title,venue,status',
             ])
             ->orderByDesc('reviewed_at')
-            ->get()
-            ->map(function (JobFairRequirementSubmission $submission) use ($isSeeker, $user, $matchingService) {
-                $data = [
-                    'id' => $submission->id,
-                    'employer_id' => $submission->employer_id,
-                    'company_name' => $submission->employer?->company_name ?: $submission->employer?->trade_name,
-                    'job_fair_id' => $submission->participation?->job_fair_id,
-                    'job_fair_title' => $submission->participation?->jobFair?->title,
-                    'venue' => $submission->participation?->jobFair?->venue,
-                    'mime_type' => $submission->mime_type,
-                    'original_filename' => $submission->original_filename,
-                    'posted_at' => ($submission->reviewed_at ?? $submission->submitted_at)?->toIso8601String(),
-                ];
+            ->get();
 
-                if ($isSeeker && $submission->participation) {
-                    $fairId = $submission->participation->job_fair_id;
-                    $employerId = $submission->employer_id;
-                    // The employer's own postings entered on their Confirmation
-                    // Slip ("use an existing posting" rows) are the only
-                    // reliable link between a job fair and a real JobVacancy —
-                    // JobFairVacancy is dead code with no live write path.
-                    $vacancies = \App\Models\JobFairConfirmationVacancy::query()
-                        ->whereHas(
-                            'confirmationSlip',
-                            fn ($query) => $query->where('job_fair_id', $fairId)->where('employer_id', $employerId)
-                        )
-                        ->whereNotNull('job_vacancy_id')
-                        ->with('jobVacancy.occupation')
-                        ->get()
-                        ->pluck('jobVacancy')
-                        ->filter();
+        $grouped = $submissions->groupBy(fn ($sub) => $sub->employer_id . '-' . $sub->participation?->job_fair_id);
 
-                    $bestScore = null;
-                    foreach ($vacancies as $vacancy) {
-                        try {
-                            $match = $matchingService->calculateMatch($vacancy, $user);
-                            $score = (float) ($match['percentage'] ?? 0);
-                            if ($bestScore === null || $score > $bestScore) {
-                                $bestScore = $score;
-                            }
-                        } catch (\Throwable $e) {
-                            // ignore match errors
+        $posters = $grouped->map(function ($group) use ($isSeeker, $user, $matchingService) {
+            $first = $group->first();
+            $data = [
+                'employer_id' => $first->employer_id,
+                'company_name' => $first->employer?->company_name ?: $first->employer?->trade_name,
+                'job_fair_id' => $first->participation?->job_fair_id,
+                'job_fair_title' => $first->participation?->jobFair?->title,
+                'venue' => $first->participation?->jobFair?->venue,
+                'posted_at' => ($first->reviewed_at ?? $first->submitted_at)?->toIso8601String(),
+                'files' => $group->map(fn ($sub) => [
+                    'id' => $sub->id,
+                    'mime_type' => $sub->mime_type,
+                    'original_filename' => $sub->original_filename,
+                ])->values()->all(),
+            ];
+
+            if ($isSeeker && $first->participation) {
+                $fairId = $first->participation->job_fair_id;
+                $employerId = $first->employer_id;
+                // The employer's own postings entered on their Confirmation
+                // Slip ("use an existing posting" rows) are the only
+                // reliable link between a job fair and a real JobVacancy —
+                // JobFairVacancy is dead code with no live write path.
+                $vacancies = \App\Models\JobFairConfirmationVacancy::query()
+                    ->whereHas(
+                        'confirmationSlip',
+                        fn ($query) => $query->where('job_fair_id', $fairId)->where('employer_id', $employerId)
+                    )
+                    ->whereNotNull('job_vacancy_id')
+                    ->with('jobVacancy.occupation')
+                    ->get()
+                    ->pluck('jobVacancy')
+                    ->filter();
+
+                $bestScore = null;
+                foreach ($vacancies as $vacancy) {
+                    try {
+                        $match = $matchingService->calculateMatch($vacancy, $user);
+                        $score = (float) ($match['percentage'] ?? 0);
+                        if ($bestScore === null || $score > $bestScore) {
+                            $bestScore = $score;
                         }
-                    }
-                    if ($bestScore !== null) {
-                        $data['match_percentage'] = $bestScore;
+                    } catch (\Throwable $e) {
+                        // ignore match errors
                     }
                 }
+                if ($bestScore !== null) {
+                    $data['match_percentage'] = $bestScore;
+                }
+            }
 
-                return $data;
-            })
-            ->values();
+            return $data;
+        })->values();
 
         return response()->json(['data' => $posters]);
     }
