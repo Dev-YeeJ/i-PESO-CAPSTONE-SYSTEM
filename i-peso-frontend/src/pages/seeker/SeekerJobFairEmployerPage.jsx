@@ -26,6 +26,8 @@ export default function SeekerJobFairEmployerPage() {
   const [error, setError] = useState('')
   const [viewingJobId, setViewingJobId] = useState(null)
 
+  const [activePosterIndex, setActivePosterIndex] = useState(0)
+
   useEffect(() => {
     getEmployerBooth(fairId, employerId)
       .then(setData)
@@ -57,7 +59,6 @@ export default function SeekerJobFairEmployerPage() {
   const { employer, job_fair, posters, vacancies } = data
   const displayName = employer.company_name || employer.trade_name
 
-  const [activePosterIndex, setActivePosterIndex] = useState(0)
   const activePoster = posters && posters.length > 0 ? posters[activePosterIndex] : null
 
   return (
