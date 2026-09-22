@@ -204,6 +204,11 @@ class JobFairController extends Controller
         $seekersNotified = 0;
 
         if ($isFirstPublish) {
+            // Pre-calculate counts since defer() runs after the response is sent.
+            $alreadyTracked = \App\Models\JobFairEmployer::where('job_fair_id', $jobFair->job_fair_id)->pluck('employer_id');
+            $invited = \App\Models\Employer::where('verification_status', 'verified')->whereNotIn('employer_id', $alreadyTracked)->count();
+            $seekersNotified = \App\Models\JobSeeker::count();
+
             // Because shared hosting often kills requests longer than 30-60s,
             // we use defer() to send the emails *after* the fast JSON response
             // is returned to the frontend. This prevents the 504 Gateway Timeout
