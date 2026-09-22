@@ -6,14 +6,7 @@ import { Badge, Button, Card, EmptyState, LoadingSkeleton } from '@/components/u
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import ConfirmationSlipPreview from '@/components/reports/ConfirmationSlipPreview'
 import ConfirmationVacancyEditor, { blankConfirmationVacancy, stripBlankConfirmationVacancies } from '@/components/reports/ConfirmationVacancyEditor'
-import {
-  expressJobFairInterest,
-  listEmployerJobFairs,
-  respondToJobFairInvitation,
-  submitJobFairConfirmation,
-  uploadJobFairRequirement,
-  viewJobFairRequirement,
-} from '@/services/jobFairService'
+import { expressJobFairInterest, getEmployerBooth, listEmployerJobFairs, respondToJobFairInvitation, submitJobFairConfirmation, submitJobFairResults, uploadJobFairRequirement, viewJobFairRequirement, deleteJobFairRequirement } from '@/services/jobFairService'
 import { getProfile, getVacancies } from '@/services/employerService'
 
 const blankConfirmation = {
@@ -482,9 +475,21 @@ export default function EmployerJobFairDashboard() {
 
                               {submissions.map((sub) => (
                                 sub.original_filename && !autoSatisfied && sub.original_filename !== 'Digital confirmation slip' && (
-                                  <button key={sub.id} type="button" onClick={() => viewSubmission(sub)} className="mt-2 flex w-full items-center gap-1.5 text-xs font-semibold text-brand-navy hover:underline">
-                                    <FileText className="h-3.5 w-3.5 shrink-0" /><span className="truncate">{reused ? `Already verified — ${sub.original_filename}` : sub.original_filename}</span>
-                                  </button>
+                                  <div key={sub.id} className="mt-2 flex items-center justify-between gap-3 group rounded-md hover:bg-slate-50">
+                                    <button type="button" onClick={() => viewSubmission(sub)} className="flex min-w-0 items-center gap-1.5 text-xs font-semibold text-brand-navy hover:underline">
+                                      <FileText className="h-3.5 w-3.5 shrink-0" /><span className="truncate">{reused ? `Already verified — ${sub.original_filename}` : sub.original_filename}</span>
+                                    </button>
+                                    {!isApproved && !reused && (
+                                      <button 
+                                        type="button" 
+                                        onClick={() => act(() => deleteJobFairRequirement(sub.id), 'Requirement removed.')}
+                                        className="text-slate-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity p-1"
+                                        title="Remove file"
+                                      >
+                                        <Trash2 className="h-3.5 w-3.5" />
+                                      </button>
+                                    )}
+                                  </div>
                                 )
                               ))}
 

@@ -203,6 +203,32 @@ class EmployerJobFairController extends Controller
         ]);
     }
 
+    public function deleteRequirement(Request $request, JobFairRequirementSubmission $submission, JobFairService $service): JsonResponse
+    {
+        $employer = $this->employer($request);
+        abort_unless($submission->employer_id === $employer->employer_id, 403);
+        
+        $participation = JobFairEmployer::find($submission->job_fair_employer_id);
+        
+        // Cannot delete if already approved
+        abort_if(in_array($participation?->participation_status, ['approved', 'attended', 'encoded_results', 'report_generated']), 403, 'Cannot remove files from an approved participation.');
+
+        // Reused/auto-satisfied ones shouldn't really be deleted manually, but we allow it if they really want,
+        // though normally it just unlinks it.
+        // For physical files, delete them.
+        if (filled($submission->document_path) && !$submission->employer_document_id) {
+            Storage::disk('local')->delete($submission->document_path);
+        }
+
+        $submission->delete();
+        
+        if ($participation) {
+            $service->syncRequirementStatus($participation);
+        }
+
+        return response()->json(['message' => 'Requirement file removed.']);
+    }
+
     public function confirmation(Request $request, JobFair $jobFair, JobFairService $service): JsonResponse
     {
         $employer = $this->employer($request);

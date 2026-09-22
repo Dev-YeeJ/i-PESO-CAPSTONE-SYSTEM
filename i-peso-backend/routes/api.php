@@ -113,6 +113,7 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::post('/job-fairs/{jobFair}/interest', [EmployerJobFairController::class, 'interest']);
             Route::post('/job-fairs/{jobFair}/respond', [EmployerJobFairController::class, 'respond']);
             Route::post('/job-fairs/{jobFair}/requirements/{requirement}', [EmployerJobFairController::class, 'uploadRequirement']);
+            Route::delete('/job-fair-requirements/{submission}', [EmployerJobFairController::class, 'deleteRequirement']);
             Route::get('/job-fair-requirements/{submission}/view', [EmployerJobFairController::class, 'viewRequirement']);
             Route::post('/job-fairs/{jobFair}/confirmation-slip', [EmployerJobFairController::class, 'confirmation']);
             Route::post('/job-fairs/{jobFair}/results', [EmployerJobFairController::class, 'results']);
