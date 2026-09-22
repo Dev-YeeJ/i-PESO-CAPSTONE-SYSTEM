@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Loader2, UserRound } from 'lucide-react'
 
 // Module-level cache so re-focusing a field with the same text already typed
@@ -12,6 +13,9 @@ function putCache(key, value) {
 
 const inputClass = 'w-full min-w-[9rem] rounded-md border border-transparent bg-transparent px-2 py-1.5 text-sm hover:border-slate-200 focus:border-brand-navy focus:bg-white focus:outline-none focus:ring-1 focus:ring-brand-navy/20'
 
+const DROPDOWN_WIDTH = 288 // w-72
+const VIEWPORT_GUTTER = 8
+
 /**
  * "Smart typing" name search for the applicant-name field on a job fair
  * result entry row. Type a few letters of a registered job seeker's name,
@@ -19,6 +23,13 @@ const inputClass = 'w-full min-w-[9rem] rounded-md border border-transparent bg-
  * to auto-fill the rest of that row (sex, city, contact number, age group,
  * education, classification) from their i-PESO profile. Free typing always
  * still works underneath for walk-ins with no account.
+ *
+ * The list renders through a portal, fixed-positioned against the input. Every
+ * table that hosts this component wraps itself in `overflow-x-auto`, and a
+ * container with a non-visible overflow on one axis clips the other axis too —
+ * so an absolutely positioned list was cut off by its own row, invisibly. That
+ * looked exactly like "search returns nothing" even while the request came back
+ * 200 with matches.
  *
  * @param {string} value
  * @param {(text: string) => void} onChangeText
@@ -31,11 +42,40 @@ export default function ApplicantNameSuggest({ value, onChangeText, onSelect, se
   const [suggestions, setSuggestions] = useState([])
   const [searched, setSearched] = useState(false)
   const [highlighted, setHighlighted] = useState(-1)
+  const [position, setPosition] = useState(null)
 
-  const wrapperRef = useRef(null)
+  const inputRef = useRef(null)
+  const dropdownRef = useRef(null)
   const abortRef = useRef(null)
 
   const query = value.trim()
+  const showDropdown = open && query.length >= 2
+
+  const reposition = useCallback(() => {
+    const rect = inputRef.current?.getBoundingClientRect()
+    if (!rect) return
+
+    const left = Math.max(
+      VIEWPORT_GUTTER,
+      Math.min(rect.left, window.innerWidth - DROPDOWN_WIDTH - VIEWPORT_GUTTER),
+    )
+    setPosition({ top: rect.bottom + 4, left, maxHeight: Math.max(120, window.innerHeight - rect.bottom - 16) })
+  }, [])
+
+  useLayoutEffect(() => {
+    if (!showDropdown) return undefined
+
+    reposition()
+    // Capture phase so scrolling any ancestor — including the table's own
+    // horizontal scroller — keeps the list pinned to its input.
+    window.addEventListener('scroll', reposition, true)
+    window.addEventListener('resize', reposition)
+
+    return () => {
+      window.removeEventListener('scroll', reposition, true)
+      window.removeEventListener('resize', reposition)
+    }
+  }, [showDropdown, reposition])
 
   useEffect(() => {
     if (!open || query.length < 2) {
@@ -81,7 +121,12 @@ export default function ApplicantNameSuggest({ value, onChangeText, onSelect, se
   useEffect(() => {
     if (!open) return undefined
     const handleOutside = (event) => {
-      if (!wrapperRef.current?.contains(event.target)) setOpen(false)
+      // The list lives in a portal, so it is not a DOM descendant of the
+      // input — it has to be excluded explicitly or picking a suggestion
+      // would close the list before the click landed.
+      if (inputRef.current?.contains(event.target)) return
+      if (dropdownRef.current?.contains(event.target)) return
+      setOpen(false)
     }
     document.addEventListener('mousedown', handleOutside)
     return () => document.removeEventListener('mousedown', handleOutside)
@@ -109,11 +154,10 @@ export default function ApplicantNameSuggest({ value, onChangeText, onSelect, se
     }
   }
 
-  const showDropdown = open && query.length >= 2
-
   return (
-    <div ref={wrapperRef} className="relative">
+    <div className="relative">
       <input
+        ref={inputRef}
         value={value}
         onChange={(event) => { onChangeText(event.target.value); setOpen(true); setHighlighted(-1) }}
         onFocus={() => setOpen(true)}
@@ -122,8 +166,12 @@ export default function ApplicantNameSuggest({ value, onChangeText, onSelect, se
         autoComplete="off"
         className={inputClass}
       />
-      {showDropdown && (
-        <div className="absolute left-0 top-full z-20 mt-1 max-h-64 w-72 overflow-auto rounded-lg border border-slate-200 bg-white py-1 shadow-lg">
+      {showDropdown && position && createPortal(
+        <div
+          ref={dropdownRef}
+          style={{ top: position.top, left: position.left, width: DROPDOWN_WIDTH, maxHeight: position.maxHeight }}
+          className="fixed z-[70] overflow-auto rounded-lg border border-slate-200 bg-white py-1 shadow-lg"
+        >
           {loading && suggestions.length === 0 && (
             <div className="flex items-center gap-2 px-3 py-2 text-xs text-slate-400">
               <Loader2 className="h-3.5 w-3.5 animate-spin" /> Searching job seekers…
@@ -151,7 +199,8 @@ export default function ApplicantNameSuggest({ value, onChangeText, onSelect, se
               )}
             </button>
           ))}
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   )
