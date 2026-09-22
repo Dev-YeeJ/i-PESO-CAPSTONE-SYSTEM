@@ -63,6 +63,7 @@ export default function JobFairDetailPage() {
   const [error, setError] = useState('')
   const [viewingReport, setViewingReport] = useState(null)
   const [reviewingParticipantId, setReviewingParticipantId] = useState(null)
+  const [reviewingGallery, setReviewingGallery] = useState(null)
   const [viewingConfirmationSlip, setViewingConfirmationSlip] = useState(null)
 
   // Search-as-you-type employer picker for "Invite" — replaces a bare
@@ -449,14 +450,32 @@ export default function JobFairDetailPage() {
                         </p>
                       )}
                       
-                      {viewableFiles.length > 0 && (
-                        <div className="mt-2 space-y-2">
-                          {viewableFiles.map((sub) => (
-                            <button key={sub.id} type="button" onClick={() => blobPreview(() => adminService.viewJobFairRequirement(sub.id))} className="flex items-center gap-1.5 text-xs font-semibold text-blue-700 hover:underline">
-                              <FileText className="h-3.5 w-3.5 shrink-0" /><span className="truncate text-left">View {sub.original_filename}</span>
-                            </button>
-                          ))}
-                        </div>
+                  const hasFiles = viewableFiles.length > 0
+
+                  return (
+                    <div key={req.id} className="rounded-xl border border-slate-200 p-4">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <span className="text-sm font-bold text-slate-800">{req.label}</span>
+                        <Badge variant={badgeStatus === 'rejected' ? 'rejected' : badgeStatus === 'approved' ? 'approved' : badgeStatus === 'review' ? 'review' : 'neutral'} icon={false}>
+                          {displayStatus}
+                        </Badge>
+                      </div>
+
+                      {autoSatisfied && (
+                        <p className="mt-2 flex items-center gap-1.5 text-xs font-semibold text-emerald-700">
+                          <ShieldCheck className="h-3.5 w-3.5" />Auto-verified from the employer's active job postings
+                        </p>
+                      )}
+                      {reused && !autoSatisfied && (
+                        <p className="mt-2 flex items-center gap-1.5 text-xs font-semibold text-emerald-700">
+                          <ShieldCheck className="h-3.5 w-3.5" />Reused from a verified accreditation document
+                        </p>
+                      )}
+                      
+                      {hasFiles && (
+                        <button type="button" onClick={() => setReviewingGallery({ req, submissions, viewableFiles, pendingSubmissions, displayStatus })} className="mt-2 flex items-center gap-1.5 text-sm font-semibold text-blue-700 hover:underline">
+                          <Eye className="h-4 w-4 shrink-0" /> View {viewableFiles.length} {viewableFiles.length === 1 ? 'File' : 'Files'} & Review
+                        </button>
                       )}
                       
                       {firstSubmission?.original_filename === 'Digital confirmation slip' && reviewingParticipant.confirmation_slip && (
@@ -466,16 +485,6 @@ export default function JobFairDetailPage() {
                       )}
                       {firstSubmission?.admin_remarks && <p className="mt-2 text-xs font-semibold text-rose-700">PESO note: {firstSubmission.admin_remarks}</p>}
 
-                      {needsReview && (
-                        <div className="mt-3 flex gap-2">
-                          <Button size="sm" variant="success" icon={CheckCircle2} onClick={() => action(() => Promise.all(pendingSubmissions.map((s) => adminService.reviewJobFairRequirement(s.id, { status: 'approved' }))), 'Requirement approved.')}>
-                            Approve
-                          </Button>
-                          <Button size="sm" variant="danger" onClick={() => action(() => Promise.all(pendingSubmissions.map((s) => adminService.reviewJobFairRequirement(s.id, { status: 'rejected', admin_remarks: 'Please submit a clear and current document.' }))), 'Requirement rejected with correction guidance.')}>
-                            Reject
-                          </Button>
-                        </div>
-                      )}
                       {submissions.length === 0 && <p className="mt-2 text-xs font-semibold text-slate-400">Waiting on the employer.</p>}
                     </div>
                   )
@@ -491,6 +500,60 @@ export default function JobFairDetailPage() {
             <DialogTitle>Confirmation Slip — {viewingConfirmationSlip?.company_name}</DialogTitle>
           </DialogHeader>
           <ConfirmationSlipPreview slip={viewingConfirmationSlip} />
+        </DialogContent>
+      </Dialog>
+      
+      <Dialog open={Boolean(reviewingGallery)} onOpenChange={(open) => {
+        if (!open) {
+          setReviewingGallery(null)
+          // If we close the gallery but the requirement dialog is open, 
+          // we might want to refresh data just in case we took an action.
+          // Since the action function already calls load(), this is fine.
+        }
+      }}>
+        <DialogContent className="max-h-[90vh] max-w-4xl overflow-y-auto">
+          {reviewingGallery && (
+            <>
+              <DialogHeader>
+                <div className="flex items-center gap-3">
+                  <DialogTitle>{reviewingGallery.req.label}</DialogTitle>
+                  <Badge variant={reviewingGallery.displayStatus === 'rejected' ? 'rejected' : reviewingGallery.displayStatus === 'approved' ? 'approved' : reviewingGallery.displayStatus === 'review' ? 'review' : 'neutral'} icon={false}>
+                    {reviewingGallery.displayStatus}
+                  </Badge>
+                </div>
+              </DialogHeader>
+              
+              <div className="mt-4 grid gap-4 grid-cols-1 md:grid-cols-2">
+                {reviewingGallery.viewableFiles.map((sub, idx) => (
+                  <div key={sub.id} className="rounded-lg border border-slate-200 overflow-hidden bg-slate-50 flex flex-col items-center p-2 gap-2">
+                    <p className="text-sm font-semibold text-slate-700 w-full truncate text-center">
+                      {idx + 1}. {sub.original_filename}
+                    </p>
+                    <Button variant="outline" size="sm" icon={Eye} onClick={() => blobPreview(() => adminService.viewJobFairRequirement(sub.id))}>
+                      Preview File
+                    </Button>
+                  </div>
+                ))}
+              </div>
+
+              {reviewingGallery.pendingSubmissions.length > 0 && (
+                <div className="mt-6 flex gap-3 border-t pt-4">
+                  <Button size="lg" variant="success" icon={CheckCircle2} onClick={async () => {
+                    await action(() => Promise.all(reviewingGallery.pendingSubmissions.map((s) => adminService.reviewJobFairRequirement(s.id, { status: 'approved' }))), 'Requirement approved.')
+                    setReviewingGallery(null)
+                  }}>
+                    Approve All Pending
+                  </Button>
+                  <Button size="lg" variant="danger" onClick={async () => {
+                    await action(() => Promise.all(reviewingGallery.pendingSubmissions.map((s) => adminService.reviewJobFairRequirement(s.id, { status: 'rejected', admin_remarks: 'Please submit a clear and current document.' }))), 'Requirement rejected with correction guidance.')
+                    setReviewingGallery(null)
+                  }}>
+                    Reject All Pending
+                  </Button>
+                </div>
+              )}
+            </>
+          )}
         </DialogContent>
       </Dialog>
     </div>
