@@ -76,7 +76,10 @@ class SeekerNearbyJobController extends Controller
             || ! empty($validated['upskill_recommended_only'])
             || ! empty($validated['certificate_match_only'])
             || isset($validated['max_missing_skills']);
-        $compact = ! empty($validated['compact']) && ! $requiresDetailedMatching;
+        
+        // Force compact to false so every job posting runs the score matching algorithm
+        $compact = false;
+        
         // Matching is calculated in PHP. Bound the candidate pool so map and
         // dashboard requests do not score hundreds of vacancies per refresh.
         $candidateLimit = min(120, max($limit * 2, 40));
