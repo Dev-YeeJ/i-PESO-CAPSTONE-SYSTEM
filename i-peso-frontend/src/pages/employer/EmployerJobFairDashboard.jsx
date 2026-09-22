@@ -6,7 +6,7 @@ import { Badge, Button, Card, EmptyState, LoadingSkeleton } from '@/components/u
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import ConfirmationSlipPreview from '@/components/reports/ConfirmationSlipPreview'
 import ConfirmationVacancyEditor, { blankConfirmationVacancy, stripBlankConfirmationVacancies } from '@/components/reports/ConfirmationVacancyEditor'
-import { expressJobFairInterest, getEmployerBooth, listEmployerJobFairs, respondToJobFairInvitation, submitJobFairConfirmation, submitJobFairResults, uploadJobFairRequirement, viewJobFairRequirement, deleteJobFairRequirement } from '@/services/jobFairService'
+import { expressJobFairInterest, listEmployerJobFairs, respondToJobFairInvitation, submitJobFairConfirmation, uploadJobFairRequirement, viewJobFairRequirement, deleteJobFairRequirement } from '@/services/jobFairService'
 import { getProfile, getVacancies } from '@/services/employerService'
 
 const blankConfirmation = {
