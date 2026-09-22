@@ -413,18 +413,28 @@ export default function JobFairDetailPage() {
               </DialogHeader>
               <div className="grid gap-3 sm:grid-cols-2">
                 {(fair.requirements ?? []).map((req) => {
-                  const submitted = reviewingParticipant.requirements?.find((x) => x.job_fair_requirement_id === req.id)
-                  const reused = Boolean(submitted?.reused_from_verification)
-                  const autoSatisfied = Boolean(submitted?.auto_satisfied)
-                  const hasViewableFile = submitted?.original_filename && !autoSatisfied && submitted.original_filename !== 'Digital confirmation slip'
-                  const needsReview = submitted && submitted.status !== 'approved' && submitted.status !== 'rejected' && !autoSatisfied
+                  const submissions = reviewingParticipant.requirements?.filter((x) => x.job_fair_requirement_id === req.id) || []
+                  const firstSubmission = submissions[0]
+                  
+                  const reused = submissions.some((s) => Boolean(s.reused_from_verification))
+                  const autoSatisfied = submissions.some((s) => Boolean(s.auto_satisfied))
+                  const viewableFiles = submissions.filter((s) => s.original_filename && !s.auto_satisfied && s.original_filename !== 'Digital confirmation slip')
+                  
+                  const pendingSubmissions = submissions.filter((s) => s.status !== 'approved' && s.status !== 'rejected' && !s.auto_satisfied)
+                  const needsReview = pendingSubmissions.length > 0
+                  
+                  const badgeStatus = submissions.length > 0 
+                    ? (submissions.some((s) => s.status === 'rejected') ? 'rejected' : submissions.every((s) => s.status === 'approved') ? 'approved' : 'review') 
+                    : null
+                    
+                  const displayStatus = badgeStatus ?? 'not submitted'
 
                   return (
                     <div key={req.id} className="rounded-xl border border-slate-200 p-4">
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <span className="text-sm font-bold text-slate-800">{req.label}</span>
-                        <Badge variant={submitted ? (submitted.status === 'rejected' ? 'rejected' : submitted.status === 'approved' ? 'approved' : 'review') : 'neutral'} icon={false}>
-                          {submitted?.status ?? 'not submitted'}
+                        <Badge variant={badgeStatus === 'rejected' ? 'rejected' : badgeStatus === 'approved' ? 'approved' : badgeStatus === 'review' ? 'review' : 'neutral'} icon={false}>
+                          {displayStatus}
                         </Badge>
                       </div>
 
@@ -438,29 +448,35 @@ export default function JobFairDetailPage() {
                           <ShieldCheck className="h-3.5 w-3.5" />Reused from a verified accreditation document
                         </p>
                       )}
-                      {hasViewableFile && (
-                        <button type="button" onClick={() => blobPreview(() => adminService.viewJobFairRequirement(submitted.id))} className="mt-2 flex items-center gap-1.5 text-xs font-semibold text-blue-700 hover:underline">
-                          <FileText className="h-3.5 w-3.5" />View {submitted.original_filename}
-                        </button>
+                      
+                      {viewableFiles.length > 0 && (
+                        <div className="mt-2 space-y-2">
+                          {viewableFiles.map((sub) => (
+                            <button key={sub.id} type="button" onClick={() => blobPreview(() => adminService.viewJobFairRequirement(sub.id))} className="flex items-center gap-1.5 text-xs font-semibold text-blue-700 hover:underline">
+                              <FileText className="h-3.5 w-3.5 shrink-0" /><span className="truncate text-left">View {sub.original_filename}</span>
+                            </button>
+                          ))}
+                        </div>
                       )}
-                      {submitted?.original_filename === 'Digital confirmation slip' && reviewingParticipant.confirmation_slip && (
+                      
+                      {firstSubmission?.original_filename === 'Digital confirmation slip' && reviewingParticipant.confirmation_slip && (
                         <button type="button" onClick={() => setViewingConfirmationSlip(reviewingParticipant.confirmation_slip)} className="mt-2 flex items-center gap-1.5 text-xs font-semibold text-brand-navy hover:underline">
                           <FileText className="h-3.5 w-3.5" />View Confirmation Slip
                         </button>
                       )}
-                      {submitted?.admin_remarks && <p className="mt-2 text-xs font-semibold text-rose-700">PESO note: {submitted.admin_remarks}</p>}
+                      {firstSubmission?.admin_remarks && <p className="mt-2 text-xs font-semibold text-rose-700">PESO note: {firstSubmission.admin_remarks}</p>}
 
                       {needsReview && (
                         <div className="mt-3 flex gap-2">
-                          <Button size="sm" variant="success" icon={CheckCircle2} onClick={() => action(() => adminService.reviewJobFairRequirement(submitted.id, { status: 'approved' }), 'Requirement approved.')}>
+                          <Button size="sm" variant="success" icon={CheckCircle2} onClick={() => action(() => Promise.all(pendingSubmissions.map((s) => adminService.reviewJobFairRequirement(s.id, { status: 'approved' }))), 'Requirement approved.')}>
                             Approve
                           </Button>
-                          <Button size="sm" variant="danger" onClick={() => action(() => adminService.reviewJobFairRequirement(submitted.id, { status: 'rejected', admin_remarks: 'Please submit a clear and current document.' }), 'Requirement rejected with correction guidance.')}>
+                          <Button size="sm" variant="danger" onClick={() => action(() => Promise.all(pendingSubmissions.map((s) => adminService.reviewJobFairRequirement(s.id, { status: 'rejected', admin_remarks: 'Please submit a clear and current document.' }))), 'Requirement rejected with correction guidance.')}>
                             Reject
                           </Button>
                         </div>
                       )}
-                      {!submitted && <p className="mt-2 text-xs font-semibold text-slate-400">Waiting on the employer.</p>}
+                      {submissions.length === 0 && <p className="mt-2 text-xs font-semibold text-slate-400">Waiting on the employer.</p>}
                     </div>
                   )
                 })}
