@@ -142,9 +142,12 @@ class JobFairController extends Controller
     {
         $this->admin($request);
         $fair = JobFair::findOrFail($id);
-        abort_if($fair->employerJoins()->exists() || $fair->resultReports()->exists(), 422, 'A job fair with participation or report records cannot be deleted. Cancel it instead.');
+        
+        $hasActiveParticipation = $fair->employerJoins()->where('participation_status', '!=', 'invited')->exists();
+        
+        abort_if($hasActiveParticipation || $fair->resultReports()->exists(), 422, 'A job fair with active employer participation or report records cannot be deleted. Cancel it instead.');
         $fair->delete();
-        return response()->json(['message' => 'Unused draft Job Fair deleted.']);
+        return response()->json(['message' => 'Job Fair deleted.']);
     }
 
     public function publish(Request $request, JobFair $jobFair, JobFairService $service): JsonResponse
