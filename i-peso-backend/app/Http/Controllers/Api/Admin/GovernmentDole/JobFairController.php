@@ -829,4 +829,16 @@ class JobFairController extends Controller
         abort_unless($request->user() instanceof Administrator, 403, 'Administrator account required.');
         return $request->user();
     }
+
+    public function destroy(Request $request, $id): JsonResponse
+    {
+        $this->admin($request);
+        
+        $jobFair = JobFair::findOrFail($id);
+        $jobFair->delete();
+
+        return response()->json([
+            'message' => 'Job fair deleted successfully.'
+        ]);
+    }
 }
