@@ -442,6 +442,11 @@ class JobFairController extends Controller
                     'location' => $vacancy->location ?: $vacancy->city_municipality,
                     'salary_range' => $vacancy->salary_range,
                     'employment_type' => $vacancy->employment_type,
+                    // Indication only — the booth never filters or gates an
+                    // application on it, matching the rest of the seeker side.
+                    'preferred_gender' => $vacancy->preferred_gender,
+                    'minimum_age' => $vacancy->minimum_age,
+                    'maximum_age' => $vacancy->maximum_age,
                 ];
 
                 if ($isSeeker) {

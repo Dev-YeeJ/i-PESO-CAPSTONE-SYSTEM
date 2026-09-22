@@ -10,7 +10,6 @@ import {
   CalendarDays,
   ChevronRight,
   Filter,
-  Info,
   Layers3,
   MapPin,
   Search,
@@ -27,6 +26,7 @@ import {
 import toast from 'react-hot-toast'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { StatCard } from '@/components/ui'
+import EmployerPreferenceChip from '@/components/jobs/EmployerPreferenceChip'
 import { applyToJob, getProfileImage, toggleSavedJob as toggleSavedJobApi } from '@/services/seekerService'
 
 const feedTabs = [
@@ -622,15 +622,7 @@ function JobCard({ job, saved = false, applying = false, onSave, onDetails, onQu
           {job.requiredSkills.length > 3 && (
             <span className="text-xs font-semibold text-slate-400">+{job.requiredSkills.length - 3} more</span>
           )}
-          {job.employerPreference && (
-            <span
-              className="inline-flex items-center gap-1 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700"
-              title="The employer noted this preference. It does not affect your match score and you can still apply."
-            >
-              <Info className="h-3.5 w-3.5" />
-              Employer preference: {job.employerPreference}
-            </span>
-          )}
+          <EmployerPreferenceChip job={job} />
         </div>
 
         <div className="flex flex-col gap-3 border-t border-slate-100 pt-3 sm:flex-row sm:items-center sm:justify-between">
@@ -1111,7 +1103,9 @@ function normalizeApiJobs(rows) {
       postedAt: row.posted_at,
       deadline: row.application_deadline,
       description: row.job_description,
-      employerPreference: formatEmployerPreference(row),
+      preferredGender: row.preferred_gender,
+      minimumAge: row.minimum_age,
+      maximumAge: row.maximum_age,
       hasApplied: Boolean(row.has_applied),
       applicationId: row.application_id,
       applicationStatus: row.application_status,
@@ -1124,29 +1118,6 @@ function normalizeApiJobs(rows) {
       missingCriticalSkills: normalizeMissingSkills(match.missing_critical_skills),
     }
   }).filter((job) => job.id)
-}
-
-/**
- * Builds the label for the employer-preference chip, or null when the employer
- * stated no preference ('Any' is the posting form's default, not a preference).
- *
- * This is an indication only — the feed never filters or ranks on it and every
- * seeker can still apply, so the chip is styled as neutral information rather
- * than as a disqualification.
- */
-function formatEmployerPreference(row) {
-  const parts = []
-
-  const gender = row.preferred_gender
-  if (gender && gender !== 'Any') parts.push(gender)
-
-  const min = row.minimum_age
-  const max = row.maximum_age
-  if (min && max) parts.push(`${min}–${max} yrs old`)
-  else if (min) parts.push(`${min} yrs old and above`)
-  else if (max) parts.push(`up to ${max} yrs old`)
-
-  return parts.length ? parts.join(' · ') : null
 }
 
 function normalizeMissingSkills(skills) {

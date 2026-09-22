@@ -1,4 +1,5 @@
 import { AlertTriangle, Award, Banknote, Bookmark, BriefcaseBusiness, CalendarDays, Check, ExternalLink, Eye, GraduationCap, Loader2, MapPin, Navigation } from 'lucide-react'
+import EmployerPreferenceChip from '@/components/jobs/EmployerPreferenceChip'
 
 const matchClass = (percentage) => {
   if (percentage >= 80) return 'bg-emerald-50 text-emerald-700 ring-emerald-200'
@@ -73,6 +74,7 @@ export default function JobMapCard({ job, isActive, isApplying, isSaving, onClic
           </span>
         )}
         {job.upskill?.recommended && <span className="inline-flex items-center gap-1 rounded-md bg-violet-50 px-2 py-1 text-[10px] font-bold text-violet-700"><GraduationCap className="h-3 w-3" /> Upskill recommended</span>}
+        <EmployerPreferenceChip job={job} className="px-2 py-1 text-[10px] font-bold" />
         {job.job_fair?.is_available_at_job_fair && <span className="inline-flex items-center gap-1 rounded-md bg-blue-50 px-2 py-1 text-[10px] font-bold text-blue-700"><CalendarDays className="h-3 w-3" /> Available at job fair</span>}
         {job.certificate_match?.matched && <span className="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2 py-1 text-[10px] font-bold text-emerald-700"><Award className="h-3 w-3" /> Certificate match</span>}
       </div>

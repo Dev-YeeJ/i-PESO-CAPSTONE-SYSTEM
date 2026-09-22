@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, Building2, CalendarDays, FileText, ImageOff, BriefcaseBusiness, Sparkles, MapPin } from 'lucide-react'
 import { Button, LoadingSkeleton } from '@/components/ui'
 import JobDetailModal from '@/components/JobDetailModal'
+import EmployerPreferenceChip from '@/components/jobs/EmployerPreferenceChip'
 import { getEmployerBooth, viewJobFairPoster } from '@/services/jobFairService'
 
 function timeAgo(iso) {
@@ -220,6 +221,8 @@ function VacancyCard({ vacancy, onView }) {
               {hasJobLink ? vacancy.vacancy.location : vacancy.place_of_work}
             </span>
           </div>
+
+          {hasJobLink && <EmployerPreferenceChip job={vacancy.vacancy} />}
         </div>
 
         {!hasJobLink && vacancy.qualifications && (

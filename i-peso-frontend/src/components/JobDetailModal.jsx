@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import { Award, Banknote, Bookmark, BriefcaseBusiness, CalendarDays, Check, ExternalLink, GraduationCap, Loader2, MapPin, Navigation, Sparkles } from 'lucide-react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import EmployerPreferenceChip from '@/components/jobs/EmployerPreferenceChip'
 import { getMapJobDetail } from '@/services/jobMapService'
 import { applyToJob, toggleSavedJob } from '@/services/seekerService'
 
@@ -133,6 +134,8 @@ export default function JobDetailModal({ postId, open, onClose, seekerLocation, 
               <div className="rounded-xl border border-slate-100 bg-slate-50 p-3"><p className="text-[9px] font-black uppercase tracking-wider text-slate-400">Salary</p><p className="mt-1 flex items-center gap-1 text-xs font-extrabold text-slate-800"><Banknote className="h-3.5 w-3.5 text-emerald-600" />{formatSalary(job)}</p></div>
               <div className="rounded-xl border border-slate-100 bg-slate-50 p-3"><p className="text-[9px] font-black uppercase tracking-wider text-slate-400">Employment type</p><p className="mt-1 text-xs font-extrabold text-slate-800">{titleCase(job.employment_type || 'Not specified')}</p></div>
             </div>
+
+            <EmployerPreferenceChip job={job} />
 
             <section>
               <h3 className="text-xs font-black uppercase tracking-wide text-slate-900">Work location</h3>

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Award, Banknote, Bookmark, BriefcaseBusiness, CalendarDays, Check, ExternalLink, Flag, GraduationCap, Loader2, MapPin, Navigation, Sparkles, X } from 'lucide-react'
+import EmployerPreferenceChip from '@/components/jobs/EmployerPreferenceChip'
 
 const formatSalary = (job) => {
   if (job.hide_salary || (!job.salary_min && !job.salary_max)) return 'Salary not disclosed'
@@ -102,6 +103,8 @@ export default function JobMapDetailsPanel({ job, isLoading = false, loadError =
           <div className="rounded-xl border border-slate-100 bg-slate-50 p-3"><p className="text-[9px] font-black uppercase tracking-wider text-slate-400">Salary</p><p className="mt-1 flex items-center gap-1 text-xs font-extrabold text-slate-800"><Banknote className="h-3.5 w-3.5 text-emerald-600" />{formatSalary(renderedJob)}</p></div>
           <div className="rounded-xl border border-slate-100 bg-slate-50 p-3"><p className="text-[9px] font-black uppercase tracking-wider text-slate-400">Employment type</p><p className="mt-1 text-xs font-extrabold text-slate-800">{titleCase(renderedJob.employment_type || 'Not specified')}</p></div>
         </div>
+
+        <EmployerPreferenceChip job={renderedJob} className="mt-4" />
 
         <section className="mt-5">
           <h3 className="text-xs font-black uppercase tracking-wide text-slate-900">Work location</h3>

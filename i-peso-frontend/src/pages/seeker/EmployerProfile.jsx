@@ -4,6 +4,7 @@ import { ArrowLeft, Building2, MapPin, BriefcaseBusiness, Calendar, Users, Targe
 import LazyImage from '@/components/common/LazyImage'
 import { Card, CardHeader, LoadingSkeleton, Badge, Button } from '@/components/ui'
 import JobDetailModal from '@/components/JobDetailModal'
+import EmployerPreferenceChip from '@/components/jobs/EmployerPreferenceChip'
 import api from '@/services/api'
 
 function formatDate(value) {
@@ -138,6 +139,7 @@ export default function EmployerProfile() {
                         <span className="flex items-center gap-1"><BriefcaseBusiness className="h-3 w-3 capitalize" />{job.employment_type?.replaceAll('_', ' ')}</span>
                         <span className="flex items-center gap-1"><Calendar className="h-3 w-3" />Posted {formatDate(job.created_at)}</span>
                       </div>
+                      <EmployerPreferenceChip job={job} className="mt-2" />
                     </div>
                     <Button variant="outline" onClick={() => setViewingJobId(job.post_id)}>
                       View Details
