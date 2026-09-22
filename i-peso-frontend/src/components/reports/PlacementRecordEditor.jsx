@@ -20,7 +20,17 @@ export const stripBlankPlacementRecords = (records) => records.filter((row) => O
  * PlacementRecord::MAPPABLE_FIELDS one column per field. No column-mapping
  * step applies since a typed row is already in canonical field shape.
  */
-export default function PlacementRecordEditor({ records, onChange, searchApplicants }) {
+export default function PlacementRecordEditor({ records, onChange, searchApplicants, assignedCompany = '' }) {
+  /**
+   * Every hire on an employer's own placement report is assigned to that
+   * employer, so the column is pre-filled rather than retyped per row — but
+   * only when it is still empty, so a row restored from a saved report or
+   * edited by hand keeps whatever it already says.
+   */
+  const withAssignedCompany = (row) => (
+    assignedCompany && !row.assigned_company ? { ...row, assigned_company: assignedCompany } : row
+  )
+
   const update = (index, key, value) => {
     onChange(records.map((row, i) => {
       if (i !== index) return row
@@ -55,7 +65,7 @@ export default function PlacementRecordEditor({ records, onChange, searchApplica
         if (age < 15 || age > 100) age = ''
       }
       
-      return {
+      return withAssignedCompany({
         ...row,
         seeker_id: suggestion.seeker_id,
         first_name: suggestion.first_name || row.first_name,
@@ -67,7 +77,7 @@ export default function PlacementRecordEditor({ records, onChange, searchApplica
         age: age || row.age,
         address: suggestion.address || row.address,
         educational_attainment: suggestion.educational_attainment || row.educational_attainment,
-      }
+      })
     }))
   }
 
@@ -169,7 +179,7 @@ export default function PlacementRecordEditor({ records, onChange, searchApplica
           </TableBody>
         </Table>
       </div>
-      <Button type="button" variant="outline" icon={Plus} onClick={() => onChange([...records, blankPlacementRecord()])}>Add Hire</Button>
+      <Button type="button" variant="outline" icon={Plus} onClick={() => onChange([...records, withAssignedCompany(blankPlacementRecord())])}>Add Hire</Button>
     </div>
   )
 }

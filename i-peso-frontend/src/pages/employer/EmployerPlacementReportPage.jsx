@@ -273,7 +273,11 @@ function ManualEntryEditor({ upload, onBack, onChange }) {
       birth_date: fields.birth_date ? String(fields.birth_date).slice(0, 10) : '',
       date_hired: fields.date_hired ? String(fields.date_hired).slice(0, 10) : '',
     }))
-    return saved.length ? saved : [blankPlacementRecord()]
+    // The employer's own company is the assigned company for every hire they
+    // report, so the first row starts pre-filled rather than blank.
+    return saved.length
+      ? saved
+      : [{ ...blankPlacementRecord(), assigned_company: upload.employer_company_name || '' }]
   }, [upload])
 
   const [records, setRecords] = useState(initialRecords)
@@ -325,7 +329,12 @@ function ManualEntryEditor({ upload, onBack, onChange }) {
 
       <Card>
         <CardHeader title="Hires this month" subtitle="Add one row per person hired. Fields marked * are required before submitting. Save as often as you like — nothing is sent to PESO until you submit below." />
-        <PlacementRecordEditor records={records} onChange={setRecords} searchApplicants={searchPlacementApplicantSuggestions} />
+        <PlacementRecordEditor
+          records={records}
+          onChange={setRecords}
+          searchApplicants={searchPlacementApplicantSuggestions}
+          assignedCompany={upload.employer_company_name || ''}
+        />
         <div className="mt-4">
           <Button variant="outline" icon={Save} loading={saving} onClick={handleSave}>
             {saving ? 'Saving…' : 'Save records'}

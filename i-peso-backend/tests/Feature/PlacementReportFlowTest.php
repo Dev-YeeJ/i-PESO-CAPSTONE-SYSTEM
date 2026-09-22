@@ -332,6 +332,26 @@ class PlacementReportFlowTest extends TestCase
             ->assertJsonPath('errors.records.0', 'This report was built from an uploaded spreadsheet — edit it through the column mapping instead.');
     }
 
+    /**
+     * The manual-entry table pre-fills the "Assigned Company" column from
+     * here so the employer does not retype their own company on every hire.
+     * Resolved server-side from the report's owner — the client should not
+     * decide what company name lands in an SPRS placement total.
+     */
+    public function test_manual_entry_report_carries_the_employers_company_name(): void
+    {
+        $employer = $this->employer('assigned-company@example.test', 'IchiTech Solutions');
+        Sanctum::actingAs($employer);
+
+        $uploadId = $this->postJson('/api/employer/placement-reports/manual', [
+            'coverage_month' => 3, 'coverage_year' => 2026,
+        ])->assertCreated()->json('data.id');
+
+        $this->getJson("/api/employer/placement-reports/{$uploadId}")
+            ->assertOk()
+            ->assertJsonPath('data.employer_company_name', 'IchiTech Solutions');
+    }
+
     public function test_reopening_a_manual_entry_report_returns_its_saved_records(): void
     {
         $employer = $this->employer();
