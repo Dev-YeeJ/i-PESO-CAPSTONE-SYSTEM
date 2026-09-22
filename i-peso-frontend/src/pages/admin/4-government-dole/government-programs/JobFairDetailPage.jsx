@@ -55,12 +55,44 @@ function Field({ label, value, onChange, type = 'text', textarea = false, classN
   )
 }
 
+function FilePreview({ fileId, filename }) {
+  const [url, setUrl] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(false)
+
+  useEffect(() => {
+    let objectUrl = null
+    adminService.viewJobFairRequirement(fileId)
+      .then(blob => {
+        objectUrl = URL.createObjectURL(blob)
+        setUrl(objectUrl)
+        setLoading(false)
+      })
+      .catch(() => {
+        setError(true)
+        setLoading(false)
+      })
+    return () => {
+      if (objectUrl) URL.revokeObjectURL(objectUrl)
+    }
+  }, [fileId])
+
+  if (loading) return <div className="flex h-40 w-full items-center justify-center bg-slate-100 rounded-md animate-pulse text-sm text-slate-500">Loading {filename}...</div>
+  if (error) return <div className="flex h-40 w-full items-center justify-center bg-red-50 text-red-600 text-sm rounded-md border border-red-200">Failed to load {filename}</div>
+
+  const isPdf = filename?.toLowerCase().endsWith('.pdf')
+  if (isPdf) {
+    return <iframe src={url} className="w-full h-[600px] border-0 rounded-md bg-white" title={filename} />
+  }
+  return <img src={url} alt={filename} className="w-full h-auto max-h-[700px] object-contain rounded-md bg-slate-900/5 mx-auto" />
+}
+
 export default function JobFairDetailPage() {
   const { id } = useParams()
   const navigate = useNavigate()
   const [fair, setFair] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
+  const [loadingPage, setLoadingPage] = useState(true)
+  const [errorPage, setErrorPage] = useState('')
   const [viewingReport, setViewingReport] = useState(null)
   const [reviewingParticipantId, setReviewingParticipantId] = useState(null)
   const [reviewingGallery, setReviewingGallery] = useState(null)
@@ -76,13 +108,13 @@ export default function JobFairDetailPage() {
   const employerPickerRef = useRef(null)
 
   const load = useCallback(async ({ silent = false } = {}) => {
-    if (!silent) { setLoading(true); setError('') }
+    if (!silent) { setLoadingPage(true); setErrorPage('') }
     try {
       setFair(await adminService.getJobFairDetail(id))
     } catch (e) {
-      if (!silent) setError(e.response?.data?.message ?? 'Unable to load event.')
+      if (!silent) setErrorPage(e.response?.data?.message ?? 'Unable to load event.')
     } finally {
-      if (!silent) setLoading(false)
+      if (!silent) setLoadingPage(false)
     }
   }, [id])
   useEffect(() => { load() }, [load])
@@ -179,7 +211,7 @@ export default function JobFairDetailPage() {
     action(() => adminService.inviteJobFairEmployer(id, { employer_id: employer.employer_id }), `${employer.company_name} invited.`)
   }
 
-  if (loading && !fair) {
+  if (loadingPage && !fair) {
     return (
       <div className="portal-page">
         <LoadingSkeleton variant="text" rows={2} className="max-w-md" />
