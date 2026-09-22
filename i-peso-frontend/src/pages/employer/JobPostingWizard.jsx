@@ -11,10 +11,8 @@ import {
   Loader2,
   MapPin,
   Plus,
-  ShieldAlert,
   Sparkles,
   Target,
-  UsersRound,
   X,
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
@@ -33,8 +31,7 @@ const steps = [
   { number: 1, title: 'Basic Information', shortTitle: 'Basic', icon: BriefcaseBusiness },
   { number: 2, title: 'Algorithm Anchors', shortTitle: 'Anchors', icon: Target },
   { number: 3, title: 'Candidate Qualifications', shortTitle: 'Qualifications', icon: GraduationCap },
-  { number: 4, title: 'Demographic Preferences', shortTitle: 'Preferences', icon: UsersRound },
-  { number: 5, title: 'Compensation & Details', shortTitle: 'Details', icon: CircleDollarSign },
+  { number: 4, title: 'Compensation & Details', shortTitle: 'Details', icon: CircleDollarSign },
 ]
 
 const natureOfWorkOptions = [
@@ -50,7 +47,6 @@ const workArrangementOptions = [
   { label: 'Hybrid', value: 'Hybrid' },
 ]
 
-const genderOptions = ['Any', 'Male', 'Female']
 
 const jobTitleSuggestions = [
   { label: 'Accounting Staff', value: 'Accounting Staff', helper: 'Standard office and finance role title.' },
@@ -110,9 +106,6 @@ const initialForm = {
   required_years_experience: 0,
   required_skills: [],
   soft_skills: [],
-  preferred_gender: 'Any',
-  minimum_age: '',
-  maximum_age: '',
   salary_min: '',
   salary_max: '',
   hide_salary: false,
@@ -203,23 +196,6 @@ export default function JobPostingWizard() {
     }
 
     if (targetStep === 4) {
-      if (!form.preferred_gender) nextErrors.preferred_gender = 'Select preferred gender.'
-      if (form.minimum_age !== '' && (Number(form.minimum_age) < 18 || Number(form.minimum_age) > 100)) {
-        nextErrors.minimum_age = 'Minimum age must be from 18 to 100.'
-      }
-      if (form.maximum_age !== '' && (Number(form.maximum_age) < 18 || Number(form.maximum_age) > 100)) {
-        nextErrors.maximum_age = 'Maximum age must be from 18 to 100.'
-      }
-      if (
-        form.minimum_age !== ''
-        && form.maximum_age !== ''
-        && Number(form.maximum_age) < Number(form.minimum_age)
-      ) {
-        nextErrors.maximum_age = 'Maximum age must be greater than or equal to minimum age.'
-      }
-    }
-
-    if (targetStep === 5) {
       if (!form.hide_salary && form.salary_min === '') nextErrors.salary_min = 'Minimum salary is required.'
       if (!form.hide_salary && form.salary_max === '') nextErrors.salary_max = 'Maximum salary is required.'
       if (
@@ -252,12 +228,12 @@ export default function JobPostingWizard() {
   }
 
   const openPreview = () => {
-    if (!validate(5)) return
+    if (!validate(4)) return
     setShowPreview(true)
   }
 
   const submit = async () => {
-    if (!validate(5)) return
+    if (!validate(4)) return
 
     setSaving(true)
     setServerError('')
@@ -303,7 +279,7 @@ export default function JobPostingWizard() {
                 <p className="text-sm font-bold text-blue-900">Step {step} of {steps.length}: {currentStep.title}</p>
                 <p className="mt-1 text-xs leading-5 text-slate-500">Complete each step to publish a clean, searchable vacancy.</p>
               </div>
-              <div className="grid grid-cols-5 gap-2">
+              <div className="grid grid-cols-4 gap-2">
                 {steps.map((item) => {
                   const Icon = item.icon
                   const active = item.number === step
@@ -354,8 +330,7 @@ export default function JobPostingWizard() {
               />
             )}
             {step === 3 && <QualificationsStep form={form} errors={errors} update={update} />}
-            {step === 4 && <DemographicPreferencesStep form={form} errors={errors} change={change} />}
-            {step === 5 && <CompensationDetailsStep form={form} errors={errors} change={change} update={update} />}
+            {step === 4 && <CompensationDetailsStep form={form} errors={errors} change={change} update={update} />}
           </div>
 
           <footer className="sticky bottom-0 z-10 flex items-center justify-between gap-3 border-t border-slate-200 bg-white/95 px-5 py-4 backdrop-blur sm:px-7">
@@ -641,57 +616,6 @@ function QualificationsStep({ form, errors, update }) {
   )
 }
 
-function DemographicPreferencesStep({ form, errors, change }) {
-  return (
-    <StepShell
-      icon={UsersRound}
-      title="Demographic Preferences"
-      description="Use only when the preference is legally relevant to the duties of the position."
-    >
-      <div className="grid gap-5 md:grid-cols-3">
-        <Field label="Preferred Gender" required error={errors.preferred_gender}>
-          <select name="preferred_gender" value={form.preferred_gender} onChange={change} className={selectClass}>
-            {genderOptions.map((option) => <option key={option} value={option}>{option}</option>)}
-          </select>
-        </Field>
-
-        <Field label="Minimum Age" required={false} error={errors.minimum_age}>
-          <input
-            name="minimum_age"
-            type="number"
-            min="18"
-            max="100"
-            value={form.minimum_age}
-            onChange={change}
-            className={inputClass}
-            placeholder="Optional"
-          />
-        </Field>
-
-        <Field label="Maximum Age" required={false} error={errors.maximum_age}>
-          <input
-            name="maximum_age"
-            type="number"
-            min={form.minimum_age || '18'}
-            max="100"
-            value={form.maximum_age}
-            onChange={change}
-            className={inputClass}
-            placeholder="Optional"
-          />
-        </Field>
-      </div>
-
-      <div className="mt-5 rounded-md bg-amber-50 p-3 text-sm leading-6 text-amber-700">
-        <div className="flex items-start gap-2">
-          <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />
-          <p>Notice: By specifying age or gender preferences, you confirm this position qualifies for a Bona Fide Occupational Qualification (BFOQ) exception under DOLE guidelines and R.A. 10911.</p>
-        </div>
-      </div>
-    </StepShell>
-  )
-}
-
 function CompensationDetailsStep({ form, errors, change, update }) {
   const [aiLoading, setAiLoading] = useState(false)
   const [aiError, setAiError] = useState('')
@@ -862,9 +786,6 @@ function PreviewBody({ form }) {
     : form.salary_min
       ? `₱${Number(form.salary_min).toLocaleString()}${form.salary_max ? ` – ₱${Number(form.salary_max).toLocaleString()}` : ''} / month`
       : '—'
-  const ageRange = form.minimum_age || form.maximum_age
-    ? `${form.minimum_age || '—'} to ${form.maximum_age || '—'}`
-    : 'No age preference'
   const description = form.job_description || '—'
 
   return (
@@ -877,8 +798,6 @@ function PreviewBody({ form }) {
       <PreviewRow label="Experience" value={yearsToExperienceLevel(form.required_years_experience)} />
       <PreviewRow label="Required hard skills" value={form.required_skills.length ? form.required_skills.join(', ') : '—'} full />
       <PreviewRow label="Preferred soft skills" value={form.soft_skills.length ? form.soft_skills.join(', ') : '—'} full />
-      <PreviewRow label="Preferred gender" value={form.preferred_gender} />
-      <PreviewRow label="Age range" value={ageRange} />
       <PreviewRow label="Salary" value={salary} />
       <PreviewRow label="Application deadline" value={form.application_deadline || '—'} />
       <PreviewRow label="Description" value={description} full />
@@ -941,9 +860,6 @@ function buildPayload(form) {
     hide_salary: Boolean(form.hide_salary),
     benefits: [],
     application_deadline: form.application_deadline,
-    preferred_gender: form.preferred_gender,
-    minimum_age: form.minimum_age === '' ? null : Number(form.minimum_age),
-    maximum_age: form.maximum_age === '' ? null : Number(form.maximum_age),
     open_to_pwds: false,
     open_to_senior_citizens: false,
     spes_tupad_eligible: false,

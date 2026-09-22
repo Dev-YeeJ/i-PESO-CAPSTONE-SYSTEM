@@ -210,22 +210,11 @@ class EmployerJobVacancyController extends Controller
             'benefits' => ['nullable', 'array', 'max:30'],
             'benefits.*' => ['string', 'max:100'],
             'application_deadline' => ['required', 'date', 'after_or_equal:today'],
-            'preferred_gender' => ['nullable', Rule::in(['Any', 'Male', 'Female'])],
-            'minimum_age' => ['nullable', 'integer', 'min:18', 'max:100'],
-            // Not 'gte:minimum_age' — that rule requires both sides to be
-            // the same type and treats a null minimum_age as failing the
-            // comparison outright, so a posting with only a maximum age set
-            // (a common, valid combination) was always rejected. Only
-            // compare the two when a minimum was actually given.
-            'maximum_age' => [
-                'nullable', 'integer', 'min:18', 'max:100',
-                function (string $attribute, mixed $value, \Closure $fail) use ($request) {
-                    $minimumAge = $request->input('minimum_age');
-                    if ($minimumAge !== null && (int) $value < (int) $minimumAge) {
-                        $fail('The maximum age must be greater than or equal to the minimum age.');
-                    }
-                },
-            ],
+            // No preferred_gender / minimum_age / maximum_age: RA 10911 makes
+            // it unlawful to publish a job notice suggesting an age preference,
+            // and the Labor Code and RA 6725 do the same for sex. A posting
+            // states bona fide qualifications (skills, licence, education) —
+            // never demographics. Unknown keys are dropped by validate().
             'open_to_pwds' => ['required', 'boolean'],
             'open_to_senior_citizens' => ['required', 'boolean'],
             'spes_tupad_eligible' => ['required', 'boolean'],
@@ -259,12 +248,6 @@ class EmployerJobVacancyController extends Controller
                 unset($data[$column]);
             }
         }
-        foreach (['preferred_gender', 'minimum_age', 'maximum_age'] as $column) {
-            if (! Schema::hasColumn('job_vacancies', $column)) {
-                unset($data[$column]);
-            }
-        }
-
         $addressService = new AddressService();
         $data['full_work_address'] = $addressService->buildFullAddress(
             $data['specific_address'] ?? null,

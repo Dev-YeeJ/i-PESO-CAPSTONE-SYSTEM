@@ -98,10 +98,8 @@ export default function JobPostingDetailPage() {
           </Card>
 
           <Card padding="sm">
-            <h2 className="text-lg font-black text-slate-950 mb-4">Inclusivity & Preferences</h2>
+            <h2 className="text-lg font-black text-slate-950 mb-4">Inclusivity</h2>
             <div className="divide-y divide-slate-100">
-              <InfoRow label="Preferred Gender" value={vacancy.preferred_gender} />
-              <InfoRow label="Age Requirement" value={vacancy.minimum_age || vacancy.maximum_age ? `${vacancy.minimum_age || 'Any'} to ${vacancy.maximum_age || 'Any'} years old` : 'Any'} />
               <InfoRow label="Open to PWDs" value={vacancy.open_to_pwds ? 'Yes' : 'No'} />
               <InfoRow label="Open to Senior Citizens" value={vacancy.open_to_senior_citizens ? 'Yes' : 'No'} />
               <InfoRow label="SPES/TUPAD Eligible" value={vacancy.spes_tupad_eligible ? 'Yes' : 'No'} />

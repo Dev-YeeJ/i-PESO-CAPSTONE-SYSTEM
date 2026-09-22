@@ -219,9 +219,6 @@ class EmployerVerificationJobPostingTest extends TestCase
             'city_municipality' => 'Urdaneta City',
             'minimum_education' => 'College Graduate',
             'salary_type' => 'Monthly',
-            'preferred_gender' => 'Any',
-            'minimum_age' => 21,
-            'maximum_age' => 55,
             'status' => 'active',
         ]);
     }
@@ -250,13 +247,15 @@ class EmployerVerificationJobPostingTest extends TestCase
     }
 
     /**
-     * maximum_age's floor used to be 15 — stale from before minimum_age was
-     * raised to 18 for every job posting (the legal minimum working age),
-     * so a posting could accept applicants as young as 15 as long as no
-     * minimum_age was also set. Locks in that both ends of the age range
-     * share the same 18-100 floor/ceiling.
+     * A job posting states bona fide qualifications, never demographics:
+     * RA 10911 sec. 5 makes it unlawful to publish a notice suggesting an age
+     * preference and extends that to job placement entities, and the Labor
+     * Code and RA 6725 cover sex. The form no longer collects either. This
+     * locks in that a client posting them directly to the API still cannot
+     * get them stored — the validator drops unknown keys, the model no longer
+     * mass-assigns them, and the columns are gone.
      */
-    public function test_maximum_age_below_the_legal_minimum_is_rejected(): void
+    public function test_demographic_preferences_cannot_be_stored_on_a_posting(): void
     {
         $employer = $this->createEmployer();
         $employer->update(['verification_status' => 'verified']);
@@ -264,46 +263,20 @@ class EmployerVerificationJobPostingTest extends TestCase
         Sanctum::actingAs($employer->fresh());
         $this->postJson('/api/employer/vacancies', [
             ...$this->vacancyPayload(),
-            'minimum_age' => null,
-            'maximum_age' => 16,
-        ])
-            ->assertUnprocessable()
-            ->assertJsonValidationErrors(['maximum_age']);
-    }
-
-    public function test_maximum_age_at_the_legal_minimum_is_accepted(): void
-    {
-        $employer = $this->createEmployer();
-        $employer->update(['verification_status' => 'verified']);
-
-        Sanctum::actingAs($employer->fresh());
-        $this->postJson('/api/employer/vacancies', [
-            ...$this->vacancyPayload(),
-            'minimum_age' => null,
-            'maximum_age' => 18,
-        ])
-            ->assertCreated();
-
-        $this->assertDatabaseHas('job_vacancies', [
-            'employer_id' => $employer->employer_id,
-            'minimum_age' => null,
-            'maximum_age' => 18,
-        ]);
-    }
-
-    public function test_maximum_age_below_minimum_age_is_rejected(): void
-    {
-        $employer = $this->createEmployer();
-        $employer->update(['verification_status' => 'verified']);
-
-        Sanctum::actingAs($employer->fresh());
-        $this->postJson('/api/employer/vacancies', [
-            ...$this->vacancyPayload(),
-            'minimum_age' => 40,
+            'preferred_gender' => 'Male',
+            'minimum_age' => 21,
             'maximum_age' => 30,
-        ])
-            ->assertUnprocessable()
-            ->assertJsonValidationErrors(['maximum_age']);
+        ])->assertCreated();
+
+        $vacancy = JobVacancy::where('employer_id', $employer->employer_id)->sole();
+
+        foreach (['preferred_gender', 'minimum_age', 'maximum_age'] as $column) {
+            $this->assertFalse(
+                Schema::hasColumn('job_vacancies', $column),
+                "job_vacancies should no longer have a {$column} column."
+            );
+            $this->assertArrayNotHasKey($column, $vacancy->getAttributes());
+        }
     }
 
     public function test_within_radius_scope_returns_nearby_vacancies_with_distance(): void
@@ -1048,9 +1021,6 @@ class EmployerVerificationJobPostingTest extends TestCase
             'soft_skills' => ['Communication'],
             'required_certifications' => [],
             'application_deadline' => now()->addMonth()->toDateString(),
-            'preferred_gender' => 'Any',
-            'minimum_age' => 21,
-            'maximum_age' => 55,
             'open_to_pwds' => true,
             'open_to_senior_citizens' => false,
             'spes_tupad_eligible' => false,
@@ -1176,9 +1146,6 @@ class EmployerVerificationJobPostingTest extends TestCase
                 $table->json('soft_skills')->nullable();
                 $table->json('required_certifications')->nullable();
                 $table->date('application_deadline')->nullable();
-                $table->string('preferred_gender')->nullable();
-                $table->unsignedTinyInteger('minimum_age')->nullable();
-                $table->unsignedTinyInteger('maximum_age')->nullable();
                 $table->boolean('open_to_pwds')->default(false);
                 $table->boolean('open_to_senior_citizens')->default(false);
                 $table->boolean('spes_tupad_eligible')->default(false);
