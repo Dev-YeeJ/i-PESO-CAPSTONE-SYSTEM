@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { motion as Motion } from 'framer-motion'
 import toast from 'react-hot-toast'
-import { ArrowLeft, ArrowRight, CalendarDays, CheckCircle2, ClipboardList, FileText, FileUp, Mail, MapPin, Save, ShieldCheck } from 'lucide-react'
+import { ArrowLeft, ArrowRight, CalendarDays, CheckCircle2, ChevronDown, ClipboardList, FileText, FileUp, Info, Lock, Mail, MapPin, Save, Search, ShieldCheck, Trash2 } from 'lucide-react'
 import { Badge, Button, Card, EmptyState, LoadingSkeleton } from '@/components/ui'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import ConfirmationSlipPreview from '@/components/reports/ConfirmationSlipPreview'
@@ -407,7 +407,23 @@ export default function EmployerJobFairDashboard() {
                     </TabsTrigger>
                   </TabsList>
 
-                  <div className="pb-6">
+                  <div className="pb-6 relative">
+                    {selected.participation.status === 'invited' && (
+                      <div className="absolute inset-0 z-10 flex flex-col items-center justify-center rounded-b-xl bg-white/80 backdrop-blur-[2px]">
+                        <div className="flex max-w-sm flex-col items-center text-center">
+                          <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-brand-50 text-brand-600">
+                            <Lock className="h-6 w-6" />
+                          </div>
+                          <h4 className="text-lg font-bold text-slate-900">Unlock Requirements</h4>
+                          <p className="mt-2 text-sm text-slate-500">
+                            Please accept the invitation above to confirm your participation and begin submitting the requirements.
+                          </p>
+                          <Button className="mt-5" onClick={acceptInvitation}>
+                            Accept Invitation
+                          </Button>
+                        </div>
+                      </div>
+                    )}
                     <TabsContent value="requirements">
                       <Motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
                       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
