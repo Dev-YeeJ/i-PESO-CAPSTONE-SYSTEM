@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import ProgramCard from '@/components/government-programs/ProgramCard'
 import EligibilityBadge from '@/components/government-programs/EligibilityBadge'
+import { eligibilityReasons } from '@/components/government-programs/programConstants'
 import { EmptyState, LoadingSkeleton } from '@/components/ui'
 import governmentProgramService from '@/services/governmentProgramService'
 
@@ -112,6 +113,8 @@ export default function GovernmentProgramsPage() {
 }
 
 function ProgramListRow({ program }) {
+  const reasons = eligibilityReasons(program.eligibility)
+
   return (
     <article className="grid gap-4 rounded-2xl border border-slate-200 bg-white p-5 sm:grid-cols-[1fr_auto_auto] sm:items-center shadow-sm transition hover:border-blue-200 hover:shadow-md group">
       <div>
@@ -123,6 +126,14 @@ function ProgramListRow({ program }) {
         </div>
         <h3 className="text-lg font-black text-slate-900 group-hover:text-blue-900 transition-colors">{program.title}</h3>
         <p className="mt-1 line-clamp-1 text-sm text-slate-500">{program.short_description || program.description}</p>
+        {reasons.length > 0 && (
+          // Named rather than merely flagged: a seeker who can see *why* can
+          // fix a stale profile, or judge for themselves whether to ask PESO —
+          // criteria are verified in person, so the badge is never the last word.
+          <p className="mt-2 text-xs leading-5 text-slate-500">
+            <span className="font-bold text-slate-600">Why: </span>{reasons.join(' · ')}
+          </p>
+        )}
       </div>
       <div className="text-sm font-semibold text-slate-500 bg-slate-50 rounded-xl px-4 py-2 border border-slate-100">
         <p className="flex items-center gap-2"><UsersRound className="h-4 w-4 text-emerald-400" />{program.total_slots === 0 ? 'Open capacity' : `${program.available_slots} slots left`}</p>

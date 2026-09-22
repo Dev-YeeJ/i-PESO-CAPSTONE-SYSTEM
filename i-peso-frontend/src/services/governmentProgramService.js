@@ -36,6 +36,10 @@ export const governmentProgramService = {
   adminPrograms: async (params = {}) => (await api.get('/admin/government-programs', { params })).data,
   adminAnalytics: async () => (await api.get('/admin/government-programs/analytics')).data.analytics,
   adminProgram: async (id) => (await api.get(`/admin/government-programs/${id}`)).data.program,
+  // Per-category defaults for the posting wizard. Served from the backend so
+  // the criteria fixed by statute live in one place rather than being
+  // re-typed into the client.
+  adminProgramPresets: async () => (await api.get('/admin/government-programs/presets')).data.presets,
   createProgram: async (payload) => (await api.post('/admin/government-programs', programFormData(payload))).data,
   updateProgram: async (id, payload) => (await api.post(`/admin/government-programs/${id}`, programFormData(payload))).data,
   archiveProgram: async (id) => (await api.delete(`/admin/government-programs/${id}`)).data,

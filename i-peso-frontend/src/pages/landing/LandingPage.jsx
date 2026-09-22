@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion as Motion, useReducedMotion, AnimatePresence } from 'framer-motion';
 import governmentProgramService from '@/services/governmentProgramService';
-import { categoryLabel } from '@/components/government-programs/programConstants';
+import PublicProgramCard from '@/components/government-programs/PublicProgramCard';
 import {
   ArrowRight,
   Briefcase,
@@ -560,27 +560,22 @@ const LandingPage = () => {
               initial="hidden"
               whileInView="visible"
               viewport={{ once: true, margin: '-50px' }}
-              className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4"
+              className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
             >
               {programs.map((program) => (
-                <Motion.div
-                  variants={itemVariants}
-                  key={program.program_id}
-                  className="rounded-xl border border-[#0A192F]/10 bg-white p-5 shadow-sm transition-all hover:shadow-md hover:-translate-y-1 cursor-default"
-                >
-                  <span className="font-mono text-[10px] font-medium tracking-wide text-[#B45309]">{categoryLabel(program.category)}</span>
-                  <h3 className="mt-2 text-sm font-bold leading-snug text-[#0A192F]">{program.name}</h3>
-                  <p className="mt-2 text-xs leading-relaxed text-slate-600 line-clamp-3">{program.blurb}</p>
+                <Motion.div variants={itemVariants} key={program.program_id}>
+                  <PublicProgramCard program={program} />
                 </Motion.div>
               ))}
             </Motion.div>
           )}
 
           <p className="mt-8 text-sm text-slate-600">
-            Eligibility and open slots vary by program.{' '}
+            Every program above is free and applied for in person at the PESO office.{' '}
             <button onClick={() => navigate('/register/seeker')} className="font-bold text-[#0A192F] underline decoration-[#B45309] decoration-2 underline-offset-2 hover:text-[#B45309] transition-colors">
-              Register to check yours
-            </button>.
+              Register to check which ones you qualify for
+            </button>{' '}
+            before you make the trip.
           </p>
         </div>
       </Motion.section>

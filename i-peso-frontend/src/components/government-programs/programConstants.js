@@ -18,19 +18,11 @@ export const PROGRAM_STATUSES = [
   { value: 'archived', label: 'Archived' },
 ]
 
-export const APPLICATION_STATUSES = [
-  { value: 'pending', label: 'Pending' },
-  { value: 'under_review', label: 'Under Review' },
-  { value: 'qualified', label: 'Qualified' },
-  { value: 'for_interview', label: 'For Interview / Assessment' },
-  { value: 'approved', label: 'Approved' },
-  { value: 'rejected', label: 'Rejected' },
-  { value: 'completed', label: 'Completed' },
-  { value: 'cancelled', label: 'Cancelled' },
-]
-
 export const categoryLabel = (value) => PROGRAM_CATEGORIES.find((item) => item.value === value)?.label ?? value?.replaceAll('_', ' ') ?? 'Program'
-export const statusLabel = (value) => [...PROGRAM_STATUSES, ...APPLICATION_STATUSES].find((item) => item.value === value)?.label ?? value?.replaceAll('_', ' ') ?? 'Unknown'
+// Program statuses only. The application statuses this used to merge in were
+// left over from the apply/review flow removed on 2026-08-29 — Government
+// Programs is postings and announcements, so no program carries one.
+export const statusLabel = (value) => PROGRAM_STATUSES.find((item) => item.value === value)?.label ?? value?.replaceAll('_', ' ') ?? 'Unknown'
 
 export const categoryTone = {
   spes: 'border-amber-200 bg-amber-50 text-amber-700',
@@ -59,3 +51,19 @@ export const statusTone = {
   archived: 'border-slate-200 bg-slate-100 text-slate-500',
   cancelled: 'border-red-200 bg-red-50 text-red-700',
 }
+
+/**
+ * The rules a seeker failed, worst first — a failed required rule is what
+ * forces "not eligible" regardless of score, so it is named before the rest.
+ */
+export function eligibilityReasons(eligibility, limit = 2) {
+  const breakdown = eligibility?.breakdown
+  if (!Array.isArray(breakdown)) return []
+
+  return breakdown
+    .filter((rule) => !rule.met)
+    .sort((a, b) => Number(b.required) - Number(a.required))
+    .slice(0, limit)
+    .map((rule) => [rule.label, rule.detail].filter(Boolean).join(' — '))
+}
+
