@@ -212,7 +212,15 @@ export default function JobFairFormPage() {
           await adminService.uploadJobFairBanner(created.job_fair_id, flyerFile)
         }
         if (publishNow) {
-          await adminService.publishJobFair(created.job_fair_id)
+          try {
+            await adminService.publishJobFair(created.job_fair_id)
+          } catch (publishErr) {
+            if (publishErr.response?.status === 504 || publishErr.response?.status === 503 || publishErr.message === 'Network Error') {
+              toast.info('Job fair published! Emails are still sending in the background.')
+            } else {
+              throw publishErr
+            }
+          }
         }
         toast.success('Job fair created successfully.')
         navigate(`/admin/job-fairs/${created.job_fair_id}`)
