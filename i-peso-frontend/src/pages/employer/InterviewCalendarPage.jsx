@@ -1,41 +1,52 @@
-import { useMemo } from 'react'
+import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { CalendarCheck, Clock3, ExternalLink } from 'lucide-react'
-import { Button, Card, CardHeader, EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui'
+import FullCalendar from '@fullcalendar/react'
+import dayGridPlugin from '@fullcalendar/daygrid'
+import interactionPlugin from '@fullcalendar/interaction'
+import timeGridPlugin from '@fullcalendar/timegrid'
+import { Card, ErrorState, LoadingSkeleton } from '@/components/ui'
 import { getEmployerCalendarEvents } from '@/services/employerApplicationService'
 
-const RANGE_DAYS = 60
-
-function formatEventRange(startStr, endStr) {
-  const isAllDay = !startStr.includes('T')
-  const start = new Date(startStr)
-  if (isAllDay) {
-    return start.toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })
-  }
-  const end = new Date(endStr)
-  const dateLabel = start.toLocaleDateString('en-PH', { weekday: 'short', month: 'short', day: 'numeric' })
-  const startTime = start.toLocaleTimeString('en-PH', { hour: 'numeric', minute: '2-digit' })
-  const endTime = end.toLocaleTimeString('en-PH', { hour: 'numeric', minute: '2-digit' })
-  return `${dateLabel} · ${startTime}–${endTime}`
-}
-
 export default function InterviewCalendarPage() {
-  const { start, end } = useMemo(() => {
-    const from = new Date()
-    from.setHours(0, 0, 0, 0)
-    const to = new Date(from)
-    to.setDate(to.getDate() + RANGE_DAYS)
-    return { start: from.toISOString(), end: to.toISOString() }
-  }, [])
+  const [dateRange, setDateRange] = useState(() => {
+    // Default to current month view
+    const now = new Date()
+    const start = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
+    const end = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString()
+    return { start, end }
+  })
 
   const eventsQuery = useQuery({
-    queryKey: ['employerCalendarEvents', start, end],
-    queryFn: () => getEmployerCalendarEvents({ start, end }),
+    queryKey: ['employerCalendarEvents', dateRange.start, dateRange.end],
+    queryFn: () => getEmployerCalendarEvents({ start: dateRange.start, end: dateRange.end }),
     staleTime: 60_000,
     retry: false,
   })
 
-  const events = eventsQuery.data?.events ?? []
+  const events = (eventsQuery.data?.events ?? []).map(event => ({
+    id: event.id,
+    title: event.title || 'Interview',
+    start: event.start,
+    end: event.end,
+    url: event.url,
+    extendedProps: {
+      url: event.url
+    }
+  }))
+
+  const handleDatesSet = (dateInfo) => {
+    setDateRange({
+      start: dateInfo.startStr,
+      end: dateInfo.endStr
+    })
+  }
+
+  const handleEventClick = (info) => {
+    if (info.event.url) {
+      info.jsEvent.preventDefault() // prevent default navigation if fullcalendar tries it
+      window.open(info.event.url, '_blank', 'noopener,noreferrer')
+    }
+  }
 
   return (
     <div className="portal-page">
@@ -45,54 +56,41 @@ export default function InterviewCalendarPage() {
         <p className="portal-subtitle">Interviews scheduled from the Applicants board, straight from your i-PESO account.</p>
       </div>
 
-      <Card padding="none">
-        <div className="p-5 sm:p-6">
-          {eventsQuery.isLoading ? (
-            <LoadingSkeleton variant="card" rows={4} />
-          ) : eventsQuery.isError ? (
-            <ErrorState
-              description="We couldn't load your interviews. Check your connection and try again."
-              error={eventsQuery.error}
-              onRetry={() => eventsQuery.refetch()}
+      <Card className="p-4 sm:p-6 overflow-hidden bg-white shadow-sm border border-slate-200 rounded-3xl">
+        {eventsQuery.isError ? (
+          <ErrorState
+            description="We couldn't load your interviews. Check your connection and try again."
+            error={eventsQuery.error}
+            onRetry={() => eventsQuery.refetch()}
+          />
+        ) : (
+          <div className="calendar-container w-full h-[700px] relative">
+            {eventsQuery.isLoading && (
+              <div className="absolute inset-0 bg-white/50 backdrop-blur-[2px] z-10 flex items-center justify-center rounded-2xl">
+                <div className="h-8 w-8 animate-spin rounded-full border-2 border-brand-navy border-t-transparent" />
+              </div>
+            )}
+            <FullCalendar
+              plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
+              initialView="dayGridMonth"
+              headerToolbar={{
+                left: 'prev,next today',
+                center: 'title',
+                right: 'dayGridMonth,timeGridWeek'
+              }}
+              events={events}
+              datesSet={handleDatesSet}
+              eventClick={handleEventClick}
+              eventContent={(arg) => (
+                <div className="overflow-hidden p-1 text-xs text-white rounded bg-brand-navy shadow-sm border border-transparent w-full">
+                  <div className="font-bold truncate">{arg.event.title}</div>
+                  <div className="text-[10px] truncate opacity-80">{arg.timeText}</div>
+                </div>
+              )}
+              height="100%"
             />
-          ) : !events.length ? (
-            <EmptyState
-              icon={CalendarCheck}
-              title="No interviews scheduled"
-              description="Interviews you schedule from the Applicants board will show up here."
-            />
-          ) : (
-            <>
-              <CardHeader title="Upcoming interviews" subtitle={`Next ${RANGE_DAYS} days`} />
-              <ul className="space-y-3">
-                {events.map((event) => (
-                  <li
-                    key={event.id}
-                    className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4"
-                  >
-                    <div>
-                      <p className="text-sm font-bold text-slate-900">{event.title || 'Interview'}</p>
-                      <p className="mt-1 inline-flex items-center gap-1.5 text-xs text-slate-500">
-                        <Clock3 className="h-3.5 w-3.5" />
-                        {formatEventRange(event.start, event.end)}
-                      </p>
-                    </div>
-                    {event.url && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        icon={ExternalLink}
-                        onClick={() => window.open(event.url, '_blank', 'noopener,noreferrer')}
-                      >
-                        Join call
-                      </Button>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            </>
-          )}
-        </div>
+          </div>
+        )}
       </Card>
     </div>
   )
