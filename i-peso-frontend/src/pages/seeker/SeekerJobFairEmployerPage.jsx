@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Building2, CalendarDays, FileText, ImageOff, BriefcaseBusiness, Sparkles, MapPin } from 'lucide-react'
+import { ArrowLeft, Building2, CalendarDays, FileText, ImageOff, BriefcaseBusiness, Sparkles, MapPin, ChevronLeft, ChevronRight } from 'lucide-react'
 import { Button, LoadingSkeleton } from '@/components/ui'
 import JobDetailModal from '@/components/JobDetailModal'
 import EmployerPreferenceChip from '@/components/jobs/EmployerPreferenceChip'
@@ -54,8 +54,11 @@ export default function SeekerJobFairEmployerPage() {
 
   if (!data) return null
 
-  const { employer, job_fair, poster, vacancies } = data
+  const { employer, job_fair, posters, vacancies } = data
   const displayName = employer.company_name || employer.trade_name
+
+  const [activePosterIndex, setActivePosterIndex] = useState(0)
+  const activePoster = posters && posters.length > 0 ? posters[activePosterIndex] : null
 
   return (
     <div className="max-w-4xl mx-auto pb-12">
@@ -76,23 +79,45 @@ export default function SeekerJobFairEmployerPage() {
       <div className="px-4 sm:px-6 space-y-10">
         
         {/* Poster Section */}
-        {poster && (
+        {posters && posters.length > 0 && activePoster && (
           <section>
             <h2 className="text-sm font-black uppercase tracking-widest text-slate-900 mb-4">Job Fair Poster</h2>
-            <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-              <PosterRenderer poster={poster} displayName={displayName} />
+            <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden relative">
+              <PosterRenderer poster={activePoster} displayName={displayName} />
               
+              {posters.length > 1 && (
+                <>
+                  <button 
+                    disabled={activePosterIndex === 0} 
+                    onClick={() => setActivePosterIndex(i => i - 1)}
+                    className="absolute left-2 top-1/2 -translate-y-1/2 flex h-10 w-10 items-center justify-center rounded-full bg-white/90 shadow-md text-slate-700 hover:bg-white disabled:opacity-50 disabled:cursor-not-allowed transition"
+                  >
+                    <ChevronLeft className="h-6 w-6" />
+                  </button>
+                  <button 
+                    disabled={activePosterIndex === posters.length - 1} 
+                    onClick={() => setActivePosterIndex(i => i + 1)}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 flex h-10 w-10 items-center justify-center rounded-full bg-white/90 shadow-md text-slate-700 hover:bg-white disabled:opacity-50 disabled:cursor-not-allowed transition"
+                  >
+                    <ChevronRight className="h-6 w-6" />
+                  </button>
+                  <div className="absolute top-4 right-4 bg-black/60 text-white text-xs font-bold px-3 py-1 rounded-full backdrop-blur-sm">
+                    {activePosterIndex + 1} / {posters.length}
+                  </div>
+                </>
+              )}
+
               <div className="border-t border-slate-100 bg-slate-50 p-4 flex flex-wrap items-center justify-between gap-4">
                 <div>
-                  <p className="text-sm font-bold text-slate-900">{poster.original_filename}</p>
+                  <p className="text-sm font-bold text-slate-900">{activePoster.original_filename}</p>
                   <p className="text-xs font-semibold text-slate-500 mt-0.5">
-                    Posted {timeAgo(poster.posted_at)}
+                    Posted {timeAgo(activePoster.posted_at)}
                   </p>
                 </div>
-                {poster.match_percentage !== undefined && poster.match_percentage !== null && (
+                {activePoster.match_percentage !== undefined && activePoster.match_percentage !== null && (
                   <div className="flex items-center gap-1.5 rounded-full bg-emerald-100 px-3 py-1.5 text-xs font-black uppercase tracking-widest text-emerald-800 shadow-sm">
                     <Sparkles className="h-4 w-4" />
-                    Up to {Math.round(poster.match_percentage)}% Match
+                    Up to {Math.round(activePoster.match_percentage)}% Match
                   </div>
                 )}
               </div>

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Html5Qrcode } from 'html5-qrcode'
 import { useNavigate, useParams } from 'react-router-dom'
-import { CheckCircle2, Clock3, Search, XCircle, Download, FileText, FileSpreadsheet } from 'lucide-react'
+import { CheckCircle2, Clock3, Search, XCircle, Download, FileText, FileSpreadsheet, SwitchCamera } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { AlertBox, Badge, Button, Card } from '@/components/ui'
 import PageHeader from '@/pages/admin/_components/PageHeader'
@@ -123,7 +123,7 @@ export default function JobFairCheckInPage() {
   useEffect(() => {
     const scanner = new Html5Qrcode(QR_ELEMENT_ID)
     scanner.start(
-      { facingMode: 'environment' },
+      { facingMode },
       { fps: 10, qrbox: { width: 250, height: 250 } },
       (decodedText) => {
         if (lockedRef.current) return
@@ -137,7 +137,7 @@ export default function JobFairCheckInPage() {
     return () => {
       scanner.stop().then(() => scanner.clear()).catch(() => {})
     }
-  }, [])
+  }, [facingMode])
 
   useEffect(() => {
     if (!search.trim()) {
@@ -173,7 +173,7 @@ export default function JobFairCheckInPage() {
   return (
     <div className="portal-page">
       <PageHeader
-        title="Job Fair Check-In"
+        title="Scan Attendance"
         subtitle="Scan a seeker's digital pass to verify pre-registration and mark attendance."
         eyebrow="Info Desk"
         actions={[
@@ -214,6 +214,13 @@ export default function JobFairCheckInPage() {
                 />
               )}
               <div id={QR_ELEMENT_ID} className="w-full overflow-hidden rounded-xl bg-slate-950 min-h-[300px]" />
+              {!cameraError && (
+                <div className="absolute bottom-4 right-4 z-20">
+                  <Button variant="secondary" size="sm" icon={SwitchCamera} onClick={() => setFacingMode((prev) => (prev === 'environment' ? 'user' : 'environment'))} className="shadow-lg">
+                    Flip Camera
+                  </Button>
+                </div>
+              )}
               {cameraError && <div className="p-4 bg-white"><AlertBox variant="warning" title="Camera unavailable">{cameraError}</AlertBox></div>}
             </Card>
           </motion.div>

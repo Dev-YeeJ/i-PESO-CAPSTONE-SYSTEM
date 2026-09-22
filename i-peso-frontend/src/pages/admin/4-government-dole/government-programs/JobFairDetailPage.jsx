@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 // eslint-disable-next-line no-unused-vars
 import { motion, AnimatePresence } from 'framer-motion'
-import { CheckCircle2, ClipboardEdit, Download, Eye, FileText, Flame, Mail, RefreshCw, Save, Search, ShieldCheck, TrendingUp, UserCheck, Users, XCircle } from 'lucide-react'
+import { CheckCircle2, ClipboardEdit, Download, Eye, FileText, Flame, Mail, RefreshCw, Save, Search, ShieldCheck, TrendingUp, UserCheck, Users, XCircle, ChevronLeft, ChevronRight } from 'lucide-react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Badge, Button, Card, CardHeader, LoadingSkeleton, StatCard } from '@/components/ui'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
@@ -96,6 +96,7 @@ export default function JobFairDetailPage() {
   const [viewingReport, setViewingReport] = useState(null)
   const [reviewingParticipantId, setReviewingParticipantId] = useState(null)
   const [reviewingGallery, setReviewingGallery] = useState(null)
+  const [activeFileIndex, setActiveFileIndex] = useState(0)
   const [viewingConfirmationSlip, setViewingConfirmationSlip] = useState(null)
 
   // Search-as-you-type employer picker for "Invite" — replaces a bare
@@ -237,7 +238,7 @@ export default function JobFairDetailPage() {
         actions={[
           { label: 'Back', onClick: () => navigate('/admin/job-fairs'), variant: 'secondary' },
           { label: 'Edit', onClick: () => navigate(`/admin/job-fairs/${id}/edit`), variant: 'secondary' },
-          { label: 'Check-In', onClick: () => navigate(`/admin/job-fairs/${id}/check-in`) },
+          { label: 'Scan Attendance', onClick: () => navigate(`/admin/job-fairs/${id}/check-in`) },
         ]}
       />
 
@@ -257,94 +258,72 @@ export default function JobFairDetailPage() {
               ))}
             </div>
 
-            <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm leading-6 text-blue-900 shadow-sm">
-              <strong>Physical event status quo:</strong> i-PESO does not force digital crowd control at the venue — employers use their normal tables and paper resumes; the system focuses on coordination before the event and report automation afterward.
-            </div>
-
             <div className="grid gap-6 xl:grid-cols-2">
             <Card>
-              <CardHeader title="Announcement & invitation" subtitle={`${fair?.status?.replaceAll('_', ' ') ?? ''} · ${fair?.venue ?? ''}`} />
-              {/* Publishing is a one-time announcement, not a toggle. The
-                  button used to render unconditionally, so every already-
-                  published fair still showed a "Publish" that looked like it
-                  would re-notify everyone but silently did nothing except
-                  reset published_at. Once published, the only invitation work
-                  left is reaching employers accredited since — which is now
-                  its own explicitly labelled action. */}
+              <CardHeader title="Announcement & Status" subtitle={`${fair?.status?.replaceAll('_', ' ') ?? ''}`} />
               <div className="flex flex-wrap items-center gap-2">
                 {!fair?.published_at ? (
                   <Button icon={ShieldCheck} onClick={() => action(() => adminService.publishJobFair(id, 'accepting_employers'), 'Announcement published. Employers and job seekers notified.')}>
-                    Publish & Invite Employers
+                    Publish & Announce
                   </Button>
                 ) : (
                   <>
                     <Badge status="approved" className="shrink-0">
                       Published {new Date(fair.published_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}
                     </Badge>
-                    {fair?.employer_registration_open && (
-                      <Button variant="outline" icon={Mail} onClick={() => action(() => adminService.resendJobFairInvitations(id), 'Invitations sent to newly accredited employers.')}>
-                        Invite new employers
-                      </Button>
-                    )}
                   </>
                 )}
                 <Button variant="outline" icon={FileText} onClick={() => blobDownload(() => adminService.downloadJobFairInvitation(id), `job-fair-invitation-${id}.pdf`)}>
-                  Invitation PDF
+                  Announcement PDF
                 </Button>
               </div>
 
               {fair?.published_at && !fair?.employer_registration_open && fair?.employer_registration_closed_reason && (
                 <p className="mt-2 text-xs font-semibold text-slate-500">{fair.employer_registration_closed_reason}</p>
               )}
+            </Card>
 
-              <div ref={employerPickerRef} className="relative mt-5">
-                <label className="text-xs font-bold uppercase tracking-wide text-slate-500 mb-1.5 block">Invite a verified employer</label>
-                <Command className="rounded-xl border border-slate-300 shadow-sm overflow-visible bg-white" shouldFilter={false}>
-                  <Command.Input
-                    value={employerQuery}
-                    onValueChange={(val) => { setEmployerQuery(val); setEmployerPickerOpen(true) }}
-                    onFocus={() => setEmployerPickerOpen(true)}
-                    placeholder="Search company name…"
-                    className="w-full border-none bg-transparent px-4 py-2.5 text-sm focus:outline-none focus:ring-0"
-                  />
-                  <AnimatePresence>
-                    {employerPickerOpen && employerQuery.trim() && (
-                      <motion.div 
-                        initial={{ opacity: 0, y: -5 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -5 }}
-                        transition={{ duration: 0.15 }}
-                        className="absolute z-10 w-full top-full mt-1 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl"
-                      >
-                        <Command.List className="max-h-64 overflow-y-auto p-1">
-                          {employerSearching ? (
-                            <Command.Loading className="px-4 py-3 text-xs font-semibold text-slate-500">Searching…</Command.Loading>
-                          ) : employerResults.length === 0 ? (
-                            <Command.Empty className="px-4 py-3 text-xs font-semibold text-slate-500">No verified employer matches.</Command.Empty>
-                          ) : (
-                            employerResults.map((employer) => (
-                              <Command.Item
-                                key={employer.employer_id}
-                                onSelect={() => inviteEmployer(employer)}
-                                className="flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition data-[selected=true]:bg-blue-50 data-[selected=true]:text-blue-700"
-                              >
-                                <Mail className="h-4 w-4 shrink-0 text-slate-400" />
-                                <span className="truncate font-bold text-slate-900">{employer.company_name}</span>
-                              </Command.Item>
-                            ))
-                          )}
-                        </Command.List>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </Command>
-              </div>
-
-              {fair?.latitude && fair?.longitude && (
-                <div className="mt-5">
-                  <LocationPreviewCard title="Venue Pin" fullAddress={fair.full_address || fair.venue} latitude={fair.latitude} longitude={fair.longitude} isAdmin verified={Boolean(fair.google_place_id)} />
+            <Card>
+              <CardHeader title="Event Details" subtitle="Information shown to job seekers and employers" />
+              <div className="space-y-4 text-sm mt-4">
+                {fair?.banner_url && (
+                  <img src={fair.banner_url} alt="Job Fair Banner" className="w-full rounded-xl object-cover mb-4 aspect-video" />
+                )}
+                <div>
+                  <span className="font-bold text-slate-900 block mb-1">Schedule</span>
+                  <span className="text-slate-600">
+                    {new Date(fair?.start_date).toLocaleDateString('en-PH', { month: 'long', day: 'numeric', year: 'numeric' })}
+                    {fair?.end_date && fair.end_date !== fair.start_date ? ` to ${new Date(fair.end_date).toLocaleDateString('en-PH', { month: 'long', day: 'numeric', year: 'numeric' })}` : ''}
+                    {' • '}
+                    {fair?.start_time} {fair?.end_time ? `- ${fair.end_time}` : ''}
+                  </span>
                 </div>
-              )}
+                
+                <div>
+                  <span className="font-bold text-slate-900 block mb-1">Venue</span>
+                  <span className="text-slate-600">{fair?.venue}</span>
+                </div>
+
+                {fair?.partner_agencies && (
+                  <div>
+                    <span className="font-bold text-slate-900 block mb-1">Partner Agencies</span>
+                    <span className="text-slate-600">{fair?.partner_agencies}</span>
+                  </div>
+                )}
+
+                {fair?.description && (
+                  <div>
+                    <span className="font-bold text-slate-900 block mb-1">Description</span>
+                    <span className="text-slate-600 whitespace-pre-wrap">{fair?.description}</span>
+                  </div>
+                )}
+
+                {fair?.latitude && fair?.longitude && (
+                  <div className="mt-5">
+                    <LocationPreviewCard title="Venue Pin" fullAddress={fair.full_address || fair.venue} latitude={fair.latitude} longitude={fair.longitude} isAdmin verified={Boolean(fair.google_place_id)} />
+                  </div>
+                )}
+              </div>
             </Card>
           </div>
           </motion.div>
@@ -486,7 +465,7 @@ export default function JobFairDetailPage() {
                       )}
                       
                       {hasFiles && (
-                        <button type="button" onClick={() => setReviewingGallery({ req, submissions, viewableFiles, pendingSubmissions, displayStatus })} className="mt-2 flex items-center gap-1.5 text-sm font-semibold text-blue-700 hover:underline">
+                        <button type="button" onClick={() => { setActiveFileIndex(0); setReviewingGallery({ req, submissions, viewableFiles, pendingSubmissions, displayStatus }) }} className="mt-2 flex items-center gap-1.5 text-sm font-semibold text-blue-700 hover:underline">
                           <Eye className="h-4 w-4 shrink-0" /> View {viewableFiles.length} {viewableFiles.length === 1 ? 'File' : 'Files'} & Review
                         </button>
                       )}
@@ -536,17 +515,22 @@ export default function JobFairDetailPage() {
                 </div>
               </DialogHeader>
               
-              <div className="mt-4 grid gap-4 grid-cols-1 md:grid-cols-2">
-                {reviewingGallery.viewableFiles.map((sub, idx) => (
-                  <div key={sub.id} className="rounded-lg border border-slate-200 overflow-hidden bg-slate-50 flex flex-col items-center p-2 gap-2">
-                    <p className="text-sm font-semibold text-slate-700 w-full truncate text-center">
-                      {idx + 1}. {sub.original_filename}
-                    </p>
-                    <Button variant="outline" size="sm" icon={Eye} onClick={() => blobPreview(() => adminService.viewJobFairRequirement(sub.id))}>
-                      Preview File
-                    </Button>
+              <div className="mt-4 relative bg-slate-50 border border-slate-200 rounded-xl overflow-hidden p-2">
+                {reviewingGallery.viewableFiles.length > 0 && (
+                  <div className="flex flex-col items-center">
+                    <FilePreview fileId={reviewingGallery.viewableFiles[activeFileIndex].id} filename={reviewingGallery.viewableFiles[activeFileIndex].original_filename} />
+                    
+                    {reviewingGallery.viewableFiles.length > 1 && (
+                      <div className="mt-4 flex items-center justify-between w-full px-4 pb-2">
+                        <Button variant="outline" size="sm" disabled={activeFileIndex === 0} onClick={() => setActiveFileIndex(i => i - 1)} icon={ChevronLeft}>Prev</Button>
+                        <span className="text-sm font-semibold text-slate-600 truncate max-w-[200px] sm:max-w-md mx-2">
+                          {activeFileIndex + 1} of {reviewingGallery.viewableFiles.length} &mdash; {reviewingGallery.viewableFiles[activeFileIndex].original_filename}
+                        </span>
+                        <Button variant="outline" size="sm" disabled={activeFileIndex === reviewingGallery.viewableFiles.length - 1} onClick={() => setActiveFileIndex(i => i + 1)} icon={ChevronRight} iconRight>Next</Button>
+                      </div>
+                    )}
                   </div>
-                ))}
+                )}
               </div>
 
               {reviewingGallery.pendingSubmissions.length > 0 && (

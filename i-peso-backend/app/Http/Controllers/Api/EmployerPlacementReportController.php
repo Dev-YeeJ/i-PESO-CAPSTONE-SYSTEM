@@ -753,6 +753,14 @@ class EmployerPlacementReportController extends Controller
             'mapping' => $upload->mappings->pluck('target_field', 'source_column'),
             'mappable_fields' => PlacementRecord::MAPPABLE_FIELDS,
             'required_fields' => PlacementRecord::REQUIRED_FIELDS,
+            // Every hire on an employer's own placement report is assigned to
+            // that employer, so the editor pre-fills the column from here
+            // rather than making them retype their company on every row.
+            // Resolved server-side because the report already knows who owns
+            // it — the client should not be deciding what lands in an SPRS
+            // placement total.
+            'employer_company_name' => $upload->employer?->company_name
+                ?: $upload->employer?->trade_name,
             // Only meaningful for a manual-entry report: the table editor
             // needs every previously-saved row back to resume where the
             // employer left off (e.g. re-opening one PESO rejected), not

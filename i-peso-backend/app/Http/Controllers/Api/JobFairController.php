@@ -399,22 +399,21 @@ class JobFairController extends Controller
         $fair = JobFair::findOrFail($jobFairId);
         $employer = Employer::findOrFail($employerId);
 
-        $posterSubmission = JobFairRequirementSubmission::query()
+        $posterSubmissions = JobFairRequirementSubmission::query()
             ->where('status', 'approved')
             ->whereHas('requirement', fn ($query) => $query->where('code', 'posterized_vacancy'))
             ->where('employer_id', $employerId)
             ->whereHas('participation', fn ($query) => $query->where('job_fair_id', $jobFairId))
-            ->first();
+            ->get();
 
-        $posterData = null;
-        if ($posterSubmission) {
-            $posterData = [
+        $postersData = $posterSubmissions->map(function ($posterSubmission) {
+            return [
                 'id' => $posterSubmission->id,
                 'mime_type' => $posterSubmission->mime_type,
                 'original_filename' => $posterSubmission->original_filename,
                 'posted_at' => ($posterSubmission->reviewed_at ?? $posterSubmission->submitted_at)?->toIso8601String(),
             ];
-        }
+        })->toArray();
 
         $confirmedVacancies = \App\Models\JobFairConfirmationVacancy::query()
             ->whereHas('confirmationSlip', fn ($query) => $query->where('job_fair_id', $jobFairId)->where('employer_id', $employerId))
@@ -463,8 +462,10 @@ class JobFairController extends Controller
         });
 
         $bestScore = $vacanciesData->max('match_percentage');
-        if ($posterData && $bestScore !== null) {
-            $posterData['match_percentage'] = $bestScore;
+        if ($postersData && $bestScore !== null) {
+            foreach ($postersData as &$pd) {
+                $pd['match_percentage'] = $bestScore;
+            }
         }
 
         return response()->json([
@@ -480,7 +481,7 @@ class JobFairController extends Controller
                 'venue' => $fair->venue,
                 'start_date' => $fair->start_date?->toDateString() ?? $fair->event_date?->toDateString(),
             ],
-            'poster' => $posterData,
+            'posters' => $postersData,
             'vacancies' => $vacanciesData,
         ]);
     }

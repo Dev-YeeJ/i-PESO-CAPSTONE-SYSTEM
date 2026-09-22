@@ -97,50 +97,53 @@ export default function JobFairEmployersTable({ participants, onReviewRequiremen
         </div>
       </div>
 
-      <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-        <Table>
-          <TableHeader>
-            {table.getHeaderGroups().map(headerGroup => (
-              <TableRow key={headerGroup.id}>
-                {headerGroup.headers.map(header => (
-                  <TableHead key={header.id}>
-                    {header.isPlaceholder ? null : (
-                      <div
-                        className={`flex items-center gap-2 ${header.column.getCanSort() ? 'cursor-pointer select-none transition-colors hover:text-slate-700' : ''}`}
-                        onClick={header.column.getToggleSortingHandler()}
-                      >
-                        {flexRender(header.column.columnDef.header, header.getContext())}
-                        {{
-                          asc: <ChevronUp className="h-4 w-4" />,
-                          desc: <ChevronDown className="h-4 w-4" />
-                        }[header.column.getIsSorted()] ?? null}
-                      </div>
-                    )}
-                  </TableHead>
-                ))}
-              </TableRow>
-            ))}
-          </TableHeader>
-          <TableBody>
-            {table.getRowModel().rows.length ? (
-              table.getRowModel().rows.map(row => (
-                <TableRow key={row.id}>
-                  {row.getVisibleCells().map(cell => (
-                    <TableCell key={cell.id} className="py-3">
-                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                    </TableCell>
-                  ))}
-                </TableRow>
-              ))
-            ) : (
-              <TableRow>
-                <TableCell colSpan={columns.length} className="h-32 text-center text-sm font-medium text-slate-500">
-                  No employers found.
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {table.getRowModel().rows.length ? (
+          table.getRowModel().rows.map(row => (
+            <div key={row.id} className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition hover:shadow-md flex flex-col justify-between">
+              <div className="flex items-start gap-4">
+                {row.original.company_logo ? (
+                  <img src={row.original.company_logo} alt={row.original.company_name} className="h-12 w-12 shrink-0 rounded-xl object-cover border border-slate-100" />
+                ) : (
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-blue-100 to-blue-200 text-blue-700 font-bold text-lg shadow-inner">
+                    {row.original.company_name.substring(0, 1).toUpperCase()}
+                  </div>
+                )}
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-base font-bold text-slate-900 leading-tight mb-1">{row.original.company_name}</p>
+                  {row.original.representative_name ? (
+                    <p className="truncate text-xs font-semibold text-slate-500 mb-2">
+                      Rep: {row.original.representative_name}
+                    </p>
+                  ) : (
+                    <div className="h-4 mb-2"></div>
+                  )}
+                  <Badge variant={statusTones[row.original.status] ?? 'neutral'} icon={false} className="text-[10px] uppercase tracking-wide">
+                    {row.original.status.replaceAll('_', ' ')}
+                  </Badge>
+                </div>
+              </div>
+              <div className="mt-5 pt-4 border-t border-slate-100 flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => onReviewRequirements(row.original.id)}
+                  className="flex items-center gap-1.5 rounded-lg bg-blue-50 px-4 py-2 text-xs font-bold text-blue-700 transition hover:bg-blue-600 hover:text-white group w-full justify-center"
+                >
+                  <FileText className="h-4 w-4 shrink-0" />
+                  <span className="truncate">
+                    {row.original.total_requirements 
+                      ? `${(row.original.requirements ?? []).filter((r) => r.status === 'approved').length} / ${row.original.total_requirements} Reqs Approved` 
+                      : 'View Details'}
+                  </span>
+                </button>
+              </div>
+            </div>
+          ))
+        ) : (
+          <div className="col-span-full h-32 flex items-center justify-center rounded-xl border border-slate-200 bg-white">
+            <p className="text-sm font-medium text-slate-500">No employers found.</p>
+          </div>
+        )}
       </div>
 
       {table.getPageCount() > 1 && (
