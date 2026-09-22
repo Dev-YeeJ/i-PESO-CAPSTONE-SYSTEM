@@ -88,7 +88,12 @@ export default function JobFairFeed() {
             ) : (
               <div className="space-y-6">
                 {fairs.map((fair) => (
-                  <article key={fair.job_fair_id} id={`fair-${fair.job_fair_id}`} className="scroll-mt-4 rounded-3xl border border-slate-200 bg-white p-6 sm:p-8 shadow-sm transition hover:border-blue-200 hover:shadow-md">
+                  <article key={fair.job_fair_id} id={`fair-${fair.job_fair_id}`} className="scroll-mt-4 rounded-3xl border border-slate-200 bg-white p-6 sm:p-8 shadow-sm transition hover:border-blue-200 hover:shadow-md overflow-hidden">
+                    {fair.banner_url && (
+                      <div className="-mx-6 -mt-6 mb-6 sm:-mx-8 sm:-mt-8">
+                        <img src={fair.banner_url} alt={`${fair.title} Banner`} className="w-full h-auto object-cover max-h-80" />
+                      </div>
+                    )}
                     <div className="flex flex-wrap items-start justify-between gap-4">
                       <div>
                         <div className="flex flex-wrap items-center gap-2">

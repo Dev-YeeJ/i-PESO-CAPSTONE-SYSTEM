@@ -277,6 +277,7 @@ class JobFairService
             'status' => $fair->status,
             'is_public' => (bool) $fair->is_public,
             'published_at' => $fair->published_at?->toIso8601String(),
+            'banner_url' => $fair->banner_url ? config('app.url') . $fair->banner_url : null,
             // Whether an employer can still join, decided here rather than
             // re-derived in the employer dashboard from status strings — the
             // old UI showed a "Join Job Fair" button for any fair with no

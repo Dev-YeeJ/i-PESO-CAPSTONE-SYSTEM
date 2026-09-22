@@ -83,8 +83,13 @@ function JobFairCard({ fair, onClick }) {
       whileHover={{ y: -4 }}
       whileTap={{ scale: 0.98 }}
       transition={{ type: 'spring', stiffness: 400, damping: 28 }}
-      className="group flex h-full flex-col items-start gap-3 rounded-3xl border border-slate-200 bg-white p-5 text-left shadow-sm transition-colors hover:border-blue-200 hover:shadow-md"
+      className="group flex h-full flex-col items-start gap-3 rounded-3xl border border-slate-200 bg-white p-5 text-left shadow-sm transition-colors hover:border-blue-200 hover:shadow-md overflow-hidden"
     >
+      {fair.banner_url && (
+        <div className="-mx-5 -mt-5 mb-1 w-[calc(100%+2.5rem)]">
+          <img src={fair.banner_url} alt={`${fair.title} Banner`} className="w-full h-32 object-cover" />
+        </div>
+      )}
       <div className="flex w-full items-start justify-between gap-2">
         <h3 className="font-black tracking-tight text-slate-950">{fair.title}</h3>
         <Badge status={status ? (PARTICIPATION_BADGE[status] ?? 'neutral') : 'neutral'} className="shrink-0">{status ? status.replaceAll('_', ' ') : 'Not joined'}</Badge>
@@ -327,7 +332,12 @@ export default function EmployerJobFairDashboard() {
             Back to all Job Fairs
           </button>
 
-          <Card>
+          <Card className="overflow-hidden">
+            {selected.banner_url && (
+              <div className="-mx-5 -mt-5 mb-5 w-[calc(100%+2.5rem)]">
+                <img src={selected.banner_url} alt={`${selected.title} Banner`} className="w-full h-auto object-cover max-h-80" />
+              </div>
+            )}
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div className="min-w-0">
                 <h2 className="text-2xl font-black text-slate-950">{selected.title}</h2>
