@@ -830,15 +830,4 @@ class JobFairController extends Controller
         return $request->user();
     }
 
-    public function destroy(Request $request, $id): JsonResponse
-    {
-        $this->admin($request);
-        
-        $jobFair = JobFair::findOrFail($id);
-        $jobFair->delete();
-
-        return response()->json([
-            'message' => 'Job fair deleted successfully.'
-        ]);
-    }
 }
