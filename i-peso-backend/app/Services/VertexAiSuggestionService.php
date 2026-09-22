@@ -3,8 +3,10 @@
 namespace App\Services;
 
 use App\Models\JobSeeker;
+use Illuminate\Http\Client\Response;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use RuntimeException;
 
@@ -27,7 +29,7 @@ class VertexAiSuggestionService
             ->post($url, $this->payload($seeker, $context));
 
         if (! $response->successful()) {
-            throw new RuntimeException('AI did not return suggestions.');
+            $this->failUpstream('AI did not return suggestions.', $response);
         }
 
         return $this->normalizeResponse($response->json());
@@ -60,8 +62,7 @@ class VertexAiSuggestionService
                 ->post($url, $this->professionalSummaryPayload($seeker, $existingSummary));
 
             if (! $response->successful()) {
-                \Illuminate\Support\Facades\Log::error('Gemini API Error: ' . $response->body());
-                throw new RuntimeException('AI could not generate a professional summary.');
+                $this->failUpstream('AI could not generate a professional summary.', $response);
             }
 
             $decoded = $this->decodeStructuredResponse($response->json());
@@ -92,7 +93,7 @@ class VertexAiSuggestionService
             ->post($url, $this->occupationClassificationEnhancedPayload($title, $limit));
 
         if (! $response->successful()) {
-            throw new RuntimeException('AI did not return occupation classifications.');
+            $this->failUpstream('AI did not return occupation classifications.', $response);
         }
 
         return $this->normalizeOccupationClassificationEnhancedResponse($response->json());
@@ -111,7 +112,7 @@ class VertexAiSuggestionService
             ->post($url, $this->occupationClassificationPayload($title, $limit));
 
         if (! $response->successful()) {
-            throw new RuntimeException('AI did not return occupation classifications.');
+            $this->failUpstream('AI did not return occupation classifications.', $response);
         }
 
         return $this->normalizeOccupationClassificationResponse($response->json(), $limit);
@@ -145,7 +146,7 @@ class VertexAiSuggestionService
             ->post($url, $this->jobPostingPayload($jobTitle, $vacancyAnchor, $additionalContext, $existingTechnicalSkills, $existingSoftSkills, $demographicPreferences));
 
         if (! $response->successful()) {
-            throw new RuntimeException('AI did not return a job posting draft.');
+            $this->failUpstream('AI did not return a job posting draft.', $response);
         }
 
         return $this->normalizeJobPostingResponse($response->json(), $existingTechnicalSkills, $existingSoftSkills);
@@ -164,7 +165,7 @@ class VertexAiSuggestionService
             ->post($url, $this->mapQueryPayload($query));
 
         if (! $response->successful()) {
-            throw new RuntimeException('AI did not return a valid parsing result.');
+            $this->failUpstream('AI did not return a valid parsing result.', $response);
         }
 
         $text = data_get($response->json(), 'candidates.0.content.parts.0.text');
@@ -181,7 +182,7 @@ class VertexAiSuggestionService
     /**
      * Resolve an HTTP client + endpoint URL.
      * Priority:
-     *   1. Gemini REST API (GOOGLE_GEMINI_API_KEY) — no GCP project needed
+     *   1. Gemini REST API (GEMINI_API_KEY) — no GCP project needed
      *   2. Vertex AI with OAuth access token (ADC / configured token)
      */
     private function resolveHttpClientAndEndpoint(): array
@@ -192,9 +193,19 @@ class VertexAiSuggestionService
         // 1. Gemini REST API (just needs an API key)
         $apiKey = trim((string) config('services.vertex_ai.gemini_api_key'));
         if ($apiKey !== '') {
+            // The model has to follow whichever API we actually call. Gemini
+            // and Vertex publish different catalogues and retire IDs on
+            // different schedules, so reusing GOOGLE_VERTEX_AI_MODEL here let
+            // the two drift apart: with GEMINI_API_KEY set we take this
+            // branch, but asked Gemini for the Vertex model, and Gemini 404s
+            // a retired ID ("no longer available to new users") — which
+            // surfaced as a blanket 503 on every AI feature. GEMINI_MODEL is
+            // the ID kept current for this key, so prefer it here.
+            $geminiModel = trim((string) config('services.gemini.model')) ?: $model;
+
             $url = sprintf(
                 'https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s',
-                rawurlencode($model),
+                rawurlencode($geminiModel),
                 $apiKey
             );
             return [Http::acceptJson()->timeout($timeout), $url];
@@ -207,13 +218,37 @@ class VertexAiSuggestionService
 
         if ($projectId === '' || $location === '' || ! $accessToken) {
             throw new RuntimeException(
-                'AI is not configured. Add GOOGLE_GEMINI_API_KEY to your .env file to enable AI features. '
+                'AI is not configured. Add GEMINI_API_KEY to your .env file to enable AI features. '
                 .'Get a free key at https://aistudio.google.com/app/apikey'
             );
         }
 
         $url = $this->endpoint($projectId, $location, $model);
         return [Http::acceptJson()->withToken($accessToken)->timeout($timeout), $url];
+    }
+
+    /**
+     * Logs why the upstream call failed, then throws the caller's own message.
+     *
+     * The user-facing text stays generic, but the status and body are what
+     * actually identify the cause — a retired model ID, a rejected key, an
+     * exhausted quota all arrive here as an indistinguishable failure. Without
+     * this the only symptom is a blanket 503 with nothing in the log.
+     */
+    private function failUpstream(string $message, Response $response): never
+    {
+        $key = trim((string) config('services.vertex_ai.gemini_api_key'));
+        $body = (string) $response->body();
+
+        Log::warning('AI request failed.', [
+            'message' => $message,
+            'status' => $response->status(),
+            // The key rides in the query string on the Gemini REST path, so
+            // scrub it before anything reaches the log.
+            'body' => mb_substr($key !== '' ? str_replace($key, '<redacted>', $body) : $body, 0, 1000),
+        ]);
+
+        throw new RuntimeException($message);
     }
 
     private function endpoint(string $projectId, string $location, string $model): string
