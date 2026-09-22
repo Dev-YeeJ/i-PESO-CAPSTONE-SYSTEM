@@ -462,26 +462,7 @@ export default function JobFairDetailPage() {
                     
                   const displayStatus = badgeStatus ?? 'not submitted'
 
-                  return (
-                    <div key={req.id} className="rounded-xl border border-slate-200 p-4">
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <span className="text-sm font-bold text-slate-800">{req.label}</span>
-                        <Badge variant={badgeStatus === 'rejected' ? 'rejected' : badgeStatus === 'approved' ? 'approved' : badgeStatus === 'review' ? 'review' : 'neutral'} icon={false}>
-                          {displayStatus}
-                        </Badge>
-                      </div>
 
-                      {autoSatisfied && (
-                        <p className="mt-2 flex items-center gap-1.5 text-xs font-semibold text-emerald-700">
-                          <ShieldCheck className="h-3.5 w-3.5" />Auto-verified from the employer's active job postings
-                        </p>
-                      )}
-                      {reused && !autoSatisfied && (
-                        <p className="mt-2 flex items-center gap-1.5 text-xs font-semibold text-emerald-700">
-                          <ShieldCheck className="h-3.5 w-3.5" />Reused from a verified accreditation document
-                        </p>
-                      )}
-                      
                   const hasFiles = viewableFiles.length > 0
 
                   return (
