@@ -201,10 +201,16 @@ export default function JobFairFormPage() {
     try {
       if (id) {
         await adminService.updateJobFair(id, payload)
+        if (flyerFile) {
+          await adminService.uploadJobFairBanner(id, flyerFile)
+        }
         toast.success('Job fair updated successfully.')
         navigate(`/admin/job-fairs/${id}`)
       } else {
         const { job_fair: created } = await adminService.createJobFair(payload)
+        if (flyerFile) {
+          await adminService.uploadJobFairBanner(created.job_fair_id, flyerFile)
+        }
         if (publishNow) {
           await adminService.publishJobFair(created.job_fair_id)
         }

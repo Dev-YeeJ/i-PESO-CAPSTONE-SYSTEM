@@ -198,6 +198,15 @@ export const adminService = {
     return data
   },
 
+  uploadJobFairBanner: async (id, file) => {
+    const formData = new FormData()
+    formData.append('banner', file)
+    const { data } = await api.post(`/admin/job-fairs/${id}/banner`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    })
+    return data
+  },
+
   updateJobFair: async (id, fairData) => {
     const { data } = await api.put(`/admin/job-fairs/${id}`, fairData)
     return data

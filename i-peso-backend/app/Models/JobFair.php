@@ -43,6 +43,7 @@ class JobFair extends Model
         'is_public',
         'published_at',
         'published_by',
+        'banner_url',
     ];
 
     protected $casts = [

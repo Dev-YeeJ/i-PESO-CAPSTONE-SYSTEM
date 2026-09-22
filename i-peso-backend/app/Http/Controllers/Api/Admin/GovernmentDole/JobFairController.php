@@ -143,11 +143,30 @@ class JobFairController extends Controller
         $this->admin($request);
         $fair = JobFair::findOrFail($id);
         
-        $hasActiveParticipation = $fair->employerJoins()->where('participation_status', '!=', 'invited')->exists();
+        $hasActiveParticipation = $fair->employerJoins()->where('participation_status', 'approved')->exists();
         
         abort_if($hasActiveParticipation || $fair->resultReports()->exists(), 422, 'A job fair with active employer participation or report records cannot be deleted. Cancel it instead.');
         $fair->delete();
         return response()->json(['message' => 'Job Fair deleted.']);
+    }
+
+    public function uploadBanner(Request $request, int $id): JsonResponse
+    {
+        $this->admin($request);
+        $fair = JobFair::findOrFail($id);
+        
+        $request->validate([
+            'banner' => ['required', 'image', 'mimes:jpeg,png,jpg,gif,svg', 'max:5120'],
+        ]);
+
+        if ($fair->banner_url) {
+            Storage::disk('public')->delete(str_replace('/storage/', '', $fair->banner_url));
+        }
+
+        $path = $request->file('banner')->store('job-fair-banners', 'public');
+        $fair->update(['banner_url' => '/storage/' . $path]);
+
+        return response()->json(['message' => 'Banner uploaded successfully.', 'banner_url' => $fair->banner_url]);
     }
 
     public function publish(Request $request, JobFair $jobFair, JobFairService $service): JsonResponse
