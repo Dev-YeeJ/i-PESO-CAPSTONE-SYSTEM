@@ -31,6 +31,9 @@ class EmployerAiSuggestionController extends Controller
             'existing_technical_skills.*' => ['string', 'max:100'],
             'existing_soft_skills' => ['nullable', 'array', 'max:20'],
             'existing_soft_skills.*' => ['string', 'max:100'],
+            'preferred_gender' => ['nullable', 'string', 'max:20'],
+            'minimum_age' => ['nullable', 'integer', 'min:15', 'max:100'],
+            'maximum_age' => ['nullable', 'integer', 'min:15', 'max:100'],
         ]);
 
         // Deterministic, catalog-grounded floor — resolves the typed job
@@ -47,6 +50,11 @@ class EmployerAiSuggestionController extends Controller
                 $validated['additional_context'] ?? null,
                 $validated['existing_technical_skills'] ?? [],
                 $validated['existing_soft_skills'] ?? [],
+                [
+                    'preferred_gender' => $validated['preferred_gender'] ?? null,
+                    'minimum_age' => $validated['minimum_age'] ?? null,
+                    'maximum_age' => $validated['maximum_age'] ?? null,
+                ],
             );
 
             $data['suggested_technical_skills'] = $this->mergeSkillNames($catalogSkills['technical'], $data['suggested_technical_skills'], 10);

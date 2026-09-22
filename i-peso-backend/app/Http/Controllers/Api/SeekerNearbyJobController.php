@@ -334,6 +334,13 @@ class SeekerNearbyJobController extends Controller
                     'benefits' => $job->benefits,
                     'required_skills' => $structuredRequiredSkills,
                     'soft_skills' => $job->soft_skills,
+                    // Surfaced so the card can show that the employer stated a
+                    // preference. It is shown for transparency only: nothing
+                    // filters, ranks or gates an application on it, and every
+                    // seeker can still apply.
+                    'preferred_gender' => $job->preferred_gender,
+                    'minimum_age' => $job->minimum_age,
+                    'maximum_age' => $job->maximum_age,
                     'match' => $match,
                     'match_percentage' => $match['percentage'] ?? 0,
                     'match_breakdown' => [
@@ -570,6 +577,9 @@ class SeekerNearbyJobController extends Controller
             'minimum_experience_months' => $job->minimum_experience_months,
             'required_skills' => $job->required_skills ?? [],
             'soft_skills' => $job->soft_skills ?? [],
+            'preferred_gender' => $job->preferred_gender,
+            'minimum_age' => $job->minimum_age,
+            'maximum_age' => $job->maximum_age,
             'application_deadline' => $job->application_deadline?->toDateString(),
             'distance_km' => $distanceKm,
             'posted_at' => $job->created_at?->toISOString(),

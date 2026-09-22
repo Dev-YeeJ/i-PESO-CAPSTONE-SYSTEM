@@ -711,6 +711,9 @@ function CompensationDetailsStep({ form, errors, change, update }) {
         additional_context: null,
         existing_technical_skills: form.required_skills,
         existing_soft_skills: form.soft_skills,
+        preferred_gender: form.preferred_gender || null,
+        minimum_age: form.minimum_age === '' ? null : Number(form.minimum_age),
+        maximum_age: form.maximum_age === '' ? null : Number(form.maximum_age),
       })
 
       const responsibilities = (data?.responsibilities ?? []).map((item) => `- ${item}`).join('\n')

@@ -132,6 +132,7 @@ class VertexAiSuggestionService
         ?string $additionalContext,
         array $existingTechnicalSkills = [],
         array $existingSoftSkills = [],
+        array $demographicPreferences = [],
     ): array {
         if (! config('services.vertex_ai.enabled')) {
             throw new RuntimeException('AI suggestions are disabled.');
@@ -141,7 +142,7 @@ class VertexAiSuggestionService
 
         $response = $http
             ->timeout((int) config('services.vertex_ai.timeout', 30))
-            ->post($url, $this->jobPostingPayload($jobTitle, $vacancyAnchor, $additionalContext, $existingTechnicalSkills, $existingSoftSkills));
+            ->post($url, $this->jobPostingPayload($jobTitle, $vacancyAnchor, $additionalContext, $existingTechnicalSkills, $existingSoftSkills, $demographicPreferences));
 
         if (! $response->successful()) {
             throw new RuntimeException('AI did not return a job posting draft.');
@@ -400,12 +401,13 @@ class VertexAiSuggestionService
         ?string $additionalContext,
         array $existingTechnicalSkills,
         array $existingSoftSkills,
+        array $demographicPreferences = [],
     ): array {
         return [
             'contents' => [[
                 'role' => 'user',
                 'parts' => [[
-                    'text' => $this->jobPostingPrompt($jobTitle, $vacancyAnchor, $additionalContext, $existingTechnicalSkills, $existingSoftSkills),
+                    'text' => $this->jobPostingPrompt($jobTitle, $vacancyAnchor, $additionalContext, $existingTechnicalSkills, $existingSoftSkills, $demographicPreferences),
                 ]],
             ]],
             'generationConfig' => [
@@ -511,6 +513,7 @@ class VertexAiSuggestionService
         ?string $additionalContext,
         array $existingTechnicalSkills,
         array $existingSoftSkills,
+        array $demographicPreferences = [],
     ): string {
         return 'You are an expert HR and recruitment assistant helping a Philippine PESO-affiliated employer write a job posting. '
             .'Write a brief, engaging job summary (2-4 sentences), followed by 5 to 7 clear, actionable responsibilities that align with the job title and vacancy anchor. '
@@ -523,7 +526,45 @@ class VertexAiSuggestionService
             .'Vacancy anchor (job family/category): '.json_encode($vacancyAnchor ?: 'not specified', JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES).'. '
             .'Additional context from the employer: '.json_encode($additionalContext ?: 'none provided', JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES).'. '
             .'Employer-selected technical skills already on this posting (do not repeat): '.json_encode(array_values($existingTechnicalSkills), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES).'. '
-            .'Employer-selected soft skills already on this posting (do not repeat): '.json_encode(array_values($existingSoftSkills), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            .'Employer-selected soft skills already on this posting (do not repeat): '.json_encode(array_values($existingSoftSkills), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)
+            .$this->demographicPreferenceInstruction($demographicPreferences);
+    }
+
+    /**
+     * Feeds the employer's stated candidate preference into the draft.
+     *
+     * The preference is treated as a clue about the job, not about the person:
+     * an employer who writes "Male, 18-25" usually means heavy lifting, field
+     * work or night shifts, and those are the duties a seeker can actually
+     * self-assess against. So the model is told to infer the underlying working
+     * conditions and express them as concrete responsibilities, and to keep age
+     * and gender wording out of the generated text — the posting carries the
+     * preference in its own fields, and duties that name a demographic would be
+     * unusable under RA 10911 and RA 6725.
+     */
+    private function demographicPreferenceInstruction(array $preferences): string
+    {
+        $gender = $preferences['preferred_gender'] ?? null;
+        $minimumAge = $preferences['minimum_age'] ?? null;
+        $maximumAge = $preferences['maximum_age'] ?? null;
+
+        if ($gender === 'Any') {
+            $gender = null;
+        }
+
+        if ($gender === null && $minimumAge === null && $maximumAge === null) {
+            return '';
+        }
+
+        return '. The employer also recorded a candidate preference on this posting: '
+            .json_encode(array_filter([
+                'preferred_gender' => $gender,
+                'minimum_age' => $minimumAge,
+                'maximum_age' => $maximumAge,
+            ], static fn ($value) => $value !== null), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)
+            .'. Read that preference as a signal about the working conditions of the role — for example physical demands such as lifting or prolonged standing, shift patterns such as night or early-morning work, field or outdoor deployment, travel, or the seniority implied by an age range — and let those conditions shape the responsibilities you write, so the duties reflect what the job actually involves. '
+            .'Do not mention age, sex, gender, or any wording implying them anywhere in the job summary or the responsibilities: state the concrete duty or working condition itself (write "Lift and move stock weighing up to 25 kg" or "Work on a rotating night shift", never "Suitable for young male applicants"). '
+            .'Never write a responsibility whose only content is a demographic requirement.';
     }
 
     private function mapQueryPrompt(string $query): string
