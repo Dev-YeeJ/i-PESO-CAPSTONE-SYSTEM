@@ -10,9 +10,26 @@ on:
 permissions:
   contents: read
 
+# A deploy that hangs must never wedge every deploy behind it: only one
+# frontend deploy runs at a time, and a newer push supersedes an older one.
+concurrency:
+  group: deploy-frontend
+  cancel-in-progress: true
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      # accept-new is exactly as strong as the ssh-keyscan step this replaces
+      # (both trust whatever key the host first presents) but costs one fewer
+      # connection to a host that throttles them.
+      SSH_OPTS: >-
+        -o StrictHostKeyChecking=accept-new
+        -o BatchMode=yes
+        -o ConnectTimeout=30
+        -o ServerAliveInterval=15
+        -o ServerAliveCountMax=8
     steps:
       - uses: actions/checkout@v4
 
@@ -24,6 +41,7 @@ jobs:
 
       - name: Install & build
         working-directory: i-peso-frontend
+        timeout-minutes: 10
         run: |
           npm ci
           npm run build
@@ -36,19 +54,29 @@ jobs:
         with:
           ssh-private-key: ${{ secrets.HOSTINGER_SSH_KEY }}
 
-      - name: Trust host key
+      # Proves the host is reachable and pins its key before the upload, so a
+      # flaky connection retries here instead of part-way through an rsync
+      # that runs with --delete against the live document root.
+      - name: Wait for server
+        timeout-minutes: 6
         run: |
-          for i in 1 2 3 4 5; do
-            if ssh-keyscan -p ${{ secrets.HOSTINGER_SSH_PORT }} ${{ secrets.HOSTINGER_SSH_HOST }} >> ~/.ssh/known_hosts 2>/dev/null; then
+          mkdir -p ~/.ssh
+          for i in 1 2 3 4 5 6; do
+            if ssh -p ${{ secrets.HOSTINGER_SSH_PORT }} $SSH_OPTS \
+                 ${{ secrets.HOSTINGER_SSH_USER }}@${{ secrets.HOSTINGER_SSH_HOST }} true; then
+              echo "server reachable"
               exit 0
             fi
-            echo "ssh-keyscan attempt $i failed, retrying in 5s..."
-            sleep 5
+            echo "connection attempt $i failed, retrying in $((i * 10))s..."
+            sleep $((i * 10))
           done
-          echo "ssh-keyscan failed after 5 attempts"
+          echo "server unreachable after 6 attempts"
           exit 1
 
       - name: Upload build
-        run: >
-          rsync -avz --delete --exclude=/api --exclude=/backend-src -e "ssh -p ${{ secrets.HOSTINGER_SSH_PORT }}"
-          i-peso-frontend/dist/ ${{ secrets.HOSTINGER_SSH_USER }}@${{ secrets.HOSTINGER_SSH_HOST }}:~/domains/ipeso.website/public_html/
+        timeout-minutes: 10
+        run: |
+          rsync -avz --delete --exclude=/api --exclude=/backend-src \
+            -e "ssh -p ${{ secrets.HOSTINGER_SSH_PORT }} $SSH_OPTS" \
+            i-peso-frontend/dist/ \
+            ${{ secrets.HOSTINGER_SSH_USER }}@${{ secrets.HOSTINGER_SSH_HOST }}:~/domains/ipeso.website/public_html/

@@ -10,35 +10,66 @@ on:
 permissions:
   contents: read
 
+# A deploy that hangs must never wedge every deploy behind it: only one
+# backend deploy runs at a time, and a newer push supersedes an older one.
+concurrency:
+  group: deploy-backend
+  cancel-in-progress: true
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      # accept-new is exactly as strong as the ssh-keyscan step this replaces
+      # (both trust whatever key the host first presents) but costs one fewer
+      # connection to a host that throttles them.
+      SSH_OPTS: >-
+        -o StrictHostKeyChecking=accept-new
+        -o BatchMode=yes
+        -o ConnectTimeout=30
+        -o ServerAliveInterval=15
+        -o ServerAliveCountMax=8
     steps:
       - name: Load deploy key
         uses: webfactory/ssh-agent@v0.9.0
         with:
           ssh-private-key: ${{ secrets.HOSTINGER_SSH_KEY }}
 
-      - name: Trust host key
+      # Proves the host is reachable and pins its key before the real deploy,
+      # so a flaky connection retries here instead of half-running a deploy.
+      - name: Wait for server
+        timeout-minutes: 6
         run: |
-          for i in 1 2 3 4 5; do
-            if ssh-keyscan -p ${{ secrets.HOSTINGER_SSH_PORT }} ${{ secrets.HOSTINGER_SSH_HOST }} >> ~/.ssh/known_hosts 2>/dev/null; then
+          mkdir -p ~/.ssh
+          for i in 1 2 3 4 5 6; do
+            if ssh -p ${{ secrets.HOSTINGER_SSH_PORT }} $SSH_OPTS \
+                 ${{ secrets.HOSTINGER_SSH_USER }}@${{ secrets.HOSTINGER_SSH_HOST }} true; then
+              echo "server reachable"
               exit 0
             fi
-            echo "ssh-keyscan attempt $i failed, retrying in 5s..."
-            sleep 5
+            echo "connection attempt $i failed, retrying in $((i * 10))s..."
+            sleep $((i * 10))
           done
-          echo "ssh-keyscan failed after 5 attempts"
+          echo "server unreachable after 6 attempts"
           exit 1
 
       - name: Pull & build on server
+        timeout-minutes: 12
         run: |
-          ssh -p ${{ secrets.HOSTINGER_SSH_PORT }} ${{ secrets.HOSTINGER_SSH_USER }}@${{ secrets.HOSTINGER_SSH_HOST }} '
+          ssh -p ${{ secrets.HOSTINGER_SSH_PORT }} $SSH_OPTS \
+            ${{ secrets.HOSTINGER_SSH_USER }}@${{ secrets.HOSTINGER_SSH_HOST }} '
+            set -e &&
+            # An SSH step has no TTY, so any interactive prompt would block
+            # forever and burn the whole job instead of failing.
+            export GIT_TERMINAL_PROMPT=0 &&
+            export COMPOSER_NO_INTERACTION=1 &&
             cd ~/domains/ipeso.website/public_html/backend-src/i-peso-backend &&
-            git pull origin main &&
+            git fetch origin main &&
+            git merge --ff-only FETCH_HEAD &&
             composer install --no-dev --optimize-autoloader --no-interaction --no-scripts &&
             php artisan package:discover --ansi &&
-            php artisan migrate --force &&
+            php artisan migrate --force --no-interaction &&
             php artisan config:cache &&
             php artisan route:cache &&
             php artisan view:cache &&

@@ -620,9 +620,13 @@ class JobFairEcosystemFlowTest extends TestCase
         $this->assertSame('Poster Corp', $feed[0]['company_name']);
         $this->assertSame('Poster Feed Job Fair', $feed[0]['job_fair_title']);
         $this->assertSame($fairId, $feed[0]['job_fair_id']);
-        $this->assertStringStartsWith('image/', $feed[0]['mime_type']);
+        // The feed groups an employer's approved posters for one fair into a
+        // single card, so the per-file id and mime type live under files[].
+        $this->assertCount(1, $feed[0]['files']);
+        $this->assertSame($posterSubmissionId, $feed[0]['files'][0]['id']);
+        $this->assertStringStartsWith('image/', $feed[0]['files'][0]['mime_type']);
 
-        $this->get("/api/job-fair-posters/{$posterSubmissionId}/view")->assertOk()->assertHeader('content-type', $feed[0]['mime_type']);
+        $this->get("/api/job-fair-posters/{$posterSubmissionId}/view")->assertOk()->assertHeader('content-type', $feed[0]['files'][0]['mime_type']);
         $this->get("/api/job-fair-posters/{$permitSubmissionId}/view")->assertNotFound();
 
         Sanctum::actingAs($admin);
