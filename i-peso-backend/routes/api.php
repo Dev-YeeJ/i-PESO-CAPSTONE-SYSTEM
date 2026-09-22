@@ -276,6 +276,9 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::middleware('admin.permission:government_dole')->group(function () {
             // Government Programs / Upskill Hub
             Route::get('/government-programs/analytics', [AdminGovernmentProgramController::class, 'analytics']);
+            // Registered before the {governmentProgram} routes so "presets" is
+            // not swallowed as a program id.
+            Route::get('/government-programs/presets', [AdminGovernmentProgramController::class, 'presets']);
             Route::get('/government-programs', [AdminGovernmentProgramController::class, 'index']);
             Route::post('/government-programs', [AdminGovernmentProgramController::class, 'store']);
             Route::get('/government-programs/{governmentProgram}', [AdminGovernmentProgramController::class, 'show']);

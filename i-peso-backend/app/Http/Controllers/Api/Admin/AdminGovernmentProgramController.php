@@ -78,6 +78,25 @@ class AdminGovernmentProgramController extends Controller
         return response()->json(['analytics' => $analytics->summary()]);
     }
 
+    /**
+     * Per-category defaults for the posting form.
+     *
+     * PESO programs have criteria fixed by statute or DOLE guidelines, so the
+     * form pre-fills the standard parts when a category is chosen and leaves
+     * the administrator to supply only what is local to the batch. Served from
+     * config rather than duplicated in the client so the posting form, and
+     * anything else that needs them later, read the same source.
+     */
+    public function presets(): JsonResponse
+    {
+        $presets = collect(config('government_program_presets', []))
+            // Never offer a preset for a category the API would then reject.
+            ->only(self::CATEGORIES)
+            ->all();
+
+        return response()->json(['presets' => $presets]);
+    }
+
     public function store(
         Request $request,
         SkillTaxonomyService $taxonomy,

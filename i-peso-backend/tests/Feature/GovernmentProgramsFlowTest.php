@@ -97,6 +97,91 @@ class GovernmentProgramsFlowTest extends TestCase
             ->assertJsonPath('programs.data.0.eligibility.status', fn ($status) => is_string($status));
     }
 
+    /**
+     * The posting form pre-fills from these, so a preset that the API would
+     * reject, or whose rules the eligibility engine cannot read, would hand an
+     * administrator a form that fails on save or scores nobody.
+     */
+    public function test_every_category_preset_is_postable_and_scoreable(): void
+    {
+        $admin = Administrator::create([
+            'first_name' => 'PESO', 'last_name' => 'Admin',
+            'email' => 'preset.admin@example.test', 'password' => 'password123',
+            'role' => 'administrator', 'status' => 'active', 'email_verified_at' => now(),
+        ]);
+
+        Sanctum::actingAs($admin);
+        $presets = $this->getJson('/api/admin/government-programs/presets')
+            ->assertOk()
+            ->json('presets');
+
+        $this->assertNotEmpty($presets, 'No category presets are configured.');
+
+        foreach ($presets as $category => $preset) {
+            $this->postJson('/api/admin/government-programs', [
+                'program_name' => "Preset check: {$category}",
+                'category' => $category,
+                'description' => $preset['description'] ?: 'Posted from the category preset.',
+                'short_description' => $preset['short_description'],
+                'target_beneficiaries' => $preset['target_beneficiaries'],
+                'eligibility_requirements' => $preset['eligibility_requirements'],
+                'required_documents' => $preset['required_documents'],
+                'citizen_charter_steps' => $preset['citizen_charter_steps'],
+                'eligibility_rules' => $preset['eligibility_rules'],
+                'total_slots' => 10,
+                'program_status' => 'open',
+                'visibility' => 'public',
+            ])->assertCreated();
+        }
+    }
+
+    /**
+     * A 17-year-old is under the SPES floor of 15-30 only at the top end, so
+     * use an over-age seeker: the age rule is `required`, and a failed
+     * required rule must force "not_eligible" however well the rest scores.
+     */
+    public function test_spes_preset_rules_actually_gate_on_age(): void
+    {
+        $admin = Administrator::create([
+            'first_name' => 'PESO', 'last_name' => 'Admin',
+            'email' => 'spes.admin@example.test', 'password' => 'password123',
+            'role' => 'administrator', 'status' => 'active', 'email_verified_at' => now(),
+        ]);
+        $preset = config('government_program_presets.spes');
+
+        Sanctum::actingAs($admin);
+        $programId = $this->postJson('/api/admin/government-programs', [
+            'program_name' => 'SPES Summer Batch',
+            'category' => 'spes',
+            'description' => $preset['description'],
+            'eligibility_rules' => $preset['eligibility_rules'],
+            'total_slots' => 20,
+            'program_status' => 'open',
+            'visibility' => 'public',
+        ])->assertCreated()->json('program.program_id');
+
+        $eligible = JobSeeker::create([
+            'first_name' => 'Ana', 'last_name' => 'Cruz', 'mobile_number' => '09170000101',
+            'email' => 'spes.young@example.test', 'password' => 'password123',
+            'profile_completed' => true, 'date_of_birth' => now()->subYears(19)->toDateString(),
+        ]);
+        $tooOld = JobSeeker::create([
+            'first_name' => 'Ben', 'last_name' => 'Santos', 'mobile_number' => '09170000102',
+            'email' => 'spes.old@example.test', 'password' => 'password123',
+            'profile_completed' => true, 'date_of_birth' => now()->subYears(45)->toDateString(),
+        ]);
+
+        Sanctum::actingAs($eligible);
+        $this->getJson("/api/seeker/government-programs/{$programId}")
+            ->assertOk()
+            ->assertJsonPath('program.eligibility.status', 'highly_eligible');
+
+        Sanctum::actingAs($tooOld);
+        $this->getJson("/api/seeker/government-programs/{$programId}")
+            ->assertOk()
+            ->assertJsonPath('program.eligibility.status', 'not_eligible');
+    }
+
     public function test_government_programs_expose_no_application_routes(): void
     {
         // Programs are postings and announcements only — there is no in-app
@@ -304,6 +389,11 @@ class GovernmentProgramsFlowTest extends TestCase
                 $table->text('target_beneficiaries')->nullable();
                 $table->json('eligibility_requirements')->nullable();
                 $table->json('required_documents')->nullable();
+                // Added by later migrations; the harness builds this table by
+                // hand, so it has to keep up or anything touching them fails
+                // here while working fine in production.
+                $table->json('eligibility_rules')->nullable();
+                $table->json('citizen_charter_steps')->nullable();
                 $table->string('target_industry')->nullable();
                 $table->foreignId('target_occupation_id')->nullable();
                 $table->dateTime('schedule')->nullable();
