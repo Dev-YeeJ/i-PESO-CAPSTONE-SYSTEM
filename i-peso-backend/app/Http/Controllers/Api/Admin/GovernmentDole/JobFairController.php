@@ -200,6 +200,9 @@ class JobFairController extends Controller
 
         $jobFair->update($attributes);
 
+        $invited = 0;
+        $seekersNotified = 0;
+
         if ($isFirstPublish) {
             // Because shared hosting often kills requests longer than 30-60s,
             // we use defer() to send the emails *after* the fast JSON response
