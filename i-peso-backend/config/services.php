@@ -64,6 +64,14 @@ return [
     'gemini' => [
         'key' => env('GEMINI_API_KEY'),
         'model' => env('GEMINI_MODEL', 'gemini-3.1-flash-lite'),
+        /*
+         | Tried when the primary model answers 503 "experiencing high demand".
+         | That is routine on the small/lite models, and with no fallback it
+         | took every AI feature down for as long as the spike lasted. Must be
+         | a different model than `model` to be worth anything — a sibling that
+         | is not lite tends to have spare capacity when the lite ones do not.
+         */
+        'fallback_model' => env('GEMINI_FALLBACK_MODEL', 'gemini-3.5-flash'),
         'base_url' => env('GEMINI_BASE_URL', 'https://generativelanguage.googleapis.com/v1beta'),
         'timeout' => (int) env('GEMINI_TIMEOUT', 20),
     ],

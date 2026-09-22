@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\JobSeeker;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Http;
@@ -12,6 +13,15 @@ use RuntimeException;
 
 class VertexAiSuggestionService
 {
+    /**
+     * How long send() may keep retrying, in seconds.
+     *
+     * Sits under the frontend's 30s axios timeout so the caller fails with our
+     * own message while the browser is still listening, rather than the
+     * browser timing out first and the server grinding on unseen.
+     */
+    private const RETRY_BUDGET_SECONDS = 24;
+
     public function __construct(
         private readonly GoogleCloudAccessTokenService $tokens
     ) {}
@@ -22,11 +32,7 @@ class VertexAiSuggestionService
             throw new RuntimeException('AI suggestions are disabled.');
         }
 
-        [$http, $url] = $this->resolveHttpClientAndEndpoint();
-
-        $response = $http
-            ->timeout((int) config('services.vertex_ai.timeout', 30))
-            ->post($url, $this->payload($seeker, $context));
+        $response = $this->send($this->payload($seeker, $context));
 
         if (! $response->successful()) {
             $this->failUpstream('AI did not return suggestions.', $response);
@@ -40,8 +46,6 @@ class VertexAiSuggestionService
         if (! config('services.vertex_ai.enabled')) {
             throw new RuntimeException('AI summary generation is disabled.');
         }
-
-        [$http, $url] = $this->resolveHttpClientAndEndpoint();
 
         $seeker->loadMissing([
             'occupations',
@@ -57,9 +61,7 @@ class VertexAiSuggestionService
         $decoded = [];
         $summary = '';
         for ($attempt = 0; $attempt < 2 && $summary === ''; $attempt++) {
-            $response = $http
-                ->timeout((int) config('services.vertex_ai.timeout', 30))
-                ->post($url, $this->professionalSummaryPayload($seeker, $existingSummary));
+            $response = $this->send($this->professionalSummaryPayload($seeker, $existingSummary));
 
             if (! $response->successful()) {
                 $this->failUpstream('AI could not generate a professional summary.', $response);
@@ -86,11 +88,7 @@ class VertexAiSuggestionService
             throw new RuntimeException('AI suggestions are disabled.');
         }
 
-        [$http, $url] = $this->resolveHttpClientAndEndpoint();
-
-        $response = $http
-            ->timeout((int) config('services.vertex_ai.timeout', 30))
-            ->post($url, $this->occupationClassificationEnhancedPayload($title, $limit));
+        $response = $this->send($this->occupationClassificationEnhancedPayload($title, $limit));
 
         if (! $response->successful()) {
             $this->failUpstream('AI did not return occupation classifications.', $response);
@@ -105,11 +103,7 @@ class VertexAiSuggestionService
             throw new RuntimeException('AI suggestions are disabled.');
         }
 
-        [$http, $url] = $this->resolveHttpClientAndEndpoint();
-
-        $response = $http
-            ->timeout((int) config('services.vertex_ai.timeout', 30))
-            ->post($url, $this->occupationClassificationPayload($title, $limit));
+        $response = $this->send($this->occupationClassificationPayload($title, $limit));
 
         if (! $response->successful()) {
             $this->failUpstream('AI did not return occupation classifications.', $response);
@@ -139,11 +133,7 @@ class VertexAiSuggestionService
             throw new RuntimeException('AI suggestions are disabled.');
         }
 
-        [$http, $url] = $this->resolveHttpClientAndEndpoint();
-
-        $response = $http
-            ->timeout((int) config('services.vertex_ai.timeout', 30))
-            ->post($url, $this->jobPostingPayload($jobTitle, $vacancyAnchor, $additionalContext, $existingTechnicalSkills, $existingSoftSkills, $demographicPreferences));
+        $response = $this->send($this->jobPostingPayload($jobTitle, $vacancyAnchor, $additionalContext, $existingTechnicalSkills, $existingSoftSkills, $demographicPreferences));
 
         if (! $response->successful()) {
             $this->failUpstream('AI did not return a job posting draft.', $response);
@@ -158,11 +148,7 @@ class VertexAiSuggestionService
             throw new RuntimeException('AI suggestions are disabled.');
         }
 
-        [$http, $url] = $this->resolveHttpClientAndEndpoint();
-
-        $response = $http
-            ->timeout((int) config('services.vertex_ai.timeout', 15))
-            ->post($url, $this->mapQueryPayload($query));
+        $response = $this->send($this->mapQueryPayload($query), (int) config('services.vertex_ai.timeout', 15));
 
         if (! $response->successful()) {
             $this->failUpstream('AI did not return a valid parsing result.', $response);
@@ -180,12 +166,92 @@ class VertexAiSuggestionService
 
 
     /**
-     * Resolve an HTTP client + endpoint URL.
+     * Sends one generateContent call, surviving a transient upstream spike.
+     *
+     * Google answers 503 "This model is currently experiencing high demand"
+     * routinely on the small/lite models — often for minutes at a time. A
+     * single attempt turned that into a dead button across every AI feature,
+     * so each model is retried with a widening gap, and if the primary is
+     * still refusing we try the configured fallback model, which usually has
+     * spare capacity when the lite one does not.
+     *
+     * Returns the last response when everything fails, so callers keep their
+     * own `! successful()` handling and their own message.
+     */
+    private function send(array $payload, ?int $timeout = null): Response
+    {
+        [$http, $urls] = $this->resolveHttpClientAndEndpoints();
+        $timeout ??= (int) config('services.vertex_ai.timeout', 30);
+        $response = null;
+
+        $transportError = null;
+
+        // Retrying is only useful while someone is still waiting for it. The
+        // browser gives up at 30s, so attempts stop before that: past the
+        // deadline the work is wasted on a client that has already gone, and
+        // on shared hosting it just holds a PHP worker open.
+        $deadline = microtime(true) + self::RETRY_BUDGET_SECONDS;
+
+        // Every model is tried once before any waiting: a spike usually hits
+        // one model and not its sibling, so switching is far quicker than
+        // sitting out a backoff on the model that is already refusing.
+        for ($round = 1; $round <= 3; $round++) {
+            foreach ($urls as $url) {
+                // Each attempt is capped by whatever is left of the budget,
+                // not just started inside it — one slow model answering at
+                // the full timeout would otherwise overrun on its own.
+                $remaining = (int) ceil($deadline - microtime(true));
+                if ($remaining < 3) {
+                    break 2;
+                }
+
+                try {
+                    $response = $http->timeout(min($timeout, $remaining))->post($url, $payload);
+                } catch (ConnectionException $exception) {
+                    // A read timeout or DNS failure is every bit as transient
+                    // as a 503, but it throws instead of returning a response,
+                    // so without this it escaped the fallback entirely and
+                    // took down the request that a sibling model could have
+                    // served.
+                    $transportError = $this->scrub($exception->getMessage());
+                    continue;
+                }
+
+                if ($response->successful()) {
+                    return $response;
+                }
+
+                // Only an overloaded or rate-limited model is worth another
+                // go. A retired model, a bad key or a malformed request will
+                // fail identically however long we sit on it.
+                if (! in_array($response->status(), [429, 503], true)) {
+                    return $response;
+                }
+            }
+
+            if ($round < 3) {
+                sleep($round);
+            }
+        }
+
+        if ($response === null) {
+            Log::warning('AI request never reached a model.', ['error' => $transportError]);
+
+            throw new RuntimeException('AI is taking too long to respond right now. Please try again in a moment.');
+        }
+
+        return $response;
+    }
+
+    /**
+     * Resolve an HTTP client + the endpoint URLs to try, in order.
      * Priority:
      *   1. Gemini REST API (GEMINI_API_KEY) — no GCP project needed
      *   2. Vertex AI with OAuth access token (ADC / configured token)
+     *
+     * @return array{0: \Illuminate\Http\Client\PendingRequest, 1: list<string>}
      */
-    private function resolveHttpClientAndEndpoint(): array
+    private function resolveHttpClientAndEndpoints(): array
     {
         $model = trim((string) config('services.vertex_ai.model', 'gemini-3.1-flash-lite'));
         $timeout = (int) config('services.vertex_ai.timeout', 30);
@@ -202,13 +268,20 @@ class VertexAiSuggestionService
             // surfaced as a blanket 503 on every AI feature. GEMINI_MODEL is
             // the ID kept current for this key, so prefer it here.
             $geminiModel = trim((string) config('services.gemini.model')) ?: $model;
+            $fallback = trim((string) config('services.gemini.fallback_model'));
 
-            $url = sprintf(
+            $candidates = array_values(array_unique(array_filter([$geminiModel, $fallback])));
+            if ($candidates === []) {
+                throw new RuntimeException('No AI model is configured. Set GEMINI_MODEL in your .env file.');
+            }
+
+            $urls = array_map(fn (string $candidate) => sprintf(
                 'https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s',
-                rawurlencode($geminiModel),
+                rawurlencode($candidate),
                 $apiKey
-            );
-            return [Http::acceptJson()->timeout($timeout), $url];
+            ), $candidates);
+
+            return [Http::acceptJson()->timeout($timeout), $urls];
         }
 
         // 2. Vertex AI
@@ -223,8 +296,10 @@ class VertexAiSuggestionService
             );
         }
 
-        $url = $this->endpoint($projectId, $location, $model);
-        return [Http::acceptJson()->withToken($accessToken)->timeout($timeout), $url];
+        return [
+            Http::acceptJson()->withToken($accessToken)->timeout($timeout),
+            [$this->endpoint($projectId, $location, $model)],
+        ];
     }
 
     /**
@@ -237,18 +312,28 @@ class VertexAiSuggestionService
      */
     private function failUpstream(string $message, Response $response): never
     {
-        $key = trim((string) config('services.vertex_ai.gemini_api_key'));
-        $body = (string) $response->body();
-
         Log::warning('AI request failed.', [
             'message' => $message,
             'status' => $response->status(),
-            // The key rides in the query string on the Gemini REST path, so
-            // scrub it before anything reaches the log.
-            'body' => mb_substr($key !== '' ? str_replace($key, '<redacted>', $body) : $body, 0, 1000),
+            'body' => mb_substr($this->scrub((string) $response->body()), 0, 1000),
         ]);
 
         throw new RuntimeException($message);
+    }
+
+    /**
+     * Removes the API key from text that is about to be logged or thrown.
+     *
+     * On the Gemini REST path the key travels in the query string, so it is
+     * embedded in the URL — and a transport exception quotes that URL in its
+     * message verbatim. Anything derived from an upstream error goes through
+     * here first.
+     */
+    private function scrub(string $text): string
+    {
+        $key = trim((string) config('services.vertex_ai.gemini_api_key'));
+
+        return $key === '' ? $text : str_replace($key, '<redacted>', $text);
     }
 
     private function endpoint(string $projectId, string $location, string $model): string
