@@ -200,17 +200,16 @@ class JobFairController extends Controller
 
         $jobFair->update($attributes);
 
-        $invited = 0;
-        $seekersNotified = 0;
         if ($isFirstPublish) {
-            // Notifications send synchronously (no queue worker runs on this
-            // shared-hosting deployment — see the Notification classes), so
-            // broadcasting to every verified employer and every job seeker
-            // can take a while; don't let PHP's default execution-time limit
-            // cut this off partway through and leave some recipients unnotified.
-            set_time_limit(0);
-            $invited = $this->broadcastInvitations($jobFair, $service);
-            $seekersNotified = $this->broadcastToSeekers($jobFair);
+            // Because shared hosting often kills requests longer than 30-60s,
+            // we use defer() to send the emails *after* the fast JSON response
+            // is returned to the frontend. This prevents the 504 Gateway Timeout
+            // and lets the admin see the success modal instantly.
+            defer(function () use ($jobFair, $service) {
+                set_time_limit(0);
+                $this->broadcastInvitations($jobFair, $service);
+                $this->broadcastToSeekers($jobFair);
+            });
         }
 
         return response()->json([
