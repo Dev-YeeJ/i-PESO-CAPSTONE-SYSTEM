@@ -98,6 +98,9 @@ Route::middleware('auth:sanctum')->group(function () {
     // Employer authenticated endpoints
     Route::prefix('employer')->group(function () {
         Route::get('/profile', [EmployerRegistrationController::class, 'getProfile']);
+        Route::put('/profile', [\App\Http\Controllers\Api\EmployerProfileController::class, 'update']);
+        Route::post('/profile/logo', [\App\Http\Controllers\Api\EmployerProfileController::class, 'updateLogo']);
+        Route::post('/profile/photo', [\App\Http\Controllers\Api\EmployerProfileController::class, 'updateRepresentativeImage']);
         Route::post('/register/step-2', [EmployerRegistrationController::class, 'registerStep2']);
         Route::post('/register/step-3', [EmployerRegistrationController::class, 'registerStep3']);
         Route::post('/register/step-4', [EmployerRegistrationController::class, 'registerStep4']);

@@ -21,6 +21,20 @@ class SeekerGovernmentProgramController extends Controller
 {
     use FormatsGovernmentPrograms;
 
+    /**
+     * Ordering for the seeker's list, best match first. Anything the engine
+     * could not judge — no rules on the program, or a profile too sparse to
+     * score — sits above outright non-matches rather than being buried.
+     */
+    private const ELIGIBILITY_RANK = [
+        'highly_eligible' => 0,
+        'eligible' => 1,
+        'partially_eligible' => 2,
+        'unknown' => 3,
+        'low_match' => 4,
+        'not_eligible' => 5,
+    ];
+
     public function index(Request $request): JsonResponse
     {
         $seeker = $this->seeker($request);
@@ -48,6 +62,23 @@ class SeekerGovernmentProgramController extends Controller
             ->orderBy('application_deadline')
             ->paginate($request->integer('per_page', 12));
         $programs->through(fn (GovernmentProgram $program) => $this->formatProgram($program, $seeker));
+
+        // Surface what this seeker actually qualifies for first. Eligibility is
+        // scored in PHP from the seeker's profile, so it cannot be an ORDER BY
+        // — the page is re-sorted after formatting, which keeps the existing
+        // status/deadline ordering as the tie-break within each band.
+        //
+        // Programs the seeker does not qualify for are ranked last, never
+        // hidden: the criteria are verified in person at PESO, a profile can
+        // be incomplete or out of date, and withholding a government posting
+        // from a citizen on that basis would be the wrong default.
+        $programs->setCollection(
+            $programs->getCollection()->sortBy(
+                fn (array $program) => self::ELIGIBILITY_RANK[$program['eligibility']['status'] ?? ''] ?? 90,
+                SORT_REGULAR,
+                false,
+            )->values()
+        );
 
         return response()->json([
             'programs' => $programs,

@@ -182,6 +182,60 @@ class GovernmentProgramsFlowTest extends TestCase
             ->assertJsonPath('program.eligibility.status', 'not_eligible');
     }
 
+    /**
+     * Programs a seeker qualifies for lead the list, and ones they do not are
+     * ranked last rather than hidden — the criteria are verified in person and
+     * a profile can be incomplete, so a government posting stays readable.
+     */
+    public function test_seeker_list_ranks_eligible_programs_first_without_hiding_the_rest(): void
+    {
+        $admin = Administrator::create([
+            'first_name' => 'PESO', 'last_name' => 'Admin',
+            'email' => 'rank.admin@example.test', 'password' => 'password123',
+            'role' => 'administrator', 'status' => 'active', 'email_verified_at' => now(),
+        ]);
+
+        Sanctum::actingAs($admin);
+
+        // Posted first, and with the earlier deadline, so the old ordering
+        // would have put the one this seeker cannot join at the top.
+        $this->postJson('/api/admin/government-programs', [
+            'program_name' => 'Youth Only Program',
+            'category' => 'spes',
+            'description' => 'Restricted to 15-30 year olds.',
+            'eligibility_rules' => config('government_program_presets.spes.eligibility_rules'),
+            'total_slots' => 5, 'program_status' => 'open', 'visibility' => 'public',
+            'application_deadline' => now()->addDays(3)->toDateString(),
+        ])->assertCreated();
+
+        $this->postJson('/api/admin/government-programs', [
+            'program_name' => 'Open To Everyone Program',
+            'category' => 'career_guidance',
+            'description' => 'No eligibility rules at all.',
+            'eligibility_rules' => [],
+            'total_slots' => 5, 'program_status' => 'open', 'visibility' => 'public',
+            'application_deadline' => now()->addDays(30)->toDateString(),
+        ])->assertCreated();
+
+        $olderSeeker = JobSeeker::create([
+            'first_name' => 'Rita', 'last_name' => 'Bautista', 'mobile_number' => '09170000103',
+            'email' => 'rank.seeker@example.test', 'password' => 'password123',
+            'profile_completed' => true, 'date_of_birth' => now()->subYears(50)->toDateString(),
+        ]);
+
+        Sanctum::actingAs($olderSeeker);
+        $rows = $this->getJson('/api/seeker/government-programs')->assertOk()->json('programs.data');
+
+        $titles = array_column($rows, 'title');
+        $this->assertSame('Open To Everyone Program', $titles[0], 'An eligible program should lead the list.');
+        $this->assertContains('Youth Only Program', $titles, 'An ineligible program must still be listed.');
+        $this->assertSame(
+            'not_eligible',
+            collect($rows)->firstWhere('title', 'Youth Only Program')['eligibility']['status'],
+            'The ineligible program should be marked, not silently reordered.'
+        );
+    }
+
     public function test_government_programs_expose_no_application_routes(): void
     {
         // Programs are postings and announcements only — there is no in-app
@@ -280,12 +334,27 @@ class GovernmentProgramsFlowTest extends TestCase
         $this->assertFalse($names->contains('Internal Pilot Program'));
         $this->assertFalse($names->contains('TUPAD Batch 10 (Expired)'));
 
-        // Trimmed, marketing-card shape only — no internal/admin detail leaks out.
+        // Carries everything a visitor needs to act on the posting without an
+        // account — the transaction happens in person at PESO, so gating the
+        // requirements, documents and contact behind a login would only
+        // obstruct the citizen.
         $entry = collect($response->json('data'))->firstWhere('name', 'TUPAD Batch 12');
         $this->assertEqualsCanonicalizing(
-            ['program_id', 'slug', 'category', 'name', 'blurb', 'application_deadline'],
+            [
+                'program_id', 'slug', 'category', 'name', 'blurb', 'description',
+                'target_beneficiaries', 'eligibility_requirements', 'required_documents',
+                'citizen_charter_steps', 'start_date', 'end_date', 'application_deadline',
+                'venue', 'location_address', 'total_slots', 'available_slots',
+                'contact_person', 'contact_email', 'contact_phone',
+            ],
             array_keys($entry),
         );
+
+        // Internal detail still must not leak: eligibility_rules is the scoring
+        // logic, and admin_id identifies the staff member who posted it.
+        foreach (['eligibility_rules', 'admin_id', 'eligibility_snapshot', 'deleted_at'] as $internal) {
+            $this->assertArrayNotHasKey($internal, $entry, "Public payload leaked {$internal}.");
+        }
     }
 
     private function createTables(): void

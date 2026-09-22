@@ -321,18 +321,38 @@ class AdminGovernmentProgramController extends Controller
         return $slug;
     }
 
+    /**
+     * Announces a newly opened program to the seekers its rules qualify.
+     *
+     * Notifications send synchronously — no queue worker runs on this
+     * shared-hosting deployment (see GovernmentProgramNotification) — and
+     * scoring every seeker against the rules is itself not cheap, so running
+     * this inline held the admin's request open. set_time_limit(0) stopped PHP
+     * cutting it off, but the browser still gave up around 30s and the host
+     * returned a 504 while the send carried on unseen.
+     *
+     * defer() runs it after the response has been sent, so the admin gets the
+     * posting back immediately and delivery continues server-side. Same fix
+     * already applied to job fair publishing.
+     */
     private function notifyRecommendedSeekers(
         GovernmentProgram $program,
         UpskillRecommendationService $recommendations,
     ): void {
-        // Notifications send synchronously (no queue worker runs on this
-        // shared-hosting deployment — see GovernmentProgramNotification),
-        // so notifying every recommended seeker can take a while; don't let
-        // PHP's default execution-time limit cut this off partway through.
-        set_time_limit(0);
-        $recommendations->recipientsForProgram($program)->each(
-            fn ($seeker) => $seeker->notify(new GovernmentProgramNotification($program, 'recommendation_opened'))
-        );
+        defer(function () use ($program, $recommendations) {
+            set_time_limit(0);
+
+            $recommendations->recipientsForProgram($program)->each(function ($seeker) use ($program) {
+                try {
+                    $seeker->notify(new GovernmentProgramNotification($program, 'recommendation_opened'));
+                } catch (\Throwable $exception) {
+                    // One unreachable seeker must not stop the announcement
+                    // reaching everybody else — and nobody is watching this
+                    // request any more, so it can only be reported.
+                    report($exception);
+                }
+            });
+        });
     }
 
     private function admin(Request $request): Administrator
