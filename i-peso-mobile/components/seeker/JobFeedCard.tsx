@@ -16,6 +16,7 @@ import Animated, {
 import { LinearGradient } from 'expo-linear-gradient'
 import type { NearbyJob } from '@/services/seekerService'
 import { Badge } from '@/components/ui/Badge'
+import { EmployerPreferenceChip } from '@/components/ui/EmployerPreferenceChip'
 import { MatchRing } from '@/components/ui/MatchRing'
 import { PressableScale } from '@/components/ui/PressableScale'
 import { useMotion } from '@/hooks/useMotion'
@@ -155,6 +156,7 @@ export function JobFeedCard({ job, index = 0, saving = false, onPress, onToggleS
               {job.job_fair?.is_available_at_job_fair ? <Badge variant="warning">Job Fair</Badge> : null}
               {job.certificate_match?.matched ? <Badge variant="success">Certificate Match</Badge> : null}
               {!job.match_deferred && match >= 80 ? <Badge variant="success">Strong Match</Badge> : null}
+              <EmployerPreferenceChip job={job} />
             </View>
 
             {requiredSkills.length ? (

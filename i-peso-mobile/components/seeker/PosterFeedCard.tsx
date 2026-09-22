@@ -12,7 +12,7 @@ import { useToast } from '@/stores/toastStore'
 import { Card } from '@/components/ui/Card'
 import { ImagePreviewModal } from '@/components/ui/ImagePreviewModal'
 import { PressableScale } from '@/components/ui/PressableScale'
-import { colors, radii, spacing, typography } from '@/theme'
+import { colors, radii, shadows, spacing, typography } from '@/theme'
 
 const avatarTones = [colors.info, colors.secondary, colors.success, colors.warning, colors.error]
 const toneFor = (name?: string | null) => {
@@ -42,9 +42,15 @@ export function PosterFeedCard({ poster, index }: { poster: JobFairPoster; index
   const { showToast } = useToast()
   const [previewOpen, setPreviewOpen] = useState(false)
   const [opening, setOpening] = useState(false)
-  const isImage = (poster.mime_type || '').startsWith('image/')
+  const [fileIndex, setFileIndex] = useState(0)
+
+  const files = poster.files ?? []
+  const hasFiles = files.length > 0
+  const hasMultiple = files.length > 1
+  const currentFile = hasFiles ? files[Math.min(fileIndex, files.length - 1)] : null
+  const isImage = (currentFile?.mime_type || '').startsWith('image/')
   const metaLine = [poster.job_fair_title, poster.venue, timeAgo(poster.posted_at)].filter(Boolean).join(' · ')
-  const posterUrl = seekerService.jobFairPosterUrl(poster.id)
+  const posterUrl = currentFile ? seekerService.jobFairPosterUrl(currentFile.id) : null
   const canViewBooth = poster.job_fair_id != null && poster.employer_id != null
 
   // React Native has no window.open — a document poster is downloaded (authenticated, same
@@ -52,10 +58,10 @@ export function PosterFeedCard({ poster, index }: { poster: JobFairPoster; index
   // user open it in whatever PDF/file viewer they already have. Mirrors the pattern this app
   // already uses for resumes (utils/fileTransfer.ts).
   const openDocument = async () => {
-    if (opening) return
+    if (opening || !currentFile || !posterUrl) return
     setOpening(true)
     try {
-      await downloadAndShare(posterUrl, poster.original_filename || `poster-${poster.id}`)
+      await downloadAndShare(posterUrl, currentFile.original_filename || `poster-${currentFile.id}`)
     } catch {
       showToast('This poster could not be opened right now. Please try again.', 'error')
     } finally {
@@ -92,39 +98,88 @@ export function PosterFeedCard({ poster, index }: { poster: JobFairPoster; index
         ) : null}
       </View>
 
-      {isImage && token ? (
-        <PressableScale
-          onPress={() => setPreviewOpen(true)}
-          ripple={null}
-          accessibilityRole="button"
-          accessibilityLabel={`Open ${poster.company_name || 'employer'} poster image`}
-        >
-          <Image
-            source={{ uri: posterUrl, headers: { Authorization: `Bearer ${token}` } }}
-            style={styles.poster}
-            resizeMode="cover"
-          />
-        </PressableScale>
-      ) : (
-        <PressableScale
-          onPress={openDocument}
-          disabled={opening}
-          ripple={null}
-          style={styles.docRow}
-          accessibilityRole="button"
-          accessibilityLabel={`Open document ${poster.original_filename || 'poster'}`}
-        >
-          {opening ? (
-            <ActivityIndicator size="small" color={colors.info} />
-          ) : (
-            <MaterialIcons name="description" size={28} color={colors.info} />
-          )}
-          <View style={styles.docTextWrap}>
-            <Text style={styles.docName} numberOfLines={1}>{poster.original_filename || 'Poster'}</Text>
-            <Text style={styles.docHint}>{opening ? 'Opening…' : 'Tap to open'}</Text>
+      <View style={styles.mediaWrap}>
+        {!hasFiles ? (
+          <View style={styles.emptyFiles}>
+            <MaterialIcons name="image-not-supported" size={20} color={colors.subtle} />
+            <Text style={styles.emptyFilesText}>No files uploaded</Text>
           </View>
-        </PressableScale>
-      )}
+        ) : isImage && token ? (
+          <PressableScale
+            onPress={() => setPreviewOpen(true)}
+            ripple={null}
+            accessibilityRole="button"
+            accessibilityLabel={`Open ${poster.company_name || 'employer'} poster image`}
+          >
+            <Image
+              source={{ uri: posterUrl!, headers: { Authorization: `Bearer ${token}` } }}
+              style={styles.poster}
+              resizeMode="cover"
+            />
+          </PressableScale>
+        ) : (
+          <PressableScale
+            onPress={openDocument}
+            disabled={opening}
+            ripple={null}
+            style={styles.docRow}
+            accessibilityRole="button"
+            accessibilityLabel={`Open document ${currentFile?.original_filename || 'poster'}`}
+          >
+            {opening ? (
+              <ActivityIndicator size="small" color={colors.info} />
+            ) : (
+              <MaterialIcons name="description" size={28} color={colors.info} />
+            )}
+            <View style={styles.docTextWrap}>
+              <Text style={styles.docName} numberOfLines={1}>{currentFile?.original_filename || 'Poster'}</Text>
+              <Text style={styles.docHint}>{opening ? 'Opening…' : 'Tap to open'}</Text>
+            </View>
+          </PressableScale>
+        )}
+
+        {hasMultiple ? (
+          <>
+            <PressableScale
+              onPress={() => setFileIndex((current) => (current - 1 + files.length) % files.length)}
+              ripple={null}
+              style={[styles.navBtn, styles.navBtnLeft]}
+              accessibilityRole="button"
+              accessibilityLabel="Previous poster image"
+            >
+              <MaterialIcons name="chevron-left" size={20} color={colors.white} />
+            </PressableScale>
+            <PressableScale
+              onPress={() => setFileIndex((current) => (current + 1) % files.length)}
+              ripple={null}
+              style={[styles.navBtn, styles.navBtnRight]}
+              accessibilityRole="button"
+              accessibilityLabel="Next poster image"
+            >
+              <MaterialIcons name="chevron-right" size={20} color={colors.white} />
+            </PressableScale>
+
+            <View style={styles.dotsRow}>
+              {files.map((file, dotIndex) => (
+                <PressableScale
+                  key={String(file.id)}
+                  onPress={() => setFileIndex(dotIndex)}
+                  ripple={null}
+                  hitSlop={6}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Go to poster ${dotIndex + 1}`}
+                >
+                  <View style={[styles.dot, dotIndex === fileIndex && styles.dotActive]} />
+                </PressableScale>
+              ))}
+            </View>
+
+            <View style={styles.counter}>
+              <Text style={styles.counterText}>{fileIndex + 1} / {files.length}</Text>
+            </View>
+          </>
+        ) : null}
+      </View>
 
       <View style={styles.footer}>
         <View style={styles.footerLeft}>
@@ -146,7 +201,7 @@ export function PosterFeedCard({ poster, index }: { poster: JobFairPoster; index
         ) : null}
       </View>
 
-      {isImage && token ? (
+      {isImage && token && posterUrl ? (
         <ImagePreviewModal
           visible={previewOpen}
           uri={posterUrl}
@@ -170,11 +225,32 @@ const styles = StyleSheet.create({
   headerText: { flex: 1 },
   company: { color: colors.textPrimary, fontSize: typography.body, fontFamily: typography.family.bold },
   meta: { color: colors.textSecondary, fontSize: typography.small, marginTop: 2 },
+  mediaWrap: { position: 'relative' },
+  emptyFiles: { alignItems: 'center', justifyContent: 'center', gap: spacing.xs, paddingVertical: spacing.xxl, backgroundColor: colors.background, borderRadius: radii.md },
+  emptyFilesText: { color: colors.subtle, fontSize: typography.small, fontFamily: typography.family.medium },
   poster: { width: '100%', aspectRatio: 4 / 3, borderRadius: radii.md, backgroundColor: colors.background },
   docRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: spacing.lg, backgroundColor: colors.background, borderRadius: radii.md },
   docTextWrap: { flex: 1 },
   docName: { color: colors.textPrimary, fontSize: typography.small, fontFamily: typography.family.bold },
   docHint: { color: colors.subtle, fontSize: 11, marginTop: 1 },
+  navBtn: {
+    position: 'absolute',
+    top: '50%',
+    marginTop: -16,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(15,23,42,0.45)',
+  },
+  navBtnLeft: { left: spacing.sm },
+  navBtnRight: { right: spacing.sm },
+  dotsRow: { position: 'absolute', bottom: spacing.sm, alignSelf: 'center', flexDirection: 'row', gap: 5, backgroundColor: 'rgba(15,23,42,0.35)', borderRadius: radii.pill, paddingHorizontal: spacing.sm, paddingVertical: 6 },
+  dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.5)' },
+  dotActive: { width: 14, backgroundColor: colors.white },
+  counter: { position: 'absolute', top: spacing.sm, right: spacing.sm, backgroundColor: 'rgba(15,23,42,0.55)', borderRadius: radii.pill, paddingHorizontal: spacing.sm, paddingVertical: 3, ...shadows.card },
+  counterText: { color: colors.white, fontSize: 11, fontFamily: typography.family.bold },
   footer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm, paddingTop: spacing.sm },
   footerLeft: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, flexShrink: 1 },
   footerText: { color: colors.subtle, fontSize: typography.small },

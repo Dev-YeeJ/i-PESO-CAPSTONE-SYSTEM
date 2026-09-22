@@ -167,6 +167,12 @@ export interface NearbyJob {
   application_deadline?: string | null
   distance_km?: number | string | null
   posted_at?: string | null
+  // Indication only — nothing filters, ranks, or gates an application on these; every
+  // seeker sees every posting and can still apply. 'Any' is the posting form's default,
+  // not a real preference, and is treated as "no preference stated".
+  preferred_gender?: string | null
+  minimum_age?: number | null
+  maximum_age?: number | null
   // Already returned by GET /seeker/job-map (SeekerNearbyJobController) but unused
   // by the current flat-list UI. Typed here so a future map view can read it
   // without any backend change — see the Job Map readiness note in the repo.
@@ -300,6 +306,7 @@ export interface JobFair {
   status: string
   is_public?: boolean
   is_rsvped?: boolean
+  banner_url?: string | null
   participating_employers?: Array<{ employer_id?: number | string; company_name?: string | null; status?: string }>
   published_vacancies?: Array<{ post_id: number | string; job_title?: string | null; vacancies_count?: number }>
 }
@@ -319,6 +326,9 @@ export interface EmployerBoothVacancy {
     location?: string | null
     salary_range?: string | null
     employment_type?: string | null
+    preferred_gender?: string | null
+    minimum_age?: number | null
+    maximum_age?: number | null
   } | null
 }
 
@@ -335,13 +345,16 @@ export interface EmployerBooth {
     venue?: string | null
     start_date?: string | null
   }
-  poster: {
+  // Renamed from a singular `poster` object — an employer's booth can now have multiple
+  // approved posters, shown as a swipeable gallery (mirrors i-peso-frontend's
+  // SeekerJobFairEmployerPage.jsx poster carousel).
+  posters: Array<{
     id: number | string
     mime_type?: string | null
     original_filename?: string | null
     posted_at?: string | null
     match_percentage?: number | null
-  } | null
+  }>
   vacancies: EmployerBoothVacancy[]
 }
 
@@ -356,17 +369,25 @@ export interface JobFairPass {
   skills?: string[]
 }
 
-export interface JobFairPoster {
+export interface JobFairPosterFile {
   id: number | string
+  mime_type?: string | null
+  original_filename?: string | null
+}
+
+// The feed is now grouped one card per employer+job-fair pair (previously one card per
+// uploaded file) — mirrors i-peso-frontend's PosterFeedTab.jsx grouping. There is no
+// top-level `id` any more; use `employer_id`+`job_fair_id` as the React key, and each
+// uploaded file (shown as a swipeable gallery) lives in `files`.
+export interface JobFairPoster {
   employer_id?: number | string | null
   company_name?: string | null
   job_fair_id?: number | string | null
   job_fair_title?: string | null
   venue?: string | null
-  mime_type?: string | null
-  original_filename?: string | null
   posted_at?: string | null
   match_percentage?: number | null
+  files: JobFairPosterFile[]
 }
 
 export interface ProgramEligibility {
@@ -504,18 +525,6 @@ export interface SeekerAnalytics {
   recent_viewers: Array<{ company_name: string; created_at: string; source: string | null }>
 }
 
-export interface CitizenCharterServiceItem {
-  service_id: number | string
-  service_name: string
-  description?: string | null
-  requirements?: string[] | null
-  processing_time?: string | null
-  fees?: string | null
-  responsible_office?: string | null
-  steps?: string[] | null
-  contact_info?: string | null
-}
-
 export interface AiSuggestionItem {
   name: string
   reason?: string
@@ -611,6 +620,9 @@ export interface EmployerVacancy {
   location?: string | null
   employment_type?: string | null
   created_at?: string | null
+  preferred_gender?: string | null
+  minimum_age?: number | null
+  maximum_age?: number | null
 }
 
 export interface EmployerProfileResponse {
@@ -942,15 +954,10 @@ export const seekerService = {
     }
   },
 
-  // ── Analytics / Citizen Charter / AI assist ───────────────────────────
+  // ── Analytics / AI assist ───────────────────────────
   async getAnalytics(): Promise<SeekerAnalytics> {
     const res = await apiClient.get('/seeker/analytics')
     return res.data?.analytics ?? { total_views_30_days: 0, search_appearances: 0, recent_viewers: [] }
-  },
-
-  async getCitizenCharterServices(): Promise<CitizenCharterServiceItem[]> {
-    const res = await apiClient.get('/seeker/citizen-charter')
-    return res.data?.data ?? []
   },
 
   /** Returns null if Vertex AI is unavailable/unconfigured (backend degrades to 503) — callers should show a friendly fallback, not an error. */
