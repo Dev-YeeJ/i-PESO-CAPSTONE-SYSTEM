@@ -582,7 +582,7 @@ class JobFairController extends Controller
         $resultReport->update([
             'status' => $validated['status'],
             'reviewed_by_admin_id' => $admin->admin_id,
-            'review_remarks' => $validated['admin_remarks'],
+            'review_remarks' => $validated['admin_remarks'] ?? null,
         ]);
 
         return response()->json([
