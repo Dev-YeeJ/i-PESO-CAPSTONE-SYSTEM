@@ -51,7 +51,21 @@ export default function JobFairEmployersTable({ participants, onReviewRequiremen
       cell: ({ row }) => {
         const p = row.original
         const totalReqs = p.total_requirements || 0
-        const approvedReqs = (p.requirements ?? []).filter((r) => r.status === 'approved').length
+        const approvedReqs = (() => {
+          const reqs = p.requirements ?? []
+          const grouped = reqs.reduce((acc, r) => {
+            if (!acc[r.job_fair_requirement_id]) acc[r.job_fair_requirement_id] = []
+            acc[r.job_fair_requirement_id].push(r)
+            return acc
+          }, {})
+          let count = 0
+          for (const key in grouped) {
+            if (grouped[key].length > 0 && grouped[key].every(s => s.status === 'approved')) {
+              count++
+            }
+          }
+          return count
+        })()
         return (
           <button
             type="button"
@@ -131,9 +145,22 @@ export default function JobFairEmployersTable({ participants, onReviewRequiremen
                 >
                   <FileText className="h-4 w-4 shrink-0" />
                   <span className="truncate">
-                    {row.original.total_requirements 
-                      ? `${(row.original.requirements ?? []).filter((r) => r.status === 'approved').length} / ${row.original.total_requirements} Reqs Approved` 
-                      : 'View Details'}
+                    {(() => {
+                      if (!row.original.total_requirements) return 'View Details'
+                      const reqs = row.original.requirements ?? []
+                      const grouped = reqs.reduce((acc, r) => {
+                        if (!acc[r.job_fair_requirement_id]) acc[r.job_fair_requirement_id] = []
+                        acc[r.job_fair_requirement_id].push(r)
+                        return acc
+                      }, {})
+                      let count = 0
+                      for (const key in grouped) {
+                        if (grouped[key].length > 0 && grouped[key].every(s => s.status === 'approved')) {
+                          count++
+                        }
+                      }
+                      return `${count} / ${row.original.total_requirements} Reqs Approved`
+                    })()}
                   </span>
                 </button>
               </div>

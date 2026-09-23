@@ -471,9 +471,21 @@ export default function JobFairDetailPage() {
                       )}
                       
                       {firstSubmission?.original_filename === 'Digital confirmation slip' && reviewingParticipant.confirmation_slip && (
-                        <button type="button" onClick={() => setViewingConfirmationSlip(reviewingParticipant.confirmation_slip)} className="mt-2 flex items-center gap-1.5 text-xs font-semibold text-brand-navy hover:underline">
-                          <FileText className="h-3.5 w-3.5" />View Confirmation Slip
-                        </button>
+                        <div className="mt-2 flex flex-col items-start gap-2">
+                          <button type="button" onClick={() => setViewingConfirmationSlip(reviewingParticipant.confirmation_slip)} className="flex items-center gap-1.5 text-xs font-semibold text-brand-navy hover:underline">
+                            <FileText className="h-3.5 w-3.5" />View Confirmation Slip
+                          </button>
+                          {badgeStatus === 'review' && firstSubmission && (
+                            <div className="flex gap-2 mt-1">
+                              <Button size="sm" variant="success" icon={CheckCircle2} onClick={() => action(() => adminService.reviewJobFairRequirement(firstSubmission.id, { status: 'approved' }), 'Confirmation Slip approved.')}>
+                                Approve
+                              </Button>
+                              <Button size="sm" variant="danger" icon={XCircle} onClick={() => action(() => adminService.reviewJobFairRequirement(firstSubmission.id, { status: 'rejected', admin_remarks: 'Confirmation slip invalid.' }), 'Confirmation Slip rejected.')}>
+                                Reject
+                              </Button>
+                            </div>
+                          )}
+                        </div>
                       )}
                       {firstSubmission?.admin_remarks && <p className="mt-2 text-xs font-semibold text-rose-700">PESO note: {firstSubmission.admin_remarks}</p>}
 
