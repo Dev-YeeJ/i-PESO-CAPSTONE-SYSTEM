@@ -52,7 +52,8 @@ export default function JobFairEmployersTable({ participants, onReviewRequiremen
         const p = row.original
         const totalReqs = p.total_requirements || 0
         const approvedReqs = (() => {
-          const reqs = p.requirements ?? []
+          const validIds = new Set(p.valid_requirement_ids || [])
+          const reqs = (p.requirements ?? []).filter(r => validIds.has(r.job_fair_requirement_id))
           const grouped = reqs.reduce((acc, r) => {
             if (!acc[r.job_fair_requirement_id]) acc[r.job_fair_requirement_id] = []
             acc[r.job_fair_requirement_id].push(r)
@@ -147,7 +148,8 @@ export default function JobFairEmployersTable({ participants, onReviewRequiremen
                   <span className="truncate">
                     {(() => {
                       if (!row.original.total_requirements) return 'View Details'
-                      const reqs = row.original.requirements ?? []
+                      const validIds = new Set(row.original.valid_requirement_ids || [])
+                      const reqs = (row.original.requirements ?? []).filter(r => validIds.has(r.job_fair_requirement_id))
                       const grouped = reqs.reduce((acc, r) => {
                         if (!acc[r.job_fair_requirement_id]) acc[r.job_fair_requirement_id] = []
                         acc[r.job_fair_requirement_id].push(r)

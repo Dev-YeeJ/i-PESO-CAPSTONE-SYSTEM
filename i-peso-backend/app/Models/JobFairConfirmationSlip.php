@@ -13,6 +13,7 @@ class JobFairConfirmationSlip extends Model
         'representative_1_name', 'representative_1_contact', 'representative_position',
         'representative_2_name', 'representative_2_contact', 'number_of_job_vacancies',
         'source', 'dedupe_key', 'submitted_by', 'submitted_at',
+        'status', 'reviewed_by_admin_id', 'review_remarks',
     ];
     protected $casts = ['number_of_job_vacancies' => 'integer', 'submitted_at' => 'datetime'];
 

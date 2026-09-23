@@ -629,6 +629,26 @@ class JobFairController extends Controller
         return response()->json(['message' => 'Admin proxy confirmation slip saved.', 'confirmation_slip' => $slip->fresh(['vacancies'])], 201);
     }
 
+    public function reviewConfirmationSlip(Request $request, \App\Models\JobFairConfirmationSlip $confirmationSlip): JsonResponse
+    {
+        $admin = $this->admin($request);
+        $validated = $request->validate([
+            'status' => ['required', Rule::in(['approved', 'rejected'])],
+            'admin_remarks' => ['required_if:status,rejected', 'nullable', 'string', 'max:2000'],
+        ]);
+
+        $confirmationSlip->update([
+            'status' => $validated['status'],
+            'reviewed_by_admin_id' => $admin->admin_id,
+            'review_remarks' => $validated['admin_remarks'],
+        ]);
+
+        return response()->json([
+            'message' => 'Confirmation slip status updated.',
+            'confirmation_slip' => $confirmationSlip->fresh(['vacancies']),
+        ]);
+    }
+
     /**
      * "Smart typing" name suggestions for the applicant-name field on the
      * proxy-encoding register — powers autofill of the rest of that row.

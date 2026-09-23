@@ -11,8 +11,8 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('job_fair_result_reports', function (Blueprint $table) {
-            $table->string('status')->default('pending')->after('submitted_by_employer_id');
+        Schema::table('job_fair_confirmation_slips', function (Blueprint $table) {
+            $table->string('status')->default('pending')->after('submitted_by');
             $table->unsignedBigInteger('reviewed_by_admin_id')->nullable()->after('status');
             $table->text('review_remarks')->nullable()->after('reviewed_by_admin_id');
             
@@ -27,7 +27,7 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('job_fair_result_reports', function (Blueprint $table) {
+        Schema::table('job_fair_confirmation_slips', function (Blueprint $table) {
             if (\Illuminate\Support\Facades\DB::getDriverName() !== 'sqlite') {
                 $table->dropForeign(['reviewed_by_admin_id']);
             }

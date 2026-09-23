@@ -156,6 +156,11 @@ export default function JobFairDetailPage() {
 
   const metrics = fair?.metrics ?? {}
   const reports = useMemo(() => fair?.result_reports ?? [], [fair])
+  const confirmationSlips = useMemo(() => {
+    const fromParticipants = (fair?.participants ?? []).map(p => p.confirmation_slip).filter(Boolean)
+    const proxySlips = fair?.proxy_confirmation_slips ?? []
+    return [...fromParticipants, ...proxySlips]
+  }, [fair])
   const unifiedTotals = useMemo(() => reports.reduce((sum, r) => ({
     total_male: sum.total_male + (r.total_male ?? 0),
     total_female: sum.total_female + (r.total_female ?? 0),
@@ -339,7 +344,8 @@ export default function JobFairDetailPage() {
             <JobFairEmployersTable 
               participants={(fair?.participants ?? []).map(p => ({
                 ...p, 
-                total_requirements: (fair?.requirements ?? []).length
+                total_requirements: (fair?.requirements ?? []).length,
+                valid_requirement_ids: (fair?.requirements ?? []).map(r => r.id)
               }))}
               onReviewRequirements={setReviewingParticipantId}
               statusTones={statusTones}
@@ -372,6 +378,45 @@ export default function JobFairDetailPage() {
           </Card>
 
           <JobFairReportsChart metrics={metrics} reports={reports} />
+
+          <Card padding="none" className="mb-6">
+            <div className="border-b border-slate-100 p-5">
+              <CardHeader title="Confirmation Slips" subtitle="Pre-event encoded requirements and pledged vacancies." />
+            </div>
+            <div className="divide-y divide-slate-100">
+              {confirmationSlips.length === 0 ? (
+                <p className="p-8 text-center text-sm text-slate-500">No confirmation slips yet.</p>
+              ) : confirmationSlips.map((c) => (
+                <div key={c.id} className="flex flex-wrap items-center justify-between gap-3 p-4">
+                  <div>
+                    <div className="flex items-center gap-2 mb-0.5">
+                      <p className="font-bold text-slate-900">{c.company_name}</p>
+                      <Badge variant={c.status === 'approved' ? 'approved' : c.status === 'rejected' ? 'rejected' : 'review'} icon={false}>
+                        {c.status || 'pending'}
+                      </Badge>
+                      {c.source === 'admin_proxy' && <Badge variant="neutral" icon={false}>Proxy Encoded</Badge>}
+                    </div>
+                    <p className="text-xs font-semibold text-slate-500">{c.number_of_job_vacancies} pledged vacancies</p>
+                    {c.review_remarks && <p className="text-xs text-rose-600 font-semibold mt-1">PESO note: {c.review_remarks}</p>}
+                  </div>
+                  <div className="flex gap-2">
+                    {(c.status === 'pending' || !c.status) && (
+                      <>
+                        <Button size="sm" variant="success" icon={CheckCircle2} onClick={() => action(() => adminService.reviewJobFairConfirmationSlip(c.id, { status: 'approved' }), 'Confirmation slip approved.')}>Approve</Button>
+                        <Button size="sm" variant="danger" icon={XCircle} onClick={() => {
+                          const remark = window.prompt("Reason for rejection:")
+                          if (remark) action(() => adminService.reviewJobFairConfirmationSlip(c.id, { status: 'rejected', admin_remarks: remark }), 'Confirmation slip rejected.')
+                        }}>Reject</Button>
+                      </>
+                    )}
+                    <Button size="sm" variant="outline" icon={Eye} onClick={() => setViewingConfirmationSlip(c)}>
+                      View
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Card>
 
           <Card padding="none">
             <div className="border-b border-slate-100 p-5">
