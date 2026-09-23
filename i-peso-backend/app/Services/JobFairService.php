@@ -617,6 +617,7 @@ class JobFairService
             ? $fair->attendees()->get(['is_attended', 'seeker_id'])
             : collect();
         $statusCount = fn (string $status): int => $participants->where('participation_status', $status)->count();
+        $reportService = app(JobFairReportService::class);
 
         return [
             'seekers_rsvped' => $attendees->whereNotNull('seeker_id')->count(),
@@ -634,7 +635,7 @@ class JobFairService
             'total_applicants' => (int) $reports->sum('total_applicants'),
             'total_male' => (int) $reports->sum('total_male'),
             'total_female' => (int) $reports->sum('total_female'),
-            'total_hots' => (int) $reports->sum('total_hots'),
+            'total_hots' => (int) $reports->sum(fn ($report) => $reportService->effectiveTotalHots($report)),
             'total_near_hired' => (int) $reports->sum('total_near_hired'),
             'total_rejected' => (int) $reports->sum('total_rejected'),
             'total_vacancies_solicited' => (int) $reports->sum('total_vacancies_solicited'),

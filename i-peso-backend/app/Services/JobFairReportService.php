@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Administrator;
+use App\Models\Application;
 use App\Models\Employer;
 use App\Models\JobFair;
 use App\Models\JobFairEmployer;
@@ -11,6 +12,7 @@ use App\Models\JobSeeker;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
@@ -174,6 +176,8 @@ class JobFairReportService
                 }
             }
 
+            $this->syncTotalHotsFromApplications($report);
+
             if ($participation) {
                 $participation->update(['participation_status' => 'encoded_results', 'encoded_results_at' => now()]);
             }
@@ -239,7 +243,7 @@ class JobFairReportService
                 'total_applicants' => (int) $reports->sum('total_applicants'),
                 'total_qualified' => (int) $reports->sum('total_qualified'),
                 'total_near_hired' => (int) $reports->sum('total_near_hired'),
-                'total_hots' => (int) $reports->sum('total_hots'),
+                'total_hots' => (int) $reports->sum(fn (JobFairResultReport $report) => $this->effectiveTotalHots($report)),
                 'total_rejected' => (int) $reports->sum('total_rejected'),
             ],
             'filter_options' => [
@@ -265,12 +269,54 @@ class JobFairReportService
             '1.6.4_establishments_participated' => $reports->count(),
             '1.6.5_job_vacancies_solicited' => (int) $reports->sum('total_vacancies_solicited'),
             '1.6.6_job_applicants_registered' => (int) $reports->sum('total_applicants'),
-            '1.6.7_total_hots' => (int) $reports->sum('total_hots'),
+            '1.6.7_total_hots' => (int) $reports->sum(fn (JobFairResultReport $report) => $this->effectiveTotalHots($report)),
             'near_hired' => (int) $reports->sum('total_near_hired'),
             'rejected' => (int) $reports->sum('total_rejected'),
             'self_service_reports' => $reports->where('source', 'employer_self_service')->count(),
             'admin_proxy_reports' => $reports->where('source', 'admin_proxy')->count(),
         ];
+    }
+
+    /**
+     * Platform booth actions are the authoritative HOTS record. Aggregate
+     * reports remain supported for paper-only employers that have no matching
+     * application rows to count.
+     */
+    public function effectiveTotalHots(JobFairResultReport $report): int
+    {
+        if (! $report->employer_id || ! Schema::hasColumn('applications', 'job_fair_id')) {
+            return (int) $report->total_hots;
+        }
+
+        $applications = $this->applicationsForReport($report);
+
+        return $applications->exists()
+            ? (int) $applications->where('applications.is_hots', true)->count()
+            : (int) $report->total_hots;
+    }
+
+    private function syncTotalHotsFromApplications(JobFairResultReport $report): void
+    {
+        if (! $report->employer_id || ! Schema::hasColumn('applications', 'job_fair_id')) {
+            return;
+        }
+
+        $applications = $this->applicationsForReport($report);
+        if (! $applications->exists()) {
+            return;
+        }
+
+        $report->update([
+            'total_hots' => (int) $applications->where('applications.is_hots', true)->count(),
+        ]);
+    }
+
+    private function applicationsForReport(JobFairResultReport $report)
+    {
+        return Application::query()
+            ->join('job_vacancies', 'job_vacancies.post_id', '=', 'applications.post_id')
+            ->where('applications.job_fair_id', $report->job_fair_id)
+            ->where('job_vacancies.employer_id', $report->employer_id);
     }
 
     private function assertTallies(array $data): void

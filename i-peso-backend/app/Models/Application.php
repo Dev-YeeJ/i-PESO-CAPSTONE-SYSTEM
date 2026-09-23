@@ -5,6 +5,8 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class Application extends Model
 {
@@ -42,6 +44,43 @@ class Application extends Model
         'placement_captured_at' => 'datetime',
         'submitted_documents' => 'array',
     ];
+
+    protected static function booted(): void
+    {
+        static::saved(function (self $application): void {
+            if (! $application->job_fair_id
+                || ! $application->wasChanged(['is_hots', 'job_fair_id', 'post_id'])
+                || ! Schema::hasTable('job_fair_result_reports')
+                || ! Schema::hasColumn('applications', 'job_fair_id')) {
+                return;
+            }
+
+            $employerId = DB::table('job_vacancies')
+                ->where('post_id', $application->post_id)
+                ->value('employer_id');
+
+            if (! $employerId) {
+                return;
+            }
+
+            DB::table('job_fair_result_reports')
+                ->where('job_fair_id', $application->job_fair_id)
+                ->where('employer_id', $employerId)
+                ->get(['id'])
+                ->each(function (object $report) use ($application, $employerId): void {
+                    $totalHots = DB::table('applications')
+                        ->join('job_vacancies', 'job_vacancies.post_id', '=', 'applications.post_id')
+                        ->where('applications.job_fair_id', $application->job_fair_id)
+                        ->where('job_vacancies.employer_id', $employerId)
+                        ->where('applications.is_hots', true)
+                        ->count();
+
+                    DB::table('job_fair_result_reports')
+                        ->where('id', $report->id)
+                        ->update(['total_hots' => $totalHots, 'updated_at' => now()]);
+                });
+        });
+    }
 
     public function jobVacancy(): BelongsTo
     {

@@ -7,6 +7,7 @@ use App\Models\Employer;
 use App\Models\InterviewSchedule;
 use App\Models\JobSeeker;
 use App\Models\JobVacancy;
+use App\Models\JobFairResultReport;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
@@ -108,11 +109,10 @@ class AdminAnalyticsService
                 ->orWhereHas('programApplications', fn (Builder $activity) => $activity->whereBetween('created_at', [$range['from'], $range['to']]));
         })->count();
 
-        $jobFairSummary = Schema::hasTable('job_fair_result_reports')
-            ? DB::table('job_fair_result_reports')->whereBetween('submitted_at', [$range['from'], $range['to']])->selectRaw(
-                'COUNT(DISTINCT job_fair_id) AS fairs, COUNT(*) AS companies, SUM(total_vacancies_offered) AS vacancies, SUM(total_applicants) AS applicants, SUM(total_hots) AS hots, SUM(total_near_hired) AS near_hired, SUM(total_rejected) AS rejected'
-            )->first()
-            : null;
+        $jobFairReports = Schema::hasTable('job_fair_result_reports')
+            ? JobFairResultReport::query()->whereBetween('submitted_at', [$range['from'], $range['to']])->get()
+            : collect();
+        $jobFairReportService = app(JobFairReportService::class);
         $jobFairsConducted = Schema::hasTable('job_fairs')
             ? DB::table('job_fairs')->whereIn('status', ['closed', 'completed'])
                 ->whereBetween(DB::raw('COALESCE(start_date, event_date)'), [$range['from']->toDateString(), $range['to']->toDateString()])->count()
@@ -142,12 +142,12 @@ class AdminAnalyticsService
             'unemployed_applicants' => (int) ($seekerSummary->unemployed ?? 0),
             'scheduled_interviews' => $scheduledInterviews,
             'job_fairs_conducted' => $jobFairsConducted,
-            'job_fair_participating_companies' => (int) ($jobFairSummary->companies ?? 0),
-            'job_fair_vacancies' => (int) ($jobFairSummary->vacancies ?? 0),
-            'job_fair_applicants' => (int) ($jobFairSummary->applicants ?? 0),
-            'job_fair_hots' => (int) ($jobFairSummary->hots ?? 0),
-            'job_fair_near_hired' => (int) ($jobFairSummary->near_hired ?? 0),
-            'job_fair_rejected' => (int) ($jobFairSummary->rejected ?? 0),
+            'job_fair_participating_companies' => $jobFairReports->count(),
+            'job_fair_vacancies' => (int) $jobFairReports->sum('total_vacancies_offered'),
+            'job_fair_applicants' => (int) $jobFairReports->sum('total_applicants'),
+            'job_fair_hots' => (int) $jobFairReports->sum(fn (JobFairResultReport $report) => $jobFairReportService->effectiveTotalHots($report)),
+            'job_fair_near_hired' => (int) $jobFairReports->sum('total_near_hired'),
+            'job_fair_rejected' => (int) $jobFairReports->sum('total_rejected'),
         ];
     }
 
@@ -156,9 +156,12 @@ class AdminAnalyticsService
         if (! Schema::hasTable('job_fair_result_reports')) {
             return ['top_hiring_companies' => [], 'mismatch_reasons' => [], 'positions' => []];
         }
-        $reports = DB::table('job_fair_result_reports')->whereBetween('submitted_at', [$range['from'], $range['to']]);
-        $companies = (clone $reports)->selectRaw('company_name AS label, SUM(total_hots) AS value')
-            ->groupBy('company_name')->orderByDesc('value')->limit(self::TOP_LIMIT)->get();
+        $reports = JobFairResultReport::query()->whereBetween('submitted_at', [$range['from'], $range['to']])->get();
+        $jobFairReportService = app(JobFairReportService::class);
+        $companies = $reports->groupBy('company_name')->map(fn (Collection $companyReports, string $company) => [
+            'label' => $company,
+            'value' => (int) $companyReports->sum(fn (JobFairResultReport $report) => $jobFairReportService->effectiveTotalHots($report)),
+        ])->sortByDesc('value')->take(self::TOP_LIMIT)->values();
         $mismatches = Schema::hasTable('job_fair_result_mismatch_tallies') ? DB::table('job_fair_result_mismatch_tallies as tallies')
             ->join('job_fair_result_reports as reports', 'reports.id', '=', 'tallies.result_report_id')
             ->whereBetween('reports.submitted_at', [$range['from'], $range['to']])
