@@ -7,7 +7,7 @@ import { Pencil, Trash2 } from 'lucide-react'
 import { Button, Card } from '@/components/ui'
 import { ConfirmModal, PageHeader, StatusBadge } from '@/pages/admin/_components'
 import DataTable from '@/pages/admin/_components/DataTable'
-import { adminService } from '@/services/adminService'
+import governmentProgramService from '@/services/governmentProgramService'
 
 export default function ProgramsListPage() {
   const navigate = useNavigate()
@@ -16,15 +16,15 @@ export default function ProgramsListPage() {
 
   const programsQuery = useQuery({
     queryKey: ['programs', { per_page: 15 }],
-    queryFn: () => adminService.getProgramsList({ per_page: 15 }),
+    queryFn: () => governmentProgramService.adminPrograms({ per_page: 15 }),
     staleTime: 1000 * 60 * 5,
     refetchOnWindowFocus: false,
   })
 
   const removeProgram = useMutation({
-    mutationFn: (programId) => adminService.deleteProgram(programId),
+    mutationFn: (programId) => governmentProgramService.archiveProgram(programId),
     onSuccess: () => {
-      toast.success('Program deleted.')
+      toast.success('Program archived.')
       setPendingDelete(null)
       queryClient.invalidateQueries({ queryKey: ['programs'] })
     },
@@ -33,7 +33,7 @@ export default function ProgramsListPage() {
     ),
   })
 
-  const programs = programsQuery.data?.data ?? []
+  const programs = (programsQuery.data?.data ?? []).filter((program) => program.program_status !== 'archived' && program.status !== 'archived')
   const loading = programsQuery.isLoading
   const errorMessage = programsQuery.isError
     ? programsQuery.error?.response?.data?.message ?? 'Unable to load programs.'
@@ -100,9 +100,9 @@ export default function ProgramsListPage() {
       <ConfirmModal
         isOpen={Boolean(pendingDelete)}
         isDangerous
-        title="Delete this program?"
-        message={`"${pendingDelete?.program_name ?? 'This program'}" will no longer be available in the portal. This cannot be undone.`}
-        confirmText="Delete program"
+        title="Archive this program?"
+        message={`"${pendingDelete?.program_name ?? 'This program'}" will no longer be available in the portal, but its record will be preserved.`}
+        confirmText="Archive program"
         loading={removeProgram.isPending}
         onCancel={() => setPendingDelete(null)}
         onConfirm={() => removeProgram.mutate(pendingDelete.program_id)}
