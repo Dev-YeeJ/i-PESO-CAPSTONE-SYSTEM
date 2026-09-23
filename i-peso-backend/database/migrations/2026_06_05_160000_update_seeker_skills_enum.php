@@ -34,7 +34,9 @@ return new class extends Migration
             Schema::table('seeker_skills', function (Blueprint $table) {
                 // For MySQL, we need to change the enum column
                 // This syntax works for MySQL 5.7+
-                DB::statement("ALTER TABLE seeker_skills MODIFY skill_type ENUM('dole_standard', 'technical', 'soft')");
+                if (\Illuminate\Support\Facades\DB::getDriverName() !== 'sqlite') {
+                    DB::statement("ALTER TABLE seeker_skills MODIFY skill_type ENUM('dole_standard', 'technical', 'soft')");
+                }
             });
         }
     }
@@ -55,7 +57,9 @@ return new class extends Migration
                 ->update(['skill_type' => 'soft_skill']);
 
             // Restore the old enum column
-            DB::statement("ALTER TABLE seeker_skills MODIFY skill_type ENUM('dole_standard', 'hard_skill', 'soft_skill')");
+            if (\Illuminate\Support\Facades\DB::getDriverName() !== 'sqlite') {
+                DB::statement("ALTER TABLE seeker_skills MODIFY skill_type ENUM('dole_standard', 'hard_skill', 'soft_skill')");
+            }
         }
     }
 };

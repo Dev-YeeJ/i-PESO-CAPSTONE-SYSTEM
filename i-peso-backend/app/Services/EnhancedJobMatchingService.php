@@ -14,7 +14,7 @@ use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 
 /**
- * Dynamic, explainable scoring engine for i-PESO job matches.
+ * Explainable scoring engine for i-PESO job matches.
  *
  * Location is intentionally excluded from this score. Controllers may still
  * filter or sort by distance without double-counting geography.
@@ -181,18 +181,9 @@ class EnhancedJobMatchingService
 
     private function weightsForVacancy(JobVacancy $vacancy): array
     {
-        $weights = self::BASE_WEIGHTS;
-        $majorGroup = $this->psocMajorGroup($vacancy);
-
-        if (in_array($majorGroup, ['1', '2'], true)) {
-            $weights['education'] = 20;
-            $weights['experience'] = 10;
-        } elseif ($majorGroup === '9') {
-            $weights['education'] = 0;
-            $weights['experience'] = 30;
-        }
-
-        return $this->normalizeWeights($weights);
+        // Every occupation and subcode uses the same transparent formula.
+        // Classification remains diagnostic metadata, not a scoring rule.
+        return self::BASE_WEIGHTS;
     }
 
     private function weightingRule(JobVacancy $vacancy): array
@@ -201,31 +192,9 @@ class EnhancedJobMatchingService
 
         return [
             'psoc_major_group' => $majorGroup,
-            'rule' => match ($majorGroup) {
-                '1', '2' => 'professionals_managers',
-                '9' => 'elementary_manual_labor',
-                default => 'default_merit_based',
-            },
+            'rule' => 'fixed_weights',
             'location_removed_from_score' => true,
         ];
-    }
-
-    private function normalizeWeights(array $weights): array
-    {
-        $total = array_sum($weights);
-        if ($total === 100) {
-            return $weights;
-        }
-
-        $normalized = [];
-        foreach ($weights as $key => $weight) {
-            $normalized[$key] = (int) round(($weight / max(1, $total)) * 100);
-        }
-
-        $difference = 100 - array_sum($normalized);
-        $normalized['skills'] += $difference;
-
-        return $normalized;
     }
 
     private function psocMajorGroup(JobVacancy $vacancy): ?string
