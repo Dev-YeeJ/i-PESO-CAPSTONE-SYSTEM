@@ -1,9 +1,13 @@
-import { createElement, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowRight, BriefcaseBusiness, Building2, CheckCircle2, CircleCheck, Clock3, FileCheck2, FilePenLine, FileX2, Plus, RotateCcw, ShieldCheck, MapPin, Upload } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { ArrowRight, BriefcaseBusiness, Building2, CheckCircle2, Clock3, UsersRound, Calendar, Award, FileX2, Plus, Users, UserPlus } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import PendingVerificationBanner from './components/PendingVerificationBanner'
 import { AlertBox, Badge, Button, Card, CardHeader, LoadingSkeleton, StatCard } from '@/components/ui'
 import * as employerService from '@/services/employerService'
+import * as employerDashboardService from '@/services/employerDashboardService'
 import { useAuthStore } from '@/stores/authStore'
+import { formatDistanceToNow } from 'date-fns'
 
 const DOCUMENT_LABELS = {
   mayors_permit: "Mayor's Permit",
@@ -22,41 +26,48 @@ const DOCUMENT_LABELS = {
 export default function EmployerDashboard() {
   const user = useAuthStore((state) => state.user)
   const updateUser = useAuthStore((state) => state.updateUser)
+  
   const [profile, setProfile] = useState(null)
-  const [vacancies, setVacancies] = useState([])
+  const [stats, setStats] = useState(null)
+  
   const [error, setError] = useState('')
   const [reuploadError, setReuploadError] = useState('')
   const [loading, setLoading] = useState(true)
   const [reuploadingType, setReuploadingType] = useState(null)
   const [reuploadNotice, setReuploadNotice] = useState('')
 
-  const loadProfile = useCallback(() => {
-    return employerService.getProfile()
-      .then((result) => {
-        setProfile(result)
+  const loadDashboard = useCallback(() => {
+    setLoading(true)
+    Promise.all([
+      employerService.getProfile(),
+      // Only fetch stats if they are already verified, otherwise it will fail or be empty. We can just fetch and catch.
+      employerDashboardService.getDashboardStats().catch(() => null)
+    ])
+      .then(([profileResult, statsResult]) => {
+        setProfile(profileResult)
+        if (statsResult) {
+          setStats(statsResult)
+        }
+        
         updateUser({
-          verification_status: result.employer.verification_status,
-          company_name: result.employer.company_name,
-          name: result.employer.company_name,
+          verification_status: profileResult.employer.verification_status,
+          company_name: profileResult.employer.company_name,
+          name: profileResult.employer.company_name,
           employer: {
             ...user?.employer,
-            logo_url: result.employer.company_logo_url,
+            logo_url: profileResult.employer.company_logo_url,
           }
         })
-        setLoading(false)
-        if (result.employer.verification_status === 'verified') {
-          employerService.getVacancies({ per_page: 12 })
-            .then((vacancyResult) => setVacancies(vacancyResult.data ?? []))
-            .catch((requestError) => setError(requestError.response?.data?.message ?? 'Vacancy summary could not be loaded.'))
-        }
       })
-      .catch((requestError) => setError(requestError.response?.data?.message ?? 'Unable to load the employer workspace.'))
+      .catch((requestError) => {
+        setError(requestError.response?.data?.message ?? 'Unable to load the employer workspace.')
+      })
       .finally(() => setLoading(false))
-  }, [updateUser])
+  }, [updateUser, user?.employer])
 
   useEffect(() => {
-    loadProfile()
-  }, [loadProfile])
+    loadDashboard()
+  }, [loadDashboard])
 
   const handleReupload = useCallback(async (documentType, file, expirationDate = null) => {
     setReuploadingType(documentType)
@@ -65,7 +76,7 @@ export default function EmployerDashboard() {
     try {
       await employerService.reuploadDocument(documentType, file, expirationDate)
       setReuploadNotice(`${DOCUMENT_LABELS[documentType] ?? documentType} has been re-uploaded and is now under review.`)
-      await loadProfile()
+      await loadDashboard()
     } catch (requestError) {
       const msg = requestError.response?.data?.message
         ?? requestError.response?.data?.errors?.document_file?.[0]
@@ -75,136 +86,193 @@ export default function EmployerDashboard() {
     } finally {
       setReuploadingType(null)
     }
-  }, [loadProfile])
+  }, [loadDashboard])
 
   const status = profile?.employer?.verification_status ?? user?.verification_status ?? 'pending'
-  const company = profile?.employer?.company_name ?? user?.company_name ?? user?.name ?? 'Employer'
   const documents = profile?.documents ?? []
   const hasRejectedDocuments = documents.some((doc) => doc.verification_status === 'rejected')
   const effectiveStatus = status === 'pending' && hasRejectedDocuments ? 'rejected' : status
   
-  // Government ID is always collected at the representative step but isn't
-  // part of getRequiredDocuments() (see Employer.php), so it's added here.
-  // Authorization Letter is no longer part of registration at all — every
-  // employer now only uploads a single Government ID / Company ID — so it
-  // must not be counted here either, or "X of Y approved" could never reach
-  // 100% for any employer (there'd always be one phantom document nobody
-  // can upload or approve).
   const requiredDocuments = useMemo(() => {
     const base = profile?.required_documents ?? []
     if (base.length === 0) return base
     return [...base, 'government_id']
   }, [profile])
-  
-  const counts = useMemo(() => ({
-    active: vacancies.filter((item) => item.status === 'active').length,
-    draft: vacancies.filter((item) => item.status === 'draft').length,
-    closed: vacancies.filter((item) => item.status === 'closed').length,
-    openings: vacancies.filter((item) => item.status === 'active').reduce((sum, item) => sum + Number(item.vacancies_count ?? 0), 0),
-  }), [vacancies])
 
-  const docStats = useMemo(() => {
-    const approved = documents.filter((d) => d.verification_status === 'approved').length
-    const rejected = documents.filter((d) => d.verification_status === 'rejected').length
-    const pending = documents.filter((d) => d.verification_status === 'pending' || !d.verification_status).length
-    const total = Math.max(requiredDocuments.length, documents.length) || 1
-    return { approved, rejected, pending, total, percent: Math.min(100, Math.round((approved / total) * 100)) }
-  }, [documents, requiredDocuments])
-
-  if (loading) return (
-    <div className="portal-page">
-      <LoadingSkeleton variant="text" rows={2} className="max-w-md" />
-      <LoadingSkeleton variant="stat" rows={4} />
-      <LoadingSkeleton variant="card" rows={2} />
-    </div>
-  )
+  if (loading) {
+    return <div className="space-y-6"><LoadingSkeleton variant="card" rows={1} /><div className="grid grid-cols-4 gap-4"><LoadingSkeleton variant="card" /><LoadingSkeleton variant="card" /><LoadingSkeleton variant="card" /><LoadingSkeleton variant="card" /></div></div>
+  }
 
   return (
-    <div className="portal-page">
-      {/* Hero Banner Section */}
-      <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200 mb-6">
-        <div className="h-32 bg-gradient-to-r from-brand-navy to-blue-700 sm:h-48" />
-        <div className="relative px-5 pb-6 sm:px-7">
-          <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
-            <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
-              <div className="relative -mt-10 shrink-0 sm:-mt-12">
-                <div className="relative flex h-28 w-28 items-center justify-center overflow-hidden rounded-2xl border-4 border-white bg-white shadow-lg sm:h-32 sm:w-32">
-                  {profile?.employer?.company_logo_url ? (
-                    <img src={profile.employer.company_logo_url} alt="Logo" className="h-full w-full object-contain p-2" />
-                  ) : (
-                    <Building2 className="h-10 w-10 text-slate-300 sm:h-12 sm:w-12" />
-                  )}
-                </div>
-              </div>
-              <div className="min-w-0 flex-1 pt-1 sm:pt-4">
-                <p className="text-xs font-extrabold uppercase tracking-[0.16em] text-blue-600 mb-1">PESO Employer Workspace</p>
-                <div className="flex items-center gap-2">
-                  <h1 className="truncate text-2xl font-black text-slate-950 sm:text-3xl">{company}</h1>
-                </div>
-                <p className="text-sm font-semibold text-slate-500 mt-1">{Array.isArray(profile?.employer?.industry) ? profile.employer.industry.join(', ') || 'Employer Account' : profile?.employer?.industry || 'Employer Account'}</p>
-              </div>
-            </div>
-            <div className="mt-4 flex flex-col gap-3 sm:mt-0 sm:mb-4 sm:flex-row sm:items-center">
-              <Badge status={effectiveStatus === 'verified' ? 'approved' : effectiveStatus === 'rejected' ? 'rejected' : 'pending'}>{effectiveStatus === 'verified' ? 'Verified' : effectiveStatus}</Badge>
-              {effectiveStatus === 'verified' && <Button to="/employer/post-job" icon={Plus}>Post New Vacancy</Button>}
-            </div>
-          </div>
+    <div className="mx-auto max-w-7xl space-y-6 px-4 py-8 pb-24 sm:px-6 lg:px-8">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">Employer Control Center</h1>
+          <p className="mt-1 text-sm text-slate-500">
+            Welcome back, {profile?.employer?.company_name ?? 'Employer'}. Here is what's happening today.
+          </p>
         </div>
       </div>
 
       {error && <AlertBox variant="danger" title="Employer workspace unavailable">{error}</AlertBox>}
       {reuploadError && <AlertBox variant="danger" title="Document re-upload failed">{reuploadError}</AlertBox>}
       {reuploadNotice && <AlertBox variant="success" title="Document re-uploaded">{reuploadNotice}</AlertBox>}
-      <PendingVerificationBanner status={effectiveStatus} rejectionReason={profile?.employer?.rejection_reason} documents={documents} requiredDocuments={requiredDocuments} onReupload={handleReupload} reuploadingType={reuploadingType} />
+      
+      <PendingVerificationBanner 
+        status={effectiveStatus} 
+        rejectionReason={profile?.employer?.rejection_reason} 
+        documents={documents} 
+        requiredDocuments={requiredDocuments} 
+        onReupload={handleReupload} 
+        reuploadingType={reuploadingType} 
+      />
 
-      {effectiveStatus === 'verified' && (
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <StatCard icon={BriefcaseBusiness} color="blue" label="Active Vacancies" value={counts.active} subtitle={`${counts.openings} total opening${counts.openings === 1 ? '' : 's'}`} hint="Published vacancies currently visible to job seekers." />
-          <StatCard icon={FilePenLine} color="amber" label="Draft Vacancies" value={counts.draft} subtitle="Not visible to seekers" hint="Saved postings you have not published yet." />
-          <StatCard icon={CircleCheck} color="slate" label="Closed Vacancies" value={counts.closed} subtitle="Completed postings" hint="Postings that are no longer accepting applications." />
-          <StatCard icon={ShieldCheck} color="green" label="Account Access" value="Enabled" subtitle="Based on PESO approval" hint="Whether your PESO accreditation currently allows posting vacancies." />
-        </div>
-      )}
+      {effectiveStatus === 'verified' && stats ? (
+        <>
+          {/* Top Row: KPIs - What is happening? */}
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <StatCard icon={BriefcaseBusiness} color="blue" label="Active Vacancies" value={stats.kpis.active_vacancies} subtitle="Currently published" hint="Number of jobs currently visible to job seekers." />
+            <StatCard icon={UsersRound} color="amber" label="Pending Applicants" value={stats.kpis.pending_applications} subtitle="Requires your review" hint="Number of applications that have not been processed." />
+            <StatCard icon={Calendar} color="violet" label="Upcoming Interviews" value={stats.kpis.upcoming_interviews} subtitle="Scheduled meetings" hint="Interviews scheduled for the future." />
+            <StatCard icon={Award} color="emerald" label="Total Hired" value={stats.kpis.total_hired} subtitle="Through i-PESO" hint="Total candidates successfully hired through the platform." />
+          </div>
 
-      {effectiveStatus === 'verified' ? (
-        <div className="grid gap-6 xl:grid-cols-[1.35fr_0.85fr]">
-          <Card>
-            <CardHeader
-              title="Vacancy Portfolio"
-              subtitle="A compact view of your most recent job postings."
-              action={<Button to="/employer/vacancies" variant="secondary" size="sm" icon={ArrowRight}>View All</Button>}
-            />
-            {vacancies.length ? (
-              <div className="grid gap-4 mt-4">
-                {vacancies.slice(0, 6).map((vacancy) => (
-                  <div key={vacancy.post_id} className="group flex flex-col justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-5 transition-all hover:border-brand-navy hover:shadow-md sm:flex-row sm:items-center">
-                    <div>
-                      <h3 className="text-base font-bold text-slate-900">{vacancy.job_title}</h3>
-                      <div className="mt-2 flex flex-wrap gap-2 text-xs text-slate-500">
-                        <span className="flex items-center gap-1"><MapPin className="h-3 w-3" />{vacancy.location || vacancy.place_of_work || 'Multiple Locations'}</span>
-                        <span className="flex items-center gap-1"><BriefcaseBusiness className="h-3 w-3" />{vacancy.nature_of_work || vacancy.employment_type?.replaceAll('_', ' ')}</span>
+          {/* Middle Row: Trends & Alerts */}
+          <div className="grid gap-6 xl:grid-cols-3">
+            {/* Trends - What changed? */}
+            <Card className="xl:col-span-2">
+              <CardHeader title="Application Trends" subtitle="Volume of applications received over the last 14 days." />
+              <div className="mt-6 h-[300px] w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={stats.chart} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                    <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} dy={10} />
+                    <YAxis allowDecimals={false} axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} dx={-10} />
+                    <Tooltip 
+                      contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                      cursor={{ stroke: '#cbd5e1', strokeWidth: 1, strokeDasharray: '4 4' }}
+                    />
+                    <Line type="monotone" dataKey="count" name="Applications" stroke="#0ea5e9" strokeWidth={3} dot={{ r: 4, fill: '#0ea5e9', strokeWidth: 2, stroke: '#fff' }} activeDot={{ r: 6, fill: '#0284c7', stroke: '#fff', strokeWidth: 2 }} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            </Card>
+
+            {/* Alerts/Tasks - What needs attention? */}
+            <Card className="flex flex-col">
+              <CardHeader title="Attention Required" subtitle="Tasks prioritizing your immediate action." />
+              <div className="mt-4 flex-1 space-y-3">
+                {stats.kpis.pending_applications > 0 ? (
+                  <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+                    <div className="flex items-center gap-3">
+                      <div className="rounded-full bg-amber-100 p-2 text-amber-600"><UsersRound className="h-5 w-5" /></div>
+                      <div>
+                        <p className="text-sm font-bold text-amber-900">{stats.kpis.pending_applications} New Applications</p>
+                        <p className="text-xs text-amber-700">Review pending candidates in your ATS.</p>
                       </div>
                     </div>
-                    <Badge variant={vacancy.status}>{vacancy.status}</Badge>
+                    <Button to="/employer/ats" variant="secondary" size="sm" className="mt-3 w-full bg-amber-100 text-amber-800 hover:bg-amber-200">Go to ATS</Button>
                   </div>
-                ))}
-              </div>
-            ) : <EmptyVacancy />}
-          </Card>
+                ) : (
+                  <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+                    <div className="flex items-center gap-3">
+                      <div className="rounded-full bg-emerald-100 p-2 text-emerald-600"><CheckCircle2 className="h-5 w-5" /></div>
+                      <div>
+                        <p className="text-sm font-bold text-emerald-900">Inbox Zero</p>
+                        <p className="text-xs text-emerald-700">All applications have been reviewed.</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
-          <Card>
-            <CardHeader title="Hiring Workflow" subtitle="Vacancy stages across your employer account." />
-            <div className="grid gap-3">
-              <PipelineStage label="Draft" count={counts.draft} description="Prepare requirements and job details" color="bg-slate-400" />
-              <PipelineStage label="Published" count={counts.active} description="Visible to qualified job seekers" color="bg-emerald-500" />
-              <PipelineStage label="Closed" count={counts.closed} description="No longer accepting applications" color="bg-brand-700" />
-            </div>
-            <div className="mt-5 rounded-xl border border-amber-200 bg-amber-50 p-4">
-              <p className="text-sm font-bold text-amber-800">Applicant tracking</p>
-              <p className="mt-1 text-xs leading-5 text-slate-600">Applicant management and interview stages will appear here when those workflow modules are connected.</p>
-            </div>
-          </Card>
-        </div>
+                {stats.kpis.upcoming_interviews > 0 && (
+                  <div className="rounded-xl border border-violet-200 bg-violet-50 p-4">
+                    <div className="flex items-center gap-3">
+                      <div className="rounded-full bg-violet-100 p-2 text-violet-600"><Calendar className="h-5 w-5" /></div>
+                      <div>
+                        <p className="text-sm font-bold text-violet-900">{stats.kpis.upcoming_interviews} Upcoming Interviews</p>
+                        <p className="text-xs text-violet-700">Prepare for your scheduled interviews.</p>
+                      </div>
+                    </div>
+                    <Button to="/employer/calendar" variant="secondary" size="sm" className="mt-3 w-full bg-violet-100 text-violet-800 hover:bg-violet-200">View Calendar</Button>
+                  </div>
+                )}
+              </div>
+            </Card>
+          </div>
+
+          {/* Bottom Row: Activity & Quick Actions */}
+          <div className="grid gap-6 xl:grid-cols-3">
+            {/* Activity - What happened recently? */}
+            <Card className="xl:col-span-2">
+              <CardHeader title="Recent Activity" subtitle="Latest applicant submissions across your active vacancies." />
+              <div className="mt-4">
+                {stats.recent_activity?.length > 0 ? (
+                  <div className="divide-y divide-slate-100">
+                    {stats.recent_activity.map((activity) => (
+                      <div key={activity.apply_id} className="flex items-center justify-between py-4">
+                        <div className="flex items-center gap-4">
+                          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-50 text-blue-600">
+                            <UserPlus className="h-5 w-5" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-bold text-slate-900">{activity.seeker_name}</p>
+                            <p className="text-xs text-slate-500">Applied for <span className="font-medium text-slate-700">{activity.job_title}</span></p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-4">
+                          <span className="text-xs text-slate-400">{formatDistanceToNow(new Date(activity.created_at), { addSuffix: true })}</span>
+                          <Badge variant={activity.status}>{activity.status}</Badge>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 p-8 text-center">
+                    <Users className="mx-auto h-8 w-8 text-slate-300" />
+                    <p className="mt-3 font-bold text-slate-800">No recent activity</p>
+                    <p className="mt-1 text-sm text-slate-500">When candidates apply, they will show up here.</p>
+                  </div>
+                )}
+              </div>
+            </Card>
+
+            {/* Quick Actions - What can I do now? */}
+            <Card>
+              <CardHeader title="Quick Actions" subtitle="Common tasks to manage your hiring." />
+              <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-1">
+                <Link to="/employer/post-job" className="flex items-center gap-3 rounded-xl border border-slate-200 p-4 transition-colors hover:border-brand-navy hover:bg-blue-50/50">
+                  <div className="rounded-lg bg-blue-100 p-2 text-blue-600"><Plus className="h-5 w-5" /></div>
+                  <div className="text-left">
+                    <p className="text-sm font-bold text-slate-900">Post a Job</p>
+                    <p className="hidden text-xs text-slate-500 sm:block">Create a new vacancy</p>
+                  </div>
+                </Link>
+                <Link to="/employer/ats" className="flex items-center gap-3 rounded-xl border border-slate-200 p-4 transition-colors hover:border-brand-navy hover:bg-blue-50/50">
+                  <div className="rounded-lg bg-emerald-100 p-2 text-emerald-600"><UsersRound className="h-5 w-5" /></div>
+                  <div className="text-left">
+                    <p className="text-sm font-bold text-slate-900">Applicant Tracking</p>
+                    <p className="hidden text-xs text-slate-500 sm:block">Manage candidates</p>
+                  </div>
+                </Link>
+                <Link to="/employer/job-fairs" className="flex items-center gap-3 rounded-xl border border-slate-200 p-4 transition-colors hover:border-brand-navy hover:bg-blue-50/50">
+                  <div className="rounded-lg bg-amber-100 p-2 text-amber-600"><Building2 className="h-5 w-5" /></div>
+                  <div className="text-left">
+                    <p className="text-sm font-bold text-slate-900">Job Fairs</p>
+                    <p className="hidden text-xs text-slate-500 sm:block">Join upcoming events</p>
+                  </div>
+                </Link>
+                <Link to="/employer/profile" className="flex items-center gap-3 rounded-xl border border-slate-200 p-4 transition-colors hover:border-brand-navy hover:bg-blue-50/50">
+                  <div className="rounded-lg bg-violet-100 p-2 text-violet-600"><BriefcaseBusiness className="h-5 w-5" /></div>
+                  <div className="text-left">
+                    <p className="text-sm font-bold text-slate-900">Company Profile</p>
+                    <p className="hidden text-xs text-slate-500 sm:block">Edit your public profile</p>
+                  </div>
+                </Link>
+              </div>
+            </Card>
+          </div>
+        </>
       ) : !documents.length && (
         <Card>
           <div className="flex flex-col items-start gap-5 sm:flex-row sm:items-center">
@@ -213,153 +281,6 @@ export default function EmployerDashboard() {
           </div>
         </Card>
       )}
-    </div>
-  )
-}
-
-function PipelineStage({ label, count, description, color }) {
-  return <div className="rounded-xl border border-slate-200 p-4"><div className="flex items-center justify-between"><div className="flex items-center gap-2"><span className={`h-2.5 w-2.5 rounded-full ${color}`} /><p className="font-bold text-slate-900">{label}</p></div><span className="text-xl font-black text-slate-950">{count}</span></div><p className="mt-2 text-xs text-slate-500">{description}</p></div>
-}
-
-function EmptyVacancy() {
-  return <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 p-8 text-center"><Building2 className="mx-auto h-8 w-8 text-slate-300" /><p className="mt-3 font-bold text-slate-800">No vacancies posted</p><p className="mt-1 text-sm text-slate-500">Create your first PESO-accredited job opportunity.</p><Button to="/employer/post-job" size="sm" className="mt-4" icon={Plus}>Post a Job</Button></div>
-}
-
-function AccreditationStat({ icon, label, count, color }) {
-  const colorMap = {
-    emerald: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-    amber: 'bg-amber-50 text-amber-700 border-amber-200',
-    red: 'bg-red-50 text-red-700 border-red-200',
-  }
-  return (
-    <div className={`rounded-xl border p-3 text-center ${colorMap[color]}`}>
-      {createElement(icon, { className: 'mx-auto h-5 w-5' })}
-      <p className="mt-1.5 text-xl font-black">{count}</p>
-      <p className="mt-0.5 text-[10px] font-bold uppercase tracking-wide">{label}</p>
-    </div>
-  )
-}
-
-function AccreditationDocRow({ docType, label, status, uploadedAt, optional, accountStatus, onReupload, reuploadingType }) {
-  const fileInputRef = useRef(null)
-  const [expirationDate, setExpirationDate] = useState('')
-  const [showDateInput, setShowDateInput] = useState(false)
-
-  const configs = {
-    approved: { icon: CheckCircle2, color: 'text-emerald-600', bg: 'border-emerald-200 bg-emerald-50/50', badge: 'Approved' },
-    rejected: { icon: FileX2, color: 'text-red-600', bg: 'border-red-200 bg-red-50/50', badge: 'Rejected' },
-    pending: { icon: Clock3, color: 'text-amber-600', bg: 'border-amber-200 bg-amber-50/50', badge: 'Under Review' },
-    not_uploaded: { icon: FileX2, color: 'text-slate-400', bg: 'border-slate-200 bg-slate-50', badge: 'Not Uploaded' },
-  }
-  const config = configs[status] ?? configs.pending
-  const formattedDate = uploadedAt ? new Date(uploadedAt).toLocaleDateString('en-PH', { year: 'numeric', month: 'short', day: 'numeric' }) : null
-
-  // Allow re-upload when:
-  // - Document is rejected or not uploaded (always)
-  // - Document is pending AND the account is rejected (employer can replace pending docs too)
-  const canReupload = status === 'rejected' || status === 'not_uploaded' || (status === 'pending' && accountStatus === 'rejected')
-  const isMayorsPermit = docType === 'mayors_permit'
-  const isUploading = reuploadingType === docType
-
-  const handleFileChange = (e) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-
-    const validTypes = ['application/pdf', 'image/jpeg', 'image/png']
-    if (!validTypes.includes(file.type)) {
-      alert('Please upload PDF or image files only (PDF, JPG, PNG)')
-      e.target.value = ''
-      return
-    }
-    if (file.size > 10 * 1024 * 1024) {
-      alert('File size must be less than 10MB')
-      e.target.value = ''
-      return
-    }
-
-    if (isMayorsPermit && !expirationDate) {
-      alert("Please enter the Mayor's Permit expiration date before uploading.")
-      e.target.value = ''
-      return
-    }
-
-    onReupload?.(docType, file, isMayorsPermit ? expirationDate : null)
-    e.target.value = ''
-    setExpirationDate('')
-    setShowDateInput(false)
-  }
-
-  return (
-    <div className={`rounded-xl border px-4 py-3 transition-colors ${config.bg}`}>
-      <div className="flex items-center gap-3">
-        {createElement(config.icon, { className: `h-5 w-5 shrink-0 ${config.color}` })}
-        <div className="min-w-0 flex-1">
-          <p className="text-sm font-bold text-slate-800">
-            {label}
-            {optional && <span className="ml-2 text-[10px] font-semibold uppercase text-slate-400">Optional</span>}
-          </p>
-          {formattedDate && <p className="mt-0.5 text-xs text-slate-400">Uploaded {formattedDate}</p>}
-        </div>
-        <div className="flex items-center gap-2">
-          <span className={`text-xs font-bold ${config.color}`}>{config.badge}</span>
-          {canReupload && (
-            <>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".pdf,.jpg,.jpeg,.png"
-                onChange={handleFileChange}
-                hidden
-              />
-              {isMayorsPermit ? (
-                showDateInput ? (
-                  <div className="flex items-center gap-1.5">
-                    <input
-                      type="date"
-                      value={expirationDate}
-                      min={new Date(Date.now() + 86400000).toISOString().split('T')[0]}
-                      onChange={(e) => setExpirationDate(e.target.value)}
-                      className="rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-xs text-slate-700 focus:border-brand-navy focus:outline-none"
-                      placeholder="Expiry date"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => expirationDate && fileInputRef.current?.click()}
-                      disabled={isUploading || !expirationDate}
-                      className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-700 shadow-sm transition-all hover:-translate-y-0.5 hover:border-brand-navy hover:text-brand-navy disabled:pointer-events-none disabled:opacity-50"
-                    >
-                      {isUploading ? <><span className="h-3 w-3 animate-spin rounded-full border-2 border-slate-300 border-t-brand-navy" />Uploading...</> : <><Upload className="h-3.5 w-3.5" />Select file</>}
-                    </button>
-                    <button type="button" onClick={() => setShowDateInput(false)} className="text-xs text-slate-400 hover:text-slate-600">✕</button>
-                  </div>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => setShowDateInput(true)}
-                    disabled={isUploading}
-                    className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-700 shadow-sm transition-all hover:-translate-y-0.5 hover:border-brand-navy hover:text-brand-navy disabled:pointer-events-none disabled:opacity-50"
-                  >
-                    {isUploading ? <><span className="h-3 w-3 animate-spin rounded-full border-2 border-slate-300 border-t-brand-navy" />Uploading...</> : <><Upload className="h-3.5 w-3.5" />{status === 'not_uploaded' ? 'Upload' : 'Re-upload'}</>}
-                  </button>
-                )
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={isUploading}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-700 shadow-sm transition-all hover:-translate-y-0.5 hover:border-brand-navy hover:text-brand-navy disabled:pointer-events-none disabled:opacity-50"
-                >
-                  {isUploading ? (
-                    <><span className="h-3 w-3 animate-spin rounded-full border-2 border-slate-300 border-t-brand-navy" />Uploading...</>
-                  ) : (
-                    <><Upload className="h-3.5 w-3.5" />{status === 'not_uploaded' ? 'Upload' : 'Re-upload'}</>
-                  )}
-                </button>
-              )}
-            </>
-          )}
-        </div>
-      </div>
     </div>
   )
 }

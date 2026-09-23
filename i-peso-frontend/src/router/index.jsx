@@ -43,6 +43,7 @@ const EmployerCalendar  = lazy(() => import('@/pages/employer/InterviewCalendarP
 const EmployerJobFairs  = lazy(() => import('@/pages/employer/EmployerJobFairDashboard'))
 const EmployerEstablishmentReport = lazy(() => import('@/pages/employer/EmployerEstablishmentReportPage'))
 const EmployerPlacementReport = lazy(() => import('@/pages/employer/EmployerPlacementReportPage'))
+const EmployerProfile   = lazy(() => import('@/pages/employer/EmployerProfile'))
 const SeekerDashboard   = lazy(() => import('@/pages/seeker/DashboardPage'))
 const SeekerProfile     = lazy(() => import('@/pages/seeker/SeekerProfile'))
 const SeekerProfileEdit = lazy(() => import('@/pages/seeker/SeekerProfileEdit'))
@@ -164,6 +165,7 @@ export const router = createBrowserRouter([
                       {
                         element: <RequireApprovedEmployer />,
                         children: [
+                          { path: 'profile', element: S(EmployerProfile) },
                           { path: 'post-job', element: S(EmployerPostJob) },
                           { path: 'vacancies', element: S(EmployerVacancies) },
                           { path: 'ats', element: S(EmployerATSGrid) },

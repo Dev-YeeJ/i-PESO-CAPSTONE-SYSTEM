@@ -63,6 +63,24 @@ class AdminDashboardController extends Controller
             ? (JobSeeker::where('profile_completed', true)->count() / $totalSeekers) * 100
             : 0;
 
+        // Generate daily application chart data for the selected range
+        $applicationsTrend = Application::whereBetween('created_at', [$from, $to])
+            ->select(DB::raw('DATE(created_at) as date'), DB::raw('count(*) as count'))
+            ->groupBy('date')
+            ->orderBy('date', 'asc')
+            ->get()
+            ->keyBy('date');
+
+        $chartData = [];
+        for ($i = 0; $i < $lengthInDays; $i++) {
+            $dateObj = (clone $from)->addDays($i);
+            $dateStr = $dateObj->format('Y-m-d');
+            $chartData[] = [
+                'date' => $dateObj->format('M d'),
+                'count' => isset($applicationsTrend[$dateStr]) ? (int)$applicationsTrend[$dateStr]->count : 0,
+            ];
+        }
+
         return response()->json([
             'range' => [
                 'date_from' => $from->toDateString(),
@@ -99,6 +117,8 @@ class AdminDashboardController extends Controller
                 'new_employers' => $this->percentChange($current['new_employers'], $previous['new_employers']),
                 'new_vacancies' => $this->percentChange($current['new_vacancies'], $previous['new_vacancies']),
             ],
+
+            'chart_data' => $chartData,
 
             'attention' => $this->attentionItems($pendingEmployerVerifications),
             // Gated on top of the dashboard's own module-free access: these two

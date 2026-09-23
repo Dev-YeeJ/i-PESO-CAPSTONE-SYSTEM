@@ -112,6 +112,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::patch('/notifications/{notification}/read', [EmployerNotificationController::class, 'markAsRead']);
 
         Route::middleware('verified.employer')->group(function () {
+            Route::get('/dashboard-stats', [\App\Http\Controllers\Api\EmployerDashboardController::class, 'stats']);
             Route::get('/job-fairs', [EmployerJobFairController::class, 'index']);
             Route::post('/job-fairs/{jobFair}/interest', [EmployerJobFairController::class, 'interest']);
             Route::post('/job-fairs/{jobFair}/respond', [EmployerJobFairController::class, 'respond']);
