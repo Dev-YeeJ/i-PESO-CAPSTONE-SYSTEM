@@ -296,14 +296,18 @@ class GeminiChatService
         $today = now()->toFormattedDateString();
 
         $userContext = "You are talking to a visitor in the public chat widget. They do not have an account open in this conversation, and nothing here is tied to any logged-in session.";
+        $helpingThemAct = "Most visitors are deciding whether i-PESO is worth signing up for, or are unsure what to do next. When your answer shows that it can help them, end with one short concrete next step (e.g. which tab to open, what to prepare). Registration is free.";
         
         if ($user) {
             if ($user instanceof JobSeeker) {
                 $userContext = "You are talking to a registered Job Seeker named {$user->first_name} {$user->last_name}. They are using the mobile app or logged in to their dashboard. Focus exclusively on helping them find jobs, manage applications, and access government programs. Do NOT mention, suggest, or explain any features intended for employers (like posting jobs or employer verification) since this user is strictly a job seeker.";
+                $helpingThemAct = "The user is already a registered Job Seeker. Do NOT tell them to sign up or register. End your helpful answers with one short concrete next step in their dashboard or app.";
             } elseif ($user instanceof Employer) {
-                $userContext = "You are talking to a registered Employer representing {$user->company_name}. They are logged in to their dashboard.";
+                $userContext = "You are talking to a registered Employer representing {$user->company_name}. They are logged in to their dashboard. Focus exclusively on helping them post job vacancies, manage applicants, handle establishment reports, and participate in job fairs. Do NOT mention, suggest, or explain any features intended for job seekers (like finding jobs or applying to programs) since this user is strictly an employer.";
+                $helpingThemAct = "The user is already a registered Employer. Do NOT tell them to sign up or register. End your helpful answers with one short concrete next step in their dashboard.";
             } elseif ($user instanceof Administrator) {
                 $userContext = "You are talking to an Administrator of the PESO office.";
+                $helpingThemAct = "The user is an Administrator. Provide concise answers to help them manage the portal.";
             }
         }
 
@@ -350,9 +354,7 @@ class GeminiChatService
         you can help with employment or PESO services.
 
         HELPING THEM ACT
-        Most visitors are deciding whether i-PESO is worth signing up for, or are unsure what to do
-        next. When your answer shows that it can help them, end with one short concrete next step
-        (e.g. which tab to open, what to prepare). Registration is free.
+        {$helpingThemAct}
 
         STYLE
         Be concise but thorough — brief by default, but do not skip a genuinely relevant detail
