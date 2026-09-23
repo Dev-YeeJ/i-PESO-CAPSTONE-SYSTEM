@@ -43,7 +43,9 @@ export default function PlacementRecordEditor({ records, onChange, searchApplica
         if (m < 0 || (m === 0 && today.getDate() < bd.getDate())) {
           age--
         }
-        if (age >= 15 && age <= 100) newRow.age = age
+        if (age >= 18 && age <= 100) newRow.age = age
+      } else if (key === 'birth_date' && !value) {
+        newRow.age = ''
       }
       return newRow
     }))
@@ -62,7 +64,7 @@ export default function PlacementRecordEditor({ records, onChange, searchApplica
         if (m < 0 || (m === 0 && today.getDate() < bd.getDate())) {
           age--
         }
-        if (age < 15 || age > 100) age = ''
+        if (age < 18 || age > 100) age = ''
       }
       
       return withAssignedCompany({
@@ -123,7 +125,7 @@ export default function PlacementRecordEditor({ records, onChange, searchApplica
                 <TableCell><input value={row.last_name || ''} onChange={(e) => update(index, 'last_name', e.target.value)} readOnly={!!row.seeker_id} placeholder="Last name" className={cellInputClass} /></TableCell>
                 <TableCell>
                   {row.seeker_id ? (
-                    <input value={row.gender || ''} readOnly className={cellInputClass} />
+                    <input value={row.gender ? row.gender.charAt(0).toUpperCase() + row.gender.slice(1) : ''} readOnly className={cellInputClass} />
                   ) : (
                     <select value={row.gender || ''} onChange={(e) => update(index, 'gender', e.target.value)} className={cellInputClass}>
                       <option value="">—</option>
@@ -134,19 +136,28 @@ export default function PlacementRecordEditor({ records, onChange, searchApplica
                 </TableCell>
                 <TableCell>
                   {row.seeker_id ? (
-                    <input value={row.civil_status || ''} readOnly className={cellInputClass} />
+                    <input value={row.civil_status ? row.civil_status.charAt(0).toUpperCase() + row.civil_status.slice(1) : ''} readOnly className={cellInputClass} />
                   ) : (
                     <select value={row.civil_status || ''} onChange={(e) => update(index, 'civil_status', e.target.value)} className={cellInputClass}>
                       <option value="">—</option>
-                      <option value="Single">Single</option>
-                      <option value="Married">Married</option>
-                      <option value="Widowed">Widowed</option>
-                      <option value="Separated">Separated</option>
+                      <option value="single">Single</option>
+                      <option value="married">Married</option>
+                      <option value="widowed">Widowed</option>
+                      <option value="separated">Separated</option>
                     </select>
                   )}
                 </TableCell>
-                <TableCell><input type="number" min="15" max="100" value={row.age || ''} onChange={(e) => update(index, 'age', e.target.value)} readOnly={!!row.seeker_id} placeholder="Age" className={cellInputClass} /></TableCell>
-                <TableCell><input type="date" value={row.birth_date || ''} onChange={(e) => update(index, 'birth_date', e.target.value)} readOnly={!!row.seeker_id} className={cellInputClass} /></TableCell>
+                <TableCell><input type="number" min="18" max="100" value={row.age || ''} onChange={(e) => update(index, 'age', e.target.value)} readOnly={!!row.seeker_id} placeholder="Age" className={cellInputClass} /></TableCell>
+                <TableCell>
+                  <input 
+                    type="date" 
+                    max={new Date(new Date().setFullYear(new Date().getFullYear() - 18)).toISOString().split('T')[0]} 
+                    value={row.birth_date || ''} 
+                    onChange={(e) => update(index, 'birth_date', e.target.value)} 
+                    readOnly={!!row.seeker_id} 
+                    className={cellInputClass} 
+                  />
+                </TableCell>
                 <TableCell><input type="date" value={row.date_hired || ''} onChange={(e) => update(index, 'date_hired', e.target.value)} className={cellInputClass} /></TableCell>
                 <TableCell><input value={row.position || ''} onChange={(e) => update(index, 'position', e.target.value)} placeholder="Position" className={cellInputClass} /></TableCell>
                 <TableCell><input value={row.department || ''} onChange={(e) => update(index, 'department', e.target.value)} placeholder="Department" className={cellInputClass} /></TableCell>
@@ -157,22 +168,22 @@ export default function PlacementRecordEditor({ records, onChange, searchApplica
                   ) : (
                     <select value={row.educational_attainment || ''} onChange={(e) => update(index, 'educational_attainment', e.target.value)} className={cellInputClass}>
                       <option value="">—</option>
-                      <option value="Elementary">Elementary</option>
-                      <option value="High School">High School</option>
-                      <option value="K-12 Senior High School">K-12 Senior High School</option>
-                      <option value="Vocational">Vocational</option>
-                      <option value="College">College</option>
-                      <option value="Post Graduate">Post Graduate</option>
+                      <option value="Elementary Graduate">Elementary Graduate</option>
+                      <option value="High School Graduate">High School Graduate</option>
+                      <option value="Senior High School Graduate">Senior High School Graduate</option>
+                      <option value="Vocational / Technical">Vocational / Technical</option>
+                      <option value="College Undergraduate">College Undergraduate</option>
+                      <option value="College Graduate">College Graduate</option>
+                      <option value="Master's Degree">Master's Degree</option>
+                      <option value="Doctorate">Doctorate</option>
                     </select>
                   )}
                 </TableCell>
                 <TableCell><input value={row.assigned_company || ''} onChange={(e) => update(index, 'assigned_company', e.target.value)} placeholder="Assigned company" className={cellInputClass} /></TableCell>
                 <TableCell>
-                  {!row.seeker_id && (
-                    <button type="button" onClick={() => onChange(records.filter((_, i) => i !== index))} aria-label="Remove hire" className="rounded-md p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600">
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  )}
+                  <button type="button" onClick={() => onChange(records.filter((_, i) => i !== index))} aria-label="Remove hire" className="rounded-md p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600">
+                    <Trash2 className="h-4 w-4" />
+                  </button>
                 </TableCell>
               </TableRow>
             ))}
