@@ -47,8 +47,12 @@ class ApplicationStatusNotification extends Notification
         // to be false even when the DB row is already cancelled, which incorrectly adds
         // the push/SMS channels for the ApplicationStatusNotification and produces a
         // second push notification alongside the (now-suppressed) InterviewCancelledNotification.
-        // Force a fresh DB read so the check always reflects the committed state.
-        $freshInterview = $this->application->interviewSchedule()->withoutGlobalScopes()->first();
+        // Force a fresh DB read so the check always reflects the committed state,
+        // unless this is an unsaved test model where no DB query should run.
+        $freshInterview = $this->application->exists
+            ? $this->application->interviewSchedule()->withoutGlobalScopes()->first()
+            : $this->application->interviewSchedule;
+            
         $interviewWasCancelled = $freshInterview?->status === 'cancelled';
 
         if ($this->application->status !== 'interview' && ! $interviewWasCancelled) {
