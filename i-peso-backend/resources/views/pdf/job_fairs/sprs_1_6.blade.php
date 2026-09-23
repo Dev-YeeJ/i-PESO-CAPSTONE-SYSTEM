@@ -23,7 +23,7 @@
             to {{ $fair->end_date->format('F d, Y') }}
         @endif
         <br>
-        <strong>Sector:</strong> {{ ucfirst($fair->sector ?? 'local') }}
+        <strong>Coverage:</strong> Local and overseas opportunities
     </div>
 
     <h2>SPRS 1.6 Summary</h2>
@@ -36,13 +36,11 @@
             </tr>
         </thead>
         <tbody>
-            <tr><td>1.6.1</td><td>Local Job Fairs Conducted</td><td>{{ $summary['1.6.1_fairs_conducted_local'] }}</td></tr>
-            <tr><td>1.6.2</td><td>Overseas Job Fairs Conducted</td><td>{{ $summary['1.6.2_fairs_conducted_overseas'] }}</td></tr>
-            <tr><td>1.6.3</td><td>Total Job Fairs Conducted</td><td>{{ $summary['1.6.3_total_fairs_conducted'] }}</td></tr>
-            <tr><td>1.6.4</td><td>Establishments Participated</td><td>{{ $summary['1.6.4_establishments_participated'] }}</td></tr>
-            <tr><td>1.6.5</td><td>Job Vacancies Solicited</td><td>{{ $summary['1.6.5_job_vacancies_solicited'] }}</td></tr>
-            <tr><td>1.6.6</td><td>Job Applicants Registered</td><td>{{ $summary['1.6.6_job_applicants_registered'] }}</td></tr>
-            <tr><td>1.6.7</td><td>Hired-On-The-Spot</td><td>{{ $summary['1.6.7_total_hots'] }}</td></tr>
+            <tr><td>1.6</td><td>Total Job Fairs Conducted</td><td>{{ $summary['1.6.1_total_fairs_conducted'] }}</td></tr>
+            <tr><td>1.6.1</td><td>Establishments Participated</td><td>{{ $summary['1.6.4_establishments_participated'] }}</td></tr>
+            <tr><td>1.6.2</td><td>Job Vacancies Solicited</td><td>{{ $summary['1.6.5_job_vacancies_solicited'] }}</td></tr>
+            <tr><td>1.6.3</td><td>Job Applicants Registered</td><td>{{ $summary['1.6.6_job_applicants_registered'] }}</td></tr>
+            <tr><td>1.6.4</td><td>Hired-On-The-Spot</td><td>{{ $summary['1.6.7_total_hots'] }}</td></tr>
             <tr><td>Additional</td><td>Near Hired</td><td>{{ $summary['near_hired'] ?? 0 }}</td></tr>
             <tr><td>Additional</td><td>Rejected</td><td>{{ $summary['rejected'] ?? 0 }}</td></tr>
             <tr><td>Audit</td><td>Employer Self-Service Reports</td><td>{{ $summary['self_service_reports'] ?? 0 }}</td></tr>

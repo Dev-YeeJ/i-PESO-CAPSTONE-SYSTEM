@@ -300,7 +300,6 @@ export interface JobFair {
   // Map" (public + in a map-eligible status + has coordinates) — mirrors i-peso-frontend's
   // JobMapPage.jsx, which filters on this same flag rather than re-deriving it client-side.
   map_eligible?: boolean
-  sector?: string | null
   target_sector?: string | null
   partner_agencies?: string[] | null
   status: string

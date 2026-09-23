@@ -30,7 +30,6 @@ class JobFair extends Model
         'latitude',
         'longitude',
         'google_place_id',
-        'sector',
         'target_sector',
         'partner_agencies',
         'event_date',

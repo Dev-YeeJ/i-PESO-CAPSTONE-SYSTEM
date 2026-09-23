@@ -547,7 +547,6 @@ class JobFairController extends Controller
             'start_time' => $fair->start_time,
             'end_time' => $fair->end_time,
             'venue' => $fair->venue,
-            'sector' => $fair->sector ?? 'local',
             'status' => $fair->status === 'ongoing' ? 'active' : $fair->status,
             'metrics' => [
                 'employers_joined' => (int) $fair->employers_count,
@@ -628,9 +627,7 @@ class JobFairController extends Controller
     private function sprsSummary(JobFair $fair): array
     {
         return [
-            '1.6.1_fairs_conducted_local' => in_array($fair->sector, ['local', 'both'], true) ? 1 : 0,
-            '1.6.2_fairs_conducted_overseas' => in_array($fair->sector, ['overseas', 'both'], true) ? 1 : 0,
-            '1.6.3_total_fairs_conducted' => 1,
+            '1.6.1_total_fairs_conducted' => 1,
             '1.6.4_establishments_participated' => $fair->employerJoins()->count(),
             '1.6.5_job_vacancies_solicited' => JobFairVacancy::query()
                 ->where('job_fair_id', $fair->job_fair_id)

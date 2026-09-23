@@ -106,8 +106,8 @@ export default function JobFairDetailScreen() {
           <Detail label="Time" value={`${textFrom(fair.start_time, '')}${fair.end_time ? ` - ${textFrom(fair.end_time, '')}` : ''}`} />
         ) : null}
         <Detail label="Venue" value={textFrom(fair.venue, 'Not listed')} />
-        {(fair.sector || fair.target_sector) ? (
-          <Detail label="Target Sector" value={titleCase(fair.target_sector || fair.sector, 'Not listed')} />
+        {fair.target_sector ? (
+          <Detail label="Target Audience" value={titleCase(fair.target_sector, 'Not listed')} />
         ) : null}
       </Card>
 
