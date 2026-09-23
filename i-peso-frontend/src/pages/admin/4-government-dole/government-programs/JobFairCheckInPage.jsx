@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { AnimatePresence } from 'framer-motion'
 import { Html5Qrcode } from 'html5-qrcode'
 import { useNavigate, useParams } from 'react-router-dom'
 import { CheckCircle2, Clock3, Search, XCircle, Download, FileText, FileSpreadsheet, SwitchCamera } from 'lucide-react'
@@ -54,6 +54,7 @@ export default function JobFairCheckInPage() {
   const [searching, setSearching] = useState(false)
   const [walkIn, setWalkIn] = useState(emptyWalkIn)
   const [encoding, setEncoding] = useState(false)
+  const [facingMode, setFacingMode] = useState('environment')
 
   const refreshCounts = useCallback(async () => {
     try {
