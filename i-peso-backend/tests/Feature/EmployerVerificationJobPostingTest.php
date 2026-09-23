@@ -454,7 +454,7 @@ class EmployerVerificationJobPostingTest extends TestCase
             ->assertJsonMissing(['job_title' => 'Low Match Job']);
     }
 
-    public function test_job_map_defers_detailed_matching_until_a_vacancy_is_selected(): void
+    public function test_job_map_returns_detailed_matching_for_compact_requests(): void
     {
         $employer = $this->createEmployer();
         $seeker = $this->createSeeker(['latitude' => 15.9761, 'longitude' => 120.5711]);
@@ -468,7 +468,7 @@ class EmployerVerificationJobPostingTest extends TestCase
         ]);
 
         $this->mock(EnhancedJobMatchingService::class, function (MockInterface $mock): void {
-            $mock->shouldReceive('calculateMatch')->once()->andReturn([
+            $mock->shouldReceive('calculateMatch')->twice()->andReturn([
                 'percentage' => 82,
                 'eligible' => true,
                 'missing_critical_skills' => [],
