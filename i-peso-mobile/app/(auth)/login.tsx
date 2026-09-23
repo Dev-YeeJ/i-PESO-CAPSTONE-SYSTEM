@@ -93,7 +93,6 @@ export default function LoginScreen() {
               <Text style={styles.footerLink}>Register here</Text>
             </TouchableOpacity>
           </View>
-          <Text style={styles.adminNote}>For PESO Admin access, use the web portal.</Text>
         </View>
       }
     >

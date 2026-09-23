@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import MaterialIcons from '@expo/vector-icons/MaterialIcons'
 import * as Haptics from 'expo-haptics'
-import { StyleSheet, Text, View } from 'react-native'
+import { Image, StyleSheet, Text, View } from 'react-native'
 import { Gesture, GestureDetector } from 'react-native-gesture-handler'
 import Animated, {
   Extrapolation,
@@ -134,9 +134,13 @@ export function JobFeedCard({ job, index = 0, saving = false, onPress, onToggleS
             accessibilityHint="Swipe left on this card to save it"
           >
             <View style={styles.topRow}>
-              <View style={styles.logo}>
-                <Text style={styles.logoText}>{companyInitials(jobCompany(job))}</Text>
-              </View>
+              {job.employer?.company_logo_url ? (
+                <Image source={{ uri: job.employer.company_logo_url }} style={styles.employerLogo} />
+              ) : (
+                <View style={styles.logo}>
+                  <Text style={styles.logoText}>{companyInitials(jobCompany(job))}</Text>
+                </View>
+              )}
               <View style={styles.titleWrap}>
                 <Text style={styles.title} numberOfLines={2}>{textFrom(job.job_title, 'Untitled job')}</Text>
                 <Text style={styles.company} numberOfLines={1}>{jobCompany(job)}</Text>
@@ -263,6 +267,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: colors.blue50,
+  },
+  employerLogo: {
+    width: 48,
+    height: 48,
+    borderRadius: radii.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+    resizeMode: 'contain',
   },
   logoText: {
     ...textStyles.smallBold,

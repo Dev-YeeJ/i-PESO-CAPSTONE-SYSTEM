@@ -14,7 +14,6 @@ import { Button } from '@/components/ui/Button'
 import {
   MatchScoreArt,
   NearbyJobsArt,
-  ProgramsArt,
   TrackingArt,
 } from '@/components/onboarding/WelcomeIllustrations'
 import { useMotion } from '@/hooks/useMotion'
@@ -38,12 +37,6 @@ const SLIDES = [
     title: 'Know where you stand',
     body: 'Every job shows how closely it fits your skills, and which ones you still need.',
     Art: MatchScoreArt,
-  },
-  {
-    eyebrow: 'DOLE programs',
-    title: 'Train first, then apply',
-    body: 'Government scholarships and training programs you qualify for, gathered in one list.',
-    Art: ProgramsArt,
   },
   {
     eyebrow: 'After you apply',

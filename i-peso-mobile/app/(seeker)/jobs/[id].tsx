@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { Image, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useQueryClient, useQuery } from '@tanstack/react-query'
 import MaterialIcons from '@expo/vector-icons/MaterialIcons'
@@ -44,6 +45,10 @@ function backTargetFor(from: string | undefined, fromId: string | undefined): st
   if (from === 'job-map') return '/(seeker)/job-map'
   if (from === 'notifications') return '/(seeker)/notifications'
   if (from === 'employer' && fromId) return `/(seeker)/employers/${fromId}`
+  if (from === 'booth' && fromId) {
+    const [jobFairId, employerId] = fromId.split(':')
+    if (jobFairId && employerId) return `/(seeker)/job-fairs/booth?jobFairId=${jobFairId}&employerId=${employerId}`
+  }
   return '/(seeker)'
 }
 
@@ -52,10 +57,12 @@ export default function JobDetailsScreen() {
   const router = useRouter()
   const queryClient = useQueryClient()
   const backTarget = backTargetFor(from, fromId)
+  const insets = useSafeAreaInsets()
 
   const [applying, setApplying] = useState(false)
   const [applyError, setApplyError] = useState('')
   const [applySuccess, setApplySuccess] = useState(false)
+  const [applyConfirmOpen, setApplyConfirmOpen] = useState(false)
   const [resourcesSkill, setResourcesSkill] = useState<string | null>(null)
   const [resources, setResources] = useState<LearningResources | null>(null)
   const [resourcesLoading, setResourcesLoading] = useState(false)
@@ -137,14 +144,7 @@ export default function JobDetailsScreen() {
 
   const confirmApply = () => {
     if (applied || applying) return
-    Alert.alert(
-      'Apply to this job?',
-      `Your profile will be shared with ${jobCompany(job)}.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Apply', style: 'default', onPress: applyToJob },
-      ]
-    )
+    setApplyConfirmOpen(true)
   }
 
   const applyToJob = async () => {
@@ -188,6 +188,9 @@ export default function JobDetailsScreen() {
           style={styles.hero}
         >
           <View style={styles.headerTop}>
+            {job.employer?.company_logo_url ? (
+              <Image source={{ uri: job.employer.company_logo_url }} style={styles.heroLogo} />
+            ) : null}
             <View style={styles.jobTitleWrap}>
               <Text style={styles.jobTitle}>{textFrom(job.job_title, 'Untitled job')}</Text>
               {job.employer?.employer_id ? (
@@ -329,7 +332,7 @@ export default function JobDetailsScreen() {
         ) : null}
       </ScrollView>
 
-      <View style={styles.footer}>
+      <View style={[styles.footer, { paddingBottom: insets.bottom + spacing.md }]}>
         <PressableScale
           onPress={() => toggleSavedMutation.mutate(String(job.post_id))}
           disabled={toggleSavedMutation.isPending}
@@ -413,6 +416,45 @@ export default function JobDetailsScreen() {
             />
           )}
         </ScrollView>
+      </BottomSheet>
+
+      <BottomSheet
+        visible={applyConfirmOpen}
+        onClose={() => setApplyConfirmOpen(false)}
+        title="Ready to apply?"
+        heightRatio={0.42}
+        footer={(
+          <View style={styles.applyConfirmActions}>
+            <Button variant="outline" size="lg" onPress={() => setApplyConfirmOpen(false)} style={styles.applyConfirmCancel}>
+              Cancel
+            </Button>
+            <Button
+              size="lg"
+              onPress={() => {
+                setApplyConfirmOpen(false)
+                applyToJob()
+              }}
+              style={styles.applyConfirmSubmit}
+            >
+              Apply now
+            </Button>
+          </View>
+        )}
+      >
+        <View style={styles.applyConfirmBody}>
+          <View style={styles.applyConfirmIcon}>
+            <MaterialIcons name="send" size={26} color={colors.info} />
+          </View>
+          <Text style={styles.applyConfirmTitle}>{job.job_title || 'This job'}</Text>
+          <Text style={styles.applyConfirmCompany}>{jobCompany(job)}</Text>
+          <Text style={styles.applyConfirmMessage}>
+            Your i-PESO profile will be shared with this employer and PESO staff for review.
+          </Text>
+          <View style={styles.applyConfirmNote}>
+            <MaterialIcons name="verified-user" size={16} color={colors.success} />
+            <Text style={styles.applyConfirmNoteText}>You can track your application status in Applications.</Text>
+          </View>
+        </View>
       </BottomSheet>
 
       <SuccessSheet
@@ -514,6 +556,7 @@ const styles = StyleSheet.create({
     ...shadows.md,
   },
   headerTop: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md },
+  heroLogo: { width: 56, height: 56, borderRadius: radii.md, backgroundColor: colors.surface, resizeMode: 'contain' },
   jobTitleWrap: { flex: 1 },
   jobTitle: { ...textStyles.display, fontSize: 26, lineHeight: 32, color: colors.white },
   company: { ...textStyles.bodyMedium, color: colors.blue200, marginTop: spacing.xs },
@@ -610,6 +653,16 @@ const styles = StyleSheet.create({
   },
   saveBtnActive: { backgroundColor: colors.blue50, borderColor: colors.blue200 },
   applyBtn: { flex: 1, marginBottom: 0 },
+  applyConfirmBody: { paddingHorizontal: spacing.xl, paddingTop: spacing.lg },
+  applyConfirmIcon: { width: 54, height: 54, borderRadius: radii.lg, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.infoBackground, borderWidth: 1, borderColor: colors.infoBorder, marginBottom: spacing.md },
+  applyConfirmTitle: { ...textStyles.title, color: colors.textPrimary },
+  applyConfirmCompany: { ...textStyles.smallBold, color: colors.info, marginTop: spacing.xs },
+  applyConfirmMessage: { ...textStyles.body, color: colors.textSecondary, lineHeight: 21, marginTop: spacing.md },
+  applyConfirmNote: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.lg, padding: spacing.md, borderRadius: radii.md, backgroundColor: colors.successBackground },
+  applyConfirmNoteText: { flex: 1, ...textStyles.smallMedium, color: colors.success },
+  applyConfirmActions: { flexDirection: 'row', gap: spacing.md },
+  applyConfirmCancel: { flex: 1, marginBottom: 0 },
+  applyConfirmSubmit: { flex: 1, marginBottom: 0, backgroundColor: colors.info },
 
   sheetBody: { paddingHorizontal: spacing.xl, paddingTop: spacing.lg, paddingBottom: spacing.xl },
   resourceLoading: { paddingVertical: spacing.sm },

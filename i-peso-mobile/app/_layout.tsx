@@ -57,6 +57,10 @@ export default function RootLayout() {
       const data = response.notification.request.content.data as Record<string, unknown>
       const destination = routeForPushData(data)
       if (destination) {
+        // Expo Router's router.push() accepts a plain string for most routes.
+        // The application detail route uses a dynamic segment ([id]), so when
+        // the destination is a deep-link we pass the path directly — Expo Router
+        // parses it and populates the [id] param from the URL segment.
         router.push(destination as any)
       }
     })

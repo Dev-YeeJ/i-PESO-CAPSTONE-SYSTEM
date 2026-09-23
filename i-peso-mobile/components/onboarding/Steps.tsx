@@ -1,13 +1,14 @@
 import { useEffect, useState } from 'react'
 import { ActivityIndicator, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native'
+import DateTimePicker from '@react-native-community/datetimepicker'
 import MaterialIcons from '@expo/vector-icons/MaterialIcons'
-import { Button } from '@/components/ui/Button'
 import { colors, radii, spacing, typography } from '@/theme'
 import { seekerService, type AiSuggestionItem, type GeocodedLocation, type OccupationClassificationSuggestion, type SkillOption } from '@/services/seekerService'
 import { Combobox } from './Combobox'
 import { AddressSearchField } from './AddressSearchField'
 import { AddressPinMap } from './AddressPinMap'
 import { LocationPickerModal, type LocationPickerValue } from './LocationPickerModal'
+import { useToast } from '@/stores/toastStore'
 import { getBarangaysByCity, getCitiesByProvince, getProvinces, matchPsgcLocation } from '@/services/psgcService'
 import {
   Choice,
@@ -30,8 +31,6 @@ import {
 } from './payloads'
 import { newEducation } from './types'
 import type {
-  EducationEntry,
-  OccupationPrefEntry,
   Step1Value,
   Step2Value,
   Step3Value,
@@ -149,61 +148,13 @@ function AiSuggestChips({ items, onAdd, addedNames }: { items: AiSuggestionItem[
   )
 }
 
-function OccupationAiSuggestions({ value, onAdd }: { value: Step3Value; onAdd: (item: AiSuggestionItem) => void }) {
-  const [opened, setOpened] = useState(false)
-  const [description, setDescription] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [suggestions, setSuggestions] = useState<AiSuggestionItem[]>([])
-  const [notice, setNotice] = useState('')
-
-  const fetchSuggestions = async () => {
-    setLoading(true)
-    setNotice('')
-    const result = await seekerService.getAiProfileSuggestions({
-      work_type_preference: value.work_type_preference,
-      target_job_description: description.trim() || undefined,
-      preferred_occupations: value.occupation_preferences
-        .filter((p) => p.raw_job_title.trim())
-        .map((p) => ({ title: p.raw_job_title, general_term: p.general_term ?? undefined })),
-    })
-    setLoading(false)
-    if (result?.occupations?.length) {
-      setSuggestions(result.occupations)
-    } else {
-      setSuggestions([])
-      setNotice('AI suggestions are unavailable right now — you can still type job titles manually above.')
-    }
-  }
-
-  if (!opened) {
-    return (
-      <Button variant="secondary" size="sm" style={styles.aiToggle} onPress={() => setOpened(true)}>
-        Need ideas? Ask AI
-      </Button>
-    )
-  }
-
-  return (
-    <View style={styles.aiPanel}>
-      <Field label="Describe your ideal job (optional)" value={description} onChangeText={setDescription} placeholder="e.g. Something in customer service, entry level" multiline autoCapitalize="sentences" />
-      <Button size="sm" style={styles.aiFetchBtn} loading={loading} onPress={fetchSuggestions}>
-        Get AI Suggestions
-      </Button>
-      {notice ? <Text style={styles.aiNotice}>{notice}</Text> : null}
-      {suggestions.length ? (
-        <AiSuggestChips items={suggestions} addedNames={value.occupation_preferences.map((p) => p.raw_job_title)} onAdd={onAdd} />
-      ) : null}
-    </View>
-  )
-}
-
 function SkillAiSuggestions({ category, currentSkills, onAdd }: { category: 'technical' | 'soft'; currentSkills: string[]; onAdd: (item: AiSuggestionItem) => void }) {
   // Deterministic, catalog-grounded suggestions (SkillRecommendationService,
   // tied to the seeker's preferred occupations) — loads automatically and
   // never depends on Gemini being available, so there's always something
   // useful here. Mirrors i-peso-frontend's SeekerSkillsForm.jsx, which
   // fetches this same endpoint on mount rather than gating it behind a tap.
-  const [catalogLoading, setCatalogLoading] = useState(true)
+  const [catalogLoading, setCatalogLoading] = useState(false)
   const [catalogSuggestions, setCatalogSuggestions] = useState<AiSuggestionItem[]>([])
 
   useEffect(() => {
@@ -227,32 +178,6 @@ function SkillAiSuggestions({ category, currentSkills, onAdd }: { category: 'tec
     }
   }, [category])
 
-  // Generative AI suggestions stay available as a supplementary "get more
-  // ideas" action — still useful when it works, just no longer the only
-  // source, so a Gemini outage doesn't leave this section empty.
-  const [aiOpened, setAiOpened] = useState(false)
-  const [aiLoading, setAiLoading] = useState(false)
-  const [aiSuggestions, setAiSuggestions] = useState<AiSuggestionItem[]>([])
-  const [aiNotice, setAiNotice] = useState('')
-
-  const fetchAiSuggestions = async () => {
-    setAiLoading(true)
-    setAiNotice('')
-    const result = await seekerService.getAiProfileSuggestions({
-      technical_skills: category === 'technical' ? currentSkills : undefined,
-      soft_skills: category === 'soft' ? currentSkills : undefined,
-    })
-    setAiLoading(false)
-    setAiOpened(true)
-    const list = category === 'technical' ? result?.technical_skills : result?.soft_skills
-    if (list?.length) {
-      setAiSuggestions(list)
-    } else {
-      setAiSuggestions([])
-      setAiNotice('AI suggestions are unavailable right now.')
-    }
-  }
-
   return (
     <View style={styles.aiPanel}>
       {catalogLoading ? (
@@ -261,18 +186,6 @@ function SkillAiSuggestions({ category, currentSkills, onAdd }: { category: 'tec
         <AiSuggestChips items={catalogSuggestions} addedNames={currentSkills} onAdd={onAdd} />
       ) : null}
 
-      {aiOpened && aiNotice ? <Text style={styles.aiNotice}>{aiNotice}</Text> : null}
-      {aiOpened && aiSuggestions.length ? <AiSuggestChips items={aiSuggestions} addedNames={currentSkills} onAdd={onAdd} /> : null}
-
-      <Button
-        variant={aiOpened ? 'ghost' : 'secondary'}
-        size="sm"
-        style={aiOpened ? styles.aiRefreshBtn : styles.aiToggle}
-        loading={aiLoading}
-        onPress={fetchAiSuggestions}
-      >
-        {aiOpened ? 'Refresh AI suggestions' : 'Get more ideas with AI'}
-      </Button>
     </View>
   )
 }
@@ -353,42 +266,6 @@ const COURSE_REQUIRED_LEVELS = ['tertiary', 'senior_high_strand', 'vocational', 
 // Mirrors web's EducationBackgroundEditor.jsx CORE_LEVEL_ORDER — the K-12/college ladder is
 // strictly ordered so an earlier stage can never have a later year than a later stage.
 // Vocational is deliberately excluded, same as web: it's commonly taken at any point in a
-// career, so it isn't checked against the ladder. secondary_non_k12/secondary_k12 share a
-// rank since they're both "high school", same as web collapsing those into one tier.
-const CORE_LEVEL_ORDER = ['elementary', 'secondary_non_k12', 'secondary_k12', 'senior_high_strand', 'tertiary', 'graduate_studies']
-
-function educationEffectiveYear(edu: EducationEntry): number | null {
-  const year = edu.year_graduated || edu.expected_year_graduated || edu.undergrad_year_last_attended || edu.year_started
-  return year ? Number(year) : null
-}
-
-function educationLevelLabel(level: string): string {
-  return EDUCATION_LEVEL_OPTIONS.find((option) => option.value === level)?.label ?? 'This level'
-}
-
-/** Mirrors web's chronologyConflict() — flags when an earlier schooling stage has a later
- *  effective year than a later stage (or vice versa), e.g. College graduated 2017 then
- *  Elementary graduated 2020, which is not a possible academic timeline. */
-function educationChronologyConflict(draft: EducationEntry, others: EducationEntry[]): string {
-  const draftRank = CORE_LEVEL_ORDER.indexOf(draft.level)
-  const draftYear = educationEffectiveYear(draft)
-  if (draftRank === -1 || draftYear === null) return ''
-
-  for (const other of others) {
-    const otherRank = CORE_LEVEL_ORDER.indexOf(other.level)
-    const otherYear = educationEffectiveYear(other)
-    if (otherRank === -1 || otherYear === null || otherRank === draftRank) continue
-
-    if (draftRank < otherRank && draftYear > otherYear) {
-      return `${educationLevelLabel(draft.level)} (${draftYear}) is an earlier schooling stage than ${educationLevelLabel(other.level)} (${otherYear}), so its year can't be later. Check the years on both records.`
-    }
-    if (draftRank > otherRank && draftYear < otherYear) {
-      return `${educationLevelLabel(draft.level)} (${draftYear}) comes after ${educationLevelLabel(other.level)} (${otherYear}) in school order, so its year can't be earlier. Check the years on both records.`
-    }
-  }
-  return ''
-}
-
 // Mirrors web's EducationBackgroundEditor.jsx YearSelect ranges exactly.
 const CURRENT_YEAR = new Date().getFullYear()
 const PAST_YEAR_OPTIONS = Array.from({ length: CURRENT_YEAR - 1949 }, (_, i) => String(CURRENT_YEAR - i)).map((y) => ({ label: y, value: y }))
@@ -571,16 +448,15 @@ export function Step1Personal({
   const [cities, setCities] = useState<{ code: string; name: string }[]>([])
   const [barangays, setBarangays] = useState<{ code: string; name: string }[]>([])
   const [addressListsLoading, setAddressListsLoading] = useState(false)
-  const [locationNotice, setLocationNotice] = useState('')
   const [locationPickerOpen, setLocationPickerOpen] = useState(false)
+  const { showToast } = useToast()
 
   const applyResolvedLocation = async (place: GeocodedLocation) => {
-    setLocationNotice('')
     let matched
     try {
       matched = await matchPsgcLocation(place)
     } catch {
-      setLocationNotice('The location was found, but its official address lists could not be loaded. Please select the address fields manually.')
+      showToast('The location was found, but official address lists could not be loaded. Please select the address fields manually.', 'error')
       matched = null
     }
     const province = matched?.provinceName?.trim() || place.province_name?.trim() || ''
@@ -702,10 +578,9 @@ export function Step1Personal({
         <>
           <Text style={styles.addressHint}>Search or use your current location, then select the Province, City / Municipality, and Barangay below.</Text>
           <AddressSearchField
-            onError={setLocationNotice}
+            onError={(message) => showToast(message, 'error')}
             onAddressSelected={applyResolvedLocation}
           />
-          {locationNotice ? <Text style={styles.errorText}>{locationNotice}</Text> : null}
           {value.latitude != null && value.longitude != null ? (
             <>
               <Text style={styles.helperText}>Drag the pin to adjust the exact spot.</Text>
@@ -817,25 +692,25 @@ export function Step2Employment({ value, onChange, errors }: { value: Step2Value
 
       {unemployed ? (
         <>
-          <Field label="Months Unemployed" keyboardType="number-pad" value={value.unemployment_months} onChangeText={(v) => set('unemployment_months', v)} error={fieldError(errors, 'unemployment_months')} />
+          <Field label="Months Unemployed" keyboardType="number-pad" value={value.unemployment_months} onChangeText={(v) => set('unemployment_months', v.replace(/\D/g, '').slice(0, 3))} error={fieldError(errors, 'unemployment_months')} />
           <SelectField label="Reason" required placeholder="Select reason" options={UNEMPLOYMENT_REASON_OPTIONS} value={value.unemployment_reason} onChange={(v) => set('unemployment_reason', v)} error={fieldError(errors, 'unemployment_reason')} />
           {value.unemployment_reason === 'others' ? (
             <Field label="Specify Reason" value={value.unemployment_reason_others} onChangeText={(v) => set('unemployment_reason_others', v)} error={fieldError(errors, 'unemployment_reason_others')} />
           ) : null}
           {value.unemployment_reason === 'terminated_abroad' ? (
-            <Field label="Country" value={value.unemployment_terminated_country} onChangeText={(v) => set('unemployment_terminated_country', v)} error={fieldError(errors, 'unemployment_terminated_country')} />
+            <CountryField label="Country" value={value.unemployment_terminated_country} onChange={(v) => set('unemployment_terminated_country', v)} error={fieldError(errors, 'unemployment_terminated_country')} />
           ) : null}
         </>
       ) : null}
 
       <SubLabel>OFW Status</SubLabel>
       <ToggleGroup label="Are you a current OFW?" value={value.is_ofw} onChange={(v) => set('is_ofw', v)} />
-      {value.is_ofw ? <Field label="OFW Country" required value={value.ofw_country} onChangeText={(v) => set('ofw_country', v)} error={fieldError(errors, 'ofw_country')} /> : null}
+      {value.is_ofw ? <CountryField label="OFW Country" required value={value.ofw_country} onChange={(v) => set('ofw_country', v)} error={fieldError(errors, 'ofw_country')} /> : null}
       <ToggleGroup label="Are you a former OFW?" value={value.is_former_ofw} onChange={(v) => set('is_former_ofw', v)} />
       {value.is_former_ofw ? (
         <>
-          <Field label="Former OFW Country" required value={value.former_ofw_country} onChangeText={(v) => set('former_ofw_country', v)} error={fieldError(errors, 'former_ofw_country')} />
-          <Field label="Return Date" required placeholder="YYYY-MM-DD" value={value.former_ofw_return_date} onChangeText={(v) => set('former_ofw_return_date', v)} error={fieldError(errors, 'former_ofw_return_date')} />
+          <CountryField label="Former OFW Country" required value={value.former_ofw_country} onChange={(v) => set('former_ofw_country', v)} error={fieldError(errors, 'former_ofw_country')} />
+          <CalendarField label="Return Date" required value={value.former_ofw_return_date} onChange={(v) => set('former_ofw_return_date', v)} error={fieldError(errors, 'former_ofw_return_date')} />
         </>
       ) : null}
 
@@ -863,10 +738,72 @@ export function Step2Employment({ value, onChange, errors }: { value: Step2Value
   )
 }
 
-// ── Preferred Location: cascading Province → City picker for "Local", plain
-// text for "Overseas" (PSGC only covers Philippine geography). Stores the
-// same "City, Province" string the field already used, so nothing about the
-// underlying payload/backend field changes.
+const ISO_COUNTRY_CODES = [
+  'AF','AL','DZ','AD','AO','AG','AR','AM','AU','AT','AZ','BS','BH','BD','BB','BY','BE','BZ','BJ','BT','BO','BA','BW','BR','BN','BG','BF','BI',
+  'CV','KH','CM','CA','CF','TD','CL','CN','CO','KM','CG','CD','CR','CI','HR','CU','CY','CZ','DK','DJ','DM','DO','EC','EG','SV','GQ','ER','EE',
+  'SZ','ET','FJ','FI','FR','GA','GM','GE','DE','GH','GR','GD','GT','GN','GW','GY','HT','HN','HU','IS','IN','ID','IR','IQ','IE','IL','IT','JM',
+  'JP','JO','KZ','KE','KI','KP','KR','KW','KG','LA','LV','LB','LS','LR','LY','LI','LT','LU','MG','MW','MY','MV','ML','MT','MH','MR','MU','MX',
+  'FM','MD','MC','MN','ME','MA','MZ','MM','NA','NR','NP','NL','NZ','NI','NE','NG','MK','NO','OM','PK','PW','PA','PG','PY','PE','PL','PT','QA',
+  'RO','RU','RW','KN','LC','VC','WS','SM','ST','SA','SN','RS','SC','SL','SG','SK','SI','SB','SO','ZA','SS','ES','LK','SD','SR','SE','CH','SY',
+  'TW','TJ','TZ','TH','TL','TG','TO','TT','TN','TR','TM','TV','UG','UA','AE','GB','US','UY','UZ','VU','VA','VE','VN','YE','ZM','ZW',
+]
+const countryNames = typeof Intl !== 'undefined' && typeof Intl.DisplayNames === 'function'
+  ? new Intl.DisplayNames(['en'], { type: 'region' })
+  : null
+const COUNTRY_OPTIONS = ISO_COUNTRY_CODES
+  .map((code) => countryNames?.of(code) ?? code)
+  .sort((a, b) => a.localeCompare(b))
+
+function CountryField({ label, value, onChange, error, required = false }: { label: string; value: string; onChange: (value: string) => void; error?: string; required?: boolean }) {
+  return (
+    <Combobox<string>
+      label={label}
+      required={required}
+      placeholder="Search a country"
+      minChars={1}
+      value={value}
+      onChangeText={onChange}
+      onSelect={onChange}
+      search={(query) => searchStaticList(COUNTRY_OPTIONS, query)}
+      renderLabel={(item) => item}
+      keyExtractor={(item) => item}
+      error={error}
+    />
+  )
+}
+
+function CalendarField({ label, value, onChange, error, required = false, maximumDate }: { label: string; value: string; onChange: (value: string) => void; error?: string; required?: boolean; maximumDate?: Date }) {
+  const [open, setOpen] = useState(false)
+  const date = parseDate(value) ?? new Date()
+
+  return (
+    <View style={styles.calendarField}>
+      <Text style={styles.label}>{label}{required ? <Text style={styles.required}> *</Text> : null}</Text>
+      <TouchableOpacity
+        style={[styles.calendarButton, error && styles.inputError]}
+        onPress={() => setOpen(true)}
+        activeOpacity={0.8}
+        accessibilityRole="button"
+        accessibilityLabel={`Select ${label}`}
+      >
+        <Text style={value ? styles.selectValueText : styles.selectPlaceholderText}>{value || 'Select date'}</Text>
+        <MaterialIcons name="calendar-today" size={18} color={colors.muted} />
+      </TouchableOpacity>
+      {error ? <Text style={styles.errorText}>{error}</Text> : null}
+      {open ? <DateTimePicker value={date} mode="date" display="default" maximumDate={maximumDate} onChange={(event, selectedDate) => {
+        if (event.type === 'dismissed') {
+          setOpen(false)
+          return
+        }
+        setOpen(false)
+        if (selectedDate) onChange(formatDate(selectedDate))
+      }} /> : null}
+    </View>
+  )
+}
+
+// ── Preferred Location: cascading Province → City picker for local work and
+// searchable country suggestions for overseas work, matching the website.
 function PreferredLocationPicker({
   value,
   onChange,
@@ -914,7 +851,20 @@ function PreferredLocationPicker({
   }, [provinceCode])
 
   if (isOverseas) {
-    return <Field label="Country" value={value} onChangeText={onChange} placeholder="e.g. Saudi Arabia" />
+    return (
+      <Combobox<string>
+        label="Country"
+        required
+        placeholder="Search a country"
+        minChars={1}
+        value={value}
+        onChangeText={onChange}
+        onSelect={onChange}
+        search={(query) => searchStaticList(COUNTRY_OPTIONS, query)}
+        renderLabel={(item) => item}
+        keyExtractor={(item) => item}
+      />
+    )
   }
 
   return (
@@ -991,21 +941,6 @@ export function Step3Preferences({ value, onChange, errors }: { value: Step3Valu
       {collapsedFieldError(errors, ['occupation_ids', 'occupation_preferences']) ? (
         <Text style={styles.errorText}>{collapsedFieldError(errors, ['occupation_ids', 'occupation_preferences'])}</Text>
       ) : null}
-
-      <OccupationAiSuggestions
-        value={value}
-        onAdd={(item) => {
-          const entry: OccupationPrefEntry = { raw_job_title: item.name, occupation_id: null, general_term: null, source: 'ai' }
-          const emptySlotIndex = value.occupation_preferences.findIndex((p) => !p.raw_job_title.trim() && !p.occupation_id)
-          if (emptySlotIndex >= 0) {
-            const next = [...value.occupation_preferences]
-            next[emptySlotIndex] = entry
-            set('occupation_preferences', next)
-          } else if (value.occupation_preferences.length < 3) {
-            set('occupation_preferences', [...value.occupation_preferences, entry])
-          }
-        }}
-      />
 
       <SelectField label="Preferred Type of Work" required placeholder="Select type of work" options={[{ label: 'Full-time', value: 'full_time' }, { label: 'Part-time', value: 'part_time' }]} value={value.work_type_preference} onChange={(v) => set('work_type_preference', v)} />
       <SelectField label="Preferred Work Location" required placeholder="Select work location" options={[{ label: 'Local', value: 'local' }, { label: 'Overseas', value: 'overseas' }]} value={value.preferred_work_location} onChange={(v) => set('preferred_work_location', v)} />
@@ -1208,11 +1143,6 @@ export function Step5Education({ value, onChange, errors }: { value: Step5Value;
             setEducations(next)
           }
           const requiresCourse = COURSE_REQUIRED_LEVELS.includes(edu.level)
-          const isMeaningful = Boolean(edu.level && edu.institution_name && edu.completion_status && edu.year_started)
-          const chronologyMessage = isMeaningful
-            ? educationChronologyConflict(edu, value.educations.filter((_, idx) => idx !== i))
-            : ''
-
           return (
             <>
               <ChoiceGroup label="Level" required options={EDUCATION_LEVEL_OPTIONS} value={edu.level} onChange={(v) => update({ level: v })} error={fieldError(errors, `educations.${i}.level`)} />
@@ -1258,7 +1188,6 @@ export function Step5Education({ value, onChange, errors }: { value: Step5Value;
               {edu.completion_status === 'currently_studying' ? (
                 <SelectField label="Expected Year of Graduation" placeholder="Select year" options={EXPECTED_YEAR_OPTIONS} value={edu.expected_year_graduated} onChange={(v) => update({ expected_year_graduated: v })} error={fieldError(errors, `educations.${i}.expected_year_graduated`)} />
               ) : null}
-              {chronologyMessage ? <Text style={styles.errorText}>{chronologyMessage}</Text> : null}
             </>
           )
         }}
@@ -1364,12 +1293,11 @@ export function Step7Experience({ value, onChange, errors }: { value: Step7Value
               <Field label="Position" required value={w.position} onChangeText={(v) => update({ position: v })} error={fieldError(errors, `work_experiences.${i}.position`)} />
               <Field label="Responsibilities" multiline value={w.responsibilities} onChangeText={(v) => update({ responsibilities: v })} error={fieldError(errors, `work_experiences.${i}.responsibilities`)} />
               <ChoiceGroup label="Employment Status" options={WORK_EMPLOYMENT_STATUS_OPTIONS} value={w.employment_status} onChange={(v) => update({ employment_status: v })} />
-              <Field label="Start Date" placeholder="YYYY-MM-DD" value={w.start_date} onChangeText={(v) => update({ start_date: v })} error={fieldError(errors, `work_experiences.${i}.start_date`)} />
-              <ToggleGroup label="Currently employed here?" value={w.currently_employed} onChange={(v) => update({ currently_employed: v, end_date: v ? '' : w.end_date })} />
+              <CalendarField label="Start Date" value={w.start_date} onChange={(v) => update({ start_date: v, number_of_months: calculateMonths(v, w.end_date) })} error={fieldError(errors, `work_experiences.${i}.start_date`)} maximumDate={new Date()} />
+              <ToggleGroup label="Currently employed here?" value={w.currently_employed} onChange={(v) => update({ currently_employed: v, end_date: v ? '' : w.end_date, number_of_months: v ? calculateMonths(w.start_date, formatDate(new Date())) : calculateMonths(w.start_date, w.end_date) })} />
               {!w.currently_employed ? (
-                <Field label="End Date" placeholder="YYYY-MM-DD" value={w.end_date} onChangeText={(v) => update({ end_date: v })} error={fieldError(errors, `work_experiences.${i}.end_date`)} />
+                <CalendarField label="End Date" value={w.end_date} onChange={(v) => update({ end_date: v, number_of_months: calculateMonths(w.start_date, v) })} error={fieldError(errors, `work_experiences.${i}.end_date`)} maximumDate={new Date()} />
               ) : null}
-              <Field label="Number of Months" keyboardType="number-pad" value={w.number_of_months} onChangeText={(v) => update({ number_of_months: v })} error={fieldError(errors, `work_experiences.${i}.number_of_months`)} />
             </>
           )
         }}
@@ -1378,7 +1306,35 @@ export function Step7Experience({ value, onChange, errors }: { value: Step7Value
   )
 }
 
+function parseDate(value: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return null
+  const date = new Date(`${value}T00:00:00`)
+  return Number.isNaN(date.getTime()) ? null : date
+}
+
+function formatDate(value: Date) {
+  const year = value.getFullYear()
+  const month = String(value.getMonth() + 1).padStart(2, '0')
+  const day = String(value.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+function calculateMonths(start: string, end: string) {
+  const startDate = parseDate(start)
+  const endDate = parseDate(end)
+  if (!startDate || !endDate || endDate < startDate) return ''
+  let months = (endDate.getFullYear() - startDate.getFullYear()) * 12 + endDate.getMonth() - startDate.getMonth()
+  if (endDate.getDate() < startDate.getDate()) months -= 1
+  return String(Math.max(0, months))
+}
+
 const styles = StyleSheet.create({
+  label: { marginBottom: spacing.sm, color: colors.secondaryText, fontSize: typography.small, fontFamily: typography.family.bold },
+  required: { color: colors.danger },
+  calendarField: { marginBottom: spacing.lg },
+  calendarButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderWidth: 1, borderColor: colors.border, borderRadius: radii.md, paddingHorizontal: spacing.lg, paddingVertical: spacing.md, backgroundColor: colors.background },
+  selectValueText: { flex: 1, color: colors.primary, fontSize: typography.body, fontFamily: typography.family.regular },
+  selectPlaceholderText: { flex: 1, color: colors.subtle, fontSize: typography.body, fontFamily: typography.family.regular },
   subLabel: { marginTop: spacing.sm, marginBottom: spacing.sm, color: colors.primary, fontSize: typography.title, fontFamily: typography.family.bold },
   sectionTitle: { color: colors.primary, fontSize: typography.title, fontFamily: typography.family.bold },
   hint: { color: colors.secondaryText, fontSize: typography.small, lineHeight: 18, marginTop: spacing.xs, marginBottom: spacing.md },

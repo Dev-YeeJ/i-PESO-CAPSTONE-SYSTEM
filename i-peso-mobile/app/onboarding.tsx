@@ -25,10 +25,9 @@ import { resolvePsgcCodes } from '@/services/psgcService'
 import { useAuthStore } from '@/stores/authStore'
 import { useMotion } from '@/hooks/useMotion'
 import { colors, gradients, radii, shadows, spacing, textStyles } from '@/theme'
-import { AlertBox } from '@/components/ui/AlertBox'
 import { Button } from '@/components/ui/Button'
 import { Skeleton, SkeletonGroup } from '@/components/ui/Skeleton'
-import { firstServerError, type ServerErrors } from '@/components/onboarding/formPrimitives'
+import { type ServerErrors } from '@/components/onboarding/formPrimitives'
 import { buildAddressString, buildStepPayload, mapProfileToForm, validateStep } from '@/components/onboarding/payloads'
 import { emptyOnboardingForm, type OnboardingFormValue } from '@/components/onboarding/types'
 import {
@@ -40,6 +39,7 @@ import {
   Step6Training,
   Step7Experience,
 } from '@/components/onboarding/Steps'
+import { useToast } from '@/stores/toastStore'
 
 interface ApiErrorBody {
   message?: string
@@ -82,8 +82,7 @@ export default function OnboardingScreen() {
   const [step, setStep] = useState(1)
   const [loading, setLoading] = useState(false)
   const [initialLoading, setInitialLoading] = useState(true)
-  const [error, setError] = useState('')
-  const [errors, setErrors] = useState<ServerErrors>({})
+  const { showToast } = useToast()
   // Drives which direction the step animates in from, so going Back reads as going back.
   const [goingBack, setGoingBack] = useState(false)
   const scrollRef = useRef<ScrollView>(null)
@@ -128,13 +127,11 @@ export default function OnboardingScreen() {
   const submit = async () => {
     const validationError = validateStep(step, form)
     if (validationError) {
-      setError(validationError)
+      showToast(validationError, 'error')
       return
     }
 
     setLoading(true)
-    setError('')
-    setErrors({})
 
     try {
       let payload = buildStepPayload(step, form)
@@ -172,16 +169,14 @@ export default function OnboardingScreen() {
     } catch (caught: unknown) {
       const err = caught as AxiosError<ApiErrorBody>
       const body = err.response?.data
-      setErrors(body?.errors ?? {})
-      setError(firstServerError(body?.errors) || body?.message || 'Unable to save this step. Check the required fields and backend connection.')
+      const firstError = body?.errors ? Object.values(body.errors)[0]?.[0] : undefined
+      showToast(firstError || body?.message || 'Unable to save this step. Check the required fields and backend connection.', 'error')
     } finally {
       setLoading(false)
     }
   }
 
   const goBack = () => {
-    setErrors({})
-    setError('')
     setGoingBack(true)
     setStep((current) => Math.max(1, current - 1))
   }
@@ -226,10 +221,6 @@ export default function OnboardingScreen() {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        {error ? (
-          <AlertBox variant="danger" style={styles.errorBox}>{error}</AlertBox>
-        ) : null}
-
         <Animated.View
           // Keyed on step so Reanimated treats each step as a new element to animate in.
           key={step}
@@ -237,13 +228,13 @@ export default function OnboardingScreen() {
           exiting={m.enabled ? (goingBack ? FadeOutRight.duration(160) : FadeOutLeft.duration(160)) : undefined}
           style={styles.card}
         >
-          {step === 1 && <Step1Personal value={form.step1} onChange={(step1) => setForm((f) => ({ ...f, step1 }))} errors={errors} lockSurname />}
-          {step === 2 && <Step2Employment value={form.step2} onChange={(step2) => setForm((f) => ({ ...f, step2 }))} errors={errors} />}
-          {step === 3 && <Step3Preferences value={form.step3} onChange={(step3) => setForm((f) => ({ ...f, step3 }))} errors={errors} />}
-          {step === 4 && <Step4Languages value={form.step4} onChange={(step4) => setForm((f) => ({ ...f, step4 }))} errors={errors} />}
-          {step === 5 && <Step5Education value={form.step5} onChange={(step5) => setForm((f) => ({ ...f, step5 }))} errors={errors} />}
-          {step === 6 && <Step6Training value={form.step6} onChange={(step6) => setForm((f) => ({ ...f, step6 }))} errors={errors} />}
-          {step === 7 && <Step7Experience value={form.step7} onChange={(step7) => setForm((f) => ({ ...f, step7 }))} errors={errors} />}
+          {step === 1 && <Step1Personal value={form.step1} onChange={(step1) => setForm((f) => ({ ...f, step1 }))} errors={undefined} lockSurname />}
+          {step === 2 && <Step2Employment value={form.step2} onChange={(step2) => setForm((f) => ({ ...f, step2 }))} errors={undefined} />}
+          {step === 3 && <Step3Preferences value={form.step3} onChange={(step3) => setForm((f) => ({ ...f, step3 }))} errors={undefined} />}
+          {step === 4 && <Step4Languages value={form.step4} onChange={(step4) => setForm((f) => ({ ...f, step4 }))} errors={undefined} />}
+          {step === 5 && <Step5Education value={form.step5} onChange={(step5) => setForm((f) => ({ ...f, step5 }))} errors={undefined} />}
+          {step === 6 && <Step6Training value={form.step6} onChange={(step6) => setForm((f) => ({ ...f, step6 }))} errors={undefined} />}
+          {step === 7 && <Step7Experience value={form.step7} onChange={(step7) => setForm((f) => ({ ...f, step7 }))} errors={undefined} />}
         </Animated.View>
       </ScrollView>
 

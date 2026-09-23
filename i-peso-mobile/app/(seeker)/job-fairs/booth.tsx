@@ -64,9 +64,13 @@ export default function EmployerBoothScreen() {
   const isImagePoster = (poster?.mime_type || '').startsWith('image/')
 
   const openJob = (postId: number | string) => {
-    // No 'booth' back-target exists on jobs/[id] (it would need both fairId and employerId to
-    // return here) — omitting `from` falls back to Home, same as any other unlisted origin.
-    router.push({ pathname: '/(seeker)/jobs/[id]', params: { id: String(postId) } })
+    // jobs/[id]'s backTargetFor only carries one id in `fromId`, but returning to this booth
+    // needs both jobFairId and employerId — packed as "jobFairId:employerId" and split back
+    // apart on the 'booth' case there.
+    router.push({
+      pathname: '/(seeker)/jobs/[id]',
+      params: { id: String(postId), from: 'booth', fromId: `${jobFairId}:${employerId}` },
+    })
   }
 
   return (

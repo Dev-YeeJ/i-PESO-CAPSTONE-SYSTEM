@@ -99,6 +99,7 @@ abstract class InterviewBaseNotification extends Notification
     public function toExpoPush(object $notifiable): array
     {
         $data = $this->toArray($notifiable);
+        $interview = $this->application->interviewSchedule;
 
         return [
             'title' => $data['title'],
@@ -107,6 +108,10 @@ abstract class InterviewBaseNotification extends Notification
                 'type' => 'interview',
                 'application_id' => $data['application_id'],
                 'interview_type' => $data['type'],
+                // Included so the mobile app can deep-link directly to the
+                // correct application detail / interview details screen when
+                // the notification is tapped, without an extra API round-trip.
+                'interview_id' => $interview?->interview_id,
             ],
         ];
     }

@@ -145,6 +145,7 @@ export interface NearbyJob {
   employer?: {
     employer_id?: number | string | null
     company_name?: string | null
+    company_logo_url?: string | null
   } | null
   employment_type?: string | null
   work_setup?: string | null
@@ -235,6 +236,7 @@ export interface SeekerApplication {
     employer?: {
       employer_id?: number | string | null
       company_name?: string | null
+      company_logo_url?: string | null
     } | null
   }) | null
   interview?: {
@@ -273,6 +275,10 @@ export interface SeekerNotification {
     job_fair_id?: number | string
     post_id?: number | string
     reference_id?: number | string
+    // Interview-specific fields — present on 'interview' type notifications.
+    // interview_type distinguishes scheduled/updated/cancelled/reminder.
+    interview_type?: string
+    interview_id?: number | string
   }
   read_at: string | null
   created_at: string
@@ -382,6 +388,7 @@ export interface JobFairPosterFile {
 export interface JobFairPoster {
   employer_id?: number | string | null
   company_name?: string | null
+  company_logo_url?: string | null
   job_fair_id?: number | string | null
   job_fair_title?: string | null
   venue?: string | null

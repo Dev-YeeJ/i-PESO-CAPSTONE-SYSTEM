@@ -84,9 +84,13 @@ export function PosterFeedCard({ poster, index }: { poster: JobFairPoster; index
     <Animated.View entering={m.enabled ? FadeInUp.delay(m.stagger(index ?? 0)).duration(240) : undefined}>
     <Card padding="sm" style={styles.card} contentStyle={styles.content}>
       <View style={styles.header}>
-        <View style={[styles.avatar, { backgroundColor: toneFor(poster.company_name) }]}>
-          <Text style={styles.avatarText}>{initialsFor(poster.company_name)}</Text>
-        </View>
+        {poster.company_logo_url ? (
+          <Image source={{ uri: poster.company_logo_url }} style={styles.employerLogo} />
+        ) : (
+          <View style={[styles.avatar, { backgroundColor: toneFor(poster.company_name) }]}>
+            <Text style={styles.avatarText}>{initialsFor(poster.company_name)}</Text>
+          </View>
+        )}
         <View style={styles.headerText}>
           <Text style={styles.company} numberOfLines={1}>{poster.company_name || 'Employer'}</Text>
           <Text style={styles.meta} numberOfLines={1}>{metaLine}</Text>
@@ -222,6 +226,7 @@ const styles = StyleSheet.create({
   matchBadgeText: { color: colors.success, fontSize: 10, fontFamily: typography.family.bold, textTransform: 'uppercase', letterSpacing: 0.5 },
   avatar: { width: 40, height: 40, borderRadius: radii.pill, alignItems: 'center', justifyContent: 'center' },
   avatarText: { color: colors.white, fontSize: typography.small, fontFamily: typography.family.bold },
+  employerLogo: { width: 40, height: 40, borderRadius: radii.pill, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, resizeMode: 'contain' },
   headerText: { flex: 1 },
   company: { color: colors.textPrimary, fontSize: typography.body, fontFamily: typography.family.bold },
   meta: { color: colors.textSecondary, fontSize: typography.small, marginTop: 2 },

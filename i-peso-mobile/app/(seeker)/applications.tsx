@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react'
 import {  Alert,
+  Image,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -174,6 +175,9 @@ function ApplicationCard({
       >
         <Card style={styles.applicationCard} padding="md">
           <View style={styles.applicationHeader}>
+            {job?.employer?.company_logo_url ? (
+              <Image source={{ uri: job.employer.company_logo_url }} style={styles.employerLogo} />
+            ) : null}
             <View style={styles.applicationTitleWrap}>
               <Text style={styles.jobTitle}>{textFrom(job?.job_title, 'Untitled job')}</Text>
               <Text style={styles.company}>{job ? jobCompany(job) : 'Employer not listed'}</Text>
@@ -254,6 +258,7 @@ const styles = StyleSheet.create({
   summaryText: { color: colors.textSecondary, fontSize: typography.body, lineHeight: 20 },
   applicationCard: { marginBottom: spacing.sm },
   applicationHeader: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: spacing.sm },
+  employerLogo: { width: 48, height: 48, borderRadius: radii.md, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, resizeMode: 'contain' },
   applicationTitleWrap: { flex: 1 },
   jobTitle: { color: colors.textPrimary, fontSize: typography.title, lineHeight: 22, fontFamily: typography.family.bold },
   company: { color: colors.textSecondary, fontSize: typography.small, fontFamily: typography.family.medium, marginTop: spacing.xs },

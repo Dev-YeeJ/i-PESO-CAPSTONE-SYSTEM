@@ -312,8 +312,17 @@ export function validateStep(step: number, form: OnboardingFormValue): string {
     const v = form.step2
     if (!v.employment_status) return 'Select your current employment status.'
     if (v.employment_status === 'employed' && !v.employment_type) return 'Select your employment type.'
-    if (v.employment_status === 'unemployed' && !v.unemployment_reason) return 'Select a reason for unemployment.'
+    if (v.employment_status === 'unemployed') {
+      if (!v.unemployment_months.trim()) return 'Enter the number of months unemployed.'
+      const months = Number(v.unemployment_months)
+      if (!Number.isInteger(months) || months < 0 || months > 999) return 'Months unemployed must be between 0 and 999.'
+      if (!v.unemployment_reason) return 'Select a reason for unemployment.'
+      if (v.unemployment_reason === 'others' && !v.unemployment_reason_others.trim()) return 'Specify the reason for unemployment.'
+      if (v.unemployment_reason === 'terminated_abroad' && !v.unemployment_terminated_country.trim()) return 'Specify the country where employment ended.'
+    }
     if (v.is_ofw && !v.ofw_country.trim()) return 'Specify the country where you work as an OFW.'
+    if (v.is_former_ofw && !v.former_ofw_country.trim()) return 'Specify the country where you previously worked as an OFW.'
+    if (v.is_former_ofw && !v.former_ofw_return_date.trim()) return 'Enter your former OFW return date.'
     if (v.is_4ps_beneficiary && !/^\d{2}-\d{2}-\d{2}-\d{3}-\d{5}$/.test(v.household_id_4ps.trim())) {
       return 'Enter a valid 4Ps Household ID (00-00-00-000-00000).'
     }
@@ -360,6 +369,16 @@ export function validateStep(step: number, form: OnboardingFormValue): string {
     const hardSkillsCount = v.hardSkills.filter((s) => s.name.trim()).length
     const softSkillsCount = v.soft_skills.filter((s) => s.name.trim()).length
     if (hardSkillsCount + softSkillsCount === 0) return 'Select at least one skill to continue.'
+    return ''
+  }
+  if (step === 7) {
+    const v = form.step7
+    for (const work of v.work_experiences) {
+      if (!work.company_name.trim() || !work.position.trim()) return 'Enter the company name and job title for each experience.'
+      if (work.start_date && !/^\d{4}-\d{2}-\d{2}$/.test(work.start_date)) return 'Select a valid start date for each experience.'
+      if (!work.currently_employed && work.end_date && !/^\d{4}-\d{2}-\d{2}$/.test(work.end_date)) return 'Select a valid end date for each experience.'
+      if (work.start_date && work.end_date && work.end_date < work.start_date) return 'An experience end date cannot be earlier than its start date.'
+    }
     return ''
   }
   return ''

@@ -12,6 +12,7 @@ import { seekerService } from '@/services/seekerService'
 import { useToggleSavedJob } from '@/hooks/use-toggle-saved-job'
 import { useMotion } from '@/hooks/useMotion'
 import { mergeParsedFilters } from '@/utils/mapQueryParser'
+import { formatSalary, jobCompany, jobLocation } from '@/utils/seekerView'
 import { AlertBox } from '@/components/ui/AlertBox'
 import { Button } from '@/components/ui/Button'
 import { BottomSheet } from '@/components/ui/BottomSheet'
@@ -97,6 +98,7 @@ export default function JobMapScreen() {
   const [activeTiers, setActiveTiers] = useState<Set<MatchTier>>(new Set(['high', 'medium', 'low']))
   const [showJobFairPins, setShowJobFairPins] = useState(true)
   const [listExpanded, setListExpanded] = useState(false)
+  const [selectedMapJob, setSelectedMapJob] = useState<NearbyJob | null>(null)
   const m = useMotion()
   const sheetProgress = useSharedValue(0)
 
@@ -291,7 +293,7 @@ export default function JobMapScreen() {
               return
             }
             const job = jobsWithCoords.find((j) => String(j.post_id) === postId)
-            if (job) openJob(job)
+            if (job) setSelectedMapJob(job)
           }}
         />
         {isLoading ? (
@@ -434,6 +436,46 @@ export default function JobMapScreen() {
           </ScrollView>
         </Animated.View>
       </View>
+
+      <BottomSheet
+        visible={Boolean(selectedMapJob)}
+        onClose={() => setSelectedMapJob(null)}
+        title={selectedMapJob?.job_title || 'Job preview'}
+        heightRatio={0.38}
+        footer={selectedMapJob ? (
+          <Button size="lg" onPress={() => {
+            const job = selectedMapJob
+            setSelectedMapJob(null)
+            openJob(job)
+          }}>
+            View job details
+          </Button>
+        ) : undefined}
+      >
+        {selectedMapJob ? (
+          <View style={styles.previewBody}>
+            <Text style={styles.previewCompany}>{jobCompany(selectedMapJob)}</Text>
+            <View style={styles.previewMetaRow}>
+              <MaterialIcons name="location-on" size={16} color={colors.info} />
+              <Text style={styles.previewMeta} numberOfLines={2}>{jobLocation(selectedMapJob)}</Text>
+            </View>
+            <View style={styles.previewMetaRow}>
+              <MaterialIcons name="payments" size={16} color={colors.success} />
+              <Text style={styles.previewMeta} numberOfLines={1}>{formatSalary(selectedMapJob)}</Text>
+            </View>
+            <View style={styles.previewBadges}>
+              <View style={styles.previewBadge}>
+                <Text style={styles.previewBadgeText}>{Math.round(Number(selectedMapJob.match_percentage ?? selectedMapJob.match?.percentage ?? 0))}% match</Text>
+              </View>
+              {selectedMapJob.distance_km != null ? (
+                <View style={styles.previewBadgeNeutral}>
+                  <Text style={styles.previewBadgeNeutralText}>{Number(selectedMapJob.distance_km).toFixed(1)} km away</Text>
+                </View>
+              ) : null}
+            </View>
+          </View>
+        ) : null}
+      </BottomSheet>
 
       <BottomSheet
         visible={filtersOpen}
@@ -607,6 +649,15 @@ const styles = StyleSheet.create({
   summaryPill: { alignSelf: 'flex-start', backgroundColor: colors.surface, borderRadius: radii.pill, paddingHorizontal: spacing.md, paddingVertical: spacing.xs, ...shadows.sm },
   summaryText: { color: colors.textSecondary, fontSize: typography.small },
   summaryStrong: { color: colors.textPrimary, fontFamily: typography.family.bold },
+  previewBody: { paddingHorizontal: spacing.xl, paddingTop: spacing.lg },
+  previewCompany: { color: colors.textSecondary, fontSize: typography.body, fontFamily: typography.family.bold, marginBottom: spacing.md },
+  previewMetaRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.sm },
+  previewMeta: { flex: 1, color: colors.textSecondary, fontSize: typography.small },
+  previewBadges: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.sm },
+  previewBadge: { borderRadius: radii.pill, backgroundColor: colors.successBackground, paddingHorizontal: spacing.md, paddingVertical: spacing.xs },
+  previewBadgeText: { color: colors.success, fontSize: 11, fontFamily: typography.family.bold },
+  previewBadgeNeutral: { borderRadius: radii.pill, backgroundColor: colors.background, paddingHorizontal: spacing.md, paddingVertical: spacing.xs },
+  previewBadgeNeutralText: { color: colors.textSecondary, fontSize: 11, fontFamily: typography.family.medium },
 
   legendCard: {
     position: 'absolute',

@@ -101,10 +101,24 @@ export interface PushNotificationData {
   program_id?: number | string
   job_fair_id?: number | string
   post_id?: number | string
+  // Interview-specific — present when type === 'interview'.
+  // interview_type distinguishes scheduled/updated/cancelled/reminder.
+  interview_type?: string
+  interview_id?: number | string
 }
 
-/** Mirrors handleNotificationPress in app/(seeker)/notifications.tsx — same payload, same destinations. */
+/**
+ * Mirrors handleNotificationPress in app/(seeker)/notifications.tsx — same payload, same destinations.
+ *
+ * Interview notifications deep-link directly to the application detail screen so the Job Seeker
+ * lands on the Interview Details section and can tap [Join Interview] immediately. Other
+ * application notifications go to the applications list (the seeker may have many active ones
+ * and listing them is a better landing experience than guessing which detail to open).
+ */
 export function routeForPushData(data: PushNotificationData): string | null {
+  if (data.type === 'interview' && data.application_id) {
+    return `/(seeker)/applications/${data.application_id}`
+  }
   if (data.application_id) return '/(seeker)/applications'
   if (data.program_id) return `/(seeker)/government-programs/${data.program_id}`
   if (data.job_fair_id) return '/(seeker)/job-fairs'

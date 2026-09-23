@@ -82,12 +82,18 @@ export default function NotificationsScreen() {
   // Routing is driven by payload fields, not the raw action_url: the backend's
   // action_url points at web routes (and is outright broken/employer-facing for
   // job fairs), so it can't be trusted for in-app navigation.
+  //
+  // Interview notifications deep-link to the application detail screen so the
+  // Job Seeker lands directly on the Interview Details section with the
+  // [Join Interview] button — mirrors routeForPushData() in pushNotifications.ts.
   const handleNotificationPress = (notification: SeekerNotification) => {
     if (!notification.read_at) {
       markReadMutation.mutate(notification.id)
     }
 
-    if (notification.data?.application_id) {
+    if (notification.data?.type === 'interview' && notification.data?.application_id) {
+      router.push(`/(seeker)/applications/${notification.data.application_id}` as any)
+    } else if (notification.data?.application_id) {
       router.push('/(seeker)/applications')
     } else if (notification.data?.program_id) {
       router.push(`/(seeker)/government-programs/${notification.data.program_id}`)

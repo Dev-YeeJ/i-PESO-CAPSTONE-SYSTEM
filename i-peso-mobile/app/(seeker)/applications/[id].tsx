@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { Alert, Image, Linking, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { SeekerApplicationsResponse } from '@/services/seekerService'
@@ -15,13 +16,14 @@ import { EmptyState } from '@/components/ui/EmptyState'
 import { PressableScale } from '@/components/ui/PressableScale'
 import { ScreenHeader } from '@/components/ui/ScreenHeader'
 import { ScreenSkeleton } from '@/components/ui/ScreenSkeleton'
-import { colors, spacing, typography } from '@/theme'
+import { colors, radii, spacing, typography } from '@/theme'
 
 export default function ApplicationDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>()
   const router = useRouter()
   const queryClient = useQueryClient()
   const { showToast } = useToast()
+  const insets = useSafeAreaInsets()
   const [withdrawError, setWithdrawError] = useState('')
 
   const { data: application, isLoading, error } = useQuery({
@@ -101,19 +103,26 @@ export default function ApplicationDetailScreen() {
       <ScrollView contentContainerStyle={styles.content}>
         {withdrawError ? <AlertBox variant="danger" style={styles.alertBox}>{withdrawError}</AlertBox> : null}
 
-        <Text style={styles.jobTitle}>{textFrom(job?.job_title, 'Untitled job')}</Text>
-        {job?.employer?.employer_id ? (
-          <PressableScale
-            scaleTo="buttonPress"
-            ripple={null}
-            onPress={() => router.push({ pathname: '/(seeker)/employers/[id]', params: { id: String(job.employer!.employer_id), from: 'application', fromId: String(id) } })}
-            accessibilityRole="link"
-          >
-            <Text style={[styles.company, styles.companyLink]}>{jobCompany(job)}</Text>
-          </PressableScale>
-        ) : (
-          <Text style={styles.company}>{job ? jobCompany(job) : 'Employer not listed'}</Text>
-        )}
+        <View style={styles.titleRow}>
+          {job?.employer?.company_logo_url ? (
+            <Image source={{ uri: job.employer.company_logo_url }} style={styles.employerLogo} />
+          ) : null}
+          <View style={styles.titleTextWrap}>
+            <Text style={styles.jobTitle}>{textFrom(job?.job_title, 'Untitled job')}</Text>
+            {job?.employer?.employer_id ? (
+              <PressableScale
+                scaleTo="buttonPress"
+                ripple={null}
+                onPress={() => router.push({ pathname: '/(seeker)/employers/[id]', params: { id: String(job.employer!.employer_id), from: 'application', fromId: String(id) } })}
+                accessibilityRole="link"
+              >
+                <Text style={[styles.company, styles.companyLink]}>{jobCompany(job)}</Text>
+              </PressableScale>
+            ) : (
+              <Text style={styles.company}>{job ? jobCompany(job) : 'Employer not listed'}</Text>
+            )}
+          </View>
+        </View>
         <Badge variant={applicationStatusVariant(application.status)} style={styles.statusBadge}>
           {application.status_label ?? titleCase(application.status)}
         </Badge>
@@ -151,11 +160,34 @@ export default function ApplicationDetailScreen() {
           <>
             <Text style={styles.sectionTitle}>Interview Information</Text>
             <Card padding="md" style={styles.warningCard}>
+              <Detail label="Status" value={titleCase(application.interview.status, 'Unknown')} />
               <Detail label="Mode" value={titleCase(application.interview.mode_of_interview, 'Not set')} />
-              <Detail label="Schedule" value={formatDate(application.interview.schedule)} />
-              <Detail label="Venue / Link" value={textFrom(application.interview.venue_or_link, 'To follow')} />
+              <Detail label="Date" value={formatDate(application.interview.schedule)} />
+              
+              {application.interview.mode_of_interview !== 'online' ? (
+                <Detail label="Venue" value={textFrom(application.interview.venue_or_link, 'To follow')} />
+              ) : null}
+
               {application.interview.instructions ? (
                 <Text style={styles.instructionsText}>{application.interview.instructions}</Text>
+              ) : null}
+
+              {application.interview.mode_of_interview === 'online' ? (
+                <View style={styles.joinActionWrap}>
+                  {application.interview.status === 'cancelled' ? (
+                    <Text style={styles.noLinkText}>Interview Cancelled</Text>
+                  ) : application.interview.venue_or_link && application.interview.venue_or_link.startsWith('http') ? (
+                    <Button
+                      variant="primary"
+                      fullWidth
+                      onPress={() => Linking.openURL(application.interview!.venue_or_link!)}
+                    >
+                      Join Interview
+                    </Button>
+                  ) : (
+                    <Text style={styles.noLinkText}>Meeting link not available yet.</Text>
+                  )}
+                </View>
               ) : null}
             </Card>
           </>
@@ -182,7 +214,7 @@ export default function ApplicationDetailScreen() {
       </ScrollView>
 
       {application.can_withdraw ? (
-        <View style={styles.footer}>
+        <View style={[styles.footer, { paddingBottom: insets.bottom + spacing.md }]}>
           <Button variant="danger" fullWidth onPress={confirmWithdraw} disabled={withdrawMutation.isPending}>
             {withdrawMutation.isPending ? 'Withdrawing...' : 'Withdraw Application'}
           </Button>
@@ -206,6 +238,9 @@ const styles = StyleSheet.create({
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: spacing.md, padding: spacing.xl },
   content: { padding: spacing.xl, paddingBottom: spacing.xxxl },
   alertBox: { marginBottom: spacing.lg },
+  titleRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md },
+  titleTextWrap: { flex: 1 },
+  employerLogo: { width: 56, height: 56, borderRadius: radii.lg, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, resizeMode: 'contain' },
   jobTitle: { color: colors.textPrimary, fontSize: typography.heading, lineHeight: 30, fontFamily: typography.family.bold },
   company: { color: colors.secondaryText, fontSize: typography.title, fontFamily: typography.family.bold, marginTop: spacing.xs },
   companyLink: { color: colors.info, textDecorationLine: 'underline' },
@@ -227,6 +262,8 @@ const styles = StyleSheet.create({
   warningCard: { marginTop: 0, backgroundColor: colors.warningBackground, borderColor: colors.warningBorder },
   successCard: { marginTop: 0, backgroundColor: colors.successBackground, borderColor: colors.successBorder },
   instructionsText: { marginTop: spacing.sm, color: colors.warning, fontSize: typography.small, lineHeight: 18 },
+  joinActionWrap: { marginTop: spacing.md, paddingTop: spacing.md, borderTopWidth: 1, borderTopColor: colors.warningBorder },
+  noLinkText: { color: colors.secondaryText, fontSize: typography.body, fontFamily: typography.family.medium, textAlign: 'center', marginVertical: spacing.sm },
   remarksText: { color: colors.secondaryText, fontSize: typography.body, lineHeight: 20 },
   footer: { padding: spacing.md, backgroundColor: colors.surface, borderTopWidth: 1, borderTopColor: colors.border },
 })

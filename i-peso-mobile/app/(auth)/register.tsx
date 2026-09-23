@@ -1,4 +1,3 @@
-import { useCallback, useState } from 'react'
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { router } from 'expo-router'
 import { Controller, useForm } from 'react-hook-form'
@@ -14,6 +13,7 @@ import { PasswordStrengthMeter } from '@/components/ui/PasswordStrengthMeter'
 import { Button } from '@/components/ui/Button'
 import { registerSchema, type RegisterFormValues } from '@/schemas/authSchemas'
 import { colors, spacing, typography } from '@/theme'
+import { useToast } from '@/stores/toastStore'
 
 interface ApiErrorBody {
   message?: string
@@ -36,11 +36,6 @@ const formatName = (value: string) =>
     .toLowerCase()
     .replace(/(^|[\s'-])([a-z])/g, (_match, separator: string, letter: string) => `${separator}${letter.toUpperCase()}`)
 
-const firstServerError = (errors: Record<string, string[]> = {}) => {
-  const firstKey = Object.keys(errors)[0]
-  return firstKey ? errors[firstKey]?.[0] : ''
-}
-
 const DEFAULT_VALUES: RegisterFormValues = {
   first_name: '',
   last_name: '',
@@ -51,12 +46,11 @@ const DEFAULT_VALUES: RegisterFormValues = {
 }
 
 export default function RegisterScreen() {
-  const [apiError, setApiError] = useState('')
+  const { showToast } = useToast()
 
   const {
     control,
     handleSubmit,
-    setError,
     watch,
     formState: { isSubmitting },
   } = useForm<RegisterFormValues>({
@@ -69,8 +63,6 @@ export default function RegisterScreen() {
   const passwordConfirmation = watch('password_confirmation')
   const passwordsMatch = Boolean(password && passwordConfirmation && password === passwordConfirmation)
 
-  const clearApiError = useCallback(() => setApiError(''), [])
-
   const onSubmit = async (values: RegisterFormValues) => {
     const payload: SeekerRegisterPayload = {
       role: 'seeker',
@@ -81,8 +73,6 @@ export default function RegisterScreen() {
       password: values.password,
       password_confirmation: values.password_confirmation,
     }
-
-    setApiError('')
 
     try {
       const data = await authService.register(payload)
@@ -98,30 +88,27 @@ export default function RegisterScreen() {
 
       if (response?.status === 422) {
         const serverErrors = response.data?.errors ?? {}
-        Object.keys(serverErrors).forEach((key) => {
-          if (key in DEFAULT_VALUES) {
-            setError(key as keyof RegisterFormValues, { type: 'server', message: serverErrors[key][0] })
-          }
-        })
-        setApiError(firstServerError(serverErrors) || response.data?.message || 'Please check the highlighted fields.')
+        const firstKey = Object.keys(serverErrors)[0]
+        showToast((firstKey && serverErrors[firstKey]?.[0]) || response.data?.message || 'Please check your registration details.', 'error')
       } else if (!response) {
         const reason = err.code === 'ECONNABORTED' ? 'The request timed out.' : 'The backend could not be reached.'
         const detail = err.message ? ` ${err.message}` : ''
-        setApiError(
+        showToast(
           `${reason} Make sure it is running at ${API_BASE_URL} and both devices use the same Wi-Fi.${detail}`
-        )
+          , 'error')
       } else {
-        setApiError(response?.data?.message ?? 'Registration failed. Check your connection to the i-PESO backend.')
+        showToast(response?.data?.message ?? 'Registration failed. Check your connection to the i-PESO backend.', 'error')
       }
     }
   }
 
+  const onInvalid = () => showToast('Please complete the required registration fields.', 'error')
+
   return (
     <AuthShell
       title="Create your account"
-      subtitle="Register as a job seeker on your phone"
+      subtitle="Create your i-PESO job seeker account"
       onBack={() => router.back()}
-      apiError={apiError}
       footer={
         <View style={styles.footer}>
           <Text style={styles.footerText}>Already have an account? </Text>
@@ -142,14 +129,12 @@ export default function RegisterScreen() {
                 value={value}
                 onChangeText={(v) => {
                   onChange(v)
-                  clearApiError()
                 }}
                 onBlur={() => {
                   onChange(formatName(value))
                   onBlur()
                 }}
                 placeholder="Juan"
-                error={error?.message}
               />
             )}
           />
@@ -164,14 +149,12 @@ export default function RegisterScreen() {
                 value={value}
                 onChangeText={(v) => {
                   onChange(v)
-                  clearApiError()
                 }}
                 onBlur={() => {
                   onChange(formatName(value))
                   onBlur()
                 }}
                 placeholder="Dela Cruz"
-                error={error?.message}
               />
             )}
           />
@@ -189,12 +172,10 @@ export default function RegisterScreen() {
             // whitespace live as the user types, not just on blur.
             onChangeText={(v) => {
               onChange(v.replace(/\s/g, '').toLowerCase())
-              clearApiError()
             }}
             onBlur={onBlur}
             placeholder="you@example.com"
             keyboardType="email-address"
-            error={error?.message}
           />
         )}
       />
@@ -208,12 +189,10 @@ export default function RegisterScreen() {
             value={value}
             onChangeText={(v) => {
               onChange(normalizeMobileNumber(v))
-              clearApiError()
             }}
             onBlur={onBlur}
             placeholder="09XXXXXXXXX"
             keyboardType="phone-pad"
-            error={error?.message}
           />
         )}
       />
@@ -227,11 +206,9 @@ export default function RegisterScreen() {
             value={value}
             onChangeText={(v) => {
               onChange(v)
-              clearApiError()
             }}
             onBlur={onBlur}
             placeholder="Minimum 8 characters"
-            error={error?.message}
           />
         )}
       />
@@ -246,17 +223,15 @@ export default function RegisterScreen() {
             value={value}
             onChangeText={(v) => {
               onChange(v)
-              clearApiError()
             }}
             onBlur={onBlur}
             placeholder="Re-enter your password"
-            error={error?.message}
           />
         )}
       />
       {passwordsMatch ? <Text style={styles.matchText}>Passwords match</Text> : null}
 
-      <Button fullWidth onPress={handleSubmit(onSubmit)} loading={isSubmitting} style={styles.submit}>
+      <Button fullWidth onPress={handleSubmit(onSubmit, onInvalid)} loading={isSubmitting} style={styles.submit}>
         Create Account
       </Button>
     </AuthShell>

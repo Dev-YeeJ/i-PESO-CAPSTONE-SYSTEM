@@ -26,7 +26,6 @@ import { Card } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
 import { AlertBox } from '@/components/ui/AlertBox'
 import { PressableScale } from '@/components/ui/PressableScale'
-import { StatCard } from '@/components/ui/StatCard'
 import { SectionHeader } from '@/components/ui/SectionHeader'
 import { MatchRing } from '@/components/ui/MatchRing'
 import { AceMascot } from '@/components/chat/AceMascot'
@@ -53,18 +52,10 @@ const SORT_ITEMS: { value: 'match' | 'distance' | 'newest'; label: string }[] = 
 ]
 
 const PRIMARY_ACTIONS: { icon: QuickActionIcon; label: string; path: string }[] = [
-  { icon: 'work', label: 'Browse Jobs', path: '/(seeker)/jobs' },
+  { icon: 'event', label: 'Job Fairs', path: '/(seeker)/job-fairs' },
+  { icon: 'collections', label: 'Employer Posters', path: '/(seeker)/employer-posters' },
   { icon: 'map', label: 'Job Map', path: '/(seeker)/job-map' },
   { icon: 'assignment', label: 'Applications', path: '/(seeker)/applications' },
-]
-
-// "Ask i-PESO" used to live here too — it now has its own highlighted banner
-// (see AceBanner below) rather than sharing this dense row as a same-weight icon.
-const MORE_ACTIONS: { icon: QuickActionIcon; label: string; path: string }[] = [
-  { icon: 'event', label: 'Job Fairs', path: '/(seeker)/job-fairs' },
-  { icon: 'school', label: 'Gov. Programs', path: '/(seeker)/government-programs' },
-  { icon: 'person', label: 'My Profile', path: '/(seeker)/profile' },
-  { icon: 'edit-note', label: 'Complete Profile', path: '/onboarding' },
 ]
 
 // "Next Best Action" — each incomplete profile-strength item maps to one concrete
@@ -133,11 +124,6 @@ export default function SeekerHomeScreen() {
     queryFn: () => seekerService.getJobFairs(),
   })
   const upcomingFairs = jobFairs.slice(0, 2)
-
-  const { data: analytics } = useQuery({
-    queryKey: ['seekerAnalytics'],
-    queryFn: () => seekerService.getAnalytics(),
-  })
 
   const greeting = useMemo(() => {
     const hour = new Date().getHours()
@@ -230,7 +216,6 @@ export default function SeekerHomeScreen() {
     return { uri: seekerService.profileImageUrl(`${profile.id}-${profileFetchedAt}`), headers: { Authorization: `Bearer ${token}` } }
   }, [profile?.has_profile_image, profile?.id, token, profileFetchedAt])
   const strength = profile?.profile_strength?.percentage ?? 0
-  const stats = profile?.dashboard_stats
   const filteredJobs = useMemo(() => {
     const query = searchQuery.trim().toLowerCase()
     const base = activeTab === 'saved' ? jobs.filter((job) => job.is_saved) : jobs
@@ -390,36 +375,6 @@ export default function SeekerHomeScreen() {
           </PressableScale>
         ) : null}
 
-        <SectionHeader title="At a glance" style={styles.sectionHeader} />
-        <View style={styles.statsRow}>
-          <StatCard
-            title="Profile Readiness"
-            value={`${Math.min(strength, 100)}%`}
-            tint="blue"
-            icon={<MaterialIcons name="person-outline" size={18} color={colors.blue700} />}
-          />
-          <StatCard
-            title="Active Applications"
-            value={stats?.active_applications ?? 0}
-            tint="blue"
-            icon={<MaterialIcons name="work-outline" size={18} color={colors.blue700} />}
-          />
-        </View>
-        <View style={[styles.statsRow, { marginTop: spacing.sm }]}>
-          <StatCard
-            title="Saved Jobs"
-            value={stats?.saved_jobs?.length ?? 0}
-            tint="amber"
-            icon={<MaterialIcons name="bookmark-border" size={18} color={colors.warning} />}
-          />
-          <StatCard
-            title="Profile Views (30d)"
-            value={analytics?.total_views_30_days ?? 0}
-            tint="green"
-            icon={<MaterialIcons name="track-changes" size={18} color={colors.success} />}
-          />
-        </View>
-
         {/* Quick Actions — the 3 most-used flows get full-weight cards; the rest sit in a
             denser secondary row so the hierarchy actually says something about priority. */}
         <SectionHeader title="Quick actions" style={styles.sectionHeader} />
@@ -435,33 +390,6 @@ export default function SeekerHomeScreen() {
         </View>
 
         <AceBanner />
-
-        <View style={styles.secondaryActionsRow}>
-          {MORE_ACTIONS.map((action) => (
-            <PressableScale
-              key={action.label}
-              scaleTo="buttonPress"
-              ripple={null}
-              style={styles.secondaryAction}
-              onPress={() => {
-                // "Complete Profile" points at /onboarding, but that screen redirects
-                // straight back here the instant profile_completed is already true —
-                // which looks exactly like the tap did nothing. Send an already-complete
-                // profile to the edit screen instead, so the button always goes somewhere.
-                if (action.path === '/onboarding' && user?.profile_completed) {
-                  router.push({ pathname: '/(seeker)/profile/edit', params: { from: 'home' } })
-                  return
-                }
-                router.push(action.path as never)
-              }}
-              accessibilityRole="button"
-              accessibilityLabel={action.label}
-            >
-              <MaterialIcons name={action.icon} size={16} color={colors.blue700} />
-              <Text style={styles.secondaryActionLabel} numberOfLines={1}>{action.label}</Text>
-            </PressableScale>
-          ))}
-        </View>
 
         <View style={styles.searchBox}>
           <MaterialIcons name="search" size={20} color={colors.subtle} />

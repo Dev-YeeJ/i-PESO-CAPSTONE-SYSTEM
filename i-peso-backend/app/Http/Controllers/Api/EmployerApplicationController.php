@@ -170,7 +170,28 @@ class EmployerApplicationController extends Controller
             ], 409);
         }
 
-        event(new ApplicationStatusChanged($application));
+        // Idempotency guard for the hired outcome: two near-simultaneous employer
+        // requests (double-click, client-side retry, network re-send) can both
+        // pass the lockForUpdate terminal-status re-check if the first commit
+        // completes between the SELECT FOR UPDATE and the second request's SELECT —
+        // that is unlikely but observable on shared-hosting environments with InnoDB
+        // gap locks. Even if the DB write is de-duplicated by the lock, a separate
+        // HTTP connection can still slip through the pre-lock guard above and
+        // trigger a second event (and therefore a second push/DB notification).
+        // Suppress the event entirely when a 'hired' status notification for this
+        // application was already written within the last 60 seconds.
+        $skipEvent = $validated['status'] === 'hired'
+            && \Illuminate\Support\Facades\DB::table('notifications')
+                ->where('notifiable_type', \App\Models\JobSeeker::class)
+                ->where('notifiable_id', $application->seeker_id)
+                ->whereRaw("JSON_EXTRACT(data, '$.status') = 'hired'")
+                ->whereRaw("JSON_EXTRACT(data, '$.application_id') = ?", [$application->apply_id])
+                ->where('created_at', '>=', now()->subSeconds(60))
+                ->exists();
+
+        if (! $skipEvent) {
+            event(new ApplicationStatusChanged($application));
+        }
 
         foreach ($sweptApplications as $sweptApp) {
             event(new ApplicationStatusChanged($sweptApp));
@@ -358,9 +379,24 @@ class EmployerApplicationController extends Controller
         }
 
         if ($originalStatus === 'interview' && $validated['status'] !== 'interview') {
+            // Always clean up the interview record in the DB — an open interview
+            // row for a closed application (hired, rejected, withdrawn) is an
+            // inconsistent state regardless of why the transition happened.
             $application->interviewSchedule()->update(['status' => 'cancelled']);
-            Notification::send($application->jobSeeker, new InterviewCancelledNotification($application));
-            Notification::send($application->jobVacancy?->employer, new InterviewCancelledNotification($application));
+
+            // Only send the "Interview Cancelled" notification when the employer
+            // explicitly cancels the interview by moving the application to a
+            // non-terminal status (e.g. back to reviewed/shortlisted).
+            // When the application moves to a terminal outcome (hired or rejected),
+            // the seeker already receives a meaningful status notification
+            // ("You're Hired!" / "Status Update"). Sending "Interview Cancelled"
+            // on top of that is misleading — the employer didn't cancel the
+            // interview; they concluded it by making a hiring decision.
+            $terminalStatuses = ['hired', 'rejected', 'withdrawn'];
+            if (! in_array($validated['status'], $terminalStatuses, true)) {
+                Notification::send($application->jobSeeker, new InterviewCancelledNotification($application));
+                Notification::send($application->jobVacancy?->employer, new InterviewCancelledNotification($application));
+            }
         }
 
         return $application;

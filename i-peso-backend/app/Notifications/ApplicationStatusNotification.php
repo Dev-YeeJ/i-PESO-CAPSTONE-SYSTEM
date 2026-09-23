@@ -38,8 +38,18 @@ class ApplicationStatusNotification extends Notification
     {
         $channels = ['mail', 'database'];
 
-        // Interview notifications have their own richer SMS and must not be duplicated.
-        $interviewWasCancelled = $this->application->interviewSchedule?->status === 'cancelled';
+        // Interview notifications have their own richer SMS and push — if the application
+        // just transitioned from 'interview' status, the interview record was marked
+        // 'cancelled' in the DB by processStatusUpdate() *before* this notification was
+        // sent. However, the Application model passed via the event still carries the
+        // pre-update in-memory relation (Eloquent doesn't refresh loaded relations on a
+        // query-builder ->update()). Reading from that stale cache causes $interviewWasCancelled
+        // to be false even when the DB row is already cancelled, which incorrectly adds
+        // the push/SMS channels for the ApplicationStatusNotification and produces a
+        // second push notification alongside the (now-suppressed) InterviewCancelledNotification.
+        // Force a fresh DB read so the check always reflects the committed state.
+        $freshInterview = $this->application->interviewSchedule()->withoutGlobalScopes()->first();
+        $interviewWasCancelled = $freshInterview?->status === 'cancelled';
 
         if ($this->application->status !== 'interview' && ! $interviewWasCancelled) {
             $channels[] = SmsChannel::class;
