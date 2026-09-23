@@ -39,8 +39,9 @@ export default function ApplicantProfileModal({
       {/* 
         Slide-over Panel Styling:
         Instead of a centered modal, we make the DialogContent stick to the right edge.
+        We explicitly override the centering and zoom animations of the default DialogContent.
       */}
-      <DialogContent className="fixed inset-y-0 right-0 z-50 h-full w-full max-w-none sm:w-[500px] lg:w-[700px] xl:w-[800px] overflow-hidden p-0 gap-0 border-l bg-slate-50 shadow-2xl transition ease-in-out data-[state=closed]:duration-300 data-[state=open]:duration-500 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right rounded-none">
+      <DialogContent className="fixed left-auto right-0 top-0 bottom-0 z-50 h-full w-full max-w-none translate-x-0 translate-y-0 sm:w-[500px] lg:w-[700px] xl:w-[800px] overflow-hidden p-0 gap-0 border-l bg-slate-50 shadow-2xl duration-500 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-100 data-[state=open]:zoom-in-100 data-[state=closed]:slide-out-to-right-full data-[state=open]:slide-in-from-right-full rounded-none sm:rounded-none">
         
         {/* Sticky Header with Actions */}
         <div className="sticky top-0 z-10 border-b border-slate-200 bg-white px-6 py-4 shadow-sm">
