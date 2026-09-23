@@ -89,7 +89,8 @@ class GovernmentProgramsFlowTest extends TestCase
         // and its eligibility hint, then applies in person at the PESO office.
         $this->getJson("/api/seeker/government-programs/{$programId}")
             ->assertOk()
-            ->assertJsonPath('program.title', 'SMAW NC II Training Test');
+            ->assertJsonPath('program.title', 'SMAW NC II Training Test')
+            ->assertJsonMissingPath('program.eligibility_rules');
 
         // Seeker programs list returns the program with an eligibility payload.
         $this->getJson('/api/seeker/government-programs')
@@ -234,6 +235,48 @@ class GovernmentProgramsFlowTest extends TestCase
             collect($rows)->firstWhere('title', 'Youth Only Program')['eligibility']['status'],
             'The ineligible program should be marked, not silently reordered.'
         );
+    }
+
+    public function test_seeker_list_ranks_across_pages_before_paginating(): void
+    {
+        $admin = Administrator::create([
+            'first_name' => 'PESO', 'last_name' => 'Admin',
+            'email' => 'page-rank.admin@example.test', 'password' => 'password123',
+            'role' => 'administrator', 'status' => 'active', 'email_verified_at' => now(),
+        ]);
+
+        Sanctum::actingAs($admin);
+
+        for ($index = 1; $index <= 12; $index++) {
+            $this->postJson('/api/admin/government-programs', [
+                'program_name' => "Ineligible Program {$index}",
+                'category' => 'spes',
+                'description' => 'Restricted to young applicants.',
+                'eligibility_rules' => config('government_program_presets.spes.eligibility_rules'),
+                'total_slots' => 5, 'program_status' => 'open', 'visibility' => 'public',
+            ])->assertCreated();
+        }
+
+        $this->postJson('/api/admin/government-programs', [
+            'program_name' => 'Eligible Program On Page Two',
+            'category' => 'career_guidance',
+            'description' => 'Available to this seeker.',
+            'eligibility_rules' => [],
+            'total_slots' => 5, 'program_status' => 'open', 'visibility' => 'public',
+        ])->assertCreated();
+
+        $seeker = JobSeeker::create([
+            'first_name' => 'Rita', 'last_name' => 'Bautista', 'mobile_number' => '09170000104',
+            'email' => 'page-rank.seeker@example.test', 'password' => 'password123',
+            'profile_completed' => true, 'date_of_birth' => now()->subYears(50)->toDateString(),
+        ]);
+
+        Sanctum::actingAs($seeker);
+        $response = $this->getJson('/api/seeker/government-programs?per_page=12')->assertOk();
+
+        $response->assertJsonPath('programs.data.0.title', 'Eligible Program On Page Two');
+        $this->assertSame(13, $response->json('programs.total'));
+        $this->assertSame(2, $response->json('programs.last_page'));
     }
 
     public function test_government_programs_expose_no_application_routes(): void

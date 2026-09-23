@@ -1,6 +1,6 @@
 import { ArrowRight, CalendarDays, CircleCheck, Clock3, MapPin, UsersRound } from 'lucide-react'
 import { Link } from 'react-router-dom'
-import { categoryLabel, statusLabel } from './programConstants'
+import { categoryLabel, eligibilityReasons, statusLabel } from './programConstants'
 import EligibilityBadge from './EligibilityBadge'
 
 const dateText = (value) => value
@@ -10,6 +10,7 @@ const dateText = (value) => value
 export default function ProgramCard({ program, to, actionLabel = 'View program', compact = false }) {
   const skills = program.skills?.filter((skill) => skill.type === 'taught' || skill.type === 'target').slice(0, 4) ?? []
   const slots = Number(program.total_slots) === 0 ? 'Open capacity' : `${program.available_slots} of ${program.total_slots} slots left`
+  const reasons = eligibilityReasons(program.eligibility)
 
   return (
     <article className="flex h-full flex-col rounded-3xl border border-slate-200 bg-white p-6 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-blue-200 hover:shadow-xl hover:shadow-blue-900/10 group">
@@ -41,6 +42,12 @@ export default function ProgramCard({ program, to, actionLabel = 'View program',
         <div className="mt-5 rounded-2xl bg-amber-50/50 border border-amber-100 p-3">
            <p className="text-xs font-semibold leading-relaxed text-amber-900">{program.recommendation_reason}</p>
         </div>
+      )}
+
+      {reasons.length > 0 && !compact && (
+        <p className="mt-4 text-xs leading-5 text-slate-500">
+          <span className="font-bold text-slate-700">Why: </span>{reasons.join(' · ')}
+        </p>
       )}
 
       <dl className="mt-6 grid gap-3 text-xs font-semibold text-slate-500 bg-slate-50 rounded-2xl p-4 border border-slate-100">

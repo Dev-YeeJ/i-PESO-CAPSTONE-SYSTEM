@@ -8,9 +8,9 @@ use App\Services\EligibilityMatchingService;
 
 trait FormatsGovernmentPrograms
 {
-    private function formatProgram(GovernmentProgram $program, ?JobSeeker $seeker = null): array
+    private function formatProgram(GovernmentProgram $program, ?JobSeeker $seeker = null, bool $includeInternalFields = true): array
     {
-        return [
+        $formatted = [
             'program_id' => $program->program_id,
             'title' => $program->program_name,
             'program_name' => $program->program_name,
@@ -20,7 +20,6 @@ trait FormatsGovernmentPrograms
             'description' => $program->description,
             'target_beneficiaries' => $program->target_beneficiaries,
             'eligibility_requirements' => $program->eligibility_requirements ?? [],
-            'eligibility_rules' => $program->eligibility_rules ?? [],
             'required_documents' => $program->required_documents ?? [],
             'citizen_charter_steps' => $program->citizen_charter_steps ?? [],
             'target_industry' => $program->target_industry,
@@ -57,5 +56,11 @@ trait FormatsGovernmentPrograms
             'created_at' => $program->created_at,
             'updated_at' => $program->updated_at,
         ];
+
+        if ($includeInternalFields) {
+            $formatted['eligibility_rules'] = $program->eligibility_rules ?? [];
+        }
+
+        return $formatted;
     }
 }

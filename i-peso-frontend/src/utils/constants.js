@@ -1,0 +1,16 @@
+export const INDUSTRIES = [
+  'Agriculture & Fishing',
+  'Construction',
+  'Education & Training',
+  'Finance & Banking',
+  'Food & Beverage',
+  'Healthcare & Medical',
+  'Information Technology',
+  'Manufacturing',
+  'Real Estate',
+  'Retail & Commerce',
+  'Transportation & Logistics',
+  'Tourism & Hospitality',
+  'Government & Public Sector',
+  'Other',
+]

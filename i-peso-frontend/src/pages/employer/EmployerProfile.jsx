@@ -12,7 +12,6 @@ import {
   UsersRound,
   X,
 } from 'lucide-react'
-import { useLocation } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import * as employerService from '@/services/employerService'
 import * as employerProfileService from '@/services/employerProfileService'
@@ -30,7 +29,6 @@ export default function EmployerProfile() {
   const [draft, setDraft] = useState({})
   
   const [logoUploadOpen, setLogoUploadOpen] = useState(false)
-  const [photoUploadOpen, setPhotoUploadOpen] = useState(false)
   
   const updateUser = useAuthStore((state) => state.updateUser)
 

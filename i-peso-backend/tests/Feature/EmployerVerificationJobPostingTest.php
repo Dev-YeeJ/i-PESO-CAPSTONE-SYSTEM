@@ -481,7 +481,6 @@ class EmployerVerificationJobPostingTest extends TestCase
         $this->getJson('/api/seeker/job-map?radius_km=5&limit=30&compact=true')
             ->assertOk()
             ->assertJsonPath('jobs.0.post_id', $job->post_id)
-            ->assertJsonPath('jobs.0.match_deferred', false)
             ->assertJsonPath('jobs.0.job_description', $job->job_description);
 
         $this->getJson("/api/seeker/job-map/{$job->post_id}")

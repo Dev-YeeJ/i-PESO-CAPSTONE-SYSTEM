@@ -9,6 +9,7 @@ use App\Models\GovernmentProgram;
 use App\Models\JobSeeker;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -60,8 +61,8 @@ class SeekerGovernmentProgramController extends Controller
         $programs = $query
             ->orderByRaw("CASE program_status WHEN 'open' THEN 0 WHEN 'closed' THEN 1 ELSE 2 END")
             ->orderBy('application_deadline')
-            ->paginate($request->integer('per_page', 12));
-        $programs->through(fn (GovernmentProgram $program) => $this->formatProgram($program, $seeker));
+            ->get()
+            ->map(fn (GovernmentProgram $program) => $this->formatProgram($program, $seeker, false));
 
         // Surface what this seeker actually qualifies for first. Eligibility is
         // scored in PHP from the seeker's profile, so it cannot be an ORDER BY
@@ -72,12 +73,20 @@ class SeekerGovernmentProgramController extends Controller
         // hidden: the criteria are verified in person at PESO, a profile can
         // be incomplete or out of date, and withholding a government posting
         // from a citizen on that basis would be the wrong default.
-        $programs->setCollection(
-            $programs->getCollection()->sortBy(
-                fn (array $program) => self::ELIGIBILITY_RANK[$program['eligibility']['status'] ?? ''] ?? 90,
-                SORT_REGULAR,
-                false,
-            )->values()
+        $programs = $programs->sortBy(
+            fn (array $program) => self::ELIGIBILITY_RANK[$program['eligibility']['status'] ?? ''] ?? 90,
+            SORT_REGULAR,
+            false,
+        )->values();
+
+        $perPage = max(1, $request->integer('per_page', 12));
+        $currentPage = LengthAwarePaginator::resolveCurrentPage();
+        $programs = new LengthAwarePaginator(
+            $programs->forPage($currentPage, $perPage)->values(),
+            $programs->count(),
+            $perPage,
+            $currentPage,
+            ['path' => $request->url(), 'query' => $request->query()]
         );
 
         return response()->json([
@@ -95,7 +104,7 @@ class SeekerGovernmentProgramController extends Controller
             'targetOccupation',
         ]);
 
-        return response()->json(['program' => $this->formatProgram($governmentProgram, $seeker)]);
+        return response()->json(['program' => $this->formatProgram($governmentProgram, $seeker, false)]);
     }
 
     public function attachment(Request $request, GovernmentProgram $governmentProgram): StreamedResponse

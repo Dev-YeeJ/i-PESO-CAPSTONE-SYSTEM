@@ -1,4 +1,4 @@
-import { createElement, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, Building2, MapPin, BriefcaseBusiness, Calendar, Users, Target, ShieldCheck } from 'lucide-react'
 import LazyImage from '@/components/common/LazyImage'
@@ -25,7 +25,7 @@ export default function EmployerProfile() {
   useEffect(() => {
     api.get(`/seeker/employers/${id}`)
       .then((res) => setData(res.data))
-      .catch((err) => {
+      .catch(() => {
         setError('Failed to load employer profile')
         toast.error('Failed to load employer profile')
       })
