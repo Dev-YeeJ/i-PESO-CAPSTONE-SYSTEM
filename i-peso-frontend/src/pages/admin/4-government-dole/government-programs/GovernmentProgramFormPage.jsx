@@ -269,7 +269,6 @@ export default function GovernmentProgramFormPage() {
                   <Info className="mt-0.5 h-4 w-4 shrink-0" />
                   <p>Setting this to <span className="font-bold">Open</span> and <span className="font-bold">Public</span> announces it to every job seeker whose profile matches the eligibility rules.</p>
                 </div>
-              </div>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <Field label="Venue"><input name="venue" value={form.venue ?? ''} onChange={handleChange} placeholder="e.g. PESO Office, Urdaneta City Hall" className={inputCls} /></Field>
                   <Field label="Attachment (PDF/DOC/image, optional)" hint="Programme guidelines or the official memo.">
