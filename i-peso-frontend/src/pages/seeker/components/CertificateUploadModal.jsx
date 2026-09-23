@@ -40,14 +40,15 @@ export default function CertificateUploadModal({ open, trainings = [], onClose, 
   const [saving, setSaving] = useState(false)
   const [progress, setProgress] = useState(0)
 
-  const effectiveTitle = selectedTraining ? selectedTraining.course : form.title.trim()
-  const effectiveIssuingBody = selectedTraining ? (selectedTraining.training_institution || 'Training Provider') : form.issuingBody.trim()
-
-  const detailsComplete = Boolean(effectiveTitle && effectiveIssuingBody && form.category && form.issuedAt)
   const selectedTraining = useMemo(
     () => trainings.find((training) => String(training.id) === String(form.trainingId)),
     [form.trainingId, trainings],
   )
+
+  const effectiveTitle = selectedTraining ? selectedTraining.course : form.title.trim()
+  const effectiveIssuingBody = selectedTraining ? (selectedTraining.training_institution || 'Training Provider') : form.issuingBody.trim()
+
+  const detailsComplete = Boolean(effectiveTitle && effectiveIssuingBody && form.category && form.issuedAt)
   const requiresTraining = CATEGORIES_REQUIRING_TRAINING.includes(form.category)
   const blockedByNoTrainings = requiresTraining && trainings.length === 0
 
