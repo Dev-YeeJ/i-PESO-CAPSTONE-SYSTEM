@@ -38,13 +38,6 @@ class SeekerCertificateController extends Controller
         $seeker = $this->seeker($request);
 
         $validated = $request->validate([
-            'title' => ['required', 'string', 'max:255'],
-            'issuing_body' => ['required', 'string', 'max:255'],
-            'category' => ['required', 'string', Rule::in(self::CATEGORIES)],
-            'issued_at' => ['required', 'date', 'before_or_equal:today'],
-            'expires_at' => ['nullable', 'date', 'after:issued_at'],
-            'credential_number' => ['nullable', 'string', 'max:100'],
-            'description' => ['nullable', 'string', 'max:2000'],
             'training_id' => [
                 Rule::requiredIf(in_array($request->input('category'), self::CATEGORIES_REQUIRING_TRAINING, true)),
                 'nullable',
@@ -52,10 +45,23 @@ class SeekerCertificateController extends Controller
                 Rule::exists('seeker_trainings', 'id')
                     ->where(fn ($query) => $query->where('seeker_id', $seeker->getKey())),
             ],
+            'title' => [Rule::requiredIf(blank($request->input('training_id'))), 'nullable', 'string', 'max:255'],
+            'issuing_body' => [Rule::requiredIf(blank($request->input('training_id'))), 'nullable', 'string', 'max:255'],
+            'category' => ['required', 'string', Rule::in(self::CATEGORIES)],
+            'issued_at' => ['required', 'date', 'before_or_equal:today'],
+            'expires_at' => ['nullable', 'date', 'after:issued_at'],
+            'credential_number' => ['nullable', 'string', 'max:100'],
+            'description' => ['nullable', 'string', 'max:2000'],
             'certificate_file' => ['required', File::types(['pdf', 'jpg', 'jpeg', 'png'])->max(5 * 1024)],
         ], [
             'training_id.required' => 'Link this certificate to one of your trainings, or add the training first.',
+            'title.required' => 'Certificate title is required for standalone certificates.',
+            'issuing_body.required' => 'Issuing organization is required for standalone certificates.',
         ]);
+
+        $training = filled($validated['training_id'] ?? null) 
+            ? $seeker->trainings()->find($validated['training_id']) 
+            : null;
 
         $file = $request->file('certificate_file');
         $path = $file->store("seeker_certificates/{$seeker->getKey()}", 'local');
@@ -67,8 +73,8 @@ class SeekerCertificateController extends Controller
 
         try {
             $certificate = DB::transaction(fn () => $seeker->certificates()->create([
-                'title' => Str::squish($validated['title']),
-                'issuing_body' => Str::squish($validated['issuing_body']),
+                'title' => Str::squish($training ? $training->course : $validated['title']),
+                'issuing_body' => Str::squish($training ? ($training->training_institution ?: 'Training Provider') : $validated['issuing_body']),
                 'category' => $validated['category'],
                 'issued_at' => $validated['issued_at'],
                 'expires_at' => $validated['expires_at'] ?? null,
