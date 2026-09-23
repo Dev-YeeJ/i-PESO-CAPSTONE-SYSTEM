@@ -617,8 +617,8 @@ class ReportController extends Controller
             $row('1_6_4', '1.6.4 Total applicants placed/Hired-on-the-Spot (HOTS)', 2, true, [
                 'curr_total' => $jf($current, 'hots'), 'prev_total' => $jf($previous, 'hots'), 'cum_total' => $jf($cumulative, 'hots'),
             ]),
-            $row('1_6_7_1', '1.6.7.1 Local', 3, false),
-            $row('1_6_7_2', '1.6.7.2 Overseas', 3, false),
+            $row('1_6_4_1', '1.6.4.1 Local', 3, false),
+            $row('1_6_4_2', '1.6.4.2 Overseas', 3, false),
 
             $section('sec_lmi', 'B. LABOR MARKET INFORMATION (LMI) PROGRAM'),
             $row('lmi_1', '1. Individuals/institutions provided with labor market information', 1, false),
