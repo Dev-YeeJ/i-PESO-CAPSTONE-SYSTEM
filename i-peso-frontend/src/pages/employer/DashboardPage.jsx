@@ -49,12 +49,13 @@ export default function EmployerDashboard() {
           setStats(statsResult)
         }
         
+        const currentUser = useAuthStore.getState().user
         updateUser({
           verification_status: profileResult.employer.verification_status,
           company_name: profileResult.employer.company_name,
           name: profileResult.employer.company_name,
           employer: {
-            ...user?.employer,
+            ...currentUser?.employer,
             logo_url: profileResult.employer.company_logo_url,
           }
         })
@@ -63,7 +64,7 @@ export default function EmployerDashboard() {
         setError(requestError.response?.data?.message ?? 'Unable to load the employer workspace.')
       })
       .finally(() => setLoading(false))
-  }, [updateUser, user?.employer])
+  }, [updateUser])
 
   useEffect(() => {
     loadDashboard()
