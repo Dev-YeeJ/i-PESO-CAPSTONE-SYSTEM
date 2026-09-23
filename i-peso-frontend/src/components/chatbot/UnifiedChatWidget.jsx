@@ -1,6 +1,6 @@
 import { createElement, useEffect, useRef, useState } from 'react'
 import {
-  MapPin, Send, X, Sparkles,
+  MapPin, Send, X, Sparkles, LogIn, KeyRound, HelpCircle,
   UserPlus, Briefcase, CalendarDays, BadgeCheck,
   CheckCircle2, UserCog, Users, ClipboardList,
 } from 'lucide-react'
@@ -28,10 +28,10 @@ import ActionButtons from './RichComponents/ActionButtons'
 const GREETING_REVEAL_DELAY = 800
 
 const GUEST_STARTERS = [
+  { icon: HelpCircle, text: 'Ano po ang i-PESO?' },
   { icon: UserPlus, text: 'Paano po mag-register?' },
-  { icon: Briefcase, text: 'Paano gumagana ang pagtugma ng trabaho?' },
-  { icon: CalendarDays, text: 'Kailan po ang susunod na job fair?' },
-  { icon: BadgeCheck, text: 'Libre po ba ang i-PESO?' },
+  { icon: LogIn, text: 'Paano po mag-login?' },
+  { icon: KeyRound, text: 'Nakalimutan ko ang password ko, paano mababawi?' },
 ]
 
 const SEEKER_STARTERS = [
