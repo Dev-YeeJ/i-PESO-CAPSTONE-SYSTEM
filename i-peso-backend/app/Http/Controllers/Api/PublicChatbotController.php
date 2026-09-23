@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Services\Chatbot\ChatbotUnavailableException;
 use App\Services\Chatbot\GeminiChatService;
+use App\Services\Chatbot\ChatbotPolicy;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -24,7 +25,7 @@ class PublicChatbotController extends Controller
     /** Visitor turns retained for context. Enough to follow up, cheap to send. */
     private const MAX_HISTORY_TURNS = 12;
 
-    public function __invoke(Request $request, GeminiChatService $chat): JsonResponse
+    public function __invoke(Request $request, GeminiChatService $chat, ChatbotPolicy $policy): JsonResponse
     {
         $data = $request->validate([
             'message' => ['required', 'string', 'max:500'],
@@ -33,7 +34,17 @@ class PublicChatbotController extends Controller
             'history.*.text' => ['required', 'string', 'max:2000'],
         ]);
 
-        $history = $data['history'] ?? [];
+        if ($refusal = $policy->refusalFor($data['message'])) {
+            return response()->json(['reply' => $refusal, 'office_location' => null]);
+        }
+
+        // Model turns come from the browser and are not trusted conversation
+        // state. Keeping user turns preserves context without allowing a
+        // caller to forge a previous assistant instruction.
+        $history = collect($data['history'] ?? [])
+            ->where('role', 'user')
+            ->values()
+            ->all();
         $history[] = ['role' => 'user', 'text' => $data['message']];
 
         $user = $request->user('sanctum');
@@ -44,6 +55,7 @@ class PublicChatbotController extends Controller
             return response()->json([
                 'reply' => $result['text'],
                 'office_location' => $result['office_location'],
+                'tool_results' => $result['tool_results'] ?? [],
             ]);
         } catch (ChatbotUnavailableException $exception) {
             // The exception already carries a visitor-safe message; the
