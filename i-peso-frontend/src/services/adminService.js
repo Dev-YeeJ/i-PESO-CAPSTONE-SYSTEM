@@ -234,6 +234,7 @@ export const adminService = {
   submitJobFairProxyResults: async (fairId, payload) => (await api.post(`/admin/job-fairs/${fairId}/proxy-results`, payload)).data,
   searchApplicantSuggestions: async (query, signal) => (await api.get('/admin/applicant-suggestions', { params: { q: query }, signal })).data.data ?? [],
   submitJobFairProxyConfirmation: async (fairId, payload) => (await api.post(`/admin/job-fairs/${fairId}/proxy-confirmation-slip`, payload)).data,
+  reviewJobFairResult: async (id, payload) => (await api.patch(`/admin/job-fair-results/${id}/review`, payload)).data,
   downloadJobFairResult: async (id) => (await api.get(`/admin/job-fair-results/${id}/roi-form-3`, { responseType: 'blob' })).data,
   downloadJobFairInvitation: async (id, params = {}) => (await api.get(`/admin/job-fairs/${id}/invitation-letter`, { params, responseType: 'blob' })).data,
   downloadJobFairAttendancePdf: async (id) => (await api.get(`/admin/job-fairs/${id}/download-attendance-pdf`, { responseType: 'blob' })).data,

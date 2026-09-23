@@ -10,7 +10,7 @@ return new class extends Migration
     {
         if (Schema::hasTable('placement_report_uploads')) {
             return;
-        }yu
+        }
 
         Schema::create('placement_report_uploads', function (Blueprint $table) {
             $table->id();
@@ -45,4 +45,3 @@ return new class extends Migration
         Schema::dropIfExists('placement_report_uploads');
     }
 };
-ddse                f                                                                                                                                                                                                                                                                                                                                           ttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttser1DFAWQGYC!!!!!!!!11

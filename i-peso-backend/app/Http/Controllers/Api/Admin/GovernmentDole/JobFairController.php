@@ -569,6 +569,26 @@ class JobFairController extends Controller
         return response()->json(['message' => 'Admin proxy report saved.', 'result_report' => $reports->saveProxy($jobFair, $admin, $validated)], 201);
     }
 
+    public function reviewResult(Request $request, \App\Models\JobFairResultReport $resultReport): JsonResponse
+    {
+        $admin = $this->admin($request);
+        $validated = $request->validate([
+            'status' => ['required', Rule::in(['approved', 'rejected'])],
+            'admin_remarks' => ['required_if:status,rejected', 'nullable', 'string', 'max:2000'],
+        ]);
+
+        $resultReport->update([
+            'status' => $validated['status'],
+            'reviewed_by_admin_id' => $admin->admin_id,
+            'review_remarks' => $validated['admin_remarks'],
+        ]);
+
+        return response()->json([
+            'message' => 'Establishment report status updated.',
+            'result_report' => $resultReport->fresh(['jobFair', 'employer', 'entries', 'mismatchTallies']),
+        ]);
+    }
+
     public function proxyConfirmation(Request $request, JobFair $jobFair, JobFairService $service): JsonResponse
     {
         $admin = $this->admin($request);

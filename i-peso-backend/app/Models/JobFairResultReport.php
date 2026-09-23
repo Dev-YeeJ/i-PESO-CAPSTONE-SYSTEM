@@ -14,6 +14,7 @@ class JobFairResultReport extends Model
         'total_male', 'total_female', 'total_applicants', 'total_qualified', 'total_hots', 'total_near_hired',
         'total_rejected', 'total_vacancies_solicited', 'total_vacancies_offered', 'remarks', 'encoded_by_admin_id',
         'submitted_by_employer_id', 'submitted_at', 'report_generated_at',
+        'status', 'reviewed_by_admin_id', 'review_remarks',
     ];
     protected $casts = [
         'total_male' => 'integer', 'total_female' => 'integer', 'total_applicants' => 'integer',

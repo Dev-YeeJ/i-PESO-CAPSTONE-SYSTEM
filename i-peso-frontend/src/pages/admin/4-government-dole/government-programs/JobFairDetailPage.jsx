@@ -383,10 +383,25 @@ export default function JobFairDetailPage() {
               ) : reports.map((r) => (
                 <div key={r.id} className="flex flex-wrap items-center justify-between gap-3 p-4">
                   <div>
-                    <p className="font-bold text-slate-900">{r.company_name}</p>
+                    <div className="flex items-center gap-2 mb-0.5">
+                      <p className="font-bold text-slate-900">{r.company_name}</p>
+                      <Badge variant={r.status === 'approved' ? 'approved' : r.status === 'rejected' ? 'rejected' : 'review'} icon={false}>
+                        {r.status || 'pending'}
+                      </Badge>
+                    </div>
                     <p className="text-xs font-semibold text-slate-500">{r.total_applicants} applicants · {r.total_hots} HOTS</p>
+                    {r.review_remarks && <p className="text-xs text-rose-600 font-semibold mt-1">PESO note: {r.review_remarks}</p>}
                   </div>
                   <div className="flex gap-2">
+                    {(r.status === 'pending' || !r.status) && (
+                      <>
+                        <Button size="sm" variant="success" icon={CheckCircle2} onClick={() => action(() => adminService.reviewJobFairResult(r.id, { status: 'approved' }), 'Report approved.')}>Approve</Button>
+                        <Button size="sm" variant="danger" icon={XCircle} onClick={() => {
+                          const remark = window.prompt("Reason for rejection:")
+                          if (remark) action(() => adminService.reviewJobFairResult(r.id, { status: 'rejected', admin_remarks: remark }), 'Report rejected.')
+                        }}>Reject</Button>
+                      </>
+                    )}
                     <Button size="sm" variant="outline" icon={Eye} onClick={() => setViewingReport(r)}>
                       View
                     </Button>

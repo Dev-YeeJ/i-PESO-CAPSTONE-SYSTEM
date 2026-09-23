@@ -65,6 +65,7 @@ class JobFairReportService
             'source' => 'employer_self_service',
             'submitted_by_employer_id' => $employer->employer_id,
             'encoded_by_admin_id' => null,
+            'status' => 'pending',
         ], $participation);
     }
 
@@ -77,6 +78,7 @@ class JobFairReportService
             'source' => 'admin_proxy',
             'encoded_by_admin_id' => $admin->admin_id,
             'submitted_by_employer_id' => null,
+            'status' => 'approved',
             'entries' => $data['entries'] ?? [],
         ]);
     }
@@ -256,7 +258,7 @@ class JobFairReportService
 
     public function sprs(JobFair $fair): array
     {
-        $reports = $fair->resultReports()->get();
+        $reports = $fair->resultReports()->where('status', 'approved')->get();
 
         return [
             '1.6.1_fairs_conducted_local' => in_array($fair->sector, ['local', 'both'], true) ? 1 : 0,
