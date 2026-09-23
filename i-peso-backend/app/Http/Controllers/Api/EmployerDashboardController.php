@@ -33,7 +33,7 @@ class EmployerDashboardController extends Controller
         $upcomingInterviews = InterviewSchedule::whereIn('apply_id', function ($query) use ($vacancyIds) {
             $query->select('apply_id')->from('applications')->whereIn('post_id', $vacancyIds);
         })
-        ->where('scheduled_at', '>=', now())
+        ->where('schedule', '>=', now())
         ->where('status', 'scheduled')
         ->count();
 
