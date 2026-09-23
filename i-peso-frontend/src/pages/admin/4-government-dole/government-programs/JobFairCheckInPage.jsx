@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Html5Qrcode } from 'html5-qrcode'
 import { useNavigate, useParams } from 'react-router-dom'
-import { CheckCircle2, Clock3, Search, XCircle, Download, FileText, FileSpreadsheet, SwitchCamera } from 'lucide-react'
+import { CheckCircle2, Clock3, Search, XCircle, FileText, FileSpreadsheet, SwitchCamera, UserPlus, RefreshCw, Users } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { AlertBox, Badge, Button, Card } from '@/components/ui'
 import PageHeader from '@/pages/admin/_components/PageHeader'
@@ -10,10 +10,16 @@ import { adminService } from '@/services/adminService'
 
 const QR_ELEMENT_ID = 'job-fair-qr-reader'
 const emptyWalkIn = { guest_name: '', guest_mobile_number: '', guest_email: '', guest_educ_attainment: '', guest_preferred_job: '' }
+const MotionDiv = motion.div
 
 function formatTime(iso) {
   if (!iso) return ''
   return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+}
+
+function formatDateTime(iso) {
+  if (!iso) return 'Not checked in'
+  return new Date(iso).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })
 }
 
 function AttendeeCard({ attendee }) {
@@ -55,6 +61,11 @@ export default function JobFairCheckInPage() {
   const [walkIn, setWalkIn] = useState(emptyWalkIn)
   const [encoding, setEncoding] = useState(false)
   const [facingMode, setFacingMode] = useState('environment')
+  const [roster, setRoster] = useState([])
+  const [rosterFilter, setRosterFilter] = useState('all')
+  const [rosterSearch, setRosterSearch] = useState('')
+  const [rosterLoading, setRosterLoading] = useState(true)
+  const [showManualRecord, setShowManualRecord] = useState(false)
 
   const refreshCounts = useCallback(async () => {
     try {
@@ -65,7 +76,23 @@ export default function JobFairCheckInPage() {
     }
   }, [id])
 
+  const refreshRoster = useCallback(async () => {
+    setRosterLoading(true)
+    try {
+      const { data } = await adminService.searchJobFairAttendees(id, rosterSearch.trim())
+      setRoster(data ?? [])
+    } catch {
+      setRoster([])
+    } finally {
+      setRosterLoading(false)
+    }
+  }, [id, rosterSearch])
+
   useEffect(() => { refreshCounts() }, [refreshCounts])
+  useEffect(() => {
+    const timeout = setTimeout(refreshRoster, 250)
+    return () => clearTimeout(timeout)
+  }, [refreshRoster])
 
   // Other staff may be checking people in from a different phone at the same
   // time — poll so the counter reflects the whole desk, not just this device.
@@ -84,15 +111,17 @@ export default function JobFairCheckInPage() {
       const data = await adminService.checkInJobFairAttendee(id, payload)
       setResult({ kind: data.status, attendee: data.attendee })
       refreshCounts()
+      refreshRoster()
     } catch (e) {
       if (e.response?.status === 404) {
         setResult({ kind: 'not_found' })
+        lockedRef.current = false
       } else {
         setLookupError(e.response?.data?.message ?? 'Check-in failed.')
         lockedRef.current = false
       }
     }
-  }, [id, refreshCounts])
+  }, [id, refreshCounts, refreshRoster])
 
   useEffect(() => { checkInRef.current = checkIn }, [checkIn])
 
@@ -114,12 +143,19 @@ export default function JobFairCheckInPage() {
       const data = await adminService.encodeJobFairWalkIn(id, walkIn)
       setResult({ kind: data.status, attendee: data.attendee })
       refreshCounts()
+      refreshRoster()
     } catch (e2) {
       setLookupError(Object.values(e2.response?.data?.errors ?? {}).flat().join(' ') || e2.response?.data?.message || 'Could not encode this registration.')
     } finally {
       setEncoding(false)
     }
   }
+
+  const visibleRoster = roster.filter((attendee) => (
+    rosterFilter === 'all'
+      || (rosterFilter === 'checked_in' && attendee.is_attended)
+      || (rosterFilter === 'pre_registered' && !attendee.is_attended)
+  ))
 
   useEffect(() => {
     const scanner = new Html5Qrcode(QR_ELEMENT_ID)
@@ -195,11 +231,36 @@ export default function JobFairCheckInPage() {
         </Card>
       </section>
 
+      <Card className="border-blue-100 bg-blue-50/50">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-3">
+            <span className="rounded-xl bg-white p-2.5 text-brand-navy shadow-sm"><Users className="h-5 w-5" /></span>
+            <div>
+              <p className="font-bold text-slate-950">Attendance desk</p>
+              <p className="text-sm text-slate-600">Live roster of everyone pre-registered for this event.</p>
+            </div>
+          </div>
+          <Button variant="outline" icon={UserPlus} onClick={() => setShowManualRecord((open) => !open)}>
+            {showManualRecord ? 'Close manual record' : 'Add manual record'}
+          </Button>
+        </div>
+        {showManualRecord && (
+          <form onSubmit={encodeWalkIn} className="mt-4 grid gap-2 border-t border-blue-100 pt-4 sm:grid-cols-2">
+            <input required value={walkIn.guest_name} onChange={(e) => setWalkIn((w) => ({ ...w, guest_name: e.target.value }))} placeholder="Full name *" className="rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm focus:border-brand-navy focus:outline-none focus:ring-2 focus:ring-brand-navy/10" />
+            <input value={walkIn.guest_mobile_number} onChange={(e) => setWalkIn((w) => ({ ...w, guest_mobile_number: e.target.value }))} placeholder="Mobile number" className="rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm focus:border-brand-navy focus:outline-none focus:ring-2 focus:ring-brand-navy/10" />
+            <input value={walkIn.guest_email} onChange={(e) => setWalkIn((w) => ({ ...w, guest_email: e.target.value }))} placeholder="Email address" className="rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm focus:border-brand-navy focus:outline-none focus:ring-2 focus:ring-brand-navy/10" />
+            <input value={walkIn.guest_preferred_job} onChange={(e) => setWalkIn((w) => ({ ...w, guest_preferred_job: e.target.value }))} placeholder="Preferred job" className="rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm focus:border-brand-navy focus:outline-none focus:ring-2 focus:ring-brand-navy/10" />
+            <input value={walkIn.guest_educ_attainment} onChange={(e) => setWalkIn((w) => ({ ...w, guest_educ_attainment: e.target.value }))} placeholder="Educational attainment" className="rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm focus:border-brand-navy focus:outline-none focus:ring-2 focus:ring-brand-navy/10" />
+            <Button type="submit" disabled={encoding || !walkIn.guest_name.trim()} icon={UserPlus}>{encoding ? 'Saving...' : 'Save and check in'}</Button>
+          </form>
+        )}
+      </Card>
+
       {lookupError && <AlertBox variant="danger" title="Check-in failed">{lookupError}</AlertBox>}
 
       <AnimatePresence mode="wait">
         {!result && (
-          <motion.div
+          <MotionDiv
             key="scanner"
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
@@ -208,7 +269,7 @@ export default function JobFairCheckInPage() {
           >
             <Card padding="none" className="relative overflow-hidden border-2 border-blue-500/30 shadow-lg shadow-blue-900/5">
               {!cameraError && (
-                <motion.div
+                <MotionDiv
                   animate={{ opacity: [0.2, 0.6, 0.2], boxShadow: ['inset 0 0 0 2px rgba(96,165,250,0)', 'inset 0 0 0 4px rgba(96,165,250,0.5)', 'inset 0 0 0 2px rgba(96,165,250,0)'] }}
                   transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
                   className="absolute inset-0 z-10 pointer-events-none rounded-xl"
@@ -224,11 +285,11 @@ export default function JobFairCheckInPage() {
               )}
               {cameraError && <div className="p-4 bg-white"><AlertBox variant="warning" title="Camera unavailable">{cameraError}</AlertBox></div>}
             </Card>
-          </motion.div>
+          </MotionDiv>
         )}
 
         {result?.kind === 'checked_in' && (
-          <motion.div
+          <MotionDiv
             key="checked_in"
             initial={{ opacity: 0, y: 20, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -239,11 +300,11 @@ export default function JobFairCheckInPage() {
               <AttendeeCard attendee={result.attendee} />
               <Button className="mt-6 w-full shadow-md" onClick={scanNext}>Scan next</Button>
             </Card>
-          </motion.div>
+          </MotionDiv>
         )}
 
         {result?.kind === 'already_checked_in' && (
-          <motion.div
+          <MotionDiv
             key="already_checked_in"
             initial={{ opacity: 0, y: 20, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -256,11 +317,11 @@ export default function JobFairCheckInPage() {
               <AttendeeCard attendee={result.attendee} />
               <Button className="mt-6 w-full shadow-md" onClick={scanNext}>Scan next</Button>
             </Card>
-          </motion.div>
+          </MotionDiv>
         )}
 
         {result?.kind === 'not_found' && (
-          <motion.div
+          <MotionDiv
             key="not_found"
             initial={{ opacity: 0, y: 20, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -342,9 +403,54 @@ export default function JobFairCheckInPage() {
               </Button>
             </form>
           </Card>
-          </motion.div>
+          </MotionDiv>
         )}
       </AnimatePresence>
+
+      <Card padding="none" className="overflow-hidden">
+        <div className="border-b border-slate-100 p-4">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <h2 className="text-lg font-black text-slate-950">Registration roster</h2>
+              <p className="text-sm text-slate-500">Select a pre-registered person here when a QR code is unavailable.</p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              {[
+                ['all', `All (${roster.length})`],
+                ['pre_registered', `Waiting (${roster.filter((row) => !row.is_attended).length})`],
+                ['checked_in', `Checked in (${roster.filter((row) => row.is_attended).length})`],
+              ].map(([value, label]) => (
+                <button key={value} type="button" onClick={() => setRosterFilter(value)} className={`rounded-full px-3 py-1.5 text-xs font-bold transition ${rosterFilter === value ? 'bg-brand-navy text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
+                  {label}
+                </button>
+              ))}
+              <button type="button" title="Refresh roster" onClick={refreshRoster} className="rounded-full border border-slate-200 p-1.5 text-slate-500 hover:bg-slate-50"><RefreshCw className={`h-4 w-4 ${rosterLoading ? 'animate-spin' : ''}`} /></button>
+            </div>
+          </div>
+          <div className="relative mt-3 max-w-md">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <input value={rosterSearch} onChange={(e) => setRosterSearch(e.target.value)} placeholder="Find by name or mobile number" className="w-full rounded-lg border border-slate-300 bg-white py-2.5 pl-9 pr-3 text-sm focus:border-brand-navy focus:outline-none focus:ring-2 focus:ring-brand-navy/10" />
+          </div>
+        </div>
+        {rosterLoading ? <p className="p-6 text-sm text-slate-500">Loading registration roster...</p> : visibleRoster.length === 0 ? <p className="p-6 text-sm text-slate-500">No attendees match this view.</p> : (
+          <div className="divide-y divide-slate-100">
+            {visibleRoster.map((attendee) => (
+              <div key={attendee.id} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="font-bold text-slate-950">{attendee.name || 'Unnamed attendee'}</p>
+                    <Badge variant={attendee.is_attended ? 'approved' : 'pending'}>{attendee.is_attended ? 'Checked in' : 'Pre-registered'}</Badge>
+                    {attendee.is_guest && <Badge variant="info">Walk-in</Badge>}
+                  </div>
+                  <p className="mt-1 text-sm text-slate-500">{attendee.mobile_number || 'No mobile number'}{attendee.email ? ` · ${attendee.email}` : ''}</p>
+                  <p className="mt-1 text-xs text-slate-400">{attendee.is_attended ? `Checked in ${formatDateTime(attendee.scanned_at)}` : 'Waiting at registration'}</p>
+                </div>
+                {!attendee.is_attended && <Button size="sm" onClick={() => checkIn({ attendee_id: attendee.id })}>Check in</Button>}
+              </div>
+            ))}
+          </div>
+        )}
+      </Card>
     </div>
   )
 }

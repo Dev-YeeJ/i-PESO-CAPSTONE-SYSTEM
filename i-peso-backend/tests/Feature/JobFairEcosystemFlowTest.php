@@ -137,6 +137,17 @@ class JobFairEcosystemFlowTest extends TestCase
         $this->assertTrue(collect($listing)->firstWhere('job_fair_id', $fairId)['is_rsvped']);
 
         Sanctum::actingAs($admin);
+        $this->getJson("/api/admin/job-fairs/{$fairId}")->assertOk()
+            ->assertJsonPath('metrics.seekers_rsvped', 1)
+            ->assertJsonPath('metrics.attendance', 0);
+        $this->postJson("/api/admin/job-fairs/{$fairId}/check-in", ['qr_code_uuid' => $firstRsvp['qr_code_uuid']])
+            ->assertOk()->assertJsonPath('status', 'checked_in');
+        $this->getJson("/api/admin/job-fairs/{$fairId}")->assertOk()
+            ->assertJsonPath('metrics.seekers_rsvped', 1)
+            ->assertJsonPath('metrics.attendance', 1);
+        $this->getJson("/api/admin/job-fairs/{$fairId}/attendees")
+            ->assertOk()->assertJsonPath('data.0.name', 'Juana Cruz')
+            ->assertJsonPath('data.0.is_attended', true);
         $this->putJson("/api/admin/job-fairs/{$fairId}", ['status' => 'completed'])->assertOk();
         $this->postJson('/api/admin/reports/generate-sprs', ['month' => 11, 'year' => 2026])->assertOk()
             ->assertJsonPath('data.1_6_job_fairs.fairs_conducted', 1)

@@ -614,9 +614,12 @@ class JobFairService
     {
         $participants = $fair->employerJoins()->get();
         $reports = $fair->resultReports()->get();
+        $attendees = $fair->attendees()->get(['is_attended', 'seeker_id']);
         $statusCount = fn (string $status): int => $participants->where('participation_status', $status)->count();
 
         return [
+            'seekers_rsvped' => $attendees->whereNotNull('seeker_id')->count(),
+            'attendance' => $attendees->where('is_attended', true)->count(),
             'total_invited' => $participants->whereNotNull('invited_at')->count(),
             'requirements_pending' => $statusCount('requirements_pending'),
             'under_review' => $statusCount('under_review'),
