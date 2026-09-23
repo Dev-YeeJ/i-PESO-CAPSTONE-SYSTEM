@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { AnimatePresence } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import { Html5Qrcode } from 'html5-qrcode'
 import { useNavigate, useParams } from 'react-router-dom'
 import { CheckCircle2, Clock3, Search, XCircle, Download, FileText, FileSpreadsheet, SwitchCamera } from 'lucide-react'
