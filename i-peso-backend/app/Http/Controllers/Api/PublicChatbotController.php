@@ -34,7 +34,9 @@ class PublicChatbotController extends Controller
             'history.*.text' => ['required', 'string', 'max:2000'],
         ]);
 
-        if ($refusal = $policy->refusalFor($data['message'])) {
+        $user = $request->user('sanctum');
+
+        if ($refusal = $policy->refusalFor($data['message'], $user)) {
             return response()->json(['reply' => $refusal, 'office_location' => null]);
         }
 
@@ -47,7 +49,6 @@ class PublicChatbotController extends Controller
             ->all();
         $history[] = ['role' => 'user', 'text' => $data['message']];
 
-        $user = $request->user('sanctum');
 
         try {
             $result = $chat->reply($history, $user);

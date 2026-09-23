@@ -19,34 +19,16 @@ import {
 } from 'lucide-react';
 import IPesoLogo from '@/components/branding/IPesoLogo';
 
-const SEEKER_FEATURES = [
+const UNIFIED_FEATURES = [
   {
     icon: Target,
     title: 'Skill-tag matching',
     body: 'Stop guessing keywords. We score your skills against requirements to show you the best fits.',
   },
   {
-    icon: Landmark,
-    title: 'One Account for Government Programs',
-    body: 'Apply for TUPAD, SPES, and local jobs without retyping your details every time.',
-  },
-  {
-    icon: CalendarDays,
-    title: 'Digital Job Fairs',
-    body: 'RSVP to local job fairs and get a digital QR pass — no printed forms to lose.',
-  },
-  {
     icon: MapPin,
     title: 'Location-Aware',
     body: 'See jobs available in your immediate vicinity and across the region, instantly sorted by distance.',
-  },
-];
-
-const EMPLOYER_FEATURES = [
-  {
-    icon: FileBadge,
-    title: 'Pre-verified Talent',
-    body: 'Every applicant is verified by PESO, so you know you are hiring real, legitimate candidates.',
   },
   {
     icon: FileSearch,
@@ -57,11 +39,6 @@ const EMPLOYER_FEATURES = [
     icon: Users,
     title: 'Centralized Screening',
     body: 'Review applications, schedule interviews, and hire directly from your dashboard.',
-  },
-  {
-    icon: Briefcase,
-    title: 'Expansive Reach',
-    body: 'Post your openings and instantly connect with thousands of registered, verified job seekers.',
   },
 ];
 
@@ -230,7 +207,7 @@ const LandingPage = () => {
               <span className="w-1.5 h-1.5 rounded-full bg-yellow-400"></span> Skill-Tag Matching
             </span>
             <span className="flex items-center gap-2">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> 8 Government Programs
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> Verified Opportunities
             </span>
           </Motion.div>
 
@@ -413,37 +390,21 @@ const LandingPage = () => {
         </Motion.div>
       </main>
 
-      {/* ── Features - Tabbed Layout ── */}
+      {/* ── Features ── */}
       <Motion.section id="features" {...sectionMotion} className="relative z-10 bg-[#0D1F38] border-t border-white/5 px-6 py-24">
         <div className="max-w-6xl mx-auto">
           <div className="flex flex-col md:flex-row md:items-end justify-between mb-14 gap-8">
             <div className="max-w-2xl">
               <p className="text-xs font-bold uppercase tracking-[0.2em] text-yellow-400">What you get</p>
               <h2 className="mt-3 text-3xl md:text-4xl font-extrabold tracking-tight text-white">
-                Built for {activeTab === 'seeker' ? 'finding work' : 'finding talent'}.
+                Built for finding work and talent.
               </h2>
-            </div>
-            
-            {/* Redundant toggle here for mobile users who scroll past the dashboard */}
-            <div className="flex bg-[#0A192F] p-1 rounded-xl border border-white/10">
-              <button 
-                onClick={() => setActiveTab('seeker')}
-                className={`px-4 py-2 text-sm font-bold rounded-lg transition-colors ${activeTab === 'seeker' ? 'bg-white/10 text-white' : 'text-slate-400'}`}
-              >
-                For Job Seekers
-              </button>
-              <button 
-                onClick={() => setActiveTab('employer')}
-                className={`px-4 py-2 text-sm font-bold rounded-lg transition-colors ${activeTab === 'employer' ? 'bg-white/10 text-white' : 'text-slate-400'}`}
-              >
-                For Employers
-              </button>
             </div>
           </div>
 
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
             <AnimatePresence mode="popLayout">
-              {(activeTab === 'seeker' ? SEEKER_FEATURES : EMPLOYER_FEATURES).map((feature, i) => {
+              {UNIFIED_FEATURES.map((feature, i) => {
                 const Icon = feature.icon;
                 return (
                   <Motion.div 
@@ -454,7 +415,7 @@ const LandingPage = () => {
                     transition={{ duration: 0.3, delay: i * 0.05 }}
                     className="rounded-2xl border border-white/10 bg-white/[0.03] p-6 transition-all hover:border-white/20 hover:bg-white/[0.05] hover:-translate-y-1"
                   >
-                    <span className={`flex h-10 w-10 items-center justify-center rounded-xl ${activeTab === 'seeker' ? 'bg-blue-500/15 text-blue-400' : 'bg-yellow-400/15 text-yellow-400'}`}>
+                    <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-500/15 text-blue-400">
                       <Icon className="h-5 w-5" aria-hidden="true" />
                     </span>
                     <h3 className="mt-4 font-bold text-white">{feature.title}</h3>

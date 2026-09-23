@@ -295,19 +295,20 @@ class GeminiChatService
     {
         $today = now()->toFormattedDateString();
 
-        $userContext = "You are talking to a visitor in the public chat widget. They do not have an account open in this conversation, and nothing here is tied to any logged-in session.";
-        $helpingThemAct = "Most visitors are deciding whether i-PESO is worth signing up for, or are unsure what to do next. When your answer shows that it can help them, end with one short concrete next step (e.g. which tab to open, what to prepare). Registration is free.";
+        $userContext = "You are talking to a GUEST in the public chat widget. They do not have an account yet. GUEST inquiries (mga madalas itanong) are strictly about what i-PESO is, how to register as a Job Seeker or Employer, and login or password inquiries. If they ask about internal features like applying to jobs, posting vacancies, or tracking applicants, politely explain that those features are for registered users and guide them to register.";
+        $helpingThemAct = "Most guests are deciding whether i-PESO is worth signing up for. When your answer shows that it can help them, end with one short concrete next step (e.g. which tab to open, what to prepare). Registration is free.";
         
+        $platformKnowledge = "";
+
         if ($user) {
+            $platformKnowledge = "You have comprehensive knowledge of the entire i-PESO platform. This includes: NSRP profiles, ATS skill-tag matching, tracking application statuses (Pending, Reviewed, Shortlisted, Interview, Hired, Rejected), Government Programs (SPES, TUPAD), Employer Verification, posting Job Vacancies, centralized ATS screening, Establishment Reports, and Job Fairs. You can explain how any of these work if asked.";
+
             if ($user instanceof JobSeeker) {
-                $userContext = "You are talking to a registered Job Seeker named {$user->first_name} {$user->last_name}. They are using the mobile app or logged in to their dashboard. Focus exclusively on helping them find jobs, manage applications, and access government programs. Do NOT mention, suggest, or explain any features intended for employers (like posting jobs or employer verification) since this user is strictly a job seeker.";
+                $userContext = "You are talking to a registered Job Seeker named {$user->first_name} {$user->last_name}. They are logged in to their dashboard. While you can answer questions about any platform feature, remember their role. If they ask how to post a job, explain how it works but clarify that they would need an Employer account.";
                 $helpingThemAct = "The user is already a registered Job Seeker. Do NOT tell them to sign up or register. End your helpful answers with one short concrete next step in their dashboard or app.";
             } elseif ($user instanceof Employer) {
-                $userContext = "You are talking to a registered Employer representing {$user->company_name}. They are logged in to their dashboard. Focus exclusively on helping them post job vacancies, manage applicants, handle establishment reports, and participate in job fairs. Do NOT mention, suggest, or explain any features intended for job seekers (like finding jobs or applying to programs) since this user is strictly an employer.";
+                $userContext = "You are talking to a registered Employer representing {$user->company_name}. They are logged in to their dashboard. While you can answer questions about any platform feature, remember their role. If they ask how to apply for a job, explain how it works but clarify that they would need a Job Seeker account.";
                 $helpingThemAct = "The user is already a registered Employer. Do NOT tell them to sign up or register. End your helpful answers with one short concrete next step in their dashboard.";
-            } elseif ($user instanceof Administrator) {
-                $userContext = "You are talking to an Administrator of the PESO office.";
-                $helpingThemAct = "The user is an Administrator. Provide concise answers to help them manage the portal.";
             }
         }
 
@@ -318,6 +319,8 @@ class GeminiChatService
         encouraging, and easy to talk to — many visitors are anxious about finding work.
 
         {$userContext}
+        
+        {$platformKnowledge}
 
         LANGUAGE
         Mirror the visitor's language exactly. Tagalog question, Tagalog answer. Taglish question,
@@ -339,9 +342,8 @@ class GeminiChatService
         You cannot check application status, verify or approve an account, reset a password, or see
         another person's personal record. If an authenticated seeker or employer asks about their own records,
         use the role-specific private tool when it is available. Treat its results as a limited status summary:
-        never invent missing fields, never expose another person's data, and never make a verification, hiring,
-        or approval decision. Guests and administrators have no private chatbot lookup; direct them to the
-        appropriate dashboard or PESO staff.
+        never invent missing fields, never expose another person's personal details, and never make a verification, hiring,
+        or approval decision. Guests have no private chatbot lookup; direct them to log in or ask PESO staff.
 
         Never ask the visitor for personal information — no full name, address, birth date,
         password, TIN, ID number, or other sensitive or contact details. This is a public chat and

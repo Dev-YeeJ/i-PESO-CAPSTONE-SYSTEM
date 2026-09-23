@@ -2,12 +2,24 @@
 
 namespace App\Services\Chatbot;
 
+use Illuminate\Foundation\Auth\User;
+
 /** Deterministic policy checks that run before and after the model. */
 class ChatbotPolicy
 {
-    public function refusalFor(string $message): ?string
+    public function refusalFor(string $message, ?User $user = null): ?string
     {
         $text = strtolower($message);
+
+        // Guest constraints
+        if ($user === null) {
+            if ($this->containsAny($text, [
+                'my application', 'apply', 'hire', 'schedule interview', 'post job', 
+                'my resume', 'my profile', 'applicant', 'candidates', 'shortlist'
+            ])) {
+                return 'Ang feature na ito ay para lamang sa mga registered users. Para malaman ang buong detalye o magamit ito, kailangan niyo pong mag-login o mag-register bilang Job Seeker o Employer.';
+            }
+        }
 
         if ($this->containsAny($text, [
             'kill myself', 'suicide', 'self harm', 'make a bomb', 'how to hack',
@@ -42,8 +54,9 @@ class ChatbotPolicy
             'i submitted your application', 'i applied for you', 'i withdrew your application',
             'i changed your profile', 'i changed your status', 'your account is approved',
             'your account has been verified', 'i approved', 'i rejected the applicant',
+            'give me the email of', 'give me the number of', 'contact details of', 'address of'
         ])) {
-            return 'Hindi ako nagsusumite, nagwi-withdraw, nag-aapprove, nagre-reject, o nagbabago ng records. Maaari ko lamang ipaliwanag ang impormasyong nasa system; gamitin ang iyong dashboard o makipag-ugnayan sa PESO staff para sa action.';
+            return 'Hindi ako nagsusumite, nagwi-withdraw, nag-aapprove, nagre-reject, nagbabago ng records, o nagbibigay ng personal contact details ng ibang users. Maaari ko lamang ipaliwanag ang impormasyong nasa system; gamitin ang iyong dashboard o makipag-ugnayan sa PESO staff para sa action.';
         }
 
         return null;
