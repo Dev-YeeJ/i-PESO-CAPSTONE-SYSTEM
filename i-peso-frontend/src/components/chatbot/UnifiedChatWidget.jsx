@@ -261,12 +261,7 @@ export default function UnifiedChatWidget() {
                           <JobFairCard fairs={message.toolResults.list_job_fairs.upcoming_job_fairs} />
                         </div>
                       )}
-                      
-                      {message.role === 'model' && !hasJobs && !hasFairs && index === messages.length - 1 && (
-                         <div className="mt-2 w-full max-w-sm">
-                           <ActionButtons context="default" onActionSelected={send} />
-                         </div>
-                      )}
+
                     </div>
                   </div>
                   {message.officeLocation && <InlineOfficeMap address={message.officeLocation.address} />}
