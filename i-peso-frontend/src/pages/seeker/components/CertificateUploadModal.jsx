@@ -26,7 +26,6 @@ const initialForm = {
   issuedAt: '',
   expiresAt: '',
   credentialNumber: '',
-  description: '',
   trainingId: '',
   file: null,
 }
@@ -41,7 +40,10 @@ export default function CertificateUploadModal({ open, trainings = [], onClose, 
   const [saving, setSaving] = useState(false)
   const [progress, setProgress] = useState(0)
 
-  const detailsComplete = Boolean(form.title.trim() && form.issuingBody.trim() && form.category && form.issuedAt)
+  const effectiveTitle = selectedTraining ? selectedTraining.course : form.title.trim()
+  const effectiveIssuingBody = selectedTraining ? (selectedTraining.training_institution || 'Training Provider') : form.issuingBody.trim()
+
+  const detailsComplete = Boolean(effectiveTitle && effectiveIssuingBody && form.category && form.issuedAt)
   const selectedTraining = useMemo(
     () => trainings.find((training) => String(training.id) === String(form.trainingId)),
     [form.trainingId, trainings],
@@ -74,7 +76,7 @@ export default function CertificateUploadModal({ open, trainings = [], onClose, 
     event.preventDefault()
     if (saving) return
 
-    const errors = validate(form, trainings)
+    const errors = validate(form, trainings, selectedTraining)
     setFieldErrors(errors)
     setGeneralError('')
     if (Object.keys(errors).length) {
@@ -87,13 +89,12 @@ export default function CertificateUploadModal({ open, trainings = [], onClose, 
     }
 
     const payload = new FormData()
-    payload.append('title', form.title.trim())
-    payload.append('issuing_body', form.issuingBody.trim())
+    payload.append('title', effectiveTitle)
+    payload.append('issuing_body', effectiveIssuingBody)
     payload.append('category', form.category)
     payload.append('issued_at', form.issuedAt)
     if (form.expiresAt) payload.append('expires_at', form.expiresAt)
     if (form.credentialNumber.trim()) payload.append('credential_number', form.credentialNumber.trim())
-    if (form.description.trim()) payload.append('description', form.description.trim())
     if (form.trainingId) payload.append('training_id', form.trainingId)
     payload.append('certificate_file', form.file)
 
@@ -149,14 +150,11 @@ export default function CertificateUploadModal({ open, trainings = [], onClose, 
               <p className="mt-1 text-xs leading-5 text-slate-500">Fields marked with an asterisk are required before the proof can be saved.</p>
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Certificate / Training Title" required error={fieldErrors.title}>
-                <input value={form.title} onChange={(event) => update('title', event.target.value)} maxLength={255} placeholder="e.g. Computer Systems Servicing NC II" className={inputClass} />
-              </Field>
-              <Field label="Issuing Organization / Provider" required error={fieldErrors.issuingBody}>
-                <input value={form.issuingBody} onChange={(event) => update('issuingBody', event.target.value)} maxLength={255} placeholder="e.g. TESDA" className={inputClass} />
-              </Field>
               <Field label="Category / Type" required error={fieldErrors.category}>
-                <select value={form.category} onChange={(event) => update('category', event.target.value)} className={inputClass}>
+                <select value={form.category} onChange={(event) => {
+                  update('category', event.target.value)
+                  if (!CATEGORIES_REQUIRING_TRAINING.includes(event.target.value)) update('trainingId', '')
+                }} className={inputClass}>
                   <option value="">Select certificate category</option>
                   {categories.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
                 </select>
@@ -169,18 +167,27 @@ export default function CertificateUploadModal({ open, trainings = [], onClose, 
                   ))}
                 </select>
               </Field>
+
+              {!selectedTraining && (
+                <>
+                  <Field label="Certificate / Training Title" required error={fieldErrors.title}>
+                    <input value={form.title} onChange={(event) => update('title', event.target.value)} maxLength={255} placeholder="e.g. Computer Systems Servicing NC II" className={inputClass} />
+                  </Field>
+                  <Field label="Issuing Organization / Provider" required error={fieldErrors.issuingBody}>
+                    <input value={form.issuingBody} onChange={(event) => update('issuingBody', event.target.value)} maxLength={255} placeholder="e.g. TESDA" className={inputClass} />
+                  </Field>
+                </>
+              )}
+
               <Field label="Issue Date" required error={fieldErrors.issuedAt}>
                 <input type="date" max={today} value={form.issuedAt} onChange={(event) => update('issuedAt', event.target.value)} className={inputClass} />
               </Field>
               <Field label="Expiration Date" hint="Optional" error={fieldErrors.expiresAt}>
                 <input type="date" min={form.issuedAt || undefined} value={form.expiresAt} onChange={(event) => update('expiresAt', event.target.value)} className={inputClass} />
               </Field>
-              <Field label="Credential Number" hint="Optional" error={fieldErrors.credentialNumber}>
-                <input value={form.credentialNumber} onChange={(event) => update('credentialNumber', event.target.value)} maxLength={100} placeholder="Certificate or license number" className={inputClass} />
-              </Field>
               <div className="sm:col-span-2">
-                <Field label="Description / Remarks" hint="Optional" error={fieldErrors.description}>
-                  <textarea rows={3} value={form.description} onChange={(event) => update('description', event.target.value)} maxLength={2000} placeholder="Add relevant details about this credential." className={`${inputClass} resize-y`} />
+                <Field label="Credential Number" hint="Optional" error={fieldErrors.credentialNumber}>
+                  <input value={form.credentialNumber} onChange={(event) => update('credentialNumber', event.target.value)} maxLength={100} placeholder="Certificate or license number" className={inputClass} />
                 </Field>
               </div>
             </div>
@@ -237,10 +244,10 @@ function Field({ label, required = false, hint = '', error, children }) {
   )
 }
 
-function validate(form, trainings = []) {
+function validate(form, trainings = [], selectedTraining = null) {
   const errors = {}
-  if (!form.title.trim()) errors.title = 'Certificate title is required.'
-  if (!form.issuingBody.trim()) errors.issuingBody = 'Issuing organization is required.'
+  if (!selectedTraining && !form.title.trim()) errors.title = 'Certificate title is required.'
+  if (!selectedTraining && !form.issuingBody.trim()) errors.issuingBody = 'Issuing organization is required.'
   if (!form.category) errors.category = 'Select a certificate category.'
   if (CATEGORIES_REQUIRING_TRAINING.includes(form.category) && !form.trainingId) {
     errors.trainingId = trainings.length === 0
@@ -267,7 +274,6 @@ function mapServerErrors(errors) {
     issued_at: 'issuedAt',
     expires_at: 'expiresAt',
     credential_number: 'credentialNumber',
-    description: 'description',
     training_id: 'trainingId',
     certificate_file: 'file',
   }
