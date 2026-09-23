@@ -8,15 +8,23 @@ table{width:100%;border-collapse:collapse;margin-bottom:4px}
 th,td{border:1px solid #cbd5e1;padding:3px 5px;text-align:left;font-size:9px;vertical-align:top}
 th{background:#f1f5f9}
 .metrics td.label{font-weight:bold;width:45%}
+.letterhead{width:100%;margin-bottom:16px;border:none}
+.letterhead td{border:none;vertical-align:middle;padding:0}
 </style></head><body>
 
-<h1>{{ $report->title }}</h1>
-<div class="meta">
-    {{ ucwords(str_replace('_', ' ', $report->report_category)) }} ·
-    Coverage {{ \Illuminate\Support\Carbon::parse($report->coverage_start)->format('M d, Y') }}
-    – {{ \Illuminate\Support\Carbon::parse($report->coverage_end)->format('M d, Y') }} ·
-    Generated {{ $report->created_at->format('M d, Y h:i A') }}
-</div>
+<table class="letterhead"><tr>
+    <td style="width:52px"><img src="{{ public_path('images/urdaneta-city-seal.jpg') }}" alt="" style="width:52px"></td>
+    <td style="text-align:center">
+        <h1>{{ $report->title }}</h1>
+        <div class="meta" style="margin-bottom:0">
+            {{ ucwords(str_replace('_', ' ', $report->report_category)) }} ·
+            Coverage {{ \Illuminate\Support\Carbon::parse($report->coverage_start)->format('M d, Y') }}
+            – {{ \Illuminate\Support\Carbon::parse($report->coverage_end)->format('M d, Y') }} ·
+            Generated {{ $report->created_at->format('M d, Y h:i A') }}
+        </div>
+    </td>
+    <td style="width:52px;text-align:right"><img src="{{ public_path('images/peso-urdaneta-seal.jpg') }}" alt="" style="width:52px"></td>
+</tr></table>
 
 @forelse($blocks as $block)
   <div class="block">

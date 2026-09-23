@@ -10,6 +10,8 @@ import { adminService } from '@/services/adminService'
 import JobFairsCalendar from './components/JobFairsCalendar'
 import { LayoutList, Calendar as CalendarIcon } from 'lucide-react'
 
+const MotionDiv = motion.div
+
 const formatDate = (value) => value ? new Date(value).toLocaleDateString() : 'TBD'
 
 const metricTiles = [
@@ -95,7 +97,7 @@ export default function JobFairsListPage() {
 
   return (
     <div className="mx-auto max-w-7xl space-y-10 pb-12">
-      <motion.div 
+      <MotionDiv
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, ease: "easeOut" }}
@@ -120,7 +122,7 @@ export default function JobFairsListPage() {
             </Button>
           </div>
         </div>
-      </motion.div>
+      </MotionDiv>
 
       <motion.section 
         initial="hidden"
@@ -217,7 +219,6 @@ export default function JobFairsListPage() {
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-3">
                     <StatusBadge status={fair.status} />
-                    <span className="rounded-full bg-slate-100 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-slate-600 shadow-inner">{fair.sector}</span>
                   </div>
                   <h2 className="mt-4 truncate text-2xl font-black tracking-tight text-slate-950 sm:text-3xl">{fair.title}</h2>
                 </div>

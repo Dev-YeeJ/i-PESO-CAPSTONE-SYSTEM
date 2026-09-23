@@ -463,7 +463,7 @@ class SkillTaxonomyMatchingTest extends TestCase
         );
     }
 
-    public function test_enhanced_match_uses_dynamic_professional_weights_without_location_factor(): void
+    public function test_enhanced_match_uses_fixed_weights_for_professional_subcodes_without_location_factor(): void
     {
         $occupation = Occupation::query()->create([
             'psoc_code' => '2512',
@@ -520,18 +520,18 @@ class SkillTaxonomyMatchingTest extends TestCase
         $this->assertSame([
             'occupation' => 30,
             'skills' => 40,
-            'experience' => 10,
-            'education' => 20,
+            'experience' => 20,
+            'education' => 10,
         ], $match['weights']);
         $this->assertSame(100, array_sum($match['weights']));
         $this->assertTrue($match['location_excluded']);
         $this->assertArrayNotHasKey('location', $match['factors']);
-        $this->assertSame('professionals_managers', $match['weighting_rule']['rule']);
+        $this->assertSame('fixed_weights', $match['weighting_rule']['rule']);
         $this->assertSame(100.0, $match['factors']['skills']['score']);
         $this->assertSame([], $match['missing_critical_skills']);
     }
 
-    public function test_enhanced_match_applies_manual_labor_weights_and_recency_decay(): void
+    public function test_enhanced_match_uses_fixed_weights_for_manual_labor_subcodes_and_recency_decay(): void
     {
         $occupation = Occupation::query()->create([
             'psoc_code' => '9211',
@@ -576,10 +576,10 @@ class SkillTaxonomyMatchingTest extends TestCase
         $this->assertSame([
             'occupation' => 30,
             'skills' => 40,
-            'experience' => 30,
-            'education' => 0,
+            'experience' => 20,
+            'education' => 10,
         ], $match['weights']);
-        $this->assertSame('elementary_manual_labor', $match['weighting_rule']['rule']);
+        $this->assertSame('fixed_weights', $match['weighting_rule']['rule']);
         $this->assertSame(50.0, $match['factors']['experience']['score']);
         $this->assertSame(0.5, $match['factors']['experience']['details']['details'][0]['recency_multiplier']);
         $this->assertSame('ended_more_than_5_years_ago', $match['factors']['experience']['details']['details'][0]['recency_bucket']);
@@ -621,6 +621,12 @@ class SkillTaxonomyMatchingTest extends TestCase
 
         $match = app(EnhancedJobMatchingService::class)->calculateMatch($vacancy, $seeker);
 
+        $this->assertSame([
+            'occupation' => 30,
+            'skills' => 40,
+            'experience' => 20,
+            'education' => 10,
+        ], $match['weights']);
         $this->assertSame(100.0, $match['factors']['skills']['score']);
         $this->assertSame([], $match['missing_critical_skills']);
     }

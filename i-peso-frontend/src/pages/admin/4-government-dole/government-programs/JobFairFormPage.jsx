@@ -13,6 +13,8 @@ import { isBefore, parseISO } from 'date-fns'
 import { useDropzone } from 'react-dropzone'
 import { toast } from 'sonner'
 
+const MotionDiv = motion.div
+
 const emptyForm = {
   title: '',
   description: '',
@@ -31,7 +33,6 @@ const emptyForm = {
   end_date: '',
   start_time: '08:00',
   end_time: '17:00',
-  sector: 'local',
   partner_agencies: [],
   submission_deadline: '',
   maximum_representatives: 2,
@@ -55,7 +56,6 @@ const schema = z.object({
   end_date: z.string().optional(),
   start_time: z.string().min(1, 'Start time is required.'),
   end_time: z.string().min(1, 'End time is required.'),
-  sector: z.enum(['local', 'overseas', 'both']),
   partner_agencies: z.array(z.string()).default([]),
   submission_deadline: z.string().optional().nullable(),
   maximum_representatives: z.coerce.number().min(1, 'At least 1 representative required.').max(10, 'Maximum 10 representatives allowed.'),
@@ -117,7 +117,6 @@ export default function JobFairFormPage() {
           end_date: endDate,
           start_time: (fair.start_time ?? '08:00').slice(0, 5),
           end_time: (fair.end_time ?? '17:00').slice(0, 5),
-          sector: fair.sector ?? 'local',
           partner_agencies: fair.partner_agencies ?? [],
           submission_deadline: fair.submission_deadline?.slice(0, 10) ?? '',
           maximum_representatives: fair.maximum_representatives ?? 2,
@@ -257,7 +256,7 @@ export default function JobFairFormPage() {
           className={`grid gap-6 ${id ? 'xl:grid-cols-[minmax(0,1fr)_320px]' : ''}`}
         >
           <motion.div variants={{ hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.1 } } }} className="space-y-6">
-            <motion.div variants={{ hidden: { opacity: 0, y: 10 }, show: { opacity: 1, y: 0 } }}>
+            <MotionDiv variants={{ hidden: { opacity: 0, y: 10 }, show: { opacity: 1, y: 0 } }}>
               <Card>
                 <CardHeader title="Basic Info" subtitle="What job seekers and employers see first." />
                 <div className="space-y-5">
@@ -271,15 +270,6 @@ export default function JobFairFormPage() {
                     <textarea {...register('description')} rows={4} className={`mt-2 w-full rounded-lg border ${errors.description ? 'border-red-400 focus:ring-red-100' : 'border-slate-300 focus:ring-blue-100 focus:border-blue-500'} px-4 py-2.5 text-sm focus:outline-none focus:ring-2`} />
                     {errors.description && <p className="mt-1 text-xs font-semibold text-red-600">{errors.description.message}</p>}
                   </div>
-                  <div>
-                    <label className="block text-sm font-bold text-slate-700">Sector</label>
-                    <select {...register('sector')} className="mt-2 w-full max-w-xs rounded-lg border border-slate-300 px-4 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100">
-                      <option value="local">Local</option>
-                      <option value="overseas">Overseas</option>
-                      <option value="both">Both</option>
-                    </select>
-                  </div>
-                  
                   {/* Dropzone Integration */}
                   <div>
                     <label className="block text-sm font-bold text-slate-700 mb-2">Event Flyer / Banner (Optional)</label>
@@ -300,7 +290,7 @@ export default function JobFairFormPage() {
                   </div>
                 </div>
               </Card>
-            </motion.div>
+            </MotionDiv>
 
             <motion.div variants={{ hidden: { opacity: 0, y: 10 }, show: { opacity: 1, y: 0 } }}>
               <Card>

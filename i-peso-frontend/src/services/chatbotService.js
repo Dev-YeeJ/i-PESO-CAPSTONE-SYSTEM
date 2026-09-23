@@ -28,13 +28,23 @@ export const chatbotService = {
         history: history.slice(-MAX_HISTORY_TURNS),
       })
 
-      return { reply: data.reply, retryable: false, officeLocation: data.office_location ?? null }
+      return { 
+        reply: data.reply, 
+        retryable: false, 
+        officeLocation: data.office_location ?? null,
+        toolResults: data.tool_results ?? {}
+      }
     } catch (error) {
       // The API returns a visitor-safe `reply` even on 429/503, so prefer it
       // over inventing our own wording here.
       const reply = error.response?.data?.reply
       if (reply) {
-        return { reply, retryable: Boolean(error.response?.data?.retryable), officeLocation: null }
+        return { 
+          reply, 
+          retryable: Boolean(error.response?.data?.retryable), 
+          officeLocation: null,
+          toolResults: {}
+        }
       }
 
       // Network failure, timeout, or CORS — no response body to read.
@@ -44,6 +54,7 @@ export const chatbotService = {
           '(Could not reach the assistant — please check your connection.)',
         retryable: true,
         officeLocation: null,
+        toolResults: {}
       }
     }
   },

@@ -437,19 +437,11 @@ class ReportController extends Controller
         $jobFairs = \App\Models\JobFair::query()
             ->whereBetween(DB::raw('COALESCE(start_date, event_date)'), [$start->toDateString(), $end->toDateString()])
             ->whereIn('status', ['completed', 'closed'])->get();
-        // job_fairs.sector ('local'/'overseas'/'both') already exists and is
-        // used in the per-event 1.6 PDF — reuse it here for the 1.6.1/1.6.2/
-        // 1.6.3 monthly split instead of leaving it unsplit.
         $jobFairSection = [
             'fairs_conducted' => $jobFairs->count(), 'participating_companies' => 0,
             'vacancies_solicited' => 0, 'applicants' => 0, 'hots' => 0,
             'near_hired' => 0, 'rejected' => 0, 'self_service_reports' => 0, 'admin_proxy_reports' => 0,
-            'fairs_local' => 0, 'fairs_overseas' => 0, 'fairs_both' => 0,
         ];
-        foreach ($jobFairs as $jobFair) {
-            $sector = in_array($jobFair->sector, ['local', 'overseas', 'both'], true) ? $jobFair->sector : 'local';
-            $jobFairSection['fairs_' . $sector]++;
-        }
         foreach ($jobFairs as $jobFair) {
             $summary = $jobFairReports->sprs($jobFair);
             $jobFairSection['participating_companies'] += $summary['1.6.4_establishments_participated'];
@@ -613,33 +605,20 @@ class ReportController extends Controller
             $row('1_6', '1.6 Job Fairs conducted', 1, true, [
                 'curr_total' => $jf($current, 'fairs_conducted'), 'prev_total' => $jf($previous, 'fairs_conducted'), 'cum_total' => $jf($cumulative, 'fairs_conducted'),
             ]),
-            $row('1_6_1', '1.6.1 Local', 2, true, [
-                'curr_total' => $jf($current, 'fairs_local'), 'prev_total' => $jf($previous, 'fairs_local'), 'cum_total' => $jf($cumulative, 'fairs_local'),
-            ]),
-            $row('1_6_2', '1.6.2 Overseas', 2, true, [
-                'curr_total' => $jf($current, 'fairs_overseas'), 'prev_total' => $jf($previous, 'fairs_overseas'), 'cum_total' => $jf($cumulative, 'fairs_overseas'),
-            ]),
-            $row('1_6_3', '1.6.3 Local & Overseas', 2, true, [
-                'curr_total' => $jf($current, 'fairs_both'), 'prev_total' => $jf($previous, 'fairs_both'), 'cum_total' => $jf($cumulative, 'fairs_both'),
-            ]),
-            $row('1_6_4', '1.6.4 Establishments/Employers Participated', 2, true, [
+            $row('1_6_1', '1.6.1 Establishments/Employers Participated', 2, true, [
                 'curr_total' => $jf($current, 'participating_companies'), 'prev_total' => $jf($previous, 'participating_companies'), 'cum_total' => $jf($cumulative, 'participating_companies'),
+            ]),
+            $row('1_6_2', '1.6.2 Job Vacancies solicited/reported', 2, true, [
+                'curr_total' => $jf($current, 'vacancies_solicited'), 'prev_total' => $jf($previous, 'vacancies_solicited'), 'cum_total' => $jf($cumulative, 'vacancies_solicited'),
+            ]),
+            $row('1_6_3', '1.6.3 Job applicants registered', 2, true, [
+                'curr_total' => $jf($current, 'applicants'), 'prev_total' => $jf($previous, 'applicants'), 'cum_total' => $jf($cumulative, 'applicants'),
+            ]),
+            $row('1_6_4', '1.6.4 Total applicants placed/Hired-on-the-Spot (HOTS)', 2, true, [
+                'curr_total' => $jf($current, 'hots'), 'prev_total' => $jf($previous, 'hots'), 'cum_total' => $jf($cumulative, 'hots'),
             ]),
             $row('1_6_4_1', '1.6.4.1 Local', 3, false),
             $row('1_6_4_2', '1.6.4.2 Overseas', 3, false),
-            $row('1_6_5', '1.6.5 Job Vacancies solicited/reported', 2, true, [
-                'curr_total' => $jf($current, 'vacancies_solicited'), 'prev_total' => $jf($previous, 'vacancies_solicited'), 'cum_total' => $jf($cumulative, 'vacancies_solicited'),
-            ]),
-            $row('1_6_5_1', '1.6.5.1 Local', 3, false),
-            $row('1_6_5_2', '1.6.5.2 Overseas', 3, false),
-            $row('1_6_6', '1.6.6 Job applicants registered', 2, true, [
-                'curr_total' => $jf($current, 'applicants'), 'prev_total' => $jf($previous, 'applicants'), 'cum_total' => $jf($cumulative, 'applicants'),
-            ]),
-            $row('1_6_7', '1.6.7 Total applicants placed/Hired-on-the-Spot (HOTS)', 2, true, [
-                'curr_total' => $jf($current, 'hots'), 'prev_total' => $jf($previous, 'hots'), 'cum_total' => $jf($cumulative, 'hots'),
-            ]),
-            $row('1_6_7_1', '1.6.7.1 Local', 3, false),
-            $row('1_6_7_2', '1.6.7.2 Overseas', 3, false),
 
             $section('sec_lmi', 'B. LABOR MARKET INFORMATION (LMI) PROGRAM'),
             $row('lmi_1', '1. Individuals/institutions provided with labor market information', 1, false),

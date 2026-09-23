@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { createElement, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { BriefcaseBusiness, Building2, CalendarDays, CheckCircle2, MapPin, QrCode, UsersRound, CalendarClock } from 'lucide-react'
 import { AlertBox, Button, Card, CardHeader, EmptyState, LoadingSkeleton } from '@/components/ui'
@@ -98,7 +98,7 @@ export default function JobFairFeed() {
                       <div>
                         <div className="flex flex-wrap items-center gap-2">
                           <span className="inline-flex rounded-full border border-blue-100 bg-blue-50 px-3 py-1.5 text-[11px] uppercase tracking-wider font-extrabold text-blue-700">
-                            {fair.target_sector || fair.sector || 'Multi-sector'}
+                            {fair.target_sector || 'All sectors'}
                           </span>
                           <EmployerCountBadge count={fair.participating_employers?.length ?? 0} />
                         </div>
@@ -216,11 +216,11 @@ function EmployerCountBadge({ count }) {
   )
 }
 
-function Info({ icon: Icon, label, value }) {
+function Info({ icon: InfoIcon, label, value }) {
   return (
     <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4 flex items-start gap-4">
        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white shadow-sm border border-slate-100">
-          <Icon className="h-5 w-5 text-indigo-400" />
+          {createElement(InfoIcon, { className: 'h-5 w-5 text-indigo-400' })}
        </div>
        <div>
          <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">{label}</p>

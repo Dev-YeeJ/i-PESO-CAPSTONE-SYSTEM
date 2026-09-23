@@ -35,14 +35,12 @@ class JobFairController extends Controller
         $filters = $request->validate([
             'search' => ['nullable', 'string', 'max:255'],
             'status' => ['nullable', Rule::in(['draft', 'published', 'accepting_employers', 'closed', 'completed', 'cancelled', 'upcoming', 'ongoing'])],
-            'sector' => ['nullable', Rule::in(['local', 'overseas', 'both'])],
             'sort' => ['nullable', Rule::in(['newest', 'oldest', 'title'])],
             'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
         ]);
         $query = JobFair::query();
         if ($filters['search'] ?? null) $query->where('title', 'like', '%'.$filters['search'].'%');
         if ($filters['status'] ?? null) $query->where('status', $filters['status']);
-        if ($filters['sector'] ?? null) $query->where('sector', $filters['sector']);
         match ($filters['sort'] ?? 'newest') {
             'oldest' => $query->orderByRaw('COALESCE(start_date, event_date) asc'),
             'title' => $query->orderBy('title'),
@@ -316,7 +314,7 @@ class JobFairController extends Controller
         $search = $validated['search'] ?? null;
 
         $attendees = JobFairAttendee::query()
-            ->with('seeker:seeker_id,first_name,last_name,mobile_number')
+            ->with('seeker:seeker_id,first_name,last_name,mobile_number,email')
             ->where('job_fair_id', $jobFair->job_fair_id)
             ->when($search, fn ($query) => $query->where(function ($outer) use ($search) {
                 $outer->whereHas('seeker', function ($seekerQuery) use ($search) {
@@ -327,17 +325,21 @@ class JobFairController extends Controller
                     ->orWhere('guest_name', 'like', "%{$search}%")
                     ->orWhere('guest_mobile_number', 'like', "%{$search}%");
             }))
-            ->orderBy('id', 'desc')
-            ->limit(20)
+            ->orderByDesc('is_attended')
+            ->orderByDesc('scanned_at')
+            ->orderByDesc('id')
+            ->limit(100)
             ->get()
             ->map(fn (JobFairAttendee $attendee) => [
                 'id' => $attendee->id,
                 'seeker_id' => $attendee->seeker_id,
                 'name' => $attendee->seeker ? trim("{$attendee->seeker->first_name} {$attendee->seeker->last_name}") : $attendee->guest_name,
                 'mobile_number' => $attendee->seeker?->mobile_number ?? $attendee->guest_mobile_number,
+                'email' => $attendee->seeker?->email ?? $attendee->guest_email,
                 'is_guest' => $attendee->seeker_id === null,
                 'is_attended' => (bool) $attendee->is_attended,
                 'scanned_at' => $attendee->scanned_at?->toISOString(),
+                'preferred_job' => $attendee->guest_preferred_job,
             ])
             ->values();
 
@@ -580,7 +582,7 @@ class JobFairController extends Controller
         $resultReport->update([
             'status' => $validated['status'],
             'reviewed_by_admin_id' => $admin->admin_id,
-            'review_remarks' => $validated['admin_remarks'],
+            'review_remarks' => $validated['admin_remarks'] ?? null,
         ]);
 
         return response()->json([
@@ -823,7 +825,7 @@ class JobFairController extends Controller
             // (possibly historical) record isn't held to that.
             'start_date' => $partial ? [$required, 'date'] : [$required, 'date', 'after_or_equal:today'],
             'end_date' => [$required, 'date', 'after_or_equal:start_date'],
-            'venue' => [$required, 'string', 'max:500'], 'sector' => [$required, Rule::in(['local', 'overseas', 'both'])],
+            'venue' => [$required, 'string', 'max:500'],
             // Structured PSGC location, mirroring how job vacancy posting captures
             // its work address — same field names so the same map picker UI applies.
             'province' => [$required, 'string', 'max:100'], 'province_code' => ['nullable', 'string', 'max:20'],

@@ -261,9 +261,7 @@ class JobFairReportService
         $reports = $fair->resultReports()->where('status', 'approved')->get();
 
         return [
-            '1.6.1_fairs_conducted_local' => in_array($fair->sector, ['local', 'both'], true) ? 1 : 0,
-            '1.6.2_fairs_conducted_overseas' => in_array($fair->sector, ['overseas', 'both'], true) ? 1 : 0,
-            '1.6.3_total_fairs_conducted' => 1,
+            '1.6.1_total_fairs_conducted' => 1,
             '1.6.4_establishments_participated' => $reports->count(),
             '1.6.5_job_vacancies_solicited' => (int) $reports->sum('total_vacancies_solicited'),
             '1.6.6_job_applicants_registered' => (int) $reports->sum('total_applicants'),

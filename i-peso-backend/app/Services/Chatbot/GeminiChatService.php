@@ -26,7 +26,10 @@ class GeminiChatService
      */
     private const MAX_TOOL_ROUNDS = 4;
 
-    public function __construct(private readonly PublicChatTools $tools)
+    public function __construct(
+        private readonly PublicChatTools $tools,
+        private readonly ChatbotPolicy $policy,
+    )
     {
     }
 
@@ -50,6 +53,8 @@ class GeminiChatService
             'parts' => [['text' => $turn['text']]],
         ], $history);
 
+        $accumulatedToolResults = [];
+
         for ($round = 0; $round < self::MAX_TOOL_ROUNDS; $round++) {
             $parts = $this->send($contents, $user);
 
@@ -61,10 +66,14 @@ class GeminiChatService
             // No tool requested — this is the actual answer.
             if ($calls === []) {
                 $text = $this->extractText($parts);
+                if ($refusal = $this->policy->actionClaimRefusal($text)) {
+                    $text = $refusal;
+                }
 
                 return [
                     'text' => $text,
                     'office_location' => $this->officeLocationIfAsked($text, $lastQuestion),
+                    'tool_results' => $accumulatedToolResults,
                 ];
             }
 
@@ -76,14 +85,17 @@ class GeminiChatService
             $responses = [];
             foreach ($calls as $call) {
                 $name = $call['name'] ?? '';
+                $toolResult = $this->tools->execute($name, $call['args'] ?? [], $user);
+                
                 $responses[] = [
                     'functionResponse' => [
                         'name' => $name,
                         // Cast for the same reason as asMaps() below: a tool
                         // that returned nothing must still serialise as {}.
-                        'response' => (object) $this->tools->execute($name, $call['args'] ?? []),
+                        'response' => (object) $toolResult,
                     ],
                 ];
+                $accumulatedToolResults[$name] = $toolResult;
             }
 
             $contents[] = ['role' => 'user', 'parts' => $responses];
@@ -95,6 +107,7 @@ class GeminiChatService
             'text' => 'Pasensya po, hindi ko po masagot iyan ngayon. Maaari po kayong magtanong sa '
                 . 'PESO office ng Urdaneta City. (Sorry — I could not resolve that one.)',
             'office_location' => null,
+            'tool_results' => [],
         ];
     }
 
@@ -156,13 +169,19 @@ class GeminiChatService
             ->post("{$config['base_url']}/models/{$config['model']}:generateContent", [
                 'systemInstruction' => ['parts' => [['text' => $this->systemInstruction($user)]]],
                 'contents' => $contents,
-                'tools' => [['functionDeclarations' => $this->tools->declarations()]],
+                'tools' => [['functionDeclarations' => $this->tools->declarations($user)]],
                 'generationConfig' => [
                     // Low temperature: this assistant recites government
                     // requirements, so we want the least creative reading of
                     // whatever the tools returned.
                     'temperature' => 0.2,
                     'maxOutputTokens' => 800,
+                ],
+                'safetySettings' => [
+                    ['category' => 'HARM_CATEGORY_HARASSMENT', 'threshold' => 'BLOCK_MEDIUM_AND_ABOVE'],
+                    ['category' => 'HARM_CATEGORY_HATE_SPEECH', 'threshold' => 'BLOCK_MEDIUM_AND_ABOVE'],
+                    ['category' => 'HARM_CATEGORY_SEXUALLY_EXPLICIT', 'threshold' => 'BLOCK_MEDIUM_AND_ABOVE'],
+                    ['category' => 'HARM_CATEGORY_DANGEROUS_CONTENT', 'threshold' => 'BLOCK_MEDIUM_AND_ABOVE'],
                 ],
             ]);
 
@@ -313,11 +332,12 @@ class GeminiChatService
         {$this->knowledgeSection()}
 
         WHAT YOU CANNOT DO
-        You cannot check application status, verify or approve an account, look anything up in a
-        specific person's dashboard, reset a password, or see any personal record, unless provided by a tool.
-        If asked about something specific to their records that you don't have, tell them to check their
-        own Dashboard, or direct them to a PESO Administrator, who makes all final verification and approval decisions — you never
-        promise, guarantee, or imply one yourself.
+        You cannot check application status, verify or approve an account, reset a password, or see
+        another person's personal record. If an authenticated seeker or employer asks about their own records,
+        use the role-specific private tool when it is available. Treat its results as a limited status summary:
+        never invent missing fields, never expose another person's data, and never make a verification, hiring,
+        or approval decision. Guests and administrators have no private chatbot lookup; direct them to the
+        appropriate dashboard or PESO staff.
 
         Never ask the visitor for personal information — no full name, address, birth date,
         password, TIN, ID number, or other sensitive or contact details. This is a public chat and

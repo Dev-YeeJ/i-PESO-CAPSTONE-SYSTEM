@@ -266,7 +266,6 @@ class JobFairService
             'map_eligible' => (bool) $fair->is_public
                 && in_array($fair->status, self::MAP_STATUSES, true)
                 && $fair->latitude !== null && $fair->longitude !== null,
-            'sector' => $fair->sector,
             'target_sector' => $fair->target_sector,
             'partner_agencies' => $fair->partner_agencies ?? [],
             'submission_deadline' => $fair->submission_deadline?->toIso8601String(),
@@ -614,9 +613,14 @@ class JobFairService
     {
         $participants = $fair->employerJoins()->get();
         $reports = $fair->resultReports()->get();
+        $attendees = Schema::hasTable('job_fair_attendees')
+            ? $fair->attendees()->get(['is_attended', 'seeker_id'])
+            : collect();
         $statusCount = fn (string $status): int => $participants->where('participation_status', $status)->count();
 
         return [
+            'seekers_rsvped' => $attendees->whereNotNull('seeker_id')->count(),
+            'attendance' => $attendees->where('is_attended', true)->count(),
             'total_invited' => $participants->whereNotNull('invited_at')->count(),
             'requirements_pending' => $statusCount('requirements_pending'),
             'under_review' => $statusCount('under_review'),

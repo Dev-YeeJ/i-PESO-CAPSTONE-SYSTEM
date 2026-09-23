@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { createElement, useEffect, useRef, useState } from 'react'
 import {
   MapPin, Send, X, Sparkles,
   UserPlus, Briefcase, CalendarDays, BadgeCheck,
@@ -8,6 +8,11 @@ import { chatbotService } from '@/services/chatbotService'
 import { useAuthStore } from '@/stores/authStore'
 import AceMascot from './AceMascot'
 import AceAvatarMark from './AceAvatarMark'
+
+import JobCardList from './RichComponents/JobCardList'
+import InteractiveMap from './RichComponents/InteractiveMap'
+import JobFairCard from './RichComponents/JobFairCard'
+import ActionButtons from './RichComponents/ActionButtons'
 
 /**
  * Unified chat widget — appears on every screen (guest, seeker, employer).
@@ -30,15 +35,15 @@ const GUEST_STARTERS = [
 ]
 
 const SEEKER_STARTERS = [
-  { icon: Briefcase, text: 'May bagong job match po ba para sa akin?' },
-  { icon: CheckCircle2, text: 'Paano ko malalaman kung na-shortlist ako?' },
-  { icon: UserCog, text: 'Paano mag-update ng aking profile o resume?' },
+  { icon: CheckCircle2, text: 'Ano po ang status ng mga application ko?' },
+  { icon: ClipboardList, text: 'May interview schedule po ba ako?' },
+  { icon: UserCog, text: 'Ano po ang kailangan para maging kumpleto ang profile?' },
   { icon: CalendarDays, text: 'Kailan po ang susunod na job fair?' },
 ]
 
 const EMPLOYER_STARTERS = [
   { icon: Briefcase, text: 'Paano mag-post ng bakante?' },
-  { icon: Users, text: 'Paano ko makikita ang mga aplikante?' },
+  { icon: Users, text: 'Ilan po ang aplikante sa mga bakante ko?' },
   { icon: ClipboardList, text: 'Paano gumawa ng placement report?' },
   { icon: CalendarDays, text: 'Paano mag-register sa job fair bilang employer?' },
 ]
@@ -165,7 +170,7 @@ export default function UnifiedChatWidget() {
 
     if (aceRef.current) { aceRef.current.play('thinking') }
 
-    const { reply, officeLocation, retryable } = await chatbotService.askPublic(question, history)
+    const { reply, officeLocation, retryable, toolResults } = await chatbotService.askPublic(question, history)
 
     if (retryable) {
       if (aceRef.current) { aceRef.current.play('error') }
@@ -173,7 +178,7 @@ export default function UnifiedChatWidget() {
       if (aceRef.current) { aceRef.current.play('success') }
     }
 
-    setMessages((current) => [...current, { role: 'model', text: reply, officeLocation }])
+    setMessages((current) => [...current, { role: 'model', text: reply, officeLocation, toolResults }])
     setBusy(false)
   }
 
@@ -229,17 +234,45 @@ export default function UnifiedChatWidget() {
               )}
             </div>
 
-            {messages.map((message, index) => (
-              <div key={`${message.role}-${index}`}>
-                <div className={`ipeso-chat-msg ${message.role === 'user' ? 'is-user' : 'is-ace'}`}>
-                  {message.role !== 'user' && <AceAvatarMark className="ipeso-chat-msg-avatar" />}
-                  <p className={`ipeso-chat-bubble ${message.role === 'user' ? 'is-user' : 'is-model'}`}>
-                    {linkifyText(message.text)}
-                  </p>
+            {messages.map((message, index) => {
+              const hasJobs = message.toolResults?.search_job_vacancies?.vacancies?.length > 0;
+              const hasFairs = message.toolResults?.list_job_fairs?.upcoming_job_fairs?.length > 0;
+
+              return (
+                <div key={`${message.role}-${index}`}>
+                  <div className={`ipeso-chat-msg ${message.role === 'user' ? 'is-user' : 'is-ace'}`}>
+                    {message.role !== 'user' && <AceAvatarMark className="ipeso-chat-msg-avatar" />}
+                    
+                    <div className="flex flex-col w-full">
+                      <p className={`ipeso-chat-bubble ${message.role === 'user' ? 'is-user' : 'is-model'}`}>
+                        {linkifyText(message.text)}
+                      </p>
+
+                      {message.role === 'model' && hasJobs && (
+                        <div className="mt-2 w-full max-w-sm">
+                          <InteractiveMap jobs={message.toolResults.search_job_vacancies.vacancies} />
+                          <JobCardList jobs={message.toolResults.search_job_vacancies.vacancies} />
+                          <ActionButtons context="jobs" onActionSelected={send} />
+                        </div>
+                      )}
+
+                      {message.role === 'model' && hasFairs && (
+                        <div className="mt-2 w-full max-w-sm">
+                          <JobFairCard fairs={message.toolResults.list_job_fairs.upcoming_job_fairs} />
+                        </div>
+                      )}
+                      
+                      {message.role === 'model' && !hasJobs && !hasFairs && index === messages.length - 1 && (
+                         <div className="mt-2 w-full max-w-sm">
+                           <ActionButtons context="default" onActionSelected={send} />
+                         </div>
+                      )}
+                    </div>
+                  </div>
+                  {message.officeLocation && <InlineOfficeMap address={message.officeLocation.address} />}
                 </div>
-                {message.officeLocation && <InlineOfficeMap address={message.officeLocation.address} />}
-              </div>
-            ))}
+              )
+            })}
 
             {busy && (
               <div className="ipeso-chat-msg is-ace">
@@ -255,7 +288,7 @@ export default function UnifiedChatWidget() {
                 <p className="ipeso-chat-starters-label">Mga Madalas Itanong</p>
                 {starters.map(({ icon: Icon, text }) => (
                   <button key={text} type="button" onClick={() => send(text)} className="ipeso-chat-starter">
-                    <Icon size={15} className="ipeso-chat-starter-icon" aria-hidden="true" />
+                    {createElement(Icon, { size: 15, className: 'ipeso-chat-starter-icon', 'aria-hidden': true })}
                     {text}
                   </button>
                 ))}

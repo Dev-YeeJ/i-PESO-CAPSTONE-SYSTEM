@@ -1,5 +1,9 @@
-<!doctype html><html><head><meta charset="utf-8"><style>body{font-family:DejaVu Sans,sans-serif;font-size:12px;line-height:1.65;color:#111827;margin:38px}.center{text-align:center}.date{text-align:right;margin:25px 0}.signature{margin-top:40px}.small{font-size:10px;color:#475569}</style></head><body>
-<div class="center"><strong>PUBLIC EMPLOYMENT SERVICE OFFICE</strong><br>Urdaneta City, Pangasinan</div>
+<!doctype html><html><head><meta charset="utf-8"><style>body{font-family:DejaVu Sans,sans-serif;font-size:12px;line-height:1.65;color:#111827;margin:38px}.center{text-align:center}.date{text-align:right;margin:25px 0}.signature{margin-top:40px}.small{font-size:10px;color:#475569}.letterhead{width:100%;border:none;margin-bottom:16px}.letterhead td{border:none;padding:0;vertical-align:middle}</style></head><body>
+<table class="letterhead"><tr>
+    <td style="width:52px"><img src="{{ public_path('images/urdaneta-city-seal.jpg') }}" alt="" style="width:52px"></td>
+    <td class="center"><strong>PUBLIC EMPLOYMENT SERVICE OFFICE</strong><br>Urdaneta City, Pangasinan</td>
+    <td style="width:52px;text-align:right"><img src="{{ public_path('images/peso-urdaneta-seal.jpg') }}" alt="" style="width:52px"></td>
+</tr></table>
 <div class="date">{{ now()->format('F d, Y') }}</div>
 <p><strong>{{ $recipientName ?: ($employer?->representative_name ?: 'HR Manager') }}</strong><br>{{ $employer?->company_name ?: 'Prospective Participating Employer' }}</p>
 <p>Dear Sir/Madam:</p>

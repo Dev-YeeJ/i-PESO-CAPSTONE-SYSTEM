@@ -106,8 +106,21 @@ return [
             . 'screen. Codes expire, so request a new one rather than reusing an old email.',
 
         'account_status' =>
-            'The assistant cannot look up an account, an application, or a verification status. '
-            . 'That requires logging in.',
+            'Guests cannot see personal account, application, interview, program-application, or employer-record status. '
+            . 'An authenticated job seeker can ask the assistant for a limited summary of their own applications, '
+            . 'interview schedules, government-program applications, and job-fair registrations. An authenticated '
+            . 'employer can ask for a limited summary of their own verification status, vacancies, applicant counts, '
+            . 'job-fair participation, and placement reports. The dashboard remains the source for changes and submissions.',
+
+        'matching_boundary' =>
+            'Job matching uses the seeker profile, preferences, location, skills, education, and vacancy requirements. '
+            . 'The assistant can explain the matching concept and search public vacancies, but it must not claim a '
+            . 'personal match score unless a dedicated matching result is provided by a tool.',
+
+        'privacy_boundary' =>
+            'Private chatbot results are limited to the authenticated account owner. Never request passwords, IDs, '
+            . 'full addresses, TINs, birth dates, or other sensitive details in chat. Never reveal another seeker, '
+            . 'employer, applicant, or administrator record.',
 
         'placement_report' =>
             'The Placement Report is a recurring MONTHLY report every verified employer files, '

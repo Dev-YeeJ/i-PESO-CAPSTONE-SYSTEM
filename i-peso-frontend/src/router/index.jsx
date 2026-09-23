@@ -71,8 +71,6 @@ const AdminEmployerReportDetail = lazy(() => import('@/pages/admin/2-constituent
 // Admin Pages - CATEGORY 3: EMPLOYMENT HUB
 const AdminJobPostingsList = lazy(() => import('@/pages/admin/3-employment-hub/job-postings/JobPostingsListPage'))
 const AdminJobPostingDetail = lazy(() => import('@/pages/admin/3-employment-hub/job-postings/JobPostingDetailPage'))
-const AdminSmartMatches = lazy(() => import('@/pages/admin/3-employment-hub/smart-matches/SmartMatchesPage'))
-const AdminMatchResults = lazy(() => import('@/pages/admin/3-employment-hub/smart-matches/MatchResultsPage'))
 
 // Admin Pages - CATEGORY 4: GOVERNMENT & DOLE
 const AdminGovernmentProgramsList = lazy(() => import('@/pages/admin/4-government-dole/government-programs/GovernmentProgramsListPage'))
@@ -204,8 +202,6 @@ export const router = createBrowserRouter([
                       // CATEGORY 3: EMPLOYMENT HUB
                       { path: 'job-postings', element: S(AdminJobPostingsList) },
                       { path: 'job-postings/:id', element: S(AdminJobPostingDetail) },
-                      { path: 'smart-matches', element: S(AdminSmartMatches) },
-                      { path: 'smart-matches/:matchId', element: S(AdminMatchResults) },
                       
                       // CATEGORY 4: GOVERNMENT & DOLE
                       { path: 'government-programs', element: S(AdminGovernmentProgramsList) },
