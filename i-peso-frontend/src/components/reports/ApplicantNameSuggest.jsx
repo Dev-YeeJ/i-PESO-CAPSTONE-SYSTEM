@@ -170,7 +170,7 @@ export default function ApplicantNameSuggest({ value, onChangeText, onSelect, se
         <div
           ref={dropdownRef}
           style={{ top: position.top, left: position.left, width: DROPDOWN_WIDTH, maxHeight: position.maxHeight }}
-          className="fixed z-[70] overflow-auto rounded-lg border border-slate-200 bg-white py-1 shadow-lg"
+          className="pointer-events-auto fixed z-[70] overflow-auto rounded-lg border border-slate-200 bg-white py-1 shadow-lg"
         >
           {loading && suggestions.length === 0 && (
             <div className="flex items-center gap-2 px-3 py-2 text-xs text-slate-400">
