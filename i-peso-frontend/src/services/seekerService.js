@@ -73,6 +73,11 @@ export const reportEmployer = async (employerId, payload) => {
   return response.data
 }
 
+export const getPublicEmployerProfile = async (employerId) => {
+  const response = await apiClient.get(`/seeker/employers/${employerId}`)
+  return response.data
+}
+
 export const uploadCertificate = async (formData, { onUploadProgress } = {}) => {
   const response = await apiClient.post('/seeker/certificates', formData, { onUploadProgress })
   return response.data

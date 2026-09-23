@@ -54,12 +54,12 @@ table{width:100%;border-collapse:collapse}
 @foreach($pages as $pageIndex => $pageEntries)
   <div class="page">
     <table class="letterhead"><tr>
-      <td style="width:52px"><img src="{{ public_path('images/peso-urdaneta-seal.jpg') }}" alt=""></td>
+      <td style="width:52px"><img src="{{ public_path('images/urdaneta-city-seal.jpg') }}" alt=""></td>
       <td style="text-align:center">
         <h1>ESTABLISHMENT REPORT</h1>
         <div class="code">RO1-JF Form 3 @if($totalPages > 1)<span class="page-of">&nbsp;&nbsp;·&nbsp;&nbsp;Page {{ $pageIndex + 1 }} of {{ $totalPages }}</span>@endif</div>
       </td>
-      <td style="width:52px;text-align:right"><img src="{{ public_path('images/urdaneta-city-seal.jpg') }}" alt=""></td>
+      <td style="width:52px;text-align:right"><img src="{{ public_path('images/peso-urdaneta-seal.jpg') }}" alt=""></td>
     </tr></table>
 
     <table class="header-row"><tr>

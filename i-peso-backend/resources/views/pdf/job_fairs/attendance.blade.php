@@ -16,14 +16,20 @@
     .badge { border-radius: 4px; padding: 2px 4px; font-size: 9px; font-weight: bold; }
     .walk-in { background-color: #fef3c7; color: #92400e; }
     .registered { background-color: #dcfce7; color: #166534; }
+    .letterhead { width: 100%; margin-bottom: 16px; border: none; }
+    .letterhead td { border: none; vertical-align: middle; padding: 0; }
   </style>
 </head>
 <body>
-  <div class="header">
-    <h2>Job Fair Attendance Report</h2>
-    <h3>{{ $fair->title }} &middot; {{ optional($fair->start_date ?? $fair->event_date)->format('F d, Y') }}</h3>
-    <h3>Total Checked-in: {{ count($rows) }}</h3>
-  </div>
+  <table class="letterhead"><tr>
+    <td style="width:52px"><img src="{{ public_path('images/urdaneta-city-seal.jpg') }}" alt="" style="width:52px"></td>
+    <td class="center">
+      <h2>Job Fair Attendance Report</h2>
+      <h3>{{ $fair->title }} &middot; {{ optional($fair->start_date ?? $fair->event_date)->format('F d, Y') }}</h3>
+      <h3>Total Checked-in: {{ count($rows) }}</h3>
+    </td>
+    <td style="width:52px;text-align:right"><img src="{{ public_path('images/peso-urdaneta-seal.jpg') }}" alt="" style="width:52px"></td>
+  </tr></table>
 
   <table>
     <thead>

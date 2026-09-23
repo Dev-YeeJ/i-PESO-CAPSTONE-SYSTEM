@@ -490,6 +490,9 @@ export default function VacancyATSPage() {
         loading={detailLoading}
         jobTitle={vacancy?.job_title}
         onScheduleInterview={(app) => { setModalTargets([app]); setActiveModal('interview') }}
+        onHire={(app) => { setModalTargets([app]); setActiveModal('hire') }}
+        onReject={(app) => { setModalTargets([app]); setActiveModal('reject') }}
+        onShortlist={(app) => { setModalTargets([app]); runStatusChange('shortlisted', [app]) }}
       />
       <InterviewModal
         open={activeModal === 'interview'}

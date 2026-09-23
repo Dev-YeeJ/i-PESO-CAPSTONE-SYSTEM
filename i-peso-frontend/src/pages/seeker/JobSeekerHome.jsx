@@ -27,6 +27,7 @@ import toast from 'react-hot-toast'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { StatCard } from '@/components/ui'
 import EmployerPreferenceChip from '@/components/jobs/EmployerPreferenceChip'
+import EmployerProfileModal from './EmployerProfileModal'
 import { applyToJob, getProfileImage, toggleSavedJob as toggleSavedJobApi } from '@/services/seekerService'
 
 const feedTabs = [
@@ -59,6 +60,7 @@ export default function JobSeekerHome({
   const [activeTab, setActiveTab] = useState('smart')
   const [sortMode, setSortMode] = useState('match')
   const [selectedJob, setSelectedJob] = useState(null)
+  const [selectedEmployerId, setSelectedEmployerId] = useState(null)
   const [savedJobIds, setSavedJobIds] = useState(profile?.dashboard_stats?.saved_jobs || [])
   const [appliedJobs, setAppliedJobs] = useState({})
   const [applyingJobIds, setApplyingJobIds] = useState([])
@@ -348,6 +350,7 @@ export default function JobSeekerHome({
                         onSave={() => toggleSavedJob(job)}
                         onDetails={() => setSelectedJob(job)}
                         onQuickApply={() => handleQuickApply(job)}
+                        onViewEmployer={() => setSelectedEmployerId(job.employerId)}
                       />
                     ))}
                   </AnimatePresence>
@@ -374,6 +377,18 @@ export default function JobSeekerHome({
             onSave={() => toggleSavedJob(selectedJob)}
             onQuickApply={() => handleQuickApply(selectedJob)}
             applying={applyingJobIds.includes(selectedJob.id)}
+            onViewEmployer={() => {
+              setSelectedJob(null)
+              setSelectedEmployerId(selectedJob.employerId)
+            }}
+          />
+        )}
+
+        {selectedEmployerId && (
+          <EmployerProfileModal
+            open={!!selectedEmployerId}
+            employerId={selectedEmployerId}
+            onClose={() => setSelectedEmployerId(null)}
           />
         )}
 
@@ -556,7 +571,7 @@ function FeedControls({
   )
 }
 
-function JobCard({ job, saved = false, applying = false, onSave, onDetails, onQuickApply }) {
+function JobCard({ job, saved = false, applying = false, onSave, onDetails, onQuickApply, onViewEmployer }) {
   const matchMeta = matchMetaFor(job.matchScore)
   const openFromKeyboard = (event) => {
     if (event.key === 'Enter' || event.key === ' ') {
@@ -583,10 +598,23 @@ function JobCard({ job, saved = false, applying = false, onSave, onDetails, onQu
     >
       <div className="flex flex-col gap-4">
         <div className="flex items-start gap-3 sm:gap-4">
-          <CompanyMark company={job.company} logoPath={job.companyLogoPath} />
+          <button 
+            type="button"
+            className="shrink-0 transition-transform hover:scale-105 focus:outline-none"
+            onClick={(e) => { e.stopPropagation(); onViewEmployer(); }}
+            title={`View ${job.company} profile`}
+          >
+            <CompanyMark company={job.company} logoPath={job.companyLogoPath} />
+          </button>
           <div className="min-w-0 flex-1">
             <h2 className="text-base font-black leading-snug text-blue-700 group-hover:underline sm:text-lg">{job.title}</h2>
-            <p className="mt-0.5 text-sm font-semibold text-slate-900">{job.company}</p>
+            <button 
+              type="button"
+              className="mt-0.5 text-sm font-semibold text-slate-900 hover:text-blue-700 hover:underline focus:outline-none focus:text-blue-700 focus:underline"
+              onClick={(e) => { e.stopPropagation(); onViewEmployer(); }}
+            >
+              {job.company}
+            </button>
             <p className="mt-0.5 text-sm text-slate-500 flex items-center gap-1.5 flex-wrap">
               <span>{job.location}</span>
               {job.distanceKm != null && (
@@ -800,7 +828,7 @@ function ProfileInsightsCard({ analytics }) {
   )
 }
 
-function JobDetailModal({ job, saved, applying = false, onClose, onSave, onQuickApply }) {
+function JobDetailModal({ job, saved, applying = false, onClose, onSave, onQuickApply, onViewEmployer }) {
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-h-[90vh] max-w-3xl overflow-y-auto">
@@ -811,15 +839,31 @@ function JobDetailModal({ job, saved, applying = false, onClose, onSave, onQuick
           </span>
           <div className="mt-4 flex items-center gap-4">
             {job.companyLogoPath && (
-              <img
-                src={job.companyLogoPath.startsWith('http') ? job.companyLogoPath : `${import.meta.env.VITE_API_BASE_URL?.replace('/api', '') || 'http://localhost:8000'}/storage/${job.companyLogoPath}`}
-                alt={job.company}
-                className="h-12 w-12 shrink-0 rounded-lg border border-slate-200 bg-white object-cover p-1 shadow-sm"
-              />
+              <button
+                type="button"
+                onClick={onViewEmployer}
+                className="shrink-0 transition-transform hover:scale-105 focus:outline-none"
+                title={`View ${job.company} profile`}
+              >
+                <img
+                  src={job.companyLogoPath.startsWith('http') ? job.companyLogoPath : `${import.meta.env.VITE_API_BASE_URL?.replace('/api', '') || 'http://localhost:8000'}/storage/${job.companyLogoPath}`}
+                  alt={job.company}
+                  className="h-12 w-12 shrink-0 rounded-lg border border-slate-200 bg-white object-cover p-1 shadow-sm"
+                />
+              </button>
             )}
             <div>
               <DialogTitle>{job.title}</DialogTitle>
-              <DialogDescription className="mt-1">{job.company} · {job.location}</DialogDescription>
+              <DialogDescription className="mt-1">
+                <button
+                  type="button"
+                  onClick={onViewEmployer}
+                  className="font-semibold text-slate-700 hover:text-blue-700 hover:underline focus:outline-none focus:text-blue-700 focus:underline"
+                >
+                  {job.company}
+                </button>
+                {' · '}{job.location}
+              </DialogDescription>
             </div>
           </div>
         </DialogHeader>
@@ -1082,6 +1126,7 @@ function normalizeApiJobs(rows) {
 
     return {
       id: String(row.post_id ?? row.id),
+      employerId: row.employer_id ?? row.employer?.id ?? row.employer?.employer_id,
       title: row.job_title ?? 'Untitled vacancy',
       company: row.employer?.company_name ?? 'PESO Partner Employer',
       companyLogoPath: row.employer?.company_logo,
