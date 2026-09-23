@@ -39,6 +39,7 @@ const EmployerPostJob   = lazy(() => import('@/pages/employer/PostJobPage'))
 const EmployerVacancies = lazy(() => import('@/pages/employer/VacanciesPage'))
 const EmployerATSGrid   = lazy(() => import('@/pages/employer/EmployerATSGrid'))
 const VacancyATSPage    = lazy(() => import('@/pages/employer/VacancyATSPage'))
+const EmployerApplicantProfilePage = lazy(() => import('@/pages/employer/ats/EmployerApplicantProfilePage'))
 const EmployerCalendar  = lazy(() => import('@/pages/employer/InterviewCalendarPage'))
 const EmployerJobFairs  = lazy(() => import('@/pages/employer/EmployerJobFairDashboard'))
 const EmployerEstablishmentReport = lazy(() => import('@/pages/employer/EmployerEstablishmentReportPage'))
@@ -168,6 +169,7 @@ export const router = createBrowserRouter([
                           { path: 'vacancies', element: S(EmployerVacancies) },
                           { path: 'ats', element: S(EmployerATSGrid) },
                           { path: 'ats/:vacancyId', element: S(VacancyATSPage) },
+                          { path: 'ats/applicant/:applicationId', element: S(EmployerApplicantProfilePage) },
                           { path: 'calendar', element: S(EmployerCalendar) },
                           { path: 'job-fairs', element: S(EmployerJobFairs) },
                           { path: 'reports/establishment-report', element: S(EmployerEstablishmentReport) },

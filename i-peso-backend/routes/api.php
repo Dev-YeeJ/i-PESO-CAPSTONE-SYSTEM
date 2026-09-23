@@ -145,6 +145,7 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::get('/applications', [EmployerApplicationController::class, 'index']);
             Route::get('/applications/{application}', [EmployerApplicationController::class, 'show']);
             Route::get('/applications/{application}/seeker-profile-image', [EmployerApplicationController::class, 'seekerProfileImage']);
+            Route::get('/applications/{application}/resume', [EmployerApplicationController::class, 'seekerResume']);
             Route::patch('/applications/bulk-status', [EmployerApplicationController::class, 'updateStatusBulk'])->middleware('throttle:20,1');
             Route::patch('/applications/{application}/status', [EmployerApplicationController::class, 'updateStatus'])->middleware('throttle:30,1');
 

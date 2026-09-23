@@ -4,6 +4,8 @@ import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import ApplicantAvatar from './ApplicantAvatar'
 import { TERMINAL_STATUSES } from './atsConstants'
 import { formatDate, formatDateTime } from './atsFormatters'
+import { getApplicantResume } from '@/services/employerApplicationService'
+import { toast } from 'sonner'
 
 function InfoTile({ label, value }) {
   return (
@@ -33,6 +35,22 @@ export default function ApplicantProfileModal({
   const timeline = data?.timeline || []
   const educations = seeker.educations || []
   const workExperiences = seeker.work_experiences || []
+
+  const handleDownloadResume = async () => {
+    if (!data?.apply_id) return
+    const toastId = toast.loading('Opening resume...')
+    try {
+      const blob = await getApplicantResume(data.apply_id)
+      const url = window.URL.createObjectURL(blob)
+      window.open(url, '_blank')
+      // Revoke the URL after a delay to ensure the browser has time to open it
+      setTimeout(() => window.URL.revokeObjectURL(url), 10000)
+      toast.dismiss(toastId)
+    } catch (error) {
+      console.error(error)
+      toast.error('Unable to open the resume.', { id: toastId })
+    }
+  }
 
   return (
     <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
@@ -64,6 +82,24 @@ export default function ApplicantProfileModal({
                 </>
               )}
               <div className="mx-2 h-6 w-px bg-slate-200"></div>
+              
+              {/* Added View Profile and View Resume Buttons */}
+              <div className="flex items-center gap-2 mr-2">
+                <Button variant="outline" size="sm" onClick={() => window.open(`/employer/ats/applicant/${data?.apply_id}`, '_blank')}>
+                  <FileText className="mr-2 h-4 w-4" /> Full Profile
+                </Button>
+                <Button 
+                  variant="secondary" 
+                  size="sm" 
+                  className="bg-blue-50 text-blue-700 hover:bg-blue-100 disabled:opacity-50" 
+                  onClick={handleDownloadResume}
+                  disabled={!seeker.has_resume}
+                  title={seeker.has_resume ? "Download Resume" : "No resume generated"}
+                >
+                  <Briefcase className="mr-2 h-4 w-4" /> View Resume
+                </Button>
+              </div>
+
               <button onClick={onClose} className="rounded-full p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500"><X className="h-5 w-5" /></button>
             </div>
           </div>
@@ -148,10 +184,10 @@ export default function ApplicantProfileModal({
                       {educations.map((edu, index) => (
                         <div key={index} className="relative pl-6 before:absolute before:left-2 before:top-2 before:bottom-[-24px] before:w-px before:bg-slate-200 last:before:hidden">
                           <div className="absolute left-1 top-1.5 h-2 w-2 rounded-full bg-blue-500 ring-4 ring-white" />
-                          <h4 className="text-base font-bold text-slate-900">{edu.course || edu.education_level}</h4>
-                          <p className="text-sm font-semibold text-slate-700">{edu.school_name}</p>
+                          <h4 className="text-base font-bold text-slate-900">{edu.course_strand || edu.level}</h4>
+                          <p className="text-sm font-semibold text-slate-700">{edu.institution_name}</p>
                           <p className="text-xs text-slate-500">
-                            {formatDate(edu.start_date)} - {edu.is_current ? 'Present' : formatDate(edu.end_date)}
+                            {edu.year_started || 'N/A'} - {edu.completion_status === 'graduated' ? edu.year_graduated : (edu.expected_year_graduated || edu.undergrad_year_last_attended || 'Present')}
                           </p>
                         </div>
                       ))}

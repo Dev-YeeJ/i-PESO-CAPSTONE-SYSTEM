@@ -129,6 +129,28 @@ class EmployerApplicationController extends Controller
         ]);
     }
 
+    /**
+     * Streams the applicant's generated PDF resume if it exists.
+     */
+    public function seekerResume(Request $request, Application $application): StreamedResponse
+    {
+        $this->ensureOwnership($request, $application);
+
+        $seeker = $application->jobSeeker;
+        abort_unless($seeker && filled($seeker->resume_path), 404, 'Resume not found for this applicant.');
+
+        $disk = Storage::disk('local')->exists($seeker->resume_path) ? 'local' : 'public';
+        abort_unless(Storage::disk($disk)->exists($seeker->resume_path), 404, 'Resume file is missing.');
+
+        $filename = 'Resume_'.$seeker->seeker_id.'_'.str($seeker->last_name)->slug('_').'.pdf';
+
+        return Storage::disk($disk)->response($seeker->resume_path, $filename, [
+            'Content-Disposition' => 'inline',
+            'X-Content-Type-Options' => 'nosniff',
+            'Cache-Control' => 'private, no-store, no-cache, must-revalidate',
+        ]);
+    }
+
     public function updateStatus(Request $request, Application $application, \App\Services\JitsiMeetingService $meetingService): JsonResponse
     {
         $employer = $this->employer($request);

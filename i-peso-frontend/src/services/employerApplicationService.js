@@ -41,3 +41,10 @@ export const getApplicantProfileImage = async (applicationId) => {
   })
   return response.data
 }
+
+export const getApplicantResume = async (applicationId) => {
+  const response = await apiClient.get(`/employer/applications/${applicationId}/resume`, {
+    responseType: 'blob',
+  })
+  return response.data
+}
