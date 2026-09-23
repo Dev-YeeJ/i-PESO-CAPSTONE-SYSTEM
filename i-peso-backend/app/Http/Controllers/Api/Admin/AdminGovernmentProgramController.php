@@ -221,10 +221,9 @@ class AdminGovernmentProgramController extends Controller
                 'program_status' => $request->input('program_status', match ($legacyStatus) {
                     'completed' => 'completed',
                     'closed' => 'closed',
-                    default => $legacyStatus ? 'open' : null,
+                    default => $program ? $program->program_status : 'open',
                 }),
                 'visibility' => $request->input('visibility', $program ? null : 'public'),
-                'start_date' => $request->input('start_date', $request->input('schedule')),
             ], fn ($value) => $value !== null));
         }
 
@@ -246,15 +245,12 @@ class AdminGovernmentProgramController extends Controller
             'eligibility_rules.*.values.*' => ['string', 'max:100'],
             'target_industry' => ['nullable', 'string', 'max:255'],
             'target_occupation_id' => ['nullable', 'integer', 'exists:occupations,id'],
-            'venue' => ['nullable', 'string', 'max:255'],
             'location_address' => ['nullable', 'string', 'max:1000'],
             'latitude' => ['nullable', 'numeric', 'between:-90,90'],
             'longitude' => ['nullable', 'numeric', 'between:-180,180'],
-            'start_date' => ['nullable', 'date'],
-            'end_date' => ['nullable', 'date', 'after_or_equal:start_date'],
             'application_deadline' => ['nullable', 'date'],
             'total_slots' => [$program ? 'sometimes' : 'required', 'integer', 'min:0', 'max:100000'],
-            'program_status' => [$program ? 'sometimes' : 'required', Rule::in(['draft', 'open', 'closed', 'completed', 'archived'])],
+            'program_status' => ['nullable', Rule::in(['draft', 'open', 'closed', 'completed', 'archived'])],
             'visibility' => [$program ? 'sometimes' : 'required', Rule::in(['public', 'internal'])],
             'attachment' => ['nullable', 'file', 'mimes:pdf,doc,docx,xls,xlsx,jpg,jpeg,png', 'max:10240'],
             'skills' => ['nullable', 'array', 'max:50'],

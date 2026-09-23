@@ -15,7 +15,7 @@ import {
 } from 'lucide-react'
 import PageHeader from '@/pages/admin/_components/PageHeader'
 import { LoadingSkeleton } from '@/components/ui'
-import { PROGRAM_CATEGORIES, PROGRAM_STATUSES, categoryLabel } from '@/components/government-programs/programConstants'
+import { PROGRAM_CATEGORIES, categoryLabel } from '@/components/government-programs/programConstants'
 import EligibilityRulesBuilder from '@/components/government-programs/EligibilityRulesBuilder'
 import governmentProgramService from '@/services/governmentProgramService'
 
@@ -27,9 +27,9 @@ const steps = [
 
 const BLANK = {
   program_name: '', category: 'other', description: '',
-  start_date: '', end_date: '', application_deadline: '', total_slots: 0,
-  program_status: 'open', visibility: 'public',
-  venue: '', eligibility_requirements: [], eligibility_rules: [],
+  application_deadline: '', total_slots: 0,
+  visibility: 'public',
+  eligibility_requirements: [], eligibility_rules: [],
 }
 
 // Everything a category preset owns. Switching category replaces exactly these
@@ -71,7 +71,6 @@ export default function GovernmentProgramFormPage() {
           ...BLANK,
           ...program,
           program_name: program.program_name ?? program.title ?? '',
-          program_status: program.status ?? 'open',
           total_slots: program.total_slots ?? 0,
           eligibility_requirements: toStringList(program.eligibility_requirements),
           eligibility_rules: Array.isArray(program.eligibility_rules) ? program.eligibility_rules : [],
@@ -245,18 +244,9 @@ export default function GovernmentProgramFormPage() {
             {step === 2 && (
               <div className="space-y-4">
                 <div className="grid gap-4 sm:grid-cols-3">
-                  <Field label="Start date"><input type="date" name="start_date" value={form.start_date ?? ''} onChange={handleChange} className={inputCls} /></Field>
-                  <Field label="End date"><input type="date" name="end_date" value={form.end_date ?? ''} onChange={handleChange} className={inputCls} /></Field>
                   <Field label="Application deadline"><input type="date" name="application_deadline" value={form.application_deadline ?? ''} onChange={handleChange} className={inputCls} /></Field>
-                </div>
-                <div className="grid gap-4 sm:grid-cols-3">
                   <Field label="Total slots" hint="0 means open capacity." required>
                     <input type="number" name="total_slots" min="0" value={form.total_slots} onChange={handleChange} className={inputCls} />
-                  </Field>
-                  <Field label="Status" required>
-                    <select name="program_status" value={form.program_status} onChange={handleChange} className={inputCls}>
-                      {PROGRAM_STATUSES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
-                    </select>
                   </Field>
                   <Field label="Visibility" required>
                     <select name="visibility" value={form.visibility} onChange={handleChange} className={inputCls}>
@@ -267,10 +257,9 @@ export default function GovernmentProgramFormPage() {
                 </div>
                 <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-800">
                   <Info className="mt-0.5 h-4 w-4 shrink-0" />
-                  <p>Setting this to <span className="font-bold">Open</span> and <span className="font-bold">Public</span> announces it to every job seeker whose profile matches the eligibility rules.</p>
+                  <p>Setting this to <span className="font-bold">Public</span> automatically announces it to job seekers. Status (Open/Closed) is determined automatically based on the Application Deadline.</p>
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2">
-                  <Field label="Venue"><input name="venue" value={form.venue ?? ''} onChange={handleChange} placeholder="e.g. PESO Office, Urdaneta City Hall" className={inputCls} /></Field>
                   <Field label="Attachment (PDF/DOC/image, optional)" hint="Programme guidelines or the official memo.">
                     <input type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png" onChange={(e) => setAttachment(e.target.files?.[0] ?? null)} className="text-sm" />
                   </Field>

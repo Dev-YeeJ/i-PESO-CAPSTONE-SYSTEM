@@ -33,8 +33,6 @@ trait FormatsGovernmentPrograms
             'location_address' => $program->location_address,
             'latitude' => $program->latitude,
             'longitude' => $program->longitude,
-            'start_date' => $program->start_date?->format('Y-m-d'),
-            'end_date' => $program->end_date?->format('Y-m-d'),
             'application_deadline' => $program->application_deadline?->format('Y-m-d'),
             'total_slots' => $program->total_slots,
             'available_slots' => $program->available_slots,

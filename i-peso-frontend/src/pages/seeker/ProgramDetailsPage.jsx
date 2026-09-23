@@ -101,7 +101,6 @@ export default function ProgramDetailsPage() {
           <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
             <h2 className="text-xl font-black tracking-tight text-slate-900">Program Details</h2>
             <dl className="mt-6 space-y-5">
-              <Detail icon={CalendarDays} label="Schedule" value={`${formatDate(program.start_date)} to ${formatDate(program.end_date)}`} />
               <Detail icon={Clock3} label="Deadline" value={formatDate(program.application_deadline)} />
               <Detail icon={MapPin} label="Venue" value={program.venue || 'To be announced'} />
               <Detail icon={UsersRound} label="Slots" value={program.total_slots === 0 ? 'Open capacity' : `${program.available_slots} of ${program.total_slots} available`} />

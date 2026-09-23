@@ -24,12 +24,9 @@ class GovernmentProgram extends Model
         'target_industry',
         'target_occupation_id',
         'schedule',
-        'venue',
         'location_address',
         'latitude',
         'longitude',
-        'start_date',
-        'end_date',
         'application_deadline',
         'slot_limit',
         'total_slots',
@@ -46,8 +43,6 @@ class GovernmentProgram extends Model
         'eligibility_requirements' => 'array',
         'eligibility_rules' => 'array',
         'schedule' => 'datetime',
-        'start_date' => 'date',
-        'end_date' => 'date',
         'application_deadline' => 'date',
         'latitude' => 'float',
         'longitude' => 'float',
@@ -62,7 +57,15 @@ class GovernmentProgram extends Model
     {
         static::saving(function (GovernmentProgram $program) {
             $program->slot_limit = $program->total_slots;
-            $program->schedule = $program->start_date?->startOfDay() ?? $program->schedule;
+
+            if ($program->application_deadline && $program->application_deadline->isPast()) {
+                $program->program_status = 'closed';
+            } else {
+                if ($program->program_status !== 'draft' && $program->program_status !== 'archived') {
+                    $program->program_status = 'open';
+                }
+            }
+
             $program->status = match ($program->program_status) {
                 'completed' => 'completed',
                 'closed', 'archived', 'draft' => 'closed',
@@ -97,5 +100,10 @@ class GovernmentProgram extends Model
             && $this->visibility === 'public'
             && (! $this->application_deadline || $this->application_deadline->isToday() || $this->application_deadline->isFuture())
             && ($this->total_slots === 0 || $this->available_slots > 0);
+    }
+
+    public function getVenueAttribute(): string
+    {
+        return 'PESO Office, Urdaneta City Hall';
     }
 }
