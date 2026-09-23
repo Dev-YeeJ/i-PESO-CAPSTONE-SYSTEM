@@ -62,8 +62,8 @@ export default function ProgramDetailsPage() {
         <h1 className="relative z-10 text-3xl font-black tracking-tight sm:text-4xl text-white drop-shadow-sm">
           {program.title}
         </h1>
-        <p className="relative z-10 mt-4 max-w-3xl text-base leading-relaxed text-blue-100">
-          {program.short_description || (program.description && program.description.length > 150 ? program.description.slice(0, 150) + '...' : program.description)}
+        <p className="relative z-10 mt-4 max-w-3xl text-base leading-relaxed text-blue-100 line-clamp-3">
+          {program.description}
         </p>
       </div>
 
@@ -73,12 +73,9 @@ export default function ProgramDetailsPage() {
             <p className="whitespace-pre-wrap text-base leading-relaxed text-slate-700">{program.description}</p>
           </Section>
 
-          <div className="grid gap-6 sm:grid-cols-2">
-            <Section title="Eligibility" icon={Target} className="h-full">
+          <div className="grid gap-6">
+            <Section title="Eligibility Requirements" icon={Target} className="h-full">
               <CheckList items={program.eligibility_requirements} empty="No specific eligibility requirements listed." />
-            </Section>
-            <Section title="Required Documents" icon={CheckCircle2} className="h-full">
-              <CheckList items={program.required_documents} empty="No documents required." />
             </Section>
           </div>
 
@@ -106,9 +103,9 @@ export default function ProgramDetailsPage() {
             <dl className="mt-6 space-y-5">
               <Detail icon={CalendarDays} label="Schedule" value={`${formatDate(program.start_date)} to ${formatDate(program.end_date)}`} />
               <Detail icon={Clock3} label="Deadline" value={formatDate(program.application_deadline)} />
-              <Detail icon={MapPin} label="Venue" value={program.venue || program.location_address || 'To be announced'} />
+              <Detail icon={MapPin} label="Venue" value={program.venue || 'To be announced'} />
               <Detail icon={UsersRound} label="Slots" value={program.total_slots === 0 ? 'Open capacity' : `${program.available_slots} of ${program.total_slots} available`} />
-              <Detail icon={Phone} label="Contact" value={[program.contact_person, program.contact_phone, program.contact_email].filter(Boolean).join(' · ') || 'PESO Programs Desk'} />
+              <Detail icon={Phone} label="Contact" value="PESO Programs Desk" />
             </dl>
             {program.has_attachment && (
               <button onClick={downloadAttachment} className="mt-8 flex w-full items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-3 text-sm font-bold text-white transition hover:bg-slate-800 shadow-md">
@@ -169,14 +166,12 @@ function Detail({ icon: Icon, label, value }) {
 }
 
 function StepperSteps({ program }) {
-  const steps = program.citizen_charter_steps?.length > 0 
-    ? program.citizen_charter_steps
-    : [
-        "Gather all required documents listed on this page.",
-        `Proceed to the PESO Office at ${program.venue || program.location_address || 'the City Hall'}.`,
-        `Look for ${program.contact_person || 'the assigned PESO Officer'}.`,
-        "Submit your documents and undergo a brief interview and assessment."
-      ];
+  const steps = [
+    "Review your eligibility match on this page.",
+    "Prepare any requirements listed above.",
+    `Proceed to the PESO Office at ${program.venue || 'the City Hall'}.`,
+    "Submit your requirements and undergo a brief assessment."
+  ];
 
   return steps.map((step, index) => (
     <div key={index} className="relative flex items-start gap-4">

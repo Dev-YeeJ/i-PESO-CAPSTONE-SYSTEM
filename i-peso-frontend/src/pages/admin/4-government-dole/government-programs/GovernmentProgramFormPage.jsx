@@ -22,24 +22,21 @@ import governmentProgramService from '@/services/governmentProgramService'
 const steps = [
   { number: 1, title: 'Program', shortTitle: 'Program', icon: ClipboardList },
   { number: 2, title: 'Schedule & Capacity', shortTitle: 'Schedule', icon: CalendarDays },
-  { number: 3, title: 'Where & Contact', shortTitle: 'Contact', icon: MapPin },
-  { number: 4, title: 'Prefilled Details', shortTitle: 'Details', icon: Sparkles },
+  { number: 3, title: 'Eligibility & Location', shortTitle: 'Details', icon: Sparkles },
 ]
 
 const BLANK = {
-  program_name: '', category: 'other', short_description: '', description: '', target_beneficiaries: '',
+  program_name: '', category: 'other', description: '',
   start_date: '', end_date: '', application_deadline: '', total_slots: 0,
   program_status: 'open', visibility: 'public',
-  venue: '', location_address: '', contact_person: '', contact_email: '', contact_phone: '',
-  eligibility_requirements: [], required_documents: [], citizen_charter_steps: [], eligibility_rules: [],
+  venue: '', eligibility_requirements: [], eligibility_rules: [],
 }
 
 // Everything a category preset owns. Switching category replaces exactly these
 // and nothing else, so the dates, slots, venue and contact an admin has
 // already typed survive changing their mind about the category.
 const PRESET_FIELDS = [
-  'short_description', 'description', 'target_beneficiaries',
-  'eligibility_requirements', 'required_documents', 'citizen_charter_steps', 'eligibility_rules',
+  'description', 'eligibility_requirements', 'eligibility_rules',
 ]
 
 const toStringList = (items = []) => items.map((item) => (typeof item === 'string' ? item : item?.label ?? '')).filter(Boolean)
@@ -77,8 +74,6 @@ export default function GovernmentProgramFormPage() {
           program_status: program.status ?? 'open',
           total_slots: program.total_slots ?? 0,
           eligibility_requirements: toStringList(program.eligibility_requirements),
-          required_documents: toStringList(program.required_documents),
-          citizen_charter_steps: toStringList(program.citizen_charter_steps),
           eligibility_rules: Array.isArray(program.eligibility_rules) ? program.eligibility_rules : [],
         })
       })
@@ -119,8 +114,6 @@ export default function GovernmentProgramFormPage() {
     const preset = presets[form.category]
     if (!preset) return 0
     return (preset.eligibility_requirements?.length ?? 0)
-      + (preset.required_documents?.length ?? 0)
-      + (preset.citizen_charter_steps?.length ?? 0)
       + (preset.eligibility_rules?.length ?? 0)
   }, [presets, form.category])
 
@@ -136,8 +129,6 @@ export default function GovernmentProgramFormPage() {
         ...form,
         total_slots: Number(form.total_slots) || 0,
         eligibility_requirements: toStringList(form.eligibility_requirements),
-        required_documents: toStringList(form.required_documents),
-        citizen_charter_steps: toStringList(form.citizen_charter_steps),
         eligibility_rules: rules,
         ...(attachment ? { attachment } : {}),
       }
@@ -245,14 +236,8 @@ export default function GovernmentProgramFormPage() {
                 <Field label="Program name" required>
                   <input name="program_name" value={form.program_name} onChange={handleChange} required placeholder="e.g. SPES Summer Batch 2026" className={inputCls} />
                 </Field>
-                <Field label="Short description" hint="One line shown on cards and the public landing page.">
-                  <input name="short_description" value={form.short_description ?? ''} onChange={handleChange} maxLength={500} className={inputCls} />
-                </Field>
                 <Field label="Full description" required>
                   <textarea name="description" value={form.description ?? ''} onChange={handleChange} required rows={6} className={inputCls} />
-                </Field>
-                <Field label="Target beneficiaries">
-                  <input name="target_beneficiaries" value={form.target_beneficiaries ?? ''} onChange={handleChange} className={inputCls} />
                 </Field>
               </div>
             )}
@@ -285,26 +270,16 @@ export default function GovernmentProgramFormPage() {
                   <p>Setting this to <span className="font-bold">Open</span> and <span className="font-bold">Public</span> announces it to every job seeker whose profile matches the eligibility rules.</p>
                 </div>
               </div>
-            )}
-
-            {step === 3 && (
-              <div className="space-y-4">
                 <div className="grid gap-4 sm:grid-cols-2">
                   <Field label="Venue"><input name="venue" value={form.venue ?? ''} onChange={handleChange} placeholder="e.g. PESO Office, Urdaneta City Hall" className={inputCls} /></Field>
-                  <Field label="Location address"><input name="location_address" value={form.location_address ?? ''} onChange={handleChange} className={inputCls} /></Field>
+                  <Field label="Attachment (PDF/DOC/image, optional)" hint="Programme guidelines or the official memo.">
+                    <input type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png" onChange={(e) => setAttachment(e.target.files?.[0] ?? null)} className="text-sm" />
+                  </Field>
                 </div>
-                <div className="grid gap-4 sm:grid-cols-3">
-                  <Field label="Contact person"><input name="contact_person" value={form.contact_person ?? ''} onChange={handleChange} className={inputCls} /></Field>
-                  <Field label="Contact email"><input type="email" name="contact_email" value={form.contact_email ?? ''} onChange={handleChange} className={inputCls} /></Field>
-                  <Field label="Contact phone"><input name="contact_phone" value={form.contact_phone ?? ''} onChange={handleChange} className={inputCls} /></Field>
-                </div>
-                <Field label="Attachment (PDF/DOC/image, optional)" hint="Programme guidelines or the official memo.">
-                  <input type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png" onChange={(e) => setAttachment(e.target.files?.[0] ?? null)} className="text-sm" />
-                </Field>
               </div>
             )}
 
-            {step === 4 && (
+            {step === 3 && (
               <div className="space-y-6">
                 <div className="flex items-start gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs leading-5 text-slate-600">
                   <Info className="mt-0.5 h-4 w-4 shrink-0" />
@@ -316,14 +291,6 @@ export default function GovernmentProgramFormPage() {
 
                 <Group title="Requirements" subtitle="Shown to job seekers as a checklist on the posting.">
                   <StringList items={form.eligibility_requirements} onChange={(v) => set('eligibility_requirements', v)} placeholder="e.g. Resident of Urdaneta City" addLabel="Add requirement" />
-                </Group>
-
-                <Group title="Required documents" subtitle="What to bring to the PESO office.">
-                  <StringList items={form.required_documents} onChange={(v) => set('required_documents', v)} placeholder="e.g. Barangay Certificate of Residency" addLabel="Add document" />
-                </Group>
-
-                <Group title="Steps to avail" subtitle="From the PESO Citizen's Charter — what the applicant does, in order.">
-                  <StringList items={form.citizen_charter_steps} onChange={(v) => set('citizen_charter_steps', v)} placeholder="e.g. Submit the requirements to the PESO staff" addLabel="Add step" />
                 </Group>
 
                 <Group title="Eligibility rules (scoring)" subtitle="Powers the eligibility badge seekers see. A failed required rule marks them not eligible.">
