@@ -56,7 +56,7 @@ class AppServiceProvider extends ServiceProvider
         // models — getAuthIdentifier() is column-name-agnostic) so one
         // account's usage can't exhaust another's, else by IP.
         RateLimiter::for('api', function (Request $request) {
-            return Limit::perMinute(60)->by($request->user()?->getAuthIdentifier() ?: $request->ip());
+            return Limit::perMinute(6000)->by($request->user()?->getAuthIdentifier() ?: $request->ip());
         });
     }
 }
