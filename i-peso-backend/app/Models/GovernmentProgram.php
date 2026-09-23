@@ -61,7 +61,7 @@ class GovernmentProgram extends Model
             if ($program->application_deadline && $program->application_deadline->isPast()) {
                 $program->program_status = 'closed';
             } else {
-                if ($program->program_status !== 'draft' && $program->program_status !== 'archived') {
+                if (! in_array($program->program_status, ['draft', 'archived', 'closed'], true)) {
                     $program->program_status = 'open';
                 }
             }
