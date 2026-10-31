@@ -109,7 +109,7 @@ var AceMascot = forwardRef(function AceMascot(props, ref) {
         viewBox="0 0 640 560"
         preserveAspectRatio="xMidYMid meet"
         role="img"
-        aria-label="Ace, the i-PESO assistant"
+        aria-label="ACE, the i-PESO assistant"
       >
         <defs>
           <radialGradient id="aceBodyGrad" cx="32%" cy="26%" r="82%">

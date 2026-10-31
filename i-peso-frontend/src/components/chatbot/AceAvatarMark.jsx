@@ -14,7 +14,7 @@ export default function AceAvatarMark({ className = '' }) {
   const panelId = `aceAvatarPanel-${uid}`
 
   return (
-    <svg viewBox="0 0 32 32" className={className} role="img" aria-label="Ace">
+    <svg viewBox="0 0 32 32" className={className} role="img" aria-label="ACE">
       <defs>
         <radialGradient id={bodyId} cx="35%" cy="26%" r="85%">
           <stop offset="0%" stopColor="#7FA6FF" />

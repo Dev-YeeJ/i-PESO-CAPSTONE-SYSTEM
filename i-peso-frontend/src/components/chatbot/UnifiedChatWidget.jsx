@@ -56,7 +56,7 @@ function startersFor(user) {
 }
 
 const DEFAULT_GREETING =
-  'Kumusta po! Ako si Ace, ang i-PESO assistant ng Urdaneta City PESO. ' +
+  'Kumusta po! Ako si ACE, ang i-PESO assistant ng Urdaneta City PESO. ' +
   'Maaari po kayong magtanong tungkol sa registration, trabaho, job fairs, at government programs.'
 
 function greetingFor(user) {
@@ -66,16 +66,16 @@ function greetingFor(user) {
   const hello = `Kumusta po${name ? ` ${name}` : ''}!`
 
   if (user.role === 'employer') {
-    return `${hello} Ako si Ace, ang inyong Assistant for Career and Employment. ` +
+    return `${hello} Ako si ACE, ang inyong Assistant for Career and Employment. ` +
       'Kaya ko kayong tulungan sa job postings, mga aplikante, o job fair registration — ano po ang gagawin natin ngayon?'
   }
 
   if (user.role === 'seeker') {
-    return `${hello} Ako si Ace, ang inyong Assistant for Career and Employment. ` +
+    return `${hello} Ako si ACE, ang inyong Assistant for Career and Employment. ` +
       'Tanungin mo ako tungkol sa job matches, application status, o job fairs — paano kita matutulungan ngayon?'
   }
 
-  return `${hello} Ako si Ace, ang i-PESO assistant. Paano ko kayo matutulungan ngayon?`
+  return `${hello} Ako si ACE, ang i-PESO assistant. Paano ko kayo matutulungan ngayon?`
 }
 
 /** Matches a bare URL or email address inside otherwise plain chat text. */
@@ -206,7 +206,7 @@ export default function UnifiedChatWidget() {
               <div className="ipeso-chat-hero-text">
                 <p className="ipeso-chat-hero-name">
                   <Sparkles size={14} aria-hidden="true" />
-                  Ace
+                  ACE
                 </p>
                 <p className="ipeso-chat-hero-role">Assistant for Career and Employment</p>
               </div>
@@ -228,7 +228,7 @@ export default function UnifiedChatWidget() {
               {greetingVisible ? (
                 <p className="ipeso-chat-bubble is-model">{greetingText}</p>
               ) : (
-                <p className="ipeso-chat-bubble is-model is-typing" aria-label="Ace is greeting you">
+                <p className="ipeso-chat-bubble is-model is-typing" aria-label="ACE is greeting you">
                   <span /><span /><span />
                 </p>
               )}
@@ -272,7 +272,7 @@ export default function UnifiedChatWidget() {
             {busy && (
               <div className="ipeso-chat-msg is-ace">
                 <AceAvatarMark className="ipeso-chat-msg-avatar" />
-                <p className="ipeso-chat-bubble is-model is-typing" aria-label="Ace is thinking">
+                <p className="ipeso-chat-bubble is-model is-typing" aria-label="ACE is thinking">
                   <span /><span /><span />
                 </p>
               </div>
@@ -302,7 +302,7 @@ export default function UnifiedChatWidget() {
               onFocus={handleInputFocus}
               onBlur={handleInputBlur}
               maxLength={500}
-              placeholder="Magtanong kay Ace…"
+              placeholder="Magtanong kay ACE…"
               aria-label="Your question"
               disabled={busy}
             />
@@ -324,7 +324,7 @@ export default function UnifiedChatWidget() {
         onClick={() => (open ? closePanel() : openPanel())}
         className={`ipeso-chat-launcher ${open ? 'is-open' : ''}`}
         aria-expanded={open}
-        aria-label={open ? 'Close Ace assistant' : 'Ask Ace'}
+        aria-label={open ? 'Close ACE assistant' : 'Ask ACE'}
       >
         {open ? (
           <X size={22} aria-hidden="true" />
