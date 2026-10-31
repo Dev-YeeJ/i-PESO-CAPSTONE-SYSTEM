@@ -392,6 +392,7 @@ const ResetPasswordPage = () => {
                       setErrors((er) => ({ ...er, password: undefined }))
                     }}
                     placeholder="Min 8 chars, incl. a number & symbol"
+                    autoComplete="new-password"
                     className={[
                       'w-full px-3.5 py-2.5 pr-11 text-sm rounded-xl border bg-white',
                       'transition-all focus:outline-none focus:ring-2 focus:ring-blue-500/20',
@@ -460,6 +461,7 @@ const ResetPasswordPage = () => {
                       setErrors((er) => ({ ...er, confirmPw: undefined }))
                     }}
                     placeholder="Re-enter new password"
+                    autoComplete="new-password"
                     className={[
                       'w-full px-3.5 py-2.5 pr-11 text-sm rounded-xl border bg-white',
                       'transition-all focus:outline-none focus:ring-2 focus:ring-blue-500/20',
