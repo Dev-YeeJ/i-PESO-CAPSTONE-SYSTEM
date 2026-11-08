@@ -135,6 +135,7 @@ class EmployerController extends Controller
             'employer_id',
             'company_type',
             'company_name',
+            'email',
             'tin',
             'trade_name',
             'industry',
@@ -201,7 +202,21 @@ class EmployerController extends Controller
 
         $jobFairParticipation = [];
         if (Schema::hasTable('job_fair_employers')) {
-            $jobFairParticipation = $employer->jobFairJoins()->select(['id', 'job_fair_id', 'joined_at'])->get()->toArray();
+            // Flatten the join row + its fair so the profile can show the event's
+            // name and date rather than bare foreign keys.
+            $jobFairParticipation = $employer->jobFairJoins()
+                ->with('jobFair:job_fair_id,title,event_date,start_date')
+                ->select(['id', 'job_fair_id', 'employer_id', 'participation_status', 'joined_at'])
+                ->get()
+                ->map(fn ($join) => [
+                    'id' => $join->id,
+                    'job_fair_id' => $join->job_fair_id,
+                    'name' => $join->jobFair?->title,
+                    'date' => $join->jobFair?->event_date ?? $join->jobFair?->start_date,
+                    'participation_status' => $join->participation_status,
+                    'joined_at' => $join->joined_at,
+                ])
+                ->toArray();
         }
 
         $payload = $employer->toArray();

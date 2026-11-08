@@ -1,179 +1,174 @@
-import { useEffect, useState } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Building2, MapPin, BriefcaseBusiness, Calendar, Users, Target, ShieldCheck } from 'lucide-react'
-import LazyImage from '@/components/common/LazyImage'
-import { Card, CardHeader, LoadingSkeleton, Badge, Button } from '@/components/ui'
+import { useState } from 'react'
+import { useLocation, useNavigate, useParams } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
+import { ArrowLeft, BriefcaseBusiness, Flag, ShieldCheck } from 'lucide-react'
+import { Button, Card, CardHeader, EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui'
 import JobDetailModal from '@/components/JobDetailModal'
-import EmployerPreferenceChip from '@/components/jobs/EmployerPreferenceChip'
-import api from '@/services/api'
+import ReportEmployerModal from '@/components/ReportEmployerModal'
+import CompanyFacts from '@/components/employers/CompanyFacts'
+import CompanyLogo from '@/components/employers/CompanyLogo'
+import VacancyRow from '@/components/employers/VacancyRow'
+import { getPublicEmployerProfile } from '@/services/seekerService'
+import { employerDisplayName, employerRegisteredName, formatIndustry, publicEmployerQueryKey } from '@/utils/employerProfile'
 
-function formatDate(value) {
-  if (!value) return 'Not provided'
-  const date = new Date(value)
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleDateString('en-PH', { year: 'numeric', month: 'short', day: 'numeric' })
-}
-import toast from 'react-hot-toast'
-
+/**
+ * Full-page company profile (/seeker/employers/:id), reached from the
+ * slide-over panel's "Open full company page". Same content and wording as
+ * the panel, laid out for a wide screen: story + jobs in the main column,
+ * facts and trust signals in the sidebar.
+ */
 export default function EmployerProfile() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const [loading, setLoading] = useState(true)
-  const [data, setData] = useState(null)
-  const [error, setError] = useState(null)
+  const location = useLocation()
   const [viewingJobId, setViewingJobId] = useState(null)
+  const [reporting, setReporting] = useState(false)
 
-  useEffect(() => {
-    api.get(`/seeker/employers/${id}`)
-      .then((res) => setData(res.data))
-      .catch(() => {
-        setError('Failed to load employer profile')
-        toast.error('Failed to load employer profile')
-      })
-      .finally(() => setLoading(false))
-  }, [id])
+  const { data, isLoading, isError, error, refetch } = useQuery({
+    queryKey: publicEmployerQueryKey(id),
+    queryFn: () => getPublicEmployerProfile(id),
+    staleTime: 5 * 60 * 1000,
+    retry: (count, err) => err?.response?.status !== 404 && count < 2,
+  })
 
-  if (loading) {
+  // A page opened directly (new tab, shared link) has no history to go back to.
+  const goBack = () => (location.key !== 'default' ? navigate(-1) : navigate('/seeker/dashboard'))
+  const backButton = (
+    <button
+      type="button"
+      onClick={goBack}
+      className="inline-flex items-center gap-2 rounded-lg text-sm font-bold text-slate-600 transition-colors hover:text-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2"
+    >
+      <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+      Back
+    </button>
+  )
+
+  if (isLoading) {
     return (
       <div className="space-y-6">
-        <LoadingSkeleton className="h-64 w-full rounded-2xl" />
-        <LoadingSkeleton className="h-48 w-full rounded-2xl" />
+        {backButton}
+        <div className="h-48 rounded-2xl bg-slate-200 motion-safe:animate-pulse" />
+        <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
+          <LoadingSkeleton variant="card" rows={3} />
+          <LoadingSkeleton variant="card" rows={1} />
+        </div>
       </div>
     )
   }
 
-  if (error || !data) {
+  if (isError || !data?.employer) {
+    const notFound = error?.response?.status === 404
     return (
-      <div className="flex h-[50vh] flex-col items-center justify-center text-center">
-        <Building2 className="h-16 w-16 text-slate-300 mb-4" />
-        <h2 className="text-xl font-bold text-slate-700">Employer Not Found</h2>
-        <p className="mt-2 text-slate-500">{error}</p>
-        <Button variant="outline" className="mt-6" onClick={() => navigate(-1)}>
-          Go Back
-        </Button>
+      <div className="space-y-6">
+        {backButton}
+        <Card>
+          {notFound ? (
+            <EmptyState
+              icon={ShieldCheck}
+              title="This company profile isn't available"
+              description="The employer may still be under PESO review, or their profile was removed."
+              action={{ label: 'Browse jobs', to: '/seeker/dashboard' }}
+            />
+          ) : (
+            <ErrorState
+              title="Couldn't load this company"
+              description="Check your connection, then try again."
+              onRetry={() => refetch()}
+              error={error}
+            />
+          )}
+        </Card>
       </div>
     )
   }
 
-  const { employer, vacancies } = data
+  const { employer, vacancies = [] } = data
+  const name = employerDisplayName(employer)
+  const registeredName = employerRegisteredName(employer)
+  const industry = formatIndustry(employer.industry)
 
   return (
     <div className="space-y-6">
-      <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-sm font-bold text-slate-500 transition-colors hover:text-slate-800">
-        <ArrowLeft className="h-4 w-4" />
-        Back
-      </button>
+      {backButton}
 
-      {/* Hero Banner Section */}
-      <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200">
-        <div className="h-32 bg-gradient-to-r from-brand-navy to-blue-700 sm:h-48" />
-        <div className="relative px-5 pb-6 sm:px-7">
-          <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
-            <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
-              <div className="relative -mt-10 shrink-0 sm:-mt-12">
-                <div className="relative flex h-28 w-28 items-center justify-center overflow-hidden rounded-2xl border-4 border-white bg-white shadow-lg sm:h-32 sm:w-32">
-                  {employer.company_logo_url ? (
-                    <LazyImage src={employer.company_logo_url} alt={employer.company_name} className="h-full w-full object-contain p-2" />
-                  ) : (
-                    <Building2 className="h-10 w-10 text-slate-300 sm:h-12 sm:w-12" />
-                  )}
-                </div>
-              </div>
-              <div className="min-w-0 flex-1 pt-1 sm:pt-4">
-                <div className="flex items-center gap-2">
-                  <h1 className="truncate text-2xl font-black text-slate-950 sm:text-3xl">{employer.trade_name || employer.company_name}</h1>
-                  {employer.verification_status === 'verified' && (
-                    <Badge status="success" icon={ShieldCheck}>Verified</Badge>
-                  )}
-                </div>
-                <p className="text-sm font-semibold text-slate-500 mt-1">{Array.isArray(employer.industry) ? employer.industry.join(', ') : employer.industry}</p>
-              </div>
+      <header className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200">
+        <div className="h-24 bg-brand-navy sm:h-32" />
+        <div className="flex flex-col gap-4 px-5 pb-6 sm:flex-row sm:items-end sm:px-7">
+          <CompanyLogo src={employer.company_logo_url} name={name} size="xl" className="-mt-12 sm:-mt-14" />
+          <div className="min-w-0 flex-1">
+            <h1 className="break-words text-2xl font-black leading-tight text-slate-950 sm:text-3xl">{name}</h1>
+            {registeredName && <p className="mt-1 text-sm text-slate-500">Registered as {registeredName}</p>}
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700">
+                <ShieldCheck className="h-3.5 w-3.5" aria-hidden="true" />
+                Verified by PESO
+              </span>
+              {industry && <span className="text-sm font-semibold text-slate-600">{industry}</span>}
             </div>
           </div>
         </div>
-      </div>
+      </header>
 
-      <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
-        <main className="space-y-6">
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+        <main className="min-w-0 space-y-6">
           <Card>
-            <CardHeader title="About the Company" subtitle="Overview and details" />
-            <div className="mt-4">
-              <p className="text-sm leading-relaxed text-slate-600 whitespace-pre-wrap">
-                {employer.company_description || 'No description provided.'}
-              </p>
-            </div>
-            <div className="mt-6 grid grid-cols-2 gap-4 border-t border-slate-100 pt-6">
-              <div>
-                <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Industry</p>
-                <p className="mt-1 flex items-center gap-1.5 text-sm font-semibold text-slate-800">
-                  <Target className="h-4 w-4 text-slate-400" />
-                  {Array.isArray(employer.industry) ? employer.industry.join(', ') : employer.industry}
-                </p>
-              </div>
-              <div>
-                <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Company Size</p>
-                <p className="mt-1 flex items-center gap-1.5 text-sm font-semibold text-slate-800">
-                  <Users className="h-4 w-4 text-slate-400" />
-                  {employer.company_size || 'Not specified'}
-                </p>
-              </div>
-              <div className="col-span-2">
-                <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Location</p>
-                <p className="mt-1 flex items-center gap-1.5 text-sm font-semibold text-slate-800">
-                  <MapPin className="h-4 w-4 shrink-0 text-slate-400" />
-                  {employer.full_address}
-                </p>
-              </div>
-            </div>
+            <CardHeader title="About the company" />
+            {employer.company_description ? (
+              <p className="max-w-prose whitespace-pre-wrap text-sm leading-7 text-slate-700">{employer.company_description}</p>
+            ) : (
+              <p className="text-sm text-slate-500">This employer hasn't added a description yet.</p>
+            )}
           </Card>
 
-          <div className="space-y-4">
-            <h2 className="text-lg font-black text-slate-900">Active Job Vacancies</h2>
+          <Card>
+            <CardHeader
+              title="Open jobs"
+              subtitle={vacancies.length > 0 ? 'Select a job to see the full details and apply.' : undefined}
+              action={<span className="text-sm font-semibold text-slate-500">{vacancies.length} {vacancies.length === 1 ? 'opening' : 'openings'}</span>}
+            />
             {vacancies.length > 0 ? (
-              <div className="grid gap-4">
-                {vacancies.map(job => (
-                  <div key={job.post_id} className="group flex flex-col justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-5 transition-all hover:border-brand-navy hover:shadow-md sm:flex-row sm:items-center">
-                    <div>
-                      <h3 className="text-base font-bold text-slate-900">{job.job_title}</h3>
-                      <div className="mt-2 flex flex-wrap gap-2 text-xs text-slate-500">
-                        <span className="flex items-center gap-1"><MapPin className="h-3 w-3" />{job.location}</span>
-                        <span className="flex items-center gap-1"><BriefcaseBusiness className="h-3 w-3 capitalize" />{job.employment_type?.replaceAll('_', ' ')}</span>
-                        <span className="flex items-center gap-1"><Calendar className="h-3 w-3" />Posted {formatDate(job.created_at)}</span>
-                      </div>
-                      <EmployerPreferenceChip job={job} className="mt-2" />
-                    </div>
-                    <Button variant="outline" onClick={() => setViewingJobId(job.post_id)}>
-                      View Details
-                    </Button>
-                  </div>
+              <ul className="space-y-2.5">
+                {vacancies.map((job) => (
+                  <VacancyRow key={job.post_id} job={job} onSelect={() => setViewingJobId(job.post_id)} />
                 ))}
-              </div>
+              </ul>
             ) : (
-              <Card className="text-center">
-                <BriefcaseBusiness className="mx-auto h-12 w-12 text-slate-300" />
-                <p className="mt-2 text-sm font-medium text-slate-600">No active job vacancies at the moment.</p>
-              </Card>
+              <EmptyState
+                size="sm"
+                icon={BriefcaseBusiness}
+                title="No open jobs right now"
+                description="New postings from this company will show up here."
+                action={{ label: 'Browse other jobs', variant: 'outline', to: '/seeker/dashboard' }}
+              />
             )}
-          </div>
+          </Card>
         </main>
 
         <aside className="space-y-6">
           <Card>
-            <CardHeader title="Contact Info" />
-            <div className="mt-4 space-y-4">
-              {/* Do not show private representative info here */}
-              <p className="text-sm text-slate-600">
-                To apply or inquire about jobs, please click "View Details" on the respective job postings.
+            <CardHeader title="Company facts" />
+            <CompanyFacts employer={employer} columns={1} />
+          </Card>
+
+          <Card>
+            <CardHeader title="How to apply" />
+            <p className="text-sm leading-6 text-slate-600">
+              Open a job above and apply from its details. Your application goes straight to this employer through i-PESO.
+            </p>
+            <div className="mt-4 flex gap-3 rounded-xl border border-blue-100 bg-blue-50 p-4">
+              <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-blue-700" aria-hidden="true" />
+              <p className="text-xs leading-5 text-blue-900">
+                PESO checked this employer's business documents before letting them post jobs. If anyone asks you to pay to apply, report them.
               </p>
-              <div className="rounded-xl border border-blue-100 bg-blue-50 p-4">
-                <div className="flex items-start gap-3">
-                  <ShieldCheck className="h-5 w-5 text-blue-600 mt-0.5" />
-                  <p className="text-xs text-blue-800 leading-relaxed">
-                    This employer has been verified by the PESO Office and is an authorized job provider.
-                  </p>
-                </div>
-              </div>
             </div>
           </Card>
+
+          <div className="text-center lg:text-left">
+            <Button variant="ghost" size="sm" icon={Flag} onClick={() => setReporting(true)} className="text-slate-500 hover:text-red-700">
+              Report this employer
+            </Button>
+          </div>
         </aside>
       </div>
 
@@ -181,7 +176,12 @@ export default function EmployerProfile() {
         postId={viewingJobId}
         open={viewingJobId !== null}
         onClose={() => setViewingJobId(null)}
-        sourceLabel={employer.trade_name || employer.company_name}
+        sourceLabel={name}
+      />
+      <ReportEmployerModal
+        open={reporting}
+        employer={{ employer_id: employer.employer_id, employer_name: name }}
+        onClose={() => setReporting(false)}
       />
     </div>
   )

@@ -1,178 +1,165 @@
-import { useState, useEffect } from 'react'
-import { Link } from 'react-router-dom'
+import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { AlertTriangle, MapPin, Building2, CalendarDays, ExternalLink, ShieldCheck, X, BriefcaseBusiness, Info } from 'lucide-react'
-import { Badge, Button, LoadingSkeleton } from '@/components/ui'
-import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
-import { getPublicEmployerProfile, reportEmployer } from '@/services/seekerService'
-import toast from 'react-hot-toast'
+import { BriefcaseBusiness, ExternalLink, Flag, ShieldCheck } from 'lucide-react'
+import { Button, EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui'
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
+import JobDetailModal from '@/components/JobDetailModal'
+import ReportEmployerModal from '@/components/ReportEmployerModal'
+import CompanyFacts from '@/components/employers/CompanyFacts'
+import CompanyLogo from '@/components/employers/CompanyLogo'
+import VacancyRow from '@/components/employers/VacancyRow'
+import { getPublicEmployerProfile } from '@/services/seekerService'
+import { employerDisplayName, employerRegisteredName, publicEmployerQueryKey } from '@/utils/employerProfile'
 
-export default function EmployerProfileModal({ open, employerId, onClose, onApplyJob }) {
+/**
+ * Slide-over company profile opened from a job card. Reading order follows
+ * what a seeker decides on: who the company is → can I trust it → what it
+ * does → which jobs are open. Reporting is available but deliberately quiet.
+ */
+export default function EmployerProfileModal({ open, employerId, onClose }) {
+  const [viewingJobId, setViewingJobId] = useState(null)
   const [reporting, setReporting] = useState(false)
-  
-  const { data, isLoading, isError, error } = useQuery({
-    queryKey: ['publicEmployer', employerId],
+
+  const { data, isLoading, isError, error, refetch, isFetching } = useQuery({
+    queryKey: publicEmployerQueryKey(employerId),
     queryFn: () => getPublicEmployerProfile(employerId),
-    enabled: !!employerId && open,
-    staleTime: 1000 * 60 * 5, // 5 minutes
+    enabled: Boolean(employerId) && open,
+    staleTime: 5 * 60 * 1000,
+    retry: (count, err) => err?.response?.status !== 404 && count < 2,
   })
 
   const employer = data?.employer
-  const vacancies = data?.vacancies || []
-
-  const handleReport = async () => {
-    const reason = window.prompt('Why are you reporting this employer? (E.g., Fraudulent, abusive, misrepresentation)')
-    if (!reason) return
-
-    setReporting(true)
-    try {
-      await reportEmployer(employerId, { reason })
-      toast.success('Employer reported successfully. Our team will review this.')
-    } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to report employer.')
-    } finally {
-      setReporting(false)
-    }
-  }
+  const vacancies = data?.vacancies ?? []
+  const name = employerDisplayName(employer)
+  const registeredName = employerRegisteredName(employer)
+  const notFound = error?.response?.status === 404
 
   return (
-    <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
-      <DialogContent className="fixed inset-y-0 right-0 z-50 h-full w-full max-w-none sm:w-[500px] lg:w-[650px] overflow-hidden p-0 gap-0 border-l bg-slate-50 shadow-2xl transition ease-in-out data-[state=closed]:duration-300 data-[state=open]:duration-500 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right rounded-none">
-        
-        {/* Sticky Header */}
-        <div className="sticky top-0 z-10 border-b border-slate-200 bg-white px-6 py-4 shadow-sm flex items-center justify-between">
-          <DialogTitle className="text-lg font-black text-slate-900 flex items-center gap-2">
-            Company Profile
-          </DialogTitle>
-          <button onClick={onClose} className="rounded-full p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500">
-            <X className="h-5 w-5" />
-          </button>
-        </div>
+    <>
+      <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
+        {/* Overrides DialogContent's centring + zoom so it slides in from the right (same fix as the ATS panel). */}
+        <DialogContent className="fixed bottom-0 left-auto right-0 top-0 z-50 flex h-full w-full max-w-none translate-x-0 translate-y-0 flex-col gap-0 overflow-hidden rounded-none border-l bg-slate-50 p-0 shadow-2xl duration-300 data-[state=closed]:zoom-out-100 data-[state=open]:zoom-in-100 data-[state=closed]:slide-out-to-right-full data-[state=open]:slide-in-from-right-full sm:w-[520px] sm:rounded-none lg:w-[600px]">
+          <header className="shrink-0 border-b border-slate-200 bg-white px-5 py-4 pr-14">
+            <DialogTitle className="text-base">Company profile</DialogTitle>
+            <DialogDescription className="sr-only">
+              Details and open jobs for {employer ? name : 'this employer'}.
+            </DialogDescription>
+          </header>
 
-        {/* Scrollable Content */}
-        <div className="h-full overflow-y-auto pb-24">
-          {isLoading ? (
-            <div className="p-8 space-y-6">
-              <div className="flex items-center gap-4">
-                <LoadingSkeleton variant="circular" width={64} height={64} />
-                <LoadingSkeleton variant="text" rows={2} className="w-48" />
-              </div>
-              <LoadingSkeleton variant="card" rows={3} />
-            </div>
-          ) : isError ? (
-            <div className="p-8 text-center">
-              <AlertTriangle className="h-10 w-10 text-amber-500 mx-auto mb-3" />
-              <h3 className="font-bold text-slate-900">Failed to load employer</h3>
-              <p className="text-sm text-slate-500">{error?.response?.data?.message || 'Could not fetch company details.'}</p>
-            </div>
-          ) : employer ? (
-            <>
-              {/* Header Banner */}
-              <div className="bg-gradient-to-br from-blue-700 to-indigo-900 px-6 py-8 text-white relative">
-                <div className="absolute top-0 right-0 p-4 opacity-10">
-                  <Building2 className="h-32 w-32" />
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+            {isLoading ? (
+              <div className="space-y-6 p-5 sm:p-6">
+                <div className="flex items-center gap-4">
+                  <div className="h-20 w-20 rounded-2xl bg-slate-200 motion-safe:animate-pulse" />
+                  <LoadingSkeleton variant="text" rows={2} className="flex-1" />
                 </div>
-                <div className="relative z-10 flex flex-col sm:flex-row items-start sm:items-center gap-5">
-                  <div className="h-20 w-20 shrink-0 overflow-hidden rounded-2xl border-4 border-white bg-white shadow-md">
-                    {employer.company_logo_url ? (
-                      <img
-                        src={employer.company_logo_url.startsWith('http') ? employer.company_logo_url : `${import.meta.env.VITE_API_BASE_URL?.replace('/api', '') || 'http://localhost:8000'}/storage/${employer.company_logo_url}`}
-                        alt={employer.company_name}
-                        className="h-full w-full object-cover"
-                      />
+                <LoadingSkeleton variant="card" rows={3} />
+              </div>
+            ) : isError ? (
+              notFound ? (
+                <EmptyState
+                  icon={ShieldCheck}
+                  title="This company profile isn't available"
+                  description="The employer may still be under PESO review, or their profile was removed."
+                  action={{ label: 'Back to jobs', variant: 'outline', onClick: onClose }}
+                />
+              ) : (
+                <ErrorState
+                  title="Couldn't load this company"
+                  description="Check your connection, then try again."
+                  onRetry={() => refetch()}
+                  error={error}
+                />
+              )
+            ) : employer ? (
+              <>
+                <section className="bg-brand-navy px-5 pb-6 pt-6 text-white sm:px-6">
+                  <div className="flex items-center gap-4">
+                    <CompanyLogo src={employer.company_logo_url} name={name} size="lg" />
+                    <div className="min-w-0">
+                      <h2 className="break-words text-xl font-black leading-tight sm:text-2xl">{name}</h2>
+                      {registeredName && <p className="mt-0.5 text-sm text-blue-100">Registered as {registeredName}</p>}
+                      <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-white/10 px-2.5 py-1 text-xs font-semibold text-white ring-1 ring-white/20">
+                        <ShieldCheck className="h-3.5 w-3.5" aria-hidden="true" />
+                        Verified by PESO
+                      </p>
+                    </div>
+                  </div>
+                </section>
+
+                <div className="space-y-6 p-5 sm:p-6">
+                  <section aria-labelledby="panel-facts" className="rounded-xl border border-slate-200 bg-white p-5">
+                    <h3 id="panel-facts" className="sr-only">Company facts</h3>
+                    <CompanyFacts employer={employer} />
+                  </section>
+
+                  <section aria-labelledby="panel-about">
+                    <h3 id="panel-about" className="text-sm font-bold text-slate-900">About the company</h3>
+                    {employer.company_description ? (
+                      <p className="mt-2 max-w-prose whitespace-pre-wrap text-sm leading-6 text-slate-700">{employer.company_description}</p>
                     ) : (
-                      <div className="flex h-full w-full items-center justify-center bg-slate-100 text-slate-400 font-bold text-2xl">
-                        {employer.company_name?.charAt(0)}
-                      </div>
+                      <p className="mt-2 text-sm text-slate-500">This employer hasn't added a description yet.</p>
                     )}
-                  </div>
-                  <div>
-                    <h2 className="text-2xl font-black">{employer.company_name}</h2>
-                    {employer.trade_name && employer.trade_name !== employer.company_name && (
-                      <p className="text-blue-200 font-medium text-sm mt-0.5">Doing business as {employer.trade_name}</p>
-                    )}
-                    {employer.verification_status === 'verified' && (
-                      <span className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-blue-600/30 px-3 py-1 text-xs font-bold text-white border border-blue-400/30">
-                        <ShieldCheck className="h-3.5 w-3.5" />
-                        Verified Employer
+                  </section>
+
+                  <section aria-labelledby="panel-jobs">
+                    <div className="flex items-baseline justify-between gap-3">
+                      <h3 id="panel-jobs" className="text-sm font-bold text-slate-900">Open jobs</h3>
+                      <span className="text-xs font-semibold text-slate-500">
+                        {vacancies.length} {vacancies.length === 1 ? 'opening' : 'openings'}
                       </span>
+                    </div>
+                    {vacancies.length > 0 ? (
+                      <>
+                        <ul className="mt-3 space-y-2.5">
+                          {vacancies.map((job) => (
+                            <VacancyRow key={job.post_id} job={job} onSelect={() => setViewingJobId(job.post_id)} />
+                          ))}
+                        </ul>
+                        <p className="mt-2 text-xs text-slate-500">Select a job to see the full details and apply.</p>
+                      </>
+                    ) : (
+                      <EmptyState
+                        size="sm"
+                        icon={BriefcaseBusiness}
+                        title="No open jobs right now"
+                        description="New postings from this company will show up here."
+                        className="mt-3 rounded-xl border border-dashed border-slate-300 bg-white"
+                      />
                     )}
-                  </div>
+                  </section>
                 </div>
-              </div>
+              </>
+            ) : null}
+          </div>
 
-              <div className="p-6 sm:p-8 space-y-8">
-                {/* Meta Overview */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm flex items-start gap-3">
-                    <BriefcaseBusiness className="h-5 w-5 text-blue-600 shrink-0 mt-0.5" />
-                    <div>
-                      <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Industry</p>
-                      <p className="mt-1 font-semibold text-slate-900">{employer.industry || 'Not specified'}</p>
-                    </div>
-                  </div>
-                  <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm flex items-start gap-3">
-                    <MapPin className="h-5 w-5 text-blue-600 shrink-0 mt-0.5" />
-                    <div>
-                      <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Location</p>
-                      <p className="mt-1 text-sm font-semibold text-slate-900">{employer.full_address || 'Not specified'}</p>
-                    </div>
-                  </div>
-                </div>
+          {employer && (
+            <footer className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-t border-slate-200 bg-white px-5 py-3">
+              <Button variant="ghost" size="sm" icon={Flag} onClick={() => setReporting(true)} className="text-slate-500 hover:text-red-700">
+                Report this employer
+              </Button>
+              <Button variant="secondary" size="sm" icon={ExternalLink} to={`/seeker/employers/${employer.employer_id}`} onClick={onClose}>
+                Open full company page
+              </Button>
+            </footer>
+          )}
 
-                {/* About Section */}
-                <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-                  <h3 className="flex items-center gap-2 font-bold text-slate-900 mb-3">
-                    <Info className="h-5 w-5 text-slate-400" /> About the Company
-                  </h3>
-                  <div className="text-sm leading-relaxed text-slate-700 whitespace-pre-wrap">
-                    {employer.company_description || <span className="italic text-slate-400">No company description provided.</span>}
-                  </div>
-                </div>
+          {isFetching && !isLoading && <span className="sr-only" role="status">Refreshing company profile…</span>}
+        </DialogContent>
+      </Dialog>
 
-                {/* Active Vacancies */}
-                <div>
-                  <h3 className="font-bold text-slate-900 mb-4 flex items-center justify-between">
-                    <span>Active Vacancies</span>
-                    <span className="rounded-full bg-blue-100 text-blue-800 px-2.5 py-0.5 text-xs font-black">{vacancies.length}</span>
-                  </h3>
-                  
-                  {vacancies.length > 0 ? (
-                    <div className="grid gap-3">
-                      {vacancies.map(job => (
-                        <div key={job.post_id} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-blue-300">
-                          <h4 className="font-bold text-blue-700 text-lg leading-tight">{job.job_title}</h4>
-                          <div className="mt-2 flex flex-wrap gap-x-4 gap-y-2 text-xs font-medium text-slate-600">
-                            <span className="flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5 text-slate-400" />{job.location}</span>
-                            <span className="flex items-center gap-1.5"><BriefcaseBusiness className="h-3.5 w-3.5 text-slate-400" />{job.employment_type?.replace('_', ' ')}</span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 p-6 text-center text-sm font-medium text-slate-500">
-                      No other active vacancies right now.
-                    </div>
-                  )}
-                </div>
-
-                {/* Footer Actions */}
-                <div className="pt-6 border-t border-slate-200 text-center">
-                  <button 
-                    onClick={handleReport}
-                    disabled={reporting}
-                    className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-400 hover:text-red-600 transition"
-                  >
-                    <AlertTriangle className="h-4 w-4" />
-                    Report this Employer
-                  </button>
-                </div>
-
-              </div>
-            </>
-          ) : null}
-        </div>
-      </DialogContent>
-    </Dialog>
+      {/* Both stack above the panel; closing either returns the seeker to the company profile. */}
+      <JobDetailModal
+        postId={viewingJobId}
+        open={viewingJobId !== null}
+        onClose={() => setViewingJobId(null)}
+        sourceLabel={employer ? name : undefined}
+      />
+      <ReportEmployerModal
+        open={reporting}
+        employer={employer ? { employer_id: employer.employer_id, employer_name: name } : null}
+        onClose={() => setReporting(false)}
+      />
+    </>
   )
 }

@@ -1881,7 +1881,11 @@ class SeekerController extends Controller
                 'trade_name' => $employer->trade_name,
                 'industry' => $employer->industry,
                 'company_size' => $employer->company_size,
-                'company_logo_url' => $employer->company_logo_url,
+                // Employer has no company_logo_url accessor — build it from the
+                // stored path the same way the admin profile does.
+                'company_logo_url' => $employer->company_logo
+                    ? (str_starts_with($employer->company_logo, 'http') ? $employer->company_logo : url('storage/' . ltrim($employer->company_logo, '/')))
+                    : null,
                 'full_address' => $employer->full_address,
                 'company_description' => $employer->company_description,
                 'verification_status' => $employer->verification_status,

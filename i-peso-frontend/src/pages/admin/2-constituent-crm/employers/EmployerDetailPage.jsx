@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { AlertTriangle, ArrowLeft, Building2, CheckCircle2, Download, Eye, FileText, MapPin, ShieldCheck, XCircle, Clock, BriefcaseBusiness } from 'lucide-react'
-import { Badge, Button, Card, CardHeader } from '@/components/ui'
+import { AlertTriangle, ArrowLeft, CheckCircle2, Download, Eye, FileText, ShieldCheck, XCircle, Clock, BriefcaseBusiness } from 'lucide-react'
+import { Badge, Button, Card, CardHeader, ErrorState, LoadingSkeleton } from '@/components/ui'
+import CompanyLogo from '@/components/employers/CompanyLogo'
+import VacancyRow from '@/components/employers/VacancyRow'
+import { formatCompanySize } from '@/utils/employerProfile'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Dialog, DialogContent, DialogHeader, DialogFooter, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
@@ -254,8 +257,30 @@ export default function EmployerDetailPage() {
     })
   }
 
-  if (loading) return <div className="py-12 text-center text-slate-500 font-medium">Loading employer profile...</div>
-  if (!employer) return <div className="py-12 text-center text-red-600 font-medium">{error || 'Employer not found'}</div>
+  if (loading && !employer) {
+    return (
+      <div className="mx-auto max-w-7xl space-y-4 px-4 py-6 sm:px-6 lg:px-8">
+        <div className="h-36 rounded-2xl bg-slate-200 motion-safe:animate-pulse" />
+        <LoadingSkeleton variant="card" rows={3} />
+      </div>
+    )
+  }
+  if (!employer) {
+    return (
+      <div className="mx-auto max-w-3xl px-4 py-10">
+        <Card>
+          <ErrorState
+            title="Couldn't open this employer profile"
+            description={error || 'The employer may have been removed. Try again, or go back to the directory.'}
+            onRetry={loadEmployer}
+          />
+          <div className="-mt-6 pb-6 text-center">
+            <Button variant="ghost" size="sm" icon={ArrowLeft} onClick={() => navigate('/admin/employers')}>Back to directory</Button>
+          </div>
+        </Card>
+      </div>
+    )
+  }
 
   const companyProfile = employer.company_profile ?? employer.company ?? {}
   const representative = employer.representative_information ?? employer.representative ?? {}
@@ -268,6 +293,8 @@ export default function EmployerDetailPage() {
   const jobFairParticipation = employer.job_fair_participation ?? []
   const verificationStatus = employer.verification_status ?? companyProfile.verification_status ?? 'pending'
   const verificationRemarks = employer.verification_remarks ?? companyProfile.rejection_reason ?? employer.rejection_reason
+  // Employers are stored as 'verified' (only documents use 'approved'); accept both.
+  const isVerified = verificationStatus === 'verified' || verificationStatus === 'approved'
 
   // Unified review derivations — every uploaded doc counts as approved unless rejected.
   const isRejected = (doc) => doc?.verification_status === 'rejected'
@@ -321,32 +348,32 @@ export default function EmployerDetailPage() {
           Back to directory
         </button>
 
-        {error && <div className="mb-5 flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-medium text-red-800"><AlertTriangle className="h-4 w-4 shrink-0" />{error}</div>}
+        {error && <div role="alert" className="mb-5 flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-medium text-red-800"><AlertTriangle className="h-4 w-4 shrink-0" />{error}</div>}
 
         <div className="space-y-4">
           {/* Compact hero */}
           <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200">
-            <div className="h-16 bg-gradient-to-r from-brand-navy to-blue-700 sm:h-20" />
+            <div className="h-16 bg-brand-navy sm:h-20" />
             <div className="relative px-5 pb-5 sm:px-6">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex items-center gap-4">
-                  <div className="relative -mt-8 shrink-0 sm:-mt-9">
-                    <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-2xl border-4 border-white bg-white shadow-lg sm:h-20 sm:w-20">
-                      {companyProfile.company_logo_url ? (
-                        <img src={companyProfile.company_logo_url} alt="Logo" className="h-full w-full object-contain p-1.5" />
-                      ) : (
-                        <Building2 className="h-8 w-8 text-slate-300 sm:h-9 sm:w-9" />
-                      )}
-                    </div>
-                  </div>
+                <div className="flex min-w-0 items-center gap-4">
+                  <CompanyLogo
+                    src={companyProfile.company_logo_url}
+                    name={companyProfile.company_name || employer.company_name}
+                    size="md"
+                    className="-mt-8 sm:-mt-9 sm:h-20 sm:w-20"
+                  />
                   <div className="min-w-0">
-                    <p className="text-[11px] font-black uppercase tracking-[0.18em] text-blue-600">
-                      {verificationStatus === 'pending' ? 'PESO Employer Audit Hub' : 'Employer Profile'}
+                    <p className="text-xs font-semibold text-slate-500">
+                      {verificationStatus === 'pending' ? 'Accreditation review' : 'Employer profile'}
                     </p>
-                    <h1 className="truncate text-xl font-black text-slate-950 sm:text-2xl">{companyProfile.company_name || employer.company_name}</h1>
+                    <h1 className="break-words text-xl font-black leading-tight text-slate-950 sm:text-2xl">{companyProfile.company_name || employer.company_name}</h1>
+                    {employer.trade_name && employer.trade_name !== (companyProfile.company_name || employer.company_name) && (
+                      <p className="mt-0.5 text-sm text-slate-500">Trades as {employer.trade_name}</p>
+                    )}
                   </div>
                 </div>
-                <Badge status={verificationStatus === 'approved' ? 'approved' : verificationStatus === 'rejected' ? 'rejected' : 'pending'}>{formatValue(verificationStatus)}</Badge>
+                <Badge status={isVerified ? 'approved' : verificationStatus === 'rejected' ? 'rejected' : 'pending'} className="self-start capitalize sm:self-center">{formatValue(verificationStatus)}</Badge>
               </div>
             </div>
           </div>
@@ -362,30 +389,41 @@ export default function EmployerDetailPage() {
 
                 <TabsContent value="overview" className="space-y-5">
                   <Card>
-                    <CardHeader title="Company Details" subtitle="Core business information registered in the system." />
-                    <div className="grid gap-x-8 gap-y-5 sm:grid-cols-2">
-                      <InfoItem label="Company name" value={companyProfile.company_name || employer.company_name} />
+                    <CardHeader title="Company details" subtitle="Business information the employer registered." />
+                    <dl className="grid gap-x-8 gap-y-5 sm:grid-cols-2">
+                      <InfoItem label="Registered name" value={companyProfile.company_name || employer.company_name} />
+                      <InfoItem label="Trade name" value={employer.trade_name} />
                       <InfoItem label="Industry" value={formatIndustry(companyProfile.industry || employer.industry)} />
+                      <InfoItem label="Company size" value={formatCompanySize(companyProfile.company_size || employer.company_size)} />
                       <InfoItem label="TIN" value={companyProfile.tin || employer.tin} />
                       <InfoItem label="Business address" value={companyProfile.business_address || businessAddress.complete_address} />
+                    </dl>
+                    <div className="mt-5 border-t border-slate-100 pt-5">
+                      <h3 className="text-sm font-bold text-slate-900">About the company</h3>
+                      <p className="mt-0.5 text-xs text-slate-500">Shown to job seekers on the public company profile.</p>
+                      {employer.company_description ? (
+                        <p className="mt-2 max-w-prose whitespace-pre-wrap text-sm leading-6 text-slate-700">{employer.company_description}</p>
+                      ) : (
+                        <p className="mt-2 text-sm text-slate-400">The employer hasn't added a description.</p>
+                      )}
                     </div>
                   </Card>
 
                   <Card>
                     <CardHeader title="Representative" subtitle="Authorized contact person for PESO coordination." />
-                    <div className="grid gap-x-8 gap-y-5 sm:grid-cols-2">
+                    <dl className="grid gap-x-8 gap-y-5 sm:grid-cols-2">
                       <InfoItem label="Name" value={representative.representative_name || `${representative.representative_first_name || ''} ${representative.representative_last_name || ''}`.trim()} />
                       <InfoItem label="Designation" value={representative.representative_designation} />
-                      <InfoItem label="Contact number" value={representative.representative_contact_number || representative.mobile_number} />
-                      <InfoItem label="Email address" value={representative.email} />
-                    </div>
+                      <InfoItem label="Contact number" value={representative.representative_contact_number || representative.mobile_number} href={(number) => `tel:${number.replace(/[^\d+]/g, '')}`} />
+                      <InfoItem label="Email address" value={representative.email} href={(email) => `mailto:${email}`} />
+                    </dl>
                   </Card>
 
                   <Card>
-                    <CardHeader title="Operational Review" subtitle="Verification status and updates." />
+                    <CardHeader title="Verification" subtitle="Accreditation status and the latest review remarks." />
                     <div className="grid gap-3 sm:grid-cols-3">
                       <div className="flex items-center gap-3 rounded-xl bg-slate-50 p-3">
-                        <span className={`rounded-lg p-2 ${verificationStatus === 'approved' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}><ShieldCheck className="h-4 w-4" /></span>
+                        <span className={`rounded-lg p-2 ${isVerified ? 'bg-emerald-100 text-emerald-700' : verificationStatus === 'rejected' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`}><ShieldCheck className="h-4 w-4" /></span>
                         <div className="min-w-0 flex-1">
                           <p className="text-xs text-slate-500">Status</p>
                           <p className="text-sm font-bold text-slate-800 capitalize">{formatValue(verificationStatus)}</p>
@@ -414,20 +452,30 @@ export default function EmployerDetailPage() {
                   {verificationStatus !== 'pending' && (
                     <div className="grid gap-5 lg:grid-cols-2">
                       <Card>
-                        <CardHeader title="Data Quality Flags" subtitle="Operational indicators for follow-up." />
+                        <CardHeader title="Data quality" subtitle="Gaps in this profile that may need follow-up." />
                         <div className="flex flex-wrap gap-2">
                           {Object.entries(dataQualityFlags || {}).filter(([, value]) => value).map(([key]) => <Badge key={key} status="warning">{labelForFlag(key)}</Badge>)}
-                          {!Object.values(dataQualityFlags || {}).some(Boolean) && <span className="text-sm text-slate-500">No flags detected.</span>}
+                          {!Object.values(dataQualityFlags || {}).some(Boolean) && (
+                            <span className="inline-flex items-center gap-1.5 text-sm text-slate-600"><CheckCircle2 className="h-4 w-4 text-emerald-600" aria-hidden="true" />Profile is complete. Nothing to follow up.</span>
+                          )}
                         </div>
                       </Card>
 
                       <Card>
-                        <CardHeader title="Job Fair Participation" subtitle="Events the employer joined." />
+                        <CardHeader title="Job fair participation" subtitle="Events this employer joined or was invited to." />
                         {jobFairParticipation?.length ? (
                           <div className="space-y-2">
-                            {jobFairParticipation.map((fair) => <div key={fair.id} className="rounded-xl border border-slate-200 bg-slate-50 p-3"><p className="text-sm font-bold text-slate-800">{fair.name}</p><p className="mt-1 text-xs text-slate-500">{formatDate(fair.date)}</p></div>)}
+                            {jobFairParticipation.map((fair) => (
+                              <div key={fair.id} className="flex items-start justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
+                                <div className="min-w-0">
+                                  <p className="text-sm font-bold text-slate-800">{fair.name || `Job fair #${fair.job_fair_id}`}</p>
+                                  <p className="mt-1 text-xs text-slate-500">{formatDate(fair.date)}</p>
+                                </div>
+                                {fair.participation_status && <span className="shrink-0 rounded-full bg-white px-2 py-0.5 text-[11px] font-bold capitalize text-slate-600 ring-1 ring-slate-200">{formatValue(fair.participation_status)}</span>}
+                              </div>
+                            ))}
                           </div>
-                        ) : <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 p-5 text-center"><p className="text-sm text-slate-500">No job fair participation records.</p></div>}
+                        ) : <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 p-5 text-center"><p className="text-sm text-slate-500">This employer hasn't joined a job fair yet.</p></div>}
                       </Card>
                     </div>
                   )}
@@ -436,24 +484,18 @@ export default function EmployerDetailPage() {
                 {verificationStatus !== 'pending' && (
                   <TabsContent value="vacancies">
                     {activeVacancies.length > 0 ? (
-                      <div className="grid gap-3">
-                        {activeVacancies.map((job) => (
-                          <div key={job.post_id} className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 transition-all hover:border-brand-navy hover:shadow-md sm:flex-row sm:items-center sm:justify-between">
-                            <div>
-                              <h3 className="text-sm font-bold text-slate-900">{job.job_title}</h3>
-                              <div className="mt-1.5 flex flex-wrap gap-2 text-xs text-slate-500">
-                                <span className="flex items-center gap-1"><MapPin className="h-3 w-3" />{job.location}</span>
-                                <span className="flex items-center gap-1"><BriefcaseBusiness className="h-3 w-3 capitalize" />{job.employment_type?.replaceAll('_', ' ')}</span>
-                                <span className="flex items-center gap-1"><Clock className="h-3 w-3" />Posted {formatDate(job.created_at)}</span>
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
+                      <>
+                        <p className="mb-3 text-sm text-slate-500">Active postings job seekers can apply to right now.</p>
+                        {/* Read-only here: VacancyRow without onSelect renders no hover/chevron, so it doesn't look clickable. */}
+                        <ul className="space-y-2.5">
+                          {activeVacancies.map((job) => <VacancyRow key={job.post_id} job={job} />)}
+                        </ul>
+                      </>
                     ) : (
                       <Card className="text-center">
-                        <BriefcaseBusiness className="mx-auto h-10 w-10 text-slate-300" />
-                        <p className="mt-2 text-sm font-medium text-slate-600">No active job vacancies.</p>
+                        <BriefcaseBusiness className="mx-auto h-10 w-10 text-slate-300" aria-hidden="true" />
+                        <p className="mt-2 text-sm font-semibold text-slate-700">No active vacancies</p>
+                        <p className="mt-1 text-sm text-slate-500">This employer has no job postings open to seekers right now.</p>
                       </Card>
                     )}
                   </TabsContent>
@@ -511,7 +553,7 @@ export default function EmployerDetailPage() {
                             <TableCell className="whitespace-normal break-words">
                               <div className="flex items-center gap-2">
                                 <span className="font-bold text-slate-900">{label}</span>
-                                {row.required && <span className="rounded-md bg-blue-50 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-blue-600">Required</span>}
+                                {row.required && <span className="rounded-md bg-blue-50 px-1.5 py-0.5 text-[11px] font-bold text-blue-700">Required</span>}
                               </div>
                               {doc ? (
                                 <p className="mt-1 break-words text-xs text-slate-400">{doc.original_filename} · Uploaded {formatDate(doc.uploaded_at || doc.created_at)}</p>
@@ -654,7 +696,7 @@ export default function EmployerDetailPage() {
                 <p className="mt-1 text-xs text-emerald-700/80">This download is audit-logged for compliance purposes.</p>
               </div>
               <label className="block text-sm text-slate-600">
-                <span className="mb-1.5 block text-xs font-extrabold uppercase tracking-wide text-slate-400">Official download purpose</span>
+                <span className="mb-1.5 block text-sm font-semibold text-slate-700">Official download purpose</span>
                 <input value={downloadReason} onChange={(event) => setDownloadReason(event.target.value)} className="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm focus:border-brand-navy focus:outline-none focus:ring-1 focus:ring-brand-navy" placeholder="State the reason for secure download (min 10 characters)" />
               </label>
               <DialogFooter>
@@ -692,12 +734,11 @@ export default function EmployerDetailPage() {
               <DialogFooter>
                 <Button variant="ghost" onClick={() => setConfirmDialog(null)}>Cancel</Button>
                 <Button
-                  variant={confirmDialog.variant === 'approve' ? 'secondary' : 'danger'}
+                  variant={confirmDialog.variant === 'approve' ? 'success' : 'danger'}
                   onClick={confirmDialog.onConfirm}
-                  disabled={actionLoading}
-                  className={confirmDialog.variant === 'approve' ? '!border-emerald-600 !bg-emerald-600 !text-white hover:!bg-emerald-700' : ''}
+                  loading={actionLoading}
                 >
-                  {actionLoading ? 'Processing...' : confirmDialog.confirmLabel}
+                  {actionLoading ? 'Saving decision…' : confirmDialog.confirmLabel}
                 </Button>
               </DialogFooter>
             </>
@@ -708,11 +749,22 @@ export default function EmployerDetailPage() {
   )
 }
 
-function InfoItem({ label, value }) {
+// Values render as-is (no underscore stripping — that mangled emails like
+// juan_dela@…); callers format enums themselves. `href` turns a value into a
+// one-click action, e.g. mailto:/tel: for contact details.
+function InfoItem({ label, value, href }) {
   return (
-    <div>
-      <p className="text-xs font-bold uppercase tracking-wide text-slate-400">{label}</p>
-      <p className="mt-1 text-sm font-semibold text-slate-800">{value ? formatValue(value) : 'Not provided'}</p>
+    <div className="min-w-0">
+      <dt className="text-xs font-semibold text-slate-500">{label}</dt>
+      <dd className="mt-1 break-words text-sm">
+        {!value ? (
+          <span className="text-slate-400">Not provided</span>
+        ) : href ? (
+          <a href={href(value)} className="font-semibold text-brand-navy underline-offset-2 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-focus">{value}</a>
+        ) : (
+          <span className="font-semibold text-slate-800">{value}</span>
+        )}
+      </dd>
     </div>
   )
 }
@@ -731,16 +783,33 @@ function labelForFlag(key) {
 
 function WatermarkedPreview({ previewDocument, documentLabels, onClose }) {
   const canvasRef = useRef(null)
+  const closeRef = useRef(null)
+  // Parent passes a fresh closure each render; read it via a ref so the
+  // focus/keyboard effect below runs once per open, not on every re-render.
+  const onCloseRef = useRef(onClose)
+  useEffect(() => { onCloseRef.current = onClose }, [onClose])
 
   useEffect(() => {
-    // Block keyboard shortcuts like Ctrl+S, Ctrl+P while preview is open
+    // Move focus into the preview so keyboard users land on "Close", and hand
+    // it back to whatever opened the preview when it closes.
+    const opener = document.activeElement
+    closeRef.current?.focus()
+    // Esc closes (like every other dialog); block Ctrl+S / Ctrl+P while open.
     const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        onCloseRef.current()
+        return
+      }
       if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'p')) {
         e.preventDefault()
       }
     }
     window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown)
+      if (opener instanceof HTMLElement) opener.focus()
+    }
   }, [])
 
   useEffect(() => {
@@ -804,17 +873,23 @@ function WatermarkedPreview({ previewDocument, documentLabels, onClose }) {
   const isImage = previewDocument.mimeType?.startsWith('image/')
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-slate-950/95 backdrop-blur-sm" onContextMenu={(e) => e.preventDefault()}>
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="watermarked-preview-title"
+      className="fixed inset-0 z-50 flex flex-col bg-slate-950/95 backdrop-blur-sm"
+      onContextMenu={(e) => e.preventDefault()}
+    >
       <div className="flex items-center justify-between border-b border-white/10 bg-slate-900 px-6 py-4 text-white">
         <div>
-          <p className="text-lg font-bold">{label}</p>
+          <p id="watermarked-preview-title" className="text-lg font-bold">{label}</p>
           <p className="text-sm text-slate-400">{previewDocument.original_filename}</p>
         </div>
         <div className="flex items-center gap-3">
           <span className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-xs font-bold text-amber-400">
             WATERMARKED PREVIEW
           </span>
-          <button type="button" onClick={onClose} className="rounded-lg border border-white/20 px-4 py-2 text-sm font-bold transition-colors hover:bg-white/10">Close Preview</button>
+          <button ref={closeRef} type="button" onClick={onClose} className="rounded-lg border border-white/20 px-4 py-2 text-sm font-bold transition-colors hover:bg-white/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-white">Close preview</button>
         </div>
       </div>
       <div className="relative flex-1 overflow-hidden p-6 flex items-center justify-center">
