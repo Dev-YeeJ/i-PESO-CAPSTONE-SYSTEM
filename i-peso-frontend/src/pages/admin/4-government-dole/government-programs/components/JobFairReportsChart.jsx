@@ -1,5 +1,7 @@
+import { useRef } from 'react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
 import { Card, CardHeader } from '@/components/ui'
+import ChartDownloadMenu from '@/components/common/ChartDownloadMenu'
 
 const COLORS = ['#1e293b', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6']
 
@@ -23,7 +25,10 @@ const CustomTooltip = ({ active, payload, label }) => {
   return null
 }
 
-export default function JobFairReportsChart({ metrics, reports }) {
+export default function JobFairReportsChart({ metrics, reports, fairTitle }) {
+  const participationRef = useRef(null)
+  const outcomesRef = useRef(null)
+  const footnote = fairTitle ? `I-PESO Job Fair · ${fairTitle}` : 'I-PESO Job Fair'
   // Aggregate data for Pie Chart
   const pieData = [
     { name: 'Approved Employers', value: metrics?.approved ?? 0 },
@@ -43,7 +48,8 @@ export default function JobFairReportsChart({ metrics, reports }) {
   return (
     <div className="grid gap-6 lg:grid-cols-2">
       <Card>
-        <CardHeader title="Employer Participation" subtitle="Approved vs Attended" />
+        <div ref={participationRef} className="bg-white">
+        <CardHeader title="Employer Participation" subtitle="Approved vs Attended" action={<ChartDownloadMenu targetRef={participationRef} title="Employer Participation" footnote={footnote} disabled={!pieData.length} />} />
         <div className="h-72 w-full p-4">
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
@@ -67,10 +73,12 @@ export default function JobFairReportsChart({ metrics, reports }) {
             </PieChart>
           </ResponsiveContainer>
         </div>
+        </div>
       </Card>
 
       <Card>
-        <CardHeader title="Top Employers by Outcomes" subtitle="Applicants and HOTS by Employer" />
+        <div ref={outcomesRef} className="bg-white">
+        <CardHeader title="Top Employers by Outcomes" subtitle="Applicants and HOTS by Employer" action={<ChartDownloadMenu targetRef={outcomesRef} title="Top Employers by Outcomes" footnote={footnote} disabled={!barData.length} />} />
         <div className="h-72 w-full p-4">
           {barData.length > 0 ? (
             <ResponsiveContainer width="100%" height="100%">
@@ -90,6 +98,7 @@ export default function JobFairReportsChart({ metrics, reports }) {
               No employer reports available.
             </div>
           )}
+        </div>
         </div>
       </Card>
     </div>

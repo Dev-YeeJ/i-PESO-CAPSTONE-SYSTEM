@@ -377,7 +377,7 @@ export default function JobFairDetailPage() {
             </div>
           </Card>
 
-          <JobFairReportsChart metrics={metrics} reports={reports} />
+          <JobFairReportsChart metrics={metrics} reports={reports} fairTitle={fair?.title} />
 
           <Card padding="none" className="mb-6">
             <div className="border-b border-slate-100 p-5">

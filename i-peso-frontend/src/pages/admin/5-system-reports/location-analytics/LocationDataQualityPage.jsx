@@ -1,4 +1,4 @@
-import { createElement } from 'react'
+import { createElement, useRef } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import api from '@/services/api'
 import {
@@ -21,8 +21,13 @@ import {
 } from 'recharts'
 import { ErrorState, LoadingSkeleton } from '@/components/ui'
 import { CHART_COLORS } from '@/design-system/chartColors'
+import ChartDownloadMenu from '@/components/common/ChartDownloadMenu'
+
+const EXPORT_FOOTNOTE = 'I-PESO Location Data Quality'
 
 export default function LocationDataQualityPage() {
+  const seekersChartRef = useRef(null)
+  const vacanciesChartRef = useRef(null)
   const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['admin', 'locationDataQuality'],
     queryFn: async () => {
@@ -72,11 +77,14 @@ export default function LocationDataQualityPage() {
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
-        <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h3 className="mb-6 font-bold text-slate-900 flex items-center gap-2">
-            <MapPin className="h-5 w-5 text-slate-400" />
-            Top Cities for Job Seekers
-          </h3>
+        <div ref={seekersChartRef} className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="mb-6 flex items-start justify-between gap-3">
+            <h3 className="font-bold text-slate-900 flex items-center gap-2">
+              <MapPin className="h-5 w-5 text-slate-400" />
+              Top Cities for Job Seekers
+            </h3>
+            <ChartDownloadMenu targetRef={seekersChartRef} title="Top Cities for Job Seekers" footnote={EXPORT_FOOTNOTE} disabled={!analytics?.seekers_by_city?.length} />
+          </div>
           <div className="h-[300px] w-full" role="img" aria-label={`Bar chart: top cities for job seekers. ${(analytics?.seekers_by_city || []).map((row) => `${row.city}: ${row.count}`).join(', ') || 'no data'}.`}>
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={analytics?.seekers_by_city || []} layout="vertical" margin={{ left: 40 }}>
@@ -90,11 +98,14 @@ export default function LocationDataQualityPage() {
           </div>
         </div>
 
-        <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h3 className="mb-6 font-bold text-slate-900 flex items-center gap-2">
-            <MapPinned className="h-5 w-5 text-slate-400" />
-            Top Cities for Job Vacancies
-          </h3>
+        <div ref={vacanciesChartRef} className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="mb-6 flex items-start justify-between gap-3">
+            <h3 className="font-bold text-slate-900 flex items-center gap-2">
+              <MapPinned className="h-5 w-5 text-slate-400" />
+              Top Cities for Job Vacancies
+            </h3>
+            <ChartDownloadMenu targetRef={vacanciesChartRef} title="Top Cities for Job Vacancies" footnote={EXPORT_FOOTNOTE} disabled={!analytics?.vacancies_by_city?.length} />
+          </div>
           <div className="h-[300px] w-full" role="img" aria-label={`Bar chart: top cities for job vacancies. ${(analytics?.vacancies_by_city || []).map((row) => `${row.city}: ${row.count}`).join(', ') || 'no data'}.`}>
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={analytics?.vacancies_by_city || []} layout="vertical" margin={{ left: 40 }}>

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import {
   AlertTriangle,
@@ -17,6 +17,7 @@ import { Link } from 'react-router-dom'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { Badge, Button, Card, CardHeader, ErrorState, LoadingSkeleton } from '@/components/ui'
 import PageHeader from '@/pages/admin/_components/PageHeader'
+import ChartDownloadMenu from '@/components/common/ChartDownloadMenu'
 import StatCard from '@/pages/admin/_components/StatCard'
 import StatusBadge from '@/pages/admin/_components/StatusBadge'
 import { adminService } from '@/services/adminService'
@@ -32,6 +33,7 @@ const PRESETS = [
 export default function DashboardPage() {
   const [preset, setPreset] = useState('this_month')
   const [range, setRange] = useState(presetRange('this_month'))
+  const trendChartRef = useRef(null)
 
   const { data: stats, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['admin', 'dashboard-stats', range],
@@ -153,7 +155,12 @@ export default function DashboardPage() {
       <div className="grid gap-6 xl:grid-cols-[1.5fr_1fr]">
         {/* Trends - What changed? */}
         <Card>
-          <CardHeader title="Application Trends" subtitle="Volume of applications received across the platform in the selected range." />
+          <div ref={trendChartRef} className="bg-white">
+          <CardHeader
+            title="Application Trends"
+            subtitle="Volume of applications received across the platform in the selected range."
+            action={<ChartDownloadMenu targetRef={trendChartRef} title="Application Trends" footnote={`I-PESO Operations Dashboard · ${range.date_from} to ${range.date_to}`} disabled={!stats?.chart_data?.length} />}
+          />
           <div className="mt-6 h-[320px] w-full">
             {stats?.chart_data?.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
@@ -168,6 +175,7 @@ export default function DashboardPage() {
             ) : (
               <div className="flex h-full items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50 text-slate-400">No trend data available for this range.</div>
             )}
+          </div>
           </div>
         </Card>
 

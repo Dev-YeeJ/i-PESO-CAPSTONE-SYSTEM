@@ -1,4 +1,4 @@
-import { createElement, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { createContext, createElement, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   Activity, BarChart3, BriefcaseBusiness, Building2, CalendarRange, CheckCircle2,
@@ -13,11 +13,14 @@ import toast from 'react-hot-toast'
 import { Button, Card } from '@/components/ui'
 import PageHeader from '@/pages/admin/_components/PageHeader'
 import StatCard from '@/pages/admin/_components/StatCard'
+import ChartDownloadMenu from '@/components/common/ChartDownloadMenu'
 import { adminService } from '@/services/adminService'
 import { analyticsService } from '@/services/analyticsService'
 import { CHART_COLORS } from '@/design-system/chartColors'
 
 const COLORS = CHART_COLORS
+// Applied-filter summary printed in the footer of downloaded chart PDFs.
+const ChartExportNoteContext = createContext('')
 const today = new Date()
 const initialFilters = {
   date_from: new Date(today.getFullYear(), today.getMonth() - 11, 1).toISOString().slice(0, 10),
@@ -180,9 +183,10 @@ function AnalyticsView({ data, loading, error, filters, appliedFilters, setFilte
   const distributions = data?.distributions || {}
   const top = data?.top_lists || {}
   const forecast = data?.forecast || {}
+  const exportNote = ['I-PESO Analytics', formatDateRange(appliedFilters.date_from, appliedFilters.date_to), `Period: ${pretty(appliedFilters.period)}`, ...chips.map(([key, value]) => `${pretty(key)}: ${value}`)].join(' · ')
 
   return (
-    <>
+    <ChartExportNoteContext.Provider value={exportNote}>
       <Card padding="none" className="overflow-hidden transition-all duration-300 hover:shadow-lg hover:shadow-brand-500/5">
         <form onSubmit={applyFilters} className="bg-gradient-to-r from-slate-50 to-white p-5 sm:p-6">
           <div className="mb-4 flex items-center justify-between gap-3">
@@ -269,7 +273,7 @@ function AnalyticsView({ data, loading, error, filters, appliedFilters, setFilte
       </div>
 
       <Forecast forecast={forecast} />
-    </>
+    </ChartExportNoteContext.Provider>
   )
 }
 
@@ -305,7 +309,21 @@ function Forecast({ forecast }) {
   return <section className="overflow-hidden rounded-2xl border border-amber-200 bg-gradient-to-br from-amber-50 to-white shadow-sm"><div className="flex items-start gap-4 border-b border-amber-100 p-5 sm:p-6"><span className="shrink-0 rounded-xl bg-amber-100 p-3 text-amber-800"><Sparkles className="h-6 w-6" /></span><div className="min-w-0"><p className="text-xs font-black uppercase tracking-[0.18em] text-amber-700">Experimental Forecast</p><h2 className="mt-1 text-xl font-black text-slate-950">Next-month labor demand signal</h2><p className="mt-1 text-sm leading-6 text-slate-600">{forecast.explanation || forecast.message || 'Forecast information is not available.'}</p></div></div>{forecast.available && items.length ? <div className="grid gap-4 p-5 sm:grid-cols-2 sm:p-6 xl:grid-cols-3 2xl:grid-cols-5">{items.map((item, index) => <div key={item.item || index} className="rounded-xl border border-amber-100 bg-white p-4"><p className="line-clamp-2 min-h-10 text-sm font-bold text-slate-900">{item.item || 'Unspecified category'}</p><p className="mt-3 text-3xl font-black text-brand-900">{safeNumber(item.predicted_next_month_count)}</p><p className="text-xs text-slate-500">predicted postings · {item.trend_direction || 'stable'}</p><p className="mt-2 text-xs font-semibold text-amber-800">R² fit: {formatFit(item.r_squared)}</p></div>)}</div> : <div className="p-5 sm:p-6"><Empty label="Not enough historical data yet to generate reliable predictions." /></div>}{forecast.confidence_note && <p className="border-t border-amber-100 px-5 py-4 text-xs leading-5 text-slate-600 sm:px-6">{forecast.confidence_note}</p>}</section>
 }
 
-function ChartCard({ title, subtitle, children }) { return <Card className="min-w-0 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg hover:shadow-brand-500/10"><div className="mb-5"><h3 className="font-bold leading-5 text-slate-950">{title}</h3>{subtitle && <p className="mt-1 text-xs leading-5 text-slate-500">{subtitle}</p>}</div>{children}</Card> }
+function ChartCard({ title, subtitle, children }) {
+  const exportRef = useRef(null)
+  const footnote = useContext(ChartExportNoteContext)
+  return (
+    <Card className="min-w-0 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg hover:shadow-brand-500/10">
+      <div ref={exportRef} className="bg-white">
+        <div className="mb-5 flex items-start justify-between gap-3">
+          <div className="min-w-0"><h3 className="font-bold leading-5 text-slate-950">{title}</h3>{subtitle && <p className="mt-1 text-xs leading-5 text-slate-500">{subtitle}</p>}</div>
+          <ChartDownloadMenu targetRef={exportRef} title={title} footnote={footnote} />
+        </div>
+        {children}
+      </div>
+    </Card>
+  )
+}
 function TrendChart({ series, lines }) { return series.length ? <div className="h-72 min-w-0" role="img" aria-label={`Line chart of ${lines.join(' and ')} across ${series.length} periods.`}><ResponsiveContainer><LineChart data={series} margin={{ top: 8, right: 12, left: -12, bottom: 4 }}><CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" /><XAxis dataKey="period" tickFormatter={formatPeriod} tick={{ fontSize: 10, fill: '#64748b' }} minTickGap={24} /><YAxis allowDecimals={false} tick={{ fontSize: 10, fill: '#64748b' }} /><Tooltip content={<ChartTooltip />} cursor={{ stroke: '#94a3b8', strokeWidth: 1, strokeDasharray: '4 4' }} /><Legend verticalAlign="bottom" height={30} wrapperStyle={{ fontSize: 11, paddingTop: 8, cursor: 'pointer' }} />{lines.map((line, index) => <Line key={line} type="monotone" dataKey={line} stroke={COLORS[index]} strokeWidth={3} dot={{ r: 2.5 }} activeDot={{ r: 7, strokeWidth: 0, fill: COLORS[index] }} animationDuration={1000} />)}</LineChart></ResponsiveContainer></div> : <Empty /> }
 function Donut({ data = [] }) { return data.length ? <div className="space-y-3"><div className="h-48" role="img" aria-label={`Proportional chart. ${seriesSummary(data)}.`}><ResponsiveContainer><PieChart><Pie data={data} dataKey="value" nameKey="label" innerRadius={48} outerRadius={76} paddingAngle={2} animationDuration={800}>{data.map((item, index) => <Cell key={item.label} fill={COLORS[index % COLORS.length]} className="hover:opacity-80 transition-opacity outline-none" />)}</Pie><Tooltip content={<ChartTooltip />} /></PieChart></ResponsiveContainer></div><div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">{data.map((item, index) => <div key={item.label} className="flex min-w-0 items-center gap-2 text-xs"><span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: COLORS[index % COLORS.length] }} /><span className="min-w-0 flex-1 truncate text-slate-600" title={item.label}>{item.label}</span><span className="font-bold text-slate-900">{safeNumber(item.value)}</span></div>)}</div></div> : <Empty /> }
 function HorizontalBars({ data = [], color = COLORS[0] }) { const rows = data.slice(0, 8); return rows.length ? <div className="h-72 min-w-0" role="img" aria-label={`Bar chart. ${seriesSummary(rows)}.`}><ResponsiveContainer><BarChart data={rows} layout="vertical" margin={{ left: 8, right: 16 }}><CartesianGrid strokeDasharray="3 3" horizontal={false} /><XAxis type="number" allowDecimals={false} tick={{ fontSize: 10, fill: '#64748b' }} /><YAxis dataKey="label" type="category" width={132} tickFormatter={(value) => truncateLabel(value, 18)} tick={{ fontSize: 10, fill: '#475569' }} /><Tooltip content={<ChartTooltip />} cursor={{ fill: '#f1f5f9' }} /><Bar dataKey="value" name="Count" fill={color} radius={[0, 6, 6, 0]} maxBarSize={24} /></BarChart></ResponsiveContainer></div> : <Empty /> }
