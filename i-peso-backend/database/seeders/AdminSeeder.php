@@ -11,8 +11,11 @@ class AdminSeeder extends Seeder
 {
     public function run()
     {
-        // Check if admin already exists
-        if (Administrator::where('email', 'admin@peso.com')->exists()) {
+        // Only bootstraps an empty install. Checking for any administrator (not
+        // just admin@peso.com) matters: production's admin was moved to the
+        // PESO Gmail, and re-seeding must not add a second admin with the
+        // default password.
+        if (Administrator::where('role', 'administrator')->exists()) {
             return;
         }
 
