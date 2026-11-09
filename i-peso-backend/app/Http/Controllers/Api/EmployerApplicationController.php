@@ -404,7 +404,10 @@ class EmployerApplicationController extends Controller
             // Always clean up the interview record in the DB — an open interview
             // row for a closed application (hired, rejected, withdrawn) is an
             // inconsistent state regardless of why the transition happened.
-            $application->interviewSchedule()->update(['status' => 'cancelled']);
+            // If the interview time already passed, it took place: record it as
+            // completed so it isn't reported (or shown to the seeker) as cancelled.
+            $closingStatus = $originalInterviewSchedule?->closingStatus() ?? 'cancelled';
+            $application->interviewSchedule()->update(['status' => $closingStatus]);
 
             // Only send the "Interview Cancelled" notification when the employer
             // explicitly cancels the interview by moving the application to a
@@ -415,7 +418,7 @@ class EmployerApplicationController extends Controller
             // on top of that is misleading — the employer didn't cancel the
             // interview; they concluded it by making a hiring decision.
             $terminalStatuses = ['hired', 'rejected', 'withdrawn'];
-            if (! in_array($validated['status'], $terminalStatuses, true)) {
+            if ($closingStatus === 'cancelled' && ! in_array($validated['status'], $terminalStatuses, true)) {
                 Notification::send($application->jobSeeker, new InterviewCancelledNotification($application));
                 Notification::send($application->jobVacancy?->employer, new InterviewCancelledNotification($application));
             }

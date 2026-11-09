@@ -8,6 +8,8 @@ use App\Models\Employer;
 use App\Models\JobSeeker;
 use App\Models\JobVacancy;
 use App\Models\Occupation;
+use App\Notifications\ApplicationWithdrawnNotification;
+use App\Notifications\InterviewReminderNotification;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
@@ -167,6 +169,160 @@ class HiringApplicationFlowTest extends TestCase
 
         Notification::assertSentTo($seeker, \App\Notifications\InterviewScheduledNotification::class);
         Notification::assertSentTo($employer, \App\Notifications\InterviewScheduledNotification::class);
+    }
+
+    public function test_interview_shows_call_ended_once_its_time_has_passed(): void
+    {
+        Notification::fake();
+        [$employer, $seeker, $application] = $this->scheduleOnlineInterview(now()->addDay()->startOfHour());
+
+        Sanctum::actingAs($seeker);
+        $this->getJson("/api/seeker/applications/{$application->apply_id}")
+            ->assertOk()
+            ->assertJsonPath('application.interview.phase', 'upcoming');
+
+        $this->travelTo(now()->addDay()->startOfHour()->addMinutes(10));
+        $this->getJson("/api/seeker/applications/{$application->apply_id}")
+            ->assertJsonPath('application.interview.phase', 'in_progress');
+
+        $this->travelTo(now()->addMinutes(55));
+        $response = $this->getJson("/api/seeker/applications/{$application->apply_id}")
+            ->assertJsonPath('application.interview.phase', 'ended');
+        $this->assertContains('Call ended', collect($response->json('application.timeline'))->pluck('title'));
+
+        // The employer's calendar keeps the event but drops the join link.
+        Sanctum::actingAs($employer);
+        $this->getJson('/api/employer/calendar/events?' . http_build_query([
+            'start' => now()->subDays(2)->toDateString(),
+            'end' => now()->addDays(2)->toDateString(),
+        ]))
+            ->assertOk()
+            ->assertJsonPath('events.0.phase', 'ended')
+            ->assertJsonPath('events.0.url', null);
+    }
+
+    public function test_hiring_after_the_interview_records_it_as_completed_not_cancelled(): void
+    {
+        Notification::fake();
+        $start = now()->addDay()->startOfHour();
+        [$employer, , $application] = $this->scheduleOnlineInterview($start);
+
+        $this->travelTo($start->copy()->addHours(2));
+        Sanctum::actingAs($employer);
+        $this->patchJson("/api/employer/applications/{$application->apply_id}/status", [
+            'status' => 'hired',
+            'placement_start_date' => now()->addWeek()->toDateString(),
+            'placement_salary' => 20000,
+            'employment_type' => 'regular',
+        ])
+            ->assertOk()
+            ->assertJsonPath('application.interview.status', 'completed')
+            ->assertJsonPath('application.interview.phase', 'ended');
+    }
+
+    public function test_pulling_back_before_the_interview_still_cancels_it(): void
+    {
+        Notification::fake();
+        [$employer, $seeker, $application] = $this->scheduleOnlineInterview(now()->addDay());
+
+        Sanctum::actingAs($employer);
+        $this->patchJson("/api/employer/applications/{$application->apply_id}/status", ['status' => 'shortlisted'])
+            ->assertOk()
+            ->assertJsonPath('application.interview.status', 'cancelled')
+            ->assertJsonPath('application.interview.phase', 'cancelled');
+
+        Notification::assertSentTo($seeker, \App\Notifications\InterviewCancelledNotification::class);
+    }
+
+    public function test_withdrawing_cancels_the_interview_and_tells_the_employer(): void
+    {
+        Notification::fake();
+        [$employer, $seeker, $application] = $this->scheduleOnlineInterview(now()->addDay());
+
+        Sanctum::actingAs($seeker);
+        $this->postJson("/api/seeker/applications/{$application->apply_id}/withdraw")->assertOk();
+
+        $this->assertSame('cancelled', $application->interviewSchedule()->first()->status);
+        Notification::assertSentTo($employer, ApplicationWithdrawnNotification::class, function ($notification, $channels) use ($employer) {
+            $data = $notification->toArray($employer);
+
+            return $channels === ['database', 'mail']
+                && $data['title'] === 'Applicant withdrew before the interview'
+                && str_contains($data['message'], 'Juan Dela Cruz withdrew their application for Software Developer.')
+                && str_contains($data['message'], 'is cancelled');
+        });
+    }
+
+    public function test_withdrawing_without_an_interview_notifies_the_employer_in_the_bell_only(): void
+    {
+        Notification::fake();
+        $employer = $this->createEmployer();
+        $seeker = $this->createSeeker();
+        $vacancy = $this->createVacancy($employer);
+
+        Sanctum::actingAs($seeker);
+        $this->postJson("/api/seeker/jobs/{$vacancy->post_id}/apply")->assertCreated();
+        $application = Application::firstOrFail();
+        $this->postJson("/api/seeker/applications/{$application->apply_id}/withdraw")->assertOk();
+
+        Notification::assertSentTo($employer, ApplicationWithdrawnNotification::class, function ($notification, $channels) use ($employer) {
+            return $channels === ['database'] && $notification->toArray($employer)['title'] === 'Applicant withdrew';
+        });
+    }
+
+    public function test_reminders_go_out_at_24_hours_1_hour_and_15_minutes_once_each(): void
+    {
+        Notification::fake();
+        $start = now()->addDays(2)->startOfHour();
+        [$employer, $seeker] = $this->scheduleOnlineInterview($start);
+
+        $windowsSent = fn () => Notification::sent($seeker, InterviewReminderNotification::class)
+            ->map(fn ($n) => $n->toArray($seeker)['reminder_window'])->all();
+
+        foreach ([[-23 * 60, ['24h']], [-22 * 60, ['24h']], [-50, ['24h', '1h']], [-40, ['24h', '1h']], [-12, ['24h', '1h', '15m']], [-5, ['24h', '1h', '15m']]] as [$offset, $expected]) {
+            $this->travelTo($start->copy()->addMinutes($offset));
+            $this->artisan('interviews:send-reminders')->assertSuccessful();
+            $this->assertSame($expected, $windowsSent(), "at {$offset} minutes");
+        }
+
+        $last = Notification::sent($employer, InterviewReminderNotification::class)->last();
+        $this->assertStringContainsString('coming up in 15 minutes', $last->toArray($employer)['message']);
+    }
+
+    public function test_an_interview_booked_last_minute_gets_only_the_15_minute_reminder(): void
+    {
+        Notification::fake();
+        [, $seeker] = $this->scheduleOnlineInterview(now()->addMinutes(10));
+
+        $this->artisan('interviews:send-reminders')->assertSuccessful();
+
+        $windows = Notification::sent($seeker, InterviewReminderNotification::class)
+            ->map(fn ($n) => $n->toArray($seeker)['reminder_window'])->all();
+        $this->assertSame(['15m'], $windows);
+    }
+
+    /** @return array{0: Employer, 1: JobSeeker, 2: Application} */
+    private function scheduleOnlineInterview(\Carbon\CarbonInterface $schedule): array
+    {
+        $employer = $this->createEmployer();
+        $seeker = $this->createSeeker();
+        $vacancy = $this->createVacancy($employer);
+
+        Sanctum::actingAs($seeker);
+        $this->postJson("/api/seeker/jobs/{$vacancy->post_id}/apply")->assertCreated();
+        $application = Application::firstOrFail();
+
+        Sanctum::actingAs($employer);
+        $this->patchJson("/api/employer/applications/{$application->apply_id}/status", [
+            'status' => 'interview',
+            'interview' => [
+                'mode_of_interview' => 'online',
+                'schedule' => $schedule->format('Y-m-d H:i:s'),
+                'auto_meet_link' => true,
+            ],
+        ])->assertOk();
+
+        return [$employer, $seeker, $application];
     }
 
     public function test_seekers_can_view_application_timeline_and_withdraw(): void

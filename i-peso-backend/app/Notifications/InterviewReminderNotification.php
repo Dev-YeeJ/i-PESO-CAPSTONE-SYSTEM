@@ -16,7 +16,11 @@ class InterviewReminderNotification extends InterviewBaseNotification
 
     protected function buildMessage(bool $isEmployer, string $companyName, string $jobTitle, string $applicantName, string $scheduledAt, string $location, string $recipientName): string
     {
-        $window = $this->reminderWindow === '1h' ? '1 hour' : '24 hours';
+        $window = match ($this->reminderWindow) {
+            '15m' => '15 minutes',
+            '1h' => '1 hour',
+            default => '24 hours',
+        };
 
         if ($isEmployer) {
             return "Reminder: your interview with {$applicantName} for {$jobTitle} is coming up in {$window}.";

@@ -13,7 +13,7 @@ import Animated, { FadeInUp } from 'react-native-reanimated'
 import type { SeekerApplication, SeekerApplicationsResponse } from '@/services/seekerService'
 import { seekerService } from '@/services/seekerService'
 import { apiErrorMessage } from '@/utils/apiError'
-import { applicationStatusVariant, formatDate, formatSalary, jobCompany, jobLocation, seekerName, textFrom, titleCase } from '@/utils/seekerView'
+import { applicationStatusVariant, formatDate, formatSalary, interviewPhase, interviewPhaseText, jobCompany, jobLocation, seekerName, textFrom, titleCase } from '@/utils/seekerView'
 import { useMotion } from '@/hooks/useMotion'
 import { useToast } from '@/stores/toastStore'
 import { AlertBox } from '@/components/ui/AlertBox'
@@ -198,8 +198,12 @@ function ApplicationCard({
             <Detail label="Match" value={`${Math.round(Number(application.match_percentage ?? 0))}%`} />
           </View>
 
-          {application.interview ? (
-            <AlertBox variant="warning" title="Interview Schedule" style={styles.infoAlert}>
+          {application.interview && interviewPhase(application.interview) === 'ended' ? (
+            <AlertBox variant="info" title={interviewPhaseText(application.interview)} style={styles.infoAlert}>
+              {`${titleCase(application.interview.mode_of_interview, 'Interview')} on ${formatDate(application.interview.schedule)}\nThe employer will update this application with their decision.`}
+            </AlertBox>
+          ) : application.interview && application.status === 'interview' ? (
+            <AlertBox variant="warning" title={`Interview Schedule · ${interviewPhaseText(application.interview)}`} style={styles.infoAlert}>
               {`${titleCase(application.interview.mode_of_interview, 'Interview')}\n${formatDate(application.interview.schedule)}\n${textFrom(application.interview.venue_or_link, 'Venue or link to follow')}`}
             </AlertBox>
           ) : null}

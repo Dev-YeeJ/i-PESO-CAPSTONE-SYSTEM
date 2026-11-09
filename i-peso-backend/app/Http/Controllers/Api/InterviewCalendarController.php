@@ -29,7 +29,8 @@ class InterviewCalendarController extends Controller
         $interviews = InterviewSchedule::query()
             ->with(['application.jobVacancy', 'application.jobSeeker'])
             ->whereHas('application.jobVacancy', fn ($vacancy) => $vacancy->where('employer_id', $employer->employer_id))
-            ->where('status', 'scheduled')
+            // Completed interviews stay on the calendar as a record of what was held.
+            ->whereIn('status', ['scheduled', 'completed'])
             ->whereBetween('schedule', [$validated['start'], $validated['end']])
             ->orderBy('schedule')
             ->get();
@@ -46,8 +47,11 @@ class InterviewCalendarController extends Controller
                 'id' => (string) $interview->interview_id,
                 'title' => $seekerName !== '' ? "{$seekerName} — {$jobTitle}" : $jobTitle,
                 'start' => $interview->schedule->toIso8601String(),
-                'end' => $interview->schedule->copy()->addMinutes(30)->toIso8601String(),
-                'url' => $isMeetLink ? $interview->venue_or_link : null,
+                'end' => $interview->endsAt()->toIso8601String(),
+                // No join link once the call is over; the event is history now.
+                'url' => $isMeetLink && $interview->phase() !== 'ended' ? $interview->venue_or_link : null,
+                'phase' => $interview->phase(),
+                'mode_of_interview' => $interview->mode_of_interview,
             ];
         })->values();
 

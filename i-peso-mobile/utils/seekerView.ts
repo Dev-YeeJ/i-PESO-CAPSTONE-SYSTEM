@@ -134,3 +134,42 @@ export function recordText(record: Record<string, unknown>, keys: string[], fall
 
   return fallback
 }
+
+type InterviewLike = {
+  mode_of_interview?: string | null
+  schedule?: string | null
+  status?: string | null
+  ends_at?: string | null
+  phase?: string | null
+} | null | undefined
+
+// Matches InterviewSchedule::ASSUMED_DURATION_MINUTES on the backend.
+const INTERVIEW_ASSUMED_DURATION_MS = 60 * 60 * 1000
+
+/** upcoming | in_progress | ended | cancelled — re-checked against the clock. */
+export function interviewPhase(interview: InterviewLike, now = Date.now()) {
+  if (!interview) return null
+  if (interview.phase === 'ended' || interview.phase === 'cancelled') return interview.phase
+  if (!interview.phase && interview.status === 'cancelled') return 'cancelled'
+  if (!interview.phase && interview.status === 'completed') return 'ended'
+  if (!interview.schedule) return 'upcoming'
+
+  const start = new Date(interview.schedule).getTime()
+  const end = interview.ends_at ? new Date(interview.ends_at).getTime() : start + INTERVIEW_ASSUMED_DURATION_MS
+  if (now >= end) return 'ended'
+  return now >= start ? 'in_progress' : 'upcoming'
+}
+
+/** "Call ended" for online/phone, "Interview ended" for face-to-face. */
+export function interviewPhaseText(interview: InterviewLike) {
+  switch (interviewPhase(interview)) {
+    case 'ended':
+      return interview?.mode_of_interview === 'face_to_face' ? 'Interview ended' : 'Call ended'
+    case 'in_progress':
+      return 'Happening now'
+    case 'cancelled':
+      return 'Interview cancelled'
+    default:
+      return 'Upcoming'
+  }
+}

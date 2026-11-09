@@ -19,6 +19,7 @@ import useDebouncedValue from './ats/useDebouncedValue'
 import useApplicationStatusActions from './ats/useApplicationStatusActions'
 import ApplicantProfileModal from './ats/ApplicantProfileModal'
 import InterviewModal from './ats/InterviewModal'
+import { InterviewPhaseChip } from './ats/InterviewSummary'
 import HireModal from './ats/HireModal'
 import RejectModal from './ats/RejectModal'
 
@@ -377,6 +378,7 @@ export default function VacancyATSPage() {
                               {seeker.name}
                             </button>
                             <p className="max-w-[200px] truncate text-xs text-slate-500">{seeker.email}</p>
+                            {activeTab === 'interview' && <InterviewPhaseChip interview={app.interview} />}
                           </div>
                         </div>
                       </td>

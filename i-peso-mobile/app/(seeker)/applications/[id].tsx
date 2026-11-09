@@ -6,7 +6,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { SeekerApplicationsResponse } from '@/services/seekerService'
 import { seekerService } from '@/services/seekerService'
 import { apiErrorMessage } from '@/utils/apiError'
-import { applicationStatusVariant, formatDate, formatSalary, jobCompany, jobLocation, textFrom, titleCase } from '@/utils/seekerView'
+import { applicationStatusVariant, formatDate, formatSalary, interviewPhase, interviewPhaseText, jobCompany, jobLocation, textFrom, titleCase } from '@/utils/seekerView'
 import { useToast } from '@/stores/toastStore'
 import { AlertBox } from '@/components/ui/AlertBox'
 import { Badge } from '@/components/ui/Badge'
@@ -160,7 +160,7 @@ export default function ApplicationDetailScreen() {
           <>
             <Text style={styles.sectionTitle}>Interview Information</Text>
             <Card padding="md" style={styles.warningCard}>
-              <Detail label="Status" value={titleCase(application.interview.status, 'Unknown')} />
+              <Detail label="Status" value={interviewPhaseText(application.interview)} />
               <Detail label="Mode" value={titleCase(application.interview.mode_of_interview, 'Not set')} />
               <Detail label="Date" value={formatDate(application.interview.schedule)} />
               
@@ -174,8 +174,10 @@ export default function ApplicationDetailScreen() {
 
               {application.interview.mode_of_interview === 'online' ? (
                 <View style={styles.joinActionWrap}>
-                  {application.interview.status === 'cancelled' ? (
+                  {interviewPhase(application.interview) === 'cancelled' ? (
                     <Text style={styles.noLinkText}>Interview Cancelled</Text>
+                  ) : interviewPhase(application.interview) === 'ended' ? (
+                    <Text style={styles.noLinkText}>Call ended. The employer will update your application with their decision.</Text>
                   ) : application.interview.venue_or_link && application.interview.venue_or_link.startsWith('http') ? (
                     <Button
                       variant="primary"

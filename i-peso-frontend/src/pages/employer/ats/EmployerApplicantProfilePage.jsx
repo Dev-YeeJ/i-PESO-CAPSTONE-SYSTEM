@@ -6,6 +6,7 @@ import { Button, LoadingSkeleton } from '@/components/ui'
 import ApplicantAvatar from './ApplicantAvatar'
 import { TERMINAL_STATUSES } from './atsConstants'
 import { formatDate, formatDateTime } from './atsFormatters'
+import InterviewSummary from './InterviewSummary'
 import { toast } from 'sonner'
 
 function InfoTile({ label, value }) {
@@ -182,15 +183,7 @@ export default function EmployerApplicantProfilePage() {
             <div>
               <SectionHeading icon={Building} title="Interview & Outcome" />
               <div className="space-y-3 text-sm text-slate-600">
-                {data?.interview ? (
-                  <div className="rounded-xl border border-blue-100 bg-blue-50 p-4 text-blue-900 shadow-sm">
-                    <p className="text-base font-black">Interview scheduled</p>
-                    <p className="mt-1 font-medium">{formatDateTime(data.interview.schedule)}</p>
-                    <p className="mt-2 text-blue-800">{data.interview.venue_or_link || 'Venue to follow'}</p>
-                  </div>
-                ) : (
-                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 shadow-sm">No interview scheduled yet.</div>
-                )}
+                <InterviewSummary interview={data?.interview} applicationStatus={data?.status} />
                 <InfoTile label="Employer remarks" value={data?.employer_remarks} />
               </div>
             </div>

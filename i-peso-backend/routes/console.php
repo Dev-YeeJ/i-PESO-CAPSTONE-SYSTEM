@@ -11,7 +11,9 @@ Artisan::command('inspire', function () {
 // Schedule::command() spawns each run as a subprocess via Symfony Process,
 // which needs proc_open — disabled on Hostinger shared hosting. Schedule::call()
 // with Artisan::call() runs the command in-process instead, avoiding it.
-Schedule::call(fn () => Artisan::call('interviews:send-reminders'))->everyFifteenMinutes();
+// Every 5 minutes so the 15-minute reminder lands 10–15 minutes before the
+// interview; at every 15 minutes it could arrive as little as a minute before.
+Schedule::call(fn () => Artisan::call('interviews:send-reminders'))->everyFiveMinutes();
 Schedule::call(fn () => Artisan::call('permits:notify-expiring'))->dailyAt('08:00');
 Schedule::call(fn () => Artisan::call('placements:notify-missing'))->dailyAt('08:30');
 

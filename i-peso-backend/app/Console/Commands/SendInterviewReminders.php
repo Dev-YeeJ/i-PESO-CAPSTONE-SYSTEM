@@ -42,22 +42,27 @@ class SendInterviewReminders extends Command
                 continue;
             }
 
-            if ($minutesUntil <= 60 && is_null($interview->interview_reminder_1h_sent_at)) {
-                Notification::send($application->jobSeeker, new InterviewReminderNotification($application, '1h'));
-                Notification::send($application->jobVacancy?->employer, new InterviewReminderNotification($application, '1h'));
+            // Each window is bounded on both sides, so only the one we're in can
+            // fire. A late-scheduled interview (say, booked 10 minutes ahead) gets
+            // the 15-minute reminder only, not a burst of all three at once.
+            $window = match (true) {
+                $minutesUntil <= 15 => '15m',
+                $minutesUntil <= 60 => '1h',
+                $minutesUntil <= 24 * 60 => '24h',
+                default => null,
+            };
 
-                $interview->forceFill(['interview_reminder_1h_sent_at' => $now])->save();
-                $sent++;
+            $column = $window ? "interview_reminder_{$window}_sent_at" : null;
+
+            if (! $column || ! is_null($interview->{$column})) {
                 continue;
             }
 
-            if ($minutesUntil <= 24 * 60 && $minutesUntil > 60 && is_null($interview->interview_reminder_24h_sent_at)) {
-                Notification::send($application->jobSeeker, new InterviewReminderNotification($application, '24h'));
-                Notification::send($application->jobVacancy?->employer, new InterviewReminderNotification($application, '24h'));
+            Notification::send($application->jobSeeker, new InterviewReminderNotification($application, $window));
+            Notification::send($application->jobVacancy?->employer, new InterviewReminderNotification($application, $window));
 
-                $interview->forceFill(['interview_reminder_24h_sent_at' => $now])->save();
-                $sent++;
-            }
+            $interview->forceFill([$column => $now])->save();
+            $sent++;
         }
 
         $this->info("Sent {$sent} interview reminder notification(s).");

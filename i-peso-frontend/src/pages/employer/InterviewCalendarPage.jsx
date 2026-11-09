@@ -6,6 +6,7 @@ import interactionPlugin from '@fullcalendar/interaction'
 import timeGridPlugin from '@fullcalendar/timegrid'
 import { Card, ErrorState, LoadingSkeleton } from '@/components/ui'
 import { getEmployerCalendarEvents } from '@/services/employerApplicationService'
+import { endedLabel } from '@/utils/interview'
 
 export default function InterviewCalendarPage() {
   const [dateRange, setDateRange] = useState(() => {
@@ -30,7 +31,9 @@ export default function InterviewCalendarPage() {
     end: event.end,
     url: event.url,
     extendedProps: {
-      url: event.url
+      url: event.url,
+      ended: event.phase === 'ended',
+      endedLabel: endedLabel(event),
     }
   }))
 
@@ -81,7 +84,12 @@ export default function InterviewCalendarPage() {
               events={events}
               datesSet={handleDatesSet}
               eventClick={handleEventClick}
-              eventContent={(arg) => (
+              eventContent={(arg) => arg.event.extendedProps.ended ? (
+                <div className="w-full overflow-hidden rounded border border-slate-300 bg-slate-100 p-1 text-xs text-slate-700">
+                  <div className="truncate font-bold">{arg.event.title}</div>
+                  <div className="truncate text-[10px]">{arg.timeText} · {arg.event.extendedProps.endedLabel}</div>
+                </div>
+              ) : (
                 <div className="overflow-hidden p-1 text-xs text-white rounded bg-brand-navy shadow-sm border border-transparent w-full">
                   <div className="font-bold truncate">{arg.event.title}</div>
                   <div className="text-[10px] truncate opacity-80">{arg.timeText}</div>

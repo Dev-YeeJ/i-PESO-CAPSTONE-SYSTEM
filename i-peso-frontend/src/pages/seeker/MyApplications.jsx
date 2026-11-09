@@ -5,6 +5,7 @@ import toast from 'react-hot-toast'
 import { Button, EmptyState, LoadingSkeleton } from '@/components/ui'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { getSeekerApplicationDetail, getSeekerApplications, withdrawSeekerApplication } from '@/services/seekerService'
+import { formatInterviewMode, formatInterviewTime, interviewPhase, interviewPhaseLabel, isJoinableLink } from '@/utils/interview'
 
 const MotionArticle = motion.article
 
@@ -38,6 +39,19 @@ const nextSteps = {
   rejected: 'This application wasn’t successful this time. Keep going — new vacancies are posted often.',
   withdrawn: 'You withdrew this application. You can apply to other vacancies anytime.',
 }
+
+const interviewEndedStep = 'Your interview is done. The employer will update this application with their decision — keep your phone reachable.'
+
+const nextStepFor = (application) =>
+  application.status === 'interview' && interviewPhase(application.interview) === 'ended'
+    ? interviewEndedStep
+    : nextSteps[application.status]
+
+// A hired/rejected application keeps its interview record; only show it while
+// it still matters (in the interview stage) or once it actually took place.
+const showInterview = (application) =>
+  Boolean(application.interview) &&
+  (application.status === 'interview' || interviewPhase(application.interview) === 'ended')
 
 export default function MyApplications() {
   const [applications, setApplications] = useState([])
@@ -246,19 +260,26 @@ export default function MyApplications() {
                   <span className="flex items-center gap-2"><CalendarClock className="h-4 w-4 text-indigo-400 shrink-0" />Applied {application.applied_at ? new Date(application.applied_at).toLocaleDateString('en-PH', { dateStyle: 'medium' }) : 'recently'}</span>
                 </div>
 
-                {nextSteps[application.status] && (
+                {nextStepFor(application) && (
                   <div className="mt-4 rounded-2xl border border-blue-100 bg-blue-50/50 p-4 flex flex-col gap-1">
                     <span className="font-extrabold uppercase tracking-wider text-[10px] text-blue-700">What’s next</span>
-                    <p className="text-xs font-semibold leading-relaxed text-blue-900">{nextSteps[application.status]}</p>
+                    <p className="text-xs font-semibold leading-relaxed text-blue-900">{nextStepFor(application)}</p>
                   </div>
                 )}
 
-                {application.interview && (
-                  <div className="mt-4 rounded-2xl border border-indigo-200 bg-indigo-50 p-4">
-                     <p className="text-[10px] font-black uppercase tracking-widest text-indigo-700 mb-1">Interview Scheduled</p>
-                     <p className="text-sm font-bold text-indigo-900">{new Date(application.interview.schedule).toLocaleString('en-PH', { dateStyle: 'medium', timeStyle: 'short' })} · {application.interview.mode_of_interview}</p>
-                  </div>
-                )}
+                {showInterview(application) && (() => {
+                  const phase = interviewPhaseLabel(application.interview)
+                  const muted = phase.phase === 'ended' || phase.phase === 'cancelled'
+                  return (
+                    <div className={`mt-4 rounded-2xl border p-4 ${muted ? 'border-slate-200 bg-slate-50' : 'border-indigo-200 bg-indigo-50'}`}>
+                      <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
+                        <p className={`text-[10px] font-black uppercase tracking-widest ${muted ? 'text-slate-600' : 'text-indigo-700'}`}>Interview</p>
+                        <span className={`rounded-full border px-2 py-0.5 text-[11px] font-bold ${phase.tone}`}>{phase.label}</span>
+                      </div>
+                      <p className={`text-sm font-bold ${muted ? 'text-slate-700' : 'text-indigo-900'}`}>{formatInterviewTime(application.interview.schedule)} · {formatInterviewMode(application.interview.mode_of_interview)}</p>
+                    </div>
+                  )
+                })()}
 
                 {application.employer_remarks && (
                   <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
@@ -313,10 +334,10 @@ export default function MyApplications() {
                 {!activeApplication.can_withdraw && <span className="rounded-full bg-amber-50 border border-amber-200 px-3 py-1.5 text-xs font-black uppercase tracking-wider text-amber-700">Final state locked</span>}
               </div>
 
-              {nextSteps[activeApplication.status] && (
+              {nextStepFor(activeApplication) && (
                 <div className="rounded-3xl border border-blue-200 bg-gradient-to-br from-blue-50 to-white p-6 shadow-sm">
                   <p className="text-xs font-black uppercase tracking-widest text-blue-800">What happens next</p>
-                  <p className="mt-2 text-sm font-semibold leading-relaxed text-slate-700">{nextSteps[activeApplication.status]}</p>
+                  <p className="mt-2 text-sm font-semibold leading-relaxed text-slate-700">{nextStepFor(activeApplication)}</p>
                 </div>
               )}
 
@@ -324,22 +345,48 @@ export default function MyApplications() {
                 <div><p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Location</p><p className="mt-1 font-bold text-slate-900">{activeApplication.job?.location || 'Location not specified'}</p></div>
                 <div><p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Applied</p><p className="mt-1 font-bold text-slate-900">{activeApplication.applied_at ? new Date(activeApplication.applied_at).toLocaleDateString('en-PH', { dateStyle: 'medium' }) : 'Recently'}</p></div>
                 <div><p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Employer remarks</p><p className="mt-1 font-bold text-slate-900">{activeApplication.employer_remarks || 'No remarks yet.'}</p></div>
-                <div><p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Interview</p><p className="mt-1 font-bold text-slate-900">{activeApplication.interview ? `${activeApplication.interview.mode_of_interview} · ${activeApplication.interview.venue_or_link || 'Venue to follow'}` : 'No interview scheduled yet.'}</p></div>
+                <div><p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Interview</p><p className="mt-1 font-bold text-slate-900">{showInterview(activeApplication) ? `${formatInterviewMode(activeApplication.interview.mode_of_interview)} · ${interviewPhaseLabel(activeApplication.interview).label}` : 'No interview scheduled yet.'}</p></div>
               </div>
 
-              {activeApplication.interview && (
-                <div className="rounded-3xl border border-indigo-200 bg-indigo-50 p-6 shadow-sm shadow-indigo-900/5">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-indigo-100/50 pb-4 mb-4">
-                    <div>
-                      <p className="text-[10px] font-black uppercase tracking-widest text-indigo-700">Interview scheduled</p>
-                      <p className="mt-1 text-lg font-black text-indigo-950">{activeApplication.interview.schedule ? new Date(activeApplication.interview.schedule).toLocaleString('en-PH', { dateStyle: 'medium', timeStyle: 'short' }) : 'Schedule pending'}</p>
+              {showInterview(activeApplication) && (() => {
+                const interview = activeApplication.interview
+                const phase = interviewPhaseLabel(interview)
+                const ended = phase.phase === 'ended'
+                const muted = ended || phase.phase === 'cancelled'
+                const canJoin = !muted && isJoinableLink(interview)
+                return (
+                  <div className={`rounded-3xl border p-6 shadow-sm ${muted ? 'border-slate-200 bg-slate-50' : 'border-indigo-200 bg-indigo-50 shadow-indigo-900/5'}`}>
+                    <div className={`flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-4 mb-4 ${muted ? 'border-slate-200' : 'border-indigo-100/50'}`}>
+                      <div>
+                        <p className={`text-[10px] font-black uppercase tracking-widest ${muted ? 'text-slate-600' : 'text-indigo-700'}`}>{ended ? phase.label : phase.phase === 'cancelled' ? 'Interview cancelled' : 'Interview scheduled'}</p>
+                        <p className={`mt-1 text-lg font-black ${muted ? 'text-slate-800' : 'text-indigo-950'}`}>{formatInterviewTime(interview.schedule)}</p>
+                      </div>
+                      <span className={`self-start sm:self-auto rounded-full border px-3 py-1.5 text-xs font-black uppercase tracking-wider shadow-sm ${phase.tone}`}>{phase.label}</span>
                     </div>
-                    <span className="self-start sm:self-auto rounded-full border border-indigo-200 bg-white px-3 py-1.5 text-xs font-black uppercase tracking-wider text-indigo-700 shadow-sm">{activeApplication.interview.mode_of_interview}</span>
+                    <p className={`text-sm font-semibold ${muted ? 'text-slate-700' : 'text-indigo-900'}`}>{formatInterviewMode(interview.mode_of_interview)}</p>
+                    {canJoin ? (
+                      <a
+                        href={interview.venue_or_link}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="mt-3 inline-flex items-center gap-2 rounded-xl bg-indigo-700 px-4 py-2.5 text-sm font-extrabold text-white transition hover:bg-indigo-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-700"
+                      >
+                        Join interview call
+                      </a>
+                    ) : !isJoinableLink(interview) && !muted ? (
+                      <p className="mt-1 text-sm font-semibold text-indigo-900 leading-relaxed">{interview.venue_or_link || 'The venue will be shared by the employer.'}</p>
+                    ) : null}
+                    {interview.instructions && !muted && <p className="mt-3 whitespace-pre-wrap text-sm text-indigo-900">{interview.instructions}</p>}
+                    <p className={`mt-3 text-sm ${muted ? 'text-slate-600' : 'text-indigo-700/80'}`}>
+                      {ended
+                        ? 'This interview is over. The employer will update your application with their decision.'
+                        : phase.phase === 'cancelled'
+                          ? 'The employer cancelled this interview.'
+                          : 'Prepare your resume, certificates, and valid ID before the interview.'}
+                    </p>
                   </div>
-                  <p className="text-sm font-semibold text-indigo-900 leading-relaxed">{activeApplication.interview.venue_or_link || 'Meeting link or venue will be shared by the employer.'}</p>
-                  <p className="mt-2 text-sm text-indigo-700/80">Prepare your resume, certificates, and valid ID before the interview.</p>
-                </div>
-              )}
+                )
+              })()}
 
               <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
                 <h3 className="text-sm font-black uppercase tracking-widest text-slate-900 mb-6">Application timeline</h3>

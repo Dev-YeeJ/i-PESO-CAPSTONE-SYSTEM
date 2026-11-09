@@ -19,6 +19,7 @@ import useApplicationStatusActions from './ats/useApplicationStatusActions'
 import ApplicantAvatar from './ats/ApplicantAvatar'
 import ApplicantProfileModal from './ats/ApplicantProfileModal'
 import InterviewModal from './ats/InterviewModal'
+import { InterviewPhaseChip } from './ats/InterviewSummary'
 import HireModal from './ats/HireModal'
 import RejectModal from './ats/RejectModal'
 
@@ -313,6 +314,7 @@ export default function EmployerATSGrid() {
                             <Link to={`/employer/ats?vacancy_id=${app.job?.post_id}`} className="mt-0.5 flex items-center gap-1 text-xs text-slate-500 transition-colors hover:text-blue-600">
                               <Briefcase className="h-3 w-3" />{app.job?.job_title}
                             </Link>
+                            {activeTab === 'interview' && <InterviewPhaseChip interview={app.interview} />}
                           </div>
                         </div>
                       </td>

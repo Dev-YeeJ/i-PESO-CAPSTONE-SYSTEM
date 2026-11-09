@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Application;
 use App\Models\JobSeeker;
 use App\Models\JobVacancy;
+use App\Notifications\ApplicationWithdrawnNotification;
 use App\Services\ActivityLogger;
 use App\Services\EnhancedJobMatchingService;
 use Illuminate\Http\JsonResponse;
@@ -64,7 +65,24 @@ class SeekerApplicationController extends Controller
             'status_changed_by' => $seeker->seeker_id,
         ])->save();
 
+        // Otherwise the interview stays on the employer's calendar and in their
+        // "Upcoming interviews" count after the seeker has pulled out.
+        $interview = $application->interviewSchedule()->where('status', 'scheduled')->first();
+        $interview?->update(['status' => $interview->closingStatus()]);
+        $cancelledInterviewAt = $interview?->status === 'cancelled' ? $interview->schedule : null;
+
         event(new ApplicationStatusChanged($application->fresh()));
+
+        // Same pattern as the other notify() call sites: a mail failure on this
+        // host must not turn an already-saved withdrawal into a 500.
+        try {
+            $application->loadMissing(['jobVacancy.employer', 'jobSeeker']);
+            $application->jobVacancy?->employer?->notify(
+                new ApplicationWithdrawnNotification($application, $cancelledInterviewAt)
+            );
+        } catch (\Throwable $exception) {
+            report($exception);
+        }
 
         ActivityLogger::logAs($seeker, 'withdrew_application', sprintf(
             'Withdrew application #%d.',

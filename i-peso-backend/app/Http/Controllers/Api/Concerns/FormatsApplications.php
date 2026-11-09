@@ -89,6 +89,9 @@ trait FormatsApplications
                 'venue_or_link' => $application->interviewSchedule->venue_or_link,
                 'instructions' => $application->interviewSchedule->instructions,
                 'status' => $application->interviewSchedule->status,
+                'ends_at' => $application->interviewSchedule->endsAt()?->toISOString(),
+                // upcoming | in_progress | ended | cancelled — drives the "Call ended" label.
+                'phase' => $application->interviewSchedule->phase(),
             ] : null,
             'placement' => $application->placement_captured_at ? [
                 'start_date' => $application->placement_start_date?->toDateString(),
@@ -166,6 +169,15 @@ trait FormatsApplications
                 'timestamp' => $application->interviewSchedule->created_at?->toISOString(),
                 'status' => 'interview_details',
             ];
+
+            if ($application->interviewSchedule->phase() === 'ended') {
+                $timeline[] = [
+                    'title' => $application->interviewSchedule->mode_of_interview === 'face_to_face' ? 'Interview ended' : 'Call ended',
+                    'description' => 'The interview time has passed. The employer will update this application with their decision.',
+                    'timestamp' => $application->interviewSchedule->endsAt()?->toISOString(),
+                    'status' => 'interview_ended',
+                ];
+            }
         }
 
         return $timeline;

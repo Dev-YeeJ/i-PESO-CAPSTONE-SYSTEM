@@ -246,6 +246,8 @@ export interface SeekerApplication {
     venue_or_link?: string | null
     instructions?: string | null
     status?: string | null
+    ends_at?: string | null
+    phase?: 'upcoming' | 'in_progress' | 'ended' | 'cancelled' | null
   } | null
   placement?: {
     start_date?: string | null
