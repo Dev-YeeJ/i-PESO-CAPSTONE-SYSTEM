@@ -17,10 +17,21 @@ const EMPTY = {
   employment_type: '',
   employee_no: '',
   date_started: '',
+  ojt_school: '',
+  ojt_course: '',
+  ojt_required_hours: '',
+  ojt_start_date: '',
+  ojt_end_date: '',
 }
 
+const INTERNSHIP_FIELDS = { ojt_school: 'school', ojt_course: 'course', ojt_required_hours: 'required_hours', ojt_start_date: 'start_date', ojt_end_date: 'end_date' }
+
 const fromStaff = (staff) => Object.fromEntries(
-  Object.keys(EMPTY).map((key) => [key, key === 'admin_role_id' ? (staff.role?.id ?? '') : (staff[key] ?? '')]),
+  Object.keys(EMPTY).map((key) => {
+    if (key === 'admin_role_id') return [key, staff.role?.id ?? '']
+    if (INTERNSHIP_FIELDS[key]) return [key, staff.internship?.[INTERNSHIP_FIELDS[key]] ?? '']
+    return [key, staff[key] ?? '']
+  }),
 )
 
 /**
@@ -30,6 +41,7 @@ const fromStaff = (staff) => Object.fromEntries(
 export default function StaffFormDialog({ open, onOpenChange, staff, positions, employmentTypes, roles, isSelf, onSaved }) {
   const isEdit = !!staff
   const [form, setForm] = useState(() => (staff ? fromStaff(staff) : EMPTY))
+  const isIntern = form.position === 'ojt_intern'
   const [errors, setErrors] = useState({})
   const [formError, setFormError] = useState('')
 
@@ -64,6 +76,9 @@ export default function StaffFormDialog({ open, onOpenChange, staff, positions, 
     event.preventDefault()
     const required = { first_name: 'First name', last_name: 'Last name', mobile_number: 'Mobile number', position: 'Position' }
     if (!isEdit) required.email = 'Email'
+    if (isIntern) {
+      Object.assign(required, { ojt_school: 'School', ojt_required_hours: 'Required hours', ojt_start_date: 'Start date', ojt_end_date: 'End date' })
+    }
     const missing = Object.fromEntries(
       Object.entries(required).filter(([key]) => !String(form[key]).trim()).map(([key, label]) => [key, `${label} is required.`]),
     )
@@ -80,6 +95,7 @@ export default function StaffFormDialog({ open, onOpenChange, staff, positions, 
         .map(([key, value]) => [key, value === '' ? null : value]),
     )
     if (!payload.admin_role_id) delete payload.admin_role_id
+    if (!isIntern) Object.keys(INTERNSHIP_FIELDS).forEach((key) => delete payload[key])
     mutation.mutate(payload)
   }
 
@@ -159,6 +175,28 @@ export default function StaffFormDialog({ open, onOpenChange, staff, positions, 
               <input type="date" value={form.date_started} onChange={set('date_started')} className={inputClass(errors.date_started)} />
             </Field>
           </fieldset>
+
+          {isIntern && (
+            <fieldset className="grid gap-4 rounded-xl border border-blue-200 bg-blue-50/50 p-4 sm:grid-cols-2">
+              <legend className="px-1 text-xs font-bold uppercase tracking-wide text-blue-800">Internship</legend>
+              <Field label="School" required error={errors.ojt_school}>
+                <input value={form.ojt_school} onChange={set('ojt_school')} placeholder="e.g. Pangasinan State University" className={inputClass(errors.ojt_school)} autoComplete="off" />
+              </Field>
+              <Field label="Course / program" error={errors.ojt_course}>
+                <input value={form.ojt_course} onChange={set('ojt_course')} placeholder="e.g. BS Information Technology" className={inputClass(errors.ojt_course)} autoComplete="off" />
+              </Field>
+              <Field label="Required hours" required hint="From the school's OJT requirement, e.g. 486." error={errors.ojt_required_hours}>
+                <input type="number" min="1" max="2000" inputMode="numeric" value={form.ojt_required_hours} onChange={set('ojt_required_hours')} className={inputClass(errors.ojt_required_hours)} />
+              </Field>
+              <div className="hidden sm:block" />
+              <Field label="Start date" required error={errors.ojt_start_date}>
+                <input type="date" value={form.ojt_start_date} onChange={set('ojt_start_date')} className={inputClass(errors.ojt_start_date)} />
+              </Field>
+              <Field label="End date" required hint="The account closes automatically after this date." error={errors.ojt_end_date}>
+                <input type="date" value={form.ojt_end_date} min={form.ojt_start_date || undefined} onChange={set('ojt_end_date')} className={inputClass(errors.ojt_end_date)} />
+              </Field>
+            </fieldset>
+          )}
         </form>
 
         <DialogFooter>

@@ -5,6 +5,7 @@ export const ACCOUNT_STATUS = {
   invited: { label: 'Invited', variant: 'pending' },
   invite_expired: { label: 'Invite expired', variant: 'warning' },
   deactivated: { label: 'Deactivated', variant: 'closed' },
+  internship_ended: { label: 'Internship ended', variant: 'closed' },
 }
 
 export const accountStatus = (staff) => ACCOUNT_STATUS[staff?.account_status] ?? ACCOUNT_STATUS.active

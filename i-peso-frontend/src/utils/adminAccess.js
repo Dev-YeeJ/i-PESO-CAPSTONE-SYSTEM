@@ -41,6 +41,7 @@ const PATH_MODULES = [
   ['/admin/activity-logs', 'activity_logs'],
   ['/admin/staff', 'configuration'],
   ['/admin/role-permissions', 'configuration'],
+  ['/admin/ojt-interns', 'configuration'],
   ['/admin/announcements', 'configuration'],
   ['/admin/content-modules', 'configuration'],
   ['/admin/settings', 'configuration'],
@@ -72,3 +73,8 @@ export const canManage = (user, module) => accessLevel(user, module) === 'manage
 export const isSystemAdministrator = (user) => !!user?.is_system_administrator
 
 export const canOpenPath = (user, pathname) => canOpen(user, moduleForPath(pathname))
+
+export const isIntern = (user) => user?.position === 'ojt_intern'
+
+/** Where a staff member lands after signing in: interns start on their time record. */
+export const adminHomePath = (user) => (isIntern(user) ? '/admin/my-ojt' : '/admin/dashboard')

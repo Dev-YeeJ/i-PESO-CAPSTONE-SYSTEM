@@ -80,6 +80,22 @@ class Administrator extends Authenticatable
         return $password;
     }
 
+    public function isIntern(): bool
+    {
+        return $this->position === \App\Support\StaffPositions::OJT_INTERN;
+    }
+
+    /** Closed automatically after the internship end date (vs. deactivated by the admin). */
+    public function internshipEnded(): bool
+    {
+        return ! $this->isActive() && $this->deactivated_reason === 'internship_ended';
+    }
+
+    public function ojtTimeLogs(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(OjtTimeLog::class, 'admin_id', 'admin_id');
+    }
+
     public function isActive(): bool
     {
         return $this->status === 'active';
@@ -124,6 +140,11 @@ class Administrator extends Authenticatable
         'employee_no',
         'employment_type',
         'date_started',
+        'ojt_school',
+        'ojt_course',
+        'ojt_required_hours',
+        'ojt_start_date',
+        'ojt_end_date',
         'email_verified_at',
     ];
 
@@ -138,6 +159,9 @@ class Administrator extends Authenticatable
     protected $casts = [
         'email_verified_at' => 'datetime',
         'date_started'      => 'date',
+        'ojt_start_date'    => 'date',
+        'ojt_end_date'      => 'date',
+        'ojt_required_hours' => 'integer',
         'must_change_password'          => 'boolean',
         'temporary_password_expires_at' => 'datetime',
         'invited_at'                    => 'datetime',

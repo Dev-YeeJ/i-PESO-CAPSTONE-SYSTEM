@@ -16,6 +16,8 @@ Artisan::command('inspire', function () {
 Schedule::call(fn () => Artisan::call('interviews:send-reminders'))->everyFiveMinutes();
 Schedule::call(fn () => Artisan::call('permits:notify-expiring'))->dailyAt('08:00');
 Schedule::call(fn () => Artisan::call('placements:notify-missing'))->dailyAt('08:30');
+// Just after midnight Philippine time, close intern accounts whose internship ended yesterday.
+Schedule::call(fn () => Artisan::call('ojt:end-internships'))->dailyAt('00:05')->timezone('Asia/Manila')->name('ojt-end-internships');
 
 // There is no persistent queue worker on this host (no Supervisor on shared
 // hosting), so queued notifications (application status, interview, employer

@@ -126,7 +126,11 @@ class StaffPositionsAndAccessTest extends TestCase
     {
         Sanctum::actingAs($this->systemAdmin());
 
-        $this->postJson('/api/admin/staff', $this->newStaff(['position' => 'ojt_intern', 'email' => 'Intern.One@Peso.test']))
+        $this->postJson('/api/admin/staff', $this->newStaff([
+            'position' => 'ojt_intern', 'email' => 'Intern.One@Peso.test',
+            'ojt_school' => 'Urdaneta City University', 'ojt_required_hours' => 300,
+            'ojt_start_date' => '2026-11-03', 'ojt_end_date' => '2027-01-29',
+        ]))
             ->assertCreated()
             ->assertJsonPath('staff.email', 'intern.one@peso.test')
             ->assertJsonPath('staff.position_label', 'OJT / Intern')

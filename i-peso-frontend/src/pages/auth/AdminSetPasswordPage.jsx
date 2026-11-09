@@ -3,6 +3,7 @@ import { Check, Eye, EyeOff, KeyRound, XCircle } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { authService } from '@/services/authService'
 import { useAuthStore } from '@/stores/authStore'
+import { adminHomePath } from '@/utils/adminAccess'
 
 // Mirrors the API rule: Password::min(8)->numbers()->symbols().
 const RULES = [
@@ -44,7 +45,7 @@ export default function AdminSetPasswordPage() {
     try {
       await authService.changeAdminPassword(current, password, confirmation)
       updateUser({ must_change_password: false })
-      navigate('/admin/dashboard', { replace: true })
+      navigate(adminHomePath(user), { replace: true })
     } catch (error) {
       const fieldErrors = error.response?.data?.errors
       if (fieldErrors) {

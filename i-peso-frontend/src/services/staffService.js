@@ -41,6 +41,58 @@ export const staffService = {
     return data
   },
 
+  // ── OJT: the signed-in intern's own time record ───────────────
+  getMyOjt: async () => {
+    const { data } = await api.get('/admin/ojt/me')
+    return data
+  },
+
+  timeIn: async () => {
+    const { data } = await api.post('/admin/ojt/me/time-in')
+    return data
+  },
+
+  timeOut: async () => {
+    const { data } = await api.post('/admin/ojt/me/time-out')
+    return data
+  },
+
+  // ── OJT: reviewing interns' hours ─────────────────────────────
+  getInterns: async () => {
+    const { data } = await api.get('/admin/ojt/interns')
+    return data
+  },
+
+  getInternLogs: async (internId) => {
+    const { data } = await api.get(`/admin/ojt/interns/${internId}/logs`)
+    return data
+  },
+
+  approveLog: async (logId) => {
+    const { data } = await api.post(`/admin/ojt/logs/${logId}/approve`)
+    return data
+  },
+
+  rejectLog: async (logId, note) => {
+    const { data } = await api.post(`/admin/ojt/logs/${logId}/reject`, { note })
+    return data
+  },
+
+  correctLog: async (logId, payload) => {
+    const { data } = await api.put(`/admin/ojt/logs/${logId}`, payload)
+    return data
+  },
+
+  addLog: async (internId, payload) => {
+    const { data } = await api.post(`/admin/ojt/interns/${internId}/logs`, payload)
+    return data
+  },
+
+  approvePending: async (internId) => {
+    const { data } = await api.post(`/admin/ojt/interns/${internId}/approve-pending`)
+    return data
+  },
+
   // ── ROLES ─────────────────────────────────────────────────────
   getRoles: async () => {
     const { data } = await api.get('/admin/roles')

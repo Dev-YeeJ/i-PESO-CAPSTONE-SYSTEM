@@ -352,7 +352,9 @@ class AuthController extends Controller
             ActivityLogger::logAs($user, 'login_blocked', "Sign-in blocked for deactivated staff account {$email}.");
 
             return response()->json([
-                'message' => 'This account has been deactivated. Contact the PESO system administrator.',
+                'message' => $user->internshipEnded()
+                    ? 'Your internship ended'.($user->ojt_end_date ? ' on '.$user->ojt_end_date->format('F j, Y') : '').', so this account is now closed. Thank you for your service to PESO Urdaneta.'
+                    : 'This account has been deactivated. Contact the PESO system administrator.',
             ], 403);
         }
 

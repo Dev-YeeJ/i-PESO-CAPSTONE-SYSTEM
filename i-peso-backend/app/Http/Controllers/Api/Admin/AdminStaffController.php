@@ -76,8 +76,10 @@ class AdminStaffController extends Controller
             'employee_no' => ['nullable', 'string', 'max:50'],
             'employment_type' => ['nullable', Rule::in(array_keys(StaffPositions::EMPLOYMENT_TYPES))],
             'date_started' => ['nullable', 'date'],
+            ...$this->internshipRules($request->input('position') === StaffPositions::OJT_INTERN),
         ], [
             'email.unique' => 'This email is already used by another account.',
+            ...self::INTERNSHIP_MESSAGES,
         ]);
 
         $role = isset($data['admin_role_id'])
@@ -175,7 +177,13 @@ class AdminStaffController extends Controller
             'employee_no' => ['nullable', 'string', 'max:50'],
             'employment_type' => ['nullable', Rule::in(array_keys(StaffPositions::EMPLOYMENT_TYPES))],
             'date_started' => ['nullable', 'date'],
-        ]);
+            ...$this->internshipRules(false),
+        ], self::INTERNSHIP_MESSAGES);
+
+        $becomesIntern = ($data['position'] ?? $staffMember->position) === StaffPositions::OJT_INTERN;
+        if ($becomesIntern) {
+            $this->ensureInternshipDetails($staffMember, $data);
+        }
 
         $before = $this->comparable($staffMember, array_keys($data));
 
@@ -220,7 +228,7 @@ class AdminStaffController extends Controller
 
         $this->ensureAnotherActiveAdministrator($staffMember, 'At least one active system administrator must remain.');
 
-        $staffMember->forceFill(['status' => 'inactive'])->save();
+        $staffMember->forceFill(['status' => 'inactive', 'deactivated_reason' => 'deactivated'])->save();
 
         // Signs them out on every browser and device right away.
         $staffMember->tokens()->delete();
@@ -240,7 +248,13 @@ class AdminStaffController extends Controller
             return response()->json(['message' => 'This account is already active.', 'staff' => $this->formatStaff($staffMember->fresh('adminRole'))]);
         }
 
-        $staffMember->forceFill(['status' => 'active'])->save();
+        abort_if(
+            $staffMember->isIntern() && $staffMember->ojt_end_date && $staffMember->ojt_end_date->toDateString() < \App\Models\OjtTimeLog::today(),
+            422,
+            'This internship has already ended. Edit the internship end date first, then reactivate.'
+        );
+
+        $staffMember->forceFill(['status' => 'active', 'deactivated_reason' => null])->save();
 
         ActivityLogger::log('reactivated_staff', sprintf(
             'Reactivated staff account %s (%s).',
@@ -306,6 +320,43 @@ class AdminStaffController extends Controller
         abort_unless($othersRemain, 422, $message);
     }
 
+    private const INTERNSHIP_MESSAGES = [
+        'ojt_school.required' => 'Enter the intern\'s school.',
+        'ojt_required_hours.required' => 'Enter the required OJT hours.',
+        'ojt_start_date.required' => 'Enter the internship start date.',
+        'ojt_end_date.required' => 'Enter the internship end date.',
+        'ojt_end_date.after_or_equal' => 'The end date must be on or after the start date.',
+    ];
+
+    /** School, required hours and dates: required when adding an intern. */
+    private function internshipRules(bool $required): array
+    {
+        $presence = $required ? 'required' : 'nullable';
+
+        return [
+            'ojt_school' => [$presence, 'string', 'max:150'],
+            'ojt_course' => ['nullable', 'string', 'max:150'],
+            'ojt_required_hours' => [$presence, 'integer', 'min:1', 'max:2000'],
+            'ojt_start_date' => [$presence, 'date'],
+            'ojt_end_date' => [$presence, 'date', 'after_or_equal:ojt_start_date'],
+        ];
+    }
+
+    /** Someone moved into the intern position needs the same details a new intern does. */
+    private function ensureInternshipDetails(Administrator $staff, array $data): void
+    {
+        $missing = [];
+        foreach (['ojt_school' => 'school', 'ojt_required_hours' => 'required OJT hours', 'ojt_start_date' => 'start date', 'ojt_end_date' => 'end date'] as $field => $label) {
+            if (blank($data[$field] ?? $staff->{$field})) {
+                $missing[$field] = "Enter the internship {$label}.";
+            }
+        }
+
+        if ($missing !== []) {
+            throw \Illuminate\Validation\ValidationException::withMessages($missing);
+        }
+    }
+
     /** Field values as plain strings, so dates and numbers compare cleanly. */
     private function comparable(Administrator $staff, array $fields): array
     {
@@ -339,6 +390,13 @@ class AdminStaffController extends Controller
             'is_system_administrator' => $staff->isSystemAdministrator(),
             'role' => $staff->adminRole?->only(['id', 'name', 'slug']),
             'access' => $staff->accessMap(),
+            'internship' => $staff->isIntern() ? [
+                'school' => $staff->ojt_school,
+                'course' => $staff->ojt_course,
+                'required_hours' => $staff->ojt_required_hours,
+                'start_date' => $staff->ojt_start_date?->toDateString(),
+                'end_date' => $staff->ojt_end_date?->toDateString(),
+            ] : null,
             'created_at' => $staff->created_at,
         ];
     }
@@ -347,6 +405,7 @@ class AdminStaffController extends Controller
     private function accountStatus(Administrator $staff): string
     {
         return match (true) {
+            $staff->internshipEnded() => 'internship_ended',
             ! $staff->isActive() => 'deactivated',
             $staff->temporaryPasswordExpired() => 'invite_expired',
             (bool) $staff->must_change_password => 'invited',

@@ -6,13 +6,20 @@ import { useAuthStore } from '@/stores/authStore'
 import { adminService } from '@/services/adminService'
 import IPesoLogo from '@/components/branding/IPesoLogo'
 import SignOutConfirmDialog from '@/components/common/SignOutConfirmDialog'
-import { canOpen, canOpenPath, moduleForPath } from '@/utils/adminAccess'
+import { canOpen, canOpenPath, isIntern, moduleForPath } from '@/utils/adminAccess'
 
 const navGroups = [
   // ========== CATEGORY 1: OVERVIEW ==========
   {
     name: 'OVERVIEW',
     items: [
+      {
+        to: '/admin/my-ojt',
+        module: null,
+        internOnly: true,
+        label: 'My OJT Hours',
+        icon: <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
+      },
       {
         to: '/admin/dashboard',
         module: moduleForPath('/admin/dashboard'),
@@ -139,6 +146,12 @@ const navGroups = [
         icon: <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>,
       },
       {
+        to: '/admin/ojt-interns',
+        module: moduleForPath('/admin/ojt-interns'),
+        label: 'OJT / Interns',
+        icon: <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 14l9-5-9-5-9 5 9 5zm0 0l6.16-3.422A12.083 12.083 0 0118.82 17.5L12 21l-6.82-3.5a12.083 12.083 0 01.66-6.922L12 14z" /></svg>,
+      },
+      {
         to: '/admin/announcements',
         module: moduleForPath('/admin/announcements'),
         label: 'Announcements',
@@ -183,7 +196,7 @@ const AdminLayout = () => {
 
   // Only what this account's role can open; a category with nothing left is dropped.
   const visibleGroups = navGroups
-    .map((group) => ({ ...group, items: group.items.filter((item) => canOpen(user, item.module)) }))
+    .map((group) => ({ ...group, items: group.items.filter((item) => (item.internOnly ? isIntern(user) : canOpen(user, item.module))) }))
     .filter((group) => group.items.length > 0)
   const accountLabel = user?.position_label ?? user?.admin_role?.name ?? 'Administrator Account'
 

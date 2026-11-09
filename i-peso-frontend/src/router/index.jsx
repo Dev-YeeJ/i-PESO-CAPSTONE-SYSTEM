@@ -97,6 +97,8 @@ const AdminSMSTemplates = lazy(() => import('@/pages/admin/5-system-reports/sms-
 // Admin Pages - CATEGORY 6: CONFIGURATION
 const AdminStaffList = lazy(() => import('@/pages/admin/6-configuration/staff/StaffListPage'))
 const AdminRolePermissions = lazy(() => import('@/pages/admin/6-configuration/staff/RolePermissionsPage'))
+const AdminOjtInterns = lazy(() => import('@/pages/admin/6-configuration/ojt/AdminOjtPage'))
+const AdminMyOjt = lazy(() => import('@/pages/admin/6-configuration/ojt/MyOjtPage'))
 const AdminAnnouncements = lazy(() => import('@/pages/admin/6-configuration/content/AnnouncementsPage'))
 const AdminContentModules = lazy(() => import('@/pages/admin/6-configuration/content/ContentModuleListPage'))
 const AdminSystemSettings = lazy(() => import('@/pages/admin/6-configuration/settings/SystemSettingsPage'))
@@ -232,6 +234,8 @@ export const router = createBrowserRouter([
                       // CATEGORY 6: CONFIGURATION
                       { path: 'staff', element: S(AdminStaffList) },
                       { path: 'role-permissions', element: S(AdminRolePermissions) },
+                      { path: 'ojt-interns', element: S(AdminOjtInterns) },
+                      { path: 'my-ojt', element: S(AdminMyOjt) },
                       { path: 'announcements', element: S(AdminAnnouncements) },
                       { path: 'content-modules', element: S(AdminContentModules) },
                       { path: 'settings', element: S(AdminSystemSettings) },
