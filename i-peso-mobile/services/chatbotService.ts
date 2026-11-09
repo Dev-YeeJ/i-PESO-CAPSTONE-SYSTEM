@@ -13,6 +13,7 @@ export interface ChatReply {
   reply: string
   retryable: boolean
   officeLocation: OfficeLocation | null
+  toolResults?: Record<string, any>
 }
 
 const MAX_HISTORY_TURNS = 12
@@ -24,7 +25,12 @@ export const chatbotService = {
         message,
         history: history.slice(-MAX_HISTORY_TURNS),
       })
-      return { reply: data.reply, retryable: false, officeLocation: data.office_location ?? null }
+      return {
+        reply: data.reply,
+        retryable: false,
+        officeLocation: data.office_location ?? null,
+        toolResults: data.tool_results ?? {},
+      }
     } catch (error: unknown) {
       const reply = (error as { response?: { data?: { reply?: string; retryable?: boolean } } }).response?.data?.reply
       if (reply) {
@@ -32,12 +38,14 @@ export const chatbotService = {
           reply,
           retryable: Boolean((error as { response?: { data?: { retryable?: boolean } } }).response?.data?.retryable),
           officeLocation: null,
+          toolResults: {},
         }
       }
       return {
         reply: 'Hindi po ako maka-connect ngayon. Pakicheck po ang inyong internet at subukan ulit.',
         retryable: true,
         officeLocation: null,
+        toolResults: {},
       }
     }
   },

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   Alert,
@@ -9,8 +9,9 @@ import {
   Text,
   TextInput,
   View,
+  Modal,
 } from 'react-native'
-import { router } from 'expo-router'
+import { router, useLocalSearchParams } from 'expo-router'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import * as ImagePicker from 'expo-image-picker'
 import * as DocumentPicker from 'expo-document-picker'
@@ -43,7 +44,7 @@ import { PressableScale } from '@/components/ui/PressableScale'
 import { SectionHeader } from '@/components/ui/SectionHeader'
 import { MatchRing } from '@/components/ui/MatchRing'
 import { ScreenSkeleton } from '@/components/ui/ScreenSkeleton'
-import { colors, radii, spacing, typography } from '@/theme'
+import { colors, radii, spacing, typography, shadows } from '@/theme'
 
 const CERTIFICATE_CATEGORIES = [
   'training_certificate', 'tesda_nc_certificate', 'professional_certificate',
@@ -60,6 +61,10 @@ export default function ProfileScreen() {
   const token = useAuthStore((state) => state.token)
   const logout = useAuthStore((state) => state.logout)
   const queryClient = useQueryClient()
+  const params = useLocalSearchParams<{ returnSection?: string }>()
+  const scrollViewRef = useRef<ScrollView>(null)
+  const sectionYMap = useRef<Record<string, number>>({})
+  const scrolledForSectionRef = useRef<string | null>(null)
   const [refreshing, setRefreshing] = useState(false)
   const [photoBusy, setPhotoBusy] = useState(false)
   const [photoVersion, setPhotoVersion] = useState(0)
@@ -76,25 +81,44 @@ export default function ProfileScreen() {
   const [summarySaving, setSummarySaving] = useState(false)
   const [savingBulletsFor, setSavingBulletsFor] = useState<string | null>(null)
 
+  const scrollToSection = useCallback((sectionKey: string) => {
+    const y = sectionYMap.current[sectionKey]
+    if (y !== undefined && scrollViewRef.current) {
+      const targetY = Math.max(0, y - 12)
+      scrollViewRef.current.scrollTo({ y: targetY, animated: true })
+      scrolledForSectionRef.current = sectionKey
+    }
+  }, [])
+
+  const handleSectionLayout = useCallback(
+    (sectionKey: string, y: number) => {
+      sectionYMap.current[sectionKey] = y
+      if (
+        params.returnSection === sectionKey &&
+        scrolledForSectionRef.current !== sectionKey
+      ) {
+        scrollToSection(sectionKey)
+      }
+    },
+    [params.returnSection, scrollToSection]
+  )
+  const [signOutModalOpen, setSignOutModalOpen] = useState(false)
+  
   const confirmSignOut = () => {
-    Alert.alert('Sign out?', 'You will need to log in again to access your account.', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Sign out',
-        style: 'destructive',
-        onPress: async () => {
-          setSigningOut(true)
-          try {
-            await logout()
-          } catch {
-            // clearAuth() already ran inside the store even if the network call failed —
-            // the seeker layout's auth guard will redirect to /login regardless.
-          } finally {
-            setSigningOut(false)
-          }
-        },
-      },
-    ])
+    setSignOutModalOpen(true)
+  }
+
+  const handleSignOut = async () => {
+    setSigningOut(true)
+    try {
+      await logout()
+      setSignOutModalOpen(false)
+    } catch {
+      // clearAuth() already ran inside the store even if the network call failed —
+      // the seeker layout's auth guard will redirect to /login regardless.
+    } finally {
+      setSigningOut(false)
+    }
   }
 
   const { data: profile, isLoading, error, refetch } = useQuery({
@@ -115,11 +139,24 @@ export default function ProfileScreen() {
 
   useEffect(() => {
     if (!profile) return
-    const savedSummary = profile.professional_summary ?? ''
+    const p = profile as Record<string, unknown>
+    const savedSummary = (p.professional_summary as string | undefined) ?? (p.summary as string | undefined) ?? ''
     setProfessionalSummary(savedSummary)
     setSummaryDraft(savedSummary)
     setSummaryEditing(false)
-  }, [profile?.id])
+  }, [profile?.id, (profile as Record<string, unknown>)?.seeker_id])
+
+  useEffect(() => {
+    const returnSection = params.returnSection
+    if (!returnSection || isLoading) return
+
+    if (scrolledForSectionRef.current !== returnSection) {
+      const timer = setTimeout(() => {
+        scrollToSection(returnSection)
+      }, 120)
+      return () => clearTimeout(timer)
+    }
+  }, [params.returnSection, isLoading, scrollToSection])
 
   const strength = profile?.profile_strength?.percentage ?? 0
   const checklist = arrayFrom<ProfileStrengthItem>(profile?.profile_strength?.items)
@@ -283,6 +320,7 @@ export default function ProfileScreen() {
   return (
     <View style={styles.flex}>
       <ScrollView
+        ref={scrollViewRef}
         contentContainerStyle={styles.content}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.secondary} />}
         showsVerticalScrollIndicator={false}
@@ -492,6 +530,7 @@ export default function ProfileScreen() {
         <SectionHeader
           title="Personal Information"
           action={<EditLink section={1} />}
+          onLayout={(e) => handleSectionLayout('1', e.nativeEvent.layout.y)}
         />
         <Card padding="md">
           <Info label="Date of Birth" value={textFrom(profile?.date_of_birth)} />
@@ -501,7 +540,7 @@ export default function ProfileScreen() {
           <Info label="Address" value={addressLine(profile)} />
         </Card>
 
-        <SectionHeader title="Employment & Preferences" action={<EditLink section={2} />} />
+        <SectionHeader title="Employment & Preferences" action={<EditLink section={2} />} onLayout={(e) => handleSectionLayout('2', e.nativeEvent.layout.y)} />
         <Card padding="md">
           <Info label="Employment Status" value={titleCase(profile?.employment_status)} />
           <Info label="Preferred Work" value={titleCase(profile?.work_type_preference)} />
@@ -509,21 +548,21 @@ export default function ProfileScreen() {
           <Info label="Preferred Areas" value={(profile?.preferred_locations_details ?? []).join(', ') || 'Not set'} />
         </Card>
 
-        <SectionHeader title="Preferred Occupations" action={<EditLink section={3} />} />
+        <SectionHeader title="Preferred Occupations" action={<EditLink section={3} />} onLayout={(e) => handleSectionLayout('3', e.nativeEvent.layout.y)} />
         <Card padding="md">
           {occupations.length ? occupations.map((o, i) => (
             <Info key={i} label={`Choice ${i + 1}`} value={recordText(o, ['occupation_title', 'raw_job_title', 'general_term'], 'Not set')} />
           )) : <EmptyLine text="No preferred occupations listed yet." />}
         </Card>
 
-        <SectionHeader title="Languages" action={<EditLink section={4} />} />
+        <SectionHeader title="Languages" action={<EditLink section={4} />} onLayout={(e) => handleSectionLayout('4', e.nativeEvent.layout.y)} />
         <Card padding="md">
           {languages.length ? languages.map((l, i) => (
             <Info key={i} label={titleCase(recordText(l, ['language']))} value={['can_read', 'can_write', 'can_speak', 'can_understand'].filter((k) => l[k]).map((k) => k.replace('can_', '')).join(', ') || 'None'} />
           )) : <EmptyLine text="No languages listed yet." />}
         </Card>
 
-        <SectionHeader title="Skills" action={<EditLink section={5} />} />
+        <SectionHeader title="Skills" action={<EditLink section={5} />} onLayout={(e) => handleSectionLayout('5', e.nativeEvent.layout.y)} />
         <Card padding="md">
           <Text style={styles.skillGroupTitle}>Technical & Hard Skills</Text>
           {hardSkills.length ? (
@@ -575,7 +614,7 @@ export default function ProfileScreen() {
           }) : <Card padding="md"><EmptyLine text="No education records listed yet." /></Card>}
         </View>
 
-        <SectionHeader title="Work Experience" action={<EditLink section={7} />} />
+        <SectionHeader title="Work Experience" action={<EditLink section={7} />} onLayout={(e) => handleSectionLayout('7', e.nativeEvent.layout.y)} />
         <View style={styles.cardList}>
           {workExperiences.length ? workExperiences.map((work, index) => {
             const key = experienceKey(work, index)
@@ -658,7 +697,7 @@ export default function ProfileScreen() {
           }) : <Card padding="md"><EmptyLine text="No work experience listed yet." /></Card>}
         </View>
 
-        <SectionHeader title="Training & Eligibility" action={<EditLink section={6} />} />
+        <SectionHeader title="Training & Eligibility" action={<EditLink section={6} />} onLayout={(e) => handleSectionLayout('6', e.nativeEvent.layout.y)} />
         <View style={styles.cardList}>
           {trainings.length || eligibilities.length ? (
             <>
@@ -753,6 +792,39 @@ export default function ProfileScreen() {
         }}
       />
 
+      <Modal visible={signOutModalOpen} transparent animationType="fade" onRequestClose={() => !signingOut && setSignOutModalOpen(false)}>
+        <View style={styles.signOutModalOverlay}>
+          <View style={styles.signOutModalContent}>
+            <View style={styles.signOutModalIconWrap}>
+              <MaterialIcons name="logout" size={32} color={colors.danger} />
+            </View>
+            <Text style={styles.signOutModalTitle}>Sign out of i-PESO?</Text>
+            <Text style={styles.signOutModalDesc}>
+              Are you sure you want to sign out of your account? You can sign in again at any time.
+            </Text>
+            <View style={styles.signOutModalActions}>
+              <Button
+                variant="outline"
+                onPress={() => setSignOutModalOpen(false)}
+                disabled={signingOut}
+                style={styles.signOutModalBtn}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="danger"
+                onPress={handleSignOut}
+                loading={signingOut}
+                disabled={signingOut}
+                style={styles.signOutModalBtn}
+              >
+                Sign Out
+              </Button>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
     </View>
   )
 }
@@ -786,13 +858,16 @@ function CertificateUploadModal({
   const [category, setCategory] = useState(CERTIFICATE_CATEGORIES[0])
   const [issuedAt, setIssuedAt] = useState('')
   const [trainingId, setTrainingId] = useState('')
-  const [file, setFile] = useState<{ uri: string; name: string; mimeType: string } | null>(null)
+  const [file, setFile] = useState<{ uri: string; name: string; mimeType: string; size?: number } | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
 
   const requiresTraining = CATEGORIES_REQUIRING_TRAINING.includes(category)
   const blockedByNoTrainings = requiresTraining && trainings.length === 0
   const selectedTraining = trainings.find((training) => String(training.id) === trainingId)
+  
+  const effectiveTitle = selectedTraining ? textFrom(selectedTraining.course) : title.trim()
+  const effectiveIssuingBody = selectedTraining ? (textFrom(selectedTraining.training_institution) || 'Training Provider') : issuingBody.trim()
 
   const reset = () => {
     setTitle(''); setIssuingBody(''); setCategory(CERTIFICATE_CATEGORIES[0]); setIssuedAt(''); setTrainingId(''); setFile(null); setError('')
@@ -802,11 +877,18 @@ function CertificateUploadModal({
     const result = await DocumentPicker.getDocumentAsync({ type: ['application/pdf', 'image/jpeg', 'image/png'], copyToCacheDirectory: true })
     if (result.canceled || !result.assets?.length) return
     const asset = result.assets[0]
-    setFile({ uri: asset.uri, name: asset.name, mimeType: asset.mimeType || 'application/pdf' })
+    setFile({ uri: asset.uri, name: asset.name, mimeType: asset.mimeType || 'application/pdf', size: asset.size })
+  }
+
+  const formatSize = (bytes?: number) => {
+    if (!bytes) return 'Unknown size'
+    if (bytes < 1024) return bytes + ' B'
+    if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB'
+    return (bytes / 1048576).toFixed(1) + ' MB'
   }
 
   const submit = async () => {
-    if (!title.trim() || !issuingBody.trim() || !issuedAt.trim() || !file) {
+    if (!effectiveTitle || !effectiveIssuingBody || !issuedAt.trim() || !file) {
       setError('Title, issuing body, issued date, and a file are required.')
       return
     }
@@ -818,8 +900,8 @@ function CertificateUploadModal({
     setError('')
     try {
       await seekerService.uploadCertificate(file.uri, file.mimeType, file.name, {
-        title: title.trim(),
-        issuing_body: issuingBody.trim(),
+        title: effectiveTitle,
+        issuing_body: effectiveIssuingBody,
         category,
         issued_at: issuedAt.trim(),
         training_id: trainingId || null,
@@ -846,12 +928,9 @@ function CertificateUploadModal({
         </View>
       }
     >
-      <ScrollView contentContainerStyle={{ paddingBottom: spacing.lg }} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={{ paddingHorizontal: spacing.xl, paddingBottom: spacing.xxl }} showsVerticalScrollIndicator={false}>
         {error ? <AlertBox variant="danger" style={{ marginBottom: spacing.md }}>{error}</AlertBox> : null}
-        <Text style={styles.label}>Title</Text>
-        <TextInput style={styles.modalInput} value={title} onChangeText={setTitle} placeholder="e.g. NC II Housekeeping" placeholderTextColor={colors.subtle} />
-        <Text style={styles.label}>Issuing Body</Text>
-        <TextInput style={styles.modalInput} value={issuingBody} onChangeText={setIssuingBody} placeholder="e.g. TESDA" placeholderTextColor={colors.subtle} />
+        
         <Text style={styles.label}>Category</Text>
         <View style={styles.tagRow}>
           {CERTIFICATE_CATEGORIES.map((c) => (
@@ -859,7 +938,10 @@ function CertificateUploadModal({
               key={c}
               scaleTo="buttonPress"
               ripple={null}
-              onPress={() => setCategory(c)}
+              onPress={() => {
+                setCategory(c)
+                if (!CATEGORIES_REQUIRING_TRAINING.includes(c)) setTrainingId('')
+              }}
               style={[styles.categoryChip, category === c && styles.categoryChipActive]}
               accessibilityRole="button"
               accessibilityState={{ selected: category === c }}
@@ -882,6 +964,15 @@ function CertificateUploadModal({
           value={trainingId}
           onChange={setTrainingId}
         />
+
+        {!selectedTraining ? (
+          <>
+            <Text style={styles.label}>Certificate / Training Title</Text>
+            <TextInput style={styles.modalInput} value={title} onChangeText={setTitle} placeholder="e.g. NC II Housekeeping" placeholderTextColor={colors.subtle} />
+            <Text style={styles.label}>Issuing Organization / Provider</Text>
+            <TextInput style={styles.modalInput} value={issuingBody} onChangeText={setIssuingBody} placeholder="e.g. TESDA" placeholderTextColor={colors.subtle} />
+          </>
+        ) : null}
         {blockedByNoTrainings ? (
           <AlertBox variant="warning" style={{ marginBottom: spacing.md }}>
             This category needs a training record on file. Add one under the Trainings section first, then come back to link it here.
@@ -890,9 +981,31 @@ function CertificateUploadModal({
           <Text style={styles.trainingHint}>This proof will be linked to: {textFrom(selectedTraining.course)}.</Text>
         ) : null}
 
-        <Button variant="outline" onPress={pickFile} style={{ marginTop: spacing.sm, marginBottom: spacing.md }}>
-          {file ? file.name : 'Choose file (PDF, JPG, PNG)'}
-        </Button>
+        {!file ? (
+          <Button variant="outline" onPress={pickFile} style={{ marginTop: spacing.sm, marginBottom: spacing.md }}>
+            Choose file (PDF, JPG, PNG)
+          </Button>
+        ) : (
+          <View style={styles.filePreviewCard}>
+            <Text style={styles.filePreviewTitle}>Selected File</Text>
+            {file.mimeType.startsWith('image/') ? (
+              <Image source={{ uri: file.uri }} style={styles.imagePreview} resizeMode="contain" />
+            ) : (
+              <View style={styles.pdfPreview}>
+                <MaterialIcons name="picture-as-pdf" size={48} color={colors.error} />
+                <Text style={styles.pdfPreviewText}>PDF Document</Text>
+              </View>
+            )}
+            <View style={styles.filePreviewInfo}>
+              <Text style={styles.filePreviewName} numberOfLines={1} ellipsizeMode="middle">{file.name}</Text>
+              <Text style={styles.filePreviewSize}>{file.mimeType.split('/')[1]?.toUpperCase() || 'DOCUMENT'} • {formatSize(file.size)}</Text>
+            </View>
+            <View style={styles.filePreviewActions}>
+              <Button variant="outline" onPress={pickFile} style={styles.filePreviewBtn}>Replace File</Button>
+              <Button variant="outline" onPress={() => setFile(null)} style={styles.filePreviewBtn}>Remove</Button>
+            </View>
+          </View>
+        )}
       </ScrollView>
     </BottomSheet>
   )
@@ -1002,4 +1115,21 @@ const styles = StyleSheet.create({
   categoryChipActive: { borderColor: colors.blue600, backgroundColor: colors.blue50 },
   categoryChipText: { fontSize: 11, color: colors.textSecondary, textTransform: 'capitalize' },
   categoryChipTextActive: { color: colors.secondary, fontFamily: typography.family.bold },
+  filePreviewCard: { marginTop: spacing.md, marginBottom: spacing.md, borderWidth: 1, borderColor: colors.border, borderRadius: radii.md, padding: spacing.md, backgroundColor: colors.surface },
+  filePreviewTitle: { color: colors.textSecondary, fontSize: 11, fontFamily: typography.family.bold, marginBottom: spacing.sm, textTransform: 'uppercase' },
+  imagePreview: { width: '100%', height: 200, borderRadius: radii.sm, backgroundColor: colors.background, marginBottom: spacing.sm },
+  pdfPreview: { width: '100%', height: 120, borderRadius: radii.sm, backgroundColor: colors.background, marginBottom: spacing.sm, alignItems: 'center', justifyContent: 'center' },
+  pdfPreviewText: { marginTop: spacing.xs, color: colors.textSecondary, fontSize: typography.small, fontFamily: typography.family.medium },
+  filePreviewInfo: { marginBottom: spacing.md },
+  filePreviewName: { color: colors.textPrimary, fontSize: typography.small, fontFamily: typography.family.bold },
+  filePreviewSize: { color: colors.textSecondary, fontSize: 11, marginTop: 2 },
+  filePreviewActions: { flexDirection: 'row', gap: spacing.sm },
+  filePreviewBtn: { flex: 1, marginBottom: 0 },
+  signOutModalOverlay: { flex: 1, backgroundColor: colors.scrim, justifyContent: 'center', alignItems: 'center', padding: spacing.xl },
+  signOutModalContent: { backgroundColor: colors.surface, borderRadius: radii.xl, padding: spacing.xl, width: '100%', maxWidth: 340, alignItems: 'center', ...shadows.elevated },
+  signOutModalIconWrap: { width: 56, height: 56, borderRadius: 28, backgroundColor: 'rgba(239,68,68,0.1)', justifyContent: 'center', alignItems: 'center', marginBottom: spacing.md },
+  signOutModalTitle: { color: colors.textPrimary, fontSize: typography.heading, fontFamily: typography.family.bold, marginBottom: spacing.xs, textAlign: 'center' },
+  signOutModalDesc: { color: colors.textSecondary, fontSize: typography.body, textAlign: 'center', lineHeight: 22, marginBottom: spacing.xl },
+  signOutModalActions: { flexDirection: 'row', gap: spacing.sm, width: '100%' },
+  signOutModalBtn: { flex: 1, marginBottom: 0 },
 })

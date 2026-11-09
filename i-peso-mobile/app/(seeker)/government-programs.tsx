@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native'
 import Animated, { FadeInUp } from 'react-native-reanimated'
 import { useQuery } from '@tanstack/react-query'
@@ -57,10 +57,16 @@ export default function GovernmentProgramsScreen() {
   const [search, setSearch] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [category, setCategory] = useState<string | undefined>(undefined)
+  const [status, setStatus] = useState<string>('open')
   const [page, setPage] = useState(1)
   const [programItems, setProgramItems] = useState<GovernmentProgram[]>([])
   const [refreshing, setRefreshing] = useState(false)
   const m = useMotion()
+
+  const statusScrollRef = useRef<ScrollView>(null)
+  const categoryScrollRef = useRef<ScrollView>(null)
+  const statusLayouts = useRef<Record<string, number>>({})
+  const categoryLayouts = useRef<Record<string, number>>({})
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(search.trim()), 300)
@@ -69,11 +75,11 @@ export default function GovernmentProgramsScreen() {
 
   useEffect(() => {
     setPage(1)
-  }, [debouncedSearch, category])
+  }, [debouncedSearch, category, status])
 
   const { data, isLoading, isFetching, error, refetch } = useQuery({
-    queryKey: ['governmentPrograms', debouncedSearch, category, page],
-    queryFn: () => seekerService.getGovernmentPrograms({ search: debouncedSearch || undefined, category, page }),
+    queryKey: ['governmentPrograms', debouncedSearch, category, status, page],
+    queryFn: () => seekerService.getGovernmentPrograms({ search: debouncedSearch || undefined, category, status: status || undefined, page }),
   })
 
   useEffect(() => {
@@ -93,6 +99,23 @@ export default function GovernmentProgramsScreen() {
     setRefreshing(false)
   }
 
+  const handleStatusPress = (val: string) => {
+    setStatus(val)
+    const x = statusLayouts.current[val]
+    if (x !== undefined) {
+      statusScrollRef.current?.scrollTo({ x: Math.max(0, x - spacing.lg), animated: true })
+    }
+  }
+
+  const handleCategoryPress = (key: string | undefined) => {
+    setCategory(key)
+    const k = key ?? 'all'
+    const x = categoryLayouts.current[k]
+    if (x !== undefined) {
+      categoryScrollRef.current?.scrollTo({ x: Math.max(0, x - spacing.lg), animated: true })
+    }
+  }
+
   const errorMessage = error ? apiErrorMessage(error, 'Unable to load Government Programs. Please try again.') : ''
 
   const hasMore = data ? page < data.programs.last_page : false
@@ -110,7 +133,6 @@ export default function GovernmentProgramsScreen() {
         Browse SPES, TUPAD, livelihood, and training programs available through PESO.
       </Text>
 
-
       <TextInput
         style={styles.search}
         value={search}
@@ -119,17 +141,72 @@ export default function GovernmentProgramsScreen() {
         placeholderTextColor={colors.subtle}
       />
 
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
-        <CategoryChip label="All" active={!category} onPress={() => setCategory(undefined)} />
-        {CATEGORIES.map((key) => (
+      {/* Status filter chips */}
+      <View style={styles.chipWrapper}>
+        <ScrollView
+          ref={statusScrollRef}
+          horizontal
+          nestedScrollEnabled
+          directionalLockEnabled
+          keyboardShouldPersistTaps="handled"
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.chipScrollContent}
+        >
           <CategoryChip
-            key={key}
-            label={data?.categories?.[key] ? `${CATEGORY_LABELS[key]} (${data.categories[key]})` : CATEGORY_LABELS[key]}
-            active={category === key}
-            onPress={() => setCategory(key)}
+            label="Open"
+            active={status === 'open'}
+            onPress={() => handleStatusPress('open')}
+            onLayout={(x) => { statusLayouts.current['open'] = x }}
           />
-        ))}
-      </ScrollView>
+          <CategoryChip
+            label="Closed"
+            active={status === 'closed'}
+            onPress={() => handleStatusPress('closed')}
+            onLayout={(x) => { statusLayouts.current['closed'] = x }}
+          />
+          <CategoryChip
+            label="Completed"
+            active={status === 'completed'}
+            onPress={() => handleStatusPress('completed')}
+            onLayout={(x) => { statusLayouts.current['completed'] = x }}
+          />
+          <CategoryChip
+            label="Any Status"
+            active={status === ''}
+            onPress={() => handleStatusPress('')}
+            onLayout={(x) => { statusLayouts.current[''] = x }}
+          />
+        </ScrollView>
+      </View>
+
+      {/* Category filter chips */}
+      <View style={styles.chipWrapper}>
+        <ScrollView
+          ref={categoryScrollRef}
+          horizontal
+          nestedScrollEnabled
+          directionalLockEnabled
+          keyboardShouldPersistTaps="handled"
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.chipScrollContent}
+        >
+          <CategoryChip
+            label="All Categories"
+            active={!category}
+            onPress={() => handleCategoryPress(undefined)}
+            onLayout={(x) => { categoryLayouts.current['all'] = x }}
+          />
+          {CATEGORIES.map((key) => (
+            <CategoryChip
+              key={key}
+              label={data?.categories?.[key] ? `${CATEGORY_LABELS[key]} (${data.categories[key]})` : CATEGORY_LABELS[key]}
+              active={category === key}
+              onPress={() => handleCategoryPress(key)}
+              onLayout={(x) => { categoryLayouts.current[key] = x }}
+            />
+          ))}
+        </ScrollView>
+      </View>
 
       {errorMessage ? (
         <AlertBox variant="warning" style={styles.alertBox}>
@@ -193,8 +270,8 @@ export default function GovernmentProgramsScreen() {
                   <Badge variant="neutral" style={styles.categoryBadge}>{categoryLabel(program.category)}</Badge>
                   <EligibilityBadge eligibility={program.eligibility} />
                 </View>
-                {program.short_description ? (
-                  <Text style={styles.programDescription} numberOfLines={2}>{program.short_description}</Text>
+                {program.description ? (
+                  <Text style={styles.programDescription} numberOfLines={2}>{program.description}</Text>
                 ) : null}
                 <View style={styles.programMetaRow}>
                   <Text style={styles.programMeta}>Deadline: {formatDate(program.application_deadline)}</Text>
@@ -221,17 +298,30 @@ export default function GovernmentProgramsScreen() {
   )
 }
 
-function CategoryChip({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
+function CategoryChip({
+  label,
+  active,
+  onPress,
+  onLayout,
+}: {
+  label: string
+  active: boolean
+  onPress: () => void
+  onLayout?: (x: number) => void
+}) {
   return (
     <PressableScale
       scaleTo="buttonPress"
       ripple={null}
       style={[styles.chip, active && styles.chipActive]}
       onPress={onPress}
+      onLayout={(e) => onLayout?.(e.nativeEvent.layout.x)}
       accessibilityRole="button"
       accessibilityState={{ selected: active }}
     >
-      <Text style={[styles.chipText, active && styles.chipTextActive]}>{label}</Text>
+      <Text style={[styles.chipText, active && styles.chipTextActive]} numberOfLines={1}>
+        {label}
+      </Text>
     </PressableScale>
   )
 }
@@ -242,8 +332,9 @@ const styles = StyleSheet.create({
   kicker: { color: colors.secondary, fontSize: typography.small, fontFamily: typography.family.bold, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: spacing.xs },
   subtitle: { color: colors.textSecondary, fontSize: typography.body, lineHeight: 20, marginBottom: spacing.lg },
   search: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radii.md, paddingHorizontal: spacing.md, paddingVertical: spacing.md, color: colors.textPrimary, fontSize: typography.body, marginBottom: spacing.md },
-  chipRow: { gap: spacing.sm, paddingBottom: spacing.lg },
-  chip: { borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, borderRadius: radii.pill, paddingVertical: spacing.sm, paddingHorizontal: spacing.md },
+  chipWrapper: { marginHorizontal: -spacing.lg, marginBottom: spacing.xs },
+  chipScrollContent: { paddingHorizontal: spacing.lg, paddingVertical: spacing.xs, gap: spacing.sm, flexDirection: 'row', alignItems: 'center' },
+  chip: { borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, borderRadius: radii.pill, paddingVertical: spacing.sm, paddingHorizontal: spacing.md, justifyContent: 'center', alignItems: 'center' },
   chipActive: { backgroundColor: colors.secondary, borderColor: colors.secondary },
   chipText: { color: colors.textSecondary, fontSize: typography.small, fontFamily: typography.family.bold },
   chipTextActive: { color: colors.white },

@@ -4,12 +4,24 @@ import { useQuery } from '@tanstack/react-query'
 import { ArrowLeft, BriefcaseBusiness, Flag, ShieldCheck } from 'lucide-react'
 import { Button, Card, CardHeader, EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui'
 import JobDetailModal from '@/components/JobDetailModal'
+<<<<<<< Updated upstream
 import ReportEmployerModal from '@/components/ReportEmployerModal'
 import CompanyFacts from '@/components/employers/CompanyFacts'
 import CompanyLogo from '@/components/employers/CompanyLogo'
 import VacancyRow from '@/components/employers/VacancyRow'
 import { getPublicEmployerProfile } from '@/services/seekerService'
 import { employerDisplayName, employerRegisteredName, formatIndustry, publicEmployerQueryKey } from '@/utils/employerProfile'
+=======
+import EmployerPreferenceChip from '@/components/jobs/EmployerPreferenceChip'
+import api from '@/services/api'
+import toast from 'react-hot-toast'
+
+function formatDate(value) {
+  if (!value) return 'Not provided'
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleDateString('en-PH', { year: 'numeric', month: 'short', day: 'numeric' })
+}
+>>>>>>> Stashed changes
 
 /**
  * Full-page company profile (/seeker/employers/:id), reached from the

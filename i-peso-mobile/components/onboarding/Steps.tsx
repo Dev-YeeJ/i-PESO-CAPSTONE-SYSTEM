@@ -17,6 +17,7 @@ import {
   InfoNote,
   RepeatableSection,
   SelectField,
+  SpinnerField,
   ToggleGroup,
   collapsedFieldError,
   fieldError,
@@ -692,7 +693,7 @@ export function Step2Employment({ value, onChange, errors }: { value: Step2Value
 
       {unemployed ? (
         <>
-          <Field label="Months Unemployed" keyboardType="number-pad" value={value.unemployment_months} onChangeText={(v) => set('unemployment_months', v.replace(/\D/g, '').slice(0, 3))} error={fieldError(errors, 'unemployment_months')} />
+          <SpinnerField label="Months Unemployed" help="Select the closest duration" max={999} value={value.unemployment_months} onChange={(v) => set('unemployment_months', v)} error={fieldError(errors, 'unemployment_months')} />
           <SelectField label="Reason" required placeholder="Select reason" options={UNEMPLOYMENT_REASON_OPTIONS} value={value.unemployment_reason} onChange={(v) => set('unemployment_reason', v)} error={fieldError(errors, 'unemployment_reason')} />
           {value.unemployment_reason === 'others' ? (
             <Field label="Specify Reason" value={value.unemployment_reason_others} onChangeText={(v) => set('unemployment_reason_others', v)} error={fieldError(errors, 'unemployment_reason_others')} />

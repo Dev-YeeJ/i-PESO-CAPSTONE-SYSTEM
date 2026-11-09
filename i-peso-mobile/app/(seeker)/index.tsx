@@ -53,7 +53,6 @@ const SORT_ITEMS: { value: 'match' | 'distance' | 'newest'; label: string }[] = 
 
 const PRIMARY_ACTIONS: { icon: QuickActionIcon; label: string; path: string }[] = [
   { icon: 'event', label: 'Job Fairs', path: '/(seeker)/job-fairs' },
-  { icon: 'collections', label: 'Employer Posters', path: '/(seeker)/employer-posters' },
   { icon: 'map', label: 'Job Map', path: '/(seeker)/job-map' },
   { icon: 'assignment', label: 'Applications', path: '/(seeker)/applications' },
 ]

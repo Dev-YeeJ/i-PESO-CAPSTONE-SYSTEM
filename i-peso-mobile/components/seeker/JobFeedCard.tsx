@@ -1,7 +1,8 @@
 import { useEffect, useRef } from 'react'
 import MaterialIcons from '@expo/vector-icons/MaterialIcons'
 import * as Haptics from 'expo-haptics'
-import { Image, StyleSheet, Text, View } from 'react-native'
+import { Image, Pressable, StyleSheet, Text, View } from 'react-native'
+import { useRouter } from 'expo-router'
 import { Gesture, GestureDetector } from 'react-native-gesture-handler'
 import Animated, {
   Extrapolation,
@@ -36,6 +37,7 @@ const SWIPE_THRESHOLD = 72
 const SWIPE_MAX = 104
 
 export function JobFeedCard({ job, index = 0, saving = false, onPress, onToggleSave }: JobFeedCardProps) {
+  const router = useRouter()
   const m = useMotion()
   const requiredSkills = listFrom(job.required_skills).slice(0, 3)
   // Nearby/Latest feeds intentionally skip full match scoring for performance and come back
@@ -134,16 +136,24 @@ export function JobFeedCard({ job, index = 0, saving = false, onPress, onToggleS
             accessibilityHint="Swipe left on this card to save it"
           >
             <View style={styles.topRow}>
-              {job.employer?.company_logo_url ? (
-                <Image source={{ uri: job.employer.company_logo_url }} style={styles.employerLogo} />
-              ) : (
-                <View style={styles.logo}>
-                  <Text style={styles.logoText}>{companyInitials(jobCompany(job))}</Text>
-                </View>
-              )}
+              <Pressable
+                onPress={() => job.employer?.employer_id && router.push({ pathname: '/(seeker)/employers/[id]', params: { id: String(job.employer.employer_id), from: 'feed' } })}
+              >
+                {job.employer?.company_logo_url ? (
+                  <Image source={{ uri: job.employer.company_logo_url }} style={styles.employerLogo} />
+                ) : (
+                  <View style={styles.logo}>
+                    <Text style={styles.logoText}>{companyInitials(jobCompany(job))}</Text>
+                  </View>
+                )}
+              </Pressable>
               <View style={styles.titleWrap}>
                 <Text style={styles.title} numberOfLines={2}>{textFrom(job.job_title, 'Untitled job')}</Text>
-                <Text style={styles.company} numberOfLines={1}>{jobCompany(job)}</Text>
+                <Pressable
+                  onPress={() => job.employer?.employer_id && router.push({ pathname: '/(seeker)/employers/[id]', params: { id: String(job.employer.employer_id), from: 'feed' } })}
+                >
+                  <Text style={styles.company} numberOfLines={1}>{jobCompany(job)}</Text>
+                </Pressable>
               </View>
               {job.match_deferred ? null : <MatchRing percentage={match} size={52} strokeWidth={5} />}
             </View>

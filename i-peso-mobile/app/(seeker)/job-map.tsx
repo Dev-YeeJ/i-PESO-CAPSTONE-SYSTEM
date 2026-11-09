@@ -19,6 +19,7 @@ import { BottomSheet } from '@/components/ui/BottomSheet'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { PressableScale } from '@/components/ui/PressableScale'
 import { ScreenHeader } from '@/components/ui/ScreenHeader'
+import { EmployerPreferenceChip } from '@/components/ui/EmployerPreferenceChip'
 import { JobFeedCard } from '@/components/seeker/JobFeedCard'
 import { LeafletMap } from '@/components/seeker/LeafletMap'
 import { colors, radii, shadows, spacing, typography } from '@/theme'
@@ -473,6 +474,7 @@ export default function JobMapScreen() {
                 </View>
               ) : null}
             </View>
+            <EmployerPreferenceChip job={selectedMapJob} style={{ marginTop: spacing.sm }} />
           </View>
         ) : null}
       </BottomSheet>

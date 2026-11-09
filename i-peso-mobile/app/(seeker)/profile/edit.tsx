@@ -92,6 +92,24 @@ export default function ProfileEditScreen() {
   const [goingBack, setGoingBack] = useState(false)
   const scrollRef = useRef<ScrollView>(null)
 
+  // Sync active step when navigation params change (e.g. user opens a different profile section)
+  // Without this, the component reuses the stale `activeStep` from their previous visit since
+  // the initial useState only fires once per mounted route.
+  useEffect(() => {
+    const step = Number(params.section)
+    if (step >= 1 && step <= 7) {
+      setActiveStep((prev) => {
+        if (prev !== step) {
+          setGoingBack(step < prev)
+          setError('')
+          setErrors({})
+          return step
+        }
+        return prev
+      })
+    }
+  }, [params.section])
+
   // profile/edit is a flat sibling in the Tabs navigator (href: null in _layout.tsx), so
   // router.back() has no reliable history to pop and falls through to the first tab (Home)
   // rather than wherever the seeker actually came from. Home's "Update Work Experience"
@@ -99,8 +117,11 @@ export default function ProfileEditScreen() {
   // unlike resume-studio.tsx (which only has one entry point), this screen needs to know
   // which one it was opened from to send the seeker back to the right place.
   const goBack = useCallback(() => {
-    router.replace(params.from === 'home' ? '/(seeker)' : '/(seeker)/profile')
-  }, [params.from])
+    router.replace({
+      pathname: params.from === 'home' ? '/(seeker)' : '/(seeker)/profile',
+      params: { returnSection: String(activeStep) },
+    })
+  }, [params.from, activeStep])
 
   // The ScreenHeader back button above only covers a tap on its own arrow — Android's
   // hardware/system back key bypasses that and goes straight to React Navigation, which

@@ -412,18 +412,12 @@ export interface GovernmentProgram {
   title: string
   program_name?: string
   category?: string
-  short_description?: string | null
   description?: string | null
-  target_beneficiaries?: string | null
   eligibility_requirements?: string[] | null
-  required_documents?: string[] | null
-  /** In-person application steps set by PESO admin. Null/empty until an admin fills it in — callers must fall back, see getCitizenCharterSteps(). */
-  citizen_charter_steps?: string[] | null
   eligibility?: ProgramEligibility | null
   target_industry?: string | null
   skills?: Array<{ id: number | string; name?: string; type?: string }>
   venue?: string | null
-  location_address?: string | null
   start_date?: string | null
   end_date?: string | null
   application_deadline?: string | null
@@ -431,9 +425,6 @@ export interface GovernmentProgram {
   available_slots?: number | null
   status: string
   visibility?: string
-  contact_person?: string | null
-  contact_email?: string | null
-  contact_phone?: string | null
   has_attachment?: boolean
   recommendation_score?: number | null
   recommendation_reason?: string | null
@@ -444,18 +435,7 @@ export interface GovernmentProgramsResponse {
   categories: Record<string, number>
 }
 
-/** Shown when a program has no admin-authored citizen_charter_steps yet. */
-export const CITIZEN_CHARTER_FALLBACK_STEPS: string[] = [
-  'Prepare Documents',
-  'Submit to PESO',
-  'Wait for Review',
-  'Claim Stub',
-]
 
-export function getCitizenCharterSteps(program: Pick<GovernmentProgram, 'citizen_charter_steps'>): string[] {
-  const steps = program.citizen_charter_steps
-  return Array.isArray(steps) && steps.length > 0 ? steps : CITIZEN_CHARTER_FALLBACK_STEPS
-}
 
 export interface OccupationOption {
   id: number
@@ -988,6 +968,20 @@ export const seekerService = {
    */
   async saveProfessionalSummary(summary: string): Promise<void> {
     await apiClient.put('/seeker/professional-summary', { professional_summary: summary.trim() || null })
+  },
+
+  async uploadProfileImage(uri: string, mimeType: string, filename: string): Promise<{ url: string }> {
+    const formData = new FormData()
+    formData.append('image', {
+      uri,
+      type: mimeType || 'image/jpeg',
+      name: filename || 'profile.jpg',
+    } as any)
+
+    const res = await apiClient.post('/seeker/profile-image', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+    return res.data
   },
 
   /**

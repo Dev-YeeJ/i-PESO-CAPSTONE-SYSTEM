@@ -441,9 +441,18 @@ function FilterLabel({ children }: { children: string }) {
 
 function FilterSection({ children }: { children: React.ReactNode }) {
   return (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
-      {children}
-    </ScrollView>
+    <View style={styles.chipWrapper}>
+      <ScrollView
+        horizontal
+        nestedScrollEnabled
+        directionalLockEnabled
+        keyboardShouldPersistTaps="handled"
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.chipScrollContent}
+      >
+        {children}
+      </ScrollView>
+    </View>
   )
 }
 
@@ -679,9 +688,16 @@ const styles = StyleSheet.create({
     marginTop: spacing.md,
     marginBottom: spacing.sm,
   },
-  chipRow: {
+  chipWrapper: {
+    marginHorizontal: -spacing.lg,
+    marginBottom: spacing.xs,
+  },
+  chipScrollContent: {
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.xs,
     gap: spacing.sm,
-    paddingBottom: spacing.xs,
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   filterBtn: {
     minHeight: 40,

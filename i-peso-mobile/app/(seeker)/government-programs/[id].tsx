@@ -4,7 +4,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useFocusEffect } from '@react-navigation/native'
 import { useQuery } from '@tanstack/react-query'
 import MaterialIcons from '@expo/vector-icons/MaterialIcons'
-import { getCitizenCharterSteps, seekerService } from '@/services/seekerService'
+import { seekerService } from '@/services/seekerService'
 import { downloadAndShare } from '@/utils/fileTransfer'
 import { formatDate, textFrom, titleCase } from '@/utils/seekerView'
 import { EligibilityBadge } from '@/components/EligibilityBadge'
@@ -116,9 +116,13 @@ export default function ProgramDetailScreen() {
   }
 
   const eligibility = Array.isArray(program.eligibility_requirements) ? program.eligibility_requirements : []
-  const requiredDocs = Array.isArray(program.required_documents) ? program.required_documents : []
   const skills = Array.isArray(program.skills) ? program.skills : []
-  const charterSteps = getCitizenCharterSteps(program)
+  const charterSteps = [
+    "Review your eligibility match on this page.",
+    "Prepare any requirements listed above.",
+    `Proceed to the PESO Office at ${program.venue || 'To be announced'}.`,
+    "Submit your requirements and undergo a brief assessment."
+  ]
   const totalSlots = program.total_slots ?? 0
   const slotsText = totalSlots > 0 ? `${program.available_slots ?? 0}/${totalSlots} slots available` : 'Open slots (unlimited)'
 
@@ -135,19 +139,16 @@ export default function ProgramDetailScreen() {
           </View>
         </View>
 
-        {program.description || program.short_description ? (
-          <Text style={styles.description}>{textFrom(program.description || program.short_description, '')}</Text>
+        {program.description ? (
+          <Text style={styles.description} numberOfLines={3} ellipsizeMode="tail">
+            {textFrom(program.description, '')}
+          </Text>
         ) : null}
 
         <Card padding="md" style={styles.infoCard}>
-          <Detail label="Venue" value={textFrom(program.venue, 'Not listed')} />
-          <Detail label="Location" value={textFrom(program.location_address, 'Not listed')} />
-          <Detail label="Dates" value={`${formatDate(program.start_date)} - ${formatDate(program.end_date)}`} />
+          <Detail label="Venue" value={textFrom(program.venue, 'To be announced')} />
           <Detail label="Application Deadline" value={formatDate(program.application_deadline)} />
           <Detail label="Slots" value={slotsText} />
-          {program.target_beneficiaries ? (
-            <Detail label="Target Beneficiaries" value={textFrom(program.target_beneficiaries, 'Not listed')} />
-          ) : null}
           {program.target_industry ? (
             <Detail label="Target Industry" value={textFrom(program.target_industry, 'Not listed')} />
           ) : null}
@@ -185,14 +186,7 @@ export default function ProgramDetailScreen() {
           </>
         )}
 
-        {requiredDocs.length > 0 && (
-          <>
-            <SectionHeader title="Required Documents" />
-            {requiredDocs.map((item, index) => (
-              <BulletRow key={`${item}-${index}`} text={item} />
-            ))}
-          </>
-        )}
+
 
         <SectionHeader title="How to Apply (In-Person)" />
         {charterSteps.map((step, index) => (
@@ -210,16 +204,10 @@ export default function ProgramDetailScreen() {
           </>
         )}
 
-        {(program.contact_person || program.contact_email || program.contact_phone) && (
-          <>
-            <SectionHeader title="Contact" />
-            <Card padding="md" style={styles.infoCard}>
-              {program.contact_person ? <Detail label="Person" value={textFrom(program.contact_person, '')} /> : null}
-              {program.contact_email ? <Detail label="Email" value={textFrom(program.contact_email, '')} /> : null}
-              {program.contact_phone ? <Detail label="Phone" value={textFrom(program.contact_phone, '')} /> : null}
-            </Card>
-          </>
-        )}
+        <SectionHeader title="Contact" />
+        <Card padding="md" style={styles.infoCard}>
+          <Detail label="Office" value="PESO Programs Desk" />
+        </Card>
 
         {program.has_attachment ? (
           <>

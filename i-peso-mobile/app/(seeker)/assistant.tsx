@@ -12,7 +12,7 @@ import {
 } from 'react-native'
 import { useRouter } from 'expo-router'
 import { useHeaderHeight } from '@react-navigation/elements'
-import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { LinearGradient } from 'expo-linear-gradient'
 import MaterialIcons from '@expo/vector-icons/MaterialIcons'
 import * as Haptics from 'expo-haptics'
@@ -25,6 +25,8 @@ import { AceMascot, type AceState } from '@/components/chat/AceMascot'
 import { AceAvatarMark } from '@/components/chat/AceAvatarMark'
 import { TypingDots } from '@/components/chat/TypingDots'
 import { PressableScale } from '@/components/ui/PressableScale'
+import { JobFeedCard } from '@/components/seeker/JobFeedCard'
+import { formatDate } from '@/utils/seekerView'
 import { colors, gradients, radii, shadows, spacing, typography } from '@/theme'
 
 /** Matches a bare URL or email address inside otherwise plain chat text. */
@@ -90,12 +92,13 @@ interface DisplayMessage extends ChatTurn {
   id: string
   retryable?: boolean
   officeLocation?: OfficeLocation | null
+  toolResults?: Record<string, any>
 }
 
 export default function AssistantScreen() {
   const router = useRouter()
   const headerHeight = useHeaderHeight()
-  const tabBarHeight = useBottomTabBarHeight()
+  const insets = useSafeAreaInsets()
   const m = useMotion()
   const user = useAuthStore((state) => state.user)
   const listRef = useRef<FlatList<DisplayMessage>>(null)
@@ -131,9 +134,9 @@ export default function AssistantScreen() {
     setSending(true)
     setAceState('thinking')
 
-    const { reply, retryable, officeLocation } = await chatbotService.askAssistant(trimmed, historyForRequest)
+    const { reply, retryable, officeLocation, toolResults } = await chatbotService.askAssistant(trimmed, historyForRequest)
 
-    setMessages((current) => [...current, { id: `${Date.now()}-model`, role: 'model', text: reply, retryable, officeLocation }])
+    setMessages((current) => [...current, { id: `${Date.now()}-model`, role: 'model', text: reply, retryable, officeLocation, toolResults }])
     setSending(false)
     setAceState(retryable ? 'error' : 'success')
     Haptics.notificationAsync(retryable ? Haptics.NotificationFeedbackType.Warning : Haptics.NotificationFeedbackType.Success)
@@ -144,14 +147,17 @@ export default function AssistantScreen() {
 
   const retryLastMessage = () => sendMessage(lastUserTextRef.current)
 
-  const onInputFocus = () => { if (!sending) setAceState('listening') }
+  const onInputFocus = () => {
+    if (!sending) setAceState('listening')
+    setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 100)
+  }
   const onInputBlur = () => { if (!sending) setAceState('idle') }
 
   return (
     <KeyboardAvoidingView
       style={styles.flex}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={headerHeight + tabBarHeight}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? headerHeight : 0}
     >
       <View style={styles.flex}>
         {/* ── Hero header with Ace ── */}
@@ -215,6 +221,37 @@ export default function AssistantScreen() {
                 <View style={styles.bubbleColumn}>
                   <View style={[styles.bubble, item.role === 'user' ? styles.userBubble : styles.modelBubble]}>
                     <Text style={textStyle}>{renderLinkedText(item.text, textStyle)}</Text>
+                    {item.role === 'model' && Boolean(item.toolResults?.search_job_vacancies?.vacancies?.length) && (
+                      <View style={{ marginTop: spacing.md, gap: spacing.sm }}>
+                        {item.toolResults?.search_job_vacancies?.vacancies?.slice(0, 3).map((job: any) => (
+                          <View key={job.post_id} style={{ marginHorizontal: -spacing.md, marginBottom: -spacing.md, paddingHorizontal: spacing.md }}>
+                            <JobFeedCard 
+                              job={job} 
+                              onPress={() => router.push(`/(seeker)/jobs/${job.post_id}`)} 
+                              onToggleSave={() => {}}
+                            />
+                          </View>
+                        ))}
+                      </View>
+                    )}
+                    {item.role === 'model' && Boolean(item.toolResults?.list_job_fairs?.upcoming_job_fairs?.length) && (
+                      <View style={{ marginTop: spacing.md, gap: spacing.sm }}>
+                        {item.toolResults?.list_job_fairs?.upcoming_job_fairs?.slice(0, 2).map((fair: any) => (
+                          <PressableScale 
+                            key={fair.job_fair_id} 
+                            style={styles.fairCard}
+                            scaleTo="buttonPress"
+                            onPress={() => router.push(`/(seeker)/job-fairs/${fair.job_fair_id}`)}
+                          >
+                            <MaterialIcons name="event" size={20} color={colors.info} />
+                            <View style={{ flex: 1 }}>
+                              <Text style={styles.fairCardTitle} numberOfLines={1}>{fair.title}</Text>
+                              <Text style={styles.fairCardDate} numberOfLines={1}>{formatDate(fair.start_date)}</Text>
+                            </View>
+                          </PressableScale>
+                        ))}
+                      </View>
+                    )}
                     {item.retryable ? (
                       <PressableScale scaleTo="buttonPress" ripple={null} onPress={retryLastMessage} disabled={sending} style={styles.retryBtn} accessibilityRole="button">
                         <MaterialIcons name="refresh" size={14} color={colors.info} />
@@ -252,33 +289,35 @@ export default function AssistantScreen() {
           }
         />
 
-        <View style={styles.inputBar}>
-          <TextInput
-            style={styles.input}
-            value={input}
-            onChangeText={setInput}
-            onFocus={onInputFocus}
-            onBlur={onInputBlur}
-            placeholder="Magtanong kay Ace…"
-            placeholderTextColor={colors.subtle}
-            maxLength={500}
-            editable={!sending}
-            multiline
-          />
-          <PressableScale
-            onPress={() => sendMessage(input)}
-            disabled={sending || !input.trim()}
-            scaleTo="buttonPress"
-            ripple={null}
-            style={[styles.sendBtn, (sending || !input.trim()) && styles.sendBtnDisabled]}
-            accessibilityRole="button"
-            accessibilityLabel="Send message"
-          >
-            <MaterialIcons name="send" size={20} color={colors.white} />
-          </PressableScale>
+        <View style={[styles.footerContainer, { paddingBottom: Math.max(insets.bottom, spacing.xs) }]}>
+          <View style={styles.inputBar}>
+            <TextInput
+              style={styles.input}
+              value={input}
+              onChangeText={setInput}
+              onFocus={onInputFocus}
+              onBlur={onInputBlur}
+              placeholder="Magtanong kay Ace…"
+              placeholderTextColor={colors.subtle}
+              maxLength={500}
+              editable={!sending}
+              multiline
+            />
+            <PressableScale
+              onPress={() => sendMessage(input)}
+              disabled={sending || !input.trim()}
+              scaleTo="buttonPress"
+              ripple={null}
+              style={[styles.sendBtn, (sending || !input.trim()) && styles.sendBtnDisabled]}
+              accessibilityRole="button"
+              accessibilityLabel="Send message"
+            >
+              <MaterialIcons name="send" size={20} color={colors.white} />
+            </PressableScale>
+          </View>
+          <Text style={styles.footerBrand}>Powered by iChitech</Text>
+          <Text style={styles.disclaimer}>Sagot batay sa impormasyon ng PESO. Huwag pong maglagay ng personal na impormasyon dito.</Text>
         </View>
-        <Text style={styles.footerBrand}>Powered by iChitech</Text>
-        <Text style={styles.disclaimer}>Sagot batay sa impormasyon ng PESO. Huwag pong maglagay ng personal na impormasyon dito.</Text>
       </View>
     </KeyboardAvoidingView>
   )
@@ -347,10 +386,32 @@ const styles = StyleSheet.create({
   chipGridLabel: { color: colors.textSecondary, fontSize: 11, fontFamily: typography.family.bold, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: spacing.xs },
   chip: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, borderWidth: 1, borderColor: colors.infoBorder, backgroundColor: colors.infoBackground, borderRadius: radii.md, paddingVertical: spacing.sm, paddingHorizontal: spacing.md },
   chipText: { flex: 1, color: colors.info, fontSize: typography.small, fontFamily: typography.family.medium },
-  inputBar: { flexDirection: 'row', alignItems: 'flex-end', gap: spacing.sm, paddingHorizontal: spacing.lg, paddingTop: spacing.sm, paddingBottom: spacing.xs, backgroundColor: colors.surface, borderTopWidth: 1, borderTopColor: colors.border },
-  input: { flex: 1, borderWidth: 1, borderColor: colors.border, borderRadius: radii.lg, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, color: colors.textPrimary, fontSize: typography.body, maxHeight: 120 },
+  footerContainer: {
+    backgroundColor: colors.surface,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    paddingTop: spacing.xs,
+  },
+  inputBar: { flexDirection: 'row', alignItems: 'flex-end', gap: spacing.sm, paddingHorizontal: spacing.lg, paddingBottom: spacing.xs },
+  input: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radii.lg,
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.sm,
+    color: colors.textPrimary,
+    fontSize: typography.body,
+    minHeight: 44,
+    maxHeight: 120,
+    textAlignVertical: 'center',
+  },
   sendBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.secondary, alignItems: 'center', justifyContent: 'center' },
   sendBtnDisabled: { backgroundColor: colors.border },
-  footerBrand: { color: colors.subtle, fontSize: 10, textAlign: 'center', paddingTop: spacing.xs, backgroundColor: colors.surface, fontFamily: typography.family.medium },
-  disclaimer: { color: colors.subtle, fontSize: 11, textAlign: 'center', paddingHorizontal: spacing.lg, paddingBottom: spacing.md, backgroundColor: colors.surface },
+  footerBrand: { color: colors.subtle, fontSize: 10, textAlign: 'center', paddingTop: 2, fontFamily: typography.family.bold },
+  disclaimer: { color: colors.subtle, fontSize: 11, textAlign: 'center', paddingHorizontal: spacing.lg, paddingTop: 2, paddingBottom: 2 },
+  fairCard: { flexDirection: 'row', gap: spacing.sm, alignItems: 'center', backgroundColor: colors.infoBackground, padding: spacing.md, borderRadius: radii.md, borderWidth: 1, borderColor: colors.infoBorder },
+  fairCardTitle: { color: colors.textPrimary, fontSize: typography.small, fontFamily: typography.family.bold },
+  fairCardDate: { color: colors.secondaryText, fontSize: typography.body, marginTop: 2 },
 })

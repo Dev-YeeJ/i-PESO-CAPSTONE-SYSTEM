@@ -125,7 +125,7 @@ function ProgramListRow({ program }) {
           <EligibilityBadge eligibility={program.eligibility} />
         </div>
         <h3 className="text-lg font-black text-slate-900 group-hover:text-blue-900 transition-colors">{program.title}</h3>
-        <p className="mt-1 line-clamp-1 text-sm text-slate-500">{program.short_description || program.description}</p>
+        <p className="mt-1 line-clamp-1 text-sm text-slate-500">{program.description}</p>
         {reasons.length > 0 && (
           // Named rather than merely flagged: a seeker who can see *why* can
           // fix a stale profile, or judge for themselves whether to ask PESO —

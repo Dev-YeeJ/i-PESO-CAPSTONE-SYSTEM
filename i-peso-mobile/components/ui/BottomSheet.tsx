@@ -157,6 +157,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderTopLeftRadius: radii.xl,
     borderTopRightRadius: radii.xl,
+    overflow: 'hidden',
     ...shadows.elevated,
   },
   grabberWrap: {

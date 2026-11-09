@@ -4,6 +4,7 @@ import {
   Modal,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
   type KeyboardTypeOptions,
@@ -12,6 +13,7 @@ import MaterialIcons from '@expo/vector-icons/MaterialIcons'
 import { TextField } from '@/components/ui/TextField'
 import { Button } from '@/components/ui/Button'
 import { colors, radii, spacing, typography } from '@/theme'
+
 
 // ── Server error helpers ───────────────────────────────────────────────────
 
@@ -84,6 +86,91 @@ export function Field({
       editable={editable}
       help={help}
     />
+  )
+}
+
+// ── Spinner Field (Web-like number input) ─────────────────────────────────
+
+export function SpinnerField({
+  label,
+  value,
+  onChange,
+  min = 0,
+  max,
+  error,
+  required = false,
+  help,
+}: {
+  label: string
+  value: string
+  onChange: (value: string) => void
+  min?: number
+  max?: number
+  error?: string
+  required?: boolean
+  help?: string
+}) {
+  const numValue = value === '' ? min : Number(value)
+
+  const decrement = () => {
+    if (numValue > min) {
+      onChange(String(numValue - 1))
+    }
+  }
+
+  const increment = () => {
+    if (max === undefined || numValue < max) {
+      onChange(String(numValue + 1))
+    }
+  }
+
+  const atMin = numValue <= min
+  const atMax = max !== undefined && numValue >= max
+
+  const handleTextChange = (text: string) => {
+    const digits = text.replace(/\D/g, '')
+    if (digits === '') {
+      onChange('')
+      return
+    }
+    const val = Number(digits)
+    if (val < min) {
+      onChange(String(min))
+    } else if (max !== undefined && val > max) {
+      onChange(String(max))
+    } else {
+      onChange(String(val))
+    }
+  }
+
+  return (
+    <View style={styles.field}>
+      <Text style={styles.label}>
+        {label}
+        {required ? <Text style={styles.required}> *</Text> : null}
+      </Text>
+      <View style={[styles.input, styles.spinnerInputContainer, error ? styles.inputError : null]}>
+        <TextInput
+          style={styles.spinnerInput}
+          value={value}
+          onChangeText={handleTextChange}
+          keyboardType="number-pad"
+        />
+        <View style={styles.spinnerControls}>
+          <TouchableOpacity onPress={increment} disabled={atMax} style={[styles.spinnerArrow, styles.spinnerArrowTop]} activeOpacity={0.7}>
+            <MaterialIcons name="arrow-drop-up" size={24} color={atMax ? colors.muted : colors.primary} />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={decrement} disabled={atMin} style={styles.spinnerArrow} activeOpacity={0.7}>
+            <MaterialIcons name="arrow-drop-down" size={24} color={atMin ? colors.muted : colors.primary} />
+          </TouchableOpacity>
+        </View>
+      </View>
+      {error ? (
+        <Text style={styles.errorText}>{error}</Text>
+      ) : help ? (
+        <Text style={styles.hint}>{help}</Text>
+      ) : null}
+    </View>
   )
 }
 
@@ -342,10 +429,10 @@ const styles = StyleSheet.create({
   choiceActive: { borderColor: colors.info, backgroundColor: colors.infoBackground },
   choiceText: { color: colors.muted, fontSize: typography.small, fontFamily: typography.family.bold, textTransform: 'capitalize' },
   choiceTextActive: { color: colors.info },
-  sectionTitle: { color: colors.primary, fontSize: typography.title, fontFamily: typography.family.bold },
+  sectionTitle: { flex: 1, color: colors.primary, fontSize: typography.title, fontFamily: typography.family.bold },
   hint: { color: colors.secondaryText, fontSize: typography.small, lineHeight: 18, marginBottom: spacing.md },
   repeatableSection: { marginTop: spacing.sm, marginBottom: spacing.lg },
-  repeatableHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.sm },
+  repeatableHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.sm },
   emptyText: { color: colors.secondaryText, fontSize: typography.small, fontStyle: 'italic', marginBottom: spacing.sm },
   repeatableItem: { borderWidth: 1, borderColor: colors.border, borderRadius: radii.lg, padding: spacing.lg, backgroundColor: colors.surface, marginBottom: spacing.md },
   repeatableItemHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.sm },
@@ -365,4 +452,9 @@ const styles = StyleSheet.create({
   selectOptionTextActive: { color: colors.info, fontFamily: typography.family.bold },
   selectCloseBtn: { marginTop: spacing.md, alignItems: 'center', paddingVertical: spacing.md },
   selectCloseBtnText: { color: colors.muted, fontSize: typography.body, fontFamily: typography.family.bold },
+  spinnerInputContainer: { flexDirection: 'row', paddingVertical: 0, paddingHorizontal: 0, overflow: 'hidden' },
+  spinnerInput: { flex: 1, paddingHorizontal: spacing.lg, paddingVertical: spacing.md, color: colors.primary, fontSize: typography.body },
+  spinnerControls: { width: 40, borderLeftWidth: 1, borderColor: colors.border, backgroundColor: colors.background },
+  spinnerArrow: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  spinnerArrowTop: { borderBottomWidth: 1, borderColor: colors.border },
 })

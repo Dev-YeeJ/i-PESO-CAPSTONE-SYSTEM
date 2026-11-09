@@ -1,4 +1,4 @@
-import { StyleSheet, View, Text, type StyleProp, type ViewStyle } from 'react-native'
+import { StyleSheet, View, Text, type StyleProp, type ViewStyle, type LayoutChangeEvent } from 'react-native'
 import { colors, spacing, typography } from '@/theme'
 
 interface SectionHeaderProps {
@@ -8,11 +8,12 @@ interface SectionHeaderProps {
    * ScrollView content is deliberately unpadded (a full-bleed hero image) so the header still
    * lines up with the padded cards below it. */
   style?: StyleProp<ViewStyle>
+  onLayout?: (event: LayoutChangeEvent) => void
 }
 
-export function SectionHeader({ title, action, style }: SectionHeaderProps) {
+export function SectionHeader({ title, action, style, onLayout }: SectionHeaderProps) {
   return (
-    <View style={[styles.container, style]}>
+    <View style={[styles.container, style]} onLayout={onLayout}>
       <Text style={styles.title}>{title}</Text>
       {action}
     </View>
