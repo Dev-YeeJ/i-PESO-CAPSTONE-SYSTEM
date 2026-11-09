@@ -287,7 +287,7 @@ class JobFairController extends Controller
 
         if ($attendee->is_attended) {
             return response()->json([
-                'message' => 'Already checked in.',
+                'message' => 'Already registered.',
                 'status' => 'already_checked_in',
                 'attendee' => $service->attendeeProfile($attendee),
             ]);
@@ -296,7 +296,7 @@ class JobFairController extends Controller
         $attendee->forceFill(['scanned_at' => now(), 'is_attended' => true])->save();
 
         return response()->json([
-            'message' => 'Checked in.',
+            'message' => 'Registered.',
             'status' => 'checked_in',
             'attendee' => $service->attendeeProfile($attendee),
         ]);
@@ -372,7 +372,7 @@ class JobFairController extends Controller
         ]);
 
         return response()->json([
-            'message' => 'Walk-in registration encoded and checked in.',
+            'message' => 'Walk-in registered.',
             'status' => 'checked_in',
             'attendee' => $service->attendeeProfile($attendee),
         ], 201);

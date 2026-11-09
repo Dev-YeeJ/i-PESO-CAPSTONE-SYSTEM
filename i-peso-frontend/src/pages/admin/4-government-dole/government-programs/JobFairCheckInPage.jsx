@@ -18,7 +18,7 @@ function formatTime(iso) {
 }
 
 function formatDateTime(iso) {
-  if (!iso) return 'Not checked in'
+  if (!iso) return 'Not yet registered'
   return new Date(iso).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })
 }
 
@@ -117,7 +117,7 @@ export default function JobFairCheckInPage() {
         setResult({ kind: 'not_found' })
         lockedRef.current = false
       } else {
-        setLookupError(e.response?.data?.message ?? 'Check-in failed.')
+        setLookupError(e.response?.data?.message ?? 'Registration failed.')
         lockedRef.current = false
       }
     }
@@ -223,7 +223,7 @@ export default function JobFairCheckInPage() {
       <section className="grid grid-cols-2 gap-3">
         <Card padding="sm">
           <p className="text-2xl font-black text-slate-950">{counts.attendance}</p>
-          <p className="text-xs font-bold text-slate-500">Checked in</p>
+          <p className="text-xs font-bold text-slate-500">Registered</p>
         </Card>
         <Card padding="sm">
           <p className="text-2xl font-black text-slate-950">{counts.rsvps}</p>
@@ -251,12 +251,12 @@ export default function JobFairCheckInPage() {
             <input value={walkIn.guest_email} onChange={(e) => setWalkIn((w) => ({ ...w, guest_email: e.target.value }))} placeholder="Email address" className="rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm focus:border-brand-navy focus:outline-none focus:ring-2 focus:ring-brand-navy/10" />
             <input value={walkIn.guest_preferred_job} onChange={(e) => setWalkIn((w) => ({ ...w, guest_preferred_job: e.target.value }))} placeholder="Preferred job" className="rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm focus:border-brand-navy focus:outline-none focus:ring-2 focus:ring-brand-navy/10" />
             <input value={walkIn.guest_educ_attainment} onChange={(e) => setWalkIn((w) => ({ ...w, guest_educ_attainment: e.target.value }))} placeholder="Educational attainment" className="rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm focus:border-brand-navy focus:outline-none focus:ring-2 focus:ring-brand-navy/10" />
-            <Button type="submit" disabled={encoding || !walkIn.guest_name.trim()} icon={UserPlus}>{encoding ? 'Saving...' : 'Save and check in'}</Button>
+            <Button type="submit" disabled={encoding || !walkIn.guest_name.trim()} icon={UserPlus}>{encoding ? 'Saving...' : 'Save and register'}</Button>
           </form>
         )}
       </Card>
 
-      {lookupError && <AlertBox variant="danger" title="Check-in failed">{lookupError}</AlertBox>}
+      {lookupError && <AlertBox variant="danger" title="Registration failed">{lookupError}</AlertBox>}
 
       <AnimatePresence mode="wait">
         {!result && (
@@ -296,7 +296,7 @@ export default function JobFairCheckInPage() {
             transition={{ type: 'spring', stiffness: 300, damping: 25 }}
           >
             <Card className="border-emerald-200 shadow-xl shadow-emerald-900/5">
-              <Badge variant="approved" className="mb-3 border-emerald-300">Checked in just now</Badge>
+              <Badge variant="approved" className="mb-3 border-emerald-300">Registered just now</Badge>
               <AttendeeCard attendee={result.attendee} />
               <Button className="mt-6 w-full shadow-md" onClick={scanNext}>Scan next</Button>
             </Card>
@@ -312,7 +312,7 @@ export default function JobFairCheckInPage() {
           >
             <Card className="border-amber-200 shadow-xl shadow-amber-900/5">
               <Badge variant="pending" className="mb-3 border-amber-300">
-                Already checked in {result.attendee?.scanned_at ? `at ${formatTime(result.attendee.scanned_at)}` : ''}
+                Already registered {result.attendee?.scanned_at ? `at ${formatTime(result.attendee.scanned_at)}` : ''}
               </Badge>
               <AttendeeCard attendee={result.attendee} />
               <Button className="mt-6 w-full shadow-md" onClick={scanNext}>Scan next</Button>
@@ -399,7 +399,7 @@ export default function JobFairCheckInPage() {
                 className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm focus:border-brand-navy focus:outline-none focus:ring-2 focus:ring-brand-navy/10"
               />
               <Button type="submit" disabled={encoding || !walkIn.guest_name.trim()} className="w-full shadow-md mt-4">
-                {encoding ? 'Registering…' : 'Register & check in'}
+                {encoding ? 'Registering…' : 'Register'}
               </Button>
             </form>
           </Card>
@@ -418,7 +418,7 @@ export default function JobFairCheckInPage() {
               {[
                 ['all', `All (${roster.length})`],
                 ['pre_registered', `Waiting (${roster.filter((row) => !row.is_attended).length})`],
-                ['checked_in', `Checked in (${roster.filter((row) => row.is_attended).length})`],
+                ['checked_in', `Registered (${roster.filter((row) => row.is_attended).length})`],
               ].map(([value, label]) => (
                 <button key={value} type="button" onClick={() => setRosterFilter(value)} className={`rounded-full px-3 py-1.5 text-xs font-bold transition ${rosterFilter === value ? 'bg-brand-navy text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
                   {label}
@@ -439,13 +439,13 @@ export default function JobFairCheckInPage() {
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
                     <p className="font-bold text-slate-950">{attendee.name || 'Unnamed attendee'}</p>
-                    <Badge variant={attendee.is_attended ? 'approved' : 'pending'}>{attendee.is_attended ? 'Checked in' : 'Pre-registered'}</Badge>
+                    <Badge variant={attendee.is_attended ? 'approved' : 'pending'}>{attendee.is_attended ? 'Registered' : 'Pre-registered'}</Badge>
                     {attendee.is_guest && <Badge variant="info">Walk-in</Badge>}
                   </div>
                   <p className="mt-1 text-sm text-slate-500">{attendee.mobile_number || 'No mobile number'}{attendee.email ? ` · ${attendee.email}` : ''}</p>
-                  <p className="mt-1 text-xs text-slate-400">{attendee.is_attended ? `Checked in ${formatDateTime(attendee.scanned_at)}` : 'Waiting at registration'}</p>
+                  <p className="mt-1 text-xs text-slate-400">{attendee.is_attended ? `Registered ${formatDateTime(attendee.scanned_at)}` : 'Waiting at registration'}</p>
                 </div>
-                {!attendee.is_attended && <Button size="sm" onClick={() => checkIn({ attendee_id: attendee.id })}>Check in</Button>}
+                {!attendee.is_attended && <Button size="sm" onClick={() => checkIn({ attendee_id: attendee.id })}>Register</Button>}
               </div>
             ))}
           </div>

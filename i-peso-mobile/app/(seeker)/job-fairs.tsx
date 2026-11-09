@@ -62,7 +62,7 @@ export default function JobFairsScreen() {
       >
         <Text style={styles.kicker}>PESO Bulletin</Text>
         <Text style={styles.subtitle}>
-          Register for a digital QR pass to make check-in faster, or simply walk in on the day.
+          Register for a digital QR pass to get registered faster at the venue, or simply walk in on the day.
         </Text>
 
         <QueryState
