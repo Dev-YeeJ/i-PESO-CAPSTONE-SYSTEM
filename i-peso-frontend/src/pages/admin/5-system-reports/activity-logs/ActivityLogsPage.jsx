@@ -1,12 +1,14 @@
 import { useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
+import { toast } from 'sonner'
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
-import { Activity, CalendarClock, Download, RefreshCw, RotateCcw, ShieldAlert, Users } from 'lucide-react'
+import { Activity, CalendarClock, Download, RefreshCw, RotateCcw, ShieldAlert, UserRound, Users, X } from 'lucide-react'
 import { Badge, Button, Card, StatCard } from '@/components/ui'
 import PageHeader from '@/pages/admin/_components/PageHeader'
 import DataTable from '@/pages/admin/_components/DataTable'
 import { adminService } from '@/services/adminService'
 
-const emptyFilters = { search: '', action: '', user_type: '', date_from: '', date_to: '' }
+const emptyFilters = { search: '', action: '', user_type: '', user_id: '', date_from: '', date_to: '' }
 const PER_PAGE = 20
 
 // Severity comes from the API so the badge tone matches the backend's own
@@ -19,9 +21,17 @@ const severityBadge = {
 }
 
 export default function ActivityLogPage() {
-  const [filters, setFilters] = useState(emptyFilters)
-  const [draft, setDraft] = useState(emptyFilters)
+  // A staff profile links here as ?user_type=administrator&user_id=12 to show one person's activity.
+  const [searchParams, setSearchParams] = useSearchParams()
+  const initialFilters = {
+    ...emptyFilters,
+    user_type: searchParams.get('user_type') ?? '',
+    user_id: searchParams.get('user_type') ? (searchParams.get('user_id') ?? '') : '',
+  }
+  const [filters, setFilters] = useState(initialFilters)
+  const [draft, setDraft] = useState(initialFilters)
   const [page, setPage] = useState(1)
+  const [exporting, setExporting] = useState(false)
 
   const { data, isFetching, isError, error, refetch } = useQuery({
     queryKey: ['admin', 'activityLogs', filters, page],
@@ -50,9 +60,44 @@ export default function ActivityLogPage() {
     setDraft(emptyFilters)
     setFilters(emptyFilters)
     setPage(1)
+    setSearchParams({}, { replace: true })
   }
 
-  const updateDraft = (key, value) => setDraft((current) => ({ ...current, [key]: value }))
+  // Narrow the log to one person (from a name in the table).
+  const showPerson = (row) => {
+    const next = { ...filters, user_type: row.user_type, user_id: String(row.user_id) }
+    setFilters(next)
+    setDraft(next)
+    setPage(1)
+  }
+
+  const clearPerson = () => {
+    const next = { ...filters, user_type: '', user_id: '' }
+    setFilters(next)
+    setDraft(next)
+    setPage(1)
+    setSearchParams({}, { replace: true })
+  }
+
+  const exportAll = async () => {
+    setExporting(true)
+    try {
+      const blob = await adminService.exportActivityLogs(filters)
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `activity-log-${new Date().toISOString().slice(0, 10)}.csv`
+      link.click()
+      URL.revokeObjectURL(url)
+    } catch {
+      toast.error('The activity log could not be exported. Please try again.')
+    } finally {
+      setExporting(false)
+    }
+  }
+
+  // Picking another user type drops the one-person filter that belonged to the old type.
+  const updateDraft = (key, value) => setDraft((current) => ({ ...current, [key]: value, ...(key === 'user_type' ? { user_id: '' } : {}) }))
 
   const errorMessage = isError
     ? (error?.response?.data?.message ?? 'Unable to load activity logs.')
@@ -62,13 +107,23 @@ export default function ActivityLogPage() {
     <div className="portal-page">
       <PageHeader
         title="Activity Log"
-        subtitle="Monitor system activity, user actions, and security events."
+        subtitle="Everything job seekers, employers, PESO staff and interns do in i-PESO, including who opened whose personal data."
         eyebrow="System & Reports"
         actions={[
           { label: 'Refresh', icon: RefreshCw, variant: 'outline', onClick: () => refetch() },
-          { label: 'Export page (CSV)', icon: Download, variant: 'outline', onClick: () => exportCsv(logs) },
+          { label: exporting ? 'Exporting…' : 'Export to CSV', icon: Download, variant: 'outline', onClick: () => !exporting && exportAll() },
         ]}
       />
+
+      {data?.actor && (
+        <div className="mt-4 flex flex-wrap items-center gap-3 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
+          <UserRound className="h-4 w-4" />
+          <span>Showing activity for <strong>{data.actor.name}</strong> · {data.actor.role}</span>
+          <button type="button" onClick={clearPerson} className="ml-auto inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-bold text-blue-800 hover:bg-blue-100">
+            <X className="h-3.5 w-3.5" /> Show everyone
+          </button>
+        </div>
+      )}
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard
@@ -163,8 +218,19 @@ export default function ActivityLogPage() {
               label: 'Actor',
               render: (value, row) => (
                 <div>
-                  <p className="font-semibold text-slate-900">{value || 'Unknown'}</p>
-                  <p className="text-xs text-slate-500">{row.user_type_label}</p>
+                  {row.user_type === 'guest' ? (
+                    <p className="font-semibold text-slate-900">{value || 'Unknown'}</p>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => showPerson(row)}
+                      title="Show only this person's activity"
+                      className="text-left font-semibold text-slate-900 hover:text-brand-navy hover:underline focus-visible:rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-navy/40"
+                    >
+                      {value || 'Unknown'}
+                    </button>
+                  )}
+                  <p className="text-xs text-slate-500">{row.actor_role ?? row.user_type_label}</p>
                 </div>
               ),
             },
@@ -262,31 +328,4 @@ function relativeTime(value) {
     amount /= step
   }
   return ''
-}
-
-function exportCsv(logs) {
-  if (!logs.length) return
-
-  const header = ['Timestamp', 'User Type', 'Actor', 'Action', 'Description', 'IP Address']
-  const rows = logs.map((log) => [
-    formatDate(log.created_at),
-    log.user_type_label,
-    log.actor_name,
-    log.action,
-    log.description,
-    log.ip_address,
-  ])
-
-  const csv = [header, ...rows]
-    .map((row) => row.map((cell) => `"${String(cell ?? '').replaceAll('"', '""')}"`).join(','))
-    .join('\r\n')
-
-  // Leading BOM so Excel opens the file as UTF-8.
-  const BOM = String.fromCharCode(0xFEFF)
-  const url = URL.createObjectURL(new Blob([BOM + csv], { type: 'text/csv;charset=utf-8;' }))
-  const link = document.createElement('a')
-  link.href = url
-  link.download = `activity-log-${new Date().toISOString().slice(0, 10)}.csv`
-  link.click()
-  URL.revokeObjectURL(url)
 }

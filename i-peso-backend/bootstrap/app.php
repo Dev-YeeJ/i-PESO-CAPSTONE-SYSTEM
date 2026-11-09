@@ -4,6 +4,7 @@ use App\Http\Middleware\EnsureAdministrator;
 use App\Http\Middleware\EnsureAdminPermission;
 use App\Http\Middleware\EnsureSystemAdministrator;
 use App\Http\Middleware\EnsureVerifiedEmployer;
+use App\Http\Middleware\RecordActivity;
 use App\Http\Middleware\SecurityHeaders;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -24,6 +25,9 @@ return Application::configure(basePath: dirname(__DIR__))
         // no default limiter at all — not Laravel's usual 60/min, literally
         // none — so routes with no explicit throttle are wide open.
         $middleware->throttleApi();
+
+        // Every signed-in user's changes (and personal-data views) go to the activity log.
+        $middleware->appendToGroup('api', RecordActivity::class);
 
         $middleware->alias([
             'admin' => EnsureAdministrator::class,

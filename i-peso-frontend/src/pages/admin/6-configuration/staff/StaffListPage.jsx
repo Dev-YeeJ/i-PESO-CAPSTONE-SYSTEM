@@ -9,7 +9,7 @@ import StatCard from '@/pages/admin/_components/StatCard'
 import DataTable from '@/pages/admin/_components/DataTable'
 import { staffService } from '@/services/staffService'
 import { useAuthStore } from '@/stores/authStore'
-import { isSystemAdministrator } from '@/utils/adminAccess'
+import { canOpen, isSystemAdministrator } from '@/utils/adminAccess'
 import StaffFormDialog from './components/StaffFormDialog'
 import StaffDetailDialog from './components/StaffDetailDialog'
 import TemporaryPasswordDialog from './components/TemporaryPasswordDialog'
@@ -43,7 +43,7 @@ export default function StaffListPage() {
     active: staff.filter((member) => member.account_status === 'active').length,
     invited: staff.filter((member) => member.account_status === 'invited' || member.account_status === 'invite_expired').length,
     interns: staff.filter((member) => member.position === 'ojt_intern' && member.status === 'active').length,
-    deactivated: staff.filter((member) => member.account_status === 'deactivated').length,
+    deactivated: staff.filter((member) => member.account_status === 'deactivated' || member.account_status === 'internship_ended').length,
   }), [staff])
 
   const filtered = useMemo(() => {
@@ -206,6 +206,7 @@ export default function StaffListPage() {
         staff={selected}
         employmentTypes={employmentTypes}
         canManageAccounts={canManageAccounts}
+        canViewActivity={canOpen(user, 'activity_logs')}
         isSelf={selected?.id === user?.id}
         onOpenChange={(open) => !open && setSelectedId(null)}
         onEdit={() => { setForm({ staff: selected }); setSelectedId(null) }}

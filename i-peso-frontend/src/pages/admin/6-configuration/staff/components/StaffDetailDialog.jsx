@@ -1,15 +1,17 @@
 import { useState } from 'react'
-import { useMutation } from '@tanstack/react-query'
+import { Link } from 'react-router-dom'
+import { useMutation, useQuery } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { KeyRound, Pencil, UserCheck, UserX } from 'lucide-react'
 import { Badge, Button, ConfirmDialog } from '@/components/ui'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { staffService } from '@/services/staffService'
+import { adminService } from '@/services/adminService'
 import { ACCESS_LABELS, MODULE_LABELS } from '@/utils/adminAccess'
 import { accountStatus, errorMessage, formatDate, formatDateTime, initialsOf } from '../staffDisplay'
 
 /** One staff member's profile, with the system administrator's account actions. */
-export default function StaffDetailDialog({ staff, employmentTypes, canManageAccounts, isSelf, onOpenChange, onEdit, onChanged }) {
+export default function StaffDetailDialog({ staff, employmentTypes, canManageAccounts, canViewActivity, isSelf, onOpenChange, onEdit, onChanged }) {
   const [confirm, setConfirm] = useState(null)
   const open = !!staff
 
@@ -53,7 +55,9 @@ export default function StaffDetailDialog({ staff, employmentTypes, canManageAcc
     },
     reactivate: {
       title: `Reactivate ${staff.name}?`,
-      description: 'They will be able to sign in again with their existing password.',
+      description: staff.account_status === 'internship_ended'
+        ? 'If the internship was extended, edit the end date first. They will be able to sign in again with their existing password.'
+        : 'They will be able to sign in again with their existing password.',
       confirmLabel: 'Reactivate account',
       variant: 'primary',
     },
@@ -97,6 +101,19 @@ export default function StaffDetailDialog({ staff, employmentTypes, canManageAcc
             <Detail label="Account created" value={formatDate(staff.created_at)} />
           </dl>
 
+          {staff.internship && (
+            <div className="rounded-xl border border-blue-200 bg-blue-50/50 p-4">
+              <h3 className="text-sm font-bold text-blue-900">Internship</h3>
+              <dl className="mt-3 grid gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
+                <Detail label="School" value={staff.internship.school} />
+                <Detail label="Course" value={staff.internship.course} />
+                <Detail label="Required hours" value={staff.internship.required_hours ? `${staff.internship.required_hours} hours` : null} />
+                <Detail label="Dates" value={staff.internship.start_date ? `${formatDate(staff.internship.start_date)} – ${formatDate(staff.internship.end_date)}` : null} />
+              </dl>
+              <p className="mt-3 text-xs text-blue-800">Hours and the daily time record are in Configuration → OJT / Interns.</p>
+            </div>
+          )}
+
           <div>
             <h3 className="text-sm font-bold text-slate-900">What they can open</h3>
             {staff.is_system_administrator ? (
@@ -114,6 +131,8 @@ export default function StaffDetailDialog({ staff, employmentTypes, canManageAcc
               <p className="mt-1 text-sm text-slate-600">Only the dashboard. Their role has no modules yet.</p>
             )}
           </div>
+
+          {canViewActivity && <RecentActivity staff={staff} />}
 
           {canManageAccounts && !isSelf && (
             <div className="flex flex-wrap gap-2 border-t border-slate-200 pt-4">
@@ -152,6 +171,43 @@ export default function StaffDetailDialog({ staff, employmentTypes, canManageAcc
         onConfirm={() => run.mutate({ action: confirm })}
       />
     </>
+  )
+}
+
+/** The last few things this person did, with a link to their full activity. */
+function RecentActivity({ staff }) {
+  const { data, isLoading } = useQuery({
+    queryKey: ['admin', 'activityLogs', 'staff', staff.id],
+    queryFn: () => adminService.getActivityLogs({ user_type: 'administrator', user_id: staff.id, per_page: 5 }),
+  })
+  const logs = data?.logs?.data ?? []
+
+  return (
+    <div>
+      <div className="flex items-center justify-between gap-3">
+        <h3 className="text-sm font-bold text-slate-900">Recent activity</h3>
+        <Link
+          to={`/admin/activity-logs?user_type=administrator&user_id=${staff.id}`}
+          className="text-xs font-bold text-brand-navy hover:underline"
+        >
+          See all activity →
+        </Link>
+      </div>
+      {isLoading ? (
+        <p className="mt-2 text-sm text-slate-500">Loading…</p>
+      ) : logs.length === 0 ? (
+        <p className="mt-2 text-sm text-slate-500">Nothing recorded yet.</p>
+      ) : (
+        <ul className="mt-2 divide-y divide-slate-100 rounded-xl border border-slate-200">
+          {logs.map((log) => (
+            <li key={log.log_id} className="px-3 py-2 text-sm">
+              <p className="text-slate-800">{log.description || log.action}</p>
+              <p className="mt-0.5 text-xs text-slate-500">{formatDateTime(log.created_at)}</p>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   )
 }
 

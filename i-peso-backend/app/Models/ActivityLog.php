@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
+use App\Support\StaffPositions;
 use Illuminate\Support\Str;
 
 class ActivityLog extends Model
@@ -96,8 +97,8 @@ class ActivityLog extends Model
     public function getSeverityAttribute(): string
     {
         return match (true) {
-            (bool) preg_match('/(failed|rejected|deleted|revoked|suspended|cancelled)/', $this->action) => 'critical',
-            (bool) preg_match('/(login|logout|registered|password|verified|downloaded)/', $this->action) => 'security',
+            (bool) preg_match('/(failed|rejected|deleted|revoked|suspended|cancelled|deactivated|blocked|cleared|removed)/', $this->action) => 'critical',
+            (bool) preg_match('/(login|logout|registered|password|verified|downloaded|viewed|exported|opened|role|staff)/', $this->action) => 'security',
             (bool) preg_match('/(approved|created|posted|applied|submitted|finalized)/', $this->action) => 'success',
             default => 'normal',
         };
@@ -115,11 +116,21 @@ class ActivityLog extends Model
         foreach ($logs->groupBy('user_type') as $userType => $group) {
             $names = self::resolveNames((string) $userType, $group->pluck('user_id')->unique()->all());
 
+            $roles = $userType === Administrator::class
+                ? Administrator::query()
+                    ->whereIn('admin_id', $group->pluck('user_id')->unique()->all())
+                    ->get(['admin_id', 'position'])
+                    ->mapWithKeys(fn (Administrator $admin) => [$admin->admin_id => StaffPositions::label($admin->position) ?? 'PESO staff'])
+                    ->all()
+                : [];
+
             foreach ($group as $log) {
                 $log->setAttribute(
                     'actor_name',
                     $names[$log->user_id] ?? self::fallbackName((string) $userType, $log->user_id)
                 );
+                // What the person is: their position for staff, otherwise the account type.
+                $log->setAttribute('actor_role', $roles[$log->user_id] ?? self::ACTOR_TYPES[$userType] ?? 'Guest');
             }
         }
     }
