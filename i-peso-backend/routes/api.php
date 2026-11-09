@@ -14,6 +14,7 @@ use App\Http\Controllers\Api\Admin\AdminEstablishmentReportController;
 use App\Http\Controllers\Api\Admin\AdminGovernmentProgramController;
 use App\Http\Controllers\Api\Admin\AdminHiringActivityReportController;
 use App\Http\Controllers\Api\Admin\AdminPlacementReportController;
+use App\Http\Controllers\Api\Admin\AdminAccountController;
 use App\Http\Controllers\Api\Admin\AdminRoleController;
 use App\Http\Controllers\Api\Admin\AdminStaffController;
 use App\Http\Controllers\Api\Admin\LocationDataQualityController;
@@ -220,6 +221,12 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Admin endpoints (protected by auth:sanctum + Administrator model check)
     Route::prefix('admin')->middleware('admin')->group(function () {
+        // The signed-in staff member's own password — the only admin route
+        // open while a temporary password is still in use.
+        Route::post('/account/password', [AdminAccountController::class, 'changePassword'])
+            ->middleware('throttle:10,1')
+            ->name('admin.account.password');
+
         // Dashboard — visible to every signed-in admin/staff account, no module gate
         Route::get('/dashboard/stats', [AdminDashboardController::class, 'stats']);
 
@@ -237,6 +244,11 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::post('/sms-notifications/{smsNotification}/retry', [AdminSmsNotificationController::class, 'retry']);
             Route::get('/location-data-quality/metrics', [LocationDataQualityController::class, 'metrics']);
             Route::get('/location-data-quality/analytics', [LocationDataQualityController::class, 'analytics']);
+        });
+
+        // Its own module so aides with Reports access don't see everyone's
+        // activity; the Office Manager gets view, the system administrator all.
+        Route::middleware('admin.permission:activity_logs')->group(function () {
             Route::get('/activity-logs', [AdminActivityController::class, 'index']);
         });
 
@@ -261,7 +273,10 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::post('/employers/{id}/reject', [EmployerVerificationController::class, 'rejectEmployer']);
             Route::post('/employers/{id}/finalize', [EmployerVerificationController::class, 'finalizeVerification']);
             Route::get('/documents/{document}/view', [EmployerVerificationController::class, 'viewDocument']);
-            Route::post('/documents/{document}/download', [EmployerVerificationController::class, 'downloadDocument']);
+            // Downloads through POST, but only reads: view-only accounts may use it.
+            Route::post('/documents/{document}/download', [EmployerVerificationController::class, 'downloadDocument'])
+                ->withoutMiddleware('admin.permission:constituent_crm')
+                ->middleware('admin.permission:constituent_crm,view');
             Route::post('/documents/{id}/review', [EmployerVerificationController::class, 'reviewDocument']);
             Route::get('/employers/stats', [EmployerVerificationController::class, 'getStats']);
 
@@ -339,7 +354,9 @@ Route::middleware('auth:sanctum')->group(function () {
             // Reports
             Route::get('/reports/establishment-report/preview', [AdminEstablishmentReportController::class, 'preview']);
             Route::get('/reports/hiring-activity/preview', [AdminHiringActivityReportController::class, 'preview']);
-            Route::post('/reports/hiring-activity/export', [AdminHiringActivityReportController::class, 'export']);
+            Route::post('/reports/hiring-activity/export', [AdminHiringActivityReportController::class, 'export'])
+                ->withoutMiddleware('admin.permission:government_dole')
+                ->middleware('admin.permission:government_dole,view');
 
             // Placement Report review + approval (employer-submitted spreadsheet imports)
             Route::get('/placement-reports/compliance', [AdminPlacementReportController::class, 'compliance']);
@@ -362,13 +379,25 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::delete('/reports/{id}', [AdminReportController::class, 'destroy']);
         });
 
+        // Viewing staff, roles and the org chart: Configuration access
+        // (the Office Manager has view).
         Route::middleware('admin.permission:configuration')->group(function () {
             Route::get('/staff', [AdminStaffController::class, 'index']);
+            Route::get('/staff/org-chart', [AdminStaffController::class, 'orgChart']);
+            Route::get('/roles', [AdminRoleController::class, 'index']);
+        });
+
+        // Changing accounts or roles is reserved for the system administrator,
+        // whatever their Configuration access. Staff are deactivated, never
+        // deleted, so the job fairs, programs and reports they created are kept.
+        Route::middleware('admin.system')->group(function () {
             Route::post('/staff', [AdminStaffController::class, 'store']);
             Route::put('/staff/{staffMember}', [AdminStaffController::class, 'update']);
-            Route::delete('/staff/{staffMember}', [AdminStaffController::class, 'destroy']);
+            Route::post('/staff/{staffMember}/deactivate', [AdminStaffController::class, 'deactivate']);
+            Route::post('/staff/{staffMember}/reactivate', [AdminStaffController::class, 'reactivate']);
+            Route::post('/staff/{staffMember}/send-password', [AdminStaffController::class, 'sendPassword'])
+                ->middleware('throttle:10,1');
 
-            Route::get('/roles', [AdminRoleController::class, 'index']);
             Route::post('/roles', [AdminRoleController::class, 'store']);
             Route::put('/roles/{role}', [AdminRoleController::class, 'update']);
             Route::delete('/roles/{role}', [AdminRoleController::class, 'destroy']);

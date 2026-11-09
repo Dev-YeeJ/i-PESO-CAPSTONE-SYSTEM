@@ -93,6 +93,15 @@ export function RequireRole({ role }) {
   return <Outlet />
 }
 
+// A staff member still on an emailed temporary password must set their own
+// before any admin page opens. The API enforces this too (403 with
+// must_change_password); this just sends them to the right screen.
+export function RequirePasswordSet({ children }) {
+  const user = useAuthStore((s) => s.user)
+  if (user?.must_change_password) return <Navigate to="/admin/set-password" replace />
+  return children ?? <Outlet />
+}
+
 export function GuestOnly() {
   const isInitialized   = useAuthStore((s) => s.isInitialized)
   const token           = useAuthStore((s) => s.token)

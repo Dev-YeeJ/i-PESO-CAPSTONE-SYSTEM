@@ -58,6 +58,10 @@ export default function AdminLoginPage() {
       })
       localStorage.setItem('ipeso_token', data.token)
       await new Promise((resolve) => setTimeout(resolve, 50))
+      if (data.user.must_change_password) {
+        navigate('/admin/set-password', { replace: true })
+        return
+      }
       const redirect = new URLSearchParams(location.search).get('redirect')
       navigate(redirect ?? '/admin/dashboard', { replace: true })
     } catch (error) {

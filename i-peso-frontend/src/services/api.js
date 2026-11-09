@@ -65,6 +65,14 @@ apiClient.interceptors.response.use(
         useAuthStore.getState().clearAuth()
       })
     }
+
+    // Signed in on a temporary password: flag it so the admin guard sends the
+    // user to the Set-password screen.
+    if (error.response?.status === 403 && error.response?.data?.must_change_password) {
+      void import('@/stores/authStore').then(({ useAuthStore }) => {
+        useAuthStore.getState().updateUser({ must_change_password: true })
+      })
+    }
     return Promise.reject(error)
   }
 )

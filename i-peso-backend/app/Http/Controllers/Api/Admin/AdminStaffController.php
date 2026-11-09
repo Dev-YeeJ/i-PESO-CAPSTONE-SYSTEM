@@ -3,11 +3,15 @@
 namespace App\Http\Controllers\Api\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Mail\StaffAccountMail;
 use App\Models\AdminRole;
 use App\Models\Administrator;
+use App\Services\ActivityLogger;
+use App\Support\StaffPositions;
+use Illuminate\Support\Arr;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
@@ -17,94 +21,346 @@ class AdminStaffController extends Controller
     {
         return response()->json([
             'data' => Administrator::query()
-                ->with('adminRole:id,name,slug')
+                ->with('adminRole')
                 ->orderBy('first_name')
-                ->get(),
+                ->get()
+                ->map(fn (Administrator $staff) => $this->formatStaff($staff)),
+            'positions' => StaffPositions::options(),
+            'employment_types' => StaffPositions::EMPLOYMENT_TYPES,
+        ]);
+    }
+
+    /** Positions in chart order with the people in each, for the Org Chart page. */
+    public function orgChart(): JsonResponse
+    {
+        $staff = Administrator::query()
+            ->with('adminRole')
+            ->where('status', 'active')
+            ->orderBy('first_name')
+            ->get();
+
+        $byPosition = $staff->groupBy(fn (Administrator $member) => $member->position ?: 'unassigned');
+        $format = fn ($members) => collect($members)
+            ->map(fn (Administrator $member) => $this->formatStaff($member))
+            ->values();
+
+        return response()->json([
+            'positions' => array_map(
+                fn (array $position) => $position + ['members' => $format($byPosition[$position['value']] ?? [])],
+                StaffPositions::options()
+            ),
+            'unassigned' => $format($byPosition['unassigned'] ?? []),
         ]);
     }
 
     public function store(Request $request): JsonResponse
     {
+        $request->merge(['email' => mb_strtolower(trim((string) $request->input('email')))]);
+
         $data = $request->validate([
             'first_name' => ['required', 'string', 'max:100'],
+            'middle_name' => ['nullable', 'string', 'max:100'],
             'last_name' => ['required', 'string', 'max:100'],
-            'email' => ['required', 'email', 'max:255', 'unique:administrators,email'],
+            'suffix' => ['nullable', 'string', 'max:20'],
+            // Sign-in checks seekers and employers first, so an email already
+            // used there could never sign in as staff.
+            'email' => [
+                'required', 'email', 'max:255',
+                Rule::unique('administrators', 'email'),
+                Rule::unique('job_seekers', 'email'),
+                Rule::unique('employers', 'email'),
+            ],
             'mobile_number' => ['required', 'string', 'max:20'],
-            'department' => ['nullable', 'string', 'max:100'],
-            'admin_role_id' => ['required', 'integer', Rule::exists('admin_roles', 'id')],
+            'position' => ['required', Rule::in(StaffPositions::keys())],
+            'admin_role_id' => ['nullable', 'integer', Rule::exists('admin_roles', 'id')],
+            'employee_no' => ['nullable', 'string', 'max:50'],
+            'employment_type' => ['nullable', Rule::in(array_keys(StaffPositions::EMPLOYMENT_TYPES))],
+            'date_started' => ['nullable', 'date'],
+        ], [
+            'email.unique' => 'This email is already used by another account.',
         ]);
 
-        $role = AdminRole::findOrFail($data['admin_role_id']);
-        $temporaryPassword = Str::password(14);
+        $role = isset($data['admin_role_id'])
+            ? AdminRole::findOrFail($data['admin_role_id'])
+            : AdminRole::where('slug', StaffPositions::defaultRoleSlug($data['position']))->firstOrFail();
 
-        $staff = Administrator::create([
-            'first_name' => $data['first_name'],
-            'last_name' => $data['last_name'],
-            'email' => $data['email'],
-            'mobile_number' => $data['mobile_number'],
-            'department' => $data['department'] ?? null,
-            'admin_role_id' => $role->id,
-            'role' => $role->slug,
-            'status' => 'active',
-            'password' => Hash::make($temporaryPassword),
-            'email_verified_at' => now(),
-        ]);
+        $staff = Administrator::create(array_merge(
+            Arr::except($data, ['admin_role_id']),
+            [
+                'admin_role_id' => $role->id,
+                'role' => $role->slug,
+                'status' => 'active',
+                // Replaced right away by the emailed temporary password.
+                'password' => Str::random(40),
+                'email_verified_at' => now(),
+                'invited_at' => now(),
+            ]
+        ));
 
-        return response()->json([
-            'message' => 'Staff account created.',
-            'staff' => $staff->fresh('adminRole'),
-            // Shown once — there is no email-invite flow yet, so the creating
-            // admin is responsible for handing this to the new staff member.
-            'temporary_password' => $temporaryPassword,
-        ], 201);
+        $temporaryPassword = $staff->issueTemporaryPassword();
+        $emailSent = $this->sendAccountEmail($staff, $temporaryPassword, StaffAccountMail::INVITE);
+
+        ActivityLogger::log('created_staff', sprintf(
+            'Created staff account %s (%s) as %s with the %s role.%s',
+            $this->displayName($staff),
+            $staff->email,
+            StaffPositions::label($staff->position),
+            $role->name,
+            $emailSent ? ' Sign-in details emailed.' : ' The email could not be sent.'
+        ));
+
+        return response()->json($this->passwordResponse(
+            $emailSent
+                ? "Staff account created. Sign-in details were sent to {$staff->email}."
+                : 'Staff account created, but the email could not be sent. Give them the temporary password below.',
+            $staff,
+            $emailSent,
+            $temporaryPassword
+        ), 201);
+    }
+
+    /**
+     * Emails a new temporary password: a fresh invite if they never finished
+     * setting up, otherwise a password reset that also signs them out.
+     */
+    public function sendPassword(Request $request, Administrator $staffMember): JsonResponse
+    {
+        abort_if($this->isSelf($request, $staffMember), 422, 'Use Change password to update your own password.');
+        abort_unless($staffMember->isActive(), 422, 'Reactivate this account before sending a new password.');
+
+        $isInvite = $staffMember->password_changed_at === null;
+
+        $temporaryPassword = $staffMember->issueTemporaryPassword();
+        if ($isInvite) {
+            $staffMember->forceFill(['invited_at' => now()])->save();
+        }
+        $staffMember->tokens()->delete();
+
+        $emailSent = $this->sendAccountEmail(
+            $staffMember,
+            $temporaryPassword,
+            $isInvite ? StaffAccountMail::INVITE : StaffAccountMail::RESET
+        );
+
+        ActivityLogger::log($isInvite ? 'resent_staff_invite' : 'reset_staff_password', sprintf(
+            '%s for %s (%s).%s',
+            $isInvite ? 'Resent the account invite' : 'Issued a new temporary password',
+            $this->displayName($staffMember),
+            $staffMember->email,
+            $emailSent ? '' : ' The email could not be sent.'
+        ));
+
+        return response()->json($this->passwordResponse(
+            $emailSent
+                ? "A new temporary password was sent to {$staffMember->email}."
+                : 'A new temporary password was made, but the email could not be sent. Give them the password below.',
+            $staffMember,
+            $emailSent,
+            $temporaryPassword
+        ));
     }
 
     public function update(Request $request, Administrator $staffMember): JsonResponse
     {
+        // Status changes go through deactivate()/reactivate(), which also
+        // sign the account out and apply the last-administrator rule.
         $data = $request->validate([
             'first_name' => ['sometimes', 'string', 'max:100'],
+            'middle_name' => ['nullable', 'string', 'max:100'],
             'last_name' => ['sometimes', 'string', 'max:100'],
+            'suffix' => ['nullable', 'string', 'max:20'],
             'mobile_number' => ['sometimes', 'string', 'max:20'],
-            'department' => ['nullable', 'string', 'max:100'],
+            'position' => ['sometimes', Rule::in(StaffPositions::keys())],
             'admin_role_id' => ['sometimes', 'integer', Rule::exists('admin_roles', 'id')],
-            'status' => ['sometimes', Rule::in(['active', 'inactive'])],
+            'employee_no' => ['nullable', 'string', 'max:50'],
+            'employment_type' => ['nullable', Rule::in(array_keys(StaffPositions::EMPLOYMENT_TYPES))],
+            'date_started' => ['nullable', 'date'],
         ]);
 
-        if (isset($data['admin_role_id'])) {
-            $isSelf = $request->user()?->getKey() === $staffMember->getKey();
+        $before = $this->comparable($staffMember, array_keys($data));
+
+        if (isset($data['admin_role_id']) && (int) $data['admin_role_id'] !== (int) $staffMember->admin_role_id) {
+            abort_if($this->isSelf($request, $staffMember), 422, 'You cannot change your own role.');
+
             $newRole = AdminRole::findOrFail($data['admin_role_id']);
 
-            abort_if(
-                $isSelf && $newRole->slug !== 'administrator',
-                422,
-                'You cannot remove your own administrator access.'
-            );
+            if ($newRole->slug !== 'administrator') {
+                $this->ensureAnotherActiveAdministrator($staffMember, 'Assign another active system administrator before changing this role.');
+            }
 
             $data['role'] = $newRole->slug;
         }
 
         $staffMember->update($data);
 
-        return response()->json(['message' => 'Staff account updated.', 'staff' => $staffMember->fresh('adminRole')]);
+        $changed = array_keys(array_diff_assoc($this->comparable($staffMember, array_keys($before)), $before));
+
+        if ($changed !== []) {
+            ActivityLogger::log('updated_staff', sprintf(
+                'Updated staff account %s (%s): %s.',
+                $this->displayName($staffMember),
+                $staffMember->email,
+                implode(', ', array_map(fn ($field) => str_replace('_', ' ', $field === 'admin_role_id' ? 'role' : $field), $changed))
+            ));
+        }
+
+        return response()->json([
+            'message' => 'Staff account updated.',
+            'staff' => $this->formatStaff($staffMember->fresh('adminRole')),
+        ]);
     }
 
-    public function destroy(Request $request, Administrator $staffMember): JsonResponse
+    public function deactivate(Request $request, Administrator $staffMember): JsonResponse
     {
-        abort_if($request->user()?->getKey() === $staffMember->getKey(), 422, 'You cannot remove your own account.');
+        abort_if($this->isSelf($request, $staffMember), 422, 'You cannot deactivate your own account.');
 
-        $remainingAdministrators = Administrator::query()
+        if (! $staffMember->isActive()) {
+            return response()->json(['message' => 'This account is already deactivated.', 'staff' => $this->formatStaff($staffMember->fresh('adminRole'))]);
+        }
+
+        $this->ensureAnotherActiveAdministrator($staffMember, 'At least one active system administrator must remain.');
+
+        $staffMember->forceFill(['status' => 'inactive'])->save();
+
+        // Signs them out on every browser and device right away.
+        $staffMember->tokens()->delete();
+
+        ActivityLogger::log('deactivated_staff', sprintf(
+            'Deactivated staff account %s (%s).',
+            $this->displayName($staffMember),
+            $staffMember->email
+        ));
+
+        return response()->json(['message' => 'Staff account deactivated.', 'staff' => $this->formatStaff($staffMember->fresh('adminRole'))]);
+    }
+
+    public function reactivate(Administrator $staffMember): JsonResponse
+    {
+        if ($staffMember->isActive()) {
+            return response()->json(['message' => 'This account is already active.', 'staff' => $this->formatStaff($staffMember->fresh('adminRole'))]);
+        }
+
+        $staffMember->forceFill(['status' => 'active'])->save();
+
+        ActivityLogger::log('reactivated_staff', sprintf(
+            'Reactivated staff account %s (%s).',
+            $this->displayName($staffMember),
+            $staffMember->email
+        ));
+
+        return response()->json(['message' => 'Staff account reactivated.', 'staff' => $this->formatStaff($staffMember->fresh('adminRole'))]);
+    }
+
+    private function sendAccountEmail(Administrator $staff, string $temporaryPassword, string $kind): bool
+    {
+        try {
+            Mail::to($staff->email)->send(new StaffAccountMail(
+                recipientName: $staff->first_name,
+                positionLabel: StaffPositions::label($staff->position),
+                email: $staff->email,
+                temporaryPassword: $temporaryPassword,
+                expiresAt: $staff->temporary_password_expires_at,
+                kind: $kind,
+            ));
+
+            return true;
+        } catch (\Throwable $exception) {
+            report($exception);
+
+            return false;
+        }
+    }
+
+    /**
+     * The temporary password is only returned when the email failed —
+     * otherwise it lives solely in the staff member's inbox.
+     */
+    private function passwordResponse(string $message, Administrator $staff, bool $emailSent, string $temporaryPassword): array
+    {
+        return array_filter([
+            'message' => $message,
+            'staff' => $this->formatStaff($staff->fresh('adminRole')),
+            'email_sent' => $emailSent,
+            'temporary_password' => $emailSent ? null : $temporaryPassword,
+        ], fn ($value) => $value !== null);
+    }
+
+    private function isSelf(Request $request, Administrator $staffMember): bool
+    {
+        return $request->user()?->getKey() === $staffMember->getKey();
+    }
+
+    /** Keeps the office from locking itself out of staff management. */
+    private function ensureAnotherActiveAdministrator(Administrator $staffMember, string $message): void
+    {
+        if (! $staffMember->isSystemAdministrator() || ! $staffMember->isActive()) {
+            return;
+        }
+
+        $othersRemain = Administrator::query()
             ->where('role', 'administrator')
+            ->where('status', 'active')
             ->where('admin_id', '!=', $staffMember->admin_id)
             ->exists();
 
-        abort_if(
-            $staffMember->role === 'administrator' && ! $remainingAdministrators,
-            422,
-            'At least one Administrator account must remain.'
+        abort_unless($othersRemain, 422, $message);
+    }
+
+    /** Field values as plain strings, so dates and numbers compare cleanly. */
+    private function comparable(Administrator $staff, array $fields): array
+    {
+        return array_map(
+            fn ($value) => $value instanceof \DateTimeInterface ? $value->format('Y-m-d') : (string) $value,
+            $staff->only($fields)
         );
+    }
 
-        $staffMember->delete();
+    private function formatStaff(Administrator $staff): array
+    {
+        return [
+            'id' => $staff->admin_id,
+            'first_name' => $staff->first_name,
+            'middle_name' => $staff->middle_name,
+            'last_name' => $staff->last_name,
+            'suffix' => $staff->suffix,
+            'name' => $this->displayName($staff),
+            'email' => $staff->email,
+            'mobile_number' => $staff->mobile_number,
+            'position' => $staff->position,
+            'position_label' => StaffPositions::label($staff->position),
+            'employee_no' => $staff->employee_no,
+            'employment_type' => $staff->employment_type,
+            'date_started' => $staff->date_started?->toDateString(),
+            'status' => $staff->status,
+            'account_status' => $this->accountStatus($staff),
+            'invited_at' => $staff->invited_at,
+            'temporary_password_expires_at' => $staff->must_change_password ? $staff->temporary_password_expires_at : null,
+            'last_login_at' => $staff->last_login_at,
+            'is_system_administrator' => $staff->isSystemAdministrator(),
+            'role' => $staff->adminRole?->only(['id', 'name', 'slug']),
+            'access' => $staff->accessMap(),
+            'created_at' => $staff->created_at,
+        ];
+    }
 
-        return response()->json(['message' => 'Staff account removed.']);
+    /** deactivated, invite_expired, invited (hasn't set a password yet) or active. */
+    private function accountStatus(Administrator $staff): string
+    {
+        return match (true) {
+            ! $staff->isActive() => 'deactivated',
+            $staff->temporaryPasswordExpired() => 'invite_expired',
+            (bool) $staff->must_change_password => 'invited',
+            default => 'active',
+        };
+    }
+
+    private function displayName(Administrator $staffMember): string
+    {
+        return trim(implode(' ', array_filter([
+            $staffMember->first_name,
+            $staffMember->middle_name ? mb_substr($staffMember->middle_name, 0, 1).'.' : null,
+            $staffMember->last_name,
+            $staffMember->suffix,
+        ])));
     }
 }
