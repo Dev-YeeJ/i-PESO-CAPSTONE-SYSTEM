@@ -232,7 +232,7 @@ function EmployerFeedbackSection({ items }: { items: EmployerFeedbackItem[] }) {
       <Text style={[styles.sectionTitle, styles.sectionGap]} accessibilityRole="header">Feedback from employers</Text>
       <View style={[styles.inline, styles.privateNote]}>
         <MaterialIcons name="lock" size={16} color={colors.textSecondary} />
-        <Text style={[styles.bodyText, styles.flexText]}>Private: only you and PESO can see this. It is never shown to other employers.</Text>
+        <Text style={[styles.bodyText, styles.flexText]}>Only you and PESO can read the comments. Employers you apply to see only your average rating and how many would hire you again.</Text>
       </View>
       {items.map((item) => (
         <Card key={item.id} padding="md" style={styles.itemCard}>
