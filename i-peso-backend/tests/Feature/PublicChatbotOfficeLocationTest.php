@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
@@ -35,6 +36,28 @@ class PublicChatbotOfficeLocationTest extends TestCase
         $this->postJson('/api/chat/public', ['message' => 'Saan po ang PESO office?'])
             ->assertOk()
             ->assertJsonPath('office_location.address', 'XHG8+FV3, Alexander St, Urdaneta City, Pangasinan');
+    }
+
+    public function test_gemini_prompt_explicitly_supports_pangasinan(): void
+    {
+        Http::fake([
+            '*generateContent*' => Http::response($this->geminiTextResponse('Akin ya.')),
+        ]);
+
+        $this->postJson('/api/chat/public', ['message' => 'Can I ask in Pangasinan?'])
+            ->assertOk();
+
+        Http::assertSent(function (Request $request): bool {
+            $instruction = preg_replace(
+                '/\s+/',
+                ' ',
+                data_get($request->data(), 'systemInstruction.parts.0.text', '')
+            ) ?? '';
+
+            return str_contains($instruction, 'Pangasinan (also called Pangasinense)')
+                && str_contains($instruction, 'Do not mistake Pangasinan for Ilocano')
+                && str_contains($instruction, 'reply in simple, respectful, conversational Pangasinan');
+        });
     }
 
     public function test_reply_not_mentioning_the_office_address_has_no_office_location(): void

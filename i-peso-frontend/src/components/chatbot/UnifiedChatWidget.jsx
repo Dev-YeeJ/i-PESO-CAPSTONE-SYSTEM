@@ -57,7 +57,8 @@ function startersFor(user) {
 
 const DEFAULT_GREETING =
   'Kumusta po! Ako si ACE, ang i-PESO assistant ng Urdaneta City PESO. ' +
-  'Maaari po kayong magtanong tungkol sa registration, trabaho, job fairs, at government programs.'
+  'Maaari po kayong magtanong tungkol sa registration, trabaho, job fairs, at government programs. ' +
+  'Maaari rin po kayong magtanong sa Pangasinan, Filipino, o English.'
 
 function greetingFor(user) {
   if (!user) return DEFAULT_GREETING
@@ -67,15 +68,18 @@ function greetingFor(user) {
 
   if (user.role === 'employer') {
     return `${hello} Ako si ACE, ang inyong Assistant for Career and Employment. ` +
-      'Kaya ko kayong tulungan sa job postings, mga aplikante, o job fair registration — ano po ang gagawin natin ngayon?'
+      'Kaya ko kayong tulungan sa job postings, mga aplikante, o job fair registration — ano po ang gagawin natin ngayon? ' +
+      'Maaari po kayong magtanong sa Pangasinan, Filipino, o English.'
   }
 
   if (user.role === 'seeker') {
     return `${hello} Ako si ACE, ang inyong Assistant for Career and Employment. ` +
-      'Tanungin mo ako tungkol sa job matches, application status, o job fairs — paano kita matutulungan ngayon?'
+      'Tanungin mo ako tungkol sa job matches, application status, o job fairs — paano kita matutulungan ngayon? ' +
+      'Maaari kang magtanong sa Pangasinan, Filipino, o English.'
   }
 
-  return `${hello} Ako si ACE, ang i-PESO assistant. Paano ko kayo matutulungan ngayon?`
+  return `${hello} Ako si ACE, ang i-PESO assistant. Paano ko kayo matutulungan ngayon? ` +
+    'Maaari po kayong magtanong sa Pangasinan, Filipino, o English.'
 }
 
 /** Matches a bare URL or email address inside otherwise plain chat text. */

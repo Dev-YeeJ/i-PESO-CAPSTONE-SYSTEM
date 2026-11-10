@@ -156,6 +156,37 @@ const APPLICATION_NEXT_STEPS: Record<string, string> = {
 // Matches InterviewSchedule::ASSUMED_DURATION_MINUTES on the backend.
 const INTERVIEW_ASSUMED_DURATION_MS = 60 * 60 * 1000
 
+// Mirrors MODE_LABELS / formatInterviewMode in i-peso-frontend/src/utils/interview.js.
+const INTERVIEW_MODE_LABELS: Record<string, string> = {
+  online: 'Online video call',
+  phone: 'Phone call',
+  face_to_face: 'Face-to-face',
+}
+
+export function formatInterviewMode(mode: string | null | undefined) {
+  return (mode && INTERVIEW_MODE_LABELS[mode]) || 'Interview'
+}
+
+/**
+ * Date AND time of an interview, e.g. "Nov 12, 2026, 9:00 AM" — mirrors formatInterviewTime in
+ * the web's utils/interview.js. The API sends a UTC ISO string (…Z) and the backend now stores
+ * the time the employer picked on the Philippine office clock correctly, so parsing it with
+ * Date shows the right local time. Explicit parts rather than dateStyle/timeStyle, which
+ * Hermes' Intl does not fully support.
+ */
+export function formatInterviewTime(value: string | null | undefined) {
+  if (!value) return 'Schedule pending'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return 'Schedule pending'
+  return date.toLocaleString('en-PH', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  })
+}
+
 /** upcoming | in_progress | ended | cancelled — re-checked against the clock. */
 export function interviewPhase(interview: InterviewLike, now = Date.now()) {
   if (!interview) return null

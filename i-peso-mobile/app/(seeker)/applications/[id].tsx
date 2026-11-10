@@ -6,7 +6,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { SeekerApplicationsResponse } from '@/services/seekerService'
 import { seekerService } from '@/services/seekerService'
 import { apiErrorMessage } from '@/utils/apiError'
-import { applicationNextStep, applicationStatusVariant, formatDate, formatSalary, interviewPhase, interviewPhaseText, jobCompany, jobLocation, textFrom, titleCase } from '@/utils/seekerView'
+import { applicationNextStep, applicationStatusVariant, formatDate, formatInterviewMode, formatInterviewTime, formatSalary, interviewPhase, interviewPhaseText, jobCompany, jobLocation, textFrom, titleCase } from '@/utils/seekerView'
 import { useToast } from '@/stores/toastStore'
 import { AlertBox } from '@/components/ui/AlertBox'
 import { Badge } from '@/components/ui/Badge'
@@ -169,8 +169,8 @@ export default function ApplicationDetailScreen() {
             <Text style={styles.sectionTitle}>Interview Information</Text>
             <Card padding="md" style={styles.warningCard}>
               <Detail label="Status" value={interviewPhaseText(application.interview)} />
-              <Detail label="Mode" value={titleCase(application.interview.mode_of_interview, 'Not set')} />
-              <Detail label="Date" value={formatDate(application.interview.schedule)} />
+              <Detail label="Mode" value={formatInterviewMode(application.interview.mode_of_interview)} />
+              <Detail label="Date and time" value={formatInterviewTime(application.interview.schedule)} />
               
               {application.interview.mode_of_interview !== 'online' ? (
                 <Detail label="Venue" value={textFrom(application.interview.venue_or_link, 'To follow')} />
