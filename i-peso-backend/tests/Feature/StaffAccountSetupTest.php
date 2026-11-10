@@ -135,21 +135,42 @@ class StaffAccountSetupTest extends TestCase
             ->assertJsonPath('user.must_change_password', false);
     }
 
-    public function test_the_new_password_must_be_strong_different_and_the_temporary_one_correct(): void
+    public function test_first_sign_in_does_not_ask_for_the_temporary_password_again(): void
     {
-        Sanctum::actingAs($this->invitedStaff('Temp1234abcd'));
+        $staff = $this->invitedStaff('Temp#1234abcd');
+        Sanctum::actingAs($staff);
+
+        $this->postJson('/api/admin/account/password', ['password' => 'weakpass', 'password_confirmation' => 'weakpass'])
+            ->assertStatus(422)->assertJsonValidationErrors('password');
+
+        // The temporary password can't simply be kept.
+        $this->postJson('/api/admin/account/password', ['password' => 'Temp#1234abcd', 'password_confirmation' => 'Temp#1234abcd'])
+            ->assertStatus(422)
+            ->assertJsonPath('errors.password.0', 'Choose a password different from the temporary one.');
+
+        $this->postJson('/api/admin/account/password', ['password' => 'MyOwn#Pass2026', 'password_confirmation' => 'MyOwn#Pass2026'])
+            ->assertOk();
+
+        $this->assertFalse($staff->refresh()->must_change_password);
+        $this->assertTrue(Hash::check('MyOwn#Pass2026', $staff->password));
+    }
+
+    public function test_a_later_password_change_still_needs_the_current_password(): void
+    {
+        $staff = $this->invitedStaff('Current#2026x');
+        $staff->forceFill(['must_change_password' => false, 'temporary_password_expires_at' => null])->save();
+        Sanctum::actingAs($staff);
+
+        $this->postJson('/api/admin/account/password', ['password' => 'MyOwn#Pass2026', 'password_confirmation' => 'MyOwn#Pass2026'])
+            ->assertStatus(422)->assertJsonValidationErrors('current_password');
 
         $this->postJson('/api/admin/account/password', [
             'current_password' => 'wrong-one', 'password' => 'MyOwn#Pass2026', 'password_confirmation' => 'MyOwn#Pass2026',
-        ])->assertStatus(422)->assertJsonPath('errors.current_password.0', 'The temporary password is incorrect.');
+        ])->assertStatus(422)->assertJsonPath('errors.current_password.0', 'Your current password is incorrect.');
 
         $this->postJson('/api/admin/account/password', [
-            'current_password' => 'Temp1234abcd', 'password' => 'weakpass', 'password_confirmation' => 'weakpass',
-        ])->assertStatus(422)->assertJsonValidationErrors('password');
-
-        $this->postJson('/api/admin/account/password', [
-            'current_password' => 'Temp1234abcd', 'password' => 'Temp1234abcd', 'password_confirmation' => 'Temp1234abcd',
-        ])->assertStatus(422)->assertJsonValidationErrors('password');
+            'current_password' => 'Current#2026x', 'password' => 'MyOwn#Pass2026', 'password_confirmation' => 'MyOwn#Pass2026',
+        ])->assertOk();
     }
 
     public function test_an_expired_temporary_password_cannot_sign_in(): void

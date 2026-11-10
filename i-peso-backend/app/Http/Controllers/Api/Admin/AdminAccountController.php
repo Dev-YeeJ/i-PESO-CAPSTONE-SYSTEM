@@ -18,28 +18,36 @@ class AdminAccountController extends Controller
      * Sets a new password. Required on first sign-in (and after the system
      * administrator issues a new temporary password) before any other admin
      * page opens; also usable any time afterwards.
+     *
+     * On first sign-in the temporary password isn't asked for again: they
+     * typed it seconds ago to get this session, and nothing else opens until
+     * they finish here. A later, voluntary change still needs the current
+     * password, so an unlocked computer can't be used to take the account.
      */
     public function changePassword(Request $request): JsonResponse
     {
         /** @var Administrator $admin */
         $admin = $request->user();
+        $wasTemporary = (bool) $admin->must_change_password;
 
         $request->validate([
-            'current_password' => ['required', 'string'],
-            'password' => ['required', 'confirmed', 'different:current_password', Password::min(8)->numbers()->symbols()],
-        ], [
-            'password.different' => 'Choose a password different from your current one.',
+            'current_password' => [$wasTemporary ? 'nullable' : 'required', 'string'],
+            'password' => ['required', 'confirmed', Password::min(8)->numbers()->symbols()],
         ]);
 
-        if (! Hash::check($request->input('current_password'), $admin->password)) {
+        if (! $wasTemporary && ! Hash::check((string) $request->input('current_password'), $admin->password)) {
             throw ValidationException::withMessages([
-                'current_password' => [$admin->must_change_password
-                    ? 'The temporary password is incorrect.'
-                    : 'Your current password is incorrect.'],
+                'current_password' => ['Your current password is incorrect.'],
             ]);
         }
 
-        $wasTemporary = (bool) $admin->must_change_password;
+        if (Hash::check($request->input('password'), $admin->password)) {
+            throw ValidationException::withMessages([
+                'password' => [$wasTemporary
+                    ? 'Choose a password different from the temporary one.'
+                    : 'Choose a password different from your current one.'],
+            ]);
+        }
 
         $admin->forceFill([
             'password' => $request->input('password'),

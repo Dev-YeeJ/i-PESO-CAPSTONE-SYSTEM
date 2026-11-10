@@ -33,9 +33,10 @@ export default function AdminSetPasswordPage() {
   const submit = async (event) => {
     event.preventDefault()
     const nextErrors = {}
-    if (!current) nextErrors.current_password = isFirstTime ? 'Enter the temporary password from your email.' : 'Enter your current password.'
+    // On first sign-in they just used the temporary password, so it isn't asked for again.
+    if (!isFirstTime && !current) nextErrors.current_password = 'Enter your current password.'
     if (!rulesMet) nextErrors.password = 'Your new password does not meet all the requirements.'
-    else if (password === current) nextErrors.password = 'Choose a password different from your current one.'
+    else if (!isFirstTime && password === current) nextErrors.password = 'Choose a password different from your current one.'
     if (!matches) nextErrors.password_confirmation = 'The passwords do not match.'
     setErrors(nextErrors)
     if (Object.keys(nextErrors).length) return
@@ -43,7 +44,7 @@ export default function AdminSetPasswordPage() {
     setLoading(true)
     setApiError('')
     try {
-      await authService.changeAdminPassword(current, password, confirmation)
+      await authService.changeAdminPassword(isFirstTime ? null : current, password, confirmation)
       updateUser({ must_change_password: false })
       navigate(adminHomePath(user), { replace: true })
     } catch (error) {
@@ -87,19 +88,21 @@ export default function AdminSetPasswordPage() {
           </h1>
           <p className="mt-1.5 text-sm leading-5 text-slate-400">
             {isFirstTime
-              ? `Welcome${user?.first_name ? `, ${user.first_name}` : ''}. Replace the temporary password from your email with one only you know.`
+              ? `Welcome${user?.first_name ? `, ${user.first_name}` : ''}. Choose your own password to replace the temporary one from your email.`
               : 'Enter your current password, then choose a new one.'}
           </p>
 
           <form onSubmit={submit} noValidate className="mt-6 space-y-4">
-            <PasswordField
-              label={isFirstTime ? 'Temporary password' : 'Current password'}
-              value={current}
-              onChange={setCurrent}
-              show={show}
-              autoComplete="current-password"
-              error={errors.current_password}
-            />
+            {!isFirstTime && (
+              <PasswordField
+                label="Current password"
+                value={current}
+                onChange={setCurrent}
+                show={show}
+                autoComplete="current-password"
+                error={errors.current_password}
+              />
+            )}
             <PasswordField
               label="New password"
               value={password}
