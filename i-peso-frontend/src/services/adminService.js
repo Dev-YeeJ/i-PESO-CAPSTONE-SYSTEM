@@ -287,4 +287,10 @@ export const adminService = {
     const { data } = await api.get('/admin/activity-logs', { params: cleanParams(params) })
     return data
   },
+
+  // Every entry matching the filters (not just the page on screen), as CSV.
+  exportActivityLogs: async (params = {}) => {
+    const response = await api.get('/admin/activity-logs/export', { params: cleanParams(params), responseType: 'blob' })
+    return response.data
+  },
 }

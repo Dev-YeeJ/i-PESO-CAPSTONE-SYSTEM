@@ -3,6 +3,7 @@ import { Eye, EyeOff, ShieldCheck, XCircle } from 'lucide-react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { authService } from '@/services/authService'
 import { useAuthStore } from '@/stores/authStore'
+import { adminHomePath } from '@/utils/adminAccess'
 
 const validate = (email, password) => {
   const errors = {}
@@ -58,8 +59,12 @@ export default function AdminLoginPage() {
       })
       localStorage.setItem('ipeso_token', data.token)
       await new Promise((resolve) => setTimeout(resolve, 50))
+      if (data.user.must_change_password) {
+        navigate('/admin/set-password', { replace: true })
+        return
+      }
       const redirect = new URLSearchParams(location.search).get('redirect')
-      navigate(redirect ?? '/admin/dashboard', { replace: true })
+      navigate(redirect ?? adminHomePath(data.user), { replace: true })
     } catch (error) {
       setApiError(error.response?.data?.message ?? CREDENTIALS_ERROR)
     } finally {

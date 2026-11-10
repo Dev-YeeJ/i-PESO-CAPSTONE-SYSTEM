@@ -37,6 +37,16 @@ export const authService = {
     return res.data
   },
 
+  // Staff: replace the emailed temporary password (or change your own).
+  async changeAdminPassword(currentPassword, password, passwordConfirmation) {
+    const res = await apiClient.post('/admin/account/password', {
+      current_password: currentPassword,
+      password,
+      password_confirmation: passwordConfirmation,
+    })
+    return res.data
+  },
+
   async getAuthenticatedUser() {
     // Short timeout: this call gates every guest-only/protected route render
     // (see authStore.initializeAuth + router/guards.jsx). If it hangs, the

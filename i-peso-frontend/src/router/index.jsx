@@ -7,6 +7,7 @@ import {
   RequireProfileComplete,
   RequireApprovedEmployer,
   RequireRole,
+  RequirePasswordSet,
   GuestOnly,
 } from './guards'
 
@@ -23,6 +24,7 @@ const PrivacyPolicyPage  = lazy(() => import('@/pages/legal/PrivacyPolicyPage'))
 const TermsOfServicePage = lazy(() => import('@/pages/legal/TermsOfServicePage'))
 const LoginPage          = lazy(() => import('@/pages/auth/LoginPage'))
 const AdminLoginPage     = lazy(() => import('@/pages/auth/AdminLoginPage'))
+const AdminSetPasswordPage = lazy(() => import('@/pages/auth/AdminSetPasswordPage'))
 const VerifyEmailPage    = lazy(() => import('@/pages/auth/VerifyEmailPage'))
 const ForgotPasswordPage = lazy(() => import('@/pages/auth/ForgotPasswordPage'))
 const ResetPasswordPage  = lazy(() => import('@/pages/auth/ResetPasswordPage'))
@@ -95,6 +97,7 @@ const AdminSMSTemplates = lazy(() => import('@/pages/admin/5-system-reports/sms-
 // Admin Pages - CATEGORY 6: CONFIGURATION
 const AdminStaffList = lazy(() => import('@/pages/admin/6-configuration/staff/StaffListPage'))
 const AdminRolePermissions = lazy(() => import('@/pages/admin/6-configuration/staff/RolePermissionsPage'))
+const AdminMyOjt = lazy(() => import('@/pages/admin/6-configuration/ojt/MyOjtPage'))
 const AdminAnnouncements = lazy(() => import('@/pages/admin/6-configuration/content/AnnouncementsPage'))
 const AdminContentModules = lazy(() => import('@/pages/admin/6-configuration/content/ContentModuleListPage'))
 const AdminSystemSettings = lazy(() => import('@/pages/admin/6-configuration/settings/SystemSettingsPage'))
@@ -184,8 +187,9 @@ export const router = createBrowserRouter([
                 path: '/admin',
                 element: <RequireRole role="administrator" />,
                 children: [
+                  { path: 'set-password', element: S(AdminSetPasswordPage) },
                   {
-                    element: <AdminLayout />,
+                    element: <RequirePasswordSet><AdminLayout /></RequirePasswordSet>,
                     children: [
                       { index: true, element: <Navigate to="dashboard" replace /> },
                       
@@ -229,6 +233,8 @@ export const router = createBrowserRouter([
                       // CATEGORY 6: CONFIGURATION
                       { path: 'staff', element: S(AdminStaffList) },
                       { path: 'role-permissions', element: S(AdminRolePermissions) },
+                      { path: 'ojt-interns', element: <Navigate to="/admin/staff?tab=ojt" replace /> },
+                      { path: 'my-ojt', element: S(AdminMyOjt) },
                       { path: 'announcements', element: S(AdminAnnouncements) },
                       { path: 'content-modules', element: S(AdminContentModules) },
                       { path: 'settings', element: S(AdminSystemSettings) },

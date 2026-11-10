@@ -18,6 +18,23 @@ use Throwable;
  */
 class ActivityLogger
 {
+    /**
+     * Set when anything is logged during the current request, so the
+     * RecordActivity middleware doesn't add a generic entry on top of a
+     * controller's specific one.
+     */
+    private static bool $recordedThisRequest = false;
+
+    public static function beginRequest(): void
+    {
+        self::$recordedThisRequest = false;
+    }
+
+    public static function recordedDuringRequest(): bool
+    {
+        return self::$recordedThisRequest;
+    }
+
     /** Log an event for the currently authenticated user, falling back to a guest entry. */
     public static function log(string $action, string $description = ''): ?ActivityLog
     {
@@ -42,6 +59,8 @@ class ActivityLogger
 
     private static function write(string $userType, int $userId, string $action, string $description): ?ActivityLog
     {
+        self::$recordedThisRequest = true;
+
         try {
             return ActivityLog::create([
                 'user_type' => $userType,

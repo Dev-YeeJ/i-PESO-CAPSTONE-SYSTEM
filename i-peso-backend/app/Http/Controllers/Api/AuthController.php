@@ -147,6 +147,21 @@ class AuthController extends Controller
             $payload['verification_status'] = $user->verification_status;
         }
 
+        if ($role === 'administrator' && $user instanceof Administrator) {
+            $user->loadMissing('adminRole');
+
+            $payload['first_name']              = $user->first_name;
+            $payload['last_name']               = $user->last_name;
+            $payload['status']                  = $user->status;
+            $payload['admin_role']              = $user->adminRole?->only(['id', 'name', 'slug']);
+            $payload['is_system_administrator'] = $user->isSystemAdministrator();
+            $payload['modules']                 = $user->grantedModules();
+            $payload['access']                  = $user->accessMap();
+            $payload['position']                = $user->position;
+            $payload['position_label']          = \App\Support\StaffPositions::label($user->position);
+            $payload['must_change_password']    = (bool) $user->must_change_password;
+        }
+
         return $payload;
     }
 
@@ -272,6 +287,10 @@ class AuthController extends Controller
 
         $token = $user->createToken('ipeso_access_token')->plainTextToken;
 
+        if ($user instanceof Administrator) {
+            $user->forceFill(['last_login_at' => now()])->saveQuietly();
+        }
+
         return response()->json([
             'message' => 'Email verified successfully. Welcome to i-PESO!',
             'token'   => $token,
@@ -330,6 +349,26 @@ class AuthController extends Controller
 
         Cache::forget($lockKey);
 
+        // Checked after the password so the message never reveals which
+        // emails belong to deactivated staff.
+        if ($user instanceof Administrator && ! $user->isActive()) {
+            ActivityLogger::logAs($user, 'login_blocked', "Sign-in blocked for deactivated staff account {$email}.");
+
+            return response()->json([
+                'message' => $user->internshipEnded()
+                    ? 'Your internship ended'.($user->ojt_end_date ? ' on '.$user->ojt_end_date->format('F j, Y') : '').', so this account is now closed. Thank you for your service to PESO Urdaneta.'
+                    : 'This account has been deactivated. Contact the PESO system administrator.',
+            ], 403);
+        }
+
+        if ($user instanceof Administrator && $user->temporaryPasswordExpired()) {
+            ActivityLogger::logAs($user, 'login_blocked', "Sign-in blocked: the temporary password for {$email} has expired.");
+
+            return response()->json([
+                'message' => 'Your temporary password has expired. Ask the PESO system administrator to send you a new one.',
+            ], 403);
+        }
+
         if (! $user->email_verified_at) {
             $otp = $this->generateAndSendOtp($email);
 
@@ -346,6 +385,10 @@ class AuthController extends Controller
         // `$user->tokens()->delete()` here; that previously logged out every other
         // platform/device the instant this one logged in.
         $token = $user->createToken('ipeso_access_token')->plainTextToken;
+
+        if ($user instanceof Administrator) {
+            $user->forceFill(['last_login_at' => now()])->saveQuietly();
+        }
 
         \Log::info("Login successful for user {$email} with role {$role}");
         ActivityLogger::logAs($user, 'login', "Signed in as {$role} ({$email}).");
@@ -477,6 +520,18 @@ class AuthController extends Controller
         $user->forceFill([
             'password' => Hash::make($request->input('password')),
         ])->save();
+
+        // Choosing a password through the emailed code also completes a
+        // staff member's account setup.
+        if ($user instanceof Administrator && $user->must_change_password) {
+            $user->forceFill([
+                'must_change_password' => false,
+                'temporary_password_expires_at' => null,
+                'password_changed_at' => now(),
+            ])->save();
+        } elseif ($user instanceof Administrator) {
+            $user->forceFill(['password_changed_at' => now()])->save();
+        }
 
         ActivityLogger::logAs($user, 'password_reset', "Password reset via emailed code for {$email}.");
 
