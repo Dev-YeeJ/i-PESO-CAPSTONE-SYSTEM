@@ -2,10 +2,8 @@ import apiClient from './api'
 
 export const authService = {
 
-  // portal: which account type to try first when one email has several (the admin sign-in
-  // page passes 'administrator'). The password must still match that account.
-  async login(email, password, portal) {
-    const res = await apiClient.post('/auth/login', { email, password, ...(portal ? { portal } : {}) })
+  async login(email, password) {
+    const res = await apiClient.post('/auth/login', { email, password })
     return res.data
   },
 

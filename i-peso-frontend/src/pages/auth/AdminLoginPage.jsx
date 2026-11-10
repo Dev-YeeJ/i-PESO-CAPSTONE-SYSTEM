@@ -3,7 +3,6 @@ import { Eye, EyeOff, ShieldCheck, XCircle } from 'lucide-react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { authService } from '@/services/authService'
 import { useAuthStore } from '@/stores/authStore'
-import { loginErrorMessage } from '@/utils/loginError'
 import { adminLandingPath } from '@/utils/adminAccess'
 
 const validate = (email, password) => {
@@ -45,7 +44,7 @@ export default function AdminLoginPage() {
     setApiError('')
     setErrors({})
     try {
-      const data = await authService.login(email, password, 'administrator')
+      const data = await authService.login(email, password)
 
       if (data.user.role !== 'administrator') {
         setApiError(CREDENTIALS_ERROR)
@@ -69,7 +68,7 @@ export default function AdminLoginPage() {
       const redirect = new URLSearchParams(location.search).get('redirect')
       navigate(adminLandingPath(data.user, redirect), { replace: true })
     } catch (error) {
-      setApiError(loginErrorMessage(error, CREDENTIALS_ERROR))
+      setApiError(error.response?.data?.message ?? CREDENTIALS_ERROR)
     } finally {
       setLoading(false)
     }

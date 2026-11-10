@@ -5,7 +5,6 @@ import AuthShell from '@/components/auth/AuthShell'
 import { AlertBox, Button, Card } from '@/components/ui'
 import { authService } from '@/services/authService'
 import { useAuthStore } from '@/stores/authStore'
-import { loginErrorMessage } from '@/utils/loginError'
 
 const roleRoutes = {
   seeker: '/seeker/dashboard',
@@ -75,7 +74,7 @@ export default function LoginPage() {
         navigate('/verify-email', { state: { email: pendingEmail } })
         return
       }
-      setApiError(loginErrorMessage(error, 'Login failed. Please check your credentials.'))
+      setApiError(error.response?.data?.message ?? 'Login failed. Please check your credentials.')
     } finally {
       setLoading(false)
     }
