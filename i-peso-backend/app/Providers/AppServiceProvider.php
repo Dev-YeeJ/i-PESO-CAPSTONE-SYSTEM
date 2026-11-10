@@ -49,6 +49,10 @@ class AppServiceProvider extends ServiceProvider
             \App\Events\ApplicationStatusChanged::class,
             \App\Listeners\SendApplicationStatusNotification::class
         );
+        \Illuminate\Support\Facades\Event::listen(
+            \App\Events\ApplicationStatusChanged::class,
+            \App\Listeners\SendReviewInvitation::class
+        );
 
         // Baseline for `throttleApi()` (bootstrap/app.php) — every route
         // without its own more specific `throttle:` rule falls back to this.

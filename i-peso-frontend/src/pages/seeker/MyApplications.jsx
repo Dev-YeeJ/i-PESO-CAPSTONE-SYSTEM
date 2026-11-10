@@ -1,11 +1,16 @@
-import { BriefcaseBusiness, CalendarClock, CheckCircle2, Compass, MapPin, Search } from 'lucide-react'
+import { BriefcaseBusiness, CalendarClock, CheckCircle2, Compass, MapPin, Search, Star } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { Link } from 'react-router-dom'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import { Button, EmptyState, LoadingSkeleton } from '@/components/ui'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { getSeekerApplicationDetail, getSeekerApplications, withdrawSeekerApplication } from '@/services/seekerService'
 import { formatInterviewMode, formatInterviewTime, interviewPhase, interviewPhaseLabel, isJoinableLink } from '@/utils/interview'
+import ReviewFormDialog from '@/components/reviews/ReviewFormDialog'
+import { reviewService } from '@/services/reviewService'
+import { MY_REVIEWS_KEY, openActions } from '@/utils/reviews'
 
 const MotionArticle = motion.article
 
@@ -54,6 +59,14 @@ const showInterview = (application) =>
   (application.status === 'interview' || interviewPhase(application.interview) === 'ended')
 
 export default function MyApplications() {
+  const queryClient = useQueryClient()
+  const [writingReview, setWritingReview] = useState(null)
+  // Which reviews each application allows (Verified Mutual Feedback System).
+  const { data: reviewData } = useQuery({ queryKey: MY_REVIEWS_KEY, queryFn: reviewService.getMine, staleTime: 60_000 })
+  const reviewByApplication = Object.fromEntries(
+    (reviewData?.opportunities ?? []).filter((item) => item.source === 'application').map((item) => [item.source_id, item]),
+  )
+  const reviewActionsFor = (applicationId) => openActions(reviewByApplication[applicationId] ? [reviewByApplication[applicationId]] : [])
   const [applications, setApplications] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -295,6 +308,15 @@ export default function MyApplications() {
                   >
                     {detailLoading && activeApplication?.apply_id === application.apply_id ? 'Loading…' : 'View full details'}
                   </button>
+                  {reviewActionsFor(application.apply_id).map((action) => (
+                    <button
+                      key={action.key}
+                      onClick={() => setWritingReview(action)}
+                      className="inline-flex items-center justify-center gap-2 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-900 transition hover:bg-amber-100 shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-600"
+                    >
+                      <Star className="h-4 w-4" /> {action.type === 'employment' ? 'Rate the workplace' : 'Rate this employer'}
+                    </button>
+                  ))}
                   {application.can_withdraw && (
                     <button
                       onClick={() => askWithdraw(application)}
@@ -304,6 +326,7 @@ export default function MyApplications() {
                     </button>
                   )}
                 </div>
+                <ReviewNote item={reviewByApplication[application.apply_id]} />
               </MotionArticle>
             ))}
             </AnimatePresence>
@@ -425,6 +448,18 @@ export default function MyApplications() {
         </DialogContent>
       </Dialog>
 
+      {writingReview && (
+        <ReviewFormDialog
+          target={writingReview}
+          onClose={() => setWritingReview(null)}
+          onSaved={(res) => {
+            setWritingReview(null)
+            toast.success(res.message)
+            queryClient.invalidateQueries({ queryKey: MY_REVIEWS_KEY })
+          }}
+        />
+      )}
+
       {/* Withdraw confirmation */}
       <Dialog open={!!pendingWithdraw} onOpenChange={(open) => !open && setPendingWithdraw(null)}>
         <DialogContent className="sm:rounded-3xl border-0 shadow-2xl">
@@ -444,4 +479,23 @@ export default function MyApplications() {
       </Dialog>
     </div>
   )
+}
+
+/** Under each application card: "You reviewed this" or when a review opens up. */
+function ReviewNote({ item }) {
+  if (!item) return null
+  const reviewed = ['recruitment', 'employment'].some((type) => item[type]?.review_id)
+  if (reviewed) {
+    return (
+      <p className="mt-3 text-xs font-semibold text-slate-500">
+        You reviewed this employer. <Link to="/seeker/reviews" className="text-blue-700 underline-offset-2 hover:underline">See or edit your review</Link>
+      </p>
+    )
+  }
+  const upcoming = item.recruitment && !item.recruitment.allowed && item.recruitment.available_from
+  if (upcoming) {
+    const date = new Date(`${item.recruitment.available_from}T00:00:00`).toLocaleDateString('en-PH', { month: 'long', day: 'numeric' })
+    return <p className="mt-3 text-xs text-slate-500">You can rate this employer once they respond, or from {date} if they don't.</p>
+  }
+  return null
 }

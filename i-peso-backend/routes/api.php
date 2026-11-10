@@ -44,6 +44,7 @@ use App\Http\Controllers\Api\SeekerApplicationController;
 use App\Http\Controllers\Api\SeekerCertificateController;
 use App\Http\Controllers\Api\SeekerController;
 use App\Http\Controllers\Api\SeekerEmployerReportController;
+use App\Http\Controllers\Api\SeekerReviewController;
 use App\Http\Controllers\Api\SeekerGovernmentProgramController;
 use App\Http\Controllers\Api\SeekerNearbyJobController;
 use App\Http\Controllers\Api\SeekerProfileImageController;
@@ -193,6 +194,15 @@ Route::middleware('auth:sanctum')->group(function () {
         // Public Employer Profile for Job Seekers
         Route::get('/employers/{employer}', [SeekerController::class, 'getPublicEmployerProfile']);
         // Report a suspicious / abusive employer or job posting
+        // Verified reviews of employers (Recruitment / Employment Experience).
+        Route::get('/reviews', [SeekerReviewController::class, 'index']);
+        Route::post('/reviews', [SeekerReviewController::class, 'store'])->middleware('throttle:10,1');
+        Route::put('/reviews/{review}', [SeekerReviewController::class, 'update'])->middleware('throttle:10,1');
+        Route::delete('/reviews/{review}', [SeekerReviewController::class, 'destroy']);
+        Route::get('/employers/{employer}/reviews', [SeekerReviewController::class, 'employerReviews']);
+        Route::post('/reviews/{review}/report', [SeekerReviewController::class, 'report'])->middleware('throttle:10,1');
+        Route::get('/employer-ratings', [SeekerReviewController::class, 'ratings']);
+
         Route::post('/employers/{employer}/report', [SeekerEmployerReportController::class, 'store'])
             ->middleware('throttle:10,1');
         Route::post('/certificates', [SeekerCertificateController::class, 'store']);

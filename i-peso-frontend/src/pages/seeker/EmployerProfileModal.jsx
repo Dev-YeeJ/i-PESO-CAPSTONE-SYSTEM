@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { BriefcaseBusiness, ExternalLink, Flag, ShieldCheck } from 'lucide-react'
 import { Button, EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui'
@@ -8,6 +9,7 @@ import ReportEmployerModal from '@/components/ReportEmployerModal'
 import CompanyFacts from '@/components/employers/CompanyFacts'
 import CompanyLogo from '@/components/employers/CompanyLogo'
 import VacancyRow from '@/components/employers/VacancyRow'
+import CompanyReviews from '@/components/reviews/CompanyReviews'
 import { getPublicEmployerProfile } from '@/services/seekerService'
 import { employerDisplayName, employerRegisteredName, publicEmployerQueryKey } from '@/utils/employerProfile'
 
@@ -19,6 +21,7 @@ import { employerDisplayName, employerRegisteredName, publicEmployerQueryKey } f
 export default function EmployerProfileModal({ open, employerId, onClose }) {
   const [viewingJobId, setViewingJobId] = useState(null)
   const [reporting, setReporting] = useState(false)
+  const navigate = useNavigate()
 
   const { data, isLoading, isError, error, refetch, isFetching } = useQuery({
     queryKey: publicEmployerQueryKey(employerId),
@@ -100,6 +103,15 @@ export default function EmployerProfileModal({ open, employerId, onClose }) {
                     ) : (
                       <p className="mt-2 text-sm text-slate-500">This employer hasn't added a description yet.</p>
                     )}
+                  </section>
+
+                  <section aria-labelledby="panel-reviews">
+                    <h3 id="panel-reviews" className="mb-3 text-sm font-bold text-slate-900">Reviews</h3>
+                    <CompanyReviews
+                      employerId={employer.employer_id}
+                      compact
+                      onSeeAll={() => { onClose(); navigate(`/seeker/employers/${employer.employer_id}#reviews`) }}
+                    />
                   </section>
 
                   <section aria-labelledby="panel-jobs">

@@ -57,6 +57,7 @@ const SeekerJobFairEmployerPage = lazy(() => import('@/pages/seeker/SeekerJobFai
 const SeekerGovernmentPrograms = lazy(() => import('@/pages/seeker/GovernmentProgramsPage'))
 const SeekerProgramDetails = lazy(() => import('@/pages/seeker/ProgramDetailsPage'))
 const SeekerApplications = lazy(() => import('@/pages/seeker/MyApplications'))
+const SeekerReviews = lazy(() => import('@/pages/seeker/MyReviewsPage'))
 const SeekerOnboarding  = lazy(() => import('@/pages/auth/onboarding/SeekerOnboarding'))
 
 // Admin Pages - CATEGORY 1: OVERVIEW
@@ -261,6 +262,7 @@ export const router = createBrowserRouter([
                           { path: 'government-programs', element: S(SeekerGovernmentPrograms) },
                           { path: 'government-programs/:id', element: S(SeekerProgramDetails) },
                           { path: 'applications', element: S(SeekerApplications) },
+                          { path: 'reviews', element: S(SeekerReviews) },
                           { path: 'profile', element: S(SeekerProfile) },
                           { path: 'profile/edit', element: S(SeekerProfileEdit) },
                           { path: 'employers/:id', element: S(SeekerEmployerProfile) },

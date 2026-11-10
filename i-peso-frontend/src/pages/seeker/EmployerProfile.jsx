@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { ArrowLeft, BriefcaseBusiness, Flag, ShieldCheck } from 'lucide-react'
@@ -8,6 +8,7 @@ import ReportEmployerModal from '@/components/ReportEmployerModal'
 import CompanyFacts from '@/components/employers/CompanyFacts'
 import CompanyLogo from '@/components/employers/CompanyLogo'
 import VacancyRow from '@/components/employers/VacancyRow'
+import CompanyReviews from '@/components/reviews/CompanyReviews'
 import { getPublicEmployerProfile } from '@/services/seekerService'
 import { employerDisplayName, employerRegisteredName, formatIndustry, publicEmployerQueryKey } from '@/utils/employerProfile'
 
@@ -30,6 +31,15 @@ export default function EmployerProfile() {
     staleTime: 5 * 60 * 1000,
     retry: (count, err) => err?.response?.status !== 404 && count < 2,
   })
+
+  // "See all reviews" from the slide-over panel lands on #reviews; jump there
+  // once the profile has rendered.
+  const hasProfile = !!data
+  useEffect(() => {
+    if (hasProfile && location.hash === '#reviews') {
+      document.getElementById('reviews')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }
+  }, [hasProfile, location.hash])
 
   // A page opened directly (new tab, shared link) has no history to go back to.
   const goBack = () => (location.key !== 'default' ? navigate(-1) : navigate('/seeker/dashboard'))
@@ -143,6 +153,13 @@ export default function EmployerProfile() {
               />
             )}
           </Card>
+
+          <div id="reviews" className="scroll-mt-24">
+            <Card>
+              <CardHeader title="Reviews" subtitle="From people who applied or worked here through i-PESO." />
+              <CompanyReviews employerId={employer.employer_id} />
+            </Card>
+          </div>
         </main>
 
         <aside className="space-y-6">

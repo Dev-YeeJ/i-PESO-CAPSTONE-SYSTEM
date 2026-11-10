@@ -1,6 +1,7 @@
 import { createElement, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
+import { useQuery } from '@tanstack/react-query'
 import {
   AlertTriangle,
   Bookmark,
@@ -29,6 +30,7 @@ import { StatCard } from '@/components/ui'
 import EmployerPreferenceChip from '@/components/jobs/EmployerPreferenceChip'
 import EmployerProfileModal from './EmployerProfileModal'
 import { applyToJob, getProfileImage, toggleSavedJob as toggleSavedJobApi } from '@/services/seekerService'
+import { reviewService } from '@/services/reviewService'
 
 const feedTabs = [
   { key: 'smart', label: 'Jobs', icon: Star },
@@ -105,6 +107,18 @@ export default function JobSeekerHome({
     latest: normalizeApiJobs(latestJobsData?.jobs ?? []),
   }), [latestJobsData, nearbyJobsData, recommendedJobsData])
   const apiJobs = useMemo(() => feedJobs[jobFeedMode] ?? [], [feedJobs, jobFeedMode])
+
+  // Verified-review ratings for the employers in the feeds, in one request.
+  // Employers with fewer than 3 reviewers come back without a rating.
+  const ratingEmployerIds = useMemo(() => [...new Set(
+    Object.values(feedJobs).flat().map((job) => job.employerId).filter(Boolean),
+  )].sort((a, b) => a - b), [feedJobs])
+  const { data: employerRatings = {} } = useQuery({
+    queryKey: ['seeker', 'employer-ratings', ratingEmployerIds],
+    queryFn: () => reviewService.ratings(ratingEmployerIds),
+    enabled: ratingEmployerIds.length > 0,
+    staleTime: 5 * 60 * 1000,
+  })
   const hasLocation = locationState === 'available'
 
   const jobs = useMemo(() => {
@@ -345,6 +359,7 @@ export default function JobSeekerHome({
                       <JobCard
                         key={job.id}
                         job={job}
+                        rating={employerRatings[job.employerId]}
                         saved={savedJobIds.includes(job.id)}
                         applying={applyingJobIds.includes(job.id)}
                         onSave={() => toggleSavedJob(job)}
@@ -571,7 +586,7 @@ function FeedControls({
   )
 }
 
-function JobCard({ job, saved = false, applying = false, onSave, onDetails, onQuickApply, onViewEmployer }) {
+function JobCard({ job, rating, saved = false, applying = false, onSave, onDetails, onQuickApply, onViewEmployer }) {
   const matchMeta = matchMetaFor(job.matchScore)
   const openFromKeyboard = (event) => {
     if (event.key === 'Enter' || event.key === ' ') {
@@ -615,6 +630,16 @@ function JobCard({ job, saved = false, applying = false, onSave, onDetails, onQu
             >
               {job.company}
             </button>
+            {rating && (
+              <span
+                className="ml-2 inline-flex items-center gap-1 align-middle text-xs font-bold text-slate-700"
+                aria-label={`Rated ${rating.average.toFixed(1)} out of 5 by ${rating.reviewers} verified reviewers`}
+              >
+                <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" aria-hidden="true" />
+                {rating.average.toFixed(1)}
+                <span className="font-normal text-slate-500">({rating.reviewers})</span>
+              </span>
+            )}
             <p className="mt-0.5 text-sm text-slate-500 flex items-center gap-1.5 flex-wrap">
               <span>{job.location}</span>
               {job.distanceKm != null && (

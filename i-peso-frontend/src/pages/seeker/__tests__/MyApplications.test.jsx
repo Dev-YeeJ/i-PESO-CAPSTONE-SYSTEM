@@ -1,12 +1,18 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import MyApplications from '../MyApplications'
+import { reviewService } from '@/services/reviewService'
 import {
   getSeekerApplications,
   withdrawSeekerApplication,
 } from '@/services/seekerService'
+
+vi.mock('@/services/reviewService', () => ({
+  reviewService: { getMine: vi.fn(() => Promise.resolve({ opportunities: [], reviews: [] })) },
+}))
 
 vi.mock('@/services/seekerService', () => ({
   getSeekerApplications: vi.fn(),
@@ -29,7 +35,12 @@ const application = {
 }
 
 function renderPage() {
-  return render(<MemoryRouter><MyApplications /></MemoryRouter>)
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <MemoryRouter><MyApplications /></MemoryRouter>
+    </QueryClientProvider>,
+  )
 }
 
 describe('MyApplications (seeker application tracking)', () => {
@@ -86,5 +97,21 @@ describe('MyApplications (seeker application tracking)', () => {
 
     expect(await screen.findByText('Server unavailable.')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /try again/i })).toBeInTheDocument()
+  })
+
+  it('offers to rate the employer once a review is allowed', async () => {
+    getSeekerApplications.mockResolvedValue({ applications: [{ ...application, status: 'rejected', can_withdraw: false }] })
+    reviewService.getMine.mockResolvedValue({
+      opportunities: [{
+        source: 'application', source_id: 1, employer: { name: 'Acme Corp' }, job_title: 'Data Encoder',
+        recruitment: { allowed: true, limited: false, review_id: null },
+        employment: { allowed: false },
+      }],
+      reviews: [],
+    })
+
+    renderPage()
+
+    expect(await screen.findByRole('button', { name: /rate this employer/i })).toBeInTheDocument()
   })
 })
