@@ -32,6 +32,8 @@ final class ChatLanguage
 
     public const ENGLISH = 'english';
 
+    public const ILOCANO = 'ilocano';
+
     /** English and Filipino in one message (Taglish). */
     public const MIXED = 'mixed';
 
@@ -57,6 +59,13 @@ final class ChatLanguage
             '/\b' . self::TL_VERBS . '\w*\s+' . self::TL_FILLER . '(?:sa|ng|in)\s+(?:filipino|tagalog)\b/u',
             '/\b(?:filipino|tagalog)\s+(?:please|po|lang|na\s+lang)\b/u',
             '/\b(?:tagalugin|i-?tagalog)\b/u',
+        ],
+        self::ILOCANO => [
+            '/\b(?:ilocano|ilokano|iloko|iloco)\s+(?:language|please|po|lang|na\s+lang)\b/u',
+            '/\b(?:wikang|salitang|lengguwaheng|lenggwaheng)\s+(?:ilocano|ilokano|iloko)\b/u',
+            '/\b' . self::EN_VERBS . '\s+' . self::EN_FILLER . '(?:in|into|using)?\s*(?:ilocano|ilokano|iloko|iloco)\b/u',
+            '/\b' . self::TL_VERBS . '\w*\s+' . self::TL_FILLER . '(?:sa|ng|in)\s+(?:ilocano|ilokano|iloko)\b/u',
+            '/^\s*(?:in\s+|sa\s+)?(?:ilocano|ilokano|iloko)\s*[.!?]*\s*$/u',
         ],
         self::ENGLISH => [
             '/\b' . self::EN_VERBS . '\s+' . self::EN_FILLER . '(?:in|into|using)?\s*english\b/u',

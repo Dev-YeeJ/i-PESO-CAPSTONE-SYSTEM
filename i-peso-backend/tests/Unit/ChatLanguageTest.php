@@ -43,6 +43,15 @@ class ChatLanguageTest extends TestCase
         }
     }
 
+    public function test_ilocano_requests_are_recognised_but_an_identity_is_not_a_request(): void
+    {
+        foreach (['Answer in Ilocano please', 'Iloko po', 'Sagutin mo sa Ilocano'] as $message) {
+            $this->assertSame(ChatLanguage::ILOCANO, ChatLanguage::fromMessages([$message])->explicit(), $message);
+        }
+
+        $this->assertNull(ChatLanguage::fromMessages(['Ilocano ako, taga Urdaneta'])->explicit());
+    }
+
     public function test_an_explicit_request_carries_forward_to_later_short_messages(): void
     {
         $language = ChatLanguage::fromMessages(['Answer in Pangasinan please', 'Production operator']);

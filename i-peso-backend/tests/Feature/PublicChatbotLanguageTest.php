@@ -107,6 +107,38 @@ class PublicChatbotLanguageTest extends TestCase
         });
     }
 
+    public function test_ilocano_is_its_own_language_and_never_assumed_to_be_pangasinan(): void
+    {
+        $this->fakeGemini('Reply text.');
+
+        $this->postJson('/api/chat/public', [
+            'message' => 'Requirements?',
+            'history' => [['role' => 'user', 'text' => 'Answer in Ilocano please']],
+        ])->assertOk();
+
+        Http::assertSent(function (Request $request): bool {
+            $instruction = $this->instruction($request);
+
+            return str_contains($instruction, self::THIS_TURN . ': The visitor asked you to use Ilocano')
+                && str_contains($instruction, 'not Pangasinan or Tagalog')
+                // The standing rule: Ilocano gets Ilocano, and the province is no reason for Pangasinan.
+                && str_contains($instruction, 'do not mistake Ilocano for Pangasinan')
+                && str_contains($instruction, 'is never a reason to reply in Pangasinan');
+        });
+    }
+
+    public function test_the_prompt_keeps_internal_labels_away_from_the_visitor(): void
+    {
+        $this->fakeGemini('Reply text.');
+
+        $this->postJson('/api/chat/public', ['message' => 'How do I register?'])->assertOk();
+
+        Http::assertSent(fn (Request $request) => str_contains(
+            $this->instruction($request),
+            'never show their internal labels to the visitor — words such as GUEST'
+        ));
+    }
+
     public function test_policy_refusals_answer_in_the_visitors_language_without_calling_the_model(): void
     {
         $this->fakeGemini('should not be used');
