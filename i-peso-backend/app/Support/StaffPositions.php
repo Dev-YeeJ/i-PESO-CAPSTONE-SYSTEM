@@ -12,9 +12,10 @@ namespace App\Support;
  */
 final class StaffPositions
 {
+    /** The head of the office, and the system administrator: manages every account. */
     public const OFFICE_MANAGER = 'peso_office_manager';
 
-    public const SYSTEM_ADMINISTRATOR = 'special_law_enforcement_officer';
+    public const LAW_ENFORCEMENT_OFFICER = 'special_law_enforcement_officer';
 
     public const ADMINISTRATIVE_AIDE = 'administrative_aide';
 
@@ -24,14 +25,13 @@ final class StaffPositions
         self::OFFICE_MANAGER => [
             'label' => 'PESO Office Manager',
             'title' => 'City Government Assistant Department Head / Public Employment Service Office Manager',
-            'default_role' => 'office-manager',
+            'default_role' => 'administrator',
             'reports_to' => null,
         ],
-        // The office's system administrator: creates and manages every account.
-        self::SYSTEM_ADMINISTRATOR => [
+        self::LAW_ENFORCEMENT_OFFICER => [
             'label' => 'Special Law Enforcement Officer',
             'title' => 'Special Law Enforcement Officer',
-            'default_role' => 'administrator',
+            'default_role' => 'law-enforcement-officer',
             'reports_to' => self::OFFICE_MANAGER,
         ],
         self::ADMINISTRATIVE_AIDE => [

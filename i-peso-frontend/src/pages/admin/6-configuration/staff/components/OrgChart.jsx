@@ -5,7 +5,7 @@ import { initialsOf } from '../staffDisplay'
 
 /**
  * PESO Urdaneta's organizational chart, filled in with the active staff in
- * each position: the Office Manager on top, the Special Law Enforcement
+ * each position: the Office Manager (the system administrator) on top, the Special Law Enforcement
  * Officer and Administrative Aides reporting to them, and OJT interns below.
  */
 export default function OrgChart({ onSelect }) {

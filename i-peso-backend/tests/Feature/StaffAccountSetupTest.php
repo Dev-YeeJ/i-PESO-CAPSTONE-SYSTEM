@@ -251,7 +251,7 @@ class StaffAccountSetupTest extends TestCase
         return Administrator::create([
             'first_name' => 'System', 'last_name' => 'Admin', 'email' => 'sleo@peso.test',
             'mobile_number' => '09171234567', 'password' => 'password123',
-            'position' => 'special_law_enforcement_officer',
+            'position' => 'peso_office_manager',
             'role' => 'administrator', 'admin_role_id' => $this->adminRole->id,
             'status' => 'active', 'email_verified_at' => now(),
         ]);

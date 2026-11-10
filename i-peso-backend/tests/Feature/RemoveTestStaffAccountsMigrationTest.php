@@ -71,7 +71,7 @@ class RemoveTestStaffAccountsMigrationTest extends TestCase
 
         $kept = DB::table('administrators')->first();
         $this->assertSame('administrator', $kept->role);
-        $this->assertSame('special_law_enforcement_officer', $kept->position);
+        $this->assertSame('peso_office_manager', $kept->position);
         $this->assertSame('active', $kept->status);
     }
 

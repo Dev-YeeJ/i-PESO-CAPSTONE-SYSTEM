@@ -30,7 +30,7 @@ class OjtInternshipTest extends TestCase
 
         foreach ([
             'administrator' => [],
-            'office-manager' => ['configuration' => 'view', 'activity_logs' => 'view'],
+            'records-viewer' => ['configuration' => 'view', 'activity_logs' => 'view'],
             'ojt-intern' => ['employment_hub' => 'view'],
         ] as $slug => $permissions) {
             $this->roles[$slug] = AdminRole::create(['name' => ucfirst($slug), 'slug' => $slug, 'permissions' => $permissions, 'is_system' => true]);
@@ -54,7 +54,7 @@ class OjtInternshipTest extends TestCase
     public function test_adding_an_intern_requires_school_hours_and_dates(): void
     {
         Mail::fake();
-        Sanctum::actingAs($this->account('sleo@peso.test', 'special_law_enforcement_officer', 'administrator'));
+        Sanctum::actingAs($this->account('sleo@peso.test', 'peso_office_manager', 'administrator'));
 
         $base = ['first_name' => 'Ana', 'last_name' => 'Reyes', 'email' => 'ana@school.test', 'mobile_number' => '09171234567', 'position' => 'ojt_intern'];
 
@@ -129,7 +129,7 @@ class OjtInternshipTest extends TestCase
 
     public function test_only_interns_have_a_time_record(): void
     {
-        Sanctum::actingAs($this->account('manager@peso.test', 'peso_office_manager', 'office-manager'));
+        Sanctum::actingAs($this->account('manager@peso.test', 'administrative_aide', 'records-viewer'));
 
         $this->getJson('/api/admin/ojt/me')->assertForbidden();
         $this->postJson('/api/admin/ojt/me/time-in')->assertForbidden();
@@ -158,7 +158,7 @@ class OjtInternshipTest extends TestCase
         $day1 = $this->entry($intern, '2026-11-05', '08:00', '17:00'); // 9 h
         $day2 = $this->entry($intern, '2026-11-06', '08:00', '12:00'); // 4 h
         $day3 = $this->entry($intern, '2026-11-09', '08:00', '11:00'); // 3 h
-        Sanctum::actingAs($this->account('sleo@peso.test', 'special_law_enforcement_officer', 'administrator'));
+        Sanctum::actingAs($this->account('sleo@peso.test', 'peso_office_manager', 'administrator'));
 
         $this->postJson("/api/admin/ojt/logs/{$day1->id}/approve")
             ->assertOk()
@@ -189,7 +189,7 @@ class OjtInternshipTest extends TestCase
         $log = $intern->ojtTimeLogs()->create([
             'work_date' => '2026-11-09', 'time_in' => Carbon::parse('2026-11-09 08:00', 'Asia/Manila')->utc(), 'status' => 'open',
         ]);
-        Sanctum::actingAs($this->account('sleo@peso.test', 'special_law_enforcement_officer', 'administrator'));
+        Sanctum::actingAs($this->account('sleo@peso.test', 'peso_office_manager', 'administrator'));
 
         $this->postJson("/api/admin/ojt/logs/{$log->id}/approve")->assertStatus(422);
 
@@ -209,7 +209,7 @@ class OjtInternshipTest extends TestCase
     {
         $intern = $this->intern();
         $this->entry($intern, '2026-11-05', '08:00', '17:00');
-        Sanctum::actingAs($this->account('sleo@peso.test', 'special_law_enforcement_officer', 'administrator'));
+        Sanctum::actingAs($this->account('sleo@peso.test', 'peso_office_manager', 'administrator'));
         $payload = ['time_in' => '08:00', 'time_out' => '16:00', 'note' => 'The system was down; signed the paper logbook.'];
 
         $this->postJson("/api/admin/ojt/interns/{$intern->admin_id}/logs", $payload + ['work_date' => '2026-11-06'])
@@ -224,11 +224,11 @@ class OjtInternshipTest extends TestCase
             ->assertStatus(422)->assertJsonPath('errors.work_date.0', "You can't add hours for a future date.");
     }
 
-    public function test_the_office_manager_can_see_interns_but_not_review_hours(): void
+    public function test_view_only_staff_can_see_interns_but_not_review_hours(): void
     {
         $intern = $this->intern();
         $log = $this->entry($intern, '2026-11-05', '08:00', '17:00');
-        Sanctum::actingAs($this->account('manager@peso.test', 'peso_office_manager', 'office-manager'));
+        Sanctum::actingAs($this->account('manager@peso.test', 'administrative_aide', 'records-viewer'));
 
         $this->getJson('/api/admin/ojt/interns')
             ->assertOk()
@@ -271,7 +271,7 @@ class OjtInternshipTest extends TestCase
             ->assertForbidden()
             ->assertJsonPath('message', 'Your internship ended on November 9, 2026, so this account is now closed. Thank you for your service to PESO Urdaneta.');
 
-        $admin = $this->account('sleo@peso.test', 'special_law_enforcement_officer', 'administrator');
+        $admin = $this->account('sleo@peso.test', 'peso_office_manager', 'administrator');
         Sanctum::actingAs($admin);
 
         $staff = collect($this->getJson('/api/admin/staff')->json('data'))->firstWhere('email', 'done@school.test');
@@ -288,8 +288,8 @@ class OjtInternshipTest extends TestCase
 
     public function test_moving_someone_into_the_intern_position_needs_internship_details(): void
     {
-        $aide = $this->account('aide@peso.test', 'administrative_aide', 'office-manager');
-        Sanctum::actingAs($this->account('sleo@peso.test', 'special_law_enforcement_officer', 'administrator'));
+        $aide = $this->account('aide@peso.test', 'administrative_aide', 'records-viewer');
+        Sanctum::actingAs($this->account('sleo@peso.test', 'peso_office_manager', 'administrator'));
 
         $this->putJson("/api/admin/staff/{$aide->admin_id}", ['position' => 'ojt_intern'])
             ->assertStatus(422)

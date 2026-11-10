@@ -154,7 +154,7 @@ class RecordActivityTest extends TestCase
 
         $this->assertStringContainsString('"Date and time (PH)","User type",Name,"Position / role",Action,Description,"IP address"', $csv);
         $this->assertStringContainsString('"Created a new job fair, ""Urdaneta Jobs Fair""."', $csv);
-        $this->assertStringContainsString('Special Law Enforcement Officer', $csv);
+        $this->assertStringContainsString('PESO Office Manager', $csv);
         $this->assertDatabaseHas('activity_logs', ['action' => 'exported_activity_log']);
     }
 
@@ -168,7 +168,7 @@ class RecordActivityTest extends TestCase
         $this->get('/api/admin/activity-logs/export')->assertForbidden();
     }
 
-    private function admin(string $email = 'sleo@peso.test', string $position = 'special_law_enforcement_officer'): Administrator
+    private function admin(string $email = 'sleo@peso.test', string $position = 'peso_office_manager'): Administrator
     {
         return Administrator::forceCreate([
             'first_name' => 'Test', 'last_name' => 'Staff', 'email' => $email, 'mobile_number' => '09171234567',

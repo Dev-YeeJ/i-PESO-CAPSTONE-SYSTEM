@@ -44,7 +44,7 @@ return new class extends Migration
                 $fixes['admin_role_id'] = $adminRoleId;
             }
             if (Schema::hasColumn('administrators', 'position')) {
-                $fixes['position'] = 'special_law_enforcement_officer';
+                $fixes['position'] = 'peso_office_manager';
             }
             if (Schema::hasColumn('administrators', 'deactivated_reason')) {
                 $fixes['deactivated_reason'] = null;

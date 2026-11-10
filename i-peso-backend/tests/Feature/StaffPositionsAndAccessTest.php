@@ -28,7 +28,8 @@ class StaffPositionsAndAccessTest extends TestCase
         // Same defaults the migration seeds.
         foreach ([
             'administrator' => ['System Administrator', []],
-            'office-manager' => ['PESO Office Manager', [
+            // A view-only supervisor role, to test viewing staff without managing them.
+            'records-viewer' => ['Records Viewer', [
                 'constituent_crm' => 'manage', 'employment_hub' => 'manage', 'government_dole' => 'manage',
                 'system_reports' => 'manage', 'activity_logs' => 'view', 'configuration' => 'view',
             ]],
@@ -97,20 +98,20 @@ class StaffPositionsAndAccessTest extends TestCase
 
     // ── Activity log is its own module ──────────────────────────────────────
 
-    public function test_aides_cannot_open_the_activity_log_but_the_office_manager_can(): void
+    public function test_aides_cannot_open_the_activity_log_but_a_role_with_access_can(): void
     {
         Sanctum::actingAs($this->account('aide@peso.test', 'administrative_aide', 'administrative-aide'));
         $this->getJson('/api/admin/activity-logs')->assertForbidden();
 
-        Sanctum::actingAs($this->account('manager@peso.test', 'peso_office_manager', 'office-manager'));
+        Sanctum::actingAs($this->account('manager@peso.test', 'administrative_aide', 'records-viewer'));
         $this->getJson('/api/admin/activity-logs')->assertOk();
     }
 
-    // ── Office Manager: sees staff, can't manage them ───────────────────────
+    // ── View-only staff: see staff, can't manage them ───────────────────────
 
-    public function test_the_office_manager_can_view_staff_but_not_add_them(): void
+    public function test_view_only_staff_can_see_staff_but_not_add_them(): void
     {
-        Sanctum::actingAs($this->account('manager@peso.test', 'peso_office_manager', 'office-manager'));
+        Sanctum::actingAs($this->account('manager@peso.test', 'administrative_aide', 'records-viewer'));
 
         $this->getJson('/api/admin/staff')->assertOk()->assertJsonPath('positions.0.value', 'peso_office_manager');
         $this->getJson('/api/admin/staff/org-chart')->assertOk();
@@ -150,17 +151,17 @@ class StaffPositionsAndAccessTest extends TestCase
         // A role sent by an old client is ignored: the position decides.
         $created = $this->postJson('/api/admin/staff', $this->newStaff([
             'position' => 'administrative_aide',
-            'admin_role_id' => $this->roles['office-manager']->id,
+            'admin_role_id' => $this->roles['records-viewer']->id,
         ]))
             ->assertCreated()
             ->assertJsonPath('staff.role.slug', 'administrative-aide');
 
-        // Moving them to another position brings that position's access.
+        // Moving them to Office Manager makes them a system administrator.
         $this->putJson('/api/admin/staff/'.$created->json('staff.id'), ['position' => 'peso_office_manager'])
             ->assertOk()
             ->assertJsonPath('staff.position', 'peso_office_manager')
-            ->assertJsonPath('staff.role.slug', 'office-manager')
-            ->assertJsonPath('staff.access.activity_logs', 'view');
+            ->assertJsonPath('staff.role.slug', 'administrator')
+            ->assertJsonPath('staff.is_system_administrator', true);
     }
 
     public function test_an_email_used_by_a_seeker_or_employer_is_rejected(): void
@@ -193,7 +194,8 @@ class StaffPositionsAndAccessTest extends TestCase
         $positions = collect($this->getJson('/api/admin/staff/org-chart')->assertOk()->json('positions'))->keyBy('value');
 
         $this->assertCount(2, $positions['administrative_aide']['members']);
-        $this->assertCount(1, $positions['special_law_enforcement_officer']['members']);
+        $this->assertCount(1, $positions['peso_office_manager']['members']);
+        $this->assertCount(0, $positions['special_law_enforcement_officer']['members']);
         $this->assertSame('peso_office_manager', $positions['administrative_aide']['reports_to']);
     }
 
@@ -254,7 +256,7 @@ class StaffPositionsAndAccessTest extends TestCase
 
     private function systemAdmin(): Administrator
     {
-        return $this->account('sleo@peso.test', 'special_law_enforcement_officer', 'administrator');
+        return $this->account('sleo@peso.test', 'peso_office_manager', 'administrator');
     }
 
     private function account(string $email, string $position, string $roleSlug, string $status = 'active'): Administrator

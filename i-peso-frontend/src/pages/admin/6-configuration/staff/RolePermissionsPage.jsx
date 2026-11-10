@@ -21,7 +21,7 @@ const MODULE_HINTS = {
 }
 
 // The order positions appear on the org chart.
-const ROLE_ORDER = ['administrator', 'office-manager', 'administrative-aide', 'ojt-intern']
+const ROLE_ORDER = ['administrator', 'law-enforcement-officer', 'administrative-aide', 'ojt-intern']
 const sortRoles = (roles) => [...roles].sort((a, b) => {
   const rank = (role) => (ROLE_ORDER.includes(role.slug) ? ROLE_ORDER.indexOf(role.slug) : ROLE_ORDER.length)
   return rank(a) - rank(b) || a.name.localeCompare(b.name)
@@ -99,7 +99,7 @@ function RoleCard({ role, modules, canEdit }) {
           </h2>
           <p className="mt-1 text-xs text-slate-500">
             {role.administrators_count ?? 0} {role.administrators_count === 1 ? 'account' : 'accounts'}
-            {locked && ' · Always has full access, including staff accounts and roles'}
+            {locked && ' · The PESO Office Manager. Always has full access, including staff accounts and roles'}
           </p>
         </div>
         <Badge variant={role.is_system ? 'neutral' : 'review'} icon={false}>{role.is_system ? 'Built-in' : 'Custom'}</Badge>

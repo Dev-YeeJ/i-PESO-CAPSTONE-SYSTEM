@@ -47,8 +47,8 @@ class Administrator extends Authenticatable
     }
 
     /**
-     * The office's system administrator (the Special Law Enforcement Officer
-     * in PESO Urdaneta's org chart): the only tier that may create, change or
+     * The office's system administrator (the PESO Office Manager, at the top
+     * of PESO Urdaneta's org chart): the only tier that may create, change or
      * deactivate staff accounts and roles.
      */
     public function isSystemAdministrator(): bool

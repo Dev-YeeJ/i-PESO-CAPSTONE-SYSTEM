@@ -100,7 +100,7 @@ class StaffManagementSafetyTest extends TestCase
             ->assertForbidden()
             ->assertJsonPath('message', 'Only the system administrator can manage staff accounts.');
 
-        $this->putJson("/api/admin/staff/{$staff->admin_id}", ['position' => 'special_law_enforcement_officer'])
+        $this->putJson("/api/admin/staff/{$staff->admin_id}", ['position' => 'peso_office_manager'])
             ->assertForbidden();
 
         $this->putJson("/api/admin/roles/{$this->staffRole->id}", ['permissions' => array_keys(AdminRole::MODULES)])
