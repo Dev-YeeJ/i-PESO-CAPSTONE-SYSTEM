@@ -48,14 +48,6 @@ final class StaffPositions
         ],
     ];
 
-    public const EMPLOYMENT_TYPES = [
-        'permanent' => 'Permanent',
-        'casual' => 'Casual',
-        'job_order' => 'Job Order',
-        'contract_of_service' => 'Contract of Service',
-        'ojt' => 'OJT / Internship',
-    ];
-
     public static function keys(): array
     {
         return array_keys(self::ALL);

@@ -8,7 +8,6 @@ use App\Models\AdminRole;
 use App\Models\Administrator;
 use App\Services\ActivityLogger;
 use App\Support\StaffPositions;
-use Illuminate\Support\Arr;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Mail;
@@ -26,7 +25,6 @@ class AdminStaffController extends Controller
                 ->get()
                 ->map(fn (Administrator $staff) => $this->formatStaff($staff)),
             'positions' => StaffPositions::options(),
-            'employment_types' => StaffPositions::EMPLOYMENT_TYPES,
         ]);
     }
 
@@ -72,22 +70,17 @@ class AdminStaffController extends Controller
             ],
             'mobile_number' => ['required', 'string', 'max:20'],
             'position' => ['required', Rule::in(StaffPositions::keys())],
-            'admin_role_id' => ['nullable', 'integer', Rule::exists('admin_roles', 'id')],
-            'employee_no' => ['nullable', 'string', 'max:50'],
-            'employment_type' => ['nullable', Rule::in(array_keys(StaffPositions::EMPLOYMENT_TYPES))],
-            'date_started' => ['nullable', 'date'],
             ...$this->internshipRules($request->input('position') === StaffPositions::OJT_INTERN),
         ], [
             'email.unique' => 'This email is already used by another account.',
             ...self::INTERNSHIP_MESSAGES,
         ]);
 
-        $role = isset($data['admin_role_id'])
-            ? AdminRole::findOrFail($data['admin_role_id'])
-            : AdminRole::where('slug', StaffPositions::defaultRoleSlug($data['position']))->firstOrFail();
+        // The position decides what someone can open (its role on the Roles page).
+        $role = $this->roleFor($data['position']);
 
         $staff = Administrator::create(array_merge(
-            Arr::except($data, ['admin_role_id']),
+            $data,
             [
                 'admin_role_id' => $role->id,
                 'role' => $role->slug,
@@ -103,11 +96,10 @@ class AdminStaffController extends Controller
         $emailSent = $this->sendAccountEmail($staff, $temporaryPassword, StaffAccountMail::INVITE);
 
         ActivityLogger::log('created_staff', sprintf(
-            'Created staff account %s (%s) as %s with the %s role.%s',
+            'Created staff account %s (%s) as %s.%s',
             $this->displayName($staff),
             $staff->email,
             StaffPositions::label($staff->position),
-            $role->name,
             $emailSent ? ' Sign-in details emailed.' : ' The email could not be sent.'
         ));
 
@@ -173,10 +165,6 @@ class AdminStaffController extends Controller
             'suffix' => ['nullable', 'string', 'max:20'],
             'mobile_number' => ['sometimes', 'string', 'max:20'],
             'position' => ['sometimes', Rule::in(StaffPositions::keys())],
-            'admin_role_id' => ['sometimes', 'integer', Rule::exists('admin_roles', 'id')],
-            'employee_no' => ['nullable', 'string', 'max:50'],
-            'employment_type' => ['nullable', Rule::in(array_keys(StaffPositions::EMPLOYMENT_TYPES))],
-            'date_started' => ['nullable', 'date'],
             ...$this->internshipRules(false),
         ], self::INTERNSHIP_MESSAGES);
 
@@ -187,15 +175,17 @@ class AdminStaffController extends Controller
 
         $before = $this->comparable($staffMember, array_keys($data));
 
-        if (isset($data['admin_role_id']) && (int) $data['admin_role_id'] !== (int) $staffMember->admin_role_id) {
-            abort_if($this->isSelf($request, $staffMember), 422, 'You cannot change your own role.');
+        // A new position brings that position's access with it.
+        if (isset($data['position']) && $data['position'] !== $staffMember->position) {
+            abort_if($this->isSelf($request, $staffMember), 422, 'You cannot change your own position.');
 
-            $newRole = AdminRole::findOrFail($data['admin_role_id']);
+            $newRole = $this->roleFor($data['position']);
 
             if ($newRole->slug !== 'administrator') {
-                $this->ensureAnotherActiveAdministrator($staffMember, 'Assign another active system administrator before changing this role.');
+                $this->ensureAnotherActiveAdministrator($staffMember, 'Assign another active system administrator before changing this position.');
             }
 
+            $data['admin_role_id'] = $newRole->id;
             $data['role'] = $newRole->slug;
         }
 
@@ -208,7 +198,7 @@ class AdminStaffController extends Controller
                 'Updated staff account %s (%s): %s.',
                 $this->displayName($staffMember),
                 $staffMember->email,
-                implode(', ', array_map(fn ($field) => str_replace('_', ' ', $field === 'admin_role_id' ? 'role' : $field), $changed))
+                implode(', ', array_map(fn ($field) => str_replace(['ojt_', '_'], ['internship ', ' '], $field), $changed))
             ));
         }
 
@@ -299,6 +289,11 @@ class AdminStaffController extends Controller
         ], fn ($value) => $value !== null);
     }
 
+    private function roleFor(string $position): AdminRole
+    {
+        return AdminRole::where('slug', StaffPositions::defaultRoleSlug($position))->firstOrFail();
+    }
+
     private function isSelf(Request $request, Administrator $staffMember): bool
     {
         return $request->user()?->getKey() === $staffMember->getKey();
@@ -379,9 +374,6 @@ class AdminStaffController extends Controller
             'mobile_number' => $staff->mobile_number,
             'position' => $staff->position,
             'position_label' => StaffPositions::label($staff->position),
-            'employee_no' => $staff->employee_no,
-            'employment_type' => $staff->employment_type,
-            'date_started' => $staff->date_started?->toDateString(),
             'status' => $staff->status,
             'account_status' => $this->accountStatus($staff),
             'invited_at' => $staff->invited_at,

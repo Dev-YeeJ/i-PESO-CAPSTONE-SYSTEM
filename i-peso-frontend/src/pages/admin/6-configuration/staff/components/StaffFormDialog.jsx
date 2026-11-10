@@ -13,10 +13,6 @@ const EMPTY = {
   email: '',
   mobile_number: '',
   position: '',
-  admin_role_id: '',
-  employment_type: '',
-  employee_no: '',
-  date_started: '',
   ojt_school: '',
   ojt_course: '',
   ojt_required_hours: '',
@@ -28,7 +24,6 @@ const INTERNSHIP_FIELDS = { ojt_school: 'school', ojt_course: 'course', ojt_requ
 
 const fromStaff = (staff) => Object.fromEntries(
   Object.keys(EMPTY).map((key) => {
-    if (key === 'admin_role_id') return [key, staff.role?.id ?? '']
     if (INTERNSHIP_FIELDS[key]) return [key, staff.internship?.[INTERNSHIP_FIELDS[key]] ?? '']
     return [key, staff[key] ?? '']
   }),
@@ -36,30 +31,19 @@ const fromStaff = (staff) => Object.fromEntries(
 
 /**
  * Add a staff member (their sign-in details are emailed) or edit one.
- * Picking a position pre-selects its default role; the role can still be changed.
+ * The position decides what they can open; that's set per position on the
+ * Roles & Permissions page.
  */
-export default function StaffFormDialog({ open, onOpenChange, staff, positions, employmentTypes, roles, isSelf, onSaved }) {
+export default function StaffFormDialog({ open, onOpenChange, staff, positions, isSelf, onSaved }) {
   const isEdit = !!staff
   const [form, setForm] = useState(() => (staff ? fromStaff(staff) : EMPTY))
   const isIntern = form.position === 'ojt_intern'
   const [errors, setErrors] = useState({})
   const [formError, setFormError] = useState('')
 
-  const roleForPosition = (positionKey) => {
-    const slug = positions.find((position) => position.value === positionKey)?.default_role
-    return roles.find((role) => role.slug === slug)?.id ?? ''
-  }
-
   const set = (field) => (event) => {
     const value = event.target.value
-    setForm((current) => {
-      const next = { ...current, [field]: value }
-      // A new position brings its default role along (new accounts only —
-      // an existing person's role is changed deliberately, not as a side effect).
-      if (field === 'position' && !isEdit) next.admin_role_id = roleForPosition(value)
-      if (field === 'position' && value === 'ojt_intern' && !current.employment_type) next.employment_type = 'ojt'
-      return next
-    })
+    setForm((current) => ({ ...current, [field]: value }))
     setErrors((current) => ({ ...current, [field]: undefined }))
   }
 
@@ -91,10 +75,9 @@ export default function StaffFormDialog({ open, onOpenChange, staff, positions, 
     const payload = Object.fromEntries(
       Object.entries(form)
         .filter(([key]) => !(isEdit && key === 'email'))
-        .filter(([key]) => !(isEdit && isSelf && key === 'admin_role_id'))
+        .filter(([key]) => !(isEdit && isSelf && key === 'position'))
         .map(([key, value]) => [key, value === '' ? null : value]),
     )
-    if (!payload.admin_role_id) delete payload.admin_role_id
     if (!isIntern) Object.keys(INTERNSHIP_FIELDS).forEach((key) => delete payload[key])
     mutation.mutate(payload)
   }
@@ -106,7 +89,7 @@ export default function StaffFormDialog({ open, onOpenChange, staff, positions, 
           <DialogTitle>{isEdit ? `Edit ${staff.name}` : 'Add staff member'}</DialogTitle>
           <DialogDescription>
             {isEdit
-              ? 'Update their details, position or role.'
+              ? 'Update their details or position.'
               : 'They will receive an email with the sign-in link and a temporary password, and set their own password on first sign-in.'}
           </DialogDescription>
         </DialogHeader>
@@ -139,40 +122,19 @@ export default function StaffFormDialog({ open, onOpenChange, staff, positions, 
           </fieldset>
 
           <fieldset className="grid gap-4 sm:grid-cols-2">
-            <legend className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500">Position and access</legend>
-            <Field label="Position" required error={errors.position}>
-              <select value={form.position} onChange={set('position')} className={inputClass(errors.position)}>
+            <legend className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500">Position</legend>
+            <Field
+              label="Position"
+              required
+              hint={isEdit && isSelf ? "You can't change your own position." : 'Decides what they can open. Set what each position can open on the Roles & Permissions page.'}
+              error={errors.position}
+            >
+              <select value={form.position} onChange={set('position')} disabled={isEdit && isSelf} className={inputClass(errors.position)}>
                 <option value="">Select a position</option>
                 {positions.map((position) => (
                   <option key={position.value} value={position.value}>{position.label}</option>
                 ))}
               </select>
-            </Field>
-            <Field
-              label="Access role"
-              hint={isEdit && isSelf ? "You can't change your own role." : 'Filled in from the position. Change it only if this person needs different access.'}
-              error={errors.admin_role_id}
-            >
-              <select value={form.admin_role_id} onChange={set('admin_role_id')} disabled={isEdit && isSelf} className={inputClass(errors.admin_role_id)}>
-                <option value="">{isEdit ? 'Select a role' : 'Default for the position'}</option>
-                {roles.map((role) => (
-                  <option key={role.id} value={role.id}>{role.name}</option>
-                ))}
-              </select>
-            </Field>
-            <Field label="Employment type" error={errors.employment_type}>
-              <select value={form.employment_type} onChange={set('employment_type')} className={inputClass(errors.employment_type)}>
-                <option value="">Not specified</option>
-                {Object.entries(employmentTypes).map(([value, label]) => (
-                  <option key={value} value={value}>{label}</option>
-                ))}
-              </select>
-            </Field>
-            <Field label="Employee no. / Plantilla no." error={errors.employee_no}>
-              <input value={form.employee_no} onChange={set('employee_no')} className={inputClass(errors.employee_no)} autoComplete="off" />
-            </Field>
-            <Field label="Date started" error={errors.date_started}>
-              <input type="date" value={form.date_started} onChange={set('date_started')} className={inputClass(errors.date_started)} />
             </Field>
           </fieldset>
 

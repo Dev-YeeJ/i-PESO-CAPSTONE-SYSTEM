@@ -31,12 +31,9 @@ export default function StaffListPage() {
   const [passwordResult, setPasswordResult] = useState(null)
 
   const staffQuery = useQuery({ queryKey: STAFF_KEY, queryFn: staffService.getStaff })
-  const rolesQuery = useQuery({ queryKey: ['admin', 'roles'], queryFn: staffService.getRoles })
 
   const staff = useMemo(() => staffQuery.data?.data ?? [], [staffQuery.data])
   const positions = staffQuery.data?.positions ?? []
-  const employmentTypes = staffQuery.data?.employment_types ?? {}
-  const roles = rolesQuery.data?.data ?? []
   const selected = staff.find((member) => member.id === selectedId) ?? null
 
   const counts = useMemo(() => ({
@@ -52,7 +49,7 @@ export default function StaffListPage() {
       if (positionFilter && member.position !== positionFilter) return false
       if (statusFilter && member.account_status !== statusFilter) return false
       if (!term) return true
-      return [member.name, member.email, member.position_label, member.role?.name, member.employee_no]
+      return [member.name, member.email, member.position_label]
         .filter(Boolean)
         .some((value) => value.toLowerCase().includes(term))
     })
@@ -102,7 +99,6 @@ export default function StaffListPage() {
       ),
     },
     { key: 'position_label', label: 'Position', render: (value) => value ?? <span className="text-slate-400">Not set</span> },
-    { key: 'role', label: 'Access role', render: (role) => role?.name ?? <span className="text-slate-400">—</span> },
     {
       key: 'account_status',
       label: 'Status',
@@ -157,7 +153,7 @@ export default function StaffListPage() {
                 <input
                   value={search}
                   onChange={(event) => setSearch(event.target.value)}
-                  placeholder="Search name, email, position or role"
+                  placeholder="Search name, email or position"
                   className="w-full rounded-lg border border-slate-300 py-2 pl-9 pr-3 text-sm focus:border-brand-navy focus:outline-none focus:ring-2 focus:ring-brand-navy/20"
                 />
               </label>
@@ -204,7 +200,6 @@ export default function StaffListPage() {
 
       <StaffDetailDialog
         staff={selected}
-        employmentTypes={employmentTypes}
         canManageAccounts={canManageAccounts}
         canViewActivity={canOpen(user, 'activity_logs')}
         isSelf={selected?.id === user?.id}
@@ -219,8 +214,6 @@ export default function StaffListPage() {
           key={form.staff?.id ?? 'new'}
           staff={form.staff}
           positions={positions}
-          employmentTypes={employmentTypes}
-          roles={roles}
           isSelf={form.staff?.id === user?.id}
           onOpenChange={(open) => !open && setForm(null)}
           onSaved={handleSaved}

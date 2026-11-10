@@ -138,21 +138,29 @@ class StaffPositionsAndAccessTest extends TestCase
             ->assertJsonPath('staff.access', ['constituent_crm' => 'view', 'employment_hub' => 'view']);
 
         $this->assertStringContainsString(
-            'as OJT / Intern with the OJT Intern role',
+            'as OJT / Intern.',
             ActivityLog::where('action', 'created_staff')->value('description')
         );
     }
 
-    public function test_the_role_can_differ_from_the_position_default(): void
+    public function test_the_position_alone_decides_access(): void
     {
         Sanctum::actingAs($this->systemAdmin());
 
-        $this->postJson('/api/admin/staff', $this->newStaff([
+        // A role sent by an old client is ignored: the position decides.
+        $created = $this->postJson('/api/admin/staff', $this->newStaff([
             'position' => 'administrative_aide',
             'admin_role_id' => $this->roles['office-manager']->id,
         ]))
             ->assertCreated()
-            ->assertJsonPath('staff.role.slug', 'office-manager');
+            ->assertJsonPath('staff.role.slug', 'administrative-aide');
+
+        // Moving them to another position brings that position's access.
+        $this->putJson('/api/admin/staff/'.$created->json('staff.id'), ['position' => 'peso_office_manager'])
+            ->assertOk()
+            ->assertJsonPath('staff.position', 'peso_office_manager')
+            ->assertJsonPath('staff.role.slug', 'office-manager')
+            ->assertJsonPath('staff.access.activity_logs', 'view');
     }
 
     public function test_an_email_used_by_a_seeker_or_employer_is_rejected(): void

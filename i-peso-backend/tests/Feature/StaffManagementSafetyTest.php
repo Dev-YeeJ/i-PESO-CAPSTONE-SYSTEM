@@ -33,6 +33,11 @@ class StaffManagementSafetyTest extends TestCase
             'name' => 'Staff', 'slug' => 'staff', 'is_system' => true,
             'permissions' => ['employment_hub'],
         ]);
+        // Adding an Administrative Aide gives them this role.
+        AdminRole::create([
+            'name' => 'Administrative Aide', 'slug' => 'administrative-aide', 'is_system' => true,
+            'permissions' => ['employment_hub' => 'manage'],
+        ]);
     }
 
     // ── Sign-in and sessions ────────────────────────────────────────────────
@@ -95,7 +100,7 @@ class StaffManagementSafetyTest extends TestCase
             ->assertForbidden()
             ->assertJsonPath('message', 'Only the system administrator can manage staff accounts.');
 
-        $this->putJson("/api/admin/staff/{$staff->admin_id}", ['admin_role_id' => $this->adminRole->id])
+        $this->putJson("/api/admin/staff/{$staff->admin_id}", ['position' => 'special_law_enforcement_officer'])
             ->assertForbidden();
 
         $this->putJson("/api/admin/roles/{$this->staffRole->id}", ['permissions' => array_keys(AdminRole::MODULES)])
@@ -113,7 +118,7 @@ class StaffManagementSafetyTest extends TestCase
         $log = ActivityLog::where('action', 'created_staff')->first();
         $this->assertNotNull($log);
         $this->assertStringContainsString('new.aide@peso.test', $log->description);
-        $this->assertStringContainsString('Staff', $log->description);
+        $this->assertStringContainsString('as Administrative Aide', $log->description);
     }
 
     // ── Deactivate instead of delete ────────────────────────────────────────
@@ -160,9 +165,9 @@ class StaffManagementSafetyTest extends TestCase
             ->assertStatus(422)
             ->assertJsonPath('message', 'You cannot deactivate your own account.');
 
-        $this->putJson("/api/admin/staff/{$admin->admin_id}", ['admin_role_id' => $this->staffRole->id])
+        $this->putJson("/api/admin/staff/{$admin->admin_id}", ['position' => 'administrative_aide'])
             ->assertStatus(422)
-            ->assertJsonPath('message', 'You cannot change your own role.');
+            ->assertJsonPath('message', 'You cannot change your own position.');
     }
 
     public function test_an_office_can_never_end_up_without_an_active_system_administrator(): void
@@ -176,7 +181,7 @@ class StaffManagementSafetyTest extends TestCase
 
         // ...but the one left can't remove their own access.
         $this->postJson("/api/admin/staff/{$sleo->admin_id}/deactivate")->assertStatus(422);
-        $this->putJson("/api/admin/staff/{$sleo->admin_id}", ['admin_role_id' => $this->staffRole->id])->assertStatus(422);
+        $this->putJson("/api/admin/staff/{$sleo->admin_id}", ['position' => 'administrative_aide'])->assertStatus(422);
 
         $this->assertSame(
             1,
@@ -219,7 +224,6 @@ class StaffManagementSafetyTest extends TestCase
             'email' => 'new.aide@peso.test',
             'mobile_number' => '09181234567',
             'position' => 'administrative_aide',
-            'admin_role_id' => $this->staffRole->id,
         ];
     }
 }

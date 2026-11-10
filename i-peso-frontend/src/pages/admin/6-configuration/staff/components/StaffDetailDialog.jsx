@@ -11,7 +11,7 @@ import { ACCESS_LABELS, MODULE_LABELS } from '@/utils/adminAccess'
 import { accountStatus, errorMessage, formatDate, formatDateTime, initialsOf } from '../staffDisplay'
 
 /** One staff member's profile, with the system administrator's account actions. */
-export default function StaffDetailDialog({ staff, employmentTypes, canManageAccounts, canViewActivity, isSelf, onOpenChange, onEdit, onChanged }) {
+export default function StaffDetailDialog({ staff, canManageAccounts, canViewActivity, isSelf, onOpenChange, onEdit, onChanged }) {
   const [confirm, setConfirm] = useState(null)
   const open = !!staff
 
@@ -78,7 +78,6 @@ export default function StaffDetailDialog({ staff, employmentTypes, canManageAcc
                 <DialogDescription className="truncate">{staff.position_label ?? 'No position set'}</DialogDescription>
                 <div className="mt-2 flex flex-wrap gap-2">
                   <Badge status={status.variant}>{status.label}</Badge>
-                  {staff.role && <Badge variant="review" icon={false}>{staff.role.name}</Badge>}
                   {isSelf && <Badge variant="neutral" icon={false}>You</Badge>}
                 </div>
               </div>
@@ -88,9 +87,6 @@ export default function StaffDetailDialog({ staff, employmentTypes, canManageAcc
           <dl className="grid gap-x-6 gap-y-4 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm sm:grid-cols-2">
             <Detail label="Email" value={staff.email} />
             <Detail label="Mobile number" value={staff.mobile_number} />
-            <Detail label="Employment type" value={employmentTypes?.[staff.employment_type]} />
-            <Detail label="Employee no." value={staff.employee_no} />
-            <Detail label="Date started" value={formatDate(staff.date_started)} />
             <Detail label="Last sign-in" value={formatDateTime(staff.last_login_at) ?? 'Never signed in'} />
             {setupPending && (
               <Detail
@@ -154,7 +150,7 @@ export default function StaffDetailDialog({ staff, employmentTypes, canManageAcc
           {canManageAccounts && isSelf && (
             <div className="flex flex-wrap items-center gap-3 border-t border-slate-200 pt-4">
               <Button variant="outline" size="sm" icon={Pencil} onClick={onEdit}>Edit my details</Button>
-              <p className="text-xs text-slate-500">You can't deactivate your own account or change your own role.</p>
+              <p className="text-xs text-slate-500">You can't deactivate your own account or change your own position.</p>
             </div>
           )}
         </DialogContent>

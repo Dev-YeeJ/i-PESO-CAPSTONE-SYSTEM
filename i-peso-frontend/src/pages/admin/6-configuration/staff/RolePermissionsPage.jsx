@@ -1,14 +1,13 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { Lock, Plus, ShieldCheck, Trash2 } from 'lucide-react'
+import { Lock, ShieldCheck, Trash2 } from 'lucide-react'
 import { Badge, Button, Card, ConfirmDialog, ErrorState, LoadingSkeleton } from '@/components/ui'
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import PageHeader from '@/pages/admin/_components/PageHeader'
 import { staffService } from '@/services/staffService'
 import { useAuthStore } from '@/stores/authStore'
 import { ACCESS_LABELS, MODULE_LABELS, isSystemAdministrator } from '@/utils/adminAccess'
-import { errorMessage, fieldErrorsFrom } from './staffDisplay'
+import { errorMessage } from './staffDisplay'
 
 const LEVELS = ['none', 'view', 'manage']
 
@@ -31,7 +30,6 @@ const sortRoles = (roles) => [...roles].sort((a, b) => {
 export default function RolePermissionsPage() {
   const user = useAuthStore((s) => s.user)
   const canEdit = isSystemAdministrator(user)
-  const [creating, setCreating] = useState(false)
 
   const { data, isLoading, error, refetch } = useQuery({ queryKey: ['admin', 'roles'], queryFn: staffService.getRoles })
   const roles = sortRoles(data?.data ?? [])
@@ -41,9 +39,8 @@ export default function RolePermissionsPage() {
     <div className="portal-page">
       <PageHeader
         title="Roles & Permissions"
-        subtitle="Choose what each role can open. View only lets staff look and download; Full access also lets them add, change and delete."
+        subtitle="Choose what each position can open. View only lets staff look and download; Full access also lets them add, change and delete."
         eyebrow="Configuration"
-        actions={canEdit ? [{ label: 'Create custom role', icon: Plus, onClick: () => setCreating(true), variant: 'primary' }] : []}
       />
 
       {!canEdit && (
@@ -64,7 +61,6 @@ export default function RolePermissionsPage() {
         </div>
       )}
 
-      {creating && <CreateRoleDialog modules={modules} onClose={() => setCreating(false)} />}
     </div>
   )
 }
@@ -188,75 +184,5 @@ function LevelPicker({ label, value, onChange, disabled }) {
         )
       })}
     </div>
-  )
-}
-
-function CreateRoleDialog({ modules, onClose }) {
-  const queryClient = useQueryClient()
-  const [name, setName] = useState('')
-  const [levels, setLevels] = useState({})
-  const [errors, setErrors] = useState({})
-
-  const create = useMutation({
-    mutationFn: () => staffService.createRole({ name: name.trim(), permissions: levels }),
-    onSuccess: (data) => {
-      toast.success(`${data.role?.name ?? 'Role'} created.`)
-      queryClient.invalidateQueries({ queryKey: ['admin', 'roles'] })
-      onClose()
-    },
-    onError: (error) => {
-      const fieldErrors = fieldErrorsFrom(error)
-      setErrors(fieldErrors)
-      if (!Object.keys(fieldErrors).length) toast.error(errorMessage(error))
-    },
-  })
-
-  const submit = (event) => {
-    event.preventDefault()
-    if (!name.trim()) {
-      setErrors({ name: 'Give the role a name.' })
-      return
-    }
-    create.mutate()
-  }
-
-  return (
-    <Dialog open onOpenChange={(open) => !open && !create.isPending && onClose()}>
-      <DialogContent className="max-h-[92vh] max-w-xl overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Create custom role</DialogTitle>
-          <DialogDescription>For staff whose work doesn't fit a built-in role. You can assign it from Staff Management.</DialogDescription>
-        </DialogHeader>
-        <form id="create-role" onSubmit={submit} noValidate className="space-y-4">
-          <label className="block text-sm font-semibold text-slate-700">
-            Role name <span className="text-red-600">*</span>
-            <input
-              value={name}
-              onChange={(event) => { setName(event.target.value); setErrors({}) }}
-              placeholder="e.g. Job Fair Coordinator"
-              className={`mt-1.5 w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-navy/20 ${errors.name ? 'border-red-400' : 'border-slate-300 focus:border-brand-navy'}`}
-            />
-            {errors.name && <span className="mt-1 block text-xs font-medium text-red-600">{errors.name}</span>}
-          </label>
-          <ul className="divide-y divide-slate-100 rounded-xl border border-slate-200">
-            {modules.map((module) => (
-              <li key={module} className="flex flex-col gap-2 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
-                <p className="text-sm font-semibold text-slate-800">{MODULE_LABELS[module] ?? module}</p>
-                <LevelPicker
-                  label={`New role: ${MODULE_LABELS[module] ?? module}`}
-                  value={levels[module] ?? 'none'}
-                  disabled={create.isPending}
-                  onChange={(level) => setLevels((current) => ({ ...current, [module]: level }))}
-                />
-              </li>
-            ))}
-          </ul>
-        </form>
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose} disabled={create.isPending}>Cancel</Button>
-          <Button type="submit" form="create-role" loading={create.isPending}>Create role</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
   )
 }
