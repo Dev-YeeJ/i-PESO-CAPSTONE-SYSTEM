@@ -250,6 +250,7 @@ export default function ResetPasswordScreen() {
         onChangeText={handlePasswordChange(setPassword, 'password')}
         placeholder="Minimum 8 characters"
         error={errors.password}
+        newPassword
       />
       <PasswordStrengthMeter password={password} />
 
@@ -259,6 +260,7 @@ export default function ResetPasswordScreen() {
         onChangeText={handlePasswordChange(setConfirmPassword, 'confirmPassword')}
         placeholder="Re-enter new password"
         error={errors.confirmPassword}
+        newPassword
       />
       {password && confirmPassword && password === confirmPassword ? (
         <Text style={s.matchText}>Passwords match</Text>

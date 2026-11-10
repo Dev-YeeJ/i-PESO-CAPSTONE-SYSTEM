@@ -5,6 +5,7 @@ import * as Device from 'expo-device'
 import * as SecureStore from 'expo-secure-store'
 import Constants from 'expo-constants'
 import { seekerService } from './seekerService'
+import { reviewKeyFromNotification } from '@/utils/reviews'
 
 const STORED_TOKEN_KEY = 'ipeso_push_token'
 
@@ -134,6 +135,9 @@ export interface PushNotificationData {
   // interview_type distinguishes scheduled/updated/cancelled/reminder.
   interview_type?: string
   interview_id?: number | string
+  // Review notifications — review_invitation also carries application_id.
+  review_type?: string
+  placement_record_id?: number | string | null
 }
 
 /**
@@ -145,6 +149,14 @@ export interface PushNotificationData {
  * and listing them is a better landing experience than guessing which detail to open).
  */
 export function routeForPushData(data: PushNotificationData): string | null {
+  // Before the application_id branch: review invitations carry application_id too.
+  if (data.type === 'review_invitation') {
+    const review = reviewKeyFromNotification(data)
+    return review ? `/(seeker)/reviews?review=${encodeURIComponent(review)}&from=notifications` : '/(seeker)/reviews?from=notifications'
+  }
+  if (data.type === 'review_moderated' || data.type === 'worker_feedback_received') {
+    return '/(seeker)/reviews?from=notifications'
+  }
   if (data.type === 'interview' && data.application_id) {
     return `/(seeker)/applications/${data.application_id}`
   }

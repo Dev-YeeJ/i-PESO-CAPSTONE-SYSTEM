@@ -26,6 +26,7 @@ import { EmptyState } from '@/components/ui/EmptyState'
 import { PressableScale } from '@/components/ui/PressableScale'
 import { SectionHeader } from '@/components/ui/SectionHeader'
 import { ScreenSkeleton } from '@/components/ui/ScreenSkeleton'
+import { ApplicationReviewActions } from '@/components/reviews/ApplicationReviewActions'
 import { colors, radii, spacing, typography } from '@/theme'
 
 const STATUS_TABS = [
@@ -330,6 +331,7 @@ function ApplicationCard({
               </Button>
             ) : null}
           </View>
+          <ApplicationReviewActions applicationId={application.apply_id} />
         </Card>
       </PressableScale>
     </Animated.View>

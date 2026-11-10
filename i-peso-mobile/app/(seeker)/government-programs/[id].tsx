@@ -120,7 +120,7 @@ export default function ProgramDetailScreen() {
   const charterSteps = [
     "Review your eligibility match on this page.",
     "Prepare any requirements listed above.",
-    `Proceed to the PESO Office at ${program.venue || 'To be announced'}.`,
+    `Proceed to the PESO Office at ${program.venue || 'the City Hall'}.`,
     "Submit your requirements and undergo a brief assessment."
   ]
   const totalSlots = program.total_slots ?? 0

@@ -5,7 +5,7 @@ import { useFocusEffect } from '@react-navigation/native'
 import { useQuery } from '@tanstack/react-query'
 import MaterialIcons from '@expo/vector-icons/MaterialIcons'
 import { seekerService } from '@/services/seekerService'
-import { useAuthStore } from '@/stores/authStore'
+import { useProfilePhotoUri } from '@/hooks/useProfilePhotoUri'
 import { useResumeGeneration } from '@/hooks/useResumeGeneration'
 import { arrayFrom, addressLine, textFrom } from '@/utils/seekerView'
 import { responsibilityLines } from '@/utils/resumeBullets'
@@ -38,7 +38,6 @@ const SECTION = { personal: 1, skills: 5, work: 7 }
 
 export default function ResumeStudioScreen() {
   const router = useRouter()
-  const token = useAuthStore((state) => state.token)
   const [resumeModalOpen, setResumeModalOpen] = useState(false)
 
   // router.replace, not router.back(): resume-studio is a flat sibling in the Tabs
@@ -82,12 +81,9 @@ export default function ResumeStudioScreen() {
   // This screen has no upload action of its own to bump a photoVersion counter from
   // (unlike profile.tsx/index.tsx) — instead, a fresh timestamp is captured once per
   // mount so a re-upload made elsewhere and then navigated back to here isn't served
-  // a stale cached image under the same unchanging URL.
+  // a stale copy. Downloaded with the session token first (see useProfilePhotoUri).
   const [mountedAt] = useState(() => Date.now())
-  const imageSource = useMemo(() => {
-    if (!profile?.has_profile_image || !token) return null
-    return { uri: seekerService.profileImageUrl(`${profile.id}-${mountedAt}`), headers: { Authorization: `Bearer ${token}` } }
-  }, [profile?.has_profile_image, profile?.id, token, mountedAt])
+  const photoUri = useProfilePhotoUri(Boolean(profile?.has_profile_image), `${profile?.id ?? 'me'}-${mountedAt}`)
 
   // Sorted most-recent-first, same as the generated PDF (mirrors web's resumeSortValue).
   const sortedExperiences = useMemo(
@@ -193,8 +189,8 @@ export default function ResumeStudioScreen() {
           <Card padding="lg" style={styles.previewCard}>
             <View style={styles.previewHeaderRow}>
               <View style={styles.previewAvatar}>
-                {imageSource ? (
-                  <Image source={imageSource} style={styles.previewAvatarImage} />
+                {photoUri ? (
+                  <Image source={{ uri: photoUri }} style={styles.previewAvatarImage} />
                 ) : (
                   <Text style={styles.previewAvatarText}>{initials(profile) || '?'}</Text>
                 )}

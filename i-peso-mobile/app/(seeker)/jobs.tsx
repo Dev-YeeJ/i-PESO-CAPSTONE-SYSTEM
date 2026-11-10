@@ -14,7 +14,7 @@ import { useRouter } from 'expo-router'
 import { LinearGradient } from 'expo-linear-gradient'
 import { Button } from '@/components/ui/Button'
 import type { AxiosError } from 'axios'
-import type { JobFilters } from '@/services/seekerService'
+import type { JobFilters, NearbyJob } from '@/services/seekerService'
 import { seekerService } from '@/services/seekerService'
 import { useToggleSavedJob } from '@/hooks/use-toggle-saved-job'
 import { AlertBox } from '@/components/ui/AlertBox'
@@ -24,7 +24,10 @@ import { PressableScale } from '@/components/ui/PressableScale'
 import { SegmentedControl } from '@/components/ui/SegmentedControl'
 import { JobFeedCard } from '@/components/seeker/JobFeedCard'
 import { JobFeedSkeleton } from '@/components/seeker/JobFeedSkeleton'
+import { useEmployerRatings } from '@/hooks/useEmployerRatings'
 import { colors, gradients, radii, shadows, spacing, textStyles, typography } from '@/theme'
+
+const EMPTY_JOBS: NearbyJob[] = []
 
 type FeedMode = NonNullable<JobFilters['feedMode']>
 
@@ -129,8 +132,10 @@ export default function JobsScreen() {
     retry: false,
   })
 
-  const jobs = jobsData?.jobs ?? []
+  const jobs = jobsData?.jobs ?? EMPTY_JOBS
   const visibleJobs = jobs.slice(0, visibleCount)
+  // One ratings request for the whole feed (not per "load more" page), like the website.
+  const employerRatings = useEmployerRatings(jobs)
   const locationRequired = (jobsError as AxiosError<{ code?: string }>)?.response?.data?.code === 'location_required'
   const errorMessage = jobsError && !locationRequired
     ? ((jobsError as AxiosError<{ message?: string }>).response?.data?.message || 'Unable to load jobs. Check the backend connection.')
@@ -185,6 +190,7 @@ export default function JobsScreen() {
             saving={toggleSavedMutation.isPending && String(toggleSavedMutation.variables) === String(item.post_id)}
             onPress={() => router.push({ pathname: '/(seeker)/jobs/[id]', params: { id: String(item.post_id), from: 'jobs' } })}
             onToggleSave={() => toggleSavedMutation.mutate(String(item.post_id))}
+            rating={item.employer?.employer_id ? employerRatings[String(item.employer.employer_id)] : undefined}
           />
         )}
         contentContainerStyle={styles.content}

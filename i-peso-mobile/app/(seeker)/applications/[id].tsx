@@ -16,6 +16,7 @@ import { EmptyState } from '@/components/ui/EmptyState'
 import { PressableScale } from '@/components/ui/PressableScale'
 import { ScreenHeader } from '@/components/ui/ScreenHeader'
 import { ScreenSkeleton } from '@/components/ui/ScreenSkeleton'
+import { ApplicationReviewActions } from '@/components/reviews/ApplicationReviewActions'
 import { colors, radii, spacing, typography } from '@/theme'
 
 export default function ApplicationDetailScreen() {
@@ -220,6 +221,9 @@ export default function ApplicationDetailScreen() {
             </Card>
           </>
         ) : null}
+
+        {/* Rate buttons / "You reviewed this employer" — renders nothing when neither applies. */}
+        <ApplicationReviewActions applicationId={application.apply_id} />
       </ScrollView>
 
       {application.can_withdraw ? (

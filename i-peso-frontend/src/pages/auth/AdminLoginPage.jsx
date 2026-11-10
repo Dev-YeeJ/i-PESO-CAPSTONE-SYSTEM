@@ -3,7 +3,7 @@ import { Eye, EyeOff, ShieldCheck, XCircle } from 'lucide-react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { authService } from '@/services/authService'
 import { useAuthStore } from '@/stores/authStore'
-import { adminHomePath } from '@/utils/adminAccess'
+import { adminLandingPath } from '@/utils/adminAccess'
 
 const validate = (email, password) => {
   const errors = {}
@@ -63,8 +63,10 @@ export default function AdminLoginPage() {
         navigate('/admin/set-password', { replace: true })
         return
       }
+      // ?redirect= may be left over from someone else's session — only follow it when this
+      // account can open that page; otherwise land on their home (the dashboard).
       const redirect = new URLSearchParams(location.search).get('redirect')
-      navigate(redirect ?? adminHomePath(data.user), { replace: true })
+      navigate(adminLandingPath(data.user, redirect), { replace: true })
     } catch (error) {
       setApiError(error.response?.data?.message ?? CREDENTIALS_ERROR)
     } finally {

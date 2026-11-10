@@ -45,6 +45,7 @@ export default function SeekerLayout() {
       <Tabs.Screen name="employer-posters" options={{ href: null }} />
       <Tabs.Screen name="government-programs/[id]" options={{ href: null }} />
       <Tabs.Screen name="employers/[id]" options={{ href: null }} />
+      <Tabs.Screen name="reviews" options={{ href: null }} />
       <Tabs.Screen name="assistant" options={{ href: null }} />
       <Tabs.Screen name="job-map" options={{ href: null }} />
     </Tabs>

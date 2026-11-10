@@ -773,7 +773,8 @@ function CountryField({ label, value, onChange, error, required = false }: { lab
   )
 }
 
-function CalendarField({ label, value, onChange, error, required = false, maximumDate }: { label: string; value: string; onChange: (value: string) => void; error?: string; required?: boolean; maximumDate?: Date }) {
+// Also used by the certificate upload sheet on the Profile screen.
+export function CalendarField({ label, value, onChange, error, required = false, maximumDate }: { label: string; value: string; onChange: (value: string) => void; error?: string; required?: boolean; maximumDate?: Date }) {
   const [open, setOpen] = useState(false)
   const date = parseDate(value) ?? new Date()
 

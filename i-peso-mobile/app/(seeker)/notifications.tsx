@@ -14,6 +14,7 @@ import { EmptyState } from '@/components/ui/EmptyState'
 import { ScreenSkeleton } from '@/components/ui/ScreenSkeleton'
 import { colors, spacing, typography } from '@/theme'
 import { formatDistanceToNow } from 'date-fns'
+import { reviewKeyFromNotification } from '@/utils/reviews'
 
 // Every backend Notification class (ApplicationStatusNotification, GovernmentProgramNotification,
 // InterviewBaseNotification, JobFairNotification/JobFairPublished) keys this as `data.type` — it
@@ -91,7 +92,15 @@ export default function NotificationsScreen() {
       markReadMutation.mutate(notification.id)
     }
 
-    if (notification.data?.type === 'interview' && notification.data?.application_id) {
+    // Review notifications go first: invitations also carry application_id, which the
+    // branch below would otherwise send to the Applications list.
+    const notificationType = notification.data?.type
+    if (notificationType === 'review_invitation') {
+      const review = reviewKeyFromNotification(notification.data)
+      router.push({ pathname: '/(seeker)/reviews', params: review ? { review, from: 'notifications' } : { from: 'notifications' } })
+    } else if (notificationType === 'review_moderated' || notificationType === 'worker_feedback_received') {
+      router.push({ pathname: '/(seeker)/reviews', params: { from: 'notifications' } })
+    } else if (notification.data?.type === 'interview' && notification.data?.application_id) {
       router.push(`/(seeker)/applications/${notification.data.application_id}` as any)
     } else if (notification.data?.application_id) {
       router.push('/(seeker)/applications')

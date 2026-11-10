@@ -83,7 +83,7 @@ const SEEKER_STARTERS: { icon: StarterIcon; text: string }[] = [
 function greetingFor(firstName?: string) {
   const hello = `Kumusta po${firstName ? ` ${firstName}` : ''}!`
   return (
-    `${hello} Ako si Ace, ang inyong Assistant for Career and Employment. ` +
+    `${hello} Ako si ACE, ang inyong Assistant for Career and Employment. ` +
     'Tanungin mo ako tungkol sa job matches, application status, o job fairs — paano kita matutulungan ngayon?'
   )
 }
@@ -176,7 +176,7 @@ export default function AssistantScreen() {
             <View style={styles.heroText}>
               <View style={styles.heroNameRow}>
                 <MaterialIcons name="auto-awesome" size={14} color={colors.blue200} />
-                <Text style={styles.heroName}>Ace</Text>
+                <Text style={styles.heroName}>ACE</Text>
               </View>
               <Text style={styles.heroRole}>Assistant for Career and Employment</Text>
             </View>
@@ -297,7 +297,7 @@ export default function AssistantScreen() {
               onChangeText={setInput}
               onFocus={onInputFocus}
               onBlur={onInputBlur}
-              placeholder="Magtanong kay Ace…"
+              placeholder="Magtanong kay ACE…"
               placeholderTextColor={colors.subtle}
               maxLength={500}
               editable={!sending}

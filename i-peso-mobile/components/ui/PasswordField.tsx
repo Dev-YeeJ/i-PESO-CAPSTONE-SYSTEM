@@ -12,6 +12,9 @@ interface PasswordFieldProps {
   error?: string
   autoFocus?: boolean
   labelRight?: ReactNode
+  /** Marks the field as a new password (web's autoComplete="new-password"), so password
+   *  managers offer to generate/save one instead of filling the current password. */
+  newPassword?: boolean
 }
 
 export function PasswordField({
@@ -23,6 +26,7 @@ export function PasswordField({
   error,
   autoFocus = false,
   labelRight,
+  newPassword = false,
 }: PasswordFieldProps) {
   const [focused, setFocused] = useState(false)
   const [visible, setVisible] = useState(false)
@@ -49,6 +53,8 @@ export function PasswordField({
           autoCapitalize="none"
           autoCorrect={false}
           autoFocus={autoFocus}
+          autoComplete={newPassword ? 'new-password' : undefined}
+          textContentType={newPassword ? 'newPassword' : undefined}
         />
         <TouchableOpacity
           onPress={() => setVisible((v) => !v)}

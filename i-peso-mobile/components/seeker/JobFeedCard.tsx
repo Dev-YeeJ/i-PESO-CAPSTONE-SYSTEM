@@ -15,7 +15,7 @@ import Animated, {
   withSpring,
 } from 'react-native-reanimated'
 import { LinearGradient } from 'expo-linear-gradient'
-import type { NearbyJob } from '@/services/seekerService'
+import type { EmployerRatingBadge, NearbyJob } from '@/services/seekerService'
 import { Badge } from '@/components/ui/Badge'
 import { EmployerPreferenceChip } from '@/components/ui/EmployerPreferenceChip'
 import { MatchRing } from '@/components/ui/MatchRing'
@@ -30,13 +30,15 @@ interface JobFeedCardProps {
   saving?: boolean
   onPress: () => void
   onToggleSave: () => void
+  /** Verified-review badge for the employer (from useEmployerRatings); absent below 3 reviewers. */
+  rating?: EmployerRatingBadge
 }
 
 /** Drag distance at which the swipe commits. Roughly the width of the action panel behind. */
 const SWIPE_THRESHOLD = 72
 const SWIPE_MAX = 104
 
-export function JobFeedCard({ job, index = 0, saving = false, onPress, onToggleSave }: JobFeedCardProps) {
+export function JobFeedCard({ job, index = 0, saving = false, onPress, onToggleSave, rating }: JobFeedCardProps) {
   const router = useRouter()
   const m = useMotion()
   const requiredSkills = listFrom(job.required_skills).slice(0, 3)
@@ -149,11 +151,25 @@ export function JobFeedCard({ job, index = 0, saving = false, onPress, onToggleS
               </Pressable>
               <View style={styles.titleWrap}>
                 <Text style={styles.title} numberOfLines={2}>{textFrom(job.job_title, 'Untitled job')}</Text>
-                <Pressable
-                  onPress={() => job.employer?.employer_id && router.push({ pathname: '/(seeker)/employers/[id]', params: { id: String(job.employer.employer_id), from: 'feed' } })}
-                >
-                  <Text style={styles.company} numberOfLines={1}>{jobCompany(job)}</Text>
-                </Pressable>
+                <View style={styles.companyRow}>
+                  <Pressable
+                    style={styles.companyPress}
+                    onPress={() => job.employer?.employer_id && router.push({ pathname: '/(seeker)/employers/[id]', params: { id: String(job.employer.employer_id), from: 'feed' } })}
+                  >
+                    <Text style={styles.company} numberOfLines={1}>{jobCompany(job)}</Text>
+                  </Pressable>
+                  {rating ? (
+                    <View
+                      style={styles.rating}
+                      accessible
+                      accessibilityLabel={`Rated ${rating.average.toFixed(1)} out of 5 by ${rating.reviewers} verified reviewers`}
+                    >
+                      <MaterialIcons name="star" size={14} color={colors.accent} />
+                      <Text style={styles.ratingValue}>{rating.average.toFixed(1)}</Text>
+                      <Text style={styles.ratingCount}>({rating.reviewers})</Text>
+                    </View>
+                  ) : null}
+                </View>
               </View>
               {job.match_deferred ? null : <MatchRing percentage={match} size={52} strokeWidth={5} />}
             </View>
@@ -300,8 +316,30 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
   },
   company: {
-    marginTop: spacing.xs,
     ...textStyles.smallMedium,
+    color: colors.textSecondary,
+  },
+  companyRow: {
+    marginTop: spacing.xs,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  companyPress: {
+    flexShrink: 1,
+  },
+  rating: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    flexShrink: 0,
+  },
+  ratingValue: {
+    ...textStyles.smallBold,
+    color: colors.textPrimary,
+  },
+  ratingCount: {
+    ...textStyles.small,
     color: colors.textSecondary,
   },
   // Salary sits directly under the title, above the other meta: after the match score it is

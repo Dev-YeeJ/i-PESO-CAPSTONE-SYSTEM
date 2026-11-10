@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   Alert,
@@ -36,6 +36,8 @@ import {
 } from '@/utils/resumeBullets'
 import MaterialIcons from '@expo/vector-icons/MaterialIcons'
 import { SelectField } from '@/components/onboarding/formPrimitives'
+import { CalendarField } from '@/components/onboarding/Steps'
+import { useProfilePhotoUri } from '@/hooks/useProfilePhotoUri'
 import { AlertBox } from '@/components/ui/AlertBox'
 import { BottomSheet } from '@/components/ui/BottomSheet'
 import { Button } from '@/components/ui/Button'
@@ -57,6 +59,48 @@ const CERTIFICATE_CATEGORIES = [
 // everything else may stand alone. Mirrors SeekerCertificateController::CATEGORIES_REQUIRING_TRAINING
 // and i-peso-frontend's CertificateUploadModal.jsx.
 const CATEGORIES_REQUIRING_TRAINING = ['training_certificate', 'tesda_nc_certificate']
+
+type CertificateFieldErrors = Partial<Record<'title' | 'issuingBody' | 'trainingId' | 'issuedAt' | 'expiresAt' | 'file', string>>
+
+const CERTIFICATE_FILE_EXTENSIONS = ['pdf', 'jpg', 'jpeg', 'png']
+const CERTIFICATE_MAX_BYTES = 5 * 1024 * 1024
+
+// Mirrors validate() in i-peso-frontend's CertificateUploadModal.jsx (same rules, same copy),
+// which in turn mirrors SeekerCertificateController::store. "Today" is the UTC date, like the
+// web form and the backend's before_or_equal:today (the app timezone is UTC), so the app never
+// accepts a date the server then rejects. Computed per call so it can't go stale overnight.
+function validateCertificate(form: {
+  title: string
+  issuingBody: string
+  category: string
+  issuedAt: string
+  expiresAt: string
+  trainingId: string
+  file: { name: string; size?: number } | null
+  requiresTraining: boolean
+  hasTrainings: boolean
+  hasSelectedTraining: boolean
+}): CertificateFieldErrors {
+  const errors: CertificateFieldErrors = {}
+  const today = new Date().toISOString().slice(0, 10)
+  if (!form.hasSelectedTraining && !form.title.trim()) errors.title = 'Certificate title is required.'
+  if (!form.hasSelectedTraining && !form.issuingBody.trim()) errors.issuingBody = 'Issuing organization is required.'
+  if (form.requiresTraining && !form.trainingId) {
+    errors.trainingId = form.hasTrainings
+      ? 'Link this certificate to one of your trainings.'
+      : 'Add a training record first, then link it here.'
+  }
+  if (!form.issuedAt) errors.issuedAt = 'Issue date is required.'
+  else if (form.issuedAt > today) errors.issuedAt = 'Issue date cannot be in the future.'
+  if (form.expiresAt && form.issuedAt && form.expiresAt <= form.issuedAt) errors.expiresAt = 'Expiration date must be after the issue date.'
+  if (!form.file) errors.file = 'Select a certificate proof file.'
+  else {
+    const extension = form.file.name.split('.').pop()?.toLowerCase() ?? ''
+    if (!CERTIFICATE_FILE_EXTENSIONS.includes(extension)) errors.file = 'Use a PDF, JPG, JPEG, or PNG file.'
+    else if ((form.file.size ?? 0) > CERTIFICATE_MAX_BYTES) errors.file = 'The proof file must not exceed 5 MB.'
+  }
+  return errors
+}
 
 // The picker's crop keeps full camera resolution, so a phone photo can be several MB — over
 // the backend's 2MB limit and often over the server's PHP post_max_size, which makes PHP drop
@@ -90,7 +134,6 @@ async function prepareProfilePhoto(asset: ImagePicker.ImagePickerAsset): Promise
 }
 
 export default function ProfileScreen() {
-  const token = useAuthStore((state) => state.token)
   const logout = useAuthStore((state) => state.logout)
   const queryClient = useQueryClient()
   const params = useLocalSearchParams<{ returnSection?: string }>()
@@ -202,14 +245,11 @@ export default function ProfileScreen() {
   const occupations = arrayFrom<Record<string, unknown>>(profile?.occupations)
   const certificates: SeekerCertificate[] = profile?.certificates ?? []
 
-  // photoVersion (bumped after every successful upload/delete) is included alongside
-  // profile.id in the cache-busting query param — profile.id alone doesn't change on a
-  // same-account re-upload, so React Native's native image loader (which caches purely by
-  // URL string) had no signal to refetch and kept showing whatever was cached before.
-  const imageSource = useMemo(() => {
-    if (!profile?.has_profile_image || !token) return null
-    return { uri: seekerService.profileImageUrl(`${profile.id}-${photoVersion}`), headers: { Authorization: `Bearer ${token}` } }
-  }, [profile?.has_profile_image, profile?.id, token, photoVersion])
+  // photoVersion (bumped after every successful upload/delete) is part of the cache key —
+  // profile.id alone doesn't change on a same-account re-upload. The photo is downloaded with
+  // the session token first (see useProfilePhotoUri); until it arrives the initial shows.
+  const hasPhoto = Boolean(profile?.has_profile_image)
+  const photoUri = useProfilePhotoUri(hasPhoto, `${profile?.id ?? 'me'}-${photoVersion}`)
 
   const invalidateProfile = () => queryClient.invalidateQueries({ queryKey: ['seekerProfile'] })
 
@@ -388,18 +428,18 @@ export default function ProfileScreen() {
               onPress={pickAndUploadPhoto}
               disabled={photoBusy}
               accessibilityRole="button"
-              accessibilityLabel={imageSource ? 'Change profile photo' : 'Add profile photo'}
+              accessibilityLabel={hasPhoto ? 'Change profile photo' : 'Add profile photo'}
             >
               <View style={styles.avatar}>
                 {photoBusy ? (
                   <ActivityIndicator color={colors.surface} />
-                ) : imageSource ? (
-                  <Image source={imageSource} style={styles.avatarImage} />
+                ) : photoUri ? (
+                  <Image source={{ uri: photoUri }} style={styles.avatarImage} />
                 ) : (
                   <Text style={styles.avatarText}>{seekerName(profile).charAt(0).toUpperCase()}</Text>
                 )}
               </View>
-              <Text style={styles.avatarEditLabel}>{imageSource ? 'Change' : 'Add photo'}</Text>
+              <Text style={styles.avatarEditLabel}>{hasPhoto ? 'Change' : 'Add photo'}</Text>
             </PressableScale>
             <View style={styles.profileHeaderText}>
               <View style={styles.nameRow}>
@@ -415,7 +455,7 @@ export default function ProfileScreen() {
                   <ActivityIndicator size="small" color={colors.info} />
                   <Text style={styles.savingText}>Saving photo...</Text>
                 </View>
-              ) : imageSource ? (
+              ) : hasPhoto ? (
                 <PressableScale scaleTo="buttonPress" ripple={null} onPress={deletePhoto} disabled={photoBusy} accessibilityRole="button">
                   <Text style={styles.removePhotoText}>Remove photo</Text>
                 </PressableScale>
@@ -806,6 +846,21 @@ export default function ProfileScreen() {
           </Button>
         </Card>
 
+        <SectionHeader title="My Reviews" />
+        <Card padding="md">
+          <Text style={styles.muted}>
+            Rate employers you&apos;ve applied to or worked for, and read employers&apos; feedback about you. Your name is never shown.
+          </Text>
+          <Button
+            variant="outline"
+            fullWidth
+            onPress={() => router.push('/(seeker)/reviews')}
+            style={styles.updateBtn}
+          >
+            Open My Reviews
+          </Button>
+        </Card>
+
         <Button variant="primary" fullWidth onPress={() => router.push('/(seeker)/profile/edit')} style={styles.editAllBtn}>
           Edit profile details
         </Button>
@@ -890,10 +945,13 @@ function CertificateUploadModal({
   const [issuingBody, setIssuingBody] = useState('')
   const [category, setCategory] = useState(CERTIFICATE_CATEGORIES[0])
   const [issuedAt, setIssuedAt] = useState('')
+  const [expiresAt, setExpiresAt] = useState('')
+  const [credentialNumber, setCredentialNumber] = useState('')
   const [trainingId, setTrainingId] = useState('')
   const [file, setFile] = useState<{ uri: string; name: string; mimeType: string; size?: number } | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const [fieldErrors, setFieldErrors] = useState<CertificateFieldErrors>({})
 
   const requiresTraining = CATEGORIES_REQUIRING_TRAINING.includes(category)
   const blockedByNoTrainings = requiresTraining && trainings.length === 0
@@ -903,7 +961,8 @@ function CertificateUploadModal({
   const effectiveIssuingBody = selectedTraining ? (textFrom(selectedTraining.training_institution) || 'Training Provider') : issuingBody.trim()
 
   const reset = () => {
-    setTitle(''); setIssuingBody(''); setCategory(CERTIFICATE_CATEGORIES[0]); setIssuedAt(''); setTrainingId(''); setFile(null); setError('')
+    setTitle(''); setIssuingBody(''); setCategory(CERTIFICATE_CATEGORIES[0]); setIssuedAt(''); setExpiresAt('')
+    setCredentialNumber(''); setTrainingId(''); setFile(null); setError(''); setFieldErrors({})
   }
 
   const pickFile = async () => {
@@ -921,12 +980,13 @@ function CertificateUploadModal({
   }
 
   const submit = async () => {
-    if (!effectiveTitle || !effectiveIssuingBody || !issuedAt.trim() || !file) {
-      setError('Title, issuing body, issued date, and a file are required.')
-      return
-    }
-    if (requiresTraining && !trainingId) {
-      setError('Link this certificate to one of your trainings, or add the training first.')
+    const errors = validateCertificate({
+      title, issuingBody, category, issuedAt, expiresAt, trainingId, file,
+      requiresTraining, hasTrainings: trainings.length > 0, hasSelectedTraining: Boolean(selectedTraining),
+    })
+    setFieldErrors(errors)
+    if (Object.keys(errors).length > 0 || !file) {
+      setError('')
       return
     }
     setBusy(true)
@@ -936,7 +996,9 @@ function CertificateUploadModal({
         title: effectiveTitle,
         issuing_body: effectiveIssuingBody,
         category,
-        issued_at: issuedAt.trim(),
+        issued_at: issuedAt,
+        expires_at: expiresAt || null,
+        credential_number: credentialNumber.trim() || null,
         training_id: trainingId || null,
       })
       reset()
@@ -983,9 +1045,6 @@ function CertificateUploadModal({
             </PressableScale>
           ))}
         </View>
-        <Text style={styles.label}>Issued Date (YYYY-MM-DD)</Text>
-        <TextInput style={styles.modalInput} value={issuedAt} onChangeText={setIssuedAt} placeholder="2024-06-15" placeholderTextColor={colors.subtle} />
-
         <SelectField
           label={`Related Training Record${requiresTraining ? '' : ' (Optional)'}`}
           required={requiresTraining}
@@ -996,16 +1055,31 @@ function CertificateUploadModal({
           }))}
           value={trainingId}
           onChange={setTrainingId}
+          error={fieldErrors.trainingId}
         />
 
         {!selectedTraining ? (
           <>
-            <Text style={styles.label}>Certificate / Training Title</Text>
-            <TextInput style={styles.modalInput} value={title} onChangeText={setTitle} placeholder="e.g. NC II Housekeeping" placeholderTextColor={colors.subtle} />
-            <Text style={styles.label}>Issuing Organization / Provider</Text>
-            <TextInput style={styles.modalInput} value={issuingBody} onChangeText={setIssuingBody} placeholder="e.g. TESDA" placeholderTextColor={colors.subtle} />
+            <Text style={styles.label}>Certificate / Training Title *</Text>
+            <TextInput style={[styles.modalInput, fieldErrors.title && styles.modalInputError]} value={title} onChangeText={setTitle} maxLength={255} placeholder="e.g. Computer Systems Servicing NC II" placeholderTextColor={colors.subtle} />
+            {fieldErrors.title ? <Text style={styles.fieldError}>{fieldErrors.title}</Text> : null}
+            <Text style={styles.label}>Issuing Organization / Provider *</Text>
+            <TextInput style={[styles.modalInput, fieldErrors.issuingBody && styles.modalInputError]} value={issuingBody} onChangeText={setIssuingBody} maxLength={255} placeholder="e.g. TESDA" placeholderTextColor={colors.subtle} />
+            {fieldErrors.issuingBody ? <Text style={styles.fieldError}>{fieldErrors.issuingBody}</Text> : null}
           </>
         ) : null}
+
+        <CalendarField label="Issue Date" required value={issuedAt} onChange={setIssuedAt} maximumDate={new Date()} error={fieldErrors.issuedAt} />
+        <CalendarField label="Expiration Date (Optional)" value={expiresAt} onChange={setExpiresAt} error={fieldErrors.expiresAt} />
+        {expiresAt ? (
+          <PressableScale scaleTo="buttonPress" ripple={null} onPress={() => setExpiresAt('')} accessibilityRole="button" style={styles.clearDate}>
+            <Text style={styles.clearDateText}>Clear expiration date</Text>
+          </PressableScale>
+        ) : null}
+
+        <Text style={styles.label}>Credential Number (Optional)</Text>
+        <TextInput style={styles.modalInput} value={credentialNumber} onChangeText={setCredentialNumber} maxLength={100} placeholder="Certificate or license number" placeholderTextColor={colors.subtle} autoCapitalize="characters" />
+
         {blockedByNoTrainings ? (
           <AlertBox variant="warning" style={{ marginBottom: spacing.md }}>
             This category needs a training record on file. Add one under the Trainings section first, then come back to link it here.
@@ -1015,9 +1089,12 @@ function CertificateUploadModal({
         ) : null}
 
         {!file ? (
-          <Button variant="outline" onPress={pickFile} style={{ marginTop: spacing.sm, marginBottom: spacing.md }}>
-            Choose file (PDF, JPG, PNG)
-          </Button>
+          <>
+            <Button variant="outline" onPress={pickFile} style={{ marginTop: spacing.sm, marginBottom: fieldErrors.file ? spacing.xs : spacing.md }}>
+              Choose file (PDF, JPG, PNG)
+            </Button>
+            {fieldErrors.file ? <Text style={styles.fieldError}>{fieldErrors.file}</Text> : null}
+          </>
         ) : (
           <View style={styles.filePreviewCard}>
             <Text style={styles.filePreviewTitle}>Selected File</Text>
@@ -1037,6 +1114,7 @@ function CertificateUploadModal({
               <Button variant="outline" onPress={pickFile} style={styles.filePreviewBtn}>Replace File</Button>
               <Button variant="outline" onPress={() => setFile(null)} style={styles.filePreviewBtn}>Remove</Button>
             </View>
+            {fieldErrors.file ? <Text style={[styles.fieldError, styles.fileErrorInCard]}>{fieldErrors.file}</Text> : null}
           </View>
         )}
       </ScrollView>
@@ -1144,6 +1222,11 @@ const styles = StyleSheet.create({
   modalInput: { borderWidth: 1, borderColor: colors.border, borderRadius: radii.md, padding: spacing.md, color: colors.textPrimary, fontSize: typography.body, marginBottom: spacing.md },
   label: { marginBottom: spacing.xs, color: colors.textSecondary, fontSize: typography.small, fontFamily: typography.family.bold },
   trainingHint: { marginBottom: spacing.md, color: colors.secondary, fontSize: typography.small, fontFamily: typography.family.medium },
+  modalInputError: { borderColor: colors.errorBorder, backgroundColor: colors.errorBackground, marginBottom: spacing.xs },
+  fieldError: { color: colors.error, fontSize: typography.small, fontFamily: typography.family.medium, marginBottom: spacing.md },
+  fileErrorInCard: { marginTop: spacing.sm, marginBottom: 0 },
+  clearDate: { alignSelf: 'flex-start', marginTop: -spacing.sm, marginBottom: spacing.md, paddingVertical: spacing.xs },
+  clearDateText: { color: colors.secondary, fontSize: typography.small, fontFamily: typography.family.bold },
   categoryChip: { borderWidth: 1, borderColor: colors.border, borderRadius: radii.pill, paddingHorizontal: spacing.md, paddingVertical: spacing.xs, marginBottom: spacing.sm },
   categoryChipActive: { borderColor: colors.blue600, backgroundColor: colors.blue50 },
   categoryChipText: { fontSize: 11, color: colors.textSecondary, textTransform: 'capitalize' },

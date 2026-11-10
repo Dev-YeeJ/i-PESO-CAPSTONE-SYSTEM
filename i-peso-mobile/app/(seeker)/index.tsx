@@ -18,6 +18,8 @@ import Animated, { FadeInUp } from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import type { NearbyJob, NearbyJobsResponse, ProfileStrengthItem, SeekerProfile } from '@/services/seekerService'
 import { seekerService } from '@/services/seekerService'
+import { useProfilePhotoUri } from '@/hooks/useProfilePhotoUri'
+import { useEmployerRatings } from '@/hooks/useEmployerRatings'
 import { useAuthStore } from '@/stores/authStore'
 import { useMotion } from '@/hooks/useMotion'
 import { firstName, listFrom } from '@/utils/seekerView'
@@ -82,7 +84,6 @@ function pickNextBestAction(items?: ProfileStrengthItem[]) {
 export default function SeekerHomeScreen() {
   const insets = useSafeAreaInsets()
   const user = useAuthStore((state) => state.user)
-  const token = useAuthStore((state) => state.token)
 
   const queryClient = useQueryClient()
   // Shares the ['seekerProfile'] query with the Profile screen, which invalidates it after a
@@ -151,6 +152,13 @@ export default function SeekerHomeScreen() {
     queryFn: () => seekerService.searchJobs({ radiusKm: 20, limit: 8, feedMode: 'latest' }),
   })
   const feedQueries = { recommended: recommendedQuery, nearby: nearbyQuery, latest: latestQuery }
+  // Verified-review ratings for every employer across the three feeds, in one request
+  // (JobSeekerHome.jsx's ratingEmployerIds / employerRatings).
+  const allFeedJobs = useMemo(
+    () => [...(recommendedQuery.data?.jobs ?? []), ...(nearbyQuery.data?.jobs ?? []), ...(latestQuery.data?.jobs ?? [])],
+    [recommendedQuery.data, nearbyQuery.data, latestQuery.data],
+  )
+  const employerRatings = useEmployerRatings(allFeedJobs)
   const feedCounts = {
     recommended: recommendedQuery.data?.jobs?.length ?? 0,
     nearby: nearbyQuery.data?.jobs?.length ?? 0,
@@ -196,14 +204,11 @@ export default function SeekerHomeScreen() {
   }, [loadProfile])
 
   const activeProfile = profile ?? user
-  // profileFetchedAt (the query's dataUpdatedAt, new on every fetch) rides along as the cache-bust value —
-  // profile.id alone never changes for the same account, so after a photo upload from the
-  // Profile screen, revisiting the dashboard would otherwise still show whatever React
-  // Native's native image loader had already cached for that unchanged URL.
-  const avatarSource = useMemo(() => {
-    if (!profile?.has_profile_image || !token) return null
-    return { uri: seekerService.profileImageUrl(`${profile.id}-${profileFetchedAt}`), headers: { Authorization: `Bearer ${token}` } }
-  }, [profile?.has_profile_image, profile?.id, token, profileFetchedAt])
+  // profileFetchedAt (the query's dataUpdatedAt, new on every fetch) is part of the cache key —
+  // profile.id alone never changes for the same account, so a photo uploaded from the Profile
+  // screen (which refetches ['seekerProfile']) gets downloaded fresh here too. The photo is
+  // fetched with the session token first (see useProfilePhotoUri); until then the initial shows.
+  const avatarUri = useProfilePhotoUri(Boolean(profile?.has_profile_image), `${profile?.id ?? 'me'}-${profileFetchedAt}`)
   const strength = profile?.profile_strength?.percentage ?? 0
   const filteredJobs = useMemo(() => {
     const query = searchQuery.trim().toLowerCase()
@@ -258,8 +263,8 @@ export default function SeekerHomeScreen() {
           <View style={styles.heroTop}>
             <View style={styles.headerLeft}>
               <View style={styles.avatarCircle}>
-                {avatarSource ? (
-                  <Image source={avatarSource} style={styles.avatarImage} />
+                {avatarUri ? (
+                  <Image source={{ uri: avatarUri }} style={styles.avatarImage} />
                 ) : (
                   <Text style={styles.avatarText}>{firstName(activeProfile).charAt(0).toUpperCase()}</Text>
                 )}
@@ -488,6 +493,7 @@ export default function SeekerHomeScreen() {
                 saving={toggleSaveMutation.isPending && String(toggleSaveMutation.variables) === String(job.post_id)}
                 onPress={() => router.push(`/(seeker)/jobs/${job.post_id}`)}
                 onToggleSave={() => toggleSaveMutation.mutate(String(job.post_id))}
+                rating={job.employer?.employer_id ? employerRatings[String(job.employer.employer_id)] : undefined}
               />
             ))}
           </View>
@@ -595,14 +601,14 @@ function AceBanner() {
         ripple={null}
         onPress={() => router.push('/(seeker)/assistant')}
         accessibilityRole="button"
-        accessibilityLabel="Ask Ace, your i-PESO assistant"
+        accessibilityLabel="Ask ACE, your i-PESO assistant"
       >
         <LinearGradient colors={[...gradients.brand]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.aceBanner}>
           <View style={styles.aceMascotWrap}>
             <AceMascot state="idle" size={64} />
           </View>
           <View style={styles.aceBannerText}>
-            <Text style={styles.aceBannerTitle}>Ask Ace</Text>
+            <Text style={styles.aceBannerTitle}>Ask ACE</Text>
             <Text style={styles.aceBannerSubtitle} numberOfLines={2}>
               Get instant help with your job search
             </Text>

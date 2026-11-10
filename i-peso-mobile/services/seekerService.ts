@@ -281,6 +281,9 @@ export interface SeekerNotification {
     // interview_type distinguishes scheduled/updated/cancelled/reminder.
     interview_type?: string
     interview_id?: number | string
+    // Review notifications (review_invitation / review_moderated / worker_feedback_received).
+    review_type?: ReviewType
+    placement_record_id?: number | string | null
   }
   read_at: string | null
   created_at: string
@@ -417,9 +420,9 @@ export interface GovernmentProgram {
   eligibility?: ProgramEligibility | null
   target_industry?: string | null
   skills?: Array<{ id: number | string; name?: string; type?: string }>
+  // Always "PESO Office, Urdaneta City Hall" (GovernmentProgram::getVenueAttribute). The
+  // program start/end dates were dropped by the 2026_09_23 legacy-fields migration.
   venue?: string | null
-  start_date?: string | null
-  end_date?: string | null
   application_deadline?: string | null
   total_slots?: number | null
   available_slots?: number | null
@@ -643,6 +646,146 @@ function toFormData(fields: Record<string, unknown>, file?: { uri: string; name:
   return formData
 }
 
+// ── Verified Mutual Feedback System (seeker reviews of employers) ─────────
+// Shapes mirror i-peso-backend's SeekerReviewController, FeedbackEligibility,
+// ReputationSummary and WorkerFeedbackVisibility exactly.
+
+export type ReviewType = 'recruitment' | 'employment'
+export type ReviewSource = 'application' | 'placement'
+export type ReviewStatus = 'published' | 'held' | 'hidden'
+export type ReviewReportReason =
+  | 'false_information' | 'not_genuine' | 'harassment' | 'personal_information' | 'discrimination' | 'other'
+
+/** FeedbackEligibility::describe — one review type for one interaction. Never compute this in the app. */
+export interface ReviewRule {
+  allowed: boolean
+  limited?: boolean
+  reason?: string
+  /** YYYY-MM-DD */
+  available_from?: string
+  review_id: number | null
+  review_status: ReviewStatus | null
+}
+
+/** FeedbackEligibility::opportunitiesFor — an application or a PESO-linked placement. */
+export interface ReviewOpportunity {
+  source: ReviewSource
+  source_id: number
+  employer: { id: number; name: string | null }
+  job_title: string | null
+  status: string
+  /** null for placements (they only get an Employment review). */
+  recruitment: ReviewRule | null
+  employment: ReviewRule | null
+}
+
+export interface ReviewAspectRating {
+  key: string
+  label: string
+  value: number | null
+}
+
+/** ReputationSummary::publicReview — anonymous: no name, no job title, month only. */
+export interface PublicReview {
+  id: number
+  type: ReviewType
+  reviewer: 'Verified employee' | 'Verified applicant'
+  month: string | null
+  limited: boolean
+  ratings: ReviewAspectRating[]
+  average: number | null
+  recommend: boolean
+  comment: string | null
+  edited: boolean
+  reply: { body: string; date: string | null; edited: boolean } | null
+}
+
+/** SeekerReviewController::ownReview — the reviewer's own view of a review. */
+export interface OwnReview extends PublicReview {
+  status: ReviewStatus
+  hold_reason: string | null
+  moderation_note: string | null
+  employer: { id: number; name: string | null }
+  job_title: string | null
+  application_id: number | null
+  placement_record_id: number | null
+  ratings_map: Record<string, number>
+  created_at: string
+  edited_at: string | null
+}
+
+/** WorkerFeedbackVisibility::forWorker — locked until reviewed or visible_from. */
+export interface EmployerFeedbackItem {
+  id: number
+  employer: { id: number; name: string | null }
+  job_title: string | null
+  locked: boolean
+  /** YYYY-MM-DD */
+  visible_from: string
+  ratings?: ReviewAspectRating[]
+  would_rehire?: string
+  comment?: string | null
+  updated_at?: string
+}
+
+export interface MyReviewsResponse {
+  opportunities: ReviewOpportunity[]
+  reviews: OwnReview[]
+  employer_feedback: EmployerFeedbackItem[]
+  aspects: {
+    recruitment: Record<string, string>
+    limited_recruitment: string[]
+    employment: Record<string, string>
+  }
+}
+
+export interface ReputationAspect {
+  label: string
+  average: number
+  ratings: number
+}
+
+/** ReputationSummary::section — averages only once `enough` (MIN_REVIEWS reviewers). */
+export type ReputationSection =
+  | { reviewers: number; enough: false }
+  | {
+      reviewers: number
+      enough: true
+      average: number | null
+      recommend_percent: number
+      aspects: Record<string, ReputationAspect>
+      strengths: string[]
+      to_improve: string[]
+    }
+
+export interface EmployerReviewsResponse {
+  summary: { min_reviews: number; recruitment: ReputationSection; employment: ReputationSection }
+  reviews: { data: PublicReview[]; current_page: number; last_page: number; total: number; per_page: number }
+}
+
+/** ReputationSummary::badges — only employers with enough reviewers are present. */
+export interface EmployerRatingBadge {
+  average: number
+  reviewers: number
+}
+
+export interface ReviewSubmitPayload {
+  type: ReviewType
+  application_id?: number
+  placement_record_id?: number
+  ratings: Record<string, number>
+  recommend: boolean
+  comment: string | null
+  agree_guidelines: boolean
+  confirm_started?: boolean
+}
+
+export interface ReviewUpdatePayload {
+  ratings: Record<string, number>
+  recommend: boolean
+  comment: string | null
+}
+
 export const seekerService = {
   // ── Profile ────────────────────────────────────────────────────────────
   async getProfile(): Promise<SeekerProfile> {
@@ -770,6 +913,46 @@ export const seekerService = {
   async reportEmployer(employerId: number | string, payload: { reason: EmployerReportReason; description: string }) {
     const res = await apiClient.post(`/seeker/employers/${employerId}/report`, payload)
     return res.data as { message: string; report: { id: number | string; reason: string; status: string; created_at: string } }
+  },
+
+  // ── Reviews (mirrors i-peso-frontend's reviewService.js) ───────────────
+  /** What the seeker can review, the reviews they've written, and employers' feedback about them. */
+  async getMyReviews(): Promise<MyReviewsResponse> {
+    const res = await apiClient.get('/seeker/reviews')
+    return res.data
+  },
+
+  async submitReview(payload: ReviewSubmitPayload) {
+    const res = await apiClient.post('/seeker/reviews', payload)
+    return res.data as { message: string; review: OwnReview }
+  },
+
+  async updateReview(id: number, payload: ReviewUpdatePayload) {
+    const res = await apiClient.put(`/seeker/reviews/${id}`, payload)
+    return res.data as { message: string; review: OwnReview }
+  },
+
+  async removeReview(id: number) {
+    const res = await apiClient.delete(`/seeker/reviews/${id}`)
+    return res.data as { message: string }
+  },
+
+  /** Report someone else's review to PESO. */
+  async reportReview(id: number, payload: { reason: ReviewReportReason; details: string | null }) {
+    const res = await apiClient.post(`/seeker/reviews/${id}/report`, payload)
+    return res.data as { message: string }
+  },
+
+  /** Small ratings for the job cards on screen: { [employerId]: { average, reviewers } }. */
+  async getEmployerRatings(employerIds: number[]): Promise<Record<string, EmployerRatingBadge>> {
+    const res = await apiClient.get('/seeker/employer-ratings', { params: { ids: employerIds } })
+    return res.data?.ratings ?? {}
+  },
+
+  /** A company's reputation summary and published reviews (anonymous). */
+  async getEmployerReviews(employerId: number | string, params: { type?: ReviewType; page?: number } = {}): Promise<EmployerReviewsResponse> {
+    const res = await apiClient.get(`/seeker/employers/${employerId}/reviews`, { params })
+    return res.data
   },
 
   // ── Applications ───────────────────────────────────────────────────────
