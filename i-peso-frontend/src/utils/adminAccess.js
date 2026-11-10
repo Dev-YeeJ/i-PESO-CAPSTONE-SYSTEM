@@ -26,6 +26,7 @@ const PATH_MODULES = [
   ['/admin/job-seekers', 'constituent_crm'],
   ['/admin/employers', 'constituent_crm'],
   ['/admin/employer-reports', 'constituent_crm'],
+  ['/admin/reviews', 'constituent_crm'],
   ['/admin/occupation-mapping', 'constituent_crm'],
   ['/admin/job-postings', 'employment_hub'],
   ['/admin/government-programs', 'government_dole'],

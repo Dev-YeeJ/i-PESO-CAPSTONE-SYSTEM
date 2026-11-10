@@ -31,7 +31,9 @@ export default function ReportReviewDialog({ review, onClose }) {
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>Report this review</DialogTitle>
-          <DialogDescription>PESO will look at it. Reviews stay up unless they break the community guidelines.</DialogDescription>
+          <DialogDescription>PESO will look at it. Reviews stay up unless they break the {''}
+            <a href="/review-guidelines" target="_blank" rel="noreferrer" className="font-semibold text-blue-700 underline-offset-2 hover:underline">community guidelines</a>.
+          </DialogDescription>
         </DialogHeader>
         {error && <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
         <fieldset>

@@ -21,6 +21,7 @@ import RouteErrorBoundary from './RouteErrorBoundary'
 // --- LAZY LOADED PAGES ---
 const LandingPage        = lazy(() => import('@/pages/landing/LandingPage'))
 const PrivacyPolicyPage  = lazy(() => import('@/pages/legal/PrivacyPolicyPage'))
+const ReviewGuidelinesPage = lazy(() => import('@/pages/legal/ReviewGuidelinesPage'))
 const TermsOfServicePage = lazy(() => import('@/pages/legal/TermsOfServicePage'))
 const LoginPage          = lazy(() => import('@/pages/auth/LoginPage'))
 const AdminLoginPage     = lazy(() => import('@/pages/auth/AdminLoginPage'))
@@ -47,6 +48,7 @@ const EmployerJobFairs  = lazy(() => import('@/pages/employer/EmployerJobFairDas
 const EmployerEstablishmentReport = lazy(() => import('@/pages/employer/EmployerEstablishmentReportPage'))
 const EmployerPlacementReport = lazy(() => import('@/pages/employer/EmployerPlacementReportPage'))
 const EmployerProfile   = lazy(() => import('@/pages/employer/EmployerProfile'))
+const EmployerReviews   = lazy(() => import('@/pages/employer/EmployerReviewsPage'))
 const SeekerDashboard   = lazy(() => import('@/pages/seeker/DashboardPage'))
 const SeekerProfile     = lazy(() => import('@/pages/seeker/SeekerProfile'))
 const SeekerProfileEdit = lazy(() => import('@/pages/seeker/SeekerProfileEdit'))
@@ -71,6 +73,7 @@ const AdminEmployersList     = lazy(() => import('@/pages/admin/2-constituent-cr
 const AdminEmployerDetail    = lazy(() => import('@/pages/admin/2-constituent-crm/employers/EmployerDetailPage'))
 const AdminEmployerReportsList = lazy(() => import('@/pages/admin/2-constituent-crm/employer-reports/EmployerReportsListPage'))
 const AdminEmployerReportDetail = lazy(() => import('@/pages/admin/2-constituent-crm/employer-reports/EmployerReportDetailPage'))
+const AdminReviewsModeration = lazy(() => import('@/pages/admin/2-constituent-crm/reviews/ReviewsModerationPage'))
 
 // Admin Pages - CATEGORY 3: EMPLOYMENT HUB
 const AdminJobPostingsList = lazy(() => import('@/pages/admin/3-employment-hub/job-postings/JobPostingsListPage'))
@@ -123,6 +126,7 @@ export const router = createBrowserRouter([
           { path: '/', element: S(LandingPage) },
           { path: '/verify-email', element: S(VerifyEmailPage) },
           { path: '/privacy-policy', element: S(PrivacyPolicyPage) },
+          { path: '/review-guidelines', element: S(ReviewGuidelinesPage) },
           { path: '/terms-of-service', element: S(TermsOfServicePage) },
           {
             element: <GuestOnly />,
@@ -178,6 +182,7 @@ export const router = createBrowserRouter([
                           { path: 'job-fairs', element: S(EmployerJobFairs) },
                           { path: 'reports/establishment-report', element: S(EmployerEstablishmentReport) },
                           { path: 'reports/placement-report', element: S(EmployerPlacementReport) },
+                          { path: 'reviews', element: S(EmployerReviews) },
                         ],
                       },
                     ],
@@ -205,6 +210,7 @@ export const router = createBrowserRouter([
                       { path: 'employers/:id', element: S(AdminEmployerDetail) },
                       { path: 'employer-reports', element: S(AdminEmployerReportsList) },
                       { path: 'employer-reports/:id', element: S(AdminEmployerReportDetail) },
+                      { path: 'reviews', element: S(AdminReviewsModeration) },
                       
                       // CATEGORY 3: EMPLOYMENT HUB
                       { path: 'job-postings', element: S(AdminJobPostingsList) },

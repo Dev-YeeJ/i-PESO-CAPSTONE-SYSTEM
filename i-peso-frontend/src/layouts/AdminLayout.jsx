@@ -57,6 +57,12 @@ const navGroups = [
         label: 'Employer Reports',
         icon: <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 21v-4m0 0V5a2 2 0 012-2h6.28a1 1 0 01.948.684l.544 1.632a1 1 0 00.948.684H19a2 2 0 012 2v6a2 2 0 01-2 2h-6.28a1 1 0 01-.948-.684l-.544-1.632A1 1 0 009.28 15H3z" /></svg>,
       },
+      {
+        to: '/admin/reviews',
+        module: moduleForPath('/admin/reviews'),
+        label: 'Reviews & Feedback',
+        icon: <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M11.48 3.5a.56.56 0 011.04 0l2.13 5.11a.56.56 0 00.47.34l5.52.44c.5.04.7.66.32.99l-4.2 3.6a.56.56 0 00-.18.56l1.28 5.38a.56.56 0 01-.84.61l-4.72-2.88a.56.56 0 00-.59 0l-4.72 2.88a.56.56 0 01-.84-.61l1.28-5.38a.56.56 0 00-.18-.56l-4.2-3.6a.56.56 0 01.32-.99l5.52-.44a.56.56 0 00.47-.34l2.13-5.11z" /></svg>,
+      },
     ]
   },
 

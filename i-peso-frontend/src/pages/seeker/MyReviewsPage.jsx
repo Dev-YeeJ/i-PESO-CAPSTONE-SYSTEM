@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
-import { Building2, MessageSquareReply, Pencil, Star, Trash2 } from 'lucide-react'
+import { Building2, Lock, MessageSquareReply, Pencil, Star, Trash2 } from 'lucide-react'
 import { Badge, Button, ConfirmDialog, EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui'
 import ReviewFormDialog from '@/components/reviews/ReviewFormDialog'
 import { Stars } from '@/components/reviews/StarRating'
@@ -106,6 +106,8 @@ export default function MyReviewsPage() {
             )}
           </section>
 
+          <EmployerFeedbackSection items={data?.employer_feedback ?? []} />
+
           <section className="mt-10" aria-labelledby="mine-heading">
             <h2 id="mine-heading" className="text-lg font-black text-slate-900">Your reviews <span className="text-slate-400">({reviews.length})</span></h2>
             {reviews.length === 0 ? (
@@ -173,5 +175,52 @@ export default function MyReviewsPage() {
         onConfirm={() => remove.mutate(removing.id)}
       />
     </div>
+  )
+}
+
+/**
+ * What employers privately said about this job seeker. Only they and PESO can
+ * read it, and it opens once they've reviewed that workplace (or after the
+ * waiting period), so neither side writes in reaction to the other.
+ */
+function EmployerFeedbackSection({ items }) {
+  if (!items.length) return null
+
+  return (
+    <section className="mt-10" aria-labelledby="employer-feedback-heading">
+      <h2 id="employer-feedback-heading" className="text-lg font-black text-slate-900">Feedback from employers</h2>
+      <p className="mt-1 flex items-center gap-1.5 text-sm text-slate-600"><Lock className="h-4 w-4" aria-hidden /> Private: only you and PESO can see this. It is never shown to other employers.</p>
+      <ul className="mt-3 space-y-3">
+        {items.map((item) => (
+          <li key={item.id} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <p className="font-bold text-slate-900">{item.employer?.name}</p>
+            {item.job_title && <p className="text-xs text-slate-500">{item.job_title}</p>}
+            {item.locked ? (
+              <p className="mt-3 rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-600">
+                {item.employer?.name} left feedback about you. Review this workplace to read it now, or it opens on{' '}
+                {new Date(`${item.visible_from}T00:00:00`).toLocaleDateString('en-PH', { month: 'long', day: 'numeric', year: 'numeric' })}.
+              </p>
+            ) : (
+              <>
+                <ul className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
+                  {item.ratings?.map((rating) => (
+                    <li key={rating.key} className="flex items-center justify-between rounded-lg border border-slate-100 px-3 py-1.5">
+                      <span className="text-slate-700">{rating.label}</span>
+                      <span className="flex items-center gap-1.5"><Stars value={rating.value} /><span className="font-bold">{rating.value}</span></span>
+                    </li>
+                  ))}
+                </ul>
+                <p className="mt-3 text-sm text-slate-700">Would hire you again: <strong>{item.would_rehire}</strong></p>
+                {item.comment && <p className="mt-2 whitespace-pre-line text-sm text-slate-700">{item.comment}</p>}
+                <p className="mt-3 text-xs text-slate-500">
+                  Think something here is unfair or not about your work? Tell PESO at the office; staff can remove feedback that breaks the{' '}
+                  <a href="/review-guidelines" target="_blank" rel="noreferrer" className="font-semibold text-blue-700 underline-offset-2 hover:underline">guidelines</a>.
+                </p>
+              </>
+            )}
+          </li>
+        ))}
+      </ul>
+    </section>
   )
 }

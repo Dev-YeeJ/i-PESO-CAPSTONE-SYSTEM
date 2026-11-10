@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\Admin\EmployerVerificationController;
 use App\Http\Controllers\Api\Admin\GovernmentDole\JobFairController as AdminJobFairController;
 use App\Http\Controllers\Api\Admin\AdminCitizenCharterController;
 use App\Http\Controllers\Api\Admin\AdminEmployerReportController;
+use App\Http\Controllers\Api\Admin\AdminReviewController;
 use App\Http\Controllers\Api\Admin\AdminEstablishmentReportController;
 use App\Http\Controllers\Api\Admin\AdminGovernmentProgramController;
 use App\Http\Controllers\Api\Admin\AdminHiringActivityReportController;
@@ -45,6 +46,7 @@ use App\Http\Controllers\Api\SeekerCertificateController;
 use App\Http\Controllers\Api\SeekerController;
 use App\Http\Controllers\Api\SeekerEmployerReportController;
 use App\Http\Controllers\Api\SeekerReviewController;
+use App\Http\Controllers\Api\EmployerFeedbackController;
 use App\Http\Controllers\Api\SeekerGovernmentProgramController;
 use App\Http\Controllers\Api\SeekerNearbyJobController;
 use App\Http\Controllers\Api\SeekerProfileImageController;
@@ -117,6 +119,14 @@ Route::middleware('auth:sanctum')->group(function () {
 
         Route::middleware('verified.employer')->group(function () {
             Route::get('/dashboard-stats', [\App\Http\Controllers\Api\EmployerDashboardController::class, 'stats']);
+
+            // Reviews of the company (read, reply once, dispute) and private feedback about hires.
+            Route::get('/reviews', [EmployerFeedbackController::class, 'reviews']);
+            Route::post('/reviews/{review}/reply', [EmployerFeedbackController::class, 'reply'])->middleware('throttle:10,1');
+            Route::delete('/reviews/{review}/reply', [EmployerFeedbackController::class, 'deleteReply']);
+            Route::post('/reviews/{review}/dispute', [EmployerFeedbackController::class, 'dispute'])->middleware('throttle:10,1');
+            Route::get('/hires', [EmployerFeedbackController::class, 'hires']);
+            Route::post('/worker-feedback', [EmployerFeedbackController::class, 'saveWorkerFeedback'])->middleware('throttle:20,1');
             Route::get('/job-fairs', [EmployerJobFairController::class, 'index']);
             Route::post('/job-fairs/{jobFair}/interest', [EmployerJobFairController::class, 'interest']);
             Route::post('/job-fairs/{jobFair}/respond', [EmployerJobFairController::class, 'respond']);
@@ -305,6 +315,17 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::get('/employers/{id}', [AdminEmployerController::class, 'show']);
 
             // Employer Reports (seeker-filed complaints about employers)
+            // Reviews & feedback moderation (Verified Mutual Feedback System).
+            Route::get('/reviews/summary', [AdminReviewController::class, 'summary']);
+            Route::get('/reviews', [AdminReviewController::class, 'index']);
+            Route::get('/reviews/{review}', [AdminReviewController::class, 'show']);
+            Route::post('/reviews/{review}/publish', [AdminReviewController::class, 'publish']);
+            Route::post('/reviews/{review}/hide', [AdminReviewController::class, 'hide']);
+            Route::post('/reviews/{review}/reply-visibility', [AdminReviewController::class, 'setReplyVisibility']);
+            Route::post('/reviews/{review}/escalate', [AdminReviewController::class, 'escalate']);
+            Route::get('/seekers/{id}/worker-feedback', [AdminReviewController::class, 'seekerWorkerFeedback']);
+            Route::post('/worker-feedback/{feedback}/visibility', [AdminReviewController::class, 'setWorkerFeedbackVisibility']);
+
             Route::get('/employer-reports', [AdminEmployerReportController::class, 'index']);
             Route::get('/employer-reports/summary', [AdminEmployerReportController::class, 'summary']);
             Route::get('/employer-reports/{employerReport}', [AdminEmployerReportController::class, 'show']);

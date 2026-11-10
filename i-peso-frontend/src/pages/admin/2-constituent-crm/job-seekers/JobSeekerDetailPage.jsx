@@ -23,6 +23,7 @@ import {
 import { Badge, Button, Card, CardHeader, LoadingSkeleton } from '@/components/ui'
 import { DownloadNSRPButton } from '@/pages/admin/_components'
 import { adminService } from '@/services/adminService'
+import WorkerFeedbackCard from './components/WorkerFeedbackCard'
 
 const formatValue = (value, fallback = 'Not provided') => {
   if (value === null || value === undefined || value === '') return fallback
@@ -279,6 +280,8 @@ export default function JobSeekerDetailPage() {
               {!Object.keys(dataQualityFlags).length && <p className="text-sm text-slate-500">No flags detected.</p>}
             </div>
           </Card>
+
+          <WorkerFeedbackCard seekerId={seeker.seeker_id ?? profile.seeker_id ?? id} />
 
           <Card>
             <CardHeader title="Applications Overview" subtitle="Applicant activity and status history." />

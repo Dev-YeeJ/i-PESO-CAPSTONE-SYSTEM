@@ -7,10 +7,12 @@ use App\Models\Employer;
 use App\Models\EmployerReview;
 use App\Models\EmployerReviewFlag;
 use App\Models\JobSeeker;
+use App\Notifications\NewEmployerReviewNotification;
 use App\Services\ActivityLogger;
 use App\Services\Feedback\FeedbackEligibility;
 use App\Services\Feedback\ReputationSummary;
 use App\Services\Feedback\ReviewService;
+use App\Services\Feedback\WorkerFeedbackVisibility;
 use App\Support\FeedbackAspects;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -37,6 +39,8 @@ class SeekerReviewController extends Controller
                 ->latest()
                 ->get()
                 ->map(fn (EmployerReview $review) => $this->ownReview($review)),
+            // Employers' private feedback about this seeker (mutual reveal applies).
+            'employer_feedback' => WorkerFeedbackVisibility::forWorker($seeker),
             'aspects' => [
                 'recruitment' => FeedbackAspects::RECRUITMENT_ASPECTS,
                 'limited_recruitment' => FeedbackAspects::LIMITED_RECRUITMENT_ASPECTS,
@@ -66,6 +70,10 @@ class SeekerReviewController extends Controller
 
         $review = $this->reviews->submit($seeker, $data, $request->ip());
         $review->load(['employer', 'reply', 'application.jobVacancy', 'placementRecord']);
+
+        if ($review->status === EmployerReview::PUBLISHED) {
+            $this->notifyEmployer($review);
+        }
 
         ActivityLogger::logAs($seeker, 'submitted_employer_review', sprintf(
             'Submitted a %s review of %s%s.',
@@ -207,6 +215,16 @@ class SeekerReviewController extends Controller
         ));
 
         return response()->json(['message' => 'Thanks. PESO will look at this review.']);
+    }
+
+    /** The employer hears about a new review (never who wrote it). */
+    private function notifyEmployer(EmployerReview $review): void
+    {
+        try {
+            $review->employer?->notify(new NewEmployerReviewNotification($review->type, $review->averageRating()));
+        } catch (\Throwable $exception) {
+            report($exception);
+        }
     }
 
     /** Reports from this many different people hide a review until PESO decides. */

@@ -152,8 +152,8 @@ export default function ReviewFormDialog({ target, existing, onClose, onSaved })
               <label className="flex items-start gap-2">
                 <input type="checkbox" checked={agree} onChange={(event) => setAgree(event.target.checked)} className="mt-0.5" />
                 <span>
-                  This is my honest experience. It has no insults, discrimination, accusations I can't back up, or anyone's personal information.
-                  Reviews that break these rules can be hidden by PESO.
+                  This is my honest experience and follows the <a href="/review-guidelines" target="_blank" rel="noreferrer" className="font-semibold text-blue-700 underline-offset-2 hover:underline">community guidelines</a>: no insults, discrimination,
+                  accusations I can't back up, or anyone's personal information. PESO can hide reviews that break them.
                 </span>
               </label>
               {errors.agree_guidelines && <p className="text-xs font-medium text-red-600">{errors.agree_guidelines}</p>}

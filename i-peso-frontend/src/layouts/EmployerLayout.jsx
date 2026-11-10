@@ -11,6 +11,7 @@ import {
   LogOut,
   Menu,
   PlusCircle,
+  Star,
   UsersRound,
   X,
 } from 'lucide-react'
@@ -30,6 +31,7 @@ const navItems = [
   { to: '/employer/reports/establishment-report', label: 'Establishment Report', icon: FileBarChart, protected: true },
   { to: '/employer/reports/placement-report', label: 'Placement Report', icon: FileSpreadsheet, protected: true },
   { to: '/employer/calendar', label: 'Calendar', icon: CalendarIcon, protected: true },
+  { to: '/employer/reviews', label: 'Reviews', icon: Star, protected: true },
 ]
 
 const pageNames = {
