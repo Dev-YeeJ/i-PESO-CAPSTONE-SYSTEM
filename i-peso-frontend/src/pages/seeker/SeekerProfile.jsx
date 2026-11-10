@@ -88,7 +88,7 @@ export default function SeekerProfile() {
     getSeekerProfile()
       .then((result) => {
         setProfile(result)
-        updateUser({ name: fullName(result) })
+        updateUser({ name: fullName(result), has_profile_image: Boolean(result?.has_profile_image) })
       })
       .catch((error) => toast.error(error.response?.data?.message ?? 'Unable to load your profile.'))
       .finally(() => setLoading(false))
@@ -796,6 +796,8 @@ export default function SeekerProfile() {
             has_resume: false,
           }, { photo: true, resume: false }))
           setPhotoVersion((current) => current + 1)
+          // Refresh the portal header avatar (SeekerLayout) with the new photo.
+          updateUser({ has_profile_image: true, profile_image_version: Date.now() })
           toast.success('Your 2x2 photo is ready for the resume.')
         }}
       />

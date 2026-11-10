@@ -143,6 +143,16 @@ type InterviewLike = {
   phase?: string | null
 } | null | undefined
 
+const APPLICATION_NEXT_STEPS: Record<string, string> = {
+  pending: 'The employer hasn’t opened your application yet. No action needed — check back in a few days.',
+  reviewed: 'The employer has viewed your application. If you’re shortlisted, you’ll be invited to an interview.',
+  shortlisted: 'You’re on the shortlist. Watch for an interview invitation and keep your phone reachable.',
+  interview: 'An interview is scheduled. Bring your resume, certificates, and a valid ID, and arrive early.',
+  hired: 'Congratulations — you’ve been hired! The employer will coordinate your start date with you.',
+  rejected: 'This application wasn’t successful this time. Keep going — new vacancies are posted often.',
+  withdrawn: 'You withdrew this application. You can apply to other vacancies anytime.',
+}
+
 // Matches InterviewSchedule::ASSUMED_DURATION_MINUTES on the backend.
 const INTERVIEW_ASSUMED_DURATION_MS = 60 * 60 * 1000
 
@@ -172,4 +182,11 @@ export function interviewPhaseText(interview: InterviewLike) {
     default:
       return 'Upcoming'
   }
+}
+
+export function applicationNextStep(status: string, interview?: InterviewLike) {
+  if (status === 'interview' && interviewPhase(interview) === 'ended') {
+    return 'Your interview is done. The employer will update this application with their decision — keep your phone reachable.'
+  }
+  return APPLICATION_NEXT_STEPS[status] ?? null
 }

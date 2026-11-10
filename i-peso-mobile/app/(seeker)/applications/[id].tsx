@@ -6,7 +6,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { SeekerApplicationsResponse } from '@/services/seekerService'
 import { seekerService } from '@/services/seekerService'
 import { apiErrorMessage } from '@/utils/apiError'
-import { applicationStatusVariant, formatDate, formatSalary, interviewPhase, interviewPhaseText, jobCompany, jobLocation, textFrom, titleCase } from '@/utils/seekerView'
+import { applicationNextStep, applicationStatusVariant, formatDate, formatSalary, interviewPhase, interviewPhaseText, jobCompany, jobLocation, textFrom, titleCase } from '@/utils/seekerView'
 import { useToast } from '@/stores/toastStore'
 import { AlertBox } from '@/components/ui/AlertBox'
 import { Badge } from '@/components/ui/Badge'
@@ -126,6 +126,13 @@ export default function ApplicationDetailScreen() {
         <Badge variant={applicationStatusVariant(application.status)} style={styles.statusBadge}>
           {application.status_label ?? titleCase(application.status)}
         </Badge>
+
+        {applicationNextStep(application.status, application.interview) ? (
+          <Card padding="md" style={styles.nextStepCard}>
+            <Text style={styles.nextStepTitle}>What happens next</Text>
+            <Text style={styles.nextStepText}>{applicationNextStep(application.status, application.interview)}</Text>
+          </Card>
+        ) : null}
 
         <Card padding="md" style={styles.infoCard}>
           {job ? <Detail label="Location" value={jobLocation(job)} /> : null}
@@ -247,6 +254,9 @@ const styles = StyleSheet.create({
   company: { color: colors.secondaryText, fontSize: typography.title, fontFamily: typography.family.bold, marginTop: spacing.xs },
   companyLink: { color: colors.info, textDecorationLine: 'underline' },
   statusBadge: { alignSelf: 'flex-start', marginTop: spacing.md },
+  nextStepCard: { marginTop: spacing.lg, backgroundColor: colors.infoBackground, borderColor: colors.infoBorder },
+  nextStepTitle: { color: colors.info, fontSize: typography.small, fontFamily: typography.family.bold, textTransform: 'uppercase', letterSpacing: 0.5 },
+  nextStepText: { color: colors.textPrimary, fontSize: typography.body, lineHeight: 20, marginTop: spacing.xs },
   infoCard: { marginTop: spacing.lg },
   detailRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: spacing.xs, borderBottomWidth: 1, borderBottomColor: colors.border },
   detailLabel: { color: colors.secondaryText, fontSize: typography.small, fontFamily: typography.family.bold },

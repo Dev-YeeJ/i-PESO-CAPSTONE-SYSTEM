@@ -133,6 +133,9 @@ class AuthController extends Controller
             $payload['first_name']           = $user->first_name;
             $payload['last_name']            = $user->last_name;
             $payload['mobile_number']        = $user->mobile_number;
+            // Lets the portal header show the seeker's 2x2 photo (fetched from the
+            // authenticated GET /api/seeker/profile-image) instead of initials.
+            $payload['has_profile_image']    = filled($user->profile_image);
         }
 
         if ($role === 'employer' && $user instanceof Employer) {

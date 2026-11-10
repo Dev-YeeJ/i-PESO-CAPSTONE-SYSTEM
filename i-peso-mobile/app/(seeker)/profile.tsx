@@ -14,6 +14,7 @@ import {
 import { router, useLocalSearchParams } from 'expo-router'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import * as ImagePicker from 'expo-image-picker'
+import { ImageManipulator, SaveFormat } from 'expo-image-manipulator'
 import * as DocumentPicker from 'expo-document-picker'
 import type { ProfileStrengthItem, SeekerCertificate } from '@/services/seekerService'
 import { seekerService } from '@/services/seekerService'
@@ -56,6 +57,37 @@ const CERTIFICATE_CATEGORIES = [
 // everything else may stand alone. Mirrors SeekerCertificateController::CATEGORIES_REQUIRING_TRAINING
 // and i-peso-frontend's CertificateUploadModal.jsx.
 const CATEGORIES_REQUIRING_TRAINING = ['training_certificate', 'tesda_nc_certificate']
+
+// The picker's crop keeps full camera resolution, so a phone photo can be several MB — over
+// the backend's 2MB limit and often over the server's PHP post_max_size, which makes PHP drop
+// the whole body and Laravel report "The profile image field is required." Re-encode to a
+// centred square JPEG of at most 800px (comfortably above the 300px minimum, usually <300KB)
+// so the upload always matches SeekerProfileImageController's rules (exact 1:1, jpg/png, 2MB).
+const PROFILE_PHOTO_MAX_SIDE = 800
+
+async function prepareProfilePhoto(asset: ImagePicker.ImagePickerAsset): Promise<string> {
+  const { width, height } = asset
+  let context = ImageManipulator.manipulate(asset.uri)
+  if (width > 0 && height > 0) {
+    const side = Math.min(width, height)
+    if (width !== height) {
+      context = context.crop({
+        originX: Math.floor((width - side) / 2),
+        originY: Math.floor((height - side) / 2),
+        width: side,
+        height: side,
+      })
+    }
+    if (side > PROFILE_PHOTO_MAX_SIDE) {
+      context = context.resize({ width: PROFILE_PHOTO_MAX_SIDE, height: PROFILE_PHOTO_MAX_SIDE })
+    }
+  } else {
+    context = context.resize({ width: PROFILE_PHOTO_MAX_SIDE })
+  }
+  const image = await context.renderAsync()
+  const saved = await image.saveAsync({ format: SaveFormat.JPEG, compress: 0.85 })
+  return saved.uri
+}
 
 export default function ProfileScreen() {
   const token = useAuthStore((state) => state.token)
@@ -199,7 +231,8 @@ export default function ProfileScreen() {
     const asset = result.assets[0]
     setPhotoBusy(true)
     try {
-      await seekerService.uploadProfileImage(asset.uri, asset.mimeType || 'image/jpeg')
+      const photoUri = await prepareProfilePhoto(asset)
+      await seekerService.uploadProfileImage(photoUri, 'image/jpeg')
       setPhotoVersion((v) => v + 1)
       await invalidateProfile()
     } catch (caught) {

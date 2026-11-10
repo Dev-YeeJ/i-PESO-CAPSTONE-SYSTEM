@@ -85,10 +85,15 @@ export default function SeekerHomeScreen() {
   const token = useAuthStore((state) => state.token)
 
   const queryClient = useQueryClient()
-  const [profile, setProfile] = useState<SeekerProfile | null>(null)
-  const [profileFetchedAt, setProfileFetchedAt] = useState(0)
+  // Shares the ['seekerProfile'] query with the Profile screen, which invalidates it after a
+  // photo upload/removal — so the header avatar here updates without a manual pull-to-refresh.
+  // (Tabs stay mounted, so a one-shot fetch on mount kept showing initials after an upload.)
+  const profileQuery = useQuery({ queryKey: ['seekerProfile'], queryFn: () => seekerService.getProfile() })
+  const profile: SeekerProfile | null = profileQuery.data ?? null
+  const profileFetchedAt = profileQuery.dataUpdatedAt
+  const loadProfile = profileQuery.refetch
+  const error = profileQuery.isError && !profile ? 'Unable to load your profile. Check the backend connection.' : ''
   const [refreshing, setRefreshing] = useState(false)
-  const [error, setError] = useState('')
   const [jobsMessage, setJobsMessage] = useState('')
   const [feedMode, setFeedMode] = useState<FeedMode>('nearby')
   const [searchQuery, setSearchQuery] = useState('')
@@ -130,21 +135,6 @@ export default function SeekerHomeScreen() {
     if (hour < 18) return 'Good afternoon'
     return 'Good evening'
   }, [])
-
-  const loadProfile = useCallback(async () => {
-    setError('')
-    try {
-      const result = await seekerService.getProfile()
-      setProfile(result)
-      setProfileFetchedAt(Date.now())
-    } catch {
-      setError('Unable to load your profile. Check the backend connection.')
-    }
-  }, [])
-
-  useEffect(() => {
-    loadProfile()
-  }, [loadProfile])
 
   // Fetched in parallel (not just the active tab) so the feed-selector cards can show a count
   // per feed the way web's JobFeedSelector does, rather than only knowing the active one.
@@ -206,7 +196,7 @@ export default function SeekerHomeScreen() {
   }, [loadProfile])
 
   const activeProfile = profile ?? user
-  // profileFetchedAt (set on every successful fetch) rides along as the cache-bust value —
+  // profileFetchedAt (the query's dataUpdatedAt, new on every fetch) rides along as the cache-bust value —
   // profile.id alone never changes for the same account, so after a photo upload from the
   // Profile screen, revisiting the dashboard would otherwise still show whatever React
   // Native's native image loader had already cached for that unchanged URL.

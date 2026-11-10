@@ -1,5 +1,6 @@
 import { Platform } from 'react-native'
-import * as Notifications from 'expo-notifications'
+import type * as NotificationsTypes from 'expo-notifications'
+import { isRunningInExpoGo } from 'expo'
 import * as Device from 'expo-device'
 import * as SecureStore from 'expo-secure-store'
 import Constants from 'expo-constants'
@@ -7,7 +8,18 @@ import { seekerService } from './seekerService'
 
 const STORED_TOKEN_KEY = 'ipeso_push_token'
 
-Notifications.setNotificationHandler({
+// Expo Go on Android dropped remote push in SDK 53, and merely importing expo-notifications
+// there logs a red "Push notifications ... removed from Expo Go" console error on every boot.
+// Load the module only where push works (development/production builds, and iOS Expo Go), so
+// testing in Expo Go stays clean; everywhere else behaviour is unchanged.
+export const pushNotificationsSupported = !(Platform.OS === 'android' && isRunningInExpoGo())
+
+const Notifications: typeof NotificationsTypes | null = pushNotificationsSupported
+  ? // eslint-disable-next-line @typescript-eslint/no-require-imports
+    require('expo-notifications')
+  : null
+
+Notifications?.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowBanner: true,
     shouldShowList: true,
@@ -16,7 +28,24 @@ Notifications.setNotificationHandler({
   }),
 })
 
+/**
+ * Subscribes to taps on push notifications. Returns an unsubscribe function (a no-op when
+ * push isn't supported in this runtime).
+ */
+export function addPushResponseListener(onData: (data: Record<string, unknown>) => void): () => void {
+  if (!Notifications) return () => {}
+  const subscription = Notifications.addNotificationResponseReceivedListener((response) => {
+    onData(response.notification.request.content.data as Record<string, unknown>)
+  })
+  return () => subscription.remove()
+}
+
 async function getExpoPushToken(): Promise<string | null> {
+  if (!Notifications) {
+    console.log('ℹ️ Push notifications are unavailable in Expo Go on Android; use a development build to test them.')
+    return null
+  }
+
   if (!Device.isDevice) {
     console.log('⚠️ Push notifications require a physical device (not a simulator/emulator).')
     return null

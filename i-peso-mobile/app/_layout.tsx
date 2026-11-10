@@ -5,10 +5,9 @@ import { Stack, router } from 'expo-router'
 import { useFonts, DMSans_400Regular, DMSans_500Medium, DMSans_700Bold } from '@expo-google-fonts/dm-sans'
 import { DMSerifDisplay_400Regular } from '@expo-google-fonts/dm-serif-display'
 import * as SplashScreen from 'expo-splash-screen'
-import * as Notifications from 'expo-notifications'
 import { useAuthStore } from '@/stores/authStore'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { syncPushToken, routeForPushData } from '@/services/pushNotifications'
+import { syncPushToken, routeForPushData, addPushResponseListener } from '@/services/pushNotifications'
 import { Toast } from '@/components/ui/Toast'
 
 const queryClient = new QueryClient()
@@ -53,8 +52,7 @@ export default function RootLayout() {
   // killed state) using the same routing rules as the in-app notifications
   // list, so both entry points land on the same screen.
   useEffect(() => {
-    const subscription = Notifications.addNotificationResponseReceivedListener((response) => {
-      const data = response.notification.request.content.data as Record<string, unknown>
+    return addPushResponseListener((data) => {
       const destination = routeForPushData(data)
       if (destination) {
         // Expo Router's router.push() accepts a plain string for most routes.
@@ -64,8 +62,6 @@ export default function RootLayout() {
         router.push(destination as any)
       }
     })
-
-    return () => subscription.remove()
   }, [])
 
   if (!fontsLoaded) return null

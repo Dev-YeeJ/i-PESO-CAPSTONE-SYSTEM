@@ -66,6 +66,14 @@ sudo systemctl reload nginx
 sudo certbot --nginx -d example.com -d www.example.com -d api.example.com
 ```
 
+Raise PHP's upload limits to match Nginx's `client_max_body_size` (12M). Without this, Ubuntu's default `post_max_size` (8M) silently drops larger uploads and Laravel reports "The profile image field is required.":
+
+```bash
+sudo cp deployment/php/99-i-peso-uploads.ini /etc/php/8.2/fpm/conf.d/
+sudo systemctl restart php8.2-fpm
+php-fpm8.2 -i | grep -E "upload_max_filesize|post_max_size"
+```
+
 ## 6. Queue worker and scheduler
 
 ```bash

@@ -16,6 +16,13 @@ const LOGIN_EMAIL_PATTERN = /\S+@\S+\.\S+/
 
 const MOBILE_PATTERN = /^09\d{9}$/
 
+export function normalizeMobileNumber(value: string) {
+  let digits = value.replace(/\D/g, '')
+  if (digits.startsWith('639')) digits = `0${digits.slice(2)}`
+  else if (digits.startsWith('9')) digits = `0${digits}`
+  return digits.slice(0, 11)
+}
+
 /**
  * Every field below uses `superRefine` with an if/else instead of chained `.min().regex()`
  * checks — that preserves this app's existing "one message at a time, required beats
@@ -71,8 +78,8 @@ export const registerSchema = z
       const trimmed = value.trim()
       if (!trimmed) {
         ctx.addIssue({ code: 'custom', message: 'Mobile number is required.' })
-      } else if (!MOBILE_PATTERN.test(trimmed)) {
-        ctx.addIssue({ code: 'custom', message: 'Use a valid PH mobile number, e.g. 09XXXXXXXXX.' })
+      } else if (!MOBILE_PATTERN.test(normalizeMobileNumber(trimmed))) {
+        ctx.addIssue({ code: 'custom', message: 'Enter a valid PH mobile number.' })
       }
     }),
     password: z.string().superRefine((value, ctx) => {

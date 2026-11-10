@@ -82,6 +82,12 @@ export default function GovernmentProgramsScreen() {
     queryFn: () => seekerService.getGovernmentPrograms({ search: debouncedSearch || undefined, category, status: status || undefined, page }),
   })
 
+  const { data: charterItems = [], error: charterError } = useQuery({
+    queryKey: ['citizenCharter'],
+    queryFn: () => seekerService.getCitizenCharter(),
+    select: (items) => items.slice(0, 3),
+  })
+
   useEffect(() => {
     if (!data) return
     setProgramItems((prev) => {
@@ -130,7 +136,7 @@ export default function GovernmentProgramsScreen() {
     >
       <Text style={styles.kicker}>PESO Programs Center</Text>
       <Text style={styles.subtitle}>
-        Browse SPES, TUPAD, livelihood, and training programs available through PESO.
+        Browse DOLE and PESO programs — SPES, TUPAD, GIP, livelihood, training, and OFW assistance. Your profile is checked against each program&apos;s eligibility rules automatically.
       </Text>
 
       <TextInput
@@ -293,6 +299,37 @@ export default function GovernmentProgramsScreen() {
           </Button>
         ) : null}
       </QueryState>
+
+      {charterError ? (
+        <AlertBox variant="warning" style={styles.alertBox}>
+          {apiErrorMessage(charterError, 'Unable to load PESO Citizen Charter services.')}
+        </AlertBox>
+      ) : null}
+
+      {charterItems.length > 0 ? (
+        <View style={styles.charterSection}>
+          <Text style={styles.charterTitle}>PESO Citizen Charter</Text>
+          <Text style={styles.charterDescription}>
+            Service requirements, processing commitments, and responsible offices to guide your walk-in applications.
+          </Text>
+          {charterItems.map((service) => (
+            <Card key={String(service.service_id)} padding="md" style={styles.charterCard}>
+              <Text style={styles.charterServiceTitle}>{service.service_name}</Text>
+              {service.description ? <Text style={styles.charterServiceDescription}>{service.description}</Text> : null}
+              <View style={styles.charterDetails}>
+                <View style={styles.charterDetail}>
+                  <Text style={styles.charterDetailLabel}>Processing</Text>
+                  <Text style={styles.charterDetailValue}>{textFrom(service.processing_time, 'Not specified')}</Text>
+                </View>
+                <View style={styles.charterDetail}>
+                  <Text style={styles.charterDetailLabel}>Fees</Text>
+                  <Text style={styles.charterDetailValue}>{textFrom(service.fees, 'None')}</Text>
+                </View>
+              </View>
+            </Card>
+          ))}
+        </View>
+      ) : null}
     </ScrollView>
     </View>
   )
@@ -354,4 +391,14 @@ const styles = StyleSheet.create({
   programMetaRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: spacing.md },
   programMeta: { color: colors.textSecondary, fontSize: typography.small, fontFamily: typography.family.bold },
   loadMoreBtn: { marginTop: spacing.sm },
+  charterSection: { marginTop: spacing.xl },
+  charterTitle: { color: colors.textPrimary, fontSize: typography.heading, fontFamily: typography.family.bold, textAlign: 'center' },
+  charterDescription: { color: colors.textSecondary, fontSize: typography.body, lineHeight: 20, textAlign: 'center', marginTop: spacing.xs, marginBottom: spacing.md },
+  charterCard: { marginBottom: spacing.sm },
+  charterServiceTitle: { color: colors.textPrimary, fontSize: typography.title, fontFamily: typography.family.bold },
+  charterServiceDescription: { color: colors.textSecondary, fontSize: typography.small, lineHeight: 20, marginTop: spacing.sm },
+  charterDetails: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md, paddingTop: spacing.md, borderTopWidth: 1, borderTopColor: colors.border },
+  charterDetail: { flex: 1 },
+  charterDetailLabel: { color: colors.subtle, fontSize: typography.small, fontFamily: typography.family.bold, marginBottom: spacing.xs },
+  charterDetailValue: { color: colors.textPrimary, fontSize: typography.small, fontFamily: typography.family.medium },
 })

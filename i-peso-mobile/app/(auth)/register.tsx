@@ -11,20 +11,13 @@ import { TextField } from '@/components/ui/TextField'
 import { PasswordField } from '@/components/ui/PasswordField'
 import { PasswordStrengthMeter } from '@/components/ui/PasswordStrengthMeter'
 import { Button } from '@/components/ui/Button'
-import { registerSchema, type RegisterFormValues } from '@/schemas/authSchemas'
+import { normalizeMobileNumber, registerSchema, type RegisterFormValues } from '@/schemas/authSchemas'
 import { colors, spacing, typography } from '@/theme'
 import { useToast } from '@/stores/toastStore'
 
 interface ApiErrorBody {
   message?: string
   errors?: Record<string, string[]>
-}
-
-const normalizeMobileNumber = (value: string) => {
-  let digits = value.replace(/\D/g, '')
-  if (digits.startsWith('639')) digits = `0${digits.slice(2)}`
-  if (digits.startsWith('9')) digits = `0${digits}`
-  return digits.slice(0, 11)
 }
 
 // Mirrors i-peso-frontend's SeekerRegistration.jsx squish()/formatName() exactly —

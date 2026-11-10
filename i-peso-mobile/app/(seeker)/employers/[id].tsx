@@ -5,7 +5,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useQuery } from '@tanstack/react-query'
 import MaterialIcons from '@expo/vector-icons/MaterialIcons'
 import { seekerService } from '@/services/seekerService'
-import { formatDate, textFrom, titleCase } from '@/utils/seekerView'
+import { textFrom, titleCase } from '@/utils/seekerView'
 import { apiErrorMessage } from '@/utils/apiError'
 import { useMotion } from '@/hooks/useMotion'
 import { Badge } from '@/components/ui/Badge'
@@ -18,6 +18,60 @@ import { ScreenHeader } from '@/components/ui/ScreenHeader'
 import { ScreenSkeleton } from '@/components/ui/ScreenSkeleton'
 import { ReportEmployerModal } from '@/components/ReportEmployerModal'
 import { colors, radii, spacing, typography } from '@/theme'
+
+const COMPANY_SIZE_LABELS: Record<string, string> = {
+  micro: 'Micro (1–9 employees)',
+  small: 'Small (10–99 employees)',
+  medium: 'Medium (100–199 employees)',
+  large: 'Large (200+ employees)',
+}
+
+function industryLabel(value: string | string[] | null | undefined) {
+  if (Array.isArray(value)) return value.filter(Boolean).join(', ') || 'Not provided'
+  return textFrom(value, 'Not provided')
+}
+
+function companySizeLabel(value: string | null | undefined) {
+  if (!value) return 'Not provided'
+  return COMPANY_SIZE_LABELS[value] ?? titleCase(value.replaceAll('_', ' '))
+}
+
+function formatEmploymentType(value: string | null | undefined) {
+  if (!value) return null
+  const normalized = value.replaceAll('_', ' ').trim().toLowerCase()
+  return normalized.charAt(0).toUpperCase() + normalized.slice(1)
+}
+
+function formatVacancySalary(job: { hide_salary?: boolean; salary_min?: number | string | null; salary_max?: number | string | null }) {
+  if (job.hide_salary) return null
+  const min = Number(job.salary_min) || null
+  const max = Number(job.salary_max) || null
+  if (!min && !max) return null
+  const peso = (amount: number) => `₱${amount.toLocaleString('en-PH', { maximumFractionDigits: 0 })}`
+  if (min !== null && max !== null && min !== max) return `${peso(min)}–${peso(max)} a month`
+  const amount = min ?? max
+  if (amount === null) return null
+  return `${peso(amount)} a month`
+}
+
+function formatPostedDate(value: string | null | undefined) {
+  if (!value) return null
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return null
+  const days = Math.floor((Date.now() - date.getTime()) / 86_400_000)
+  if (days <= 0) return 'Posted today'
+  if (days === 1) return 'Posted yesterday'
+  if (days < 7) return `Posted ${days} days ago`
+  return `Posted ${date.toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}`
+}
+
+function formatMemberSince(value: string | null | undefined) {
+  if (!value) return 'Not provided'
+  const date = new Date(value)
+  return Number.isNaN(date.getTime())
+    ? 'Not provided'
+    : date.toLocaleDateString('en-PH', { month: 'long', year: 'numeric' })
+}
 
 // Where the header's back button should land, since employers/[id] is a flat sibling in the
 // Tabs navigator (see jobs/[id].tsx's backTargetFor for the same reasoning) — plain
@@ -69,6 +123,11 @@ export default function EmployerProfileScreen() {
   }
 
   const { employer, vacancies } = data
+  const employerName = employer.trade_name || employer.company_name
+  const registeredName = employer.trade_name && employer.company_name !== employer.trade_name
+    ? employer.company_name
+    : null
+  const industry = industryLabel(employer.industry)
 
   return (
     <View style={styles.flex}>
@@ -84,12 +143,13 @@ export default function EmployerProfileScreen() {
           </View>
           <View style={styles.headerText}>
             <View style={styles.nameRow}>
-              <Text style={styles.name} numberOfLines={2}>{textFrom(employer.trade_name || employer.company_name, 'Employer')}</Text>
+              <Text style={styles.name} numberOfLines={2}>{textFrom(employerName, 'Employer')}</Text>
               {employer.verification_status === 'verified' ? (
-                <Badge variant="success">Verified</Badge>
+                <Badge variant="success">Verified by PESO</Badge>
               ) : null}
             </View>
-            {employer.industry ? <Text style={styles.industry}>{employer.industry}</Text> : null}
+            {registeredName ? <Text style={styles.registeredName}>Registered as {registeredName}</Text> : null}
+            {industry !== 'Not provided' ? <Text style={styles.industry}>{industry}</Text> : null}
           </View>
         </View>
 
@@ -98,11 +158,11 @@ export default function EmployerProfileScreen() {
           <Text style={styles.description}>{textFrom(employer.company_description, 'No description provided.')}</Text>
 
           <View style={styles.detailGrid}>
-            <Detail label="Industry" value={textFrom(employer.industry, 'Not specified')} />
-            <Detail label="Company Size" value={textFrom(employer.company_size, 'Not specified')} />
+            <Detail label="Industry" value={industry} />
+            <Detail label="Company Size" value={companySizeLabel(employer.company_size)} />
           </View>
-          <Detail label="Location" value={textFrom(employer.full_address, 'Not listed')} />
-          {employer.created_at ? <Detail label="On i-PESO Since" value={formatDate(employer.created_at)} /> : null}
+          <Detail label="Location" value={textFrom(employer.full_address, 'Not provided')} />
+          <Detail label="On i-PESO Since" value={formatMemberSince(employer.created_at)} />
         </Card>
 
         <View style={styles.trustBox}>
@@ -114,52 +174,72 @@ export default function EmployerProfileScreen() {
           </Text>
         </View>
 
-        <Text style={styles.sectionTitle}>Active Job Vacancies</Text>
+        <Card padding="md" style={styles.howToApplyCard}>
+          <Text style={styles.sectionTitle}>How to Apply</Text>
+          <Text style={styles.description}>
+            Open a job above and apply from its details. Your application goes straight to this employer through i-PESO.
+          </Text>
+          <View style={styles.safetyBox}>
+            <MaterialIcons name="verified-user" size={18} color={colors.info} />
+            <Text style={styles.safetyText}>
+              PESO checked this employer&apos;s business documents before letting them post jobs. If anyone asks you to pay to apply, report them.
+            </Text>
+          </View>
+        </Card>
+
+        <Text style={styles.sectionTitle}>Open Jobs</Text>
         {vacancies.length > 0 ? (
-          vacancies.map((job, index) => (
-            <Animated.View
-              key={String(job.post_id)}
-              entering={m.enabled ? FadeInUp.delay(m.stagger(index)).duration(240) : undefined}
-            >
-              <PressableScale
-                scaleTo="cardPress"
-                ripple={null}
-                onPress={() => router.push(`/(seeker)/jobs/${job.post_id}`)}
-                accessibilityRole="button"
-                accessibilityLabel={`View ${textFrom(job.job_title, 'job')} details`}
+          vacancies.map((job, index) => {
+            const employmentType = formatEmploymentType(job.employment_type)
+            const salary = formatVacancySalary(job)
+            const posted = formatPostedDate(job.created_at)
+            return (
+              <Animated.View
+                key={String(job.post_id)}
+                entering={m.enabled ? FadeInUp.delay(m.stagger(index)).duration(240) : undefined}
               >
-                <Card padding="md" style={styles.jobCard}>
-                  <Text style={styles.jobTitle} numberOfLines={2}>{textFrom(job.job_title, 'Untitled job')}</Text>
-                  <View style={styles.jobMetaRow}>
-                    {job.location ? (
-                      <View style={styles.jobMetaItem}>
-                        <MaterialIcons name="place" size={14} color={colors.subtle} />
-                        <Text style={styles.jobMeta}>{job.location}</Text>
-                      </View>
-                    ) : null}
-                    {job.employment_type ? (
-                      <View style={styles.jobMetaItem}>
-                        <MaterialIcons name="work" size={14} color={colors.subtle} />
-                        <Text style={styles.jobMeta}>{titleCase(job.employment_type)}</Text>
-                      </View>
-                    ) : null}
-                    {job.created_at ? (
-                      <View style={styles.jobMetaItem}>
-                        <MaterialIcons name="event" size={14} color={colors.subtle} />
-                        <Text style={styles.jobMeta}>Posted {formatDate(job.created_at)}</Text>
-                      </View>
-                    ) : null}
-                  </View>
-                  <EmployerPreferenceChip job={job} style={styles.preferenceChip} />
-                </Card>
-              </PressableScale>
-            </Animated.View>
-          ))
+                <PressableScale
+                  scaleTo="cardPress"
+                  ripple={null}
+                  onPress={() => router.push(`/(seeker)/jobs/${job.post_id}`)}
+                  accessibilityRole="button"
+                  accessibilityLabel={`View ${textFrom(job.job_title, 'job')} details`}
+                >
+                  <Card padding="md" style={styles.jobCard}>
+                    <Text style={styles.jobTitle} numberOfLines={2}>{textFrom(job.job_title, 'Untitled job')}</Text>
+                    <View style={styles.jobMetaRow}>
+                      {job.location ? (
+                        <View style={styles.jobMetaItem}>
+                          <MaterialIcons name="place" size={14} color={colors.subtle} />
+                          <Text style={styles.jobMeta}>{job.location}</Text>
+                        </View>
+                      ) : null}
+                      {employmentType ? (
+                        <View style={styles.jobMetaItem}>
+                          <MaterialIcons name="work" size={14} color={colors.subtle} />
+                          <Text style={styles.jobMeta}>{employmentType}</Text>
+                        </View>
+                      ) : null}
+                      {salary ? (
+                        <View style={styles.jobMetaItem}>
+                          <MaterialIcons name="attach-money" size={14} color={colors.subtle} />
+                          <Text style={styles.jobMeta}>{salary}</Text>
+                        </View>
+                      ) : null}
+                    </View>
+                    {posted ? <Text style={styles.jobMetaPosted}>{posted}</Text> : null}
+                    <EmployerPreferenceChip job={job} style={styles.preferenceChip} />
+                  </Card>
+                </PressableScale>
+              </Animated.View>
+            )
+          })
         ) : (
           <EmptyState
             icon="work-off"
-            title="No active vacancies"
-            message="This employer has no active job vacancies at the moment."
+            title="No open jobs right now"
+            message="New postings from this company will show up here."
+            action={<Button variant="outline" onPress={() => router.replace('/(seeker)/jobs')}>Browse other jobs</Button>}
           />
         )}
 
@@ -198,6 +278,7 @@ const styles = StyleSheet.create({
   headerText: { flex: 1 },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flexWrap: 'wrap' },
   name: { color: colors.textPrimary, fontSize: typography.heading, fontFamily: typography.family.bold, flexShrink: 1 },
+  registeredName: { color: colors.textSecondary, fontSize: typography.small, marginTop: spacing.xs },
   industry: { color: colors.textSecondary, fontSize: typography.small, marginTop: spacing.xs },
   infoCard: { marginBottom: spacing.lg },
   sectionTitle: { color: colors.textPrimary, fontSize: typography.title, fontFamily: typography.family.bold, marginBottom: spacing.sm },
@@ -206,6 +287,9 @@ const styles = StyleSheet.create({
   detailItem: { flex: 1, marginBottom: spacing.sm },
   detailLabel: { color: colors.subtle, fontSize: 11, fontFamily: typography.family.bold, textTransform: 'uppercase', marginBottom: 2 },
   detailValue: { color: colors.textPrimary, fontSize: typography.small, fontFamily: typography.family.medium },
+  howToApplyCard: { marginBottom: spacing.lg },
+  safetyBox: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, backgroundColor: colors.infoBackground, borderWidth: 1, borderColor: colors.infoBorder, borderRadius: radii.md, padding: spacing.md, marginTop: spacing.md },
+  safetyText: { flex: 1, color: colors.info, fontSize: typography.small, lineHeight: 18 },
   trustBox: { flexDirection: 'row', gap: spacing.sm, backgroundColor: colors.infoBackground, borderWidth: 1, borderColor: colors.infoBorder, borderRadius: radii.md, padding: spacing.md, marginBottom: spacing.lg },
   trustText: { flex: 1, color: colors.info, fontSize: typography.small, lineHeight: 18 },
   jobCard: { marginBottom: spacing.sm },
@@ -214,6 +298,7 @@ const styles = StyleSheet.create({
   preferenceChip: { marginTop: spacing.sm },
   jobMetaItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   jobMeta: { color: colors.textSecondary, fontSize: typography.small },
+  jobMetaPosted: { color: colors.textSecondary, fontSize: typography.small, marginTop: spacing.sm },
   reportLink: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs, marginTop: spacing.xl, paddingVertical: spacing.md },
   reportLinkText: { color: colors.error, fontSize: typography.small, fontFamily: typography.family.bold },
 })

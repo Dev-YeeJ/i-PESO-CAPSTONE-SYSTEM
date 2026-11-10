@@ -289,6 +289,30 @@ export function buildStepPayload(step: number, form: OnboardingFormValue) {
   }
 }
 
+function validateDateOfBirth(value: string): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value)
+  if (!match) return 'Enter a valid date of birth.'
+
+  const [, yearText, monthText, dayText] = match
+  const year = Number(yearText)
+  const month = Number(monthText)
+  const day = Number(dayText)
+  const birthDate = new Date(year, month - 1, day)
+  if (
+    birthDate.getFullYear() !== year ||
+    birthDate.getMonth() !== month - 1 ||
+    birthDate.getDate() !== day
+  ) {
+    return 'Enter a valid date of birth.'
+  }
+
+  const today = new Date()
+  const latestEligibleDate = new Date(today.getFullYear() - 15, today.getMonth(), today.getDate())
+  if (birthDate > latestEligibleDate) return 'You must be at least 15 years old.'
+
+  return ''
+}
+
 // ── Quick client-side "required field" checks (server is source of truth for the rest) ──
 
 export function validateStep(step: number, form: OnboardingFormValue): string {
@@ -298,6 +322,8 @@ export function validateStep(step: number, form: OnboardingFormValue): string {
       || !v.address_province.trim() || !v.address_municipality_city.trim() || !v.address_barangay.trim() || !v.address_house_street.trim()) {
       return 'Please complete the required personal information and address fields.'
     }
+    const dateOfBirthError = validateDateOfBirth(v.date_of_birth)
+    if (dateOfBirthError) return dateOfBirthError
     const heightFt = Number(v.height_ft)
     if (!Number.isFinite(heightFt) || heightFt < 2.5 || heightFt > 8.5) return 'Select a valid height in feet and inches.'
     if (!v.sex) return 'Select your sex.'

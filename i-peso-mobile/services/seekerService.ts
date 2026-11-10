@@ -435,6 +435,14 @@ export interface GovernmentProgramsResponse {
   categories: Record<string, number>
 }
 
+export interface CitizenCharterItem {
+  service_id: number | string
+  service_name: string
+  description?: string | null
+  processing_time?: string | null
+  fees?: string | null
+}
+
 
 
 export interface OccupationOption {
@@ -593,7 +601,7 @@ export interface PublicEmployerProfile {
   employer_id: number | string
   company_name: string
   trade_name?: string | null
-  industry?: string | null
+  industry?: string | string[] | null
   company_size?: string | null
   company_logo_url?: string | null
   full_address?: string | null
@@ -607,6 +615,9 @@ export interface EmployerVacancy {
   job_title: string
   location?: string | null
   employment_type?: string | null
+  salary_min?: number | string | null
+  salary_max?: number | string | null
+  hide_salary?: boolean
   created_at?: string | null
   preferred_gender?: string | null
   minimum_age?: number | null
@@ -848,6 +859,11 @@ export const seekerService = {
     return res.data?.program
   },
 
+  async getCitizenCharter(): Promise<CitizenCharterItem[]> {
+    const res = await apiClient.get('/seeker/citizen-charter')
+    return res.data?.data ?? []
+  },
+
   programAttachmentUrl(id: number | string) {
     return `${API_BASE_URL}/seeker/government-programs/${id}/attachment`
   },
@@ -968,20 +984,6 @@ export const seekerService = {
    */
   async saveProfessionalSummary(summary: string): Promise<void> {
     await apiClient.put('/seeker/professional-summary', { professional_summary: summary.trim() || null })
-  },
-
-  async uploadProfileImage(uri: string, mimeType: string, filename: string): Promise<{ url: string }> {
-    const formData = new FormData()
-    formData.append('image', {
-      uri,
-      type: mimeType || 'image/jpeg',
-      name: filename || 'profile.jpg',
-    } as any)
-
-    const res = await apiClient.post('/seeker/profile-image', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    })
-    return res.data
   },
 
   /**

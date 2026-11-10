@@ -109,10 +109,12 @@ Open a third PowerShell terminal:
 ```powershell
 cd i-peso-mobile
 npm.cmd install
-npx.cmd expo start --lan -c
+npx.cmd expo start --go --lan -c
 ```
 
 Scan the QR code with Expo Go.
+
+Use `--go` because the project includes `expo-dev-client`: without it, the QR code is for a custom development build and Expo Go shows "Can't open this project". (If Expo is already running, press `s` in the terminal to switch to Expo Go, then scan the new QR code.)
 
 Use `--lan` so the phone connects through the local network. Use `-c` so Expo clears its cache and reloads the new `EXPO_PUBLIC_API_URL`.
 

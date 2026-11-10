@@ -6,6 +6,7 @@ import NotificationBell from '@/pages/seeker/components/NotificationBell'
 import IPesoLogo from '@/components/branding/IPesoLogo'
 import MobileBottomNav from '@/pages/seeker/components/MobileBottomNav'
 import SignOutConfirmDialog from '@/components/common/SignOutConfirmDialog'
+import { useSeekerPhotoUrl } from '@/hooks/useSeekerPhotoUrl'
 
 const navLinks = [
   { to: '/seeker/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -35,6 +36,10 @@ export default function SeekerLayout() {
   const [mobileOpen, setMobileOpen] = useState(false)
   const [signOutOpen, setSignOutOpen] = useState(false)
   const initials = user?.name?.split(' ').map((name) => name[0]).join('').slice(0, 2).toUpperCase() ?? 'JS'
+  const photoUrl = useSeekerPhotoUrl()
+  const avatarContent = photoUrl
+    ? <img src={photoUrl} alt="" className="h-full w-full object-cover" />
+    : initials
   const pageName = pageNames[location.pathname] ?? 'Job Seeker Portal'
 
   const sidebar = (
@@ -71,7 +76,7 @@ export default function SeekerLayout() {
           onClick={() => setMobileOpen(false)}
           className={`mb-2 flex items-center rounded-lg transition hover:bg-white/5 ${collapsed ? 'justify-center' : 'gap-3 px-2 py-2'}`}
         >
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-gold text-xs font-black text-brand-navy">{initials}</span>
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-brand-gold text-xs font-black text-brand-navy">{avatarContent}</span>
           {!collapsed && <div className="min-w-0"><p className="truncate text-sm font-bold text-white">{user?.name}</p><p className="text-xs text-blue-200">View my profile</p></div>}
         </NavLink>
         <button onClick={() => setCollapsed(!collapsed)} className={`portal-sidebar-action hidden md:flex ${collapsed ? 'justify-center' : 'gap-3 px-3'}`}>
@@ -117,7 +122,7 @@ export default function SeekerLayout() {
               className="flex items-center gap-3 rounded-lg px-1.5 py-1 transition hover:bg-slate-100"
               title="Go to My Profile"
             >
-              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-brand-navy text-xs font-black text-white shadow-sm">{initials}</span>
+              <span className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full bg-brand-navy text-xs font-black text-white shadow-sm">{avatarContent}</span>
               <div className="hidden lg:block text-left"><p className="max-w-40 truncate text-sm font-bold text-slate-800">{user?.name}</p><p className="text-xs text-slate-500">Job Seeker</p></div>
             </button>
           </div>
