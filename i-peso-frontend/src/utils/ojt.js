@@ -58,3 +58,61 @@ export function daysLeftLabel(progress) {
   if (days === 0) return 'Last day today'
   return `${days} ${days === 1 ? 'day' : 'days'} left`
 }
+
+// ── Planning an internship (Add / Edit staff form) ───────────────────────────
+
+/** Common school OJT requirements; "Other" covers anything else. */
+export const OJT_HOUR_PRESETS = [240, 300, 360, 400, 486, 500, 600]
+
+/** The office's standard day, used to estimate the end date. */
+export const OJT_HOURS_PER_DAY = 8
+
+/** A start date can be at most this many days in the past. */
+export const OJT_START_LOOKBACK_DAYS = 30
+
+const toUtc = (ymd) => {
+  const [y, m, d] = String(ymd).split('-').map(Number)
+  return new Date(Date.UTC(y, m - 1, d))
+}
+const toYmd = (date) => date.toISOString().slice(0, 10)
+const isWorkingDay = (date) => date.getUTCDay() !== 0 && date.getUTCDay() !== 6 // Monday–Friday
+
+export function workingDaysNeeded(hours) {
+  const value = Number(hours)
+  return value > 0 ? Math.ceil(value / OJT_HOURS_PER_DAY) : 0
+}
+
+/**
+ * The date of the last working day needed to finish the hours, counting the
+ * start date if it's a weekday (8 hours a day, Monday to Friday).
+ */
+export function endDateFor(startYmd, hours) {
+  const needed = workingDaysNeeded(hours)
+  if (!startYmd || !needed) return ''
+  const day = toUtc(startYmd)
+  let counted = 0
+  while (true) {
+    if (isWorkingDay(day)) counted += 1
+    if (counted === needed) return toYmd(day)
+    day.setUTCDate(day.getUTCDate() + 1)
+  }
+}
+
+/** Working days (Monday–Friday) from start to end, both included. */
+export function workingDaysBetween(startYmd, endYmd) {
+  if (!startYmd || !endYmd || endYmd < startYmd) return 0
+  const day = toUtc(startYmd)
+  const end = toUtc(endYmd)
+  let count = 0
+  while (day <= end) {
+    if (isWorkingDay(day)) count += 1
+    day.setUTCDate(day.getUTCDate() + 1)
+  }
+  return count
+}
+
+export function earliestStartDate(today = todayInManila()) {
+  const day = toUtc(today)
+  day.setUTCDate(day.getUTCDate() - OJT_START_LOOKBACK_DAYS)
+  return toYmd(day)
+}

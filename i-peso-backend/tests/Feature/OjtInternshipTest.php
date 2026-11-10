@@ -77,6 +77,36 @@ class OjtInternshipTest extends TestCase
             ->assertJsonPath('staff.role.slug', 'ojt-intern');
     }
 
+    public function test_a_new_interns_start_date_can_be_at_most_30_days_back(): void
+    {
+        Mail::fake();
+        Sanctum::actingAs($this->account('sleo@peso.test', 'peso_office_manager', 'administrator'));
+        $base = [
+            'first_name' => 'Ana', 'last_name' => 'Reyes', 'mobile_number' => '09171234567', 'position' => 'ojt_intern',
+            'ojt_school' => 'PSU', 'ojt_required_hours' => 486, 'ojt_end_date' => '2027-02-08',
+        ];
+
+        // Test clock: Nov 10, 2026 → earliest allowed start is Oct 11.
+        $this->postJson('/api/admin/staff', $base + ['email' => 'old@school.test', 'ojt_start_date' => '2026-10-10'])
+            ->assertStatus(422)
+            ->assertJsonPath('errors.ojt_start_date.0', "The start date can't be more than 30 days ago.");
+
+        $this->postJson('/api/admin/staff', $base + ['email' => 'ok@school.test', 'ojt_start_date' => '2026-10-11'])->assertCreated();
+        $this->postJson('/api/admin/staff', $base + ['email' => 'future@school.test', 'ojt_start_date' => '2026-12-01'])->assertCreated();
+    }
+
+    public function test_editing_keeps_an_old_start_date_but_rejects_a_new_old_one(): void
+    {
+        $intern = $this->intern(['ojt_start_date' => '2026-09-01', 'ojt_end_date' => '2026-12-15']);
+        Sanctum::actingAs($this->account('sleo@peso.test', 'peso_office_manager', 'administrator'));
+
+        // Unchanged (even though it's now more than 30 days back): fine.
+        $this->putJson("/api/admin/staff/{$intern->admin_id}", ['ojt_start_date' => '2026-09-01', 'ojt_end_date' => '2026-12-20'])->assertOk();
+
+        $this->putJson("/api/admin/staff/{$intern->admin_id}", ['ojt_start_date' => '2026-09-15'])
+            ->assertStatus(422)->assertJsonValidationErrors('ojt_start_date');
+    }
+
     // ── Time in / time out ──────────────────────────────────────────────────
 
     public function test_an_intern_times_in_and_out_and_the_hours_wait_for_approval(): void

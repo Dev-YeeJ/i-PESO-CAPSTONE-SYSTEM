@@ -4,6 +4,7 @@ import { Button } from '@/components/ui'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { staffService } from '@/services/staffService'
 import { errorMessage, fieldErrorsFrom } from '../staffDisplay'
+import { OJT_HOUR_PRESETS, OJT_HOURS_PER_DAY, earliestStartDate, endDateFor, formatWorkDate, workingDaysBetween, workingDaysNeeded } from '@/utils/ojt'
 
 const EMPTY = {
   first_name: '',
@@ -41,6 +42,40 @@ export default function StaffFormDialog({ open, onOpenChange, staff, positions, 
   const isEdit = !!staff
   const [form, setForm] = useState(() => (staff ? fromStaff(staff) : EMPTY))
   const isIntern = form.position === 'ojt_intern'
+  // Required hours: a preset from the dropdown, or "Other" to type a number.
+  const [customHours, setCustomHours] = useState(() => !!form.ojt_required_hours && !OJT_HOUR_PRESETS.includes(Number(form.ojt_required_hours)))
+  // Once the end date is changed by hand, start date / hours changes stop overwriting it.
+  const [endTouched, setEndTouched] = useState(false)
+  const originalStart = staff?.internship?.start_date ?? ''
+  const minStart = originalStart && originalStart < earliestStartDate() ? originalStart : earliestStartDate()
+  const suggestedEnd = endDateFor(form.ojt_start_date, form.ojt_required_hours)
+  const daysNeeded = workingDaysNeeded(form.ojt_required_hours)
+  const daysPlanned = workingDaysBetween(form.ojt_start_date, form.ojt_end_date)
+  const tooShort = !!form.ojt_end_date && daysNeeded > 0 && daysPlanned < daysNeeded
+
+  // Start date or hours changed: fill in the end date unless it was set by hand.
+  const setPlan = (field, value) => {
+    setForm((current) => {
+      const next = { ...current, [field]: value }
+      if (!endTouched) {
+        const end = endDateFor(next.ojt_start_date, next.ojt_required_hours)
+        if (end) next.ojt_end_date = end
+      }
+      return next
+    })
+    setErrors((current) => ({ ...current, [field]: undefined, ojt_end_date: undefined }))
+  }
+
+  const chooseHours = (event) => {
+    const value = event.target.value
+    if (value === 'other') {
+      setCustomHours(true)
+      setPlan('ojt_required_hours', '')
+    } else {
+      setCustomHours(false)
+      setPlan('ojt_required_hours', value)
+    }
+  }
   const [errors, setErrors] = useState({})
   const [formError, setFormError] = useState('')
 
@@ -69,6 +104,9 @@ export default function StaffFormDialog({ open, onOpenChange, staff, positions, 
     const missing = Object.fromEntries(
       Object.entries(required).filter(([key]) => !String(form[key]).trim()).map(([key, label]) => [key, `${label} is required.`]),
     )
+    if (isIntern && form.ojt_start_date && form.ojt_start_date !== originalStart && form.ojt_start_date < earliestStartDate()) {
+      missing.ojt_start_date = "The start date can't be more than 30 days ago."
+    }
     if (Object.keys(missing).length) {
       setErrors(missing)
       return
@@ -153,16 +191,54 @@ export default function StaffFormDialog({ open, onOpenChange, staff, positions, 
               <Field label="Course / program" error={errors.ojt_course}>
                 <input value={form.ojt_course} onChange={set('ojt_course')} placeholder="e.g. BS Information Technology" className={inputClass(errors.ojt_course)} autoComplete="off" />
               </Field>
-              <Field label="Required hours" required hint="From the school's OJT requirement, e.g. 486." error={errors.ojt_required_hours}>
-                <input type="number" min="1" max="2000" inputMode="numeric" value={form.ojt_required_hours} onChange={set('ojt_required_hours')} className={inputClass(errors.ojt_required_hours)} />
+              <Field label="Required hours" required hint="From the school's OJT requirement." error={errors.ojt_required_hours}>
+                <select value={customHours ? 'other' : String(form.ojt_required_hours ?? '')} onChange={chooseHours} className={inputClass(errors.ojt_required_hours)}>
+                  <option value="">Select hours</option>
+                  {OJT_HOUR_PRESETS.map((hours) => <option key={hours} value={String(hours)}>{hours} hours</option>)}
+                  <option value="other">Other…</option>
+                </select>
+                {customHours && (
+                  <input
+                    type="number" min="1" max="2000" inputMode="numeric" autoFocus
+                    aria-label="Required hours (other)"
+                    placeholder="Type the number of hours"
+                    value={form.ojt_required_hours}
+                    onChange={(event) => setPlan('ojt_required_hours', event.target.value)}
+                    className={inputClass(errors.ojt_required_hours)}
+                  />
+                )}
               </Field>
               <div className="hidden sm:block" />
-              <Field label="Start date" required error={errors.ojt_start_date}>
-                <input type="date" value={form.ojt_start_date} onChange={set('ojt_start_date')} className={inputClass(errors.ojt_start_date)} />
+              <Field label="Start date" required hint="Up to 30 days ago, or any future date." error={errors.ojt_start_date}>
+                <input type="date" value={form.ojt_start_date} min={minStart} onChange={(event) => setPlan('ojt_start_date', event.target.value)} className={inputClass(errors.ojt_start_date)} />
               </Field>
-              <Field label="End date" required hint="The account closes automatically after this date." error={errors.ojt_end_date}>
-                <input type="date" value={form.ojt_end_date} min={form.ojt_start_date || undefined} onChange={set('ojt_end_date')} className={inputClass(errors.ojt_end_date)} />
+              <Field
+                label="End date"
+                required
+                hint={daysNeeded
+                  ? `Filled in for ${daysNeeded} working days (${OJT_HOURS_PER_DAY} hours a day, Monday to Friday). You can change it. The account closes after this date.`
+                  : 'Choose the start date and hours to fill this in. The account closes after this date.'}
+                error={errors.ojt_end_date}
+              >
+                <input
+                  type="date"
+                  value={form.ojt_end_date}
+                  min={form.ojt_start_date || undefined}
+                  onChange={(event) => { setEndTouched(true); set('ojt_end_date')(event) }}
+                  className={inputClass(errors.ojt_end_date)}
+                />
               </Field>
+              {tooShort && (
+                <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-900 sm:col-span-2" role="status">
+                  Only {daysPlanned} working {daysPlanned === 1 ? 'day' : 'days'} until this date. {form.ojt_required_hours} hours needs {daysNeeded}
+                  {suggestedEnd ? `, which ends ${formatWorkDate(suggestedEnd, { month: 'long', day: 'numeric', year: 'numeric' })}` : ''}.{' '}
+                  {suggestedEnd && (
+                    <button type="button" className="font-bold underline underline-offset-2" onClick={() => { setEndTouched(false); setForm((current) => ({ ...current, ojt_end_date: suggestedEnd })) }}>
+                      Use that date
+                    </button>
+                  )}
+                </p>
+              )}
             </fieldset>
           )}
         </form>

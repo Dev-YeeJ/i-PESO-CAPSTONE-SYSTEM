@@ -173,6 +173,15 @@ class AdminStaffController extends Controller
             $this->ensureInternshipDetails($staffMember, $data);
         }
 
+        // An unchanged start date is fine even if it's now old; a new one must be recent.
+        if (! empty($data['ojt_start_date'])
+            && $data['ojt_start_date'] !== $staffMember->ojt_start_date?->toDateString()
+            && $data['ojt_start_date'] < $this->earliestOjtStart()) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'ojt_start_date' => self::INTERNSHIP_MESSAGES['ojt_start_date.after_or_equal'],
+            ]);
+        }
+
         $before = $this->comparable($staffMember, array_keys($data));
 
         // A new position brings that position's access with it.
@@ -324,6 +333,7 @@ class AdminStaffController extends Controller
         'ojt_start_date.required' => 'Enter the internship start date.',
         'ojt_end_date.required' => 'Enter the internship end date.',
         'ojt_end_date.after_or_equal' => 'The end date must be on or after the start date.',
+        'ojt_start_date.after_or_equal' => "The start date can't be more than 30 days ago.",
     ];
 
     /** School, required hours and dates: required when adding an intern. */
@@ -335,9 +345,20 @@ class AdminStaffController extends Controller
             'ojt_school' => [$presence, 'string', 'max:150'],
             'ojt_course' => ['nullable', 'string', 'max:150'],
             'ojt_required_hours' => [$presence, 'integer', 'min:1', 'max:2000'],
-            'ojt_start_date' => [$presence, 'date'],
+            // New interns: up to OJT_START_LOOKBACK_DAYS back (recording someone who
+            // already started), or any future date. Edits are checked in update().
+            'ojt_start_date' => $required
+                ? [$presence, 'date', 'after_or_equal:'.$this->earliestOjtStart()]
+                : [$presence, 'date'],
             'ojt_end_date' => [$presence, 'date', 'after_or_equal:ojt_start_date'],
         ];
+    }
+
+    private const OJT_START_LOOKBACK_DAYS = 30;
+
+    private function earliestOjtStart(): string
+    {
+        return \Illuminate\Support\Carbon::now('Asia/Manila')->subDays(self::OJT_START_LOOKBACK_DAYS)->toDateString();
     }
 
     /** Someone moved into the intern position needs the same details a new intern does. */
