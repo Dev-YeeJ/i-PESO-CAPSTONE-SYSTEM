@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { getEmployerApplicationDetail, getApplicantResume } from '@/services/employerApplicationService'
+import WorkerRatingBadge from '@/components/reviews/WorkerRatingBadge'
 import { ChevronLeft, Briefcase, FileText, Mail, MapPin, Phone, Sparkles, GraduationCap, Building } from 'lucide-react'
 import { Button, LoadingSkeleton } from '@/components/ui'
 import ApplicantAvatar from './ApplicantAvatar'
@@ -35,7 +36,7 @@ export default function EmployerApplicantProfilePage() {
     const fetchApplication = async () => {
       try {
         const response = await getEmployerApplicationDetail(applicationId)
-        setData(response.application)
+        setData({ ...response.application, worker_rating: response.worker_rating })
       } catch (error) {
         console.error(error)
         toast.error('Failed to load application details')
@@ -110,6 +111,7 @@ export default function EmployerApplicantProfilePage() {
                     {data?.status_label}
                   </span>
                   <span className="text-sm font-semibold text-amber-600">{data?.match_percentage}% Match</span>
+                  <WorkerRatingBadge rating={data?.worker_rating} />
                 </div>
               </div>
             </div>

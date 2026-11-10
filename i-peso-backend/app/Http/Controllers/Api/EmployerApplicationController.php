@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Application;
 use App\Models\Employer;
 use App\Events\ApplicationStatusChanged;
+use App\Services\Feedback\WorkerRating;
 use App\Notifications\InterviewCancelledNotification;
 use App\Notifications\InterviewScheduledNotification;
 use App\Notifications\InterviewUpdatedNotification;
@@ -104,6 +105,8 @@ class EmployerApplicationController extends Controller
 
         return response()->json([
             'application' => $this->formatApplication($application),
+            // Star average and would-rehire count from all employers' feedback (no comments, no names).
+            'worker_rating' => $this->workerRating($application),
         ]);
     }
 
@@ -287,6 +290,22 @@ class EmployerApplicationController extends Controller
             'message' => 'Applications updated successfully.',
             'count' => count($processedApplications),
         ]);
+    }
+
+    /** The applicant's rating from employers; an extra, so it can never break the profile. */
+    private function workerRating(Application $application): ?array
+    {
+        if (! $application->seeker_id) {
+            return null;
+        }
+
+        try {
+            return WorkerRating::forSeeker((int) $application->seeker_id);
+        } catch (\Throwable $exception) {
+            report($exception);
+
+            return null;
+        }
     }
 
     /** An interview time from the form: Philippine time unless it says otherwise, stored as UTC. */

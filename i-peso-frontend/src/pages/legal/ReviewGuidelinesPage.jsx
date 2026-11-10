@@ -99,9 +99,10 @@ export default function ReviewGuidelinesPage() {
           <li>Your name is never shown. Others see you as a <em>Verified applicant</em> or <em>Verified employee</em>, with the month of your review.</li>
           <li>The employer never sees who wrote a review. PESO staff can see it, only to verify and moderate.</li>
           <li>
-            Employers can give PESO private feedback about people they hired. It is never public and never shown to other
-            employers. You can read what an employer wrote about you on your My Reviews page, once you have reviewed that
-            workplace or 14 days after they wrote it, whichever comes first.
+            Employers can give feedback about people they hired. The comments are private: only you and PESO can read them,
+            on your My Reviews page, once you have reviewed that workplace or 14 days after they wrote it, whichever comes
+            first. Employers you apply to can see your average rating from employers, how many employers rated you and how
+            many would hire you again, but never the comments or which companies wrote them.
           </li>
         </ul>
         <p>

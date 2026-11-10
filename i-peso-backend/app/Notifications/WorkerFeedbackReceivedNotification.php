@@ -26,7 +26,7 @@ class WorkerFeedbackReceivedNotification extends Notification
         return [
             'type' => 'worker_feedback_received',
             'title' => "{$this->companyName} left feedback about you",
-            'message' => "Only you and PESO can see it. Review your workplace to read it now, or it opens on {$this->visibleFrom}.",
+            'message' => "Only you and PESO can read the comments. Review your workplace to read it now, or it opens on {$this->visibleFrom}.",
             'action_url' => '/seeker/reviews',
         ];
     }

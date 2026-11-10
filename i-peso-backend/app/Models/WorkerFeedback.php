@@ -6,8 +6,9 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
- * An employer's private feedback about someone they hired. Never public and
- * never shown to other employers: only PESO staff and the worker can read it.
+ * An employer's feedback about someone they hired. The comment is private
+ * (PESO staff and the worker); the star average and would-rehire count are
+ * shown to employers viewing the person's applications (WorkerRating).
  */
 class WorkerFeedback extends Model
 {

@@ -276,7 +276,7 @@ function HiresTab() {
     <div className="mt-4 space-y-4">
       <p className="flex gap-2 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
         <Lock className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
-        <span>Feedback about the people you hired is <strong>private</strong>. Only PESO and the worker can read it. It is never shown to other employers or on any public page.</span>
+        <span>Your <strong>comments are private</strong>: only PESO and the worker can read them. Employers the worker applies to later see only their <strong>star average and would-rehire count</strong>, never your comments or your company name.</span>
       </p>
 
       {isLoading ? (
@@ -351,7 +351,7 @@ function WorkerFeedbackDialog({ hire, aspects, rehireOptions, onClose }) {
       <DialogContent className="max-h-[92vh] max-w-md overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Feedback on {hire.name}</DialogTitle>
-          <DialogDescription>Private: only PESO and {hire.name.split(' ')[0]} can read this.</DialogDescription>
+          <DialogDescription>Your comment is private (PESO and {hire.name.split(' ')[0]} only). Your stars and would-rehire answer count toward the rating other employers see.</DialogDescription>
         </DialogHeader>
         {errors.form && <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{errors.form}</p>}
         <div className="space-y-4">

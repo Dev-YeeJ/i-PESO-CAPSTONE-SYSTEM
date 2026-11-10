@@ -31,7 +31,7 @@ export default function WorkerFeedbackCard({ seekerId }) {
 
   return (
     <Card>
-      <CardHeader title="Feedback from employers" subtitle="Private. Only PESO and this job seeker can see it; never other employers." />
+      <CardHeader title="Feedback from employers" subtitle="Comments are private to PESO and this job seeker. Employers they apply to see only the star average and would-rehire count." />
       {isLoading ? (
         <p className="text-sm text-slate-500">Loading…</p>
       ) : feedback.length === 0 ? (

@@ -244,7 +244,7 @@ class EmployerFeedbackController extends Controller
         ));
 
         return response()->json([
-            'message' => 'Saved. Only PESO and the worker can see this feedback.',
+            'message' => "Saved. Your comment stays private; the stars and would-rehire answer count toward the worker's rating.",
             'feedback' => $this->feedbackView($feedback),
         ], $existing ? 200 : 201);
     }
