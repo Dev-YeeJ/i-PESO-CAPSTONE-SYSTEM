@@ -11,7 +11,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import * as z from 'zod'
 import { isBefore, parseISO } from 'date-fns'
 import { useDropzone } from 'react-dropzone'
-import { toast } from 'sonner'
+import toast from 'react-hot-toast'
 
 const MotionDiv = motion.div
 
@@ -215,7 +215,7 @@ export default function JobFairFormPage() {
             await adminService.publishJobFair(created.job_fair_id)
           } catch (publishErr) {
             if (publishErr.response?.status === 504 || publishErr.response?.status === 503 || publishErr.message === 'Network Error') {
-              toast.info('Job fair published! Emails are still sending in the background.')
+              toast('Job fair published! Emails are still sending in the background.')
             } else {
               throw publishErr
             }

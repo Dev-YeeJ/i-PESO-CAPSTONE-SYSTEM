@@ -6,7 +6,7 @@ import { TERMINAL_STATUSES } from './atsConstants'
 import { formatDate, formatDateTime } from './atsFormatters'
 import InterviewSummary from './InterviewSummary'
 import { getApplicantResume } from '@/services/employerApplicationService'
-import { toast } from 'sonner'
+import toast from 'react-hot-toast'
 
 function InfoTile({ label, value }) {
   return (

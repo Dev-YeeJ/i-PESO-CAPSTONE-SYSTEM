@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { toast } from 'sonner'
+import toast from 'react-hot-toast'
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { Activity, CalendarClock, Download, RefreshCw, RotateCcw, ShieldAlert, UserRound, Users, X } from 'lucide-react'
 import { Badge, Button, Card, StatCard } from '@/components/ui'

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { toast } from 'sonner'
+import toast from 'react-hot-toast'
 import { Check, CheckCheck, Pencil, Plus, X } from 'lucide-react'
 import { Badge, Button, ErrorState, LoadingSkeleton } from '@/components/ui'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'

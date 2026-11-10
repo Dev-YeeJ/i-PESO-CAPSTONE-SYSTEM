@@ -7,7 +7,7 @@ import { adminService } from '@/services/adminService'
 import { useForm, FormProvider, Controller, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { toast } from 'sonner'
+import toast from 'react-hot-toast'
 import { blankResultEntry } from '@/components/reports/jobFairResultVocab'
 
 const inputClass = 'mt-2 w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm shadow-sm transition-colors focus:border-brand-navy focus:outline-none focus:ring-2 focus:ring-brand-navy/20'

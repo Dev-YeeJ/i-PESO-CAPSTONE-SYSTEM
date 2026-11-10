@@ -5,7 +5,7 @@ import { CheckCircle2, ClipboardEdit, Download, Eye, FileText, Flame, Mail, Refr
 import { useNavigate, useParams } from 'react-router-dom'
 import { Badge, Button, Card, CardHeader, LoadingSkeleton, StatCard } from '@/components/ui'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
-import { toast } from 'sonner'
+import toast from 'react-hot-toast'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import PageHeader from '@/pages/admin/_components/PageHeader'

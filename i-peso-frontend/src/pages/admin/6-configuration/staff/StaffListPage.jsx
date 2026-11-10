@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { toast } from 'sonner'
+import toast from 'react-hot-toast'
 import { GraduationCap, MailCheck, Search, UserPlus, UserX, UsersRound } from 'lucide-react'
 import { Badge, Card } from '@/components/ui'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'

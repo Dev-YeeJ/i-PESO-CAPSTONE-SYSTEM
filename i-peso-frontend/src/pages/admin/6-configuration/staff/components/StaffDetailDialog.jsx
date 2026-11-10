@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useMutation, useQuery } from '@tanstack/react-query'
-import { toast } from 'sonner'
+import toast from 'react-hot-toast'
 import { KeyRound, Pencil, UserCheck, UserX } from 'lucide-react'
 import { Badge, Button, ConfirmDialog } from '@/components/ui'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
