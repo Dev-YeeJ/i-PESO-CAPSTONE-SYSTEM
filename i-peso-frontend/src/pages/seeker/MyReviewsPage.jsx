@@ -189,7 +189,7 @@ function EmployerFeedbackSection({ items }) {
   return (
     <section className="mt-10" aria-labelledby="employer-feedback-heading">
       <h2 id="employer-feedback-heading" className="text-lg font-black text-slate-900">Feedback from employers</h2>
-      <p className="mt-1 flex items-center gap-1.5 text-sm text-slate-600"><Lock className="h-4 w-4" aria-hidden /> Private: only you and PESO can see this. It is never shown to other employers.</p>
+      <p className="mt-1 flex items-center gap-1.5 text-sm text-slate-600"><Lock className="h-4 w-4" aria-hidden /> Only you and PESO can read the comments. Employers you apply to see only your average rating and how many would hire you again.</p>
       <ul className="mt-3 space-y-3">
         {items.map((item) => (
           <li key={item.id} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">

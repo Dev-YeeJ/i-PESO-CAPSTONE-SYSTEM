@@ -1,4 +1,5 @@
 import { Briefcase, CheckCircle2, FileText, Mail, MapPin, Phone, Sparkles, X, GraduationCap, Building } from 'lucide-react'
+import WorkerRatingBadge from '@/components/reviews/WorkerRatingBadge'
 import { Badge, Button, LoadingSkeleton } from '@/components/ui'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import ApplicantAvatar from './ApplicantAvatar'
@@ -128,6 +129,7 @@ export default function ApplicantProfileModal({
                 <div className="flex flex-wrap items-center gap-2">
                   {status && <Badge status={status}>{data?.status_label || status}</Badge>}
                   <Badge variant="neutral" icon={false}>{Math.round(Number(data?.match_percentage ?? 0))}% match</Badge>
+                  <WorkerRatingBadge rating={data?.worker_rating} />
                 </div>
 
                 {/* Grid Overview */}

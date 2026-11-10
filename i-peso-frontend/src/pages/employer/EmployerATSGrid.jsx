@@ -111,7 +111,7 @@ export default function EmployerATSGrid() {
     setActiveModal('profile')
     try {
       const data = await getEmployerApplicationDetail(app.apply_id)
-      setDetailApplication(data.application)
+      setDetailApplication({ ...data.application, worker_rating: data.worker_rating })
     } catch (error) {
       toast.error(error.response?.data?.message || 'Failed to load applicant details.')
       closeModal()

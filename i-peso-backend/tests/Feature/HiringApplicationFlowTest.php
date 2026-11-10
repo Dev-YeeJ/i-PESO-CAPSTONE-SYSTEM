@@ -348,6 +348,41 @@ class HiringApplicationFlowTest extends TestCase
         ])->assertStatus(422)->assertJsonValidationErrors(['interview.schedule' => 'Choose an interview time in the future.']);
     }
 
+    public function test_employers_see_an_applicants_rating_from_other_employers_without_comments(): void
+    {
+        (require database_path('migrations/2026_11_12_000001_create_employer_feedback_tables.php'))->up();
+        $employer = $this->createEmployer();
+        $pastEmployer = $this->createEmployer();
+        $anotherPastEmployer = $this->createEmployer();
+        $seeker = $this->createSeeker();
+        $vacancy = $this->createVacancy($employer);
+
+        Sanctum::actingAs($seeker);
+        $this->postJson("/api/seeker/jobs/{$vacancy->post_id}/apply")->assertCreated();
+        $application = Application::firstOrFail();
+
+        Sanctum::actingAs($employer);
+        $this->getJson("/api/employer/applications/{$application->apply_id}")->assertOk()->assertJsonPath('worker_rating', null);
+
+        $feedback = fn (int $employerId, int $stars, string $rehire, string $status = 'visible') => \App\Models\WorkerFeedback::create([
+            'employer_id' => $employerId, 'seeker_id' => $seeker->seeker_id, 'would_rehire' => $rehire, 'status' => $status,
+            'ratings' => ['professionalism' => $stars, 'communication' => $stars, 'reliability' => $stars, 'job_performance' => $stars],
+            'comment' => 'Private comment that must never reach other employers.',
+        ]);
+        $feedback($pastEmployer->employer_id, 5, 'yes');
+        $feedback($anotherPastEmployer->employer_id, 4, 'yes');
+        $feedback($this->createEmployer()->employer_id, 1, 'no', 'hidden'); // hidden by PESO: not counted
+
+        $response = $this->getJson("/api/employer/applications/{$application->apply_id}")
+            ->assertOk()
+            ->assertJsonPath('worker_rating.average', 4.5)
+            ->assertJsonPath('worker_rating.employers', 2)
+            ->assertJsonPath('worker_rating.would_rehire.yes', 2)
+            ->assertJsonPath('worker_rating.would_rehire.no', 0);
+
+        $this->assertStringNotContainsString('Private comment', $response->getContent());
+    }
+
     private function scheduleOnlineInterview(\Carbon\CarbonInterface $schedule): array
     {
         $employer = $this->createEmployer();
