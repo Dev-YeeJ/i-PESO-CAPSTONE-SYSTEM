@@ -12,10 +12,14 @@ function blankValues(initialInterview) {
   if (!initialInterview?.schedule) {
     return { date: '', time: '', mode: 'online', autoMeet: true, venueOrLink: '', instructions: '' }
   }
+  // Fill the form on the office clock (Philippine time), whatever the device's zone.
   const scheduled = new Date(initialInterview.schedule)
+  const manila = Number.isNaN(scheduled.getTime()) ? null : new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Manila', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+  }).formatToParts(scheduled).reduce((parts, part) => ({ ...parts, [part.type]: part.value }), {})
   return {
-    date: Number.isNaN(scheduled.getTime()) ? '' : scheduled.toISOString().slice(0, 10),
-    time: Number.isNaN(scheduled.getTime()) ? '' : scheduled.toTimeString().slice(0, 5),
+    date: manila ? `${manila.year}-${manila.month}-${manila.day}` : '',
+    time: manila ? `${manila.hour}:${manila.minute}` : '',
     mode: initialInterview.mode_of_interview || 'online',
     autoMeet: false,
     venueOrLink: initialInterview.venue_or_link || '',
@@ -39,7 +43,7 @@ export default function InterviewModal({ open, onClose, targets = [], initialInt
 
   const scheduleIsPast = useMemo(() => {
     if (!date || !time) return false
-    const candidate = new Date(`${date}T${time}:00`)
+    const candidate = new Date(`${date}T${time}:00+08:00`)
     return Number.isNaN(candidate.getTime()) || candidate.getTime() <= Date.now()
   }, [date, time])
 
@@ -49,7 +53,8 @@ export default function InterviewModal({ open, onClose, targets = [], initialInt
   const submit = handleSubmit((values) => {
     onSubmit({
       interview: {
-        schedule: `${values.date} ${values.time}`,
+        // Explicit Philippine offset, so the server never has to guess the zone.
+        schedule: `${values.date}T${values.time}:00+08:00`,
         mode_of_interview: values.mode,
         auto_meet_link: values.mode === 'online' && values.autoMeet,
         venue_or_link: values.mode === 'online' && values.autoMeet ? undefined : values.venueOrLink.trim(),

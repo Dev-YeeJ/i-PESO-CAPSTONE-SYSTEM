@@ -64,7 +64,7 @@ class ApplicationWithdrawnNotification extends Notification
             return $base;
         }
 
-        return $base.' Their interview on '.$this->cancelledInterviewAt->format('F j, Y \a\t g:i A').' is cancelled.';
+        return $base.' Their interview on '.$this->cancelledInterviewAt->copy()->timezone('Asia/Manila')->format('F j, Y \a\t g:i A').' is cancelled.';
     }
 
     private function applicantName(): string

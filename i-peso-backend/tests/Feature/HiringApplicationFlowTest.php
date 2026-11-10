@@ -302,6 +302,52 @@ class HiringApplicationFlowTest extends TestCase
     }
 
     /** @return array{0: Employer, 1: JobSeeker, 2: Application} */
+    public function test_an_interview_time_is_read_as_philippine_time_and_shown_correctly(): void
+    {
+        $employer = $this->createEmployer();
+        $seeker = $this->createSeeker();
+        $vacancy = $this->createVacancy($employer);
+        Sanctum::actingAs($seeker);
+        $this->postJson("/api/seeker/jobs/{$vacancy->post_id}/apply")->assertCreated();
+        $application = Application::firstOrFail();
+
+        // 3:23 AM on the office clock, two days out — the form sends it with the +08:00 offset.
+        $manila = now('Asia/Manila')->addDays(2)->setTime(3, 23);
+        Sanctum::actingAs($employer);
+        $this->patchJson("/api/employer/applications/{$application->apply_id}/status", [
+            'status' => 'interview',
+            'interview' => ['mode_of_interview' => 'online', 'schedule' => $manila->format('Y-m-d\TH:i:sP'), 'auto_meet_link' => true],
+        ])->assertOk();
+
+        $stored = \App\Models\InterviewSchedule::firstOrFail()->schedule;
+        $this->assertSame($manila->copy()->utc()->toIso8601String(), $stored->toIso8601String());
+        $this->assertSame('3:23 AM', $stored->copy()->timezone('Asia/Manila')->format('g:i A'));
+
+        // A time without a zone (older clients) is read as Philippine time too.
+        $this->assertSame(
+            $manila->copy()->utc()->toIso8601String(),
+            \App\Http\Controllers\Api\EmployerApplicationController::interviewTime($manila->format('Y-m-d H:i'))->toIso8601String()
+        );
+    }
+
+    public function test_a_past_philippine_time_is_rejected(): void
+    {
+        $employer = $this->createEmployer();
+        $seeker = $this->createSeeker();
+        $vacancy = $this->createVacancy($employer);
+        Sanctum::actingAs($seeker);
+        $this->postJson("/api/seeker/jobs/{$vacancy->post_id}/apply")->assertCreated();
+        $application = Application::firstOrFail();
+
+        // One hour ago in Manila (which is still "in the future" if misread as UTC).
+        $past = now('Asia/Manila')->subHour();
+        Sanctum::actingAs($employer);
+        $this->patchJson("/api/employer/applications/{$application->apply_id}/status", [
+            'status' => 'interview',
+            'interview' => ['mode_of_interview' => 'online', 'schedule' => $past->format('Y-m-d H:i'), 'auto_meet_link' => true],
+        ])->assertStatus(422)->assertJsonValidationErrors(['interview.schedule' => 'Choose an interview time in the future.']);
+    }
+
     private function scheduleOnlineInterview(\Carbon\CarbonInterface $schedule): array
     {
         $employer = $this->createEmployer();
@@ -317,7 +363,7 @@ class HiringApplicationFlowTest extends TestCase
             'status' => 'interview',
             'interview' => [
                 'mode_of_interview' => 'online',
-                'schedule' => $schedule->format('Y-m-d H:i:s'),
+                'schedule' => $schedule->copy()->timezone('Asia/Manila')->format('Y-m-d H:i:s'),
                 'auto_meet_link' => true,
             ],
         ])->assertOk();

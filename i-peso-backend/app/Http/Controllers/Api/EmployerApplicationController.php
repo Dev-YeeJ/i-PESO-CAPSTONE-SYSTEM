@@ -289,6 +289,12 @@ class EmployerApplicationController extends Controller
         ]);
     }
 
+    /** An interview time from the form: Philippine time unless it says otherwise, stored as UTC. */
+    public static function interviewTime(mixed $value): \Illuminate\Support\Carbon
+    {
+        return \Illuminate\Support\Carbon::parse((string) $value, 'Asia/Manila')->utc();
+    }
+
     protected function validateStatusPayload(Request $request): array
     {
         return $request->validate([
@@ -298,7 +304,17 @@ class EmployerApplicationController extends Controller
             'seeker_mismatch_reason_code' => ['nullable', Rule::in(array_keys(\App\Services\EstablishmentReportService::SEEKER_MISMATCH_REASONS))],
             'mismatch_reason_details' => ['nullable', 'string', 'max:5000'],
             'interview.mode_of_interview' => ['required_if:status,interview', 'nullable', Rule::in(['face_to_face', 'online', 'phone'])],
-            'interview.schedule' => ['required_if:status,interview', 'nullable', 'date', 'after:now'],
+            // The employer picks a time on the office clock (Philippine time). The
+            // server runs in UTC, so a time without a zone is read as Manila time.
+            'interview.schedule' => ['required_if:status,interview', 'nullable', 'date', function (string $attribute, mixed $value, \Closure $fail) {
+                try {
+                    if (self::interviewTime($value)->lte(now())) {
+                        $fail('Choose an interview time in the future.');
+                    }
+                } catch (\Throwable) {
+                    $fail('Enter a valid interview date and time.');
+                }
+            }],
             'interview.venue_or_link' => [
                 Rule::requiredIf(fn () => $request->input('status') === 'interview' && ! $request->boolean('interview.auto_meet_link')),
                 'nullable', 'string', 'max:500',
@@ -377,7 +393,7 @@ class EmployerApplicationController extends Controller
                 ['apply_id' => $application->apply_id],
                 [
                     'mode_of_interview' => $interview['mode_of_interview'],
-                    'schedule' => $interview['schedule'],
+                    'schedule' => self::interviewTime($interview['schedule']),
                     'venue_or_link' => $interview['venue_or_link'] ?? null,
                     'instructions' => $interview['instructions'] ?? null,
                     'status' => 'scheduled',

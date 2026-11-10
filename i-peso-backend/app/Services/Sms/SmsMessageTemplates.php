@@ -77,6 +77,6 @@ class SmsMessageTemplates
 
     private static function dateTime(?CarbonInterface $schedule): string
     {
-        return $schedule?->format('M j, Y g:i A') ?? 'a date to be confirmed';
+        return $schedule?->copy()->timezone('Asia/Manila')->format('M j, Y g:i A') ?? 'a date to be confirmed';
     }
 }

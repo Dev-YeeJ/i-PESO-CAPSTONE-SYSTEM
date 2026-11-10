@@ -75,7 +75,7 @@ abstract class InterviewBaseNotification extends Notification
         $applicantName = trim("{$this->application->jobSeeker?->first_name} {$this->application->jobSeeker?->last_name}");
         $recipientName = $this->recipientName($notifiable);
         $interview = $this->application->interviewSchedule;
-        $scheduledAt = $interview?->schedule ? $interview->schedule->format('F j, Y \a\t g:i A') : 'TBD';
+        $scheduledAt = $interview?->schedule ? $interview->schedule->copy()->timezone('Asia/Manila')->format('F j, Y \a\t g:i A') : 'TBD';
         $mode = $interview ? ucfirst(str_replace('_', ' ', $interview->mode_of_interview)) : 'TBD';
         $location = $interview?->venue_or_link ?: 'Venue to follow';
 
@@ -124,7 +124,7 @@ abstract class InterviewBaseNotification extends Notification
         $applicantName = trim("{$this->application->jobSeeker?->first_name} {$this->application->jobSeeker?->last_name}");
         $recipientName = $this->recipientName($notifiable);
         $interview = $this->application->interviewSchedule;
-        $scheduledAt = $interview?->schedule ? $interview->schedule->format('F j, Y \a\t g:i A') : 'TBD';
+        $scheduledAt = $interview?->schedule ? $interview->schedule->copy()->timezone('Asia/Manila')->format('F j, Y \a\t g:i A') : 'TBD';
         $mode = $interview ? ucfirst(str_replace('_', ' ', $interview->mode_of_interview)) : 'TBD';
         $location = $interview?->venue_or_link ?: 'Venue to follow';
         $notes = $interview?->instructions ?: 'Please be ready with your resume, certificates, and valid ID.';
