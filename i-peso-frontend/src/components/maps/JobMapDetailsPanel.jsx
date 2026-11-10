@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import EmployerRatingSummary from '@/components/reviews/EmployerRatingSummary'
 import { Award, Banknote, Bookmark, BriefcaseBusiness, CalendarDays, Check, ExternalLink, Flag, GraduationCap, Loader2, MapPin, Navigation, Sparkles, X } from 'lucide-react'
 import EmployerPreferenceChip from '@/components/jobs/EmployerPreferenceChip'
 
@@ -17,7 +18,7 @@ const matchTone = (percentage) => {
   return 'bg-slate-100 text-slate-600 ring-slate-200'
 }
 
-export default function JobMapDetailsPanel({ job, isLoading = false, loadError = '', onClose, onApply, onSave, onTraining, onJobFair, onApplicationStatus, onReport, isApplying, isSaving }) {
+export default function JobMapDetailsPanel({ job, onViewCompanyReviews, isLoading = false, loadError = '', onClose, onApply, onSave, onTraining, onJobFair, onApplicationStatus, onReport, isApplying, isSaving }) {
   const [expandedJobId, setExpandedJobId] = useState(null)
   const contentRef = useRef(null)
   const descriptionRef = useRef(null)
@@ -105,6 +106,15 @@ export default function JobMapDetailsPanel({ job, isLoading = false, loadError =
         </div>
 
         <EmployerPreferenceChip job={renderedJob} className="mt-4" />
+
+        {(renderedJob.employer_id || renderedJob.employer?.employer_id) && (
+          <div className="mt-4">
+            <EmployerRatingSummary
+              employerId={renderedJob.employer_id || renderedJob.employer?.employer_id}
+              onSeeAll={onViewCompanyReviews ? () => onViewCompanyReviews(renderedJob.employer_id || renderedJob.employer?.employer_id) : undefined}
+            />
+          </div>
+        )}
 
         <section className="mt-5">
           <h3 className="text-xs font-black uppercase tracking-wide text-slate-900">Work location</h3>

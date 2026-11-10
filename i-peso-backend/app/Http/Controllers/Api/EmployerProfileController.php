@@ -48,10 +48,14 @@ class EmployerProfileController extends Controller
 
         try {
             $employer->update($validator->validated());
+            $employer->refresh();
 
             return response()->json([
                 'message' => 'Profile updated successfully.',
-                'employer' => $employer->refresh(),
+                // Same shape the profile page loads with, so the logo doesn't drop out after saving.
+                'employer' => $employer->toArray() + [
+                    'company_logo_url' => $employer->company_logo ? Storage::disk('public')->url($employer->company_logo) : null,
+                ],
             ], 200);
         } catch (\Exception $e) {
             return response()->json([
@@ -79,8 +83,10 @@ class EmployerProfileController extends Controller
         }
 
         try {
-            $disk = config('filesystems.employer_documents_disk', 'local');
-            
+            // Logos are public (job cards, company pages), and every page reads them
+            // from the public disk, the same place registration stores them.
+            $disk = 'public';
+
             // Delete old logo if exists
             if ($employer->company_logo && Storage::disk($disk)->exists($employer->company_logo)) {
                 Storage::disk($disk)->delete($employer->company_logo);

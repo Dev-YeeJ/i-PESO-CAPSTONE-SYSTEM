@@ -61,12 +61,17 @@ class ReputationSummary
 
         $overall = collect($averages)->avg('average');
 
+        // How many people gave each overall star rating (their review's average, rounded).
+        $stars = $counted->map(fn (EmployerReview $review) => (int) round((float) $review->averageRating()))->countBy();
+        $distribution = collect([5, 4, 3, 2, 1])->map(fn (int $star) => ['stars' => $star, 'count' => (int) ($stars[$star] ?? 0)])->all();
+
         return [
             'reviewers' => $people,
             'enough' => true,
             'average' => $overall !== null ? round($overall, 1) : null,
             'recommend_percent' => (int) round($counted->where('recommend', true)->count() / $people * 100),
             'aspects' => $averages,
+            'distribution' => $distribution,
             'strengths' => collect($averages)->filter(fn ($aspect) => $aspect['average'] >= self::STRENGTH_AT)->keys()->values(),
             'to_improve' => collect($averages)->filter(fn ($aspect) => $aspect['average'] <= self::IMPROVE_AT)->keys()->values(),
         ];

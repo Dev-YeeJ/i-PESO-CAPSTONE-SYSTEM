@@ -682,6 +682,32 @@ class EmployerVerificationJobPostingTest extends TestCase
         $this->assertSame('pending', $document->verification_status);
     }
 
+    public function test_a_new_company_logo_is_stored_publicly_and_kept_after_saving_the_profile(): void
+    {
+        Storage::fake('public');
+        Storage::fake('local');
+        $employer = $this->createEmployer();
+        Sanctum::actingAs($employer);
+
+        $url = $this->post('/api/employer/profile/logo', [
+            'company_logo' => UploadedFile::fake()->image('logo.png', 200, 200),
+        ], ['Accept' => 'application/json'])->assertOk()->json('company_logo_url');
+
+        $path = $employer->refresh()->company_logo;
+        // Job cards and company pages read logos from the public disk.
+        Storage::disk('public')->assertExists($path);
+        $this->assertSame(Storage::disk('public')->url($path), $url);
+
+        $this->putJson('/api/employer/profile', [
+            'industry' => ['Manufacturing'],
+            'company_size' => 'small',
+            'company_description' => 'We mill rice for Urdaneta City.',
+            'representative_name' => 'Ana Reyes',
+            'representative_designation' => 'HR Manager',
+            'mobile_number' => '09171234567',
+        ])->assertOk()->assertJsonPath('employer.company_logo_url', $url);
+    }
+
     public function test_employer_profile_exposes_document_expiration_date(): void
     {
         $employer = $this->createEmployer();
@@ -1107,6 +1133,10 @@ class EmployerVerificationJobPostingTest extends TestCase
                 $table->string('password');
                 $table->string('company_type')->nullable();
                 $table->string('company_name')->nullable();
+                $table->text('industry')->nullable();
+                $table->string('company_size')->nullable();
+                $table->text('company_description')->nullable();
+                $table->string('company_logo')->nullable();
                 $table->string('representative_name')->nullable();
                 $table->string('representative_first_name')->nullable();
                 $table->string('representative_middle_name')->nullable();

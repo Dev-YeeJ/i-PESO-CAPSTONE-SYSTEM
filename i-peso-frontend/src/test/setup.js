@@ -35,3 +35,14 @@ Element.prototype.hasPointerCapture = Element.prototype.hasPointerCapture ?? (()
 Element.prototype.setPointerCapture = Element.prototype.setPointerCapture ?? (() => {})
 Element.prototype.releasePointerCapture = Element.prototype.releasePointerCapture ?? (() => {})
 Element.prototype.scrollIntoView = Element.prototype.scrollIntoView ?? (() => {})
+
+// framer-motion's useInView needs IntersectionObserver; report everything as visible.
+if (!global.IntersectionObserver) {
+  global.IntersectionObserver = class IntersectionObserver {
+    constructor(callback) { this.callback = callback }
+    observe(target) { this.callback([{ isIntersecting: true, target, intersectionRatio: 1 }], this) }
+    unobserve() {}
+    disconnect() {}
+    takeRecords() { return [] }
+  }
+}

@@ -123,6 +123,45 @@ class EmployerFeedbackTest extends TestCase
         $this->postJson("/api/employer/reviews/{$elsewhere}/reply", ['body' => 'This is not our review at all.'])->assertNotFound();
     }
 
+    public function test_reviews_can_be_filtered_to_those_needing_a_reply_or_disputed(): void
+    {
+        $replied = $this->review('Quick and fair.');
+        $waiting = $this->review('Slow to answer.');
+        $disputed = $this->review('They asked for a placement fee.');
+        Sanctum::actingAs($this->employerModel());
+
+        $this->postJson("/api/employer/reviews/{$replied}/reply", ['body' => 'Thank you for applying with us.'])->assertOk();
+        $this->postJson("/api/employer/reviews/{$disputed}/dispute", [
+            'reason' => 'false_information', 'details' => 'We never charge applicants any fee; our records show no such request.',
+        ])->assertOk();
+
+        $ids = fn (string $filter) => collect($this->getJson("/api/employer/reviews?type=recruitment&filter={$filter}")->assertOk()->json('reviews.data'))->pluck('id')->sort()->values()->all();
+
+        $this->assertSame(collect([$waiting, $disputed])->sort()->values()->all(), $ids('needs_reply'));
+        $this->assertSame([$disputed], $ids('disputed'));
+        $this->assertCount(3, $ids('all'));
+
+        $this->getJson('/api/employer/reviews?type=recruitment')
+            ->assertJsonPath('counts.recruitment', ['all' => 3, 'needs_reply' => 2, 'disputed' => 1])
+            ->assertJsonPath('counts.employment', ['all' => 0, 'needs_reply' => 0, 'disputed' => 0]);
+        $this->getJson('/api/employer/reviews?filter=everything')->assertStatus(422);
+    }
+
+    public function test_the_summary_includes_how_many_people_gave_each_star_rating(): void
+    {
+        $this->review('Fine.');
+        $this->review('Fine.');
+        $this->review('Fine.');
+        Sanctum::actingAs($this->employerModel());
+
+        $this->getJson('/api/employer/reviews')
+            ->assertJsonPath('summary.recruitment.enough', true)
+            ->assertJsonPath('summary.recruitment.distribution', [
+                ['stars' => 5, 'count' => 0], ['stars' => 4, 'count' => 3], ['stars' => 3, 'count' => 0],
+                ['stars' => 2, 'count' => 0], ['stars' => 1, 'count' => 0],
+            ]);
+    }
+
     // ── Dispute ─────────────────────────────────────────────────────────────
 
     public function test_disputing_sends_it_to_peso_and_the_review_stays_up(): void

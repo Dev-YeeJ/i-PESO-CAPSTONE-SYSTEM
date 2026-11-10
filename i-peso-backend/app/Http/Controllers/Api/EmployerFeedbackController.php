@@ -41,18 +41,35 @@ class EmployerFeedbackController extends Controller
 
         $filters = $request->validate([
             'type' => ['nullable', Rule::in([FeedbackAspects::RECRUITMENT, FeedbackAspects::EMPLOYMENT])],
+            'filter' => ['nullable', Rule::in(['all', 'needs_reply', 'disputed'])],
         ]);
+
+        $disputed = fn ($query) => $query->where('reporter_type', EmployerReviewFlag::BY_EMPLOYER);
 
         $reviews = EmployerReview::query()
             ->published()
             ->with(['reply', 'flags' => fn ($query) => $query->where('reporter_type', EmployerReviewFlag::BY_EMPLOYER)->latest()])
             ->where('employer_id', $employer->employer_id)
             ->when($filters['type'] ?? null, fn ($query, $type) => $query->where('type', $type))
+            ->when(($filters['filter'] ?? null) === 'needs_reply', fn ($query) => $query->whereDoesntHave('reply'))
+            ->when(($filters['filter'] ?? null) === 'disputed', fn ($query) => $query->whereHas('flags', $disputed))
             ->latest()
             ->paginate(10);
 
+        // Per type: how many reviews are still waiting for a reply, and how many were disputed.
+        $base = fn () => EmployerReview::query()->published()->where('employer_id', $employer->employer_id);
+        $counts = [];
+        foreach ([FeedbackAspects::RECRUITMENT, FeedbackAspects::EMPLOYMENT] as $type) {
+            $counts[$type] = [
+                'all' => $base()->where('type', $type)->count(),
+                'needs_reply' => $base()->where('type', $type)->whereDoesntHave('reply')->count(),
+                'disputed' => $base()->where('type', $type)->whereHas('flags', $disputed)->count(),
+            ];
+        }
+
         return response()->json([
             'summary' => ReputationSummary::for($employer),
+            'counts' => $counts,
             'reviews' => $reviews->through(fn (EmployerReview $review) => $this->employerView($review)),
             'dispute_reasons' => FeedbackAspects::FLAG_REASONS,
         ]);

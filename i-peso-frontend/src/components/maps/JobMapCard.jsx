@@ -1,4 +1,4 @@
-import { AlertTriangle, Award, Banknote, Bookmark, BriefcaseBusiness, CalendarDays, Check, ExternalLink, Eye, GraduationCap, Loader2, MapPin, Navigation } from 'lucide-react'
+import { AlertTriangle, Award, Banknote, Bookmark, BriefcaseBusiness, CalendarDays, Check, ExternalLink, Eye, GraduationCap, Loader2, MapPin, Navigation, Star } from 'lucide-react'
 import EmployerPreferenceChip from '@/components/jobs/EmployerPreferenceChip'
 
 const matchClass = (percentage) => {
@@ -15,7 +15,7 @@ const formatSalary = (job) => {
   return `₱${Number(job.salary_min || job.salary_max).toLocaleString()}`
 }
 
-export default function JobMapCard({ job, isActive, isApplying, isSaving, onClick, onView, onApply, onSave, onTraining, onJobFair }) {
+export default function JobMapCard({ job, rating, isActive, isApplying, isSaving, onClick, onView, onApply, onSave, onTraining, onJobFair }) {
   const hasMatch = job.match_percentage !== null && job.match_percentage !== undefined
   const matchPercentage = hasMatch ? Math.round(job.match_percentage) : null
   const missingSkillCount = job.missing_skills?.length || 0
@@ -46,7 +46,13 @@ export default function JobMapCard({ job, isActive, isApplying, isSaving, onClic
         <div className="min-w-0">
           <h3 className="truncate text-sm font-extrabold text-slate-900">{job.job_title}</h3>
           <p className="mt-0.5 flex items-center gap-1.5 truncate text-xs font-medium text-slate-500">
-            <BriefcaseBusiness className="h-3.5 w-3.5 shrink-0" /> {job.employer_name}
+            <BriefcaseBusiness className="h-3.5 w-3.5 shrink-0" /> <span className="truncate">{job.employer_name}</span>
+            {rating && (
+              <span className="inline-flex shrink-0 items-center gap-0.5 font-bold text-slate-700" aria-label={`Rated ${rating.average.toFixed(1)} out of 5 by ${rating.reviewers} verified reviewers`}>
+                <Star className="h-3 w-3 fill-amber-400 text-amber-400" aria-hidden="true" />{rating.average.toFixed(1)}
+                <span className="font-normal text-slate-400">({rating.reviewers})</span>
+              </span>
+            )}
           </p>
         </div>
         <span className={`shrink-0 rounded-full px-2 py-1 text-[10px] font-black ring-1 ring-inset ${hasMatch ? matchClass(matchPercentage) : 'bg-blue-50 text-blue-700 ring-blue-200'}`}>

@@ -15,7 +15,7 @@ export const updateProfile = async (data) => {
  * @param {File} file 
  * @returns {Promise<Object>}
  */
-export const uploadCompanyLogo = async (file) => {
+export const uploadCompanyLogo = async (file, onProgress) => {
   const formData = new FormData()
   formData.append('company_logo', file)
 
@@ -23,6 +23,9 @@ export const uploadCompanyLogo = async (file) => {
     headers: {
       'Content-Type': 'multipart/form-data',
     },
+    onUploadProgress: onProgress
+      ? (event) => event.total && onProgress(Math.round((event.loaded / event.total) * 100))
+      : undefined,
   })
   return response.data
 }

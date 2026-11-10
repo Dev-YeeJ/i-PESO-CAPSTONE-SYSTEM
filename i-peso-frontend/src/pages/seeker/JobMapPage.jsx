@@ -9,6 +9,8 @@ import JobMapFilters from '../../components/maps/JobMapFilters'
 import JobMapDetailsPanel from '../../components/maps/JobMapDetailsPanel'
 import ReportEmployerModal from '../../components/ReportEmployerModal'
 import JobFairInfoModal from '../../components/JobFairInfoModal'
+import EmployerProfileModal from './EmployerProfileModal'
+import { reviewService } from '../../services/reviewService'
 import { ALLOWED_RADII, getMapJobDetail, getMapJobs } from '../../services/jobMapService'
 import { applyToJob, toggleSavedJob } from '../../services/seekerService'
 import { listJobFairs } from '../../services/jobFairService'
@@ -134,6 +136,7 @@ export default function JobMapPage() {
   const [savingIds, setSavingIds] = useState([])
   const [pendingApplyJobId, setPendingApplyJobId] = useState(null)
   const [assistantOpen, setAssistantOpen] = useState(false)
+  const [companyId, setCompanyId] = useState(null)
   const detailAbortRef = useRef(null)
   const detailRequestId = useRef(0)
   const filtersRef = useRef(filters)
@@ -184,6 +187,18 @@ export default function JobMapPage() {
 
   const jobs = jobsQuery.data?.jobs ?? EMPTY_LIST
   const summary = jobsQuery.data?.summary ?? null
+
+  // Verified-review ratings for the listed employers, in one request
+  // (employers with fewer than 3 reviewers come back without one).
+  const ratingEmployerIds = useMemo(() => [...new Set(
+    jobs.map((job) => job.employer_id || job.employer?.employer_id).filter(Boolean),
+  )].sort((a, b) => a - b), [jobs])
+  const { data: employerRatings = {} } = useQuery({
+    queryKey: ['seeker', 'employer-ratings', ratingEmployerIds],
+    queryFn: () => reviewService.ratings(ratingEmployerIds),
+    enabled: ratingEmployerIds.length > 0,
+    staleTime: 5 * 60 * 1000,
+  })
   const seekerLocation = jobsQuery.data?.seeker_location ?? EMPTY_SEEKER_LOCATION
   const locationRequired = jobsQuery.data?.locationRequired ?? false
   // isLoading is only true before the very first result ever lands;
@@ -506,7 +521,7 @@ export default function JobMapPage() {
             </div>
           ) : jobs.map((job) => (
             <div id={`map-job-${job.post_id}`} key={job.post_id}>
-              <JobMapCard job={job} isActive={selectedJobId === job.post_id} isApplying={applyingIds.includes(job.post_id)} isSaving={savingIds.includes(job.post_id)} onClick={() => openDetails(job)} onView={openDetails} onApply={requestApply} onSave={handleSave} onTraining={viewTraining} onJobFair={handleJobFair} />
+              <JobMapCard job={job} rating={employerRatings[job.employer_id || job.employer?.employer_id]} isActive={selectedJobId === job.post_id} isApplying={applyingIds.includes(job.post_id)} isSaving={savingIds.includes(job.post_id)} onClick={() => openDetails(job)} onView={openDetails} onApply={requestApply} onSave={handleSave} onTraining={viewTraining} onJobFair={handleJobFair} />
             </div>
           ))}
           {!isFetching && !error && jobs.length >= Number(filters.limit) && Number(filters.limit) < 100 && (
@@ -529,12 +544,13 @@ export default function JobMapPage() {
 
       {/* Floating Details Panel */}
       <div className="absolute inset-0 z-20 pointer-events-none">
-        <JobMapDetailsPanel job={detailsJob} isLoading={detailLoadingId === selectedJobId} loadError={detailError} onClose={() => { detailAbortRef.current?.abort(); setSelectedJobId(null); setDetailError('') }} onApply={requestApply} onSave={handleSave} onTraining={viewTraining} onJobFair={handleJobFair} onApplicationStatus={() => navigate('/seeker/applications')} onReport={(job) => setReportTarget({ employer_id: job.employer_id || job.employer?.employer_id, employer_name: job.employer_name })} isApplying={detailsJob ? applyingIds.includes(detailsJob.post_id) : false} isSaving={detailsJob ? savingIds.includes(detailsJob.post_id) : false} />
+        <JobMapDetailsPanel job={detailsJob} onViewCompanyReviews={(employerId) => setCompanyId(employerId)} isLoading={detailLoadingId === selectedJobId} loadError={detailError} onClose={() => { detailAbortRef.current?.abort(); setSelectedJobId(null); setDetailError('') }} onApply={requestApply} onSave={handleSave} onTraining={viewTraining} onJobFair={handleJobFair} onApplicationStatus={() => navigate('/seeker/applications')} onReport={(job) => setReportTarget({ employer_id: job.employer_id || job.employer?.employer_id, employer_name: job.employer_name })} isApplying={detailsJob ? applyingIds.includes(detailsJob.post_id) : false} isSaving={detailsJob ? savingIds.includes(detailsJob.post_id) : false} />
       </div>
 
       <ApplyConfirmation job={pendingApplyJob} onCancel={() => setPendingApplyJobId(null)} onConfirm={submitApplication} applying={pendingApplyJob ? applyingIds.includes(pendingApplyJob.post_id) : false} />
       <ReportEmployerModal open={Boolean(reportTarget)} employer={reportTarget} onClose={() => setReportTarget(null)} />
       <JobFairInfoModal fair={jobFairPopup} open={Boolean(jobFairPopup)} onClose={() => setJobFairPopup(null)} />
+      <EmployerProfileModal open={!!companyId} employerId={companyId} onClose={() => setCompanyId(null)} />
     </div>
   )
 }
