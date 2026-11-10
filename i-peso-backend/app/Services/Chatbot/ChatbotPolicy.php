@@ -7,7 +7,7 @@ use Illuminate\Foundation\Auth\User;
 /** Deterministic policy checks that run before and after the model. */
 class ChatbotPolicy
 {
-    public function refusalFor(string $message, ?User $user = null): ?string
+    public function refusalFor(string $message, ?User $user = null, string $language = ChatLanguage::FILIPINO): ?string
     {
         $text = strtolower($message);
 
@@ -17,7 +17,7 @@ class ChatbotPolicy
                 'my application', 'apply', 'hire', 'schedule interview', 'post job', 
                 'my resume', 'my profile', 'applicant', 'candidates', 'shortlist'
             ])) {
-                return 'Ang feature na ito ay para lamang sa mga registered users. Para malaman ang buong detalye o magamit ito, kailangan niyo pong mag-login o mag-register bilang Job Seeker o Employer.';
+                return ChatbotMessages::get('guest_only', $language);
             }
         }
 
@@ -25,7 +25,7 @@ class ChatbotPolicy
             'kill myself', 'suicide', 'self harm', 'make a bomb', 'how to hack',
             'steal password', 'buy illegal drugs', 'sexual assault', 'porn', 'rape',
         ])) {
-            return 'Pasensya po, hindi ako makakatulong sa mapanganib, ilegal, o hindi naaangkop na kahilingan. Maaari po kitang tulungan sa trabaho, aplikasyon, o serbisyo ng PESO.';
+            return ChatbotMessages::get('unsafe', $language);
         }
 
         if ($this->containsAny($text, [
@@ -33,21 +33,21 @@ class ChatbotPolicy
             'because she is pregnant', 'because he is disabled', 'avoid pwd', 'reject pwd',
             'based on religion', 'based on race', 'based on nationality', 'based on marital status',
         ])) {
-            return 'Hindi ako makakapagrekomenda ng pagtanggap o pagtanggi ng aplikante batay sa kasarian, edad, kapansanan, relihiyon, lahi, nationality, pagbubuntis, o marital status. Gumamit lamang ng patas at job-related na qualifications at sundin ang patakaran ng PESO at batas.';
+            return ChatbotMessages::get('discrimination', $language);
         }
 
         if ($this->containsAny($text, ['write sql', 'run sql', 'drop table', 'delete database', 'execute command', 'ignore previous instructions'])) {
-            return 'Hindi ako tumatanggap ng arbitrary commands o database instructions. Maaari po kitang tulungan sa lehitimong trabaho, aplikasyon, o serbisyo ng PESO.';
+            return ChatbotMessages::get('commands', $language);
         }
 
         if ($this->containsAny($text, ['recipe', 'write code', 'politics', 'sports score', 'joke about'])) {
-            return 'Nakadisenyo ako para sa trabaho, aplikasyon, PESO services, at i-PESO. Maaari po kitang tulungan sa mga paksang iyon.';
+            return ChatbotMessages::get('off_topic', $language);
         }
 
         return null;
     }
 
-    public function actionClaimRefusal(string $response): ?string
+    public function actionClaimRefusal(string $response, string $language = ChatLanguage::FILIPINO): ?string
     {
         $text = strtolower($response);
         if ($this->containsAny($text, [
@@ -56,7 +56,7 @@ class ChatbotPolicy
             'your account has been verified', 'i approved', 'i rejected the applicant',
             'give me the email of', 'give me the number of', 'contact details of', 'address of'
         ])) {
-            return 'Hindi ako nagsusumite, nagwi-withdraw, nag-aapprove, nagre-reject, nagbabago ng records, o nagbibigay ng personal contact details ng ibang users. Maaari ko lamang ipaliwanag ang impormasyong nasa system; gamitin ang iyong dashboard o makipag-ugnayan sa PESO staff para sa action.';
+            return ChatbotMessages::get('action_claim', $language);
         }
 
         return null;

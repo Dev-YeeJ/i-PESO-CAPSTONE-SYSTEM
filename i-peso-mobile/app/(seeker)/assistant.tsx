@@ -84,7 +84,8 @@ function greetingFor(firstName?: string) {
   const hello = `Kumusta po${firstName ? ` ${firstName}` : ''}!`
   return (
     `${hello} Ako si ACE, ang inyong Assistant for Career and Employment. ` +
-    'Tanungin mo ako tungkol sa job matches, application status, o job fairs — paano kita matutulungan ngayon?'
+    'Tanungin mo ako tungkol sa job matches, application status, o job fairs — paano kita matutulungan ngayon? ' +
+    'Maaari kang magtanong sa Pangasinan, Filipino, o English.'
   )
 }
 

@@ -313,6 +313,7 @@ class SeekerNearbyJobController extends Controller
                     'employer' => [
                         'employer_id' => $job->employer?->employer_id,
                         'company_name' => $job->employer?->company_name,
+                        ...$this->employerLogo($job),
                     ],
                     'employment_type' => $job->employment_type,
                     'work_setup' => $job->work_setup,
@@ -560,6 +561,7 @@ class SeekerNearbyJobController extends Controller
             'employer' => [
                 'employer_id' => $job->employer?->employer_id,
                 'company_name' => $job->employer?->company_name,
+                ...$this->employerLogo($job),
             ],
             'employment_type' => $job->employment_type,
             'work_setup' => $job->work_setup,
@@ -730,6 +732,24 @@ class SeekerNearbyJobController extends Controller
             'matched_count' => $matched->count(),
             'required_count' => $requirements->count(),
             'matched_certificates' => $matched,
+        ];
+    }
+
+    /**
+     * The employer's logo for job cards. The query already loads company_logo; it was never
+     * sent, so web and mobile cards always fell back to initials. company_logo is the stored
+     * path (what the website's CompanyMark reads); company_logo_url is the full URL (what the
+     * mobile JobFeedCard reads), built the same way as getPublicEmployerProfile().
+     */
+    private function employerLogo(JobVacancy $job): array
+    {
+        $path = $job->employer?->company_logo;
+
+        return [
+            'company_logo' => $path,
+            'company_logo_url' => $path
+                ? (str_starts_with($path, 'http') ? $path : url('storage/'.ltrim($path, '/')))
+                : null,
         ];
     }
 

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Services\Chatbot\ChatbotUnavailableException;
+use App\Services\Chatbot\ChatLanguage;
 use App\Services\Chatbot\GeminiChatService;
 use App\Services\Chatbot\ChatbotPolicy;
 use Illuminate\Http\JsonResponse;
@@ -36,10 +37,6 @@ class PublicChatbotController extends Controller
 
         $user = $request->user('sanctum');
 
-        if ($refusal = $policy->refusalFor($data['message'], $user)) {
-            return response()->json(['reply' => $refusal, 'office_location' => null]);
-        }
-
         // Model turns come from the browser and are not trusted conversation
         // state. Keeping user turns preserves context without allowing a
         // caller to forge a previous assistant instruction.
@@ -49,9 +46,16 @@ class PublicChatbotController extends Controller
             ->all();
         $history[] = ['role' => 'user', 'text' => $data['message']];
 
+        // Worked out once, from the visitor's own turns, for both the fixed
+        // policy replies below and the model request (see ChatLanguage).
+        $language = ChatLanguage::fromMessages(array_column($history, 'text'));
+
+        if ($refusal = $policy->refusalFor($data['message'], $user, $language->forFixedReplies())) {
+            return response()->json(['reply' => $refusal, 'office_location' => null]);
+        }
 
         try {
-            $result = $chat->reply($history, $user);
+            $result = $chat->reply($history, $user, $language);
 
             return response()->json([
                 'reply' => $result['text'],

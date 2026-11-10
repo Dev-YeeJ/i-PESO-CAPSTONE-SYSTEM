@@ -25,6 +25,29 @@ class AuthController extends Controller
     // ── PRIVATE HELPERS ──────────────────────────────────────────────────────
 
     /**
+     * Every account with this email, in sign-in priority order (seeker, employer,
+     * administrator). Usually one; more when the same person holds two account types.
+     *
+     * @return array<int, array{model: JobSeeker|Employer|Administrator, role: string}>
+     */
+    private function findUsersByEmail(string $email): array
+    {
+        $matches = [];
+
+        if ($seeker = JobSeeker::where('email', $email)->first()) {
+            $matches[] = ['model' => $seeker, 'role' => 'seeker'];
+        }
+        if ($employer = Employer::where('email', $email)->first()) {
+            $matches[] = ['model' => $employer, 'role' => 'employer'];
+        }
+        if ($admin = Administrator::where('email', $email)->first()) {
+            $matches[] = ['model' => $admin, 'role' => 'administrator'];
+        }
+
+        return $matches;
+    }
+
+    /**
      * Search all three user tables for a given email address.
      *
      * @return array{model: JobSeeker|Employer|Administrator, role: string}|null
@@ -322,7 +345,18 @@ class AuthController extends Controller
             ], 429);
         }
 
-        $result = $this->findUserByEmail($email);
+        // One email can belong to more than one account type (e.g. a job seeker who later
+        // registered as an employer). Stopping at the first match meant a password changed on
+        // the other account could never be used, so try each one, in the usual order.
+        $matches = $this->findUsersByEmail($email);
+
+        // The admin sign-in page asks for its own account type first, so a staff member whose
+        // job seeker account shares the email and password still lands in the admin portal.
+        if (in_array($request->input('portal'), ['seeker', 'employer', 'administrator'], true)) {
+            usort($matches, fn (array $a, array $b) => ($b['role'] === $request->input('portal')) <=> ($a['role'] === $request->input('portal')));
+        }
+
+        $result = $matches[0] ?? null;
 
         if (! $result) {
             Cache::put($lockKey, (int) Cache::get($lockKey, 0) + 1, now()->addMinutes(15));
@@ -332,6 +366,13 @@ class AuthController extends Controller
             return response()->json([
                 'message' => 'These credentials do not match our records.',
             ], 401);
+        }
+
+        foreach ($matches as $match) {
+            if (Hash::check($password, $match['model']->password)) {
+                $result = $match;
+                break;
+            }
         }
 
         $user = $result['model'];
@@ -509,31 +550,34 @@ class AuthController extends Controller
             ], 422);
         }
 
-        $result = $this->findUserByEmail($email);
+        $matches = $this->findUsersByEmail($email);
 
-        if (! $result) {
+        if ($matches === []) {
             return response()->json(['message' => 'User not found.'], 404);
         }
 
-        ['model' => $user] = $result;
-
-        $user->forceFill([
-            'password' => Hash::make($request->input('password')),
-        ])->save();
-
-        // Choosing a password through the emailed code also completes a
-        // staff member's account setup.
-        if ($user instanceof Administrator && $user->must_change_password) {
+        // The emailed code proves they own this address, so every account on it gets the
+        // new password. Updating only the first match (the job seeker one) left a second
+        // account on the same email — e.g. their employer account — with the old password.
+        foreach ($matches as ['model' => $user]) {
             $user->forceFill([
-                'must_change_password' => false,
-                'temporary_password_expires_at' => null,
-                'password_changed_at' => now(),
+                'password' => Hash::make($request->input('password')),
             ])->save();
-        } elseif ($user instanceof Administrator) {
-            $user->forceFill(['password_changed_at' => now()])->save();
-        }
 
-        ActivityLogger::logAs($user, 'password_reset', "Password reset via emailed code for {$email}.");
+            // Choosing a password through the emailed code also completes a
+            // staff member's account setup.
+            if ($user instanceof Administrator && $user->must_change_password) {
+                $user->forceFill([
+                    'must_change_password' => false,
+                    'temporary_password_expires_at' => null,
+                    'password_changed_at' => now(),
+                ])->save();
+            } elseif ($user instanceof Administrator) {
+                $user->forceFill(['password_changed_at' => now()])->save();
+            }
+
+            ActivityLogger::logAs($user, 'password_reset', "Password reset via emailed code for {$email}.");
+        }
 
         Cache::forget("ipeso_reset_{$email}");
         Cache::forget($attemptKey);

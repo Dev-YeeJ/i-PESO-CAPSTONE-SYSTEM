@@ -28,14 +28,13 @@ import { Card } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
 import { AlertBox } from '@/components/ui/AlertBox'
 import { PressableScale } from '@/components/ui/PressableScale'
-import { SectionHeader } from '@/components/ui/SectionHeader'
 import { MatchRing } from '@/components/ui/MatchRing'
 import { AceMascot } from '@/components/chat/AceMascot'
 import { Skeleton, SkeletonGroup } from '@/components/ui/Skeleton'
 import { JobFeedCard } from '@/components/seeker/JobFeedCard'
 import { colors, gradients, radii, shadows, spacing, textStyles, typography } from '@/theme'
 
-type QuickActionIcon = React.ComponentProps<typeof MaterialIcons>['name']
+type IconName = React.ComponentProps<typeof MaterialIcons>['name']
 type FeedMode = 'recommended' | 'nearby' | 'latest'
 
 // Mirrors web's JobFeedSelector — title + description per feed, with a live count badge.
@@ -51,12 +50,6 @@ const SORT_ITEMS: { value: 'match' | 'distance' | 'newest'; label: string }[] = 
   { value: 'match', label: 'Match' },
   { value: 'distance', label: 'Distance' },
   { value: 'newest', label: 'Newest' },
-]
-
-const PRIMARY_ACTIONS: { icon: QuickActionIcon; label: string; path: string }[] = [
-  { icon: 'event', label: 'Job Fairs', path: '/(seeker)/job-fairs' },
-  { icon: 'map', label: 'Job Map', path: '/(seeker)/job-map' },
-  { icon: 'assignment', label: 'Applications', path: '/(seeker)/applications' },
 ]
 
 // "Next Best Action" — each incomplete profile-strength item maps to one concrete
@@ -369,20 +362,8 @@ export default function SeekerHomeScreen() {
           </PressableScale>
         ) : null}
 
-        {/* Quick Actions — the 3 most-used flows get full-weight cards; the rest sit in a
-            denser secondary row so the hierarchy actually says something about priority. */}
-        <SectionHeader title="Quick actions" style={styles.sectionHeader} />
-        <View style={styles.primaryActionsGrid}>
-          {PRIMARY_ACTIONS.map((action, index) => (
-            <QuickAction
-              key={action.label}
-              {...action}
-              index={index}
-              onPress={() => router.push(action.path as never)}
-            />
-          ))}
-        </View>
-
+        {/* Quick actions were removed: Job Fairs opens from the bulletin above, Job Map from
+            the Jobs tab's Map button, and Applications is the "Applied" tab. */}
         <AceBanner />
 
         <View style={styles.searchBox}>
@@ -524,7 +505,7 @@ function TabButton({
   onPress,
 }: {
   label: string
-  icon: QuickActionIcon
+  icon: IconName
   active: boolean
   count?: number
   onPress: () => void
@@ -547,40 +528,6 @@ function TabButton({
   )
 }
 
-function QuickAction({
-  icon,
-  label,
-  index,
-  onPress,
-}: {
-  icon: QuickActionIcon
-  label: string
-  index: number
-  onPress: () => void
-}) {
-  const m = useMotion()
-
-  return (
-    <Animated.View
-      style={styles.flexOne}
-      entering={m.enabled ? FadeInUp.delay(m.stagger(index)).duration(240) : undefined}
-    >
-      <PressableScale
-        scaleTo="buttonPress"
-        style={styles.actionCard}
-        onPress={onPress}
-        accessibilityRole="button"
-        accessibilityLabel={label}
-      >
-        <View style={styles.actionIconCircle}>
-          <MaterialIcons name={icon} size={22} color={colors.blue700} />
-        </View>
-        <Text style={styles.actionLabel} numberOfLines={1}>{label}</Text>
-      </PressableScale>
-    </Animated.View>
-  )
-}
-
 /**
  * Ace's one prominent entry point on Home — previously just a same-weight icon lost in the
  * secondary actions row (see the comment on MORE_ACTIONS above). Uses `gradients.brand`
@@ -594,7 +541,7 @@ function AceBanner() {
   return (
     <Animated.View
       style={styles.aceBannerWrap}
-      entering={m.enabled ? FadeInUp.delay(m.stagger(PRIMARY_ACTIONS.length)).duration(240) : undefined}
+      entering={m.enabled ? FadeInUp.delay(m.stagger(0)).duration(240) : undefined}
     >
       <PressableScale
         scaleTo="buttonPress"
@@ -673,15 +620,8 @@ const styles = StyleSheet.create({
   bulletinMetaRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
   bulletinMeta: { ...textStyles.small, color: colors.textSecondary, flexShrink: 1 },
 
-  // The ScrollView's own content has no horizontal padding (so the hero gradient bleeds
-  // edge-to-edge), so every section header needs this to line up with the padded cards below.
-  sectionHeader: { marginHorizontal: spacing.lg },
 
   statsRow: { flexDirection: 'row', gap: spacing.sm, paddingHorizontal: spacing.lg },
-  primaryActionsGrid: { flexDirection: 'row', gap: spacing.sm, paddingHorizontal: spacing.lg },
-  actionCard: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radii.lg, paddingVertical: spacing.lg, paddingHorizontal: spacing.xs, alignItems: 'center', justifyContent: 'center', gap: spacing.sm, ...shadows.xs },
-  actionIconCircle: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.blue50, alignItems: 'center', justifyContent: 'center' },
-  actionLabel: { color: colors.textPrimary, ...textStyles.smallBold, lineHeight: undefined, textAlign: 'center' },
 
   aceBannerWrap: { marginHorizontal: spacing.lg, marginTop: spacing.md },
   aceBanner: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, borderRadius: radii.lg, padding: spacing.lg, ...shadows.md },

@@ -531,6 +531,45 @@ class EmployerVerificationJobPostingTest extends TestCase
             ->assertJsonPath('jobs.0.job_title', 'Latest Active Vacancy');
     }
 
+    public function test_job_feed_includes_the_employer_logo_for_job_cards(): void
+    {
+        $withLogo = $this->createEmployer();
+        $withLogo->forceFill(['company_logo' => 'employer_logos/ichitech.png'])->save();
+        $withoutLogo = $this->createEmployer();
+        $seeker = $this->createSeeker();
+
+        foreach ([[$withLogo, 'Logo Company Job', now()], [$withoutLogo, 'No Logo Company Job', now()->subDay()]] as [$employer, $title, $created]) {
+            $job = JobVacancy::create([
+                ...$this->vacancyPayload(),
+                'employer_id' => $employer->employer_id,
+                'job_title' => $title,
+                'location' => 'Urdaneta City, Pangasinan',
+                'latitude' => 15.9761,
+                'longitude' => 120.5711,
+            ]);
+            $job->forceFill(['created_at' => $created])->save();
+        }
+
+        $this->mock(EnhancedJobMatchingService::class, function (MockInterface $mock): void {
+            $mock->shouldReceive('calculateMatch')->andReturn([
+                'percentage' => 60,
+                'eligible' => true,
+                'missing_critical_skills' => [],
+                'factors' => ['skills' => ['details' => []]],
+            ]);
+        });
+
+        Sanctum::actingAs($seeker);
+
+        $jobs = collect($this->getJson('/api/seeker/nearby-jobs?feed_mode=latest&sort=newest&limit=10')
+            ->assertOk()
+            ->json('jobs'))->keyBy('job_title');
+
+        $this->assertSame('employer_logos/ichitech.png', $jobs['Logo Company Job']['employer']['company_logo']);
+        $this->assertSame(url('storage/employer_logos/ichitech.png'), $jobs['Logo Company Job']['employer']['company_logo_url']);
+        $this->assertNull($jobs['No Logo Company Job']['employer']['company_logo_url']);
+    }
+
     public function test_hired_application_is_excluded_from_the_seeker_dashboard_feed(): void
     {
         $employer = $this->createEmployer();
@@ -1107,6 +1146,7 @@ class EmployerVerificationJobPostingTest extends TestCase
                 $table->string('password');
                 $table->string('company_type')->nullable();
                 $table->string('company_name')->nullable();
+                $table->string('company_logo')->nullable();
                 $table->string('representative_name')->nullable();
                 $table->string('representative_first_name')->nullable();
                 $table->string('representative_middle_name')->nullable();
@@ -1124,6 +1164,12 @@ class EmployerVerificationJobPostingTest extends TestCase
                 $table->timestamps();
                 $table->softDeletes();
             });
+        }
+
+        // Another test class may have built `employers` first without it; the real
+        // migration (2026_06_06_000000) has always had this column.
+        if (! Schema::hasColumn('employers', 'company_logo')) {
+            Schema::table('employers', fn (Blueprint $table) => $table->string('company_logo')->nullable());
         }
 
         if (! Schema::hasTable('employer_documents')) {
