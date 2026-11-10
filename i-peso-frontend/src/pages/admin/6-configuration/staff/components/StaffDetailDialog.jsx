@@ -106,7 +106,7 @@ export default function StaffDetailDialog({ staff, canManageAccounts, canViewAct
                 <Detail label="Required hours" value={staff.internship.required_hours ? `${staff.internship.required_hours} hours` : null} />
                 <Detail label="Dates" value={staff.internship.start_date ? `${formatDate(staff.internship.start_date)} – ${formatDate(staff.internship.end_date)}` : null} />
               </dl>
-              <p className="mt-3 text-xs text-blue-800">Hours and the daily time record are in Configuration → OJT / Interns.</p>
+              <p className="mt-3 text-xs text-blue-800">Their hours and daily time record are in the OJT / Interns tab.</p>
             </div>
           )}
 

@@ -2,18 +2,20 @@ import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { AlarmClock, CheckCircle2, ClipboardCheck, GraduationCap } from 'lucide-react'
 import { Badge, Card } from '@/components/ui'
-import PageHeader from '@/pages/admin/_components/PageHeader'
 import StatCard from '@/pages/admin/_components/StatCard'
 import DataTable from '@/pages/admin/_components/DataTable'
 import { staffService } from '@/services/staffService'
 import { useAuthStore } from '@/stores/authStore'
 import { isSystemAdministrator } from '@/utils/adminAccess'
 import { daysLeftLabel } from '@/utils/ojt'
-import HoursProgress from './components/HoursProgress'
-import InternLogsDialog from './components/InternLogsDialog'
+import HoursProgress from './HoursProgress'
+import InternLogsDialog from './InternLogsDialog'
 
-/** Every intern's hours at a glance; open one to review their daily time record. */
-export default function AdminOjtPage() {
+/**
+ * The OJT / Interns tab of Staff Management: every intern's hours at a
+ * glance; open one to review their daily time record.
+ */
+export default function OjtInternsPanel() {
   const user = useAuthStore((s) => s.user)
   const canReview = isSystemAdministrator(user)
   const [openId, setOpenId] = useState(null)
@@ -67,16 +69,14 @@ export default function AdminOjtPage() {
   ]
 
   return (
-    <div className="portal-page">
-      <PageHeader
-        title="OJT / Interns"
-        eyebrow="Configuration"
-        subtitle={canReview
+    <div className="mt-4">
+      <p className="text-sm text-slate-600">
+        {canReview
           ? 'Review interns’ daily time in and time out. Hours count toward their requirement once you approve them.'
           : 'Interns’ hours and daily time records. Only the system administrator approves hours.'}
-      />
+      </p>
 
-      <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard icon={GraduationCap} color="blue" label="Active interns" value={(summary.active ?? 0).toLocaleString()} subtitle="Can time in today" />
         <StatCard icon={ClipboardCheck} color="amber" label="Waiting for approval" value={(summary.pending_entries ?? 0).toLocaleString()} subtitle="Time entries to review" />
         <StatCard icon={AlarmClock} color="red" label="Ending soon" value={(summary.ending_soon ?? 0).toLocaleString()} subtitle="Within 3 days" />
@@ -86,7 +86,7 @@ export default function AdminOjtPage() {
       <Card padding="none" className="mt-6">
         <div className="border-b border-slate-100 p-4 sm:p-5">
           <h2 className="text-base font-bold text-slate-950">Interns</h2>
-          <p className="text-sm text-slate-500">Add interns from Staff Management with the OJT / Intern position.</p>
+          <p className="text-sm text-slate-500">To add an intern, use Add staff member and choose the OJT / Intern position.</p>
         </div>
         <DataTable
           columns={columns}
@@ -97,7 +97,7 @@ export default function AdminOjtPage() {
           onRowClick={(intern) => setOpenId(intern.id)}
           caption="OJT interns and their hours. Select a row to open the daily time record."
           emptyTitle="No interns yet"
-          emptyDescription="Add an intern in Staff Management using the OJT / Intern position."
+          emptyDescription="Use Add staff member and choose the OJT / Intern position."
         />
       </Card>
 

@@ -146,12 +146,6 @@ const navGroups = [
         icon: <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>,
       },
       {
-        to: '/admin/ojt-interns',
-        module: moduleForPath('/admin/ojt-interns'),
-        label: 'OJT / Interns',
-        icon: <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 14l9-5-9-5-9 5 9 5zm0 0l6.16-3.422A12.083 12.083 0 0118.82 17.5L12 21l-6.82-3.5a12.083 12.083 0 01.66-6.922L12 14z" /></svg>,
-      },
-      {
         to: '/admin/announcements',
         module: moduleForPath('/admin/announcements'),
         label: 'Announcements',

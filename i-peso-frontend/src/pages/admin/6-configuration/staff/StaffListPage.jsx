@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { GraduationCap, MailCheck, Search, UserPlus, UserX, UsersRound } from 'lucide-react'
@@ -14,6 +15,7 @@ import StaffFormDialog from './components/StaffFormDialog'
 import StaffDetailDialog from './components/StaffDetailDialog'
 import TemporaryPasswordDialog from './components/TemporaryPasswordDialog'
 import OrgChart from './components/OrgChart'
+import OjtInternsPanel from '../ojt/components/OjtInternsPanel'
 import { ACCOUNT_STATUS, accountStatus, formatDateTime, initialsOf } from './staffDisplay'
 
 const STAFF_KEY = ['admin', 'staff']
@@ -29,6 +31,9 @@ export default function StaffListPage() {
   const [selectedId, setSelectedId] = useState(null)
   const [form, setForm] = useState(null) // { staff } — staff is null when adding
   const [passwordResult, setPasswordResult] = useState(null)
+  const [searchParams, setSearchParams] = useSearchParams()
+  const tab = ['directory', 'org-chart', 'ojt'].includes(searchParams.get('tab')) ? searchParams.get('tab') : 'directory'
+  const setTab = (next) => setSearchParams(next === 'directory' ? {} : { tab: next }, { replace: true })
 
   const staffQuery = useQuery({ queryKey: STAFF_KEY, queryFn: staffService.getStaff })
 
@@ -138,10 +143,11 @@ export default function StaffListPage() {
         <StatCard icon={UserX} color="red" label="Deactivated" value={counts.deactivated.toLocaleString()} subtitle="Can no longer sign in" />
       </div>
 
-      <Tabs defaultValue="directory" className="mt-6">
-        <TabsList>
+      <Tabs value={tab} onValueChange={setTab} className="mt-6">
+        <TabsList className="max-w-full overflow-x-auto">
           <TabsTrigger value="directory">Staff directory</TabsTrigger>
           <TabsTrigger value="org-chart">Org chart</TabsTrigger>
+          <TabsTrigger value="ojt">OJT / Interns</TabsTrigger>
         </TabsList>
 
         <TabsContent value="directory">
@@ -195,6 +201,10 @@ export default function StaffListPage() {
           <Card className="mt-4">
             <OrgChart onSelect={(member) => setSelectedId(member.id)} />
           </Card>
+        </TabsContent>
+
+        <TabsContent value="ojt">
+          <OjtInternsPanel />
         </TabsContent>
       </Tabs>
 
