@@ -20,7 +20,10 @@ const EMPTY = {
   ojt_end_date: '',
 }
 
-const INTERNSHIP_FIELDS = { ojt_school: 'school', ojt_course: 'course', ojt_required_hours: 'required_hours', ojt_start_date: 'start_date', ojt_end_date: 'end_date' }
+// Same choices as the employer and job seeker forms.
+const SUFFIXES = ['Jr.', 'Sr.', 'II', 'III', 'IV', 'V']
+
+const INTERNSHIP_FIELDS ={ ojt_school: 'school', ojt_course: 'course', ojt_required_hours: 'required_hours', ojt_start_date: 'start_date', ojt_end_date: 'end_date' }
 
 const fromStaff = (staff) => Object.fromEntries(
   Object.keys(EMPTY).map((key) => {
@@ -110,8 +113,11 @@ export default function StaffFormDialog({ open, onOpenChange, staff, positions, 
             <Field label="Last name" required error={errors.last_name}>
               <input value={form.last_name} onChange={set('last_name')} className={inputClass(errors.last_name)} autoComplete="off" />
             </Field>
-            <Field label="Suffix" hint="e.g. Jr., III" error={errors.suffix}>
-              <input value={form.suffix} onChange={set('suffix')} className={inputClass(errors.suffix)} autoComplete="off" />
+            <Field label="Suffix" error={errors.suffix}>
+              <select value={form.suffix} onChange={set('suffix')} className={inputClass(errors.suffix)}>
+                <option value="">None</option>
+                {SUFFIXES.map((suffix) => <option key={suffix} value={suffix}>{suffix}</option>)}
+              </select>
             </Field>
             <Field label="Email" required={!isEdit} hint={isEdit ? 'The sign-in email cannot be changed.' : 'Their sign-in email. The account details are sent here.'} error={errors.email}>
               <input type="email" value={form.email} onChange={set('email')} disabled={isEdit} className={inputClass(errors.email)} autoComplete="off" />

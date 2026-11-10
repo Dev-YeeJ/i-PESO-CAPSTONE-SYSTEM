@@ -59,7 +59,7 @@ class AdminStaffController extends Controller
             'first_name' => ['required', 'string', 'max:100'],
             'middle_name' => ['nullable', 'string', 'max:100'],
             'last_name' => ['required', 'string', 'max:100'],
-            'suffix' => ['nullable', 'string', 'max:20'],
+            'suffix' => ['nullable', Rule::in(self::SUFFIXES)],
             // Sign-in checks seekers and employers first, so an email already
             // used there could never sign in as staff.
             'email' => [
@@ -162,7 +162,7 @@ class AdminStaffController extends Controller
             'first_name' => ['sometimes', 'string', 'max:100'],
             'middle_name' => ['nullable', 'string', 'max:100'],
             'last_name' => ['sometimes', 'string', 'max:100'],
-            'suffix' => ['nullable', 'string', 'max:20'],
+            'suffix' => ['nullable', Rule::in(self::SUFFIXES)],
             'mobile_number' => ['sometimes', 'string', 'max:20'],
             'position' => ['sometimes', Rule::in(StaffPositions::keys())],
             ...$this->internshipRules(false),
@@ -314,6 +314,9 @@ class AdminStaffController extends Controller
 
         abort_unless($othersRemain, 422, $message);
     }
+
+    /** Same choices as the employer and job seeker forms. */
+    private const SUFFIXES = ['Jr.', 'Sr.', 'II', 'III', 'IV', 'V'];
 
     private const INTERNSHIP_MESSAGES = [
         'ojt_school.required' => 'Enter the intern\'s school.',
