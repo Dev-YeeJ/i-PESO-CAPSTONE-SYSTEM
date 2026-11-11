@@ -60,6 +60,7 @@ const SeekerGovernmentPrograms = lazy(() => import('@/pages/seeker/GovernmentPro
 const SeekerProgramDetails = lazy(() => import('@/pages/seeker/ProgramDetailsPage'))
 const SeekerApplications = lazy(() => import('@/pages/seeker/MyApplications'))
 const SeekerReviews = lazy(() => import('@/pages/seeker/MyReviewsPage'))
+const MySafetyReports = lazy(() => import('@/pages/shared/MySafetyReportsPage'))
 const SeekerOnboarding  = lazy(() => import('@/pages/auth/onboarding/SeekerOnboarding'))
 
 // Admin Pages - CATEGORY 1: OVERVIEW
@@ -71,8 +72,8 @@ const AdminJobSeekersList    = lazy(() => import('@/pages/admin/2-constituent-cr
 const AdminJobSeekerDetail   = lazy(() => import('@/pages/admin/2-constituent-crm/job-seekers/JobSeekerDetailPage'))
 const AdminEmployersList     = lazy(() => import('@/pages/admin/2-constituent-crm/employers/EmployersListPage'))
 const AdminEmployerDetail    = lazy(() => import('@/pages/admin/2-constituent-crm/employers/EmployerDetailPage'))
-const AdminEmployerReportsList = lazy(() => import('@/pages/admin/2-constituent-crm/employer-reports/EmployerReportsListPage'))
-const AdminEmployerReportDetail = lazy(() => import('@/pages/admin/2-constituent-crm/employer-reports/EmployerReportDetailPage'))
+const AdminSafetyReportsList = lazy(() => import('@/pages/admin/2-constituent-crm/safety-reports/SafetyReportsListPage'))
+const AdminSafetyReportDetail = lazy(() => import('@/pages/admin/2-constituent-crm/safety-reports/SafetyReportDetailPage'))
 const AdminReviewsModeration = lazy(() => import('@/pages/admin/2-constituent-crm/reviews/ReviewsModerationPage'))
 
 // Admin Pages - CATEGORY 3: EMPLOYMENT HUB
@@ -107,9 +108,9 @@ const AdminContentModules = lazy(() => import('@/pages/admin/6-configuration/con
 const AdminSystemSettings = lazy(() => import('@/pages/admin/6-configuration/settings/SystemSettingsPage'))
 
 // --- SUSPENSE HELPER ---
-const S = (Component) => (
+const S = (Component, props = {}) => (
   <Suspense fallback={<PageLoader />}>
-    <Component />
+    <Component {...props} />
   </Suspense>
 )
 
@@ -183,6 +184,7 @@ export const router = createBrowserRouter([
                           { path: 'reports/establishment-report', element: S(EmployerEstablishmentReport) },
                           { path: 'reports/placement-report', element: S(EmployerPlacementReport) },
                           { path: 'reviews', element: S(EmployerReviews) },
+                          { path: 'safety-reports', element: S(MySafetyReports, { role: 'employer' }) },
                         ],
                       },
                     ],
@@ -208,8 +210,11 @@ export const router = createBrowserRouter([
                       { path: 'job-seekers/:id', element: S(AdminJobSeekerDetail) },
                       { path: 'employers', element: S(AdminEmployersList) },
                       { path: 'employers/:id', element: S(AdminEmployerDetail) },
-                      { path: 'employer-reports', element: S(AdminEmployerReportsList) },
-                      { path: 'employer-reports/:id', element: S(AdminEmployerReportDetail) },
+                      { path: 'safety-reports', element: S(AdminSafetyReportsList) },
+                      { path: 'safety-reports/:id', element: S(AdminSafetyReportDetail) },
+                      // Former "Employer Reports" — now part of Reports & Safety.
+                      { path: 'employer-reports', element: <Navigate to="/admin/safety-reports" replace /> },
+                      { path: 'employer-reports/:id', element: <Navigate to="/admin/safety-reports" replace /> },
                       { path: 'reviews', element: S(AdminReviewsModeration) },
                       
                       // CATEGORY 3: EMPLOYMENT HUB
@@ -269,6 +274,7 @@ export const router = createBrowserRouter([
                           { path: 'government-programs/:id', element: S(SeekerProgramDetails) },
                           { path: 'applications', element: S(SeekerApplications) },
                           { path: 'reviews', element: S(SeekerReviews) },
+                          { path: 'safety-reports', element: S(MySafetyReports, { role: 'seeker' }) },
                           { path: 'profile', element: S(SeekerProfile) },
                           { path: 'profile/edit', element: S(SeekerProfileEdit) },
                           { path: 'employers/:id', element: S(SeekerEmployerProfile) },

@@ -68,11 +68,6 @@ export const applyToJob = async (postId) => {
   return response.data
 }
 
-export const reportEmployer = async (employerId, payload) => {
-  const response = await apiClient.post(`/seeker/employers/${employerId}/report`, payload)
-  return response.data
-}
-
 export const getPublicEmployerProfile = async (employerId) => {
   const response = await apiClient.get(`/seeker/employers/${employerId}`)
   return response.data

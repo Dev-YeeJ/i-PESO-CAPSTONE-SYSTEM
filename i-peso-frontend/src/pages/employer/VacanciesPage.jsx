@@ -78,7 +78,13 @@ export default function VacanciesPage() {
                     <div className="flex flex-wrap items-center gap-2">
                       <h2 className="text-lg font-extrabold text-slate-900 truncate">{vacancy.job_title}</h2>
                       <Badge variant={vacancy.status} className="uppercase text-[10px] tracking-wider">{vacancy.status}</Badge>
+                      {vacancy.admin_hold_at && <Badge variant="rejected" className="uppercase text-[10px] tracking-wider">On hold by PESO</Badge>}
                     </div>
+                    {vacancy.admin_hold_at && (
+                      <p className="mt-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs leading-5 text-red-800">
+                        PESO has hidden this vacancy from job seekers while it reviews a concern. You can still edit its details; check your notifications for what PESO needs from you. It can be reopened once PESO releases it.
+                      </p>
+                    )}
                     
                     <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-2 text-sm text-slate-600">
                       <span className="flex items-center gap-1.5"><MapPin className="h-4 w-4 text-slate-400" /><span className="truncate">{vacancy.location}</span></span>

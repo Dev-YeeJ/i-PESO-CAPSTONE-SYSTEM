@@ -80,26 +80,7 @@ export const adminService = {
     return data
   },
 
-  // ── EMPLOYER REPORTS ──────────────────────────────────────────
-  getEmployerReports: async (params = {}) => {
-    const { data } = await api.get('/admin/employer-reports', { params: cleanParams(params) })
-    return data
-  },
-
-  getEmployerReportSummary: async () => {
-    const { data } = await api.get('/admin/employer-reports/summary')
-    return data
-  },
-
-  getEmployerReport: async (id) => {
-    const { data } = await api.get(`/admin/employer-reports/${id}`)
-    return data.report
-  },
-
-  updateEmployerReport: async (id, payload) => {
-    const { data } = await api.put(`/admin/employer-reports/${id}`, payload)
-    return data.report
-  },
+  // Employer reports moved to Reports & Safety — see services/safetyReportService.js.
 
   approveEmployer: async (id, remarks = null) => {
     const { data } = await api.post(`/admin/employers/${id}/approve`, { remarks })

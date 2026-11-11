@@ -105,6 +105,16 @@ class SeekerApplicationController extends Controller
         // Jobseekers may apply with just their basic registration info — the full
         // NSRP profile (education, work history, etc.) can be completed later.
 
+        // Set only by a PESO administrator after reviewing a safety report.
+        if ($seeker->isRestricted()) {
+            return response()->json([
+                'message' => 'PESO has temporarily restricted new applications on your account'
+                    .($seeker->restriction_ends_at ? ' until '.$seeker->restriction_ends_at->timezone('Asia/Manila')->format('F j, Y') : '')
+                    .'. Contact the PESO office for details.',
+                'account_restricted' => true,
+            ], 403);
+        }
+
         if ($vacancy->status !== 'active') {
             throw ValidationException::withMessages([
                 'job' => ['This vacancy is no longer accepting applications.'],

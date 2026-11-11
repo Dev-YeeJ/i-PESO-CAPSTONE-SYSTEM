@@ -9,7 +9,7 @@ use App\Http\Controllers\Api\Admin\ConstituentCRM\SeekerController as AdminSeeke
 use App\Http\Controllers\Api\Admin\EmployerVerificationController;
 use App\Http\Controllers\Api\Admin\GovernmentDole\JobFairController as AdminJobFairController;
 use App\Http\Controllers\Api\Admin\AdminCitizenCharterController;
-use App\Http\Controllers\Api\Admin\AdminEmployerReportController;
+use App\Http\Controllers\Api\Admin\SafetyReportController as AdminSafetyReportController;
 use App\Http\Controllers\Api\Admin\AdminReviewController;
 use App\Http\Controllers\Api\Admin\AdminEstablishmentReportController;
 use App\Http\Controllers\Api\Admin\AdminGovernmentProgramController;
@@ -44,7 +44,7 @@ use App\Http\Controllers\Api\SeekerAnalyticsController;
 use App\Http\Controllers\Api\SeekerApplicationController;
 use App\Http\Controllers\Api\SeekerCertificateController;
 use App\Http\Controllers\Api\SeekerController;
-use App\Http\Controllers\Api\SeekerEmployerReportController;
+use App\Http\Controllers\Api\SafetyReportController;
 use App\Http\Controllers\Api\SeekerReviewController;
 use App\Http\Controllers\Api\EmployerFeedbackController;
 use App\Http\Controllers\Api\SeekerGovernmentProgramController;
@@ -127,6 +127,13 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::post('/reviews/{review}/dispute', [EmployerFeedbackController::class, 'dispute'])->middleware('throttle:10,1');
             Route::get('/hires', [EmployerFeedbackController::class, 'hires']);
             Route::post('/worker-feedback', [EmployerFeedbackController::class, 'saveWorkerFeedback'])->middleware('throttle:20,1');
+
+            // Report & Safety: reporting a job seeker who applied to this employer.
+            Route::get('/safety-reports/options', [SafetyReportController::class, 'options']);
+            Route::get('/safety-reports', [SafetyReportController::class, 'index']);
+            Route::post('/safety-reports', [SafetyReportController::class, 'store'])->middleware('throttle:5,1');
+            Route::get('/safety-reports/{safetyReport}', [SafetyReportController::class, 'show']);
+            Route::post('/safety-reports/{safetyReport}/details', [SafetyReportController::class, 'addDetails'])->middleware('throttle:10,1');
             Route::get('/job-fairs', [EmployerJobFairController::class, 'index']);
             Route::post('/job-fairs/{jobFair}/interest', [EmployerJobFairController::class, 'interest']);
             Route::post('/job-fairs/{jobFair}/respond', [EmployerJobFairController::class, 'respond']);
@@ -203,7 +210,6 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('/profile-image', [SeekerProfileImageController::class, 'destroy']);
         // Public Employer Profile for Job Seekers
         Route::get('/employers/{employer}', [SeekerController::class, 'getPublicEmployerProfile']);
-        // Report a suspicious / abusive employer or job posting
         // Verified reviews of employers (Recruitment / Employment Experience).
         Route::get('/reviews', [SeekerReviewController::class, 'index']);
         Route::post('/reviews', [SeekerReviewController::class, 'store'])->middleware('throttle:10,1');
@@ -213,8 +219,15 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/reviews/{review}/report', [SeekerReviewController::class, 'report'])->middleware('throttle:10,1');
         Route::get('/employer-ratings', [SeekerReviewController::class, 'ratings']);
 
-        Route::post('/employers/{employer}/report', [SeekerEmployerReportController::class, 'store'])
-            ->middleware('throttle:10,1');
+        // Report & Safety: reporting an employer, company or job vacancy.
+        Route::get('/safety-reports/options', [SafetyReportController::class, 'options']);
+        Route::get('/safety-reports', [SafetyReportController::class, 'index']);
+        Route::post('/safety-reports', [SafetyReportController::class, 'store'])->middleware('throttle:5,1');
+        Route::get('/safety-reports/{safetyReport}', [SafetyReportController::class, 'show']);
+        Route::post('/safety-reports/{safetyReport}/details', [SafetyReportController::class, 'addDetails'])->middleware('throttle:10,1');
+        // Original endpoint, kept for installed copies of the mobile app.
+        Route::post('/employers/{employer}/report', [SafetyReportController::class, 'legacyEmployerReport'])
+            ->middleware('throttle:5,1');
         Route::post('/certificates', [SeekerCertificateController::class, 'store']);
         Route::get('/certificates/{certificate}/view', [SeekerCertificateController::class, 'view']);
         Route::delete('/certificates/{certificate}', [SeekerCertificateController::class, 'destroy']);
@@ -314,7 +327,6 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::get('/employers', [AdminEmployerController::class, 'index']);
             Route::get('/employers/{id}', [AdminEmployerController::class, 'show']);
 
-            // Employer Reports (seeker-filed complaints about employers)
             // Reviews & feedback moderation (Verified Mutual Feedback System).
             Route::get('/reviews/summary', [AdminReviewController::class, 'summary']);
             Route::get('/reviews', [AdminReviewController::class, 'index']);
@@ -326,10 +338,16 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::get('/seekers/{id}/worker-feedback', [AdminReviewController::class, 'seekerWorkerFeedback']);
             Route::post('/worker-feedback/{feedback}/visibility', [AdminReviewController::class, 'setWorkerFeedbackVisibility']);
 
-            Route::get('/employer-reports', [AdminEmployerReportController::class, 'index']);
-            Route::get('/employer-reports/summary', [AdminEmployerReportController::class, 'summary']);
-            Route::get('/employer-reports/{employerReport}', [AdminEmployerReportController::class, 'show']);
-            Route::put('/employer-reports/{employerReport}', [AdminEmployerReportController::class, 'update']);
+            // Reports & Safety — every safety report, in both directions.
+            Route::get('/safety-reports/options', [AdminSafetyReportController::class, 'options']);
+            Route::get('/safety-reports/summary', [AdminSafetyReportController::class, 'summary']);
+            Route::get('/safety-reports/subjects/{type}/{id}', [AdminSafetyReportController::class, 'subject'])->whereNumber('id');
+            Route::get('/safety-reports', [AdminSafetyReportController::class, 'index']);
+            Route::get('/safety-reports/{safetyReport}', [AdminSafetyReportController::class, 'show']);
+            Route::patch('/safety-reports/{safetyReport}', [AdminSafetyReportController::class, 'update']);
+            Route::post('/safety-reports/{safetyReport}/notes', [AdminSafetyReportController::class, 'note']);
+            Route::post('/safety-reports/{safetyReport}/actions', [AdminSafetyReportController::class, 'action']);
+            Route::get('/safety-reports/{safetyReport}/attachments/{attachment}', [AdminSafetyReportController::class, 'attachment']);
         });
 
         Route::middleware('admin.permission:government_dole')->group(function () {

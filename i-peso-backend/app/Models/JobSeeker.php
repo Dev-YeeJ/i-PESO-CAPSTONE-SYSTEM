@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasAccountRestriction;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -9,7 +10,7 @@ use Laravel\Sanctum\HasApiTokens;
 
 class JobSeeker extends Authenticatable
 {
-    use HasApiTokens, Notifiable;
+    use HasAccountRestriction, HasApiTokens, Notifiable;
 
     protected static function boot()
     {
@@ -19,7 +20,6 @@ class JobSeeker extends Authenticatable
             $seeker->educations()->delete();
             $seeker->occupations()->delete();
             $seeker->workExperiences()->delete();
-            $seeker->reports()->delete();
             $seeker->seekerSkills()->delete();
             $seeker->certificates()->delete();
             $seeker->applications()->delete();
@@ -172,14 +172,6 @@ class JobSeeker extends Authenticatable
     public function workExperiences(): HasMany
     {
         return $this->hasMany(SeekerWorkExperience::class, 'seeker_id', 'seeker_id');
-    }
-
-    /**
-     * Employer reports filed by this seeker.
-     */
-    public function reports(): HasMany
-    {
-        return $this->hasMany(EmployerReport::class, 'seeker_id', 'seeker_id');
     }
 
     public function skills(): HasMany

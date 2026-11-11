@@ -1,5 +1,5 @@
 import { createElement, useState } from 'react'
-import { BookOpenCheck, CalendarDays, ChevronLeft, CircleCheck, ClipboardList, GraduationCap, LayoutDashboard, LogOut, Menu, UserRound, X, MapPin, Star } from 'lucide-react'
+import { BookOpenCheck, CalendarDays, ChevronLeft, CircleCheck, ClipboardList, GraduationCap, LayoutDashboard, LogOut, Menu, UserRound, X, MapPin, ShieldAlert, Star } from 'lucide-react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '@/stores/authStore'
 import NotificationBell from '@/pages/seeker/components/NotificationBell'
@@ -14,6 +14,7 @@ const navLinks = [
   { to: '/seeker/job-map', label: 'Smart Job Map', icon: MapPin },
   { to: '/seeker/applications', label: 'My Applications', icon: ClipboardList },
   { to: '/seeker/reviews', label: 'My Reviews', icon: Star },
+  { to: '/seeker/safety-reports', label: 'Safety Reports', icon: ShieldAlert },
   { to: '/seeker/government-programs', label: 'Government Programs', icon: GraduationCap },
   { to: '/seeker/profile', label: 'My Profile', icon: UserRound },
 ]

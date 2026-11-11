@@ -62,6 +62,16 @@ class JobVacancy extends Model
         'status',
     ];
 
+    /**
+     * PESO's internal justification for a safety hold stays out of every
+     * serialized vacancy (employer listings, public search). The employer is
+     * told about a hold through the notice PESO writes for them.
+     */
+    protected $hidden = [
+        'admin_hold_reason',
+        'admin_hold_report_id',
+    ];
+
     protected $casts = [
         'required_skills' => 'array',
         'hard_to_find_skills' => 'array',
@@ -78,6 +88,7 @@ class JobVacancy extends Model
         'minimum_experience_months' => 'integer',
         'certifications_mandatory' => 'boolean',
         'application_deadline' => 'date',
+        'admin_hold_at' => 'datetime',
         'minimum_age' => 'integer',
         'maximum_age' => 'integer',
         'open_to_pwds' => 'boolean',
@@ -217,6 +228,15 @@ class JobVacancy extends Model
     public function employer(): BelongsTo
     {
         return $this->belongsTo(Employer::class, 'employer_id', 'employer_id');
+    }
+
+    /**
+     * Hidden by PESO after a safety report review. A held vacancy is closed
+     * to job seekers and its employer cannot reopen it until PESO releases it.
+     */
+    public function isOnAdminHold(): bool
+    {
+        return $this->admin_hold_at !== null;
     }
 
     public function occupation(): BelongsTo

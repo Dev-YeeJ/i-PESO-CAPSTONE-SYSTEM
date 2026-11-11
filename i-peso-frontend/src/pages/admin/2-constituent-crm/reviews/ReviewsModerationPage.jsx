@@ -30,13 +30,17 @@ const STATUS = {
   hidden: { label: 'Hidden', variant: 'rejected' },
 }
 
+// Same categories a job seeker picks when reporting an employer (SafetyReportCatalog).
 const REPORT_REASONS = {
-  fake_job: 'Fake job',
-  misleading: 'Misleading posting',
-  abusive: 'Abusive behavior',
-  discrimination: 'Discrimination',
-  illegal_fees: 'Illegal fees',
-  other: 'Other',
+  scam_fraud: 'Suspected scam or fraudulent job offer',
+  fake_vacancy: 'Fake or misleading job vacancy',
+  misleading_terms: 'Misleading salary, benefits, or job information',
+  illegal_fees: 'Request for money or unauthorized fees',
+  unprofessional_conduct: 'Inappropriate or unprofessional behavior',
+  discrimination_harassment: 'Discrimination or harassment',
+  suspicious_company: 'Suspicious company information',
+  offer_mismatch: 'Job vacancy does not match the actual offer',
+  other: 'Other concern',
 }
 
 const errorText = (error, fallback) =>
@@ -274,7 +278,7 @@ function ReviewDetailDialog({ id, canAct, onClose }) {
             {canAct && mode && (
               <div className="space-y-3 rounded-xl border border-slate-300 p-4">
                 {mode === 'escalate' && (
-                  <label className="block text-sm font-bold text-slate-800">Employer report reason
+                  <label className="block text-sm font-bold text-slate-800">Safety case category
                     <select value={reason} onChange={(event) => setReason(event.target.value)} className="mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-normal">
                       {Object.entries(REPORT_REASONS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
                     </select>
@@ -298,12 +302,12 @@ function ReviewDetailDialog({ id, canAct, onClose }) {
               <>
                 <Button variant="outline" onClick={() => { setMode(null); setError('') }} disabled={act.isPending}>Back</Button>
                 <Button variant={mode === 'hide' ? 'danger' : 'primary'} loading={act.isPending} onClick={submit}>
-                  {mode === 'publish' ? (review.status === 'published' ? 'Keep published' : 'Publish review') : mode === 'hide' ? 'Hide review' : 'Open employer report'}
+                  {mode === 'publish' ? (review.status === 'published' ? 'Keep published' : 'Publish review') : mode === 'hide' ? 'Hide review' : 'Open safety case'}
                 </Button>
               </>
             ) : (
               <>
-                <Button variant="ghost" onClick={() => setMode('escalate')}>Turn into employer report</Button>
+                <Button variant="ghost" onClick={() => setMode('escalate')}>Open a safety case</Button>
                 {review.status !== 'hidden' && <Button variant="danger" onClick={() => setMode('hide')}>Hide</Button>}
                 <Button onClick={() => setMode('publish')}>{review.status === 'published' ? 'Keep published' : 'Publish'}</Button>
               </>

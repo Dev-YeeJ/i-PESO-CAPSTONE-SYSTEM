@@ -544,11 +544,11 @@ export default function JobMapPage() {
 
       {/* Floating Details Panel */}
       <div className="absolute inset-0 z-20 pointer-events-none">
-        <JobMapDetailsPanel job={detailsJob} onViewCompanyReviews={(employerId) => setCompanyId(employerId)} isLoading={detailLoadingId === selectedJobId} loadError={detailError} onClose={() => { detailAbortRef.current?.abort(); setSelectedJobId(null); setDetailError('') }} onApply={requestApply} onSave={handleSave} onTraining={viewTraining} onJobFair={handleJobFair} onApplicationStatus={() => navigate('/seeker/applications')} onReport={(job) => setReportTarget({ employer_id: job.employer_id || job.employer?.employer_id, employer_name: job.employer_name })} isApplying={detailsJob ? applyingIds.includes(detailsJob.post_id) : false} isSaving={detailsJob ? savingIds.includes(detailsJob.post_id) : false} />
+        <JobMapDetailsPanel job={detailsJob} onViewCompanyReviews={(employerId) => setCompanyId(employerId)} isLoading={detailLoadingId === selectedJobId} loadError={detailError} onClose={() => { detailAbortRef.current?.abort(); setSelectedJobId(null); setDetailError('') }} onApply={requestApply} onSave={handleSave} onTraining={viewTraining} onJobFair={handleJobFair} onApplicationStatus={() => navigate('/seeker/applications')} onReport={(job) => setReportTarget({ employer: { employer_id: job.employer_id || job.employer?.employer_id, employer_name: job.employer_name }, vacancy: { post_id: job.post_id, job_title: job.job_title } })} isApplying={detailsJob ? applyingIds.includes(detailsJob.post_id) : false} isSaving={detailsJob ? savingIds.includes(detailsJob.post_id) : false} />
       </div>
 
       <ApplyConfirmation job={pendingApplyJob} onCancel={() => setPendingApplyJobId(null)} onConfirm={submitApplication} applying={pendingApplyJob ? applyingIds.includes(pendingApplyJob.post_id) : false} />
-      <ReportEmployerModal open={Boolean(reportTarget)} employer={reportTarget} onClose={() => setReportTarget(null)} />
+      <ReportEmployerModal open={Boolean(reportTarget)} employer={reportTarget?.employer} vacancy={reportTarget?.vacancy} onClose={() => setReportTarget(null)} />
       <JobFairInfoModal fair={jobFairPopup} open={Boolean(jobFairPopup)} onClose={() => setJobFairPopup(null)} />
       <EmployerProfileModal open={!!companyId} employerId={companyId} onClose={() => setCompanyId(null)} />
     </div>

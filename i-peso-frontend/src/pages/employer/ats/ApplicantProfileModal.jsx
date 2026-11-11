@@ -6,6 +6,7 @@ import ApplicantAvatar from './ApplicantAvatar'
 import { TERMINAL_STATUSES } from './atsConstants'
 import { formatDate, formatDateTime } from './atsFormatters'
 import InterviewSummary from './InterviewSummary'
+import ReportApplicantButton from '@/components/safety/ReportApplicantButton'
 import { getApplicantResume } from '@/services/employerApplicationService'
 import toast from 'react-hot-toast'
 
@@ -232,6 +233,8 @@ export default function ApplicantProfileModal({
                     </div>
                   </div>
                 </div>
+
+                <ReportApplicantButton applicationId={data?.apply_id} applicantName={seeker.name} jobTitle={jobTitle || data?.job?.job_title} />
 
               </>
             )}

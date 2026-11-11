@@ -24,6 +24,7 @@ import { Badge, Button, Card, CardHeader, LoadingSkeleton } from '@/components/u
 import { DownloadNSRPButton } from '@/pages/admin/_components'
 import { adminService } from '@/services/adminService'
 import WorkerFeedbackCard from './components/WorkerFeedbackCard'
+import SafetyHistoryCard from '@/components/safety/SafetyHistoryCard'
 
 const formatValue = (value, fallback = 'Not provided') => {
   if (value === null || value === undefined || value === '') return fallback
@@ -282,6 +283,7 @@ export default function JobSeekerDetailPage() {
           </Card>
 
           <WorkerFeedbackCard seekerId={seeker.seeker_id ?? profile.seeker_id ?? id} />
+          <SafetyHistoryCard type="job_seeker" id={seeker.seeker_id ?? profile.seeker_id ?? id} />
 
           <Card>
             <CardHeader title="Applications Overview" subtitle="Applicant activity and status history." />

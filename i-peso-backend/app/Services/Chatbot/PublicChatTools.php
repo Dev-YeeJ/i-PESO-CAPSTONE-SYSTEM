@@ -8,6 +8,7 @@ use App\Models\GovernmentProgram;
 use App\Models\JobFair;
 use App\Models\JobSeeker;
 use App\Models\JobVacancy;
+use App\Models\PlacementReportUpload;
 use Illuminate\Foundation\Auth\User;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Schema;
@@ -218,11 +219,23 @@ class PublicChatTools
             ])->values()->all()
             : [];
 
-        $reports = Schema::hasTable('employer_reports')
-            ? $employer->reports()->latest()->limit(self::MAX_ROWS)->get()->map(fn ($report) => [
-                'period' => $report->reporting_period ?? $report->report_month ?? null,
-                'status' => $report->status,
-            ])->values()->all()
+        // The employer's own monthly placement reports. (This once read
+        // $employer->reports(), which was the list of complaints job seekers
+        // had filed *about* the employer — leaking the existence and status of
+        // confidential reports to the reported party.)
+        $reports = Schema::hasTable('placement_report_uploads')
+            ? PlacementReportUpload::query()
+                ->where('employer_id', $employer->employer_id)
+                ->latest('id')
+                ->limit(self::MAX_ROWS)
+                ->get()
+                ->map(fn (PlacementReportUpload $report) => [
+                    'period' => $report->coverage_month && $report->coverage_year
+                        ? Carbon::create($report->coverage_year, $report->coverage_month, 1)->format('F Y')
+                        : null,
+                    'status' => str_replace('_', ' ', $report->status),
+                    'no_hires_declared' => (bool) $report->is_nil_report,
+                ])->values()->all()
             : [];
 
         return [

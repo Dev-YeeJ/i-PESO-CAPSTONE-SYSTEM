@@ -29,6 +29,21 @@ class AuthController extends Controller
      *
      * @return array{model: JobSeeker|Employer|Administrator, role: string}|null
      */
+    private function suspendedResponse(object $user, string $email): ?JsonResponse
+    {
+        if (! ($user instanceof JobSeeker || $user instanceof Employer) || ! $user->isSuspended()) {
+            return null;
+        }
+
+        ActivityLogger::logAs($user, 'login_blocked', "Sign-in blocked: account {$email} is suspended by PESO.");
+
+        return response()->json([
+            'message' => $user->suspensionMessage(),
+            'account_suspended' => true,
+            'suspended_until' => $user->restriction_ends_at?->toIso8601String(),
+        ], 403);
+    }
+
     private function findUserByEmail(string $email): ?array
     {
         $seeker = JobSeeker::where('email', $email)->first();
@@ -285,6 +300,10 @@ class AuthController extends Controller
         Cache::forget("ipeso_otp_{$email}");
         Cache::forget($attemptKey);
 
+        if ($blocked = $this->suspendedResponse($user, $email)) {
+            return $blocked;
+        }
+
         $token = $user->createToken('ipeso_access_token')->plainTextToken;
 
         if ($user instanceof Administrator) {
@@ -367,6 +386,13 @@ class AuthController extends Controller
             return response()->json([
                 'message' => 'Your temporary password has expired. Ask the PESO system administrator to send you a new one.',
             ], 403);
+        }
+
+        // A PESO suspension after a safety report review. Checked after the
+        // password, like the staff check above, so it reveals nothing to
+        // someone who does not know the password.
+        if ($blocked = $this->suspendedResponse($user, $email)) {
+            return $blocked;
         }
 
         if (! $user->email_verified_at) {

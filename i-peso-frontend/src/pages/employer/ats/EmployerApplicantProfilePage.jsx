@@ -8,6 +8,7 @@ import ApplicantAvatar from './ApplicantAvatar'
 import { TERMINAL_STATUSES } from './atsConstants'
 import { formatDate, formatDateTime } from './atsFormatters'
 import InterviewSummary from './InterviewSummary'
+import ReportApplicantButton from '@/components/safety/ReportApplicantButton'
 import toast from 'react-hot-toast'
 
 function InfoTile({ label, value }) {
@@ -243,6 +244,8 @@ export default function EmployerApplicantProfilePage() {
                 )}
               </div>
             </div>
+
+            <ReportApplicantButton applicationId={data?.apply_id} applicantName={seeker.name} jobTitle={data?.job?.job_title} />
           </div>
         </div>
       </div>

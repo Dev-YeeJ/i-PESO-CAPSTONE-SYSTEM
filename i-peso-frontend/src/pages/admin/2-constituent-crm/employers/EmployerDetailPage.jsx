@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogFooter, DialogTitle, DialogD
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import { adminService } from '@/services/adminService'
+import SafetyHistoryCard from '@/components/safety/SafetyHistoryCard'
 
 const DOCUMENT_LABELS = {
   mayors_permit: "Mayor's Permit",
@@ -447,6 +448,8 @@ export default function EmployerDetailPage() {
                       </div>
                     </div>
                   </Card>
+
+                  <SafetyHistoryCard type="employer" id={employer.employer_id ?? id} />
 
                   {/* Extra profile sections for verified employers */}
                   {verificationStatus !== 'pending' && (

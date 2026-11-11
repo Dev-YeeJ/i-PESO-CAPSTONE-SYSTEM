@@ -11,6 +11,7 @@ import {
   LogOut,
   Menu,
   PlusCircle,
+  ShieldAlert,
   Star,
   UsersRound,
   X,
@@ -32,6 +33,7 @@ const navItems = [
   { to: '/employer/reports/placement-report', label: 'Placement Report', icon: FileSpreadsheet, protected: true },
   { to: '/employer/calendar', label: 'Calendar', icon: CalendarIcon, protected: true },
   { to: '/employer/reviews', label: 'Reviews', icon: Star, protected: true },
+  { to: '/employer/safety-reports', label: 'Safety Reports', icon: ShieldAlert, protected: true },
 ]
 
 const pageNames = {

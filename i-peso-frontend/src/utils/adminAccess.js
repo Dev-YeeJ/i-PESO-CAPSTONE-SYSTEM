@@ -25,6 +25,7 @@ const PATH_MODULES = [
   ['/admin/verification-queue', 'constituent_crm'],
   ['/admin/job-seekers', 'constituent_crm'],
   ['/admin/employers', 'constituent_crm'],
+  ['/admin/safety-reports', 'constituent_crm'],
   ['/admin/employer-reports', 'constituent_crm'],
   ['/admin/reviews', 'constituent_crm'],
   ['/admin/occupation-mapping', 'constituent_crm'],

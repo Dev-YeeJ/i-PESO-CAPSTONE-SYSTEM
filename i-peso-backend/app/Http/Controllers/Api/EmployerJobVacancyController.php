@@ -44,6 +44,7 @@ class EmployerJobVacancyController extends Controller
         EnhancedJobMatchingService $matching
     ): JsonResponse {
         $employer = $this->employer($request);
+        $this->guardSafetyRestrictions($request, $employer);
         $vacancy = $employer->vacancies()->create($this->validatedData($request, $maps));
         $taxonomy->syncVacancy($vacancy);
         $matchingProfiles->syncVacancyCertifications($vacancy);
@@ -78,6 +79,7 @@ class EmployerJobVacancyController extends Controller
         EnhancedJobMatchingService $matching
     ): JsonResponse {
         $this->ensureOwnership($request, $vacancy);
+        $this->guardSafetyRestrictions($request, $this->employer($request), $vacancy);
         $vacancy->update($this->validatedData($request, $maps));
         $taxonomy->syncVacancy($vacancy);
         $matchingProfiles->syncVacancyCertifications($vacancy);
@@ -146,6 +148,36 @@ class EmployerJobVacancyController extends Controller
         ActivityLogger::logAs($this->employer($request), 'deleted_vacancy', $description);
 
         return response()->json(['message' => 'Job vacancy deleted successfully.']);
+    }
+
+    /**
+     * PESO safety measures, set only by an administrator after reviewing a
+     * report: a vacancy on hold stays closed until PESO releases it, and a
+     * restricted employer cannot publish or reopen vacancies. Editing a held
+     * vacancy's content is still allowed so the employer can correct it.
+     */
+    private function guardSafetyRestrictions(Request $request, Employer $employer, ?JobVacancy $vacancy = null): void
+    {
+        $requested = $request->input('status');
+
+        if ($vacancy?->isOnAdminHold() && $requested !== null && $requested !== $vacancy->status) {
+            abort(response()->json([
+                'message' => 'PESO has temporarily hidden this vacancy while it reviews a concern. You can edit its details, but it cannot be reopened until PESO releases it.',
+                'errors' => ['status' => ['This vacancy is on hold by PESO.']],
+                'vacancy_on_hold' => true,
+            ], 422));
+        }
+
+        $publishing = $requested === 'active' && $vacancy?->status !== 'active';
+        if ($publishing && $employer->isRestricted()) {
+            abort(response()->json([
+                'message' => 'PESO has temporarily restricted publishing vacancies on your account'
+                    .($employer->restriction_ends_at ? ' until '.$employer->restriction_ends_at->timezone('Asia/Manila')->format('F j, Y') : '')
+                    .'. You can still save drafts. Contact the PESO office for details.',
+                'errors' => ['status' => ['Publishing is restricted on this account.']],
+                'account_restricted' => true,
+            ], 403));
+        }
     }
 
     private function validatedData(Request $request, GoogleMapsService $maps): array

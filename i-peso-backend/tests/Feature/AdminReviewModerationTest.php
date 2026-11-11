@@ -56,6 +56,7 @@ class AdminReviewModerationTest extends TestCase
             });
         }
         (require database_path('migrations/2026_11_12_000001_create_employer_feedback_tables.php'))->up();
+        (require database_path('migrations/2026_11_13_000001_create_safety_reports_tables.php'))->up();
 
         $this->employerId = $this->employer('Urdaneta Rice Mill Corp.');
     }
@@ -119,7 +120,7 @@ class AdminReviewModerationTest extends TestCase
         $this->getJson("/api/seeker/employers/{$this->employerId}/reviews")->assertJsonCount(0, 'reviews.data');
     }
 
-    public function test_a_review_can_become_an_employer_report_and_replies_can_be_hidden(): void
+    public function test_a_review_can_become_a_safety_case_and_replies_can_be_hidden(): void
     {
         $id = $this->review('They asked for a 2,000 peso processing fee.');
         DB::table('employer_review_replies')->insert(['review_id' => $id, 'employer_id' => $this->employerId, 'body' => 'You are lying.', 'status' => 'published', 'created_at' => now(), 'updated_at' => now()]);
@@ -127,10 +128,19 @@ class AdminReviewModerationTest extends TestCase
 
         $this->postJson("/api/admin/reviews/{$id}/escalate", ['reason' => 'illegal_fees', 'note' => 'Check with the applicant.'])
             ->assertOk()
-            ->assertJsonPath('message', fn ($message) => str_starts_with($message, 'Employer report #'));
-        $report = DB::table('employer_reports')->first();
-        $this->assertSame('investigating', $report->status);
+            ->assertJsonPath('message', fn ($message) => str_starts_with($message, 'Safety report RPT-'));
+        $report = DB::table('safety_reports')->first();
+        $this->assertSame('under_review', $report->status);
+        $this->assertSame('peso_staff', $report->reporter_type, 'Filed by PESO, not in the reviewer name.');
+        $this->assertSame('high', $report->priority);
+        $this->assertSame($id, (int) $report->review_id);
         $this->assertStringContainsString('2,000 peso processing fee', $report->description);
+
+        // Escalating the same review again points to the existing case.
+        $this->postJson("/api/admin/reviews/{$id}/escalate", ['reason' => 'illegal_fees'])
+            ->assertOk()
+            ->assertJsonPath('report_id', $report->id);
+        $this->assertSame(1, DB::table('safety_reports')->count());
 
         $this->postJson("/api/admin/reviews/{$id}/reply-visibility", ['visible' => false])->assertOk()->assertJsonPath('review.reply.status', 'hidden');
         Sanctum::actingAs($this->seeker('viewer@example.test'));

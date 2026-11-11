@@ -1,4 +1,4 @@
-import { BriefcaseBusiness, CalendarClock, CheckCircle2, Compass, MapPin, Search, Star } from 'lucide-react'
+import { BriefcaseBusiness, CalendarClock, CheckCircle2, Compass, Flag, MapPin, Search, Star } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Link } from 'react-router-dom'
@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { getSeekerApplicationDetail, getSeekerApplications, withdrawSeekerApplication } from '@/services/seekerService'
 import { formatInterviewMode, formatInterviewTime, interviewPhase, interviewPhaseLabel, isJoinableLink } from '@/utils/interview'
 import ReviewFormDialog from '@/components/reviews/ReviewFormDialog'
+import ReportEmployerModal from '@/components/ReportEmployerModal'
 import { reviewService } from '@/services/reviewService'
 import { MY_REVIEWS_KEY, openActions } from '@/utils/reviews'
 
@@ -73,6 +74,7 @@ export default function MyApplications() {
   const [activeApplication, setActiveApplication] = useState(null)
   const [detailLoading, setDetailLoading] = useState(false)
   const [withdrawingId, setWithdrawingId] = useState(null)
+  const [reportingApplication, setReportingApplication] = useState(null)
   const [pendingWithdraw, setPendingWithdraw] = useState(null)
   const [queuedWithdraw, setQueuedWithdraw] = useState(null)
   const [statusFilter, setStatusFilter] = useState('')
@@ -440,6 +442,11 @@ export default function MyApplications() {
           )}
 
           <DialogFooter className="mt-4 pt-4 border-t border-slate-100">
+            {activeApplication?.job?.employer?.employer_id && (
+              <Button variant="ghost" icon={Flag} onClick={() => setReportingApplication(activeApplication)} className="mr-auto text-slate-500 hover:text-red-700">
+                Report a concern
+              </Button>
+            )}
             <Button variant="ghost" onClick={() => setActiveApplication(null)} className="font-bold">Close</Button>
             {activeApplication?.can_withdraw && (
               <Button variant="danger" onClick={() => askWithdraw(activeApplication)} className="rounded-xl font-bold shadow-md">Withdraw application</Button>
@@ -447,6 +454,14 @@ export default function MyApplications() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ReportEmployerModal
+        open={Boolean(reportingApplication)}
+        employer={reportingApplication ? { employer_id: reportingApplication.job?.employer?.employer_id, employer_name: reportingApplication.job?.employer?.company_name } : null}
+        vacancy={reportingApplication?.job ? { post_id: reportingApplication.job.post_id, job_title: reportingApplication.job.job_title } : null}
+        applicationId={reportingApplication?.apply_id ?? null}
+        onClose={() => setReportingApplication(null)}
+      />
 
       {writingReview && (
         <ReviewFormDialog

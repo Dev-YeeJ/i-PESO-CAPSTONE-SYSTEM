@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
-import { Award, Banknote, Bookmark, BriefcaseBusiness, CalendarDays, Check, ExternalLink, GraduationCap, Loader2, MapPin, Navigation, Sparkles } from 'lucide-react'
+import { Award, Banknote, Bookmark, BriefcaseBusiness, CalendarDays, Check, ExternalLink, Flag, GraduationCap, Loader2, MapPin, Navigation, Sparkles } from 'lucide-react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import EmployerPreferenceChip from '@/components/jobs/EmployerPreferenceChip'
+import ReportEmployerModal from '@/components/ReportEmployerModal'
 import { getMapJobDetail } from '@/services/jobMapService'
 import { applyToJob, toggleSavedJob } from '@/services/seekerService'
 
@@ -39,6 +40,7 @@ export default function JobDetailModal({ postId, open, onClose, seekerLocation, 
   const [showFullDescription, setShowFullDescription] = useState(false)
   const [applying, setApplying] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [reporting, setReporting] = useState(false)
   const abortRef = useRef(null)
 
   useEffect(() => {
@@ -104,7 +106,10 @@ export default function JobDetailModal({ postId, open, onClose, seekerLocation, 
   ]
   const location = job?.full_work_address || job?.work_location || 'Location not specified'
 
+  const employerId = job?.employer_id || job?.employer?.employer_id
+
   return (
+    <>
     <Dialog open={open} onOpenChange={(next) => !next && onClose?.()}>
       <DialogContent className="max-h-[85vh] max-w-xl overflow-y-auto">
         <DialogHeader>
@@ -168,9 +173,23 @@ export default function JobDetailModal({ postId, open, onClose, seekerLocation, 
               <button type="button" disabled={applying} onClick={() => job.has_applied ? navigate('/seeker/applications') : handleApply()} className={`inline-flex items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-xs font-bold text-white transition disabled:bg-slate-300 ${job.has_applied ? 'bg-emerald-700 hover:bg-emerald-800' : 'bg-blue-950 hover:bg-blue-900'}`}>{applying && <Loader2 className="h-4 w-4 animate-spin" />}{job.has_applied ? 'View Application' : applying ? 'Applying…' : 'Apply Now'}</button>
               {job.google_maps_url && <a href={job.google_maps_url} target="_blank" rel="noreferrer" className="col-span-2 inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-bold text-slate-700 transition hover:border-blue-300 hover:text-blue-900"><ExternalLink className="h-4 w-4" />Open in Maps</a>}
             </div>
+            {employerId && (
+              <div className="text-center">
+                <button type="button" onClick={() => setReporting(true)} className="inline-flex items-center gap-1.5 rounded-full px-2 py-1 text-[11px] font-bold text-slate-400 transition hover:bg-red-50 hover:text-red-600">
+                  <Flag className="h-3.5 w-3.5" />Report this vacancy
+                </button>
+              </div>
+            )}
           </>
         )}
       </DialogContent>
     </Dialog>
+    <ReportEmployerModal
+      open={reporting}
+      employer={employerId ? { employer_id: employerId, employer_name: job?.employer_name } : null}
+      vacancy={job ? { post_id: job.post_id ?? postId, job_title: job.job_title } : null}
+      onClose={() => setReporting(false)}
+    />
+    </>
   )
 }

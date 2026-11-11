@@ -4,7 +4,8 @@ namespace App\Http\Controllers\Api\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Administrator;
-use App\Models\EmployerReport;
+use App\Models\SafetyReport;
+use App\Models\SafetyReportEvent;
 use App\Models\EmployerReview;
 use App\Models\EmployerReviewFlag;
 use App\Models\JobSeeker;
@@ -14,6 +15,7 @@ use App\Notifications\ReviewModeratedNotification;
 use App\Services\ActivityLogger;
 use App\Services\Feedback\ReputationSummary;
 use App\Support\FeedbackAspects;
+use App\Support\SafetyReportCatalog;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -182,20 +184,42 @@ class AdminReviewController extends Controller
 
     /**
      * A review describing misconduct (illegal fees, a fake job, abuse) also
-     * goes to Employer Reports so it's investigated, not just displayed.
+     * opens a Reports & Safety case so it's investigated, not just displayed.
+     * The case is filed by PESO, not in the reviewer's name — so it never
+     * blocks the reviewer from filing a report of their own.
      */
     public function escalate(Request $request, EmployerReview $review): JsonResponse
     {
+        // Older clients still send the original employer-report reason codes.
+        $legacy = [
+            'fake_job' => 'fake_vacancy', 'misleading' => 'misleading_terms', 'abusive' => 'discrimination_harassment',
+            'discrimination' => 'discrimination_harassment',
+        ];
         $data = $request->validate([
-            'reason' => ['required', Rule::in(EmployerReport::REASONS)],
+            'reason' => ['required', Rule::in(array_merge(array_keys(SafetyReportCatalog::EMPLOYER_CATEGORIES), array_keys($legacy)))],
             'note' => ['nullable', 'string', 'max:1000'],
         ]);
+        $category = $legacy[$data['reason']] ?? $data['reason'];
         $review->loadMissing('employer');
 
-        $report = EmployerReport::create([
-            'employer_id' => $review->employer_id,
-            'seeker_id' => $review->seeker_id,
-            'reason' => $data['reason'],
+        $existing = SafetyReport::query()->where('review_id', $review->id)->first();
+        if ($existing) {
+            return response()->json([
+                'message' => "This review is already case {$existing->case_number}.",
+                'report_id' => $existing->id,
+                'case_number' => $existing->case_number,
+            ]);
+        }
+
+        $admin = $this->admin($request);
+        $report = SafetyReport::create([
+            'reporter_type' => SafetyReportCatalog::REPORTER_STAFF,
+            'filed_by_admin_id' => $admin->admin_id,
+            'subject_type' => SafetyReportCatalog::SUBJECT_EMPLOYER,
+            'subject_employer_id' => $review->employer_id,
+            'application_id' => $review->application_id ?? null,
+            'review_id' => $review->id,
+            'category' => $category,
             'description' => trim(sprintf(
                 "Opened by PESO from review #%d (%s experience).\n\n%s%s",
                 $review->id,
@@ -203,15 +227,24 @@ class AdminReviewController extends Controller
                 $review->comment ?: '(No written comment.)',
                 ! empty($data['note']) ? "\n\nStaff note: {$data['note']}" : ''
             )),
-            'status' => 'investigating',
+            'status' => SafetyReportCatalog::STATUS_UNDER_REVIEW,
+            'priority' => SafetyReportCatalog::defaultPriority($category),
+        ]);
+        $report->events()->create([
+            'actor_type' => 'admin', 'actor_admin_id' => $admin->admin_id, 'kind' => SafetyReportEvent::KIND_SUBMITTED,
+            'body' => "Opened from review #{$review->id}.",
         ]);
 
         ActivityLogger::log('escalated_employer_review', sprintf(
-            'Turned review #%d of %s into employer report #%d (%s).',
-            $review->id, $review->employer?->company_name ?? 'an employer', $report->id, $data['reason']
+            'Turned review #%d of %s into safety report %s (%s).',
+            $review->id, $review->employer?->company_name ?? 'an employer', $report->case_number, $category
         ));
 
-        return response()->json(['message' => "Employer report #{$report->id} opened.", 'report_id' => $report->id]);
+        return response()->json([
+            'message' => "Safety report {$report->case_number} opened.",
+            'report_id' => $report->id,
+            'case_number' => $report->case_number,
+        ]);
     }
 
     // ── Worker feedback (shown on the admin job seeker profile) ─────────────

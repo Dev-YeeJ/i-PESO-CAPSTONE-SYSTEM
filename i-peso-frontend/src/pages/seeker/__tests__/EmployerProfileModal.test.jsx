@@ -4,14 +4,27 @@ import { axe } from 'vitest-axe'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import EmployerProfileModal from '../EmployerProfileModal'
 import { getPublicEmployerProfile } from '@/services/seekerService'
+import { safetyReportService } from '@/services/safetyReportService'
 import { renderWithProviders } from '@/test/utils'
 
 vi.mock('@/services/seekerService', () => ({
   getPublicEmployerProfile: vi.fn(),
-  reportEmployer: vi.fn(),
   applyToJob: vi.fn(),
   toggleSavedJob: vi.fn(),
 }))
+
+vi.mock('@/services/safetyReportService', () => ({
+  safetyReportService: { options: vi.fn(), submit: vi.fn() },
+}))
+
+const reportOptions = {
+  subject_type: 'employer',
+  categories: [
+    { value: 'illegal_fees', label: 'Request for money or unauthorized fees', hint: 'You were asked to pay.' },
+    { value: 'other', label: 'Other concern', hint: null },
+  ],
+  limits: { description_min: 30, description_max: 3000, max_attachments: 5, max_attachment_kb: 5120, attachment_types: ['jpg', 'png', 'pdf'] },
+}
 
 // The job popup fetches its own data; keep it inert so this test stays on the panel.
 vi.mock('@/components/JobDetailModal', () => ({
@@ -64,14 +77,32 @@ describe('EmployerProfileModal (seeker company profile panel)', () => {
     expect(screen.getByText('job 31')).toBeInTheDocument()
   })
 
-  it('reports through the structured form, not a browser prompt', async () => {
+  it('reports through the structured form, confirming who is reported and that it is truthful', async () => {
     getPublicEmployerProfile.mockResolvedValue(profile)
+    safetyReportService.options.mockResolvedValue(reportOptions)
+    safetyReportService.submit.mockResolvedValue({ report: { id: 12, case_number: 'RPT-2026-00012' } })
     const promptSpy = vi.spyOn(window, 'prompt')
     renderPanel()
 
     await userEvent.click(await screen.findByRole('button', { name: 'Report this employer' }))
-    const reportDialog = await screen.findByRole('dialog', { name: /Report Northwind/ })
-    expect(within(reportDialog).getByRole('combobox')).toBeInTheDocument()
+    const reportDialog = await screen.findByRole('dialog', { name: /Report an employer/ })
+    expect(within(reportDialog).getByText('You are reporting')).toBeInTheDocument()
+    expect(within(reportDialog).getByText('Northwind')).toBeInTheDocument()
+
+    await userEvent.click(await within(reportDialog).findByRole('radio', { name: /unauthorized fees/ }))
+    await userEvent.type(within(reportDialog).getByRole('textbox', { name: /What happened/ }), 'The recruiter asked me for 1,500 pesos before the interview.')
+    await userEvent.click(within(reportDialog).getByRole('button', { name: 'Review report' }))
+
+    const confirmDialog = await screen.findByRole('dialog', { name: /Confirm your report/ })
+    await userEvent.click(within(confirmDialog).getByRole('button', { name: 'Submit report' }))
+    expect(within(confirmDialog).getByText('Please confirm that your report is truthful.')).toBeInTheDocument()
+    expect(safetyReportService.submit).not.toHaveBeenCalled()
+
+    await userEvent.click(within(confirmDialog).getByRole('checkbox'))
+    await userEvent.click(within(confirmDialog).getByRole('button', { name: 'Submit report' }))
+
+    expect(await screen.findByText('RPT-2026-00012')).toBeInTheDocument()
+    expect(safetyReportService.submit).toHaveBeenCalledWith('seeker', expect.objectContaining({ subject_id: 7, category: 'illegal_fees', acknowledge: true }))
     expect(promptSpy).not.toHaveBeenCalled()
     promptSpy.mockRestore()
   })

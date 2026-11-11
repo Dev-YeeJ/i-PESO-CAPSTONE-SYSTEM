@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasAccountRestriction;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -10,7 +11,7 @@ use Laravel\Sanctum\HasApiTokens;
 
 class Employer extends Authenticatable
 {
-    use HasApiTokens, Notifiable, SoftDeletes;
+    use HasAccountRestriction, HasApiTokens, Notifiable, SoftDeletes;
 
     // Mirrors the fixed option list in Step2CompanyProfile.jsx — keep both in sync.
     public const INDUSTRIES = [
@@ -38,12 +39,10 @@ class Employer extends Authenticatable
             if ($employer->isForceDeleting()) {
                 $employer->documents()->forceDelete();
                 $employer->vacancies()->forceDelete();
-                $employer->reports()->forceDelete();
                 $employer->jobFairJoins()->forceDelete();
             } else {
                 $employer->documents()->delete();
                 $employer->vacancies()->delete();
-                $employer->reports()->delete();
                 $employer->jobFairJoins()->delete();
             }
         });
@@ -138,14 +137,6 @@ class Employer extends Authenticatable
     public function vacancies(): HasMany
     {
         return $this->hasMany(JobVacancy::class, 'employer_id', 'employer_id');
-    }
-
-    /**
-     * Seeker-filed reports about this employer.
-     */
-    public function reports(): HasMany
-    {
-        return $this->hasMany(EmployerReport::class, 'employer_id', 'employer_id');
     }
 
     public function jobFairJoins(): HasMany
