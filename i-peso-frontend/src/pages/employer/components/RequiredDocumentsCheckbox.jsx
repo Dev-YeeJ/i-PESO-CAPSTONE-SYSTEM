@@ -4,6 +4,7 @@ export default function RequiredDocumentsCheckbox({ requiredDocuments, uploadedD
     const labels = {
       'mayors_permit': "Mayor's Permit",
       'bir_certificate': 'BIR Certificate of Registration (Form 2303)',
+      'philJobnet_proof': 'PhilJobNet Registration Proof',
       'dti_certificate': 'DTI Certificate of Registration',
       'sec_certificate': 'SEC Certificate of Registration',
       'prpa_license': 'DOLE PRPA License',

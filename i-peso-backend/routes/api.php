@@ -109,6 +109,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/profile/photo', [\App\Http\Controllers\Api\EmployerProfileController::class, 'updateRepresentativeImage']);
         Route::post('/register/step-2', [EmployerRegistrationController::class, 'registerStep2']);
         Route::post('/register/step-3', [EmployerRegistrationController::class, 'registerStep3']);
+        Route::delete('/register/document/{documentType}', [EmployerRegistrationController::class, 'deleteDocument']);
         Route::post('/register/step-4', [EmployerRegistrationController::class, 'registerStep4']);
         Route::get('/required-documents', [EmployerRegistrationController::class, 'getRequiredDocuments']);
         Route::post('/register/company-type', [EmployerRegistrationController::class, 'setCompanyType']);
