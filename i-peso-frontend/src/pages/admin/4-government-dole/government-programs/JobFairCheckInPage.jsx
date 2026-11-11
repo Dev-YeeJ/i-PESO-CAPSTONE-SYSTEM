@@ -7,6 +7,8 @@ import toast from 'react-hot-toast'
 import { AlertBox, Badge, Button, Card } from '@/components/ui'
 import PageHeader from '@/pages/admin/_components/PageHeader'
 import { adminService } from '@/services/adminService'
+import { useAuthStore } from '@/stores/authStore'
+import { canManage } from '@/utils/adminAccess'
 
 const QR_ELEMENT_ID = 'job-fair-qr-reader'
 const emptyWalkIn = { guest_name: '', guest_mobile_number: '', guest_email: '', guest_educ_attainment: '', guest_preferred_job: '' }
@@ -49,6 +51,8 @@ function AttendeeCard({ attendee }) {
 export default function JobFairCheckInPage() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const user = useAuthStore((state) => state.user)
+  const canAct = canManage(user, 'government_dole')
   const lockedRef = useRef(false)
   const checkInRef = useRef(() => {})
   const [cameraError, setCameraError] = useState('')
@@ -104,7 +108,7 @@ export default function JobFairCheckInPage() {
   }, [refreshCounts])
 
   const checkIn = useCallback(async (payload) => {
-    if (lockedRef.current) return
+    if (!canAct || lockedRef.current) return
     lockedRef.current = true
     setLookupError('')
     try {
@@ -121,7 +125,7 @@ export default function JobFairCheckInPage() {
         lockedRef.current = false
       }
     }
-  }, [id, refreshCounts, refreshRoster])
+  }, [canAct, id, refreshCounts, refreshRoster])
 
   useEffect(() => { checkInRef.current = checkIn }, [checkIn])
 
@@ -136,7 +140,7 @@ export default function JobFairCheckInPage() {
 
   const encodeWalkIn = async (e) => {
     e.preventDefault()
-    if (encoding || !walkIn.guest_name.trim()) return
+    if (!canAct || encoding || !walkIn.guest_name.trim()) return
     setEncoding(true)
     setLookupError('')
     try {
@@ -158,6 +162,8 @@ export default function JobFairCheckInPage() {
   ))
 
   useEffect(() => {
+    if (!canAct) return undefined
+
     const scanner = new Html5Qrcode(QR_ELEMENT_ID)
     scanner.start(
       { facingMode },
@@ -174,7 +180,7 @@ export default function JobFairCheckInPage() {
     return () => {
       scanner.stop().then(() => scanner.clear()).catch(() => {})
     }
-  }, [facingMode])
+  }, [canAct, facingMode])
 
   useEffect(() => {
     if (!search.trim()) {
@@ -205,6 +211,18 @@ export default function JobFairCheckInPage() {
     } catch (e) {
       toast.error(e.response?.data?.message ?? 'Download failed.')
     }
+  }
+
+  if (!canAct) {
+    return (
+      <div className="portal-page">
+        <PageHeader title="Attendance desk" eyebrow="Government & DOLE" actions={[{ label: 'Back to event', onClick: () => navigate(`/admin/job-fairs/${id}`), variant: 'secondary' }]} />
+        <Card className="mt-6">
+          <p className="text-sm font-bold text-slate-900">Full access is required to record attendance.</p>
+          <p className="mt-1 text-sm text-slate-600">Your role can view event details but cannot check in attendees or add walk-ins.</p>
+        </Card>
+      </div>
+    )
   }
 
   return (

@@ -13,6 +13,8 @@ import LocationPreviewCard from '@/components/maps/LocationPreviewCard'
 import EstablishmentReportPreview from '@/components/reports/EstablishmentReportPreview'
 import ConfirmationSlipPreview from '@/components/reports/ConfirmationSlipPreview'
 import { adminService } from '@/services/adminService'
+import { useAuthStore } from '@/stores/authStore'
+import { canManage } from '@/utils/adminAccess'
 import { Command } from 'cmdk'
 import JobFairEmployersTable from './components/JobFairEmployersTable'
 import JobFairReportsChart from './components/JobFairReportsChart'
@@ -90,6 +92,8 @@ function FilePreview({ fileId, filename }) {
 export default function JobFairDetailPage() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const user = useAuthStore((state) => state.user)
+  const canAct = canManage(user, 'government_dole')
   const [fair, setFair] = useState(null)
   const [loadingPage, setLoadingPage] = useState(true)
   const [errorPage, setErrorPage] = useState('')
@@ -242,8 +246,10 @@ export default function JobFairDetailPage() {
         eyebrow="Zero-Interference Job Fair"
         actions={[
           { label: 'Back', onClick: () => navigate('/admin/job-fairs'), variant: 'secondary' },
-          { label: 'Edit', onClick: () => navigate(`/admin/job-fairs/${id}/edit`), variant: 'secondary' },
-          { label: 'Scan Attendance', onClick: () => navigate(`/admin/job-fairs/${id}/check-in`) },
+          ...(canAct ? [
+            { label: 'Edit', onClick: () => navigate(`/admin/job-fairs/${id}/edit`), variant: 'secondary' },
+            { label: 'Scan Attendance', onClick: () => navigate(`/admin/job-fairs/${id}/check-in`) },
+          ] : []),
         ]}
       />
 
@@ -267,16 +273,16 @@ export default function JobFairDetailPage() {
             <Card>
               <CardHeader title="Announcement & Status" subtitle={`${fair?.status?.replaceAll('_', ' ') ?? ''}`} />
               <div className="flex flex-wrap items-center gap-2">
-                {!fair?.published_at ? (
+                {!fair?.published_at && canAct ? (
                   <Button icon={ShieldCheck} onClick={() => action(() => adminService.publishJobFair(id, 'accepting_employers'), 'Announcement published. Employers and job seekers notified.')}>
                     Publish & Announce
                   </Button>
+                ) : fair?.published_at ? (
+                  <Badge status="approved" className="shrink-0">
+                    Published {new Date(fair.published_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}
+                  </Badge>
                 ) : (
-                  <>
-                    <Badge status="approved" className="shrink-0">
-                      Published {new Date(fair.published_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}
-                    </Badge>
-                  </>
+                  <Badge status="pending" className="shrink-0">Not published</Badge>
                 )}
                 <Button variant="outline" icon={FileText} onClick={() => blobDownload(() => adminService.downloadJobFairInvitation(id), `job-fair-invitation-${id}.pdf`)}>
                   Announcement PDF
@@ -400,7 +406,7 @@ export default function JobFairDetailPage() {
                     {c.review_remarks && <p className="text-xs text-rose-600 font-semibold mt-1">PESO note: {c.review_remarks}</p>}
                   </div>
                   <div className="flex gap-2">
-                    {(c.status === 'pending' || !c.status) && (
+                    {canAct && (c.status === 'pending' || !c.status) && (
                       <>
                         <Button size="sm" variant="success" icon={CheckCircle2} onClick={() => action(() => adminService.reviewJobFairConfirmationSlip(c.id, { status: 'approved' }), 'Confirmation slip approved.')}>Approve</Button>
                         <Button size="sm" variant="danger" icon={XCircle} onClick={() => {
@@ -438,7 +444,7 @@ export default function JobFairDetailPage() {
                     {r.review_remarks && <p className="text-xs text-rose-600 font-semibold mt-1">PESO note: {r.review_remarks}</p>}
                   </div>
                   <div className="flex gap-2">
-                    {(r.status === 'pending' || !r.status) && (
+                    {canAct && (r.status === 'pending' || !r.status) && (
                       <>
                         <Button size="sm" variant="success" icon={CheckCircle2} onClick={() => action(() => adminService.reviewJobFairResult(r.id, { status: 'approved' }), 'Report approved.')}>Approve</Button>
                         <Button size="sm" variant="danger" icon={XCircle} onClick={() => {
@@ -535,7 +541,7 @@ export default function JobFairDetailPage() {
                           <button type="button" onClick={() => setViewingConfirmationSlip(reviewingParticipant.confirmation_slip)} className="flex items-center gap-1.5 text-xs font-semibold text-brand-navy hover:underline">
                             <FileText className="h-3.5 w-3.5" />View Confirmation Slip
                           </button>
-                          {badgeStatus === 'review' && firstSubmission && (
+                          {canAct && badgeStatus === 'review' && firstSubmission && (
                             <div className="flex gap-2 mt-1">
                               <Button size="sm" variant="success" icon={CheckCircle2} onClick={() => action(() => adminService.reviewJobFairRequirement(firstSubmission.id, { status: 'approved' }), 'Confirmation Slip approved.')}>
                                 Approve
@@ -605,7 +611,7 @@ export default function JobFairDetailPage() {
                 )}
               </div>
 
-              {reviewingGallery.pendingSubmissions.length > 0 && (
+              {canAct && reviewingGallery.pendingSubmissions.length > 0 && (
                 <div className="mt-6 flex gap-3 border-t pt-4">
                   <Button size="lg" variant="success" icon={CheckCircle2} onClick={async () => {
                     await action(() => Promise.all(reviewingGallery.pendingSubmissions.map((s) => adminService.reviewJobFairRequirement(s.id, { status: 'approved' }))), 'Requirement approved.')

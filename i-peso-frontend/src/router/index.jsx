@@ -236,6 +236,7 @@ export const router = createBrowserRouter([
                       
                       // CATEGORY 5: SYSTEM & REPORTS
                       { path: 'labor-analytics', element: S(AdminLaborAnalytics) },
+                      { path: 'analytics', element: <Navigate to="/admin/labor-analytics" replace /> },
                       { path: 'location-data-quality', element: S(AdminLocationDataQuality) },
                       { path: 'labor-analytics/:id', element: S(AdminAnalyticsDetail) },
                       { path: 'activity-logs', element: S(AdminActivityLogs) },

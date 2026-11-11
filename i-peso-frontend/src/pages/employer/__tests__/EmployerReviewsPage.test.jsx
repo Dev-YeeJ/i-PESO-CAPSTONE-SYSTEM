@@ -66,23 +66,31 @@ describe('EmployerReviewsPage', () => {
   it('shows the summary, star distribution and reviews', async () => {
     renderWithProviders(<EmployerReviewsPage />, { route: '/employer/reviews' })
 
-    expect(await screen.findByText('Review number 1.')).toBeInTheDocument()
-    expect(screen.getByText('Thank you for applying.')).toBeInTheDocument()
+    expect(await screen.findByText('Review number 2.')).toBeInTheDocument()
+    expect(screen.queryByText('Review number 1.')).not.toBeInTheDocument()
     expect(screen.getByRole('table', { name: /each overall star rating/i })).toBeInTheDocument()
     expect(screen.getByText('75%')).toBeInTheDocument()
     // Working-here isn't public yet: 1 of the 3 reviewers needed.
     expect(screen.getByText('1 of 3 reviews needed')).toBeInTheDocument()
   })
 
-  it('filters to reviews that still need a reply', async () => {
+  it('opens on reviews that still need a reply', async () => {
     renderWithProviders(<EmployerReviewsPage />, { route: '/employer/reviews' })
-    await screen.findByText('Review number 1.')
-
-    await userEvent.click(screen.getByRole('radio', { name: /needs reply/i }))
+    await screen.findByText('Review number 2.')
 
     await waitFor(() => expect(employerFeedbackService.getReviews).toHaveBeenLastCalledWith({ type: 'recruitment', page: 1, filter: 'needs_reply' }))
     await waitFor(() => expect(screen.queryByText('Review number 1.')).not.toBeInTheDocument())
     expect(screen.getByText('Review number 2.')).toBeInTheDocument()
+  })
+
+  it('lets employers switch back to all reviews', async () => {
+    renderWithProviders(<EmployerReviewsPage />, { route: '/employer/reviews' })
+    await screen.findByText('Review number 2.')
+
+    await userEvent.click(screen.getByRole('radio', { name: /^all$/i }))
+
+    expect(await screen.findByText('Review number 1.')).toBeInTheDocument()
+    expect(screen.getByText('Thank you for applying.')).toBeInTheDocument()
   })
 
   it('opens the hires tab from the URL', async () => {

@@ -2,15 +2,16 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { AlertTriangle, ArrowLeft, CheckCircle2, Download, Eye, FileText, ShieldCheck, XCircle, Clock, BriefcaseBusiness } from 'lucide-react'
 import { Badge, Button, Card, CardHeader, ErrorState, LoadingSkeleton } from '@/components/ui'
-import CompanyLogo from '@/components/employers/CompanyLogo'
+import EmployerProfilePreview from '@/components/employers/EmployerProfilePreview'
 import VacancyRow from '@/components/employers/VacancyRow'
-import { formatCompanySize } from '@/utils/employerProfile'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Dialog, DialogContent, DialogHeader, DialogFooter, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import { adminService } from '@/services/adminService'
 import SafetyHistoryCard from '@/components/safety/SafetyHistoryCard'
+import { useAuthStore } from '@/stores/authStore'
+import { canManage, isIntern } from '@/utils/adminAccess'
 
 const DOCUMENT_LABELS = {
   mayors_permit: "Mayor's Permit",
@@ -41,11 +42,6 @@ const formatValue = (value, fallback = 'Not provided') => {
   return String(value).replaceAll('_', ' ')
 }
 
-const formatIndustry = (value) => {
-  if (Array.isArray(value)) return value.length ? value.join(', ') : undefined
-  return value
-}
-
 const formatDate = (value) => {
   if (!value) return 'Not provided'
   const date = new Date(value)
@@ -55,6 +51,9 @@ const formatDate = (value) => {
 export default function EmployerDetailPage() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const user = useAuthStore((s) => s.user)
+  const canAct = canManage(user, 'constituent_crm') && !isIntern(user)
+
   const [employer, setEmployer] = useState(null)
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState(false)
@@ -72,6 +71,7 @@ export default function EmployerDetailPage() {
   const [confirmDialog, setConfirmDialog] = useState(null)
   // Track documents viewed during this session so UI updates immediately
   const [viewedDocumentIds, setViewedDocumentIds] = useState(new Set())
+  const [staffViewedDocumentIds, setStaffViewedDocumentIds] = useState(new Set())
   // Main-column tab — defaults to whichever the admin actually needs first:
   // the document queue for a pending employer, the profile otherwise.
   const [activeTab, setActiveTab] = useState(null)
@@ -171,11 +171,14 @@ export default function EmployerDetailPage() {
       const file = await adminService.getEmployerDocument(document.document_id)
       const fileUrl = URL.createObjectURL(file)
       setPreviewDocument({ ...document, url: fileUrl, mimeType: file.type })
-      setViewedDocumentIds((prev) => {
-        const next = new Set(prev)
-        next.add(document.document_id)
-        return next
-      })
+      setStaffViewedDocumentIds((prev) => new Set(prev).add(document.document_id))
+      if (canAct) {
+        setViewedDocumentIds((prev) => {
+          const next = new Set(prev)
+          next.add(document.document_id)
+          return next
+        })
+      }
     } catch (requestError) {
       setError(requestError.response?.data?.message ?? 'Unable to open this document.')
     } finally {
@@ -352,32 +355,7 @@ export default function EmployerDetailPage() {
         {error && <div role="alert" className="mb-5 flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-medium text-red-800"><AlertTriangle className="h-4 w-4 shrink-0" />{error}</div>}
 
         <div className="space-y-4">
-          {/* Compact hero */}
-          <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200">
-            <div className="h-16 bg-brand-navy sm:h-20" />
-            <div className="relative px-5 pb-5 sm:px-6">
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex min-w-0 items-center gap-4">
-                  <CompanyLogo
-                    src={companyProfile.company_logo_url}
-                    name={companyProfile.company_name || employer.company_name}
-                    size="md"
-                    className="-mt-8 sm:-mt-9 sm:h-20 sm:w-20"
-                  />
-                  <div className="min-w-0">
-                    <p className="text-xs font-semibold text-slate-500">
-                      {verificationStatus === 'pending' ? 'Accreditation review' : 'Employer profile'}
-                    </p>
-                    <h1 className="break-words text-xl font-black leading-tight text-slate-950 sm:text-2xl">{companyProfile.company_name || employer.company_name}</h1>
-                    {employer.trade_name && employer.trade_name !== (companyProfile.company_name || employer.company_name) && (
-                      <p className="mt-0.5 text-sm text-slate-500">Trades as {employer.trade_name}</p>
-                    )}
-                  </div>
-                </div>
-                <Badge status={isVerified ? 'approved' : verificationStatus === 'rejected' ? 'rejected' : 'pending'} className="self-start capitalize sm:self-center">{formatValue(verificationStatus)}</Badge>
-              </div>
-            </div>
-          </div>
+          <EmployerProfilePreview employer={{ ...employer, ...companyProfile }} verificationStatus={verificationStatus} />
 
           <Tabs value={activeTab ?? 'overview'} onValueChange={setActiveTab}>
                 <TabsList>
@@ -390,24 +368,11 @@ export default function EmployerDetailPage() {
 
                 <TabsContent value="overview" className="space-y-5">
                   <Card>
-                    <CardHeader title="Company details" subtitle="Business information the employer registered." />
+                    <CardHeader title="Legal registration" subtitle="Details PESO uses to match the submitted documents." />
                     <dl className="grid gap-x-8 gap-y-5 sm:grid-cols-2">
-                      <InfoItem label="Registered name" value={companyProfile.company_name || employer.company_name} />
-                      <InfoItem label="Trade name" value={employer.trade_name} />
-                      <InfoItem label="Industry" value={formatIndustry(companyProfile.industry || employer.industry)} />
-                      <InfoItem label="Company size" value={formatCompanySize(companyProfile.company_size || employer.company_size)} />
+                      <InfoItem label="Business type" value={formatValue(companyProfile.company_type || employer.company_type)} />
                       <InfoItem label="TIN" value={companyProfile.tin || employer.tin} />
-                      <InfoItem label="Business address" value={companyProfile.business_address || businessAddress.complete_address} />
                     </dl>
-                    <div className="mt-5 border-t border-slate-100 pt-5">
-                      <h3 className="text-sm font-bold text-slate-900">About the company</h3>
-                      <p className="mt-0.5 text-xs text-slate-500">Shown to job seekers on the public company profile.</p>
-                      {employer.company_description ? (
-                        <p className="mt-2 max-w-prose whitespace-pre-wrap text-sm leading-6 text-slate-700">{employer.company_description}</p>
-                      ) : (
-                        <p className="mt-2 text-sm text-slate-400">The employer hasn't added a description.</p>
-                      )}
-                    </div>
                   </Card>
 
                   <Card>
@@ -574,13 +539,21 @@ export default function EmployerDetailPage() {
                                 </div>
                               ) : doc.verification_status === 'approved' ? (
                                 <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700"><CheckCircle2 className="h-3.5 w-3.5" />Approved</span>
+                              ) : (doc.viewed_at || viewedDocumentIds.has(doc.document_id)) ? (
+                                <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 border border-blue-200 px-2.5 py-1 text-xs font-bold text-blue-700">
+                                  <Eye className="h-3.5 w-3.5" />
+                                  Viewed
+                                </span>
+                              ) : (doc.staff_viewed_at || staffViewedDocumentIds.has(doc.document_id)) ? (
+                                <span className="inline-flex items-center gap-1 rounded-full bg-sky-50 border border-sky-200 px-2.5 py-1 text-xs font-bold text-sky-800">
+                                  <Eye className="h-3.5 w-3.5" />
+                                  Seen by staff · officer review required
+                                </span>
                               ) : (
-                                <div className="flex flex-col items-start gap-1">
-                                  <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-bold text-amber-700"><AlertTriangle className="h-3.5 w-3.5" />Pending review</span>
-                                  {(doc.viewed_at || viewedDocumentIds.has(doc.document_id)) && (
-                                    <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-bold text-blue-700"><Eye className="h-3 w-3" />Viewed</span>
-                                  )}
-                                </div>
+                                <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 border border-amber-200 px-2.5 py-1 text-xs font-bold text-amber-700">
+                                  <AlertTriangle className="h-3.5 w-3.5" />
+                                  Not yet viewed
+                                </span>
                               )}
                             </TableCell>
                             <TableCell className="text-xs text-slate-600">
@@ -607,7 +580,7 @@ export default function EmployerDetailPage() {
                                         <span className="hidden xl:inline">Download</span>
                                       </Button>
                                     </div>
-                                    {verificationStatus === 'pending' && (
+                                    {canAct && verificationStatus === 'pending' && (
                                       rejected ? (
                                         <Button variant="outline" size="sm" icon={CheckCircle2} onClick={() => undoRejectRow(doc.document_id)} disabled={busy}>
                                           {busy ? 'Saving...' : 'Undo'}
@@ -643,10 +616,12 @@ export default function EmployerDetailPage() {
                     <div className="flex flex-col items-center justify-between gap-4 border-t border-slate-100 pt-4 md:flex-row">
                       <Button variant="ghost" onClick={() => navigate('/admin/employers')} icon={ArrowLeft}>Back to Queue</Button>
 
-                      {/* The viewed-gate is checked first: the backend rejects finalize with a
-                          422 unless every uploaded required document has been opened, so a
-                          missing document must not hand the admin an enabled button. */}
-                      {!allRequiredViewed ? (
+                      {!canAct ? (
+                        <div className="flex items-center gap-2 rounded-xl border border-blue-200 bg-blue-50/70 px-4 py-2.5 text-xs font-semibold text-blue-900">
+                          <ShieldCheck className="h-4 w-4 text-blue-600 shrink-0" />
+                          <span>View-only mode: You can inspect submitted documents. Accreditation approval and rejection actions are restricted to authorized PESO officers.</span>
+                        </div>
+                      ) : !allRequiredViewed ? (
                         <div className="flex items-center gap-3">
                           <span className="text-sm font-semibold text-amber-600">
                             Open {unviewedRequiredDocs.map((type) => DOCUMENT_LABELS[type] ?? type).join(', ')} before completing the review

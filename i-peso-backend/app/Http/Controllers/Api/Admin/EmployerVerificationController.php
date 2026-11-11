@@ -120,7 +120,8 @@ class EmployerVerificationController extends Controller
 
         // Carbon 3's diffInX() helpers return floats, so floor to whole hours
         // before splitting into days/hours for a clean, decimal-free display.
-        $hoursWaiting = $employer->created_at ? (int) floor($employer->created_at->diffInHours(now())) : 0;
+        $submittedAt = $employer->registration_submitted_at ?? $employer->created_at;
+        $hoursWaiting = $submittedAt ? (int) floor($submittedAt->diffInHours(now())) : 0;
 
         return [
             'employer_id'                       => $employer->employer_id,
@@ -153,6 +154,7 @@ class EmployerVerificationController extends Controller
     {
         $pending = Employer::query()
             ->where('verification_status', 'pending')
+            ->whereNotNull('registration_submitted_at')
             ->with('documents')
             ->get()
             ->map(fn (Employer $employer) => $this->queueEntry($employer));
@@ -203,6 +205,7 @@ class EmployerVerificationController extends Controller
                     'original_filename' => $doc->original_filename,
                     'uploaded_at' => $doc->uploaded_at,
                     'viewed_at' => $doc->viewed_at,
+                    'staff_viewed_at' => $doc->staff_viewed_at,
                     'verification_status' => $doc->verification_status,
                     'admin_notes' => $doc->admin_notes,
                 ]),
@@ -515,8 +518,22 @@ class EmployerVerificationController extends Controller
             $document->employer_id
         ));
 
-        if ($document->viewed_at === null) {
+        // Keep staff access visible without allowing a view-only role or OJT
+        // to satisfy the authorized officer's separate review requirement.
+        $user = $request->user();
+        $isAuthorizingOfficer = $user instanceof \App\Models\Administrator
+            && $user->canManageModule('constituent_crm')
+            && $user->position !== 'ojt_intern';
+
+        if ($user instanceof \App\Models\Administrator && $document->staff_viewed_at === null) {
+            $document->staff_viewed_at = now();
+        }
+
+        if ($isAuthorizingOfficer && $document->viewed_at === null) {
             $document->viewed_at = now();
+        }
+
+        if ($document->isDirty()) {
             $document->save();
         }
 
@@ -664,7 +681,9 @@ class EmployerVerificationController extends Controller
     {
         try {
             $stats = [
-                'pending' => Employer::where('verification_status', 'pending')->count(),
+                'pending' => Employer::where('verification_status', 'pending')
+                    ->whereNotNull('registration_submitted_at')
+                    ->count(),
                 'verified' => Employer::where('verification_status', 'verified')->count(),
                 'rejected' => Employer::where('verification_status', 'rejected')->count(),
                 'total' => Employer::count(),

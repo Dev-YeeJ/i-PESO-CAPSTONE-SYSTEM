@@ -31,7 +31,7 @@ export default function EmployerReviewsPage() {
   const [params, setParams] = useSearchParams()
   const tab = pick(params.get('tab'), TABS.map((item) => item.value), 'company')
   const type = pick(params.get('type'), TYPES.map((item) => item.value), 'recruitment')
-  const filter = pick(params.get('filter'), FILTERS, 'all')
+  const filter = pick(params.get('filter'), FILTERS, 'needs_reply')
   const page = Math.max(1, Number(params.get('page')) || 1)
 
   // Keep the view in the URL so it survives a refresh and can be linked to.
@@ -230,7 +230,7 @@ function CompanyReviews({ query, type, filter, page, onChange }) {
             label="Filter reviews"
             size="sm"
             value={filter}
-            onChange={(value) => onChange({ filter: value === 'all' ? null : value, page: null })}
+            onChange={(value) => onChange({ filter: value, page: null })}
             options={[
               { value: 'all', label: 'All' },
               { value: 'needs_reply', label: <><MessageSquareReply className="h-3.5 w-3.5" aria-hidden />Needs reply</>, count: counts?.needs_reply, highlight: true },

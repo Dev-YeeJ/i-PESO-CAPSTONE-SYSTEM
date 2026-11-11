@@ -186,6 +186,26 @@ class EmployerVerificationJobPostingTest extends TestCase
         ]);
     }
 
+    public function test_verification_queue_excludes_registrations_that_have_not_been_submitted(): void
+    {
+        $incomplete = $this->createEmployer();
+        $submitted = $this->createEmployer();
+        $submitted->update(['registration_submitted_at' => now()]);
+        $admin = $this->createAdmin('queue-summary-admin@example.com');
+
+        Sanctum::actingAs($admin);
+
+        $this->getJson('/api/admin/employers/pending')
+            ->assertOk()
+            ->assertJsonPath('summary.pending', 1)
+            ->assertJsonPath('total', 1)
+            ->assertJsonMissing(['employer_id' => $incomplete->employer_id]);
+
+        $this->getJson('/api/admin/employers/stats')
+            ->assertOk()
+            ->assertJsonPath('pending', 1);
+    }
+
     public function test_admin_approval_unlocks_job_posting(): void
     {
         Notification::fake();
@@ -975,6 +995,31 @@ class EmployerVerificationJobPostingTest extends TestCase
         ]);
     }
 
+    public function test_ojt_document_view_is_recorded_without_satisfying_officer_review(): void
+    {
+        Storage::fake('public');
+        $employer = $this->createEmployer();
+        $document = EmployerDocument::create([
+            'employer_id' => $employer->employer_id,
+            'document_type' => 'mayors_permit',
+            'document_path' => 'employer_documents/mayors-permit.pdf',
+            'original_filename' => 'mayors-permit.pdf',
+            'file_size' => 13,
+            'mime_type' => 'application/pdf',
+            'uploaded_at' => now(),
+        ]);
+        Storage::disk('public')->put($document->document_path, 'mock pdf data');
+        $ojt = $this->createAdmin('ojt-reviewer@example.com');
+        $ojt->forceFill(['position' => 'ojt_intern'])->save();
+
+        Sanctum::actingAs($ojt);
+        $this->get("/api/admin/documents/{$document->document_id}/view")->assertOk();
+
+        $document->refresh();
+        $this->assertNotNull($document->staff_viewed_at);
+        $this->assertNull($document->viewed_at);
+    }
+
     public function test_admin_download_requires_reason_and_creates_audit_log(): void
     {
         Storage::fake('public');
@@ -1201,6 +1246,10 @@ class EmployerVerificationJobPostingTest extends TestCase
             Schema::table('employers', fn (Blueprint $table) => $table->string('company_logo')->nullable());
         }
 
+        if (! Schema::hasColumn('administrators', 'position')) {
+            Schema::table('administrators', fn (Blueprint $table) => $table->string('position')->nullable());
+        }
+
         if (! Schema::hasTable('employer_documents')) {
             Schema::create('employer_documents', function (Blueprint $table) {
                 $table->id('document_id');
@@ -1215,6 +1264,7 @@ class EmployerVerificationJobPostingTest extends TestCase
                 $table->text('admin_notes')->nullable();
                 $table->date('expiration_date')->nullable();
                 $table->timestamp('viewed_at')->nullable();
+                $table->timestamp('staff_viewed_at')->nullable();
                 $table->timestamps();
             });
         }

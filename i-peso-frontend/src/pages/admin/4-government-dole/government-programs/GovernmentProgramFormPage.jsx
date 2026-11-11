@@ -18,6 +18,8 @@ import { LoadingSkeleton } from '@/components/ui'
 import { PROGRAM_CATEGORIES, categoryLabel } from '@/components/government-programs/programConstants'
 import EligibilityRulesBuilder from '@/components/government-programs/EligibilityRulesBuilder'
 import governmentProgramService from '@/services/governmentProgramService'
+import { useAuthStore } from '@/stores/authStore'
+import { canManage } from '@/utils/adminAccess'
 
 const steps = [
   { number: 1, title: 'Program', shortTitle: 'Program', icon: ClipboardList },
@@ -44,6 +46,8 @@ const toStringList = (items = []) => items.map((item) => (typeof item === 'strin
 export default function GovernmentProgramFormPage() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const user = useAuthStore((state) => state.user)
+  const canAct = canManage(user, 'government_dole')
   const [step, setStep] = useState(1)
   const [form, setForm] = useState(BLANK)
   const [attachment, setAttachment] = useState(null)
@@ -165,6 +169,19 @@ export default function GovernmentProgramFormPage() {
   const back = () => setStep((s) => Math.max(s - 1, 1))
 
   if (loading) return <div className="space-y-6"><LoadingSkeleton variant="text" rows={1} className="max-w-xs" /><LoadingSkeleton variant="card" rows={4} /></div>
+
+  if (!canAct) {
+    return (
+      <div className="space-y-6">
+        <PageHeader title={id ? 'Edit Government Program' : 'Post a Government Program'} eyebrow="Government & DOLE" />
+        <div className="rounded-2xl border border-blue-200 bg-blue-50 p-5">
+          <p className="text-sm font-bold text-blue-950">Full access is required to create or edit programs.</p>
+          <p className="mt-1 text-sm text-blue-800">Your role can view Government &amp; DOLE information but cannot change it.</p>
+          <button type="button" className="mt-4 rounded-lg border border-blue-300 bg-white px-3 py-2 text-sm font-bold text-blue-900" onClick={() => navigate('/admin/government-programs')}>Back to programs</button>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">

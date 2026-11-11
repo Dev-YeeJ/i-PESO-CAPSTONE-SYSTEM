@@ -4,10 +4,14 @@ import toast from 'react-hot-toast'
 import { Button, Card, ConfirmDialog, EmptyState, StatCard } from '@/components/ui'
 import PageHeader from '@/pages/admin/_components/PageHeader'
 import { smsService } from '@/services/smsService'
+import { useAuthStore } from '@/stores/authStore'
+import { canManage } from '@/utils/adminAccess'
 
 const initialFilters = { status: '', purpose: '', page: 1, per_page: 15 }
 
 export default function SMSNotificationsPage() {
+  const user = useAuthStore((state) => state.user)
+  const canAct = canManage(user, 'system_reports')
   const [data, setData] = useState(null)
   const [filters, setFilters] = useState(initialFilters)
   const [draftFilters, setDraftFilters] = useState({ status: '', purpose: '' })
@@ -101,7 +105,7 @@ export default function SMSNotificationsPage() {
         eyebrow="System & Reports"
         actions={[
           { label: 'Refresh', icon: RefreshCw, variant: 'outline', onClick: () => load() },
-          { label: 'Clear logs', icon: Trash2, variant: 'danger', onClick: () => setClearConfirmOpen(true) },
+          ...(canAct ? [{ label: 'Clear logs', icon: Trash2, variant: 'danger', onClick: () => setClearConfirmOpen(true) }] : []),
         ]}
       />
 
@@ -177,7 +181,7 @@ export default function SMSNotificationsPage() {
                     </td>
                     <td className="px-4 py-3"><Status status={log.status} /></td>
                     <td className="px-4 py-3">
-                      {log.status === 'failed' ? (
+                      {log.status === 'failed' && canAct ? (
                         <Button
                           size="sm"
                           variant="outline"
@@ -200,16 +204,18 @@ export default function SMSNotificationsPage() {
         </> : <EmptyState filtered title="No SMS records match your filters" description="Try adjusting the status or purpose filters above." />}
       </Card>
 
-      <ConfirmDialog
-        open={clearConfirmOpen}
-        onOpenChange={setClearConfirmOpen}
-        title="Clear all SMS logs?"
-        description={`This permanently deletes all ${num(summary.total)} SMS log record(s), including delivery history and error details. This cannot be undone.`}
-        confirmLabel="Delete all"
-        variant="danger"
-        busy={clearing}
-        onConfirm={clearLogs}
-      />
+      {canAct && (
+        <ConfirmDialog
+          open={clearConfirmOpen}
+          onOpenChange={setClearConfirmOpen}
+          title="Clear all SMS logs?"
+          description={`This permanently deletes all ${num(summary.total)} SMS log record(s), including delivery history and error details. This cannot be undone.`}
+          confirmLabel="Delete all"
+          variant="danger"
+          busy={clearing}
+          onConfirm={clearLogs}
+        />
+      )}
     </div>
   )
 }

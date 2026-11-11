@@ -57,7 +57,9 @@ class AdminDashboardController extends Controller
         $totalSeekers = JobSeeker::count();
         $totalEmployers = Employer::count();
         $activeVacancies = JobVacancy::where('status', 'active')->count();
-        $pendingEmployerVerifications = Employer::where('verification_status', 'pending')->count();
+        $pendingEmployerVerifications = Employer::where('verification_status', 'pending')
+            ->whereNotNull('registration_submitted_at')
+            ->count();
 
         $profileCompletionRate = $totalSeekers > 0
             ? (JobSeeker::where('profile_completed', true)->count() / $totalSeekers) * 100
@@ -164,7 +166,8 @@ class AdminDashboardController extends Controller
 
         if ($pendingEmployerVerifications > 0) {
             $waitingLong = Employer::where('verification_status', 'pending')
-                ->where('created_at', '<=', now()->subDays(7))
+                ->whereNotNull('registration_submitted_at')
+                ->where('registration_submitted_at', '<=', now()->subDays(7))
                 ->count();
 
             $items[] = [

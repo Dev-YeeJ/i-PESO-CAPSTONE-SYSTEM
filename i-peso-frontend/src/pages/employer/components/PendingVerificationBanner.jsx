@@ -89,13 +89,14 @@ function DocumentStatusRow({ doc, accountStatus, onReupload, reuploadingType }) 
           {DOCUMENT_LABELS[doc.document_type] ?? doc.document_type}
         </span>
         <div className="flex items-center gap-2">
-          {doc.verification_status === 'pending' && doc.viewed_at && (
-            <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-bold text-blue-700">
+          {doc.verification_status === 'pending' && (doc.viewed_at || doc.staff_viewed_at) ? (
+            <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 border border-blue-200 px-2 py-0.5 text-xs font-bold text-blue-700">
               <Eye className="h-3 w-3" />
               Viewed
             </span>
+          ) : (
+            <span className={`text-xs font-bold ${config.color}`}>{config.label}</span>
           )}
-          <span className={`text-xs font-bold ${config.color}`}>{config.label}</span>
           {canReupload && (
             <>
               <input

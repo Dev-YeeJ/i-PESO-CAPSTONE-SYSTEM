@@ -272,7 +272,7 @@ export default function DashboardPage() {
                 <p className="hidden text-xs text-slate-500 sm:block">DOLE programs & SPES</p>
               </div>
             </Link>
-            <Link to="/admin/analytics" className="flex items-center gap-3 rounded-xl border border-slate-200 p-4 transition-colors hover:border-brand-navy hover:bg-blue-50/50">
+            <Link to="/admin/labor-analytics" className="flex items-center gap-3 rounded-xl border border-slate-200 p-4 transition-colors hover:border-brand-navy hover:bg-blue-50/50">
               <div className="rounded-lg bg-violet-100 p-2 text-violet-600"><PieChart className="h-5 w-5" /></div>
               <div className="text-left">
                 <p className="text-sm font-bold text-slate-900">Labor Analytics</p>

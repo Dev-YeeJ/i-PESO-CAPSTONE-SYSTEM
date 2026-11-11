@@ -8,10 +8,14 @@ import { Button, Card } from '@/components/ui'
 import { ConfirmModal, PageHeader, StatusBadge } from '@/pages/admin/_components'
 import DataTable from '@/pages/admin/_components/DataTable'
 import governmentProgramService from '@/services/governmentProgramService'
+import { useAuthStore } from '@/stores/authStore'
+import { canManage } from '@/utils/adminAccess'
 
 export default function ProgramsListPage() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const user = useAuthStore((s) => s.user)
+  const canAct = canManage(user, 'government_dole')
   const [pendingDelete, setPendingDelete] = useState(null)
 
   const programsQuery = useQuery({
@@ -45,7 +49,7 @@ export default function ProgramsListPage() {
         title="Government Programs"
         subtitle="Manage SPES, TUPAD, and other government initiatives."
         eyebrow="Government & DOLE"
-        actions={[{ label: 'Create Program', onClick: () => navigate('/admin/government-programs/create'), variant: 'primary' }]}
+        actions={canAct ? [{ label: 'Create Program', onClick: () => navigate('/admin/government-programs/create'), variant: 'primary' }] : []}
       />
 
       <Card padding="none" className="mt-6">
@@ -62,7 +66,7 @@ export default function ProgramsListPage() {
             { key: 'slot_limit', label: 'Slots' },
             { key: 'schedule', label: 'Schedule', render: (d) => (d ? new Date(d).toLocaleDateString() : '—') },
             { key: 'status', label: 'Status', render: (s) => <StatusBadge status={s} /> },
-            {
+            ...(canAct ? [{
               key: 'actions',
               label: 'Actions',
               render: (_value, row) => (
@@ -85,7 +89,7 @@ export default function ProgramsListPage() {
                   </Button>
                 </div>
               ),
-            },
+            }] : []),
           ]}
           data={programs}
           loading={loading}
