@@ -42,6 +42,7 @@ export default function Step3DocumentUpload({ companyType, onCompanyTypeSet, onC
   const [requiredDocuments, setRequiredDocuments] = useState([])
   const [optionalDocuments, setOptionalDocuments] = useState([])
   const [uploadedDocuments, setUploadedDocuments] = useState([])
+  const [documentsMeta, setDocumentsMeta] = useState({})
   const [uploading, setUploading] = useState({})
   const [error, setError] = useState(null)
   const [initialLoading, setInitialLoading] = useState(Boolean(companyType))
@@ -64,6 +65,9 @@ export default function Step3DocumentUpload({ companyType, onCompanyTypeSet, onC
         setRequiredDocuments(response.required_documents || [])
         setOptionalDocuments(response.optional_documents || [])
         setUploadedDocuments(response.uploaded_documents || [])
+        if (response.documents_meta) {
+          setDocumentsMeta(response.documents_meta)
+        }
       } catch (err) {
         setError(err.message)
       } finally {
@@ -87,6 +91,9 @@ export default function Step3DocumentUpload({ companyType, onCompanyTypeSet, onC
       setRequiredDocuments(response.required_documents || [])
       setOptionalDocuments(response.optional_documents || [])
       setUploadedDocuments(response.uploaded_documents || [])
+      if (response.documents_meta) {
+        setDocumentsMeta(response.documents_meta)
+      }
       setInitialLoading(false)
       onCompanyTypeSet?.(value)
     } catch (err) {
@@ -100,16 +107,45 @@ export default function Step3DocumentUpload({ companyType, onCompanyTypeSet, onC
   const handleDocumentUpload = async (documentType, file, expirationDate = null) => {
     setUploading((prev) => ({ ...prev, [documentType]: true }))
     try {
-      await employerService.uploadDocument(documentType, file, expirationDate)
+      const response = await employerService.uploadDocument(documentType, file, expirationDate)
       setUploadedDocuments((prev) => {
         if (!prev.includes(documentType)) {
           return [...prev, documentType]
         }
         return prev
       })
+      setDocumentsMeta((prev) => ({
+        ...prev,
+        [documentType]: {
+          original_filename: response?.original_filename || file.name,
+          expiration_date: expirationDate || response?.expiration_date,
+        },
+      }))
       setError(null)
     } catch (err) {
       setError(uploadErrorMessage(err))
+    } finally {
+      setUploading((prev) => ({ ...prev, [documentType]: false }))
+    }
+  }
+
+  const handleDocumentDelete = async (documentType) => {
+    setUploading((prev) => ({ ...prev, [documentType]: true }))
+    try {
+      try {
+        await employerService.deleteDocument(documentType)
+      } catch (backendErr) {
+        console.warn('Backend delete document failed, clearing locally:', backendErr)
+      }
+      setUploadedDocuments((prev) => prev.filter((doc) => doc !== documentType))
+      setDocumentsMeta((prev) => {
+        const copy = { ...prev }
+        delete copy[documentType]
+        return copy
+      })
+      setError(null)
+    } catch (err) {
+      setError(err.message || 'Unable to remove document.')
     } finally {
       setUploading((prev) => ({ ...prev, [documentType]: false }))
     }
@@ -177,15 +213,25 @@ export default function Step3DocumentUpload({ companyType, onCompanyTypeSet, onC
           />
 
           <div className="space-y-3">
-            <h3 className="font-semibold text-slate-900 text-sm">Upload Required Documents</h3>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 border-b border-slate-200 pb-2">
+              <div>
+                <h3 className="font-bold text-slate-900 text-base">Upload Required Documents</h3>
+                <p className="text-xs text-slate-500">Please provide clear copies of all required documents for account verification.</p>
+              </div>
+              <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-200 w-fit">
+                {requiredUploadedCount} of {requiredDocuments.length} Uploaded
+              </span>
+            </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
               {requiredDocuments.map((docType) => (
                 <DocumentUploadZone
                   key={docType}
                   documentType={docType}
                   isUploaded={uploadedDocuments.includes(docType)}
+                  fileMeta={documentsMeta[docType]}
                   onUpload={(file, expirationDate) => handleDocumentUpload(docType, file, expirationDate)}
+                  onUndo={() => handleDocumentDelete(docType)}
                   loading={uploading[docType] || false}
                 />
               ))}
@@ -193,20 +239,22 @@ export default function Step3DocumentUpload({ companyType, onCompanyTypeSet, onC
           </div>
 
           {optionalDocuments.length > 0 && (
-            <div className="space-y-3">
-              <div>
-                <h3 className="font-semibold text-slate-900 text-sm">Optional / Local PESO Documents</h3>
+            <div className="space-y-3 pt-2">
+              <div className="border-b border-slate-200 pb-2">
+                <h3 className="font-bold text-slate-900 text-base">Optional / Local PESO Documents</h3>
                 <p className="mt-0.5 text-xs text-slate-500">
                   Upload these when requested by the local PESO or when already available.
                 </p>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
                 {optionalDocuments.map((docType) => (
                   <DocumentUploadZone
                     key={docType}
                     documentType={docType}
                     isUploaded={uploadedDocuments.includes(docType)}
+                    fileMeta={documentsMeta[docType]}
                     onUpload={(file, expirationDate) => handleDocumentUpload(docType, file, expirationDate)}
+                    onUndo={() => handleDocumentDelete(docType)}
                     loading={uploading[docType] || false}
                     optional
                   />

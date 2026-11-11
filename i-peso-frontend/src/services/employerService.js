@@ -20,6 +20,11 @@ export const uploadDocument = async (documentType, file, expirationDate = null) 
   return response.data
 }
 
+export const deleteDocument = async (documentType) => {
+  const response = await apiClient.delete(`/employer/register/document/${documentType}`)
+  return response.data
+}
+
 export const getRequiredDocuments = async () => {
   const response = await apiClient.get('/employer/required-documents')
   return response.data

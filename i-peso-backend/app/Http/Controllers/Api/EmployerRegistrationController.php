@@ -235,9 +235,48 @@ class EmployerRegistrationController extends Controller
                 'message' => 'Document uploaded successfully.',
                 'document_id' => $document->document_id,
                 'document_type' => $document->document_type,
+                'original_filename' => $document->original_filename,
+                'expiration_date' => $document->expiration_date,
             ], 201);
         } catch (\Exception $e) {
             return response()->json(['error' => $this->safeErrorMessage($e, 'Unable to upload this document. Please try again.')], 500);
+        }
+    }
+
+    /**
+     * Delete / undo an uploaded document
+     * DELETE /api/employer/register/document/{documentType}
+     */
+    public function deleteDocument(Request $request, string $documentType): JsonResponse
+    {
+        try {
+            $employer = $this->authenticatedEmployer($request);
+            $document = $employer->documents()->where('document_type', $documentType)->first();
+            if ($document) {
+                $this->deleteStoredDocument($document->document_path);
+                $document->delete();
+            }
+
+            $required = $employer->getRequiredDocuments();
+            $optional = $employer->getOptionalDocuments();
+            $uploaded = $employer->documents()
+                ->pluck('document_type')
+                ->toArray();
+            $documentsMeta = $employer->documents()
+                ->get(['document_type', 'original_filename', 'expiration_date'])
+                ->keyBy('document_type');
+
+            return response()->json([
+                'message' => 'Document removed successfully.',
+                'required_documents' => $required,
+                'optional_documents' => $optional,
+                'uploaded_documents' => $uploaded,
+                'documents_meta' => $documentsMeta,
+                'missing_documents' => array_diff($required, $uploaded),
+                'all_uploaded' => $employer->hasAllRequiredDocuments(),
+            ], 200);
+        } catch (\Exception $e) {
+            return response()->json(['error' => $this->safeErrorMessage($e, 'Unable to remove document.')], 500);
         }
     }
 
@@ -254,11 +293,15 @@ class EmployerRegistrationController extends Controller
             $uploaded = $employer->documents()
                 ->pluck('document_type')
                 ->toArray();
+            $documentsMeta = $employer->documents()
+                ->get(['document_type', 'original_filename', 'expiration_date'])
+                ->keyBy('document_type');
 
             return response()->json([
                 'required_documents' => $required,
                 'optional_documents' => $optional,
                 'uploaded_documents' => $uploaded,
+                'documents_meta' => $documentsMeta,
                 'missing_documents' => array_diff($required, $uploaded),
                 'all_uploaded' => $employer->hasAllRequiredDocuments(),
             ], 200);
