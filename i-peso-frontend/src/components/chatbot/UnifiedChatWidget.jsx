@@ -119,6 +119,8 @@ export default function UnifiedChatWidget() {
   const [busy, setBusy] = useState(false)
   const [greetingVisible, setGreetingVisible] = useState(false)
   const [listening, setListening] = useState(false)
+  const [voiceProcessing, setVoiceProcessing] = useState(false)
+  const [voiceDraft, setVoiceDraft] = useState(false)
   const [speakingMessage, setSpeakingMessage] = useState(null)
   const [speechLanguage, setSpeechLanguage] = useState('fil-PH')
   const [voiceError, setVoiceError] = useState('')
@@ -129,6 +131,9 @@ export default function UnifiedChatWidget() {
   const logEndRef = useRef(null)
   const aceRef = useRef(null)
   const recognitionRef = useRef(null)
+  const recognitionInputRef = useRef('')
+  const recognitionTranscriptRef = useRef('')
+  const recognitionErrorRef = useRef(false)
   const utteranceRef = useRef(null)
 
   const SpeechRecognition = typeof window !== 'undefined'
@@ -182,7 +187,7 @@ export default function UnifiedChatWidget() {
 
   useEffect(() => {
     logEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
-  }, [messages, busy])
+  }, [messages, busy, voiceDraft])
 
   useEffect(() => () => {
     recognitionRef.current?.abort()
@@ -205,9 +210,14 @@ export default function UnifiedChatWidget() {
     recognitionRef.current?.abort()
     stopSpeaking()
     setVoiceError('')
+    setVoiceDraft(false)
+    setVoiceProcessing(false)
 
     const recognition = new SpeechRecognition()
     const initialInput = input.trim()
+    recognitionInputRef.current = initialInput
+    recognitionTranscriptRef.current = ''
+    recognitionErrorRef.current = false
     recognition.lang = speechLanguage
     recognition.continuous = false
     recognition.interimResults = true
@@ -220,13 +230,18 @@ export default function UnifiedChatWidget() {
         .map((result) => result[0].transcript)
         .join(' ')
         .trim()
+      recognitionTranscriptRef.current = transcript
+      setVoiceProcessing(true)
+      setVoiceError('')
       setInput([initialInput, transcript].filter(Boolean).join(' ').slice(0, 500))
     }
     recognition.onerror = (event) => {
       if (recognitionRef.current !== recognition || event.error === 'aborted') return
+      recognitionErrorRef.current = true
+      setVoiceProcessing(false)
       const errors = {
         'not-allowed': 'Microphone access was denied. Allow microphone access in your browser settings, or type your question.',
-        'no-speech': 'No speech was detected. Please try again or type your question.',
+        'no-speech': 'I couldn’t understand that. Please try speaking again, or type your message instead.',
         'audio-capture': 'No microphone was found. Connect a microphone or type your question.',
         network: 'Speech recognition is unavailable right now. Please try again or type your question.',
       }
@@ -236,6 +251,17 @@ export default function UnifiedChatWidget() {
       if (recognitionRef.current !== recognition) return
       recognitionRef.current = null
       setListening(false)
+      setVoiceProcessing(false)
+      const transcript = recognitionTranscriptRef.current
+      if (!recognitionErrorRef.current) {
+        if (transcript) {
+          setInput([recognitionInputRef.current, transcript].filter(Boolean).join(' ').slice(0, 500))
+          setVoiceDraft(true)
+          setVoiceError('')
+        } else {
+          setVoiceError('I couldn’t understand that. Please try speaking again, or type your message instead.')
+        }
+      }
       inputRef.current?.focus()
     }
 
@@ -245,6 +271,8 @@ export default function UnifiedChatWidget() {
     } catch {
       recognitionRef.current = null
       setListening(false)
+      setVoiceProcessing(false)
+      recognitionErrorRef.current = true
       setVoiceError('Could not start voice input. Please try again or type your question.')
     }
   }
@@ -279,11 +307,13 @@ export default function UnifiedChatWidget() {
 
   const send = async (text) => {
     const question = text.trim()
-    if (!question || busy) return
+    if (!question || busy || listening || voiceProcessing) return
 
     recognitionRef.current?.abort()
     recognitionRef.current = null
     setListening(false)
+    setVoiceProcessing(false)
+    setVoiceDraft(false)
     stopSpeaking()
     setVoiceError('')
 
@@ -313,6 +343,21 @@ export default function UnifiedChatWidget() {
 
   const greetingText = greetingFor(user)
   const starters = startersFor(user)
+  const voiceStatus = voiceError || (
+    voiceProcessing
+      ? 'Processing your speech…'
+      : listening
+        ? 'Listening… Speak now, then review your transcript before sending.'
+        : busy
+          ? 'ACE is processing your message…'
+          : speakingMessage
+            ? 'ACE is speaking. Select Stop to interrupt.'
+            : voiceDraft
+              ? 'Review the voice draft above. Edit it if needed, then select Send.'
+              : (!SpeechRecognition || !speechSynthesisAvailable)
+                ? 'Some voice features are not supported by this browser. You can still chat by typing.'
+                : ''
+  )
 
   return (
     <div className="ipeso-chat">
@@ -424,6 +469,15 @@ export default function UnifiedChatWidget() {
               )
             })}
 
+            {voiceDraft && input.trim() && (
+              <div className="ipeso-chat-msg is-user">
+                <div className="ipeso-chat-response">
+                  <p className="ipeso-chat-draft-label">Voice message draft · Not sent</p>
+                  <p className="ipeso-chat-bubble is-user">{input}</p>
+                </div>
+              </div>
+            )}
+
             {busy && (
               <div className="ipeso-chat-msg is-ace">
                 <AceAvatarMark className="ipeso-chat-msg-avatar" />
@@ -458,20 +512,23 @@ export default function UnifiedChatWidget() {
                 onChange={(event) => setSpeechLanguage(event.target.value)}
                 disabled={busy || listening}
               >
-                <option value="fil-PH">Filipino</option>
+                <option value="fil-PH">Filipino / Taglish</option>
                 <option value="en-US">English</option>
               </select>
             </div>
             <input
               ref={inputRef}
               value={input}
-              onChange={(event) => setInput(event.target.value)}
+              onChange={(event) => {
+                setInput(event.target.value)
+                setVoiceError('')
+              }}
               onFocus={handleInputFocus}
               onBlur={handleInputBlur}
               maxLength={500}
               placeholder="Magtanong kay ACE…"
               aria-label="Your question"
-              disabled={busy}
+              disabled={busy || listening || voiceProcessing}
             />
             <button
               type="button"
@@ -487,21 +544,17 @@ export default function UnifiedChatWidget() {
             >
               <Mic size={16} aria-hidden="true" />
             </button>
-            <button type="submit" disabled={busy || !input.trim()} aria-label="Send message">
+            <button type="submit" disabled={busy || listening || voiceProcessing || !input.trim()} aria-label="Send message">
               <Send size={16} aria-hidden="true" />
             </button>
           </form>
 
           <p className="ipeso-chat-voice-status" role="status" aria-live="polite">
-            {voiceError || (listening
-              ? 'Listening… Speak now, then review your transcript before sending.'
-              : (!SpeechRecognition || !speechSynthesisAvailable)
-                ? 'Some voice features are not supported by this browser. You can still chat by typing.'
-                : '')}
+            {voiceStatus}
           </p>
           {SpeechRecognition && (
             <p className="ipeso-chat-voice-disclosure">
-              Voice recognition uses your browser’s speech service; audio may be processed by that provider.
+              Filipino / Taglish recognition depends on browser support. Your browser’s speech service may process audio.
             </p>
           )}
 

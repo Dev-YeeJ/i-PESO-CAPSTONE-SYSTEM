@@ -283,6 +283,13 @@
   align-items: flex-end;
 }
 
+.ipeso-chat-draft-label {
+  margin: 0;
+  color: var(--ace-text-2);
+  font-size: 0.62rem;
+  text-align: right;
+}
+
 .ipeso-chat-voice-action {
   display: inline-flex;
   align-items: center;
