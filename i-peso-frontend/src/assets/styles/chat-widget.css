@@ -484,34 +484,12 @@
 
 .ipeso-chat-form {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
   gap: 0.45rem;
   border-top: 1px solid var(--ace-border);
   padding: 0.65rem 0.75rem;
   background: var(--ace-surface);
 }
-
-.ipeso-chat-voice-tools {
-  display: flex;
-  flex: 0 0 100%;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 0.4rem;
-  color: var(--ace-text-2);
-  font-size: 0.68rem;
-}
-
-.ipeso-chat-voice-tools select {
-  border: 1px solid var(--ace-surface-3);
-  border-radius: 0.5rem;
-  padding: 0.2rem 0.4rem;
-  color: var(--ace-text);
-  background: var(--ace-surface);
-  font: inherit;
-}
-
-.ipeso-chat-voice-tools select:focus-visible { outline: 2px solid var(--ace-blue); outline-offset: 1px; }
 
 .ipeso-chat-form input {
   flex: 1;

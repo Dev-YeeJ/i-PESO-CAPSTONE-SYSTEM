@@ -56,6 +56,10 @@ describe('UnifiedChatWidget voice controls', () => {
         }
       },
     })
+    Object.defineProperty(window, 'isSecureContext', {
+      configurable: true,
+      value: true,
+    })
   })
 
   it('puts a recognized transcript in the composer without sending it', () => {
@@ -67,6 +71,7 @@ describe('UnifiedChatWidget voice controls', () => {
     })
     render(<UnifiedChatWidget />)
     fireEvent.click(screen.getByRole('button', { name: 'Ask ACE' }))
+    expect(screen.queryByLabelText('Speech language')).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Start voice input' }))
 
     const [recognition] = MockSpeechRecognition.instances
@@ -89,6 +94,20 @@ describe('UnifiedChatWidget voice controls', () => {
     })
     fireEvent.click(screen.getByRole('button', { name: 'Send message' }))
     return waitFor(() => expect(askPublic).toHaveBeenCalledWith('Find me a job in Urdaneta', []))
+  })
+
+  it('keeps the microphone actionable and explains when recognition is unsupported', () => {
+    Object.defineProperty(window, 'SpeechRecognition', {
+      configurable: true,
+      value: undefined,
+    })
+    render(<UnifiedChatWidget />)
+    fireEvent.click(screen.getByRole('button', { name: 'Ask ACE' }))
+    const microphone = screen.getByRole('button', { name: 'Start voice input' })
+    expect(microphone).toBeEnabled()
+    fireEvent.click(microphone)
+
+    expect(screen.getByRole('status')).toHaveTextContent('not supported by this browser')
   })
 
   it('asks the user to type or try again when microphone permission is denied', () => {
@@ -122,7 +141,7 @@ describe('UnifiedChatWidget voice controls', () => {
 
     const utterance = window.speechSynthesis.speak.mock.calls[0][0]
     expect(utterance.text).toBe('Your application is being reviewed.')
-    expect(utterance.lang).toBe('fil-PH')
+    expect(utterance.lang).toBe(navigator.languages?.[0] || navigator.language || 'fil-PH')
     fireEvent.click(screen.getByRole('button', { name: 'Stop speaking reply' }))
     expect(window.speechSynthesis.cancel).toHaveBeenCalled()
   })

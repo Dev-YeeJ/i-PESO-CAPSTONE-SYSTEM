@@ -122,7 +122,6 @@ export default function UnifiedChatWidget() {
   const [voiceProcessing, setVoiceProcessing] = useState(false)
   const [voiceDraft, setVoiceDraft] = useState(false)
   const [speakingMessage, setSpeakingMessage] = useState(null)
-  const [speechLanguage, setSpeechLanguage] = useState('fil-PH')
   const [voiceError, setVoiceError] = useState('')
   const user = useAuthStore((state) => state.user)
 
@@ -139,6 +138,9 @@ export default function UnifiedChatWidget() {
   const SpeechRecognition = typeof window !== 'undefined'
     ? window.SpeechRecognition || window.webkitSpeechRecognition
     : null
+  const speechLanguage = typeof navigator !== 'undefined'
+    ? navigator.languages?.[0] || navigator.language || 'fil-PH'
+    : 'fil-PH'
   const speechSynthesisAvailable = typeof window !== 'undefined'
     && Boolean(window.speechSynthesis)
     && Boolean(window.SpeechSynthesisUtterance)
@@ -203,7 +205,12 @@ export default function UnifiedChatWidget() {
 
   const startListening = () => {
     if (!SpeechRecognition) {
-      setVoiceError('Voice input is not supported by this browser. You can type your question instead.')
+      setVoiceError('Voice input is not supported by this browser. Try a supported browser or type your question.')
+      return
+    }
+
+    if (window.isSecureContext === false) {
+      setVoiceError('Microphone access requires a secure connection (HTTPS or localhost).')
       return
     }
 
@@ -241,9 +248,11 @@ export default function UnifiedChatWidget() {
       setVoiceProcessing(false)
       const errors = {
         'not-allowed': 'Microphone access was denied. Allow microphone access in your browser settings, or type your question.',
+        'service-not-allowed': 'The browser speech service is blocked. Check browser permissions or type your question.',
         'no-speech': 'I couldn’t understand that. Please try speaking again, or type your message instead.',
         'audio-capture': 'No microphone was found. Connect a microphone or type your question.',
         network: 'Speech recognition is unavailable right now. Please try again or type your question.',
+        'language-not-supported': 'Your browser does not support its preferred speech language. Try changing your browser language or type your question.',
       }
       setVoiceError(errors[event.error] || 'Voice input failed. Please try again or type your question.')
     }
@@ -268,12 +277,17 @@ export default function UnifiedChatWidget() {
     recognitionRef.current = recognition
     try {
       recognition.start()
-    } catch {
+      setListening(true)
+    } catch (error) {
       recognitionRef.current = null
       setListening(false)
       setVoiceProcessing(false)
       recognitionErrorRef.current = true
-      setVoiceError('Could not start voice input. Please try again or type your question.')
+      setVoiceError(error?.name === 'NotAllowedError'
+        ? 'Microphone access was denied. Allow it in your browser settings, or type your question.'
+        : error?.name === 'InvalidStateError'
+          ? 'The microphone is already active. Stop it before trying again.'
+          : 'Could not start voice input. Check microphone permissions and try again, or type your question.')
     }
   }
 
@@ -504,18 +518,6 @@ export default function UnifiedChatWidget() {
 
           {/* ── Composer ── */}
           <form onSubmit={onSubmit} className="ipeso-chat-form">
-            <div className="ipeso-chat-voice-tools">
-              <label htmlFor="ipeso-chat-speech-language">Speech language</label>
-              <select
-                id="ipeso-chat-speech-language"
-                value={speechLanguage}
-                onChange={(event) => setSpeechLanguage(event.target.value)}
-                disabled={busy || listening}
-              >
-                <option value="fil-PH">Filipino / Taglish</option>
-                <option value="en-US">English</option>
-              </select>
-            </div>
             <input
               ref={inputRef}
               value={input}
@@ -536,7 +538,7 @@ export default function UnifiedChatWidget() {
                 if (listening) recognitionRef.current?.stop()
                 else startListening()
               }}
-              disabled={busy || (!SpeechRecognition && !listening)}
+              disabled={busy}
               aria-label={listening ? 'Stop voice input' : 'Start voice input'}
               aria-pressed={listening}
               title={SpeechRecognition ? undefined : 'Voice input is not supported by this browser'}
@@ -554,7 +556,7 @@ export default function UnifiedChatWidget() {
           </p>
           {SpeechRecognition && (
             <p className="ipeso-chat-voice-disclosure">
-              Filipino / Taglish recognition depends on browser support. Your browser’s speech service may process audio.
+              Voice uses your browser’s preferred language. English and Filipino / Taglish support varies; audio may be processed by its speech service.
             </p>
           )}
 
