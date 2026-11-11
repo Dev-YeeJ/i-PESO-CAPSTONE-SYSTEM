@@ -102,7 +102,7 @@ export default function ProgramDetailsPage() {
             <h2 className="text-xl font-black tracking-tight text-slate-900">Program Details</h2>
             <dl className="mt-6 space-y-5">
               <Detail icon={Clock3} label="Deadline" value={formatDate(program.application_deadline)} />
-              <Detail icon={MapPin} label="Venue" value={program.venue || 'To be announced'} />
+              <Detail icon={MapPin} label="Venue" value={program.location_address || program.venue || 'PESO Office, Urdaneta City Hall'} />
               <Detail icon={UsersRound} label="Slots" value={program.total_slots === 0 ? 'Open capacity' : `${program.available_slots} of ${program.total_slots} available`} />
               <Detail icon={Phone} label="Contact" value="PESO Programs Desk" />
             </dl>
@@ -154,7 +154,7 @@ function Detail({ icon: Icon, label, value }) {
   return (
     <div className="flex gap-4">
       <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-50 text-slate-500 border border-slate-100">
-        <Icon className="h-5 w-5" />
+        {createElement(Icon, { className: 'h-5 w-5' })}
       </div>
       <div>
         <dt className="text-xs font-bold uppercase tracking-wider text-slate-500">{label}</dt>
@@ -166,10 +166,9 @@ function Detail({ icon: Icon, label, value }) {
 
 function StepperSteps({ program }) {
   const steps = [
-    "Review your eligibility match on this page.",
-    "Prepare any requirements listed above.",
-    `Proceed to the PESO Office at ${program.venue || 'the City Hall'}.`,
-    "Submit your requirements and undergo a brief assessment."
+    'Review the eligibility requirements and your profile-based estimate on this page.',
+    `Confirm current availability, schedule, and required documents with PESO at ${program.location_address || program.venue || 'the PESO Office, Urdaneta City Hall'} before visiting.`,
+    `Submit your application in person at the listed location${program.application_deadline ? ` by ${formatDate(program.application_deadline)}` : ''}. PESO will verify your eligibility.`,
   ];
 
   return steps.map((step, index) => (

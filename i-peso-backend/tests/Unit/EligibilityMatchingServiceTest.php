@@ -70,12 +70,45 @@ class EligibilityMatchingServiceTest extends TestCase
             'employment_status' => 'unemployed',
             'educ_attainment' => 'High School Graduate',
             'is_4ps_beneficiary' => false,
+            'profile_completed' => true,
         ]);
 
         $result = $this->svc->evaluate($seeker, $this->spesProgram());
 
         $this->assertSame('partially_eligible', $result['status']);
         $this->assertSame(83, $result['score']);
+    }
+
+    public function test_missing_profile_data_is_unknown_not_a_failed_eligibility_rule(): void
+    {
+        $program = new GovernmentProgram(['eligibility_rules' => [
+            ['field' => 'age', 'op' => 'between', 'min' => 15, 'max' => 30, 'label' => 'Age 15-30', 'weight' => 2, 'required' => true],
+            ['field' => 'employment_status', 'op' => 'in', 'values' => ['unemployed'], 'label' => 'Unemployed', 'weight' => 1],
+        ]]);
+        $seeker = new JobSeeker(['employment_status' => 'unemployed']);
+
+        $result = $this->svc->evaluate($seeker, $program);
+
+        $this->assertSame('profile_incomplete', $result['status']);
+        $this->assertSame('Update your profile to check eligibility', $result['label']);
+        $this->assertSame(100, $result['score']);
+        $this->assertSame(50, $result['coverage']);
+        $this->assertFalse($result['breakdown'][0]['known']);
+        $this->assertFalse($result['breakdown'][0]['met']);
+    }
+
+    public function test_no_known_criteria_does_not_show_a_zero_or_full_match_score(): void
+    {
+        $program = new GovernmentProgram(['eligibility_rules' => [
+            ['field' => 'age', 'op' => 'between', 'min' => 15, 'max' => 30, 'label' => 'Age 15-30', 'weight' => 1, 'required' => true],
+        ]]);
+        $seeker = new JobSeeker();
+
+        $result = $this->svc->evaluate($seeker, $program);
+
+        $this->assertSame('profile_incomplete', $result['status']);
+        $this->assertNull($result['score']);
+        $this->assertSame(0, $result['coverage']);
     }
 
     public function test_education_min_level_uses_human_readable_ranking(): void
@@ -93,6 +126,16 @@ class EligibilityMatchingServiceTest extends TestCase
         $this->assertSame('highly_eligible', $this->svc->evaluate($masters, $program)['status']);
     }
 
+    public function test_civil_status_rules_match_profile_values_case_insensitively(): void
+    {
+        $program = new GovernmentProgram(['eligibility_rules' => [
+            ['field' => 'civil_status', 'op' => 'in', 'values' => ['single'], 'label' => 'Single', 'weight' => 1],
+        ]]);
+        $seeker = new JobSeeker(['civil_status' => 'Single']);
+
+        $this->assertSame('highly_eligible', $this->svc->evaluate($seeker, $program)['status']);
+    }
+
     public function test_ofw_rule_matches_former_ofw_too(): void
     {
         $program = new GovernmentProgram(['eligibility_rules' => [
@@ -100,7 +143,7 @@ class EligibilityMatchingServiceTest extends TestCase
         ]]);
 
         $formerOfw = new JobSeeker(['is_ofw' => false, 'is_former_ofw' => true]);
-        $notOfw = new JobSeeker(['is_ofw' => false, 'is_former_ofw' => false]);
+        $notOfw = new JobSeeker(['is_ofw' => false, 'is_former_ofw' => false, 'profile_completed' => true]);
 
         $this->assertSame('highly_eligible', $this->svc->evaluate($formerOfw, $program)['status']);
         $this->assertSame('not_eligible', $this->svc->evaluate($notOfw, $program)['status']);

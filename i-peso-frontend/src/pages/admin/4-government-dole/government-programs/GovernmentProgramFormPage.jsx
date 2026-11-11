@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import {
@@ -27,7 +27,7 @@ const steps = [
 
 const BLANK = {
   program_name: '', category: 'other', description: '',
-  application_deadline: '', total_slots: 0,
+  application_deadline: '', total_slots: 0, location_address: '',
   visibility: 'public',
   eligibility_requirements: [], eligibility_rules: [],
 }
@@ -48,7 +48,6 @@ export default function GovernmentProgramFormPage() {
   const [form, setForm] = useState(BLANK)
   const [attachment, setAttachment] = useState(null)
   const [presets, setPresets] = useState({})
-  const [appliedPreset, setAppliedPreset] = useState(null)
   const [loading, setLoading] = useState(!!id)
   const [submitting, setSubmitting] = useState(false)
 
@@ -72,6 +71,7 @@ export default function GovernmentProgramFormPage() {
           ...program,
           program_name: program.program_name ?? program.title ?? '',
           total_slots: program.total_slots ?? 0,
+          visibility: 'public',
           eligibility_requirements: toStringList(program.eligibility_requirements),
           eligibility_rules: Array.isArray(program.eligibility_rules) ? program.eligibility_rules : [],
         })
@@ -95,7 +95,6 @@ export default function GovernmentProgramFormPage() {
     set('category', category)
 
     if (id || !preset) {
-      setAppliedPreset(null)
       return
     }
 
@@ -106,18 +105,39 @@ export default function GovernmentProgramFormPage() {
       }
       return next
     })
-    setAppliedPreset(category)
   }, [presets, id, set])
 
-  const presetCount = useMemo(() => {
-    const preset = presets[form.category]
-    if (!preset) return 0
-    return (preset.eligibility_requirements?.length ?? 0)
-      + (preset.eligibility_rules?.length ?? 0)
-  }, [presets, form.category])
+  const validate = useCallback((target) => {
+    if (target >= 1 && !form.program_name.trim()) {
+      toast.error('Program name is required.')
+      setStep(1)
+      return false
+    }
+    if (target >= 2 && !form.description.trim()) {
+      toast.error('A full description is required.')
+      setStep(1)
+      return false
+    }
+    if (target >= 2 && form.application_deadline && form.application_deadline < localDateString()) {
+      toast.error('Application deadline cannot be in the past.')
+      setStep(2)
+      return false
+    }
+    if (target >= 3) {
+      const eligibilityError = validateEligibilityRules(form.eligibility_rules ?? [])
+      if (eligibilityError) {
+        toast.error(eligibilityError)
+        setStep(3)
+        return false
+      }
+    }
+    return true
+  }, [form.program_name, form.description, form.application_deadline, form.eligibility_rules])
 
   const handleSubmit = useCallback(async (e) => {
     e.preventDefault()
+    if (!validate(3)) return
+
     setSubmitting(true)
     try {
       const rules = (form.eligibility_rules ?? [])
@@ -145,21 +165,7 @@ export default function GovernmentProgramFormPage() {
     } finally {
       setSubmitting(false)
     }
-  }, [id, form, attachment, navigate])
-
-  const validate = (target) => {
-    if (target >= 1 && !form.program_name.trim()) {
-      toast.error('Program name is required.')
-      setStep(1)
-      return false
-    }
-    if (target >= 2 && !form.description.trim()) {
-      toast.error('A full description is required.')
-      setStep(1)
-      return false
-    }
-    return true
-  }
+  }, [id, form, attachment, navigate, validate])
 
   const next = () => { if (validate(step + 1)) setStep((s) => Math.min(s + 1, steps.length)) }
   const back = () => setStep((s) => Math.max(s - 1, 1))
@@ -179,9 +185,9 @@ export default function GovernmentProgramFormPage() {
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <p className="text-sm font-bold text-blue-900">Step {step} of {steps.length}: {currentStep.title}</p>
-                <p className="mt-1 text-xs leading-5 text-slate-500">Government Programs are announcements — job seekers read the posting and apply in person at PESO.</p>
+                <p className="mt-1 text-xs leading-5 text-slate-500">All posted programs are public announcements. Job seekers review eligibility and apply in person at PESO.</p>
               </div>
-              <div className="grid grid-cols-4 gap-2">
+              <div className="grid grid-cols-3 gap-2">
                 {steps.map((s) => (
                   <button
                     key={s.number}
@@ -216,15 +222,6 @@ export default function GovernmentProgramFormPage() {
                   </select>
                 </Field>
 
-                {appliedPreset && presetCount > 0 && (
-                  <div className="flex items-start gap-2 rounded-xl border border-blue-100 bg-blue-50 p-3 text-xs leading-5 text-blue-900">
-                    <Sparkles className="mt-0.5 h-4 w-4 shrink-0" />
-                    <p>
-                      <span className="font-bold">{presetCount} standard {categoryLabel(appliedPreset)} details filled in</span> — eligibility rules,
-                      documents, requirements and the PESO steps. Review them on the last step; everything stays editable.
-                    </p>
-                  </div>
-                )}
                 {id && (
                   <div className="flex items-start gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs leading-5 text-slate-600">
                     <Info className="mt-0.5 h-4 w-4 shrink-0" />
@@ -243,26 +240,24 @@ export default function GovernmentProgramFormPage() {
 
             {step === 2 && (
               <div className="space-y-4">
-                <div className="grid gap-4 sm:grid-cols-3">
-                  <Field label="Application deadline"><input type="date" name="application_deadline" value={form.application_deadline ?? ''} onChange={handleChange} className={inputCls} /></Field>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <Field label="Application deadline" hint="Optional. If set, it must be today or a future date.">
+                    <input type="date" name="application_deadline" min={localDateString()} value={form.application_deadline ?? ''} onChange={handleChange} className={inputCls} />
+                  </Field>
                   <Field label="Total slots" hint="0 means open capacity." required>
                     <input type="number" name="total_slots" min="0" value={form.total_slots} onChange={handleChange} className={inputCls} />
-                  </Field>
-                  <Field label="Visibility" required>
-                    <select name="visibility" value={form.visibility} onChange={handleChange} className={inputCls}>
-                      <option value="public">Public (seekers and the landing page)</option>
-                      <option value="internal">Internal (admin only)</option>
-                    </select>
                   </Field>
                 </div>
                 <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-800">
                   <Info className="mt-0.5 h-4 w-4 shrink-0" />
-                  <p>Setting this to <span className="font-bold">Public</span> automatically announces it to job seekers. Status (Open/Closed) is determined automatically based on the Application Deadline.</p>
+                  <p>Programs are always public to job seekers. A past deadline is not allowed; programs with no deadline remain open until their status is changed.</p>
                 </div>
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <Field label="Attachment (PDF/DOC/image, optional)" hint="Programme guidelines or the official memo.">
+                <div>
+                  <Field label="Attachment (optional)" hint="PDF, DOC, XLS, or image; maximum 10 MB. Uploading a new file replaces the current attachment.">
                     <input type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png" onChange={(e) => setAttachment(e.target.files?.[0] ?? null)} className="text-sm" />
                   </Field>
+                  {attachment && <p className="mt-2 text-xs font-medium text-emerald-700">Selected: {attachment.name} ({formatFileSize(attachment.size)})</p>}
+                  {!attachment && id && form.has_attachment && <p className="mt-2 text-xs text-slate-500">An attachment is already saved. Leave this empty to keep it.</p>}
                 </div>
               </div>
             )}
@@ -281,8 +276,14 @@ export default function GovernmentProgramFormPage() {
                   <StringList items={form.eligibility_requirements} onChange={(v) => set('eligibility_requirements', v)} placeholder="e.g. Resident of Urdaneta City" addLabel="Add requirement" />
                 </Group>
 
-                <Group title="Eligibility rules (scoring)" subtitle="Powers the eligibility badge seekers see. A failed required rule marks them not eligible.">
+                <Group title="Eligibility rules (scoring)" subtitle="A failed required rule means the known profile data does not meet a gate. Other rules contribute to the match score. Missing profile data stays unknown, not a failure; PESO confirms eligibility in person.">
                   <EligibilityRulesBuilder rules={form.eligibility_rules} onChange={(v) => set('eligibility_rules', v)} />
+                </Group>
+
+                <Group title="Program location" subtitle="Where job seekers should go for the in-person orientation, assessment, or application. Leave blank to use the PESO Office, Urdaneta City Hall.">
+                  <Field label="Location or service point">
+                    <input name="location_address" value={form.location_address ?? ''} onChange={handleChange} maxLength={1000} placeholder="e.g. PESO Office, Urdaneta City Hall" className={inputCls} />
+                  </Field>
                 </Group>
               </div>
             )}
@@ -314,6 +315,42 @@ export default function GovernmentProgramFormPage() {
 }
 
 const inputCls = 'w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500'
+
+function localDateString() {
+  const now = new Date()
+  const month = String(now.getMonth() + 1).padStart(2, '0')
+  const day = String(now.getDate()).padStart(2, '0')
+  return `${now.getFullYear()}-${month}-${day}`
+}
+
+function formatFileSize(bytes) {
+  return bytes < 1024 * 1024
+    ? `${Math.max(1, Math.round(bytes / 1024))} KB`
+    : `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
+function validateEligibilityRules(rules) {
+  for (const rule of rules) {
+    if (!rule.field) return 'Choose a field for each eligibility rule.'
+    if (!Number.isFinite(Number(rule.weight)) || Number(rule.weight) <= 0) {
+      return 'Each eligibility rule needs a positive scoring weight.'
+    }
+    if (rule.field === 'age' && (
+      rule.min === '' || rule.max === '' ||
+      !Number.isFinite(Number(rule.min)) || !Number.isFinite(Number(rule.max)) ||
+      Number(rule.min) < 0 || Number(rule.max) > 200 || Number(rule.min) > Number(rule.max)
+    )) {
+      return 'Enter a valid age range where the maximum is not less than the minimum.'
+    }
+    if (['employment_status', 'civil_status'].includes(rule.field) && !(rule.values?.length)) {
+      return 'Select at least one accepted value for each employment or civil status rule.'
+    }
+    if (['educ_attainment', 'sex', 'residency'].includes(rule.field) && !String(rule.value ?? '').trim()) {
+      return 'Enter a value for each education, sex, or residency rule.'
+    }
+  }
+  return ''
+}
 
 function Group({ title, subtitle, children }) {
   return (

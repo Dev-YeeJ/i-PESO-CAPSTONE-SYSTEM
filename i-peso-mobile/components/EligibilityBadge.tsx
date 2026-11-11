@@ -7,6 +7,7 @@ const MAP: Record<string, { variant: 'success' | 'warning' | 'neutral' | 'danger
   partially_eligible: { variant: 'warning', showScore: true },
   low_match: { variant: 'neutral', showScore: true },
   not_eligible: { variant: 'danger', showScore: false },
+  profile_incomplete: { variant: 'warning', showScore: false },
   unknown: { variant: 'neutral', showScore: false },
 }
 

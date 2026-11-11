@@ -53,7 +53,7 @@ export default function ProgramCard({ program, to, actionLabel = 'View program',
       <dl className="mt-6 grid gap-3 text-xs font-semibold text-slate-500 bg-slate-50 rounded-2xl p-4 border border-slate-100">
         <div className="flex items-center gap-2"><Clock3 className="h-4 w-4 text-blue-400 shrink-0" /><dt className="sr-only">Deadline</dt><dd>Apply by {dateText(program.application_deadline)}</dd></div>
         <div className="flex items-center gap-2"><UsersRound className="h-4 w-4 text-emerald-400 shrink-0" /><dt className="sr-only">Slots</dt><dd>{slots}</dd></div>
-        {(program.venue || program.location_address) && <div className="flex items-center gap-2"><MapPin className="h-4 w-4 text-rose-400 shrink-0" /><dt className="sr-only">Venue</dt><dd className="line-clamp-1">{program.venue || program.location_address}</dd></div>}
+        {(program.location_address || program.venue) && <div className="flex items-center gap-2"><MapPin className="h-4 w-4 text-rose-400 shrink-0" /><dt className="sr-only">Venue</dt><dd className="line-clamp-1">{program.location_address || program.venue}</dd></div>}
         {program.start_date && <div className="flex items-center gap-2"><CalendarDays className="h-4 w-4 text-indigo-400 shrink-0" /><dt className="sr-only">Start date</dt><dd>Starts {dateText(program.start_date)}</dd></div>}
       </dl>
 

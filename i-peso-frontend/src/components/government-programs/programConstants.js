@@ -6,7 +6,6 @@ export const PROGRAM_CATEGORIES = [
   { value: 'livelihood_program', label: 'Livelihood Program' },
   { value: 'tech_voc_training', label: 'Tech-Voc Training' },
   { value: 'career_guidance', label: 'Career Guidance / Counseling' },
-  { value: 'citizen_charter', label: 'PESO Citizen Charter' },
   { value: 'other', label: 'Other PESO Programs' },
 ]
 
@@ -32,7 +31,6 @@ export const categoryTone = {
   livelihood_program: 'border-emerald-200 bg-emerald-50 text-emerald-700',
   tech_voc_training: 'border-cyan-200 bg-cyan-50 text-cyan-700',
   career_guidance: 'border-violet-200 bg-violet-50 text-violet-700',
-  citizen_charter: 'border-slate-200 bg-slate-100 text-slate-700',
   other: 'border-rose-200 bg-rose-50 text-rose-700',
 }
 

@@ -14,11 +14,6 @@
 | Everything here is a starting point, not a constraint: the posting form
 | lets an admin edit or clear any pre-filled value for a batch that differs.
 |
-| `citizen_charter_steps` follow the Urdaneta City PESO Citizen's Charter
-| (2021, 1st edition). Step durations come straight from it. Staff names are
-| deliberately NOT included — the charter names specific people, which goes
-| stale and is personal data; role titles are stable and sufficient.
-|
 | `eligibility_rules` are scored by EligibilityMatchingService. That engine
 | can only read what is on a seeker's profile, so criteria it cannot check —
 | "is an enrolled student", "parents' income below the poverty threshold" —
@@ -224,31 +219,6 @@ return [
             'Fill up the Skills Registry System (SRS) Form 1 if you are not yet registered (2-5 minutes).',
             'Undergo a one-on-one interview with the SLEO/PESO Coordinator. Career coaching is also available (5-10 minutes).',
             'Receive your career guidance output and the recommended next steps.',
-        ],
-        'eligibility_rules' => [],
-    ],
-
-    'citizen_charter' => [
-        'short_description' => 'PESO frontline services, the steps to avail them, and how long each step takes.',
-        'target_beneficiaries' => 'All citizens transacting with the Public Employment Service Office.',
-        'description' => "The PESO Citizen's Charter sets out the frontline services of the Public Employment Service Office, the steps a citizen follows for each, and the time each step should take.\n\nAll PESO services are free of charge. PESO is a non-fee charging facility established under RA 8759, as amended by RA 10691.",
-        'eligibility_requirements' => [
-            'Open to all citizens',
-        ],
-        'required_documents' => [
-            'Valid government-issued ID',
-        ],
-        'citizen_charter_steps' => [
-            'Submit the requirements to the Community Employment Center (CEC) staff (2-5 minutes).',
-            'Fill up the Skills Registry System (SRS) Form 1 clearly and legibly. Make sure to indicate a contact number; if you have no telephone, provide the number and name of someone who can accept the call for you.',
-            'Wait for the validation of your filled-up SRS Registration Form.',
-            'Your data is encoded in the Skills Registry System and the job matching facility is run (2-5 minutes).',
-            'Undergo a one-on-one interview with the SLEO/PESO Coordinator. Career coaching is also available (5-10 minutes).',
-            'Choose one or two positions from the Job Opportunities Bulletin Series (JOBS) posted on the PESO bulletin board.',
-            'Receive your Referral Letter from the Administrative Aide (about 5 minutes).',
-            'Proceed to the employer you are referred to, attaching the referral letter to your curriculum vitae. One set of documents is required per referral, and you will need to follow up your application.',
-            'For succeeding referrals, note your application number and the date you submitted the requirements, fill up a Referral Form and undergo another interview (5-10 minutes).',
-            'Renew or update your Skills Registry System information after 6 months. A new set of requirements is required.',
         ],
         'eligibility_rules' => [],
     ],
