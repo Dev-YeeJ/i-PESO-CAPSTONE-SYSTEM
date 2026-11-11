@@ -31,9 +31,10 @@ class SeekerGovernmentProgramController extends Controller
         'highly_eligible' => 0,
         'eligible' => 1,
         'partially_eligible' => 2,
-        'unknown' => 3,
-        'low_match' => 4,
-        'not_eligible' => 5,
+        'profile_incomplete' => 3,
+        'unknown' => 4,
+        'low_match' => 5,
+        'not_eligible' => 6,
     ];
 
     public function index(Request $request): JsonResponse

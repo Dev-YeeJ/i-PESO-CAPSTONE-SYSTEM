@@ -21,10 +21,10 @@ const EDUCATION_LEVELS = [
 ]
 
 const CIVIL_STATUS_OPTIONS = [
-  { value: 'Single', label: 'Single' },
-  { value: 'Married', label: 'Married' },
-  { value: 'Widowed', label: 'Widowed' },
-  { value: 'Separated', label: 'Separated' },
+  { value: 'single', label: 'Single' },
+  { value: 'married', label: 'Married' },
+  { value: 'widowed', label: 'Widowed' },
+  { value: 'separated', label: 'Separated' },
 ]
 
 const SEX_OPTIONS = [
@@ -40,7 +40,7 @@ const FIELD_CONFIG = {
   is_ofw: { label: 'OFW / former OFW', op: 'equals', input: 'boolean' },
   sex: { label: 'Sex', op: 'equals', input: 'select', options: SEX_OPTIONS },
   civil_status: { label: 'Civil status', op: 'in', input: 'multiselect', options: CIVIL_STATUS_OPTIONS },
-  residency: { label: 'Residency (city/municipality)', op: 'equals', input: 'text' },
+  residency: { label: 'City / municipality of residence', op: 'equals', input: 'text' },
 }
 
 const FIELD_ORDER = Object.keys(FIELD_CONFIG)
@@ -255,7 +255,7 @@ export default function EligibilityRulesBuilder({ rules = [], onChange }) {
                 <label className="flex flex-col gap-1">
                   <span className="text-xs font-bold text-slate-500">Weight</span>
                   <input
-                    type="number" min="0" max="100" step="1" value={rule.weight ?? 1}
+                    type="number" min="0.01" max="100" step="0.1" value={rule.weight ?? 1}
                     onChange={(e) => update(index, { weight: e.target.value === '' ? '' : Number(e.target.value) })}
                     className="w-20 rounded-lg border border-slate-300 px-3 py-2 text-sm"
                   />
@@ -280,7 +280,7 @@ export default function EligibilityRulesBuilder({ rules = [], onChange }) {
               </div>
 
               <label className="mt-3 flex flex-col gap-1">
-                <span className="text-xs font-bold text-slate-500">Label shown to the applicant</span>
+                <span className="text-xs font-bold text-slate-500">Explanation shown to the job seeker</span>
                 <input
                   type="text" value={rule.label ?? ''}
                   onChange={(e) => onChange(rules.map((r, i) => (i === index ? { ...r, label: e.target.value } : r)))}

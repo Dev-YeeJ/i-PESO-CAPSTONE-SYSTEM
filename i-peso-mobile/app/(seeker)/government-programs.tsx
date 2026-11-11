@@ -136,7 +136,7 @@ export default function GovernmentProgramsScreen() {
     >
       <Text style={styles.kicker}>PESO Programs Center</Text>
       <Text style={styles.subtitle}>
-        Browse DOLE and PESO programs — SPES, TUPAD, GIP, livelihood, training, and OFW assistance. Your profile is checked against each program&apos;s eligibility rules automatically.
+        Browse DOLE and PESO programs — SPES, TUPAD, GIP, livelihood, training, and OFW assistance. Your profile shows a preliminary eligibility estimate; PESO confirms eligibility in person.
       </Text>
 
       <TextInput
@@ -283,6 +283,11 @@ export default function GovernmentProgramsScreen() {
                   <Text style={styles.programMeta}>Deadline: {formatDate(program.application_deadline)}</Text>
                   <Text style={styles.programMeta}>{slotsLabel(program)}</Text>
                 </View>
+                {(program.location_address || program.venue) ? (
+                  <Text style={styles.programLocation} numberOfLines={1}>
+                    <MaterialIcons name="place" size={13} color={colors.info} /> {program.location_address || program.venue}
+                  </Text>
+                ) : null}
               </Card>
             </PressableScale>
           </Animated.View>
@@ -390,6 +395,7 @@ const styles = StyleSheet.create({
   programDescription: { color: colors.textSecondary, fontSize: typography.small, lineHeight: 18, marginTop: spacing.sm },
   programMetaRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: spacing.md },
   programMeta: { color: colors.textSecondary, fontSize: typography.small, fontFamily: typography.family.bold },
+  programLocation: { color: colors.textSecondary, fontSize: typography.small, marginTop: spacing.sm },
   loadMoreBtn: { marginTop: spacing.sm },
   charterSection: { marginTop: spacing.xl },
   charterTitle: { color: colors.textPrimary, fontSize: typography.heading, fontFamily: typography.family.bold, textAlign: 'center' },

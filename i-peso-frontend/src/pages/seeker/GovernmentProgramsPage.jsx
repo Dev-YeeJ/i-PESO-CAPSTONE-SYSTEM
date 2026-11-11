@@ -43,7 +43,7 @@ export default function GovernmentProgramsPage() {
           <p className="text-xs font-bold uppercase tracking-widest text-blue-300">PESO Programs Center</p>
           <h1 className="mt-1 text-3xl font-black tracking-tight text-white drop-shadow-sm">Government Programs</h1>
           <p className="mt-3 max-w-2xl text-base leading-relaxed text-blue-100">
-            Browse DOLE and PESO programs — SPES, TUPAD, GIP, livelihood, training, and OFW assistance. Your profile is checked against each program's eligibility rules automatically.
+            Browse DOLE and PESO programs — SPES, TUPAD, GIP, livelihood, training, and OFW assistance. Your profile shows a preliminary eligibility estimate; PESO confirms eligibility in person.
           </p>
         </div>
       </div>

@@ -117,11 +117,10 @@ export default function ProgramDetailScreen() {
 
   const eligibility = Array.isArray(program.eligibility_requirements) ? program.eligibility_requirements : []
   const skills = Array.isArray(program.skills) ? program.skills : []
-  const charterSteps = [
-    "Review your eligibility match on this page.",
-    "Prepare any requirements listed above.",
-    `Proceed to the PESO Office at ${program.venue || 'the City Hall'}.`,
-    "Submit your requirements and undergo a brief assessment."
+  const applicationSteps = [
+    'Review the eligibility requirements and your profile-based estimate on this page.',
+    `Confirm current availability, schedule, and required documents with PESO at ${program.location_address || program.venue || 'the PESO Office, Urdaneta City Hall'} before visiting.`,
+    `Submit your application in person at the listed location${program.application_deadline ? ` by ${formatDate(program.application_deadline)}` : ''}. PESO will verify your eligibility.`,
   ]
   const totalSlots = program.total_slots ?? 0
   const slotsText = totalSlots > 0 ? `${program.available_slots ?? 0}/${totalSlots} slots available` : 'Open slots (unlimited)'
@@ -146,7 +145,7 @@ export default function ProgramDetailScreen() {
         ) : null}
 
         <Card padding="md" style={styles.infoCard}>
-          <Detail label="Venue" value={textFrom(program.venue, 'To be announced')} />
+          <Detail label="Venue" value={textFrom(program.location_address || program.venue, 'PESO Office, Urdaneta City Hall')} />
           <Detail label="Application Deadline" value={formatDate(program.application_deadline)} />
           <Detail label="Slots" value={slotsText} />
           {program.target_industry ? (
@@ -158,16 +157,25 @@ export default function ProgramDetailScreen() {
           <>
             <SectionHeader title="Your Eligibility" />
             <Card padding="md" style={styles.infoCard}>
+              {program.eligibility.status === 'profile_incomplete' ? (
+                <AlertBox variant="warning" style={styles.eligibilityNotice}>
+                  Preliminary match: {typeof program.eligibility.score === 'number' ? `${program.eligibility.score}%` : 'not enough profile data'} using {program.eligibility.evaluated_rules ?? 0} of {program.eligibility.total_rules ?? program.eligibility.breakdown.length} criteria. Complete your profile to check missing criteria. PESO confirms eligibility in person.
+                </AlertBox>
+              ) : (
+                <Text style={styles.eligibilityDisclaimer}>
+                  This is an estimate based on your i-PESO profile, not an official decision. PESO confirms eligibility in person.
+                </Text>
+              )}
               {program.eligibility.breakdown.map((item, index) => (
                 <View key={index} style={styles.eligRow}>
                   <MaterialIcons
-                    name={item.met ? 'check-circle' : 'cancel'}
+                    name={item.known === false ? 'help-outline' : item.met ? 'check-circle' : 'cancel'}
                     size={18}
-                    color={item.met ? colors.success : colors.error}
+                    color={item.known === false ? colors.warning : item.met ? colors.success : colors.error}
                   />
                   <View style={styles.eligBody}>
                     <Text style={styles.eligLabel}>
-                      {item.label}{item.required && !item.met ? '  (required)' : ''}
+                      {item.label}{item.required && item.known !== false && !item.met ? '  (required)' : ''}
                     </Text>
                     {item.detail ? <Text style={styles.eligDetail}>{item.detail}</Text> : null}
                   </View>
@@ -189,7 +197,7 @@ export default function ProgramDetailScreen() {
 
 
         <SectionHeader title="How to Apply (In-Person)" />
-        {charterSteps.map((step, index) => (
+        {applicationSteps.map((step, index) => (
           <BulletRow key={`${step}-${index}`} text={`${index + 1}. ${step}`} />
         ))}
 
@@ -266,6 +274,8 @@ const styles = StyleSheet.create({
   detailLabel: { color: colors.secondaryText, fontSize: typography.small, fontFamily: typography.family.bold },
   detailValue: { color: colors.textPrimary, fontSize: typography.small, fontFamily: typography.family.bold, textAlign: 'right', flex: 1, marginLeft: spacing.md },
   eligRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.xs },
+  eligibilityNotice: { marginBottom: spacing.sm },
+  eligibilityDisclaimer: { color: colors.secondaryText, fontSize: typography.small, lineHeight: 18, marginBottom: spacing.sm },
   eligBody: { flex: 1 },
   eligLabel: { color: colors.textPrimary, fontSize: typography.small, fontFamily: typography.family.bold },
   eligDetail: { color: colors.secondaryText, fontSize: typography.small, marginTop: 2 },

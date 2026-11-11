@@ -406,12 +406,15 @@ export interface JobFairPoster {
 }
 
 export interface ProgramEligibility {
-  score: number
+  score: number | null
   status:
     | 'highly_eligible' | 'eligible' | 'partially_eligible'
-    | 'low_match' | 'not_eligible' | 'unknown' | string
+    | 'low_match' | 'not_eligible' | 'profile_incomplete' | 'unknown' | string
   label: string
-  breakdown: Array<{ label: string; met: boolean; required: boolean; detail?: string | null }>
+  breakdown: { label: string; met: boolean; known?: boolean; required: boolean; detail?: string | null }[]
+  coverage?: number
+  evaluated_rules?: number
+  total_rules?: number
 }
 
 export interface GovernmentProgram {
@@ -424,9 +427,9 @@ export interface GovernmentProgram {
   eligibility?: ProgramEligibility | null
   target_industry?: string | null
   skills?: Array<{ id: number | string; name?: string; type?: string }>
-  // Always "PESO Office, Urdaneta City Hall" (GovernmentProgram::getVenueAttribute). The
-  // program start/end dates were dropped by the 2026_09_23 legacy-fields migration.
+  // Uses the program's location_address when set, otherwise the PESO office fallback.
   venue?: string | null
+  location_address?: string | null
   application_deadline?: string | null
   total_slots?: number | null
   available_slots?: number | null

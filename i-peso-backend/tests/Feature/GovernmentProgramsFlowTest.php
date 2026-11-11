@@ -9,8 +9,10 @@ use App\Models\JobSeeker;
 use App\Models\Skill;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
@@ -74,12 +76,15 @@ class GovernmentProgramsFlowTest extends TestCase
             'program_status' => 'open',
             'visibility' => 'public',
             'application_deadline' => now()->addWeek()->toDateString(),
+            'location_address' => 'Urdaneta City PESO, Alexander Street',
             'skills' => [
                 ['skill_id' => $welding->id, 'name' => 'SMAW Welding', 'type' => 'taught'],
             ],
         ])->assertCreated()
             ->assertJsonPath('program.title', 'SMAW NC II Training Test')
-            ->assertJsonPath('program.available_slots', 2);
+            ->assertJsonPath('program.available_slots', 2)
+            ->assertJsonPath('program.location_address', 'Urdaneta City PESO, Alexander Street')
+            ->assertJsonPath('program.venue', 'Urdaneta City PESO, Alexander Street');
 
         $programId = $programResponse->json('program.program_id');
 
@@ -117,6 +122,7 @@ class GovernmentProgramsFlowTest extends TestCase
             ->json('presets');
 
         $this->assertNotEmpty($presets, 'No category presets are configured.');
+        $this->assertArrayNotHasKey('citizen_charter', $presets);
 
         foreach ($presets as $category => $preset) {
             $this->postJson('/api/admin/government-programs', [
@@ -134,6 +140,102 @@ class GovernmentProgramsFlowTest extends TestCase
                 'visibility' => 'public',
             ])->assertCreated();
         }
+    }
+
+    public function test_citizen_charter_is_not_a_new_government_program_type(): void
+    {
+        $admin = Administrator::create([
+            'first_name' => 'PESO', 'last_name' => 'Admin',
+            'email' => 'charter.program.admin@example.test', 'password' => 'password123',
+            'role' => 'administrator', 'status' => 'active', 'email_verified_at' => now(),
+        ]);
+        Sanctum::actingAs($admin);
+
+        $this->postJson('/api/admin/government-programs', [
+            'program_name' => 'PESO Charter as a program',
+            'category' => 'citizen_charter',
+            'description' => 'This should remain in the separate Citizen Charter module.',
+            'total_slots' => 0,
+        ])->assertUnprocessable()->assertJsonValidationErrors('category');
+    }
+
+    public function test_attachment_upload_is_stored_and_available_to_the_seeker(): void
+    {
+        Storage::fake('local');
+        $admin = Administrator::create([
+            'first_name' => 'PESO', 'last_name' => 'Admin',
+            'email' => 'attachment.program.admin@example.test', 'password' => 'password123',
+            'role' => 'administrator', 'status' => 'active', 'email_verified_at' => now(),
+        ]);
+        Sanctum::actingAs($admin);
+
+        $response = $this->post('/api/admin/government-programs', [
+            'program_name' => 'Attachment upload test',
+            'category' => 'other',
+            'description' => 'Program guidelines attached.',
+            'total_slots' => 0,
+            'attachment' => UploadedFile::fake()->create('guidelines.pdf', 40, 'application/pdf'),
+        ])->assertCreated();
+
+        $programId = $response->json('program.program_id');
+        $program = GovernmentProgram::findOrFail($programId);
+        $this->assertNotEmpty($program->attachment_path);
+        Storage::disk('local')->assertExists($program->attachment_path);
+
+        $seeker = JobSeeker::create([
+            'first_name' => 'Mia', 'last_name' => 'Reyes', 'mobile_number' => '09170000108',
+            'email' => 'attachment.program.seeker@example.test', 'password' => 'password123',
+        ]);
+        Sanctum::actingAs($seeker);
+
+        $this->get("/api/seeker/government-programs/{$programId}/attachment")->assertOk();
+    }
+
+    public function test_application_deadline_rejects_dates_in_the_past(): void
+    {
+        $admin = Administrator::create([
+            'first_name' => 'PESO', 'last_name' => 'Admin',
+            'email' => 'deadline.program.admin@example.test', 'password' => 'password123',
+            'role' => 'administrator', 'status' => 'active', 'email_verified_at' => now(),
+        ]);
+        Sanctum::actingAs($admin);
+
+        $this->postJson('/api/admin/government-programs', [
+            'program_name' => 'Expired deadline test',
+            'category' => 'other',
+            'description' => 'Deadline validation test.',
+            'total_slots' => 0,
+            'application_deadline' => now()->subDay()->toDateString(),
+        ])->assertUnprocessable()->assertJsonValidationErrors('application_deadline');
+
+        $this->postJson('/api/admin/government-programs', [
+            'program_name' => 'Deadline today test',
+            'category' => 'other',
+            'description' => 'Today remains a valid deadline.',
+            'total_slots' => 0,
+            'application_deadline' => today()->toDateString(),
+        ])->assertCreated()->assertJsonPath('program.status', 'open');
+    }
+
+    public function test_invalid_eligibility_rules_are_rejected_instead_of_scored(): void
+    {
+        $admin = Administrator::create([
+            'first_name' => 'PESO', 'last_name' => 'Admin',
+            'email' => 'invalid.rules.admin@example.test', 'password' => 'password123',
+            'role' => 'administrator', 'status' => 'active', 'email_verified_at' => now(),
+        ]);
+        Sanctum::actingAs($admin);
+
+        $this->postJson('/api/admin/government-programs', [
+            'program_name' => 'Invalid rule test',
+            'category' => 'spes',
+            'description' => 'Invalid rule payload should not be saved.',
+            'total_slots' => 0,
+            'eligibility_rules' => [
+                ['field' => 'age', 'op' => 'equals', 'min' => 30, 'max' => 15, 'weight' => 1],
+            ],
+        ])->assertUnprocessable()
+            ->assertJsonValidationErrors(['eligibility_rules.0.op', 'eligibility_rules.0.max']);
     }
 
     /**
@@ -348,20 +450,12 @@ class GovernmentProgramsFlowTest extends TestCase
             'application_deadline' => now()->addWeek()->toDateString(),
         ]))->assertCreated();
 
-        // Should NOT appear: internal visibility (staff-only posting).
+        // Visibility is no longer a user choice; old client values are forced public.
         $this->postJson('/api/admin/government-programs', array_merge($basePayload, [
             'program_name' => 'Internal Pilot Program',
             'program_status' => 'open',
             'visibility' => 'internal',
             'application_deadline' => now()->addWeek()->toDateString(),
-        ]))->assertCreated();
-
-        // Should NOT appear: deadline already passed.
-        $this->postJson('/api/admin/government-programs', array_merge($basePayload, [
-            'program_name' => 'TUPAD Batch 10 (Expired)',
-            'program_status' => 'open',
-            'visibility' => 'public',
-            'application_deadline' => now()->subDay()->toDateString(),
         ]))->assertCreated();
 
         // Drop the admin session from earlier in this test — the whole point
@@ -374,8 +468,7 @@ class GovernmentProgramsFlowTest extends TestCase
         $names = collect($response->json('data'))->pluck('name');
         $this->assertTrue($names->contains('TUPAD Batch 12'));
         $this->assertFalse($names->contains('TUPAD Batch 11 (Closed)'));
-        $this->assertFalse($names->contains('Internal Pilot Program'));
-        $this->assertFalse($names->contains('TUPAD Batch 10 (Expired)'));
+        $this->assertTrue($names->contains('Internal Pilot Program'));
 
         // Carries everything a visitor needs to act on the posting without an
         // account — the transaction happens in person at PESO, so gating the

@@ -8,6 +8,7 @@ const MAP = {
   partially_eligible: { cls: 'border-amber-200 bg-amber-50 text-amber-700', Icon: AlertTriangle, showScore: true },
   low_match: { cls: 'border-slate-200 bg-slate-100 text-slate-600', Icon: MinusCircle, showScore: true },
   not_eligible: { cls: 'border-red-200 bg-red-50 text-red-700', Icon: XCircle, showScore: false },
+  profile_incomplete: { cls: 'border-amber-200 bg-amber-50 text-amber-800', Icon: AlertTriangle, showScore: false },
   unknown: { cls: 'border-slate-200 bg-slate-100 text-slate-500', Icon: MinusCircle, showScore: false },
 }
 

@@ -31,7 +31,6 @@ class AdminGovernmentProgramController extends Controller
         'livelihood_program',
         'tech_voc_training',
         'career_guidance',
-        'citizen_charter',
         'other',
     ];
 
@@ -227,7 +226,14 @@ class AdminGovernmentProgramController extends Controller
             ], fn ($value) => $value !== null));
         }
 
-        return $request->validate([
+        // Government-program announcements are always public; visibility is
+        // no longer an administrator-controlled posting option.
+        $request->merge(['visibility' => 'public']);
+        if (! $program && ! $request->filled('program_status')) {
+            $request->merge(['program_status' => 'open']);
+        }
+
+        $data = $request->validate([
             'program_name' => [$program ? 'sometimes' : 'required', 'string', 'max:255'],
             'category' => [$program ? 'sometimes' : 'required', Rule::in(self::CATEGORIES)],
             'description' => [$program ? 'sometimes' : 'required', 'string', 'max:30000'],
@@ -236,10 +242,10 @@ class AdminGovernmentProgramController extends Controller
             'eligibility_rules.*.field' => ['required_with:eligibility_rules', 'string', Rule::in(self::RULE_FIELDS)],
             'eligibility_rules.*.op' => ['required_with:eligibility_rules', 'string', Rule::in(self::RULE_OPS)],
             'eligibility_rules.*.label' => ['nullable', 'string', 'max:200'],
-            'eligibility_rules.*.weight' => ['nullable', 'numeric', 'min:0', 'max:100'],
+            'eligibility_rules.*.weight' => ['nullable', 'numeric', 'min:0.01', 'max:100'],
             'eligibility_rules.*.required' => ['nullable', 'boolean'],
-            'eligibility_rules.*.min' => ['nullable', 'numeric'],
-            'eligibility_rules.*.max' => ['nullable', 'numeric'],
+            'eligibility_rules.*.min' => ['nullable', 'numeric', 'min:0'],
+            'eligibility_rules.*.max' => ['nullable', 'numeric', 'min:0', 'max:200'],
             'eligibility_rules.*.value' => ['nullable'],
             'eligibility_rules.*.values' => ['nullable', 'array', 'max:20'],
             'eligibility_rules.*.values.*' => ['string', 'max:100'],
@@ -248,16 +254,75 @@ class AdminGovernmentProgramController extends Controller
             'location_address' => ['nullable', 'string', 'max:1000'],
             'latitude' => ['nullable', 'numeric', 'between:-90,90'],
             'longitude' => ['nullable', 'numeric', 'between:-180,180'],
-            'application_deadline' => ['nullable', 'date'],
+            'application_deadline' => ['nullable', 'date', 'after_or_equal:today'],
             'total_slots' => [$program ? 'sometimes' : 'required', 'integer', 'min:0', 'max:100000'],
             'program_status' => ['nullable', Rule::in(['draft', 'open', 'closed', 'completed', 'archived'])],
-            'visibility' => [$program ? 'sometimes' : 'required', Rule::in(['public', 'internal'])],
+            'visibility' => ['required', Rule::in(['public'])],
             'attachment' => ['nullable', 'file', 'mimes:pdf,doc,docx,xls,xlsx,jpg,jpeg,png', 'max:10240'],
             'skills' => ['nullable', 'array', 'max:50'],
             'skills.*.skill_id' => ['nullable', 'integer', 'exists:skill_catalog_entries,id'],
             'skills.*.name' => ['required_with:skills', 'string', 'max:150'],
             'skills.*.type' => ['nullable', Rule::in(['taught', 'required', 'target'])],
         ]);
+
+        $this->validateEligibilityRuleConfiguration($data['eligibility_rules'] ?? []);
+
+        return $data;
+    }
+
+    /**
+     * The scoring engine must never receive a rule that it cannot evaluate.
+     * Reject inconsistent field/operator pairs and incomplete ranges instead
+     * of silently assigning a misleading score to every seeker.
+     */
+    private function validateEligibilityRuleConfiguration(array $rules): void
+    {
+        $expectedOperators = [
+            'age' => ['between'],
+            'employment_status' => ['in'],
+            'educ_attainment' => ['min_level'],
+            'is_4ps_beneficiary' => ['equals'],
+            'is_ofw' => ['equals'],
+            'sex' => ['equals'],
+            'civil_status' => ['in'],
+            'residency' => ['equals'],
+        ];
+        $errors = [];
+
+        foreach ($rules as $index => $rule) {
+            $field = $rule['field'] ?? '';
+            $operator = $rule['op'] ?? '';
+
+            if (isset($expectedOperators[$field]) && ! in_array($operator, $expectedOperators[$field], true)) {
+                $errors["eligibility_rules.{$index}.op"] = 'Choose a supported operator for this eligibility rule.';
+            }
+
+            if ($field === 'age') {
+                $min = $rule['min'] ?? null;
+                $max = $rule['max'] ?? null;
+                if ($min === null || $max === null || (float) $min > (float) $max) {
+                    $errors["eligibility_rules.{$index}.max"] = 'Enter a valid age range where the maximum is not less than the minimum.';
+                }
+            }
+
+            if (in_array($field, ['is_4ps_beneficiary', 'is_ofw'], true) && isset($rule['value']) && ! is_bool($rule['value'])) {
+                $errors["eligibility_rules.{$index}.value"] = 'Choose yes or no for this eligibility rule.';
+            }
+
+            if (in_array($field, ['employment_status', 'civil_status'], true) && empty($rule['values'])) {
+                $errors["eligibility_rules.{$index}.values"] = 'Select at least one accepted value.';
+            }
+
+            if (in_array($field, ['educ_attainment', 'sex', 'residency'], true) && blank($rule['value'] ?? null)) {
+                $errors["eligibility_rules.{$index}.value"] = 'Enter a value for this eligibility rule.';
+            } elseif (in_array($field, ['educ_attainment', 'sex', 'residency'], true) && ! is_string($rule['value'])) {
+                $errors["eligibility_rules.{$index}.value"] = 'Enter a text value for this eligibility rule.';
+            }
+        }
+
+        if ($errors !== []) {
+            throw \Illuminate\Validation\ValidationException::withMessages($errors);
+        }
     }
 
     private function syncSkills(GovernmentProgram $program, array $skills, SkillTaxonomyService $taxonomy): void

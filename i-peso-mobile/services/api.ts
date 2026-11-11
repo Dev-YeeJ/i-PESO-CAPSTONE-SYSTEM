@@ -70,6 +70,41 @@ console.log('🔍 i-PESO API CONFIGURATION');
 console.log('🔍 API BASE URL:', BASE_URL);
 console.log('========================================');
 
+/** Keys whose values must never reach the console (Metro logs are shared and pasted around). */
+const SENSITIVE_KEYS = /pass(word)?|otp|code|token|secret|pin/i;
+
+/**
+ * A log-safe description of a request body. Error logs used to print the raw body, which
+ * put sign-in passwords on screen in plain text. Passwords, reset codes and tokens are
+ * masked; uploads (FormData) are summarised only — never their fields, so report
+ * descriptions and file names stay out of the logs too.
+ */
+function describeRequestData(data: unknown): unknown {
+  if (data === undefined || data === null || data === '') return data;
+  if (typeof FormData !== 'undefined' && data instanceof FormData) return '[form data — not logged]';
+
+  let parsed: unknown = data;
+  if (typeof data === 'string') {
+    try {
+      parsed = JSON.parse(data);
+    } catch {
+      return '[request body — not logged]';
+    }
+  }
+
+  const mask = (value: unknown): unknown => {
+    if (Array.isArray(value)) return value.map(mask);
+    if (value && typeof value === 'object') {
+      return Object.fromEntries(Object.entries(value as Record<string, unknown>).map(
+        ([key, inner]) => [key, SENSITIVE_KEYS.test(key) ? '••••••' : mask(inner)],
+      ));
+    }
+    return value;
+  };
+
+  return mask(parsed);
+}
+
 const apiClient = axios.create({
   baseURL: BASE_URL,
 
@@ -142,7 +177,7 @@ apiClient.interceptors.response.use(
       console.log(`❌ API ${label}`);
       console.log('Full URL:', fullUrl);
       console.log('Request Method:', error.config?.method);
-      console.log('Request Data:', error.config?.data);
+      console.log('Request Data:', describeRequestData(error.config?.data));
       console.log('Response Status:', status);
       console.log('Response Data:', error.response.data);
 
@@ -181,7 +216,7 @@ apiClient.interceptors.response.use(
       console.log('Request URL:', error.config?.url);
       console.log('Full URL:', fullUrl);
       console.log('Request Method:', error.config?.method);
-      console.log('Request Data:', error.config?.data);
+      console.log('Request Data:', describeRequestData(error.config?.data));
       console.log('Error Code:', error.code);
       console.log('Error Message:', error.message);
       console.log('Request was sent but no response was received — check that the backend is reachable at this address from the device.');

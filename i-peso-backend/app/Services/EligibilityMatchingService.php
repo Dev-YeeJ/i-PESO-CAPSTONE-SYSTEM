@@ -14,10 +14,9 @@ use Illuminate\Support\Carbon;
  * Rule shape (one object per requirement):
  *   { field, op, [min,max|value|values], label, weight=1, required=false }
  *
- * Scoring:
- *   - Any failed `required` rule  => status "not_eligible" (regardless of score).
- *   - score = round( sum(weight of met rules) / sum(all weights) * 100 ).
- *   - 100 => highly_eligible, 60-99 => partially_eligible, <60 => low_match.
+ * Scoring uses only rules with known profile values. Missing profile data is
+ * reported as incomplete, never treated as proof that a seeker fails a rule.
+ * A known failure of a required rule still marks the seeker not eligible.
  */
 class EligibilityMatchingService
 {
@@ -43,7 +42,7 @@ class EligibilityMatchingService
     ];
 
     /**
-     * @return array{score:int,status:string,label:string,breakdown:array<int,array{label:string,met:bool,required:bool,detail:?string}>}
+     * @return array{score:?int,status:string,label:string,breakdown:array<int,array{label:string,met:bool,known:bool,required:bool,detail:?string}>,coverage:int,evaluated_rules:int,total_rules:int}
      */
     public function evaluate(?JobSeeker $seeker, GovernmentProgram $program): array
     {
@@ -51,17 +50,19 @@ class EligibilityMatchingService
 
         // No rules defined => open to everyone.
         if (empty($rules)) {
-            return ['score' => 100, 'status' => 'eligible', 'label' => 'Eligible', 'breakdown' => []];
+            return ['score' => 100, 'status' => 'eligible', 'label' => 'Eligible', 'breakdown' => [], 'coverage' => 100, 'evaluated_rules' => 0, 'total_rules' => 0];
         }
 
         // No seeker (e.g. public/preview) => can't evaluate.
         if (! $seeker) {
-            return ['score' => 0, 'status' => 'unknown', 'label' => 'Sign in to check eligibility', 'breakdown' => []];
+            return ['score' => null, 'status' => 'unknown', 'label' => 'Sign in to check eligibility', 'breakdown' => [], 'coverage' => 0, 'evaluated_rules' => 0, 'total_rules' => count($rules)];
         }
 
         $totalWeight = 0.0;
         $metWeight = 0.0;
         $requiredFailed = false;
+        $unknownRules = 0;
+        $evaluatedRules = 0;
         $breakdown = [];
 
         foreach ($rules as $rule) {
@@ -69,27 +70,57 @@ class EligibilityMatchingService
                 continue;
             }
             $weight = (float) ($rule['weight'] ?? 1);
-            $totalWeight += $weight;
-
             [$met, $detail] = $this->checkRule($seeker, $rule);
-            if ($met) {
+            if ($met === null) {
+                $unknownRules++;
+            } else {
+                $evaluatedRules++;
+                $totalWeight += $weight;
+            }
+            if ($met === true) {
                 $metWeight += $weight;
-            } elseif ($rule['required'] ?? false) {
+            } elseif ($met === false && ($rule['required'] ?? false)) {
                 $requiredFailed = true;
             }
 
             $breakdown[] = [
                 'label' => (string) ($rule['label'] ?? $this->humanizeField($rule['field'])),
-                'met' => $met,
+                'met' => $met === true,
+                'known' => $met !== null,
                 'required' => (bool) ($rule['required'] ?? false),
                 'detail' => $detail,
             ];
         }
 
-        $score = $totalWeight > 0 ? (int) round(($metWeight / $totalWeight) * 100) : 100;
+        $score = $totalWeight > 0 ? (int) round(($metWeight / $totalWeight) * 100) : null;
+        $coverage = (int) round(($evaluatedRules / max(1, count($breakdown))) * 100);
 
         if ($requiredFailed) {
-            return ['score' => $score, 'status' => 'not_eligible', 'label' => 'Not Eligible', 'breakdown' => $breakdown];
+            return [
+                'score' => $score,
+                'breakdown' => $breakdown,
+                'coverage' => $coverage,
+                'status' => 'not_eligible',
+                'label' => 'Not Eligible',
+                'evaluated_rules' => $evaluatedRules,
+                'total_rules' => count($breakdown),
+            ];
+        }
+
+        if ($unknownRules > 0) {
+            return [
+                'score' => $score,
+                'status' => 'profile_incomplete',
+                'label' => 'Update your profile to check eligibility',
+                'breakdown' => $breakdown,
+                'coverage' => $coverage,
+                'evaluated_rules' => $evaluatedRules,
+                'total_rules' => count($breakdown),
+            ];
+        }
+
+        if ($score === null) {
+            $score = 100;
         }
 
         if ($score >= 100) {
@@ -100,11 +131,19 @@ class EligibilityMatchingService
             [$status, $label] = ['low_match', 'Low Match'];
         }
 
-        return compact('score', 'status', 'label', 'breakdown');
+        return [
+            'score' => $score,
+            'status' => $status,
+            'label' => $label,
+            'breakdown' => $breakdown,
+            'coverage' => $coverage,
+            'evaluated_rules' => $evaluatedRules,
+            'total_rules' => count($breakdown),
+        ];
     }
 
     /**
-     * @return array{0:bool,1:?string} [met, human-readable detail]
+     * @return array{0:?bool,1:?string} [met, null when profile data is missing]
      */
     private function checkRule(JobSeeker $seeker, array $rule): array
     {
@@ -112,44 +151,73 @@ class EligibilityMatchingService
             case 'age':
                 $age = $seeker->date_of_birth ? Carbon::parse($seeker->date_of_birth)->age : null;
                 if ($age === null) {
-                    return [false, 'No birth date on your profile'];
+                    return [null, 'Add your birth date to your profile'];
                 }
                 $min = (int) ($rule['min'] ?? 0);
                 $max = (int) ($rule['max'] ?? 200);
                 return [$age >= $min && $age <= $max, "Your age: {$age}"];
 
             case 'employment_status':
-                $values = array_map('strval', $rule['values'] ?? []);
+                if (blank($seeker->employment_status)) {
+                    return [null, 'Add your employment status to your profile'];
+                }
+                $values = array_map(fn ($value) => mb_strtolower(trim((string) $value)), $rule['values'] ?? []);
                 return [
-                    in_array((string) $seeker->employment_status, $values, true),
+                    in_array(mb_strtolower(trim((string) $seeker->employment_status)), $values, true),
                     'Your status: '.($seeker->employment_status ?: 'not set'),
                 ];
 
             case 'educ_attainment':
                 $have = $this->educationRank($seeker->educ_attainment);
                 $need = $this->educationRank($rule['value'] ?? '');
+                if ($have === 0 || $need === 0) {
+                    return [null, 'Add your highest educational attainment to your profile'];
+                }
                 return [$have >= $need && $have > 0, 'Your attainment: '.($seeker->educ_attainment ?: 'not set')];
 
             case 'is_4ps_beneficiary':
+                if ($seeker->is_4ps_beneficiary === null
+                    || (! (bool) $seeker->is_4ps_beneficiary && ! $seeker->profile_completed)) {
+                    return [null, 'Complete your profile to confirm your 4Ps status'];
+                }
                 $want = (bool) ($rule['value'] ?? true);
                 return [(bool) $seeker->is_4ps_beneficiary === $want, $seeker->is_4ps_beneficiary ? '4Ps member' : 'Not a 4Ps member'];
 
             case 'is_ofw':
+                if (($seeker->is_ofw === null && $seeker->is_former_ofw === null)
+                    || (! (bool) $seeker->is_ofw && ! (bool) $seeker->is_former_ofw && ! $seeker->profile_completed)) {
+                    return [null, 'Add your OFW status to your profile'];
+                }
                 $want = (bool) ($rule['value'] ?? true);
                 $isOfw = (bool) ($seeker->is_ofw || $seeker->is_former_ofw);
                 return [$isOfw === $want, $isOfw ? 'OFW / former OFW' : 'Not an OFW'];
 
             case 'sex':
-                return [(string) $seeker->sex === (string) ($rule['value'] ?? ''), 'Sex: '.($seeker->sex ?: 'not set')];
+                if (blank($seeker->sex)) {
+                    return [null, 'Add your sex to your profile'];
+                }
+                return [
+                    mb_strtolower(trim((string) $seeker->sex)) === mb_strtolower(trim((string) ($rule['value'] ?? ''))),
+                    'Sex: '.($seeker->sex ?: 'not set'),
+                ];
 
             case 'civil_status':
-                $values = array_map('strval', $rule['values'] ?? []);
-                return [in_array((string) $seeker->civil_status, $values, true), 'Civil status: '.($seeker->civil_status ?: 'not set')];
+                if (blank($seeker->civil_status)) {
+                    return [null, 'Add your civil status to your profile'];
+                }
+                $values = array_map(fn ($value) => mb_strtolower(trim((string) $value)), $rule['values'] ?? []);
+                return [
+                    in_array(mb_strtolower(trim((string) $seeker->civil_status)), $values, true),
+                    'Civil status: '.($seeker->civil_status ?: 'not set'),
+                ];
 
             case 'residency':
+                if (blank($seeker->address_municipality_city)) {
+                    return [null, 'Add your city or municipality to your profile'];
+                }
                 $city = (string) ($rule['value'] ?? '');
                 return [
-                    strcasecmp((string) $seeker->address_municipality_city, $city) === 0,
+                    strcasecmp(trim((string) $seeker->address_municipality_city), trim($city)) === 0,
                     'Your city/municipality: '.($seeker->address_municipality_city ?: 'not set'),
                 ];
 

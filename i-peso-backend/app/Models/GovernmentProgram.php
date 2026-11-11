@@ -58,7 +58,7 @@ class GovernmentProgram extends Model
         static::saving(function (GovernmentProgram $program) {
             $program->slot_limit = $program->total_slots;
 
-            if ($program->application_deadline && $program->application_deadline->isPast()) {
+            if ($program->application_deadline && $program->application_deadline->isBefore(today())) {
                 $program->program_status = 'closed';
             } else {
                 if (! in_array($program->program_status, ['draft', 'archived', 'closed'], true)) {
@@ -104,6 +104,6 @@ class GovernmentProgram extends Model
 
     public function getVenueAttribute(): string
     {
-        return 'PESO Office, Urdaneta City Hall';
+        return $this->location_address ?: 'PESO Office, Urdaneta City Hall';
     }
 }
