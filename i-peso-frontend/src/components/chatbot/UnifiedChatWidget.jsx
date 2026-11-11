@@ -1,6 +1,6 @@
-import { createElement, useEffect, useRef, useState } from 'react'
+import { createElement, useCallback, useEffect, useRef, useState } from 'react'
 import {
-  MapPin, Send, X, Sparkles, LogIn, KeyRound, HelpCircle,
+  MapPin, Mic, Send, Volume2, VolumeX, X, Sparkles, LogIn, KeyRound, HelpCircle,
   UserPlus, Briefcase, CalendarDays, BadgeCheck,
   CheckCircle2, UserCog, Users, ClipboardList,
 } from 'lucide-react'
@@ -118,12 +118,41 @@ export default function UnifiedChatWidget() {
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
   const [greetingVisible, setGreetingVisible] = useState(false)
+  const [listening, setListening] = useState(false)
+  const [speakingMessage, setSpeakingMessage] = useState(null)
+  const [speechLanguage, setSpeechLanguage] = useState('fil-PH')
+  const [voiceError, setVoiceError] = useState('')
   const user = useAuthStore((state) => state.user)
 
   const launcherRef = useRef(null)
   const inputRef = useRef(null)
   const logEndRef = useRef(null)
   const aceRef = useRef(null)
+  const recognitionRef = useRef(null)
+  const utteranceRef = useRef(null)
+
+  const SpeechRecognition = typeof window !== 'undefined'
+    ? window.SpeechRecognition || window.webkitSpeechRecognition
+    : null
+  const speechSynthesisAvailable = typeof window !== 'undefined'
+    && Boolean(window.speechSynthesis)
+    && Boolean(window.SpeechSynthesisUtterance)
+
+  const stopSpeaking = useCallback(() => {
+    if (typeof window !== 'undefined' && window.speechSynthesis) {
+      window.speechSynthesis.cancel()
+    }
+    utteranceRef.current = null
+    setSpeakingMessage(null)
+  }, [])
+
+  const closePanel = useCallback(() => {
+    recognitionRef.current?.abort()
+    recognitionRef.current = null
+    setListening(false)
+    stopSpeaking()
+    setOpen(false)
+  }, [stopSpeaking])
 
   const openPanel = () => {
     // Reset before the open-triggered effect runs, so the panel never
@@ -131,14 +160,13 @@ export default function UnifiedChatWidget() {
     setGreetingVisible(false)
     setOpen(true)
   }
-  const closePanel = () => setOpen(false)
 
   useEffect(() => {
     if (!open) return undefined
     const onKeyDown = (event) => { if (event.key === 'Escape') closePanel() }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [open])
+  }, [open, closePanel])
 
   useEffect(() => {
     if (!open) {
@@ -156,6 +184,11 @@ export default function UnifiedChatWidget() {
     logEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
   }, [messages, busy])
 
+  useEffect(() => () => {
+    recognitionRef.current?.abort()
+    if (window.speechSynthesis) window.speechSynthesis.cancel()
+  }, [])
+
   const handleInputFocus = () => {
     if (aceRef.current && !busy) { aceRef.current.play('listening') }
   }
@@ -163,9 +196,96 @@ export default function UnifiedChatWidget() {
     if (aceRef.current && !busy) { aceRef.current.play('idle') }
   }
 
+  const startListening = () => {
+    if (!SpeechRecognition) {
+      setVoiceError('Voice input is not supported by this browser. You can type your question instead.')
+      return
+    }
+
+    recognitionRef.current?.abort()
+    stopSpeaking()
+    setVoiceError('')
+
+    const recognition = new SpeechRecognition()
+    const initialInput = input.trim()
+    recognition.lang = speechLanguage
+    recognition.continuous = false
+    recognition.interimResults = true
+    recognition.onstart = () => {
+      if (recognitionRef.current === recognition) setListening(true)
+    }
+    recognition.onresult = (event) => {
+      if (recognitionRef.current !== recognition) return
+      const transcript = Array.from(event.results)
+        .map((result) => result[0].transcript)
+        .join(' ')
+        .trim()
+      setInput([initialInput, transcript].filter(Boolean).join(' ').slice(0, 500))
+    }
+    recognition.onerror = (event) => {
+      if (recognitionRef.current !== recognition || event.error === 'aborted') return
+      const errors = {
+        'not-allowed': 'Microphone access was denied. Allow microphone access in your browser settings, or type your question.',
+        'no-speech': 'No speech was detected. Please try again or type your question.',
+        'audio-capture': 'No microphone was found. Connect a microphone or type your question.',
+        network: 'Speech recognition is unavailable right now. Please try again or type your question.',
+      }
+      setVoiceError(errors[event.error] || 'Voice input failed. Please try again or type your question.')
+    }
+    recognition.onend = () => {
+      if (recognitionRef.current !== recognition) return
+      recognitionRef.current = null
+      setListening(false)
+      inputRef.current?.focus()
+    }
+
+    recognitionRef.current = recognition
+    try {
+      recognition.start()
+    } catch {
+      recognitionRef.current = null
+      setListening(false)
+      setVoiceError('Could not start voice input. Please try again or type your question.')
+    }
+  }
+
+  const speakText = (text, messageId) => {
+    if (!speechSynthesisAvailable) {
+      setVoiceError('Spoken replies are not supported by this browser.')
+      return
+    }
+
+    stopSpeaking()
+    const utterance = new window.SpeechSynthesisUtterance(text)
+    utterance.lang = speechLanguage
+    utterance.onend = () => {
+      if (utteranceRef.current !== utterance) return
+      utteranceRef.current = null
+      setSpeakingMessage(null)
+    }
+    utterance.onerror = (event) => {
+      if (utteranceRef.current !== utterance) return
+      utteranceRef.current = null
+      setSpeakingMessage(null)
+      if (event.error !== 'canceled' && event.error !== 'interrupted') {
+        setVoiceError('Could not play this reply aloud. Please try again.')
+      }
+    }
+    utteranceRef.current = utterance
+    setVoiceError('')
+    setSpeakingMessage(messageId)
+    window.speechSynthesis.speak(utterance)
+  }
+
   const send = async (text) => {
     const question = text.trim()
     if (!question || busy) return
+
+    recognitionRef.current?.abort()
+    recognitionRef.current = null
+    setListening(false)
+    stopSpeaking()
+    setVoiceError('')
 
     const history = messages.map(({ role, text: body }) => ({ role, text: body }))
     setMessages((current) => [...current, { role: 'user', text: question }])
@@ -229,13 +349,30 @@ export default function UnifiedChatWidget() {
                 rather than static text that was just there on open. */}
             <div className="ipeso-chat-msg is-ace">
               <AceAvatarMark className="ipeso-chat-msg-avatar" />
-              {greetingVisible ? (
-                <p className="ipeso-chat-bubble is-model">{greetingText}</p>
-              ) : (
-                <p className="ipeso-chat-bubble is-model is-typing" aria-label="ACE is greeting you">
-                  <span /><span /><span />
-                </p>
-              )}
+              <div className="ipeso-chat-response">
+                {greetingVisible ? (
+                  <>
+                    <p className="ipeso-chat-bubble is-model">{greetingText}</p>
+                    {speechSynthesisAvailable && (
+                      <button
+                        type="button"
+                        className="ipeso-chat-voice-action"
+                        onClick={() => speakingMessage === 'greeting'
+                          ? stopSpeaking()
+                          : speakText(greetingText, 'greeting')}
+                        aria-label={speakingMessage === 'greeting' ? 'Stop speaking greeting' : 'Read greeting aloud'}
+                      >
+                        {speakingMessage === 'greeting' ? <VolumeX size={14} /> : <Volume2 size={14} />}
+                        {speakingMessage === 'greeting' ? 'Stop' : 'Listen'}
+                      </button>
+                    )}
+                  </>
+                ) : (
+                  <p className="ipeso-chat-bubble is-model is-typing" aria-label="ACE is greeting you">
+                    <span /><span /><span />
+                  </p>
+                )}
+              </div>
             </div>
 
             {messages.map((message, index) => {
@@ -247,10 +384,24 @@ export default function UnifiedChatWidget() {
                   <div className={`ipeso-chat-msg ${message.role === 'user' ? 'is-user' : 'is-ace'}`}>
                     {message.role !== 'user' && <AceAvatarMark className="ipeso-chat-msg-avatar" />}
                     
-                    <div className="flex flex-col w-full">
+                    <div className="ipeso-chat-response">
                       <p className={`ipeso-chat-bubble ${message.role === 'user' ? 'is-user' : 'is-model'}`}>
                         {linkifyText(message.text)}
                       </p>
+
+                      {message.role === 'model' && speechSynthesisAvailable && (
+                        <button
+                          type="button"
+                          className="ipeso-chat-voice-action"
+                          onClick={() => speakingMessage === `reply-${index}`
+                            ? stopSpeaking()
+                            : speakText(message.text, `reply-${index}`)}
+                          aria-label={speakingMessage === `reply-${index}` ? 'Stop speaking reply' : 'Read reply aloud'}
+                        >
+                          {speakingMessage === `reply-${index}` ? <VolumeX size={14} /> : <Volume2 size={14} />}
+                          {speakingMessage === `reply-${index}` ? 'Stop' : 'Listen'}
+                        </button>
+                      )}
 
                       {message.role === 'model' && hasJobs && (
                         <div className="mt-2 w-full max-w-sm">
@@ -299,6 +450,18 @@ export default function UnifiedChatWidget() {
 
           {/* ── Composer ── */}
           <form onSubmit={onSubmit} className="ipeso-chat-form">
+            <div className="ipeso-chat-voice-tools">
+              <label htmlFor="ipeso-chat-speech-language">Speech language</label>
+              <select
+                id="ipeso-chat-speech-language"
+                value={speechLanguage}
+                onChange={(event) => setSpeechLanguage(event.target.value)}
+                disabled={busy || listening}
+              >
+                <option value="fil-PH">Filipino</option>
+                <option value="en-US">English</option>
+              </select>
+            </div>
             <input
               ref={inputRef}
               value={input}
@@ -310,10 +473,37 @@ export default function UnifiedChatWidget() {
               aria-label="Your question"
               disabled={busy}
             />
+            <button
+              type="button"
+              onClick={() => {
+                if (listening) recognitionRef.current?.stop()
+                else startListening()
+              }}
+              disabled={busy || (!SpeechRecognition && !listening)}
+              aria-label={listening ? 'Stop voice input' : 'Start voice input'}
+              aria-pressed={listening}
+              title={SpeechRecognition ? undefined : 'Voice input is not supported by this browser'}
+              className={`ipeso-chat-mic ${listening ? 'is-listening' : ''}`}
+            >
+              <Mic size={16} aria-hidden="true" />
+            </button>
             <button type="submit" disabled={busy || !input.trim()} aria-label="Send message">
               <Send size={16} aria-hidden="true" />
             </button>
           </form>
+
+          <p className="ipeso-chat-voice-status" role="status" aria-live="polite">
+            {voiceError || (listening
+              ? 'Listening… Speak now, then review your transcript before sending.'
+              : (!SpeechRecognition || !speechSynthesisAvailable)
+                ? 'Some voice features are not supported by this browser. You can still chat by typing.'
+                : '')}
+          </p>
+          {SpeechRecognition && (
+            <p className="ipeso-chat-voice-disclosure">
+              Voice recognition uses your browser’s speech service; audio may be processed by that provider.
+            </p>
+          )}
 
           <p className="ipeso-chat-foot">
             Powered by iChitech · Batay sa impormasyon ng PESO
