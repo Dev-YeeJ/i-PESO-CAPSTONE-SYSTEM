@@ -9,6 +9,7 @@ import Animated, { FadeInDown, FadeInUp, interpolate, useAnimatedStyle, useShare
 import type { AxiosError } from 'axios'
 import type { JobFair, JobFilters, NearbyJob } from '@/services/seekerService'
 import { seekerService } from '@/services/seekerService'
+import { useEmployerRatings } from '@/hooks/useEmployerRatings'
 import { useToggleSavedJob } from '@/hooks/use-toggle-saved-job'
 import { useMotion } from '@/hooks/useMotion'
 import { mergeParsedFilters } from '@/utils/mapQueryParser'
@@ -182,6 +183,8 @@ export default function JobMapScreen() {
 
   const allJobs = data?.jobs ?? EMPTY_JOBS
   const jobs = useMemo(() => allJobs.filter((job) => activeTiers.has(tierFor(job))), [allJobs, activeTiers])
+  // Verified-review ratings for the listed employers, in one request (JobMapPage.jsx).
+  const employerRatings = useEmployerRatings(allJobs)
   const jobsWithCoords = useMemo(
     () => (pinsData ?? []).filter((job) => job.latitude != null && job.longitude != null && activeTiers.has(tierFor(job))),
     [pinsData, activeTiers]
@@ -431,6 +434,7 @@ export default function JobMapScreen() {
                 saving={toggleSavedMutation.isPending && String(toggleSavedMutation.variables) === String(job.post_id)}
                 onPress={() => openJob(job)}
                 onToggleSave={() => toggleSavedMutation.mutate(String(job.post_id))}
+                rating={job.employer?.employer_id ? employerRatings[String(job.employer.employer_id)] : undefined}
               />
             ))}
             {isFetching && !isLoading ? <ActivityIndicator color={colors.info} style={styles.footerSpinner} /> : null}

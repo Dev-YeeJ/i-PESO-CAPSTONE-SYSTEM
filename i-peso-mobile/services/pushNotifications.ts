@@ -138,6 +138,9 @@ export interface PushNotificationData {
   // Review notifications — review_invitation also carries application_id.
   review_type?: string
   placement_record_id?: number | string | null
+  // Report & Safety — safety_report_update carries report_id; safety_action_notice carries action.
+  report_id?: number | string
+  action?: string
 }
 
 /**
@@ -157,6 +160,13 @@ export function routeForPushData(data: PushNotificationData): string | null {
   if (data.type === 'review_moderated' || data.type === 'worker_feedback_received') {
     return '/(seeker)/reviews?from=notifications'
   }
+  if (data.type === 'safety_report_update') {
+    return data.report_id
+      ? `/(seeker)/safety-reports?case=${encodeURIComponent(String(data.report_id))}&from=notifications`
+      : '/(seeker)/safety-reports?from=notifications'
+  }
+  // A PESO notice about the seeker's own account has no screen; open Notifications to read it.
+  if (data.type === 'safety_action_notice') return '/(seeker)/notifications'
   if (data.type === 'interview' && data.application_id) {
     return `/(seeker)/applications/${data.application_id}`
   }

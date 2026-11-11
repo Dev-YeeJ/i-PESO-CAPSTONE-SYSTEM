@@ -861,6 +861,21 @@ export default function ProfileScreen() {
           </Button>
         </Card>
 
+        <SectionHeader title="Safety Reports" />
+        <Card padding="md">
+          <Text style={styles.muted}>
+            Concerns you reported to PESO about employers or job vacancies, and their status. Reports are confidential.
+          </Text>
+          <Button
+            variant="outline"
+            fullWidth
+            onPress={() => router.push('/(seeker)/safety-reports')}
+            style={styles.updateBtn}
+          >
+            Open My Safety Reports
+          </Button>
+        </Card>
+
         <Button variant="primary" fullWidth onPress={() => router.push('/(seeker)/profile/edit')} style={styles.editAllBtn}>
           Edit profile details
         </Button>

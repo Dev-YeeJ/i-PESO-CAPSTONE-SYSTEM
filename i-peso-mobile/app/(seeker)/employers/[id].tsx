@@ -16,7 +16,7 @@ import { EmptyState } from '@/components/ui/EmptyState'
 import { PressableScale } from '@/components/ui/PressableScale'
 import { ScreenHeader } from '@/components/ui/ScreenHeader'
 import { ScreenSkeleton } from '@/components/ui/ScreenSkeleton'
-import { ReportEmployerModal } from '@/components/ReportEmployerModal'
+import { ReportConcernSheet } from '@/components/safety/ReportConcernSheet'
 import { CompanyReviews } from '@/components/reviews/CompanyReviews'
 import { colors, radii, spacing, typography } from '@/theme'
 
@@ -294,10 +294,9 @@ export default function EmployerProfileScreen() {
         </PressableScale>
       </ScrollView>
 
-      <ReportEmployerModal
+      <ReportConcernSheet
         visible={reportOpen}
-        employerId={employer.employer_id}
-        employerName={name}
+        target={{ subjectId: employer.employer_id, subjectName: name }}
         onClose={() => setReportOpen(false)}
       />
     </View>

@@ -17,6 +17,8 @@ import { PressableScale } from '@/components/ui/PressableScale'
 import { ScreenHeader } from '@/components/ui/ScreenHeader'
 import { ScreenSkeleton } from '@/components/ui/ScreenSkeleton'
 import { ApplicationReviewActions } from '@/components/reviews/ApplicationReviewActions'
+import { ReportConcernSheet } from '@/components/safety/ReportConcernSheet'
+import MaterialIcons from '@expo/vector-icons/MaterialIcons'
 import { colors, radii, spacing, typography } from '@/theme'
 
 export default function ApplicationDetailScreen() {
@@ -26,6 +28,7 @@ export default function ApplicationDetailScreen() {
   const { showToast } = useToast()
   const insets = useSafeAreaInsets()
   const [withdrawError, setWithdrawError] = useState('')
+  const [reportOpen, setReportOpen] = useState(false)
 
   const { data: application, isLoading, error } = useQuery({
     queryKey: ['application', id],
@@ -224,7 +227,29 @@ export default function ApplicationDetailScreen() {
 
         {/* Rate buttons / "You reviewed this employer" — renders nothing when neither applies. */}
         <ApplicationReviewActions applicationId={application.apply_id} />
+
+        {/* Kept quiet, as on the website: reporting never competes with the main actions. */}
+        {job?.employer?.employer_id ? (
+          <PressableScale scaleTo="buttonPress" ripple={null} style={styles.reportLink} onPress={() => setReportOpen(true)} accessibilityRole="button">
+            <MaterialIcons name="flag" size={16} color={colors.textSecondary} />
+            <Text style={styles.reportLinkText}>Report a concern</Text>
+          </PressableScale>
+        ) : null}
       </ScrollView>
+
+      {job?.employer?.employer_id ? (
+        <ReportConcernSheet
+          visible={reportOpen}
+          target={{
+            subjectId: job.employer.employer_id,
+            subjectName: jobCompany(job),
+            postId: job.post_id,
+            postTitle: job.job_title,
+            applicationId: application.apply_id,
+          }}
+          onClose={() => setReportOpen(false)}
+        />
+      ) : null}
 
       {application.can_withdraw ? (
         <View style={[styles.footer, { paddingBottom: insets.bottom + spacing.md }]}>
@@ -282,4 +307,6 @@ const styles = StyleSheet.create({
   noLinkText: { color: colors.secondaryText, fontSize: typography.body, fontFamily: typography.family.medium, textAlign: 'center', marginVertical: spacing.sm },
   remarksText: { color: colors.secondaryText, fontSize: typography.body, lineHeight: 20 },
   footer: { padding: spacing.md, backgroundColor: colors.surface, borderTopWidth: 1, borderTopColor: colors.border },
+  reportLink: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs, marginTop: spacing.xl, minHeight: 44 },
+  reportLinkText: { color: colors.textSecondary, fontSize: typography.small, fontFamily: typography.family.bold },
 })

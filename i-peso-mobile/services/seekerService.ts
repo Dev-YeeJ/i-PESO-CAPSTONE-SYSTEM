@@ -284,6 +284,10 @@ export interface SeekerNotification {
     // Review notifications (review_invitation / review_moderated / worker_feedback_received).
     review_type?: ReviewType
     placement_record_id?: number | string | null
+    // Report & Safety notifications.
+    report_id?: number | string
+    case_number?: string
+    action?: string
   }
   read_at: string | null
   created_at: string
@@ -632,7 +636,94 @@ export interface EmployerProfileResponse {
   vacancies: EmployerVacancy[]
 }
 
-export type EmployerReportReason = 'fake_job' | 'misleading' | 'abusive' | 'discrimination' | 'illegal_fees' | 'other'
+// ── Report & Safety (job seekers reporting employers) ─────────────────────
+// Shapes mirror i-peso-backend's SafetyReportCatalog::formOptions() and
+// SafetyReportService::reporterView(). A reporter only ever sees this view —
+// never PESO's notes, findings or the action taken.
+
+export type SafetyReportStatus = 'submitted' | 'under_review' | 'action_required' | 'resolved' | 'dismissed'
+
+export interface SafetyReportOptions {
+  subject_type: 'employer' | 'job_seeker'
+  categories: { value: string; label: string; hint: string | null }[]
+  limits: {
+    description_min: number
+    description_max: number
+    max_attachments: number
+    max_attachment_kb: number
+    attachment_types: string[]
+  }
+  statuses: { value: SafetyReportStatus; label: string }[]
+}
+
+/** One case in the reporter's list (reporterView, not detailed). */
+export interface SafetyReportSummary {
+  id: number
+  case_number: string
+  subject_type: 'employer' | 'job_seeker'
+  subject_name: string | null
+  category: string
+  category_label: string
+  status: SafetyReportStatus
+  status_label: string
+  is_open: boolean
+  vacancy_title: string | null
+  created_at: string | null
+  updated_at: string | null
+  closed_at: string | null
+  /** The only outcome text a reporter ever sees. */
+  outcome_message: string
+}
+
+/** reporterView(detailed: true). */
+export interface SafetyReportDetail extends SafetyReportSummary {
+  description: string
+  incident_date: string | null
+  attachments: { id: number; name: string; size: number; created_at: string | null }[]
+  updates: { body: string | null; attachments: number; created_at: string | null }[]
+}
+
+export interface SafetyReportsPage {
+  data: SafetyReportSummary[]
+  current_page: number
+  last_page: number
+  total: number
+}
+
+/** A picked file, appended to multipart as { uri, name, type }. */
+export interface EvidenceFile {
+  uri: string
+  name: string
+  type: string
+  size?: number
+}
+
+export interface SafetyReportSubmitPayload {
+  subject_id: number | string
+  post_id?: number | string | null
+  application_id?: number | string | null
+  category: string
+  description: string
+  incident_date?: string | null
+  attachments: EvidenceFile[]
+}
+
+/** The 409 body when an open report about the same employer already exists. */
+export interface SafetyReportDuplicateBody {
+  message: string
+  existing_report: { id: number; case_number: string; status: SafetyReportStatus }
+}
+
+/** Multipart for the safety endpoints: optional empty fields left out, files as attachments[]. */
+function safetyFormData(fields: Record<string, string | number | null | undefined>, files: EvidenceFile[]) {
+  const form = new FormData()
+  Object.entries(fields).forEach(([key, value]) => {
+    if (value === undefined || value === null || value === '') return
+    form.append(key, String(value))
+  })
+  files.forEach((file) => form.append('attachments[]', { uri: file.uri, name: file.name, type: file.type } as unknown as Blob))
+  return form
+}
 
 function toFormData(fields: Record<string, unknown>, file?: { uri: string; name: string; type: string; fieldName: string }) {
   const formData = new FormData()
@@ -910,9 +1001,41 @@ export const seekerService = {
     return res.data
   },
 
-  async reportEmployer(employerId: number | string, payload: { reason: EmployerReportReason; description: string }) {
-    const res = await apiClient.post(`/seeker/employers/${employerId}/report`, payload)
-    return res.data as { message: string; report: { id: number | string; reason: string; status: string; created_at: string } }
+  // ── Report & Safety (mirrors safetyReportService.js with role 'seeker') ─
+  async safetyReportOptions(): Promise<SafetyReportOptions> {
+    const res = await apiClient.get('/seeker/safety-reports/options')
+    return res.data
+  },
+
+  async mySafetyReports(page = 1): Promise<SafetyReportsPage> {
+    const res = await apiClient.get('/seeker/safety-reports', { params: { page } })
+    return res.data
+  },
+
+  async mySafetyReport(id: number | string): Promise<SafetyReportDetail> {
+    const res = await apiClient.get(`/seeker/safety-reports/${id}`)
+    return res.data.report
+  },
+
+  /** 201 with the case, 409 (SafetyReportDuplicateBody) or 422 with field errors. */
+  async submitSafetyReport(payload: SafetyReportSubmitPayload) {
+    const form = safetyFormData({
+      subject_id: payload.subject_id,
+      post_id: payload.post_id,
+      application_id: payload.application_id,
+      category: payload.category,
+      description: payload.description,
+      incident_date: payload.incident_date,
+      acknowledge: '1',
+    }, payload.attachments)
+    const res = await apiClient.post('/seeker/safety-reports', form, { headers: { 'Content-Type': 'multipart/form-data' } })
+    return res.data as { message: string; report: SafetyReportDetail }
+  },
+
+  async addSafetyReportDetails(id: number | string, payload: { details?: string | null; attachments: EvidenceFile[] }) {
+    const form = safetyFormData({ details: payload.details }, payload.attachments)
+    const res = await apiClient.post(`/seeker/safety-reports/${id}/details`, form, { headers: { 'Content-Type': 'multipart/form-data' } })
+    return res.data as { message: string; report: SafetyReportDetail }
   },
 
   // ── Reviews (mirrors i-peso-frontend's reviewService.js) ───────────────

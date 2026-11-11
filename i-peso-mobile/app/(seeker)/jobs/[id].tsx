@@ -32,7 +32,8 @@ import { ScreenHeader } from '@/components/ui/ScreenHeader'
 import { MatchRing } from '@/components/ui/MatchRing'
 import { Skeleton, SkeletonGroup } from '@/components/ui/Skeleton'
 import { SuccessSheet } from '@/components/ui/SuccessSheet'
-import { ReportEmployerModal } from '@/components/ReportEmployerModal'
+import { ReportConcernSheet } from '@/components/safety/ReportConcernSheet'
+import { CompanyRatingSummary } from '@/components/reviews/CompanyRatingSummary'
 import { colors, gradients, radii, shadows, spacing, textStyles } from '@/theme'
 
 // Where the header's back button should land, since jobs/[id] is a flat sibling in the
@@ -325,9 +326,18 @@ export default function JobDetailsScreen() {
         </Card>
 
         {job.employer?.employer_id ? (
+          <View style={styles.ratingSummary}>
+            <CompanyRatingSummary
+              employerId={job.employer.employer_id}
+              onSeeAll={() => router.push({ pathname: '/(seeker)/employers/[id]', params: { id: String(job.employer!.employer_id), from: 'job', fromId: String(id) } })}
+            />
+          </View>
+        ) : null}
+
+        {job.employer?.employer_id ? (
           <PressableScale scaleTo="buttonPress" ripple={null} style={styles.reportLink} onPress={() => setReportOpen(true)} accessibilityRole="button">
             <MaterialIcons name="flag" size={16} color={colors.textSecondary} />
-            <Text style={styles.reportLinkText}>Report this employer</Text>
+            <Text style={styles.reportLinkText}>Report this vacancy</Text>
           </PressableScale>
         ) : null}
       </ScrollView>
@@ -470,12 +480,14 @@ export default function JobDetailsScreen() {
         onSecondary={() => setApplySuccess(false)}
       />
 
-      <ReportEmployerModal
-        visible={reportOpen}
-        employerId={job.employer?.employer_id ?? null}
-        employerName={jobCompany(job)}
-        onClose={() => setReportOpen(false)}
-      />
+      {job.employer?.employer_id ? (
+        // The backend links the seeker's application to this vacancy on its own.
+        <ReportConcernSheet
+          visible={reportOpen}
+          target={{ subjectId: job.employer.employer_id, subjectName: jobCompany(job), postId: job.post_id, postTitle: job.job_title }}
+          onClose={() => setReportOpen(false)}
+        />
+      ) : null}
     </View>
   )
 }
@@ -629,6 +641,7 @@ const styles = StyleSheet.create({
   tagMutedText: { ...textStyles.smallMedium, color: colors.muted },
   missingHint: { marginTop: spacing.md, ...textStyles.small, color: colors.textSecondary, lineHeight: 18 },
 
+  ratingSummary: { marginTop: spacing.lg },
   reportLink: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs, marginTop: spacing.xxl, paddingVertical: spacing.md },
   reportLinkText: { ...textStyles.smallBold, color: colors.textSecondary },
 

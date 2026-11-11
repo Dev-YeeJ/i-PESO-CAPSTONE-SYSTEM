@@ -100,6 +100,14 @@ export default function NotificationsScreen() {
       router.push({ pathname: '/(seeker)/reviews', params: review ? { review, from: 'notifications' } : { from: 'notifications' } })
     } else if (notificationType === 'review_moderated' || notificationType === 'worker_feedback_received') {
       router.push({ pathname: '/(seeker)/reviews', params: { from: 'notifications' } })
+    } else if (notificationType === 'safety_report_update') {
+      router.push({
+        pathname: '/(seeker)/safety-reports',
+        params: notification.data?.report_id ? { case: String(notification.data.report_id), from: 'notifications' } : { from: 'notifications' },
+      })
+    } else if (notificationType === 'safety_action_notice') {
+      // A notice from PESO about this account: no screen of its own. Marked read above;
+      // stay here rather than falling through to another branch.
     } else if (notification.data?.type === 'interview' && notification.data?.application_id) {
       router.push(`/(seeker)/applications/${notification.data.application_id}` as any)
     } else if (notification.data?.application_id) {
