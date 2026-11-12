@@ -671,12 +671,76 @@ class JobFairController extends Controller
 
     public function downloadAttendancePdf(Request $request, JobFair $jobFair)
     {
-        $this->admin($request);
+        $admin = $this->admin($request);
         $rows = $this->attendanceRows($jobFair);
 
-        return Pdf::loadView('pdf.job_fairs.attendance', ['fair' => $jobFair, 'rows' => $rows])
-            ->setPaper('a4', 'landscape')
-            ->download('job-fair-attendance-'.$jobFair->job_fair_id.'.pdf');
+        $pdf = Pdf::loadView('pdf.job_fairs.attendance', $this->attendancePdfData($jobFair, $rows, $admin))
+            ->setPaper('a4', 'landscape');
+        \App\Support\PdfPageNumbers::stamp($pdf);
+
+        return $pdf->download('job-fair-attendance-'.$jobFair->job_fair_id.'.pdf');
+    }
+
+    /**
+     * Event details, headline counts and signatory for the formal attendance
+     * PDF (pdf/job_fairs/attendance). The rows themselves are shared with the
+     * Excel export via attendanceRows(), so they're passed through untouched.
+     */
+    private function attendancePdfData(JobFair $jobFair, array $rows, $admin): array
+    {
+        $dash = '—';
+        $rowsCollection = collect($rows);
+        $male = $rowsCollection->filter(fn ($row) => strtolower((string) $row['gender']) === 'male')->count();
+        $female = $rowsCollection->filter(fn ($row) => strtolower((string) $row['gender']) === 'female')->count();
+        $registered = $rowsCollection->where('type', 'Registered')->count();
+
+        $start = $jobFair->start_date ?? $jobFair->event_date;
+        $end = $jobFair->end_date;
+        $date = match (true) {
+            ! $start => $dash,
+            $end && ! $end->isSameDay($start) => $start->format('F d, Y').' – '.$end->format('F d, Y'),
+            default => $start->format('l, F d, Y'),
+        };
+        $time = $jobFair->start_time
+            ? date('g:i A', strtotime($jobFair->start_time)).($jobFair->end_time ? ' – '.date('g:i A', strtotime($jobFair->end_time)) : '')
+            : $dash;
+
+        $partners = collect($jobFair->partner_agencies ?? [])
+            ->map(fn ($partner) => is_array($partner) ? ($partner['name'] ?? null) : $partner)
+            ->filter()
+            ->implode(', ');
+
+        $participatingEmployers = $jobFair->employerJoins()
+            ->whereIn('participation_status', ['approved', 'attended', 'encoded_results', 'report_generated'])
+            ->count();
+
+        return [
+            'fair' => $jobFair,
+            'rows' => $rows,
+            'referenceNo' => sprintf('JF-%05d-ATT', $jobFair->job_fair_id),
+            'generatedAt' => now()->setTimezone('Asia/Manila')->format('M d, Y h:i A'),
+            'generatedDate' => now()->setTimezone('Asia/Manila')->format('M d, Y'),
+            'preparedBy' => trim(($admin->first_name ?? '').' '.($admin->last_name ?? '')) ?: null,
+            'event' => [
+                'date' => $date,
+                'time' => $time,
+                'venue' => $jobFair->venue ?: $dash,
+                'address' => collect([$jobFair->specific_address, $jobFair->barangay, $jobFair->city_municipality, $jobFair->province])
+                    ->filter()->implode(', ') ?: $dash,
+                'target_sector' => filled($jobFair->target_sector) ? ucwords(str_replace('_', ' ', (string) $jobFair->target_sector)) : 'General Public',
+                'partner_agencies' => $partners ?: $dash,
+                'status' => filled($jobFair->status) ? ucwords(str_replace('_', ' ', (string) $jobFair->status)) : $dash,
+            ],
+            'summary' => [
+                'total' => $rowsCollection->count(),
+                'registered' => $registered,
+                'walk_in' => $rowsCollection->count() - $registered,
+                'male' => $male,
+                'female' => $female,
+                'unspecified' => $rowsCollection->count() - $male - $female,
+                'employers' => $participatingEmployers,
+            ],
+        ];
     }
 
     public function downloadAttendanceExcel(Request $request, JobFair $jobFair)

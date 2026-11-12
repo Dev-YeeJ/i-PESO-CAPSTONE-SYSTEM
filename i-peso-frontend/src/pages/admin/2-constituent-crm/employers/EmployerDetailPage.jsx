@@ -69,9 +69,10 @@ export default function EmployerDetailPage() {
   const [error, setError] = useState('')
   // Confirmation dialog state
   const [confirmDialog, setConfirmDialog] = useState(null)
-  // Track documents viewed during this session so UI updates immediately
+  // Documents *this account* opened during this session, so the badge flips
+  // immediately without a reload. "Viewed" is per account — a colleague having
+  // opened a file never marks it viewed for you (server: viewed_by_me_at).
   const [viewedDocumentIds, setViewedDocumentIds] = useState(new Set())
-  const [staffViewedDocumentIds, setStaffViewedDocumentIds] = useState(new Set())
   // Main-column tab — defaults to whichever the admin actually needs first:
   // the document queue for a pending employer, the profile otherwise.
   const [activeTab, setActiveTab] = useState(null)
@@ -119,7 +120,7 @@ export default function EmployerDetailPage() {
     setReviewingDocumentId(documentId)
     try {
       const result = await adminService.reviewEmployerDocument(documentId, 'rejected', reason)
-      patchDocument(documentId, { verification_status: result.verification_status, admin_notes: result.admin_notes, viewed_at: result.viewed_at })
+      patchDocument(documentId, { verification_status: result.verification_status, admin_notes: result.admin_notes, viewed_at: result.viewed_at, viewed_by_me_at: result.viewed_by_me_at })
     } catch (requestError) {
       setError(requestError.response?.data?.errors ? Object.values(requestError.response.data.errors).flat().join(' ') : (requestError.response?.data?.message ?? 'Unable to reject this document.'))
     } finally {
@@ -133,7 +134,7 @@ export default function EmployerDetailPage() {
     setReviewingDocumentId(documentId)
     try {
       const result = await adminService.reviewEmployerDocument(documentId, 'approved', null)
-      patchDocument(documentId, { verification_status: result.verification_status, admin_notes: result.admin_notes, viewed_at: result.viewed_at })
+      patchDocument(documentId, { verification_status: result.verification_status, admin_notes: result.admin_notes, viewed_at: result.viewed_at, viewed_by_me_at: result.viewed_by_me_at })
     } catch (requestError) {
       setError(requestError.response?.data?.message ?? 'Unable to undo this rejection.')
     } finally {
@@ -171,14 +172,7 @@ export default function EmployerDetailPage() {
       const file = await adminService.getEmployerDocument(document.document_id)
       const fileUrl = URL.createObjectURL(file)
       setPreviewDocument({ ...document, url: fileUrl, mimeType: file.type })
-      setStaffViewedDocumentIds((prev) => new Set(prev).add(document.document_id))
-      if (canAct) {
-        setViewedDocumentIds((prev) => {
-          const next = new Set(prev)
-          next.add(document.document_id)
-          return next
-        })
-      }
+      setViewedDocumentIds((prev) => new Set(prev).add(document.document_id))
     } catch (requestError) {
       setError(requestError.response?.data?.message ?? 'Unable to open this document.')
     } finally {
@@ -318,11 +312,14 @@ export default function EmployerDetailPage() {
 
   const requiredCount = requiredDocuments.length
 
-  // Check if all required documents have been viewed (only for unapproved docs)
+  const viewedByMe = (doc) => Boolean(doc?.viewed_by_me_at) || viewedDocumentIds.has(doc?.document_id)
+
+  // Required documents still awaiting a decision that *this account* hasn't
+  // opened — mirrors the server's finalize guard (EmployerVerificationController).
   const unviewedRequiredDocs = requiredDocuments.filter((type) => {
     const doc = verificationDocuments.find((d) => d.document_type === type)
     if (!doc || doc.verification_status === 'approved') return false
-    return !doc.viewed_at && !viewedDocumentIds.has(doc.document_id)
+    return !viewedByMe(doc)
   })
   const allRequiredViewed = unviewedRequiredDocs.length === 0
 
@@ -539,21 +536,23 @@ export default function EmployerDetailPage() {
                                 </div>
                               ) : doc.verification_status === 'approved' ? (
                                 <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700"><CheckCircle2 className="h-3.5 w-3.5" />Approved</span>
-                              ) : (doc.viewed_at || viewedDocumentIds.has(doc.document_id)) ? (
+                              ) : viewedByMe(doc) ? (
                                 <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 border border-blue-200 px-2.5 py-1 text-xs font-bold text-blue-700">
                                   <Eye className="h-3.5 w-3.5" />
-                                  Viewed
-                                </span>
-                              ) : (doc.staff_viewed_at || staffViewedDocumentIds.has(doc.document_id)) ? (
-                                <span className="inline-flex items-center gap-1 rounded-full bg-sky-50 border border-sky-200 px-2.5 py-1 text-xs font-bold text-sky-800">
-                                  <Eye className="h-3.5 w-3.5" />
-                                  Seen by staff · officer review required
+                                  Viewed by you
                                 </span>
                               ) : (
-                                <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 border border-amber-200 px-2.5 py-1 text-xs font-bold text-amber-700">
-                                  <AlertTriangle className="h-3.5 w-3.5" />
-                                  Not yet viewed
-                                </span>
+                                <div>
+                                  <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 border border-amber-200 px-2.5 py-1 text-xs font-bold text-amber-700">
+                                    <AlertTriangle className="h-3.5 w-3.5" />
+                                    Not yet viewed by you
+                                  </span>
+                                  {doc.viewed_by?.length > 0 && (
+                                    <p className="mt-1 whitespace-normal break-words text-xs text-slate-400">
+                                      Opened by {doc.viewed_by.map((viewer) => viewer.name).join(', ')}
+                                    </p>
+                                  )}
+                                </div>
                               )}
                             </TableCell>
                             <TableCell className="text-xs text-slate-600">

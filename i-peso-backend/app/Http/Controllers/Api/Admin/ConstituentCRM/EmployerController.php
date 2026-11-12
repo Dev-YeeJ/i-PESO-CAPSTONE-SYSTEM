@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Administrator;
 use App\Models\Application;
 use App\Models\Employer;
+use App\Models\EmployerDocumentView;
 use App\Services\ActivityLogger;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
@@ -179,6 +180,16 @@ class EmployerController extends Controller
         $documents = [];
         if (Schema::hasTable('employer_documents')) {
             $documents = $employer->documents()->select(['document_id', 'employer_id', 'document_type', 'original_filename', 'mime_type', 'file_size', 'uploaded_at', 'verification_status', 'admin_notes', 'expiration_date', 'viewed_at', 'staff_viewed_at'])->get()->toArray();
+
+            // "Viewed" on the admin review screen is per account: whether *this*
+            // staff member opened the file, plus who else did (context only).
+            if (Schema::hasTable('employer_document_views')) {
+                $viewState = EmployerDocumentView::summarizeFor(array_column($documents, 'document_id'), request()->user());
+                $documents = array_map(fn (array $document) => $document + [
+                    'viewed_by_me_at' => $viewState[$document['document_id']]['viewed_by_me_at'] ?? null,
+                    'viewed_by' => $viewState[$document['document_id']]['viewed_by'] ?? [],
+                ], $documents);
+            }
         }
 
         $vacancies = [];

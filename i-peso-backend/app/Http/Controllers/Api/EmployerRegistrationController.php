@@ -161,6 +161,9 @@ class EmployerRegistrationController extends Controller
     public function registerStep3(Request $request): JsonResponse
     {
         $employer = $this->authenticatedEmployer($request);
+        // The full required set (company documents + Government ID), not just the
+        // Step 3 checklist: the employer dashboard re-uploads a rejected or
+        // replaced Government ID through this same endpoint.
         $requiredDocuments = $employer->getRequiredDocuments();
         $allowedDocuments = array_merge($requiredDocuments, $employer->getOptionalDocuments());
 
@@ -208,6 +211,11 @@ class EmployerRegistrationController extends Controller
                     ? $request->input('expiration_date')
                     : null,
             ]);
+
+            // updateOrCreate keeps the same document_id for a replacement file, so
+            // every staff account's "I've opened this" record would otherwise carry
+            // over to a file none of them has seen.
+            $document->forgetViews();
 
             // When a rejected employer uploads a corrected document, reset the employer account
             // and ALL other still-rejected documents back to 'pending' so the admin can
@@ -258,7 +266,7 @@ class EmployerRegistrationController extends Controller
                 $document->delete();
             }
 
-            $required = $employer->getRequiredDocuments();
+            $required = $employer->getRequiredCompanyDocuments();
             $optional = $employer->getOptionalDocuments();
             $uploaded = $employer->documents()
                 ->pluck('document_type')
@@ -274,7 +282,7 @@ class EmployerRegistrationController extends Controller
                 'uploaded_documents' => $uploaded,
                 'documents_meta' => $documentsMeta,
                 'missing_documents' => array_diff($required, $uploaded),
-                'all_uploaded' => $employer->hasAllRequiredDocuments(),
+                'all_uploaded' => $employer->hasAllRequiredCompanyDocuments(),
             ], 200);
         } catch (\Exception $e) {
             return response()->json(['error' => $this->safeErrorMessage($e, 'Unable to remove document.')], 500);
@@ -289,7 +297,7 @@ class EmployerRegistrationController extends Controller
     {
         try {
             $employer = $this->authenticatedEmployer($request);
-            $required = $employer->getRequiredDocuments();
+            $required = $employer->getRequiredCompanyDocuments();
             $optional = $employer->getOptionalDocuments();
             $uploaded = $employer->documents()
                 ->pluck('document_type')
@@ -304,7 +312,7 @@ class EmployerRegistrationController extends Controller
                 'uploaded_documents' => $uploaded,
                 'documents_meta' => $documentsMeta,
                 'missing_documents' => array_diff($required, $uploaded),
-                'all_uploaded' => $employer->hasAllRequiredDocuments(),
+                'all_uploaded' => $employer->hasAllRequiredCompanyDocuments(),
             ], 200);
         } catch (\Exception $e) {
             return response()->json(['error' => $this->safeErrorMessage($e, 'Unable to load required documents.')], 404);
@@ -315,7 +323,7 @@ class EmployerRegistrationController extends Controller
      * Set (or change, before the account is approved) the employer's legal
      * company type. Deferred here from account creation to the start of the
      * Legal Documents step, since this is the only thing it actually
-     * affects — see Employer::getRequiredDocuments().
+     * affects — see Employer::getRequiredCompanyDocuments().
      * POST /api/employer/register/company-type
      */
     public function setCompanyType(Request $request): JsonResponse
@@ -339,7 +347,7 @@ class EmployerRegistrationController extends Controller
 
             $employer->update(['company_type' => $request->company_type]);
 
-            $required = $employer->getRequiredDocuments();
+            $required = $employer->getRequiredCompanyDocuments();
             $optional = $employer->getOptionalDocuments();
             $uploaded = $employer->documents()
                 ->pluck('document_type')
@@ -351,7 +359,7 @@ class EmployerRegistrationController extends Controller
                 'optional_documents' => $optional,
                 'uploaded_documents' => $uploaded,
                 'missing_documents' => array_diff($required, $uploaded),
-                'all_uploaded' => $employer->hasAllRequiredDocuments(),
+                'all_uploaded' => $employer->hasAllRequiredCompanyDocuments(),
             ], 200);
         } catch (\Exception $e) {
             return response()->json(['error' => $this->safeErrorMessage($e, 'Unable to save your company type.')], 404);
@@ -391,7 +399,7 @@ class EmployerRegistrationController extends Controller
                 ], 422);
             }
 
-            if (! $employer->hasAllRequiredDocuments()) {
+            if (! $employer->hasAllRequiredCompanyDocuments()) {
                 return response()->json([
                     'message' => 'Upload all required company documents before submitting.',
                 ], 422);
@@ -418,7 +426,14 @@ class EmployerRegistrationController extends Controller
                 $idFile = $request->file('government_id');
                 $idPath = $idFile->store('employer_documents', $this->documentDisk());
 
-                EmployerDocument::updateOrCreate([
+                // Same clean-up Step 3 does for a replaced company document —
+                // a resubmission otherwise orphans the previous ID image on disk.
+                $previousId = $employer->documents()->where('document_type', 'government_id')->first();
+                if ($previousId) {
+                    $this->deleteStoredDocument($previousId->document_path);
+                }
+
+                $governmentId = EmployerDocument::updateOrCreate([
                     'employer_id' => $employer->employer_id,
                     'document_type' => 'government_id',
                 ], [
@@ -431,6 +446,8 @@ class EmployerRegistrationController extends Controller
                     'viewed_at' => null,
                     'staff_viewed_at' => null,
                 ]);
+
+                $governmentId->forgetViews();
             }
 
             try {

@@ -286,6 +286,40 @@ class PlacementReportFlowTest extends TestCase
         $this->assertSame(2, PlacementRecord::where('upload_id', $uploadId)->count());
     }
 
+    public function test_admin_can_export_a_submitted_report_and_a_nil_report_as_the_formal_pdf(): void
+    {
+        $employer = $this->employer();
+        $admin = $this->admin();
+
+        Sanctum::actingAs($employer);
+        $uploadId = $this->postJson('/api/employer/placement-reports/manual', [
+            'coverage_month' => 3, 'coverage_year' => 2026,
+        ])->assertCreated()->json('data.id');
+        $this->putJson("/api/employer/placement-reports/{$uploadId}/records", [
+            'records' => [
+                ['first_name' => 'Ana', 'last_name' => 'Santos', 'date_hired' => '2026-03-10', 'position' => 'Encoder', 'gender' => 'female', 'birth_date' => '2000-10-13'],
+                ['first_name' => 'Ben', 'middle_name' => 'Cruz', 'last_name' => 'Lim', 'date_hired' => '2026-03-15', 'position' => 'Driver', 'gender' => 'male', 'assigned_company' => 'Client Corp'],
+            ],
+        ])->assertOk();
+        $this->postJson("/api/employer/placement-reports/{$uploadId}/submit")->assertOk();
+
+        $nilEmployer = $this->employer('nil-employer@example.test', 'Quiet Month Inc.');
+        Sanctum::actingAs($nilEmployer);
+        $nilId = $this->postJson('/api/employer/placement-reports/nil', [
+            'coverage_month' => 3, 'coverage_year' => 2026,
+        ])->assertCreated()->json('data.id');
+
+        Sanctum::actingAs($admin);
+        $this->postJson("/api/admin/placement-reports/{$uploadId}/approve")->assertOk();
+
+        foreach ([$uploadId, $nilId] as $id) {
+            $response = $this->get("/api/admin/placement-reports/{$id}/export-pdf")
+                ->assertOk()
+                ->assertHeader('content-type', 'application/pdf');
+            $this->assertStringStartsWith('%PDF', $response->getContent());
+        }
+    }
+
     public function test_manual_entry_cannot_be_submitted_with_no_records(): void
     {
         $employer = $this->employer();

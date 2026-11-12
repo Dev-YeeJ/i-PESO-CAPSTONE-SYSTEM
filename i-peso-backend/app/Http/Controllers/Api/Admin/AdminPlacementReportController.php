@@ -173,29 +173,126 @@ class AdminPlacementReportController extends Controller
         $this->admin($request);
         $this->assertSubmitted($placementReport);
 
-        $placementReport->load('employer:employer_id,company_name,trade_name');
-        $records = $placementReport->records()->orderBy('id')->get();
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('pdf.placement_report', $this->pdfData($placementReport))
+            ->setPaper('a4', 'landscape');
 
-        $html = '<style>body { font-family: sans-serif; font-size: 10px; } table { width: 100%; border-collapse: collapse; } th, td { border: 1px solid #ccc; padding: 4px; text-align: left; }</style>';
-        $html .= '<h2>Placement Report</h2>';
-        $html .= '<p><strong>Employer:</strong> ' . e($placementReport->employer?->company_name ?: $placementReport->employer?->trade_name) . '</p>';
-        $html .= '<p><strong>Coverage:</strong> ' . $placementReport->coverage_year . '-' . str_pad($placementReport->coverage_month, 2, '0', STR_PAD_LEFT) . '</p>';
-        $html .= '<table><thead><tr>';
-        foreach (PlacementRecord::MAPPABLE_FIELDS as $label) {
-            $html .= '<th>' . e($label) . '</th>';
-        }
-        $html .= '</tr></thead><tbody>';
-        foreach ($records as $record) {
-            $html .= '<tr>';
-            foreach (array_keys(PlacementRecord::MAPPABLE_FIELDS) as $field) {
-                $html .= '<td>' . e($record->{$field} ?? '') . '</td>';
-            }
-            $html .= '</tr>';
-        }
-        $html .= '</tbody></table>';
+        \App\Support\PdfPageNumbers::stamp($pdf);
 
-        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadHTML($html)->setPaper('a4', 'landscape');
         return $pdf->download('placement-report-'.$placementReport->id.'-'.now()->format('Ymd').'.pdf');
+    }
+
+    /**
+     * Everything the formal placement report template (pdf/placement_report)
+     * prints: letterhead-ready establishment details, report metadata, a
+     * per-sex/youth/i-PESO summary, the formatted register rows and the
+     * signatories. Kept out of the Blade view so the template stays layout only.
+     */
+    private function pdfData(PlacementReportUpload $report): array
+    {
+        $report->load(['employer', 'reviewer:admin_id,first_name,last_name']);
+        $records = $report->records()->orderBy('id')->get();
+        $employer = $report->employer;
+        $dash = '—';
+        $orDash = fn ($value) => filled($value) ? (string) $value : $dash;
+        $date = fn ($value) => $value ? Carbon::parse($value)->format('M d, Y') : $dash;
+        $titleCase = fn ($value) => filled($value) ? ucwords(strtolower(str_replace('_', ' ', (string) $value))) : $dash;
+
+        $companyName = $employer?->company_name ?: ($employer?->trade_name ?: 'Unnamed establishment');
+        $coverage = Carbon::create($report->coverage_year, $report->coverage_month, 1);
+
+        $rows = $records->map(function (PlacementRecord $record) use ($orDash, $date, $titleCase) {
+            $age = $record->age;
+            if ($age === null && $record->birth_date) {
+                $age = (int) floor($record->birth_date->diffInYears($record->date_hired ?? now()));
+            }
+
+            $name = trim(collect([$record->first_name, $record->middle_name])->filter()->join(' '));
+
+            return [
+                'name' => trim(($record->last_name ? $record->last_name.', ' : '').$name, ', ') ?: '—',
+                'sex' => $titleCase($record->gender),
+                'sex_key' => strtolower(substr((string) $record->gender, 0, 1)),
+                'civil_status' => $titleCase($record->civil_status),
+                'age' => $age ?? '—',
+                'age_value' => $age,
+                'birth_date' => $date($record->birth_date),
+                'date_hired' => $date($record->date_hired),
+                'position' => $orDash($record->position),
+                'department' => $orDash($record->department),
+                'address' => $orDash($record->address),
+                'education' => $orDash($record->educational_attainment),
+                'assigned_company' => $orDash($record->assigned_company),
+                'registered' => $record->seeker_id !== null,
+            ];
+        });
+
+        $male = $rows->where('sex_key', 'm')->count();
+        $female = $rows->where('sex_key', 'f')->count();
+
+        // Recruitment agencies report where each hire was deployed; for a
+        // direct employer the column just repeats its own name, so drop it.
+        $showAssignedCompany = $records->contains(fn (PlacementRecord $record) => filled($record->assigned_company)
+            && strcasecmp(trim($record->assigned_company), trim($companyName)) !== 0);
+
+        $reviewerName = $report->reviewer
+            ? trim($report->reviewer->first_name.' '.$report->reviewer->last_name)
+            : null;
+
+        $industry = $employer?->industry;
+        $address = $employer?->complete_address ?: collect([
+            $employer?->house_unit_street,
+            $employer?->barangay,
+            $employer?->city_municipality,
+            $employer?->province,
+        ])->filter()->join(', ');
+
+        return [
+            'report' => $report,
+            'referenceNo' => sprintf('PR-%04d%02d-%05d', $report->coverage_year, $report->coverage_month, $report->id),
+            'coverageLabel' => $coverage->format('F Y'),
+            'coveragePeriod' => $coverage->format('F 1').' – '.$coverage->copy()->endOfMonth()->format('F j, Y'),
+            'reportType' => match (true) {
+                (bool) $report->is_nil_report => 'Nil Report (no hires)',
+                $report->stored_path === null => 'Manual Entry',
+                default => 'File Upload'.($report->original_filename ? ' ('.$report->original_filename.')' : ''),
+            },
+            'statusLabel' => match ($report->status) {
+                PlacementReportUpload::STATUS_APPROVED => 'Approved',
+                PlacementReportUpload::STATUS_REJECTED => 'Returned for Correction',
+                PlacementReportUpload::STATUS_PENDING_REVIEW => 'For PESO Review',
+                default => $titleCase($report->status),
+            },
+            'submittedAt' => $date($report->submitted_at),
+            'generatedAt' => now()->setTimezone('Asia/Manila')->format('M d, Y h:i A'),
+            'employer' => [
+                'name' => $companyName,
+                'trade_name' => $employer?->trade_name && $employer->trade_name !== $companyName ? $employer->trade_name : null,
+                'company_type' => $titleCase($employer?->company_type),
+                'industry' => is_array($industry) ? ($industry ? implode(', ', $industry) : $dash) : $orDash($industry),
+                'tin' => $orDash($employer?->tin),
+                'address' => $orDash($address),
+                'representative' => $orDash($employer?->representative_name
+                    ?: trim(($employer?->representative_first_name ?? '').' '.($employer?->representative_last_name ?? ''))),
+                'designation' => $orDash($employer?->representative_designation),
+                'contact_number' => $orDash($employer?->representative_contact_number ?: $employer?->mobile_number),
+                'email' => $orDash($employer?->email),
+            ],
+            'reviewer' => [
+                'name' => $reviewerName ?: 'Not yet reviewed',
+                'signatory' => $reviewerName,
+                'date' => $report->reviewed_at ? $date($report->reviewed_at) : null,
+            ],
+            'summary' => [
+                'total' => $rows->count(),
+                'male' => $male,
+                'female' => $female,
+                'unspecified' => $rows->count() - $male - $female,
+                'youth' => $rows->filter(fn ($row) => $row['age_value'] !== null && $row['age_value'] >= 15 && $row['age_value'] <= 30)->count(),
+                'registered' => $rows->where('registered', true)->count(),
+            ],
+            'showAssignedCompany' => $showAssignedCompany,
+            'rows' => $rows->values()->all(),
+        ];
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────

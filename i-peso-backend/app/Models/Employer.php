@@ -150,9 +150,32 @@ class Employer extends Authenticatable
     }
 
     /**
-     * Get only required documents for this employer's company type
+     * Document types collected by the representative step (Step 4) rather than
+     * the company Legal Documents step (Step 3), yet still required of every
+     * employer regardless of company type.
      */
-    public function getRequiredDocuments()
+    public const IDENTITY_DOCUMENTS = ['government_id'];
+
+    /**
+     * Every document an employer must have on file to be accredited: the
+     * company documents for its type plus the representative's Government ID.
+     * This is the set the admin review, the finalize/approve verdict, the
+     * verification queue and the employer's own dashboard all work from.
+     */
+    public function getRequiredDocuments(): array
+    {
+        return array_values(array_unique(array_merge(
+            $this->getRequiredCompanyDocuments(),
+            self::IDENTITY_DOCUMENTS,
+        )));
+    }
+
+    /**
+     * Only the company documents uploaded on the Legal Documents step (Step 3)
+     * for this employer's company type — the Government ID is uploaded with the
+     * representative details on Step 4, so the Step 3 checklist excludes it.
+     */
+    public function getRequiredCompanyDocuments(): array
     {
         $required = [
             'mayors_permit',
@@ -191,7 +214,7 @@ class Employer extends Authenticatable
      * No document is optional anymore — the affidavit of undertaking and
      * the no-pending-case certificate (the last two that used to be
      * optional outside the recruitment-agency types) are now required for
-     * every company type, see getRequiredDocuments(). Kept as a method
+     * every company type, see getRequiredCompanyDocuments(). Kept as a method
      * returning an empty array so existing callers (the Step 3 upload UI,
      * the required-documents API response) keep working unchanged.
      */
@@ -201,11 +224,24 @@ class Employer extends Authenticatable
     }
 
     /**
-     * Check if all required documents are uploaded
+     * Check if every required document (company documents + Government ID) is uploaded.
      */
     public function hasAllRequiredDocuments(): bool
     {
-        $required = $this->getRequiredDocuments();
+        return $this->hasUploadedAll($this->getRequiredDocuments());
+    }
+
+    /**
+     * Check if every Step 3 company document is uploaded — the gate for
+     * moving on to (and submitting) the representative step.
+     */
+    public function hasAllRequiredCompanyDocuments(): bool
+    {
+        return $this->hasUploadedAll($this->getRequiredCompanyDocuments());
+    }
+
+    private function hasUploadedAll(array $required): bool
+    {
         $uploaded = $this->documents()
             ->whereIn('document_type', $required)
             ->pluck('document_type')

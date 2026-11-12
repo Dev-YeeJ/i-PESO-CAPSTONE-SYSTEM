@@ -130,11 +130,9 @@ export default function EmployerDashboard() {
   const hasRejectedDocuments = documents.some((doc) => doc.verification_status === 'rejected')
   const effectiveStatus = status === 'pending' && hasRejectedDocuments ? 'rejected' : status
   
-  const requiredDocuments = useMemo(() => {
-    const base = profile?.required_documents ?? []
-    if (base.length === 0) return base
-    return [...base, 'government_id']
-  }, [profile])
+  // The profile API's required_documents already includes the representative's
+  // Government ID (required for every employer) — no client-side append needed.
+  const requiredDocuments = useMemo(() => profile?.required_documents ?? [], [profile])
 
   if (loading) {
     return <div className="mx-auto max-w-7xl space-y-6 px-4 py-8 pb-24 sm:px-6 lg:px-8"><LoadingSkeleton variant="card" rows={1} /><div className="grid grid-cols-4 gap-4"><LoadingSkeleton variant="card" /><LoadingSkeleton variant="card" /><LoadingSkeleton variant="card" /><LoadingSkeleton variant="card" /></div></div>

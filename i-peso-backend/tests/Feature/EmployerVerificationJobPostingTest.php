@@ -6,6 +6,7 @@ use App\Models\Administrator;
 use App\Models\Application;
 use App\Models\Employer;
 use App\Models\EmployerDocument;
+use App\Models\EmployerDocumentView;
 use App\Models\JobSeeker;
 use App\Models\JobVacancy;
 use App\Models\Occupation;
@@ -116,6 +117,9 @@ class EmployerVerificationJobPostingTest extends TestCase
         $required = $response->json('required_documents');
         $this->assertContains('prpa_license', $required);
         $this->assertContains('sec_certificate', $required);
+        // The Government ID is collected on the representative step, so the
+        // Legal Documents checklist must not ask for it (it would block Step 3).
+        $this->assertNotContains('government_id', $required);
 
         $this->assertDatabaseHas('employers', [
             'employer_id' => $employer->employer_id,
@@ -688,9 +692,9 @@ class EmployerVerificationJobPostingTest extends TestCase
         Notification::fake();
         $employer = $this->createEmployer();
         $this->uploadRequiredDocuments($employer, 'pending');
-        $employer->documents()->update(['viewed_at' => now()]);
         $document = $employer->documents()->where('document_type', 'mayors_permit')->firstOrFail();
         $admin = $this->createAdmin('resubmission-admin@example.com');
+        $this->markAllDocumentsViewedBy($employer, $admin);
         $notes = 'The permit has expired. Upload the renewed permit with a visible validity date.';
 
         Sanctum::actingAs($admin);
@@ -726,6 +730,8 @@ class EmployerVerificationJobPostingTest extends TestCase
 
         $document = $employer->documents()->where('document_type', 'mayors_permit')->firstOrFail();
         $document->update(['viewed_at' => now()->subDay()]);
+        $reviewer = $this->createAdmin('reupload-viewer@example.com');
+        EmployerDocumentView::record($document->document_id, $reviewer->admin_id);
 
         Sanctum::actingAs($employer);
         $this->postJson('/api/employer/register/step-3', [
@@ -739,6 +745,8 @@ class EmployerVerificationJobPostingTest extends TestCase
         // been opened. A stale viewed_at would let a brand new file skip that check.
         $this->assertNull($document->viewed_at);
         $this->assertSame('pending', $document->verification_status);
+        // ...and the same goes for every account's own "I've opened it" record.
+        $this->assertDatabaseMissing('employer_document_views', ['document_id' => $document->document_id]);
     }
 
     public function test_a_new_company_logo_is_stored_publicly_and_kept_after_saving_the_profile(): void
@@ -816,9 +824,9 @@ class EmployerVerificationJobPostingTest extends TestCase
         Notification::fake();
         $employer = $this->createEmployer();
         $this->uploadRequiredDocuments($employer, 'pending');
-        $employer->documents()->update(['viewed_at' => now()]);
         $document = $employer->documents()->where('document_type', 'mayors_permit')->firstOrFail();
         $admin = $this->createAdmin('finalize-reject-admin@example.com');
+        $this->markAllDocumentsViewedBy($employer, $admin);
         $reason = 'The permit has lapsed and must be renewed before accreditation.';
 
         Sanctum::actingAs($admin);
@@ -1067,6 +1075,132 @@ class EmployerVerificationJobPostingTest extends TestCase
         ]);
     }
 
+    public function test_viewed_badge_is_per_account_not_shared_between_staff(): void
+    {
+        Storage::fake('local');
+        $employer = $this->createEmployer();
+        $this->uploadRequiredDocuments($employer, 'pending');
+        $permit = $employer->documents()->where('document_type', 'mayors_permit')->firstOrFail();
+        Storage::disk('local')->put($permit->document_path, 'mock pdf data');
+        $first = $this->createAdmin('first-viewer@example.com');
+        $second = $this->createAdmin('second-viewer@example.com');
+
+        Sanctum::actingAs($first);
+        $this->get("/api/admin/documents/{$permit->document_id}/view")->assertOk();
+
+        // The account that opened it sees it as viewed...
+        $mine = collect($this->getJson("/api/admin/employers/{$employer->employer_id}")->assertOk()->json('verification_documents'))
+            ->firstWhere('document_id', $permit->document_id);
+        $this->assertNotNull($mine['viewed_by_me_at']);
+        $this->assertSame([], $mine['viewed_by']);
+
+        // ...a colleague does not, and only sees who else opened it as context.
+        Sanctum::actingAs($second);
+        $theirs = collect($this->getJson("/api/admin/employers/{$employer->employer_id}")->assertOk()->json('verification_documents'))
+            ->firstWhere('document_id', $permit->document_id);
+        $this->assertNull($theirs['viewed_by_me_at']);
+        $this->assertSame($first->admin_id, $theirs['viewed_by'][0]['admin_id']);
+        $this->assertSame('PESO Admin', $theirs['viewed_by'][0]['name']);
+
+        $review = collect($this->getJson("/api/admin/employers/{$employer->employer_id}/review")->assertOk()->json('documents'))
+            ->firstWhere('document_id', $permit->document_id);
+        $this->assertNull($review['viewed_by_me_at']);
+    }
+
+    public function test_finalize_requires_the_deciding_officer_to_have_viewed_the_documents_themselves(): void
+    {
+        Notification::fake();
+        $employer = $this->createEmployer();
+        $employer->update(['registration_submitted_at' => now()]);
+        $this->uploadRequiredDocuments($employer, 'pending');
+        $colleague = $this->createAdmin('colleague-viewer@example.com');
+        $officer = $this->createAdmin('deciding-officer@example.com');
+        $this->markAllDocumentsViewedBy($employer, $colleague);
+
+        // Everything was opened — but by someone else.
+        Sanctum::actingAs($officer);
+        $response = $this->postJson("/api/admin/employers/{$employer->employer_id}/finalize")
+            ->assertStatus(422)
+            ->assertJsonPath('error', 'You must view all required documents before completing the review.');
+        $this->assertContains('government_id', $response->json('unviewed_documents'));
+        $this->assertSame('pending', $employer->fresh()->verification_status);
+
+        $this->markAllDocumentsViewedBy($employer, $officer);
+        $this->postJson("/api/admin/employers/{$employer->employer_id}/finalize")
+            ->assertOk()
+            ->assertJsonPath('outcome', 'approved');
+    }
+
+    public function test_government_id_is_required_for_every_company_type(): void
+    {
+        foreach (['sole_proprietorship', 'corporation_partnership', 'local_recruitment_agency', 'overseas_recruitment_agency', 'government_agency'] as $companyType) {
+            $employer = new Employer(['company_type' => $companyType]);
+
+            $this->assertContains('government_id', $employer->getRequiredDocuments(), $companyType);
+            $this->assertNotContains('government_id', $employer->getRequiredCompanyDocuments(), $companyType);
+        }
+    }
+
+    public function test_finalize_rejects_an_employer_whose_government_id_is_missing(): void
+    {
+        Notification::fake();
+        $employer = $this->createEmployer();
+        $this->uploadRequiredDocuments($employer, 'pending');
+        $employer->documents()->where('document_type', 'government_id')->delete();
+        $admin = $this->createAdmin('missing-id-admin@example.com');
+        $this->markAllDocumentsViewedBy($employer, $admin);
+
+        Sanctum::actingAs($admin);
+        $required = $this->getJson("/api/admin/employers/{$employer->employer_id}")->assertOk()->json('required_documents');
+        $this->assertContains('government_id', $required);
+
+        $this->postJson("/api/admin/employers/{$employer->employer_id}/finalize")
+            ->assertOk()
+            ->assertJsonPath('outcome', 'rejected');
+
+        $this->assertStringContainsString('Government ID: Required document was not submitted.', $employer->fresh()->rejection_reason);
+    }
+
+    public function test_rejected_government_id_rejects_the_employer_and_can_be_reuploaded(): void
+    {
+        Notification::fake();
+        Storage::fake('local');
+        $employer = $this->createEmployer();
+        $this->uploadRequiredDocuments($employer, 'pending');
+        $governmentId = $employer->documents()->where('document_type', 'government_id')->firstOrFail();
+        $admin = $this->createAdmin('id-reject-admin@example.com');
+        $this->markAllDocumentsViewedBy($employer, $admin);
+
+        Sanctum::actingAs($admin);
+        $this->postJson("/api/admin/documents/{$governmentId->document_id}/review", [
+            'verification_status' => 'rejected',
+            'admin_notes' => 'Document is blurry or unreadable',
+        ])->assertOk();
+        $this->postJson("/api/admin/employers/{$employer->employer_id}/finalize")
+            ->assertOk()
+            ->assertJsonPath('outcome', 'rejected');
+
+        // The employer dashboard's re-upload button posts to Step 3, which used to
+        // refuse government_id outright, leaving the employer stuck.
+        Sanctum::actingAs($employer->fresh());
+        $this->postJson('/api/employer/register/step-3', [
+            'document_type' => 'government_id',
+            'document_file' => UploadedFile::fake()->image('new-id.png'),
+        ])->assertCreated();
+
+        $governmentId->refresh();
+        $this->assertSame('pending', $governmentId->verification_status);
+        $this->assertSame('pending', $employer->fresh()->verification_status);
+        $this->assertDatabaseMissing('employer_document_views', ['document_id' => $governmentId->document_id]);
+    }
+
+    private function markAllDocumentsViewedBy(Employer $employer, Administrator $admin): void
+    {
+        foreach ($employer->documents()->pluck('document_id') as $documentId) {
+            EmployerDocumentView::record((int) $documentId, (int) $admin->admin_id);
+        }
+    }
+
     private function createEmployer(): Employer
     {
         return Employer::create([
@@ -1266,6 +1400,17 @@ class EmployerVerificationJobPostingTest extends TestCase
                 $table->timestamp('viewed_at')->nullable();
                 $table->timestamp('staff_viewed_at')->nullable();
                 $table->timestamps();
+            });
+        }
+
+        if (! Schema::hasTable('employer_document_views')) {
+            Schema::create('employer_document_views', function (Blueprint $table) {
+                $table->id();
+                $table->unsignedBigInteger('document_id');
+                $table->unsignedBigInteger('administrator_id');
+                $table->timestamp('viewed_at');
+                $table->timestamps();
+                $table->unique(['document_id', 'administrator_id']);
             });
         }
 

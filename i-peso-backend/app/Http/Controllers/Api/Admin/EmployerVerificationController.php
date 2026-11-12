@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Employer;
 use App\Models\EmployerDocument;
+use App\Models\EmployerDocumentView;
 use App\Notifications\EmployerVerificationProgressUpdated;
 use App\Notifications\EmployerVerificationStatusChanged;
 use App\Services\ActivityLogger;
@@ -175,6 +176,10 @@ class EmployerVerificationController extends Controller
     {
         try {
             $employer = Employer::with('documents')->findOrFail($employer_id);
+            $viewState = EmployerDocumentView::summarizeFor(
+                $employer->documents->pluck('document_id'),
+                request()->user(),
+            );
 
             return response()->json([
                 'employer' => [
@@ -206,6 +211,8 @@ class EmployerVerificationController extends Controller
                     'uploaded_at' => $doc->uploaded_at,
                     'viewed_at' => $doc->viewed_at,
                     'staff_viewed_at' => $doc->staff_viewed_at,
+                    'viewed_by_me_at' => $viewState[$doc->document_id]['viewed_by_me_at'] ?? null,
+                    'viewed_by' => $viewState[$doc->document_id]['viewed_by'] ?? [],
                     'verification_status' => $doc->verification_status,
                     'admin_notes' => $doc->admin_notes,
                 ]),
@@ -365,17 +372,26 @@ class EmployerVerificationController extends Controller
         try {
             $employer = Employer::with('documents')->findOrFail($employer_id);
 
-            // Require all required documents to be viewed by the admin before making a final decision
+            // The officer making the decision must have opened every required
+            // document still awaiting a decision *themselves* — a colleague having
+            // opened it doesn't count (see the employer_document_views migration).
+            // Documents already approved in an earlier review round are exempt.
             $requiredDocs = $employer->getRequiredDocuments();
+            $viewedByMe = EmployerDocumentView::query()
+                ->where('administrator_id', $request->user()->getKey())
+                ->whereIn('document_id', $employer->documents->pluck('document_id'))
+                ->pluck('document_id')
+                ->map(fn ($id) => (int) $id)
+                ->all();
             $unviewedRequired = $employer->documents
                 ->whereIn('document_type', $requiredDocs)
                 ->where('verification_status', '!=', 'approved')
-                ->where('viewed_at', null);
+                ->reject(fn ($document) => in_array((int) $document->document_id, $viewedByMe, true));
 
             if ($unviewedRequired->isNotEmpty()) {
                 return response()->json([
                     'error' => 'You must view all required documents before completing the review.',
-                    'unviewed_documents' => $unviewedRequired->pluck('document_type')
+                    'unviewed_documents' => $unviewedRequired->pluck('document_type')->values(),
                 ], 422);
             }
 
@@ -520,7 +536,14 @@ class EmployerVerificationController extends Controller
 
         // Keep staff access visible without allowing a view-only role or OJT
         // to satisfy the authorized officer's separate review requirement.
+        // These two shared columns only feed the employer-facing "PESO has opened
+        // your document" indicator; the admin-side "Viewed" badge and the finalize
+        // guard read the per-account record below.
         $user = $request->user();
+
+        if ($user instanceof \App\Models\Administrator) {
+            EmployerDocumentView::record((int) $document->document_id, (int) $user->getKey());
+        }
         $isAuthorizingOfficer = $user instanceof \App\Models\Administrator
             && $user->canManageModule('constituent_crm')
             && $user->position !== 'ojt_intern';
@@ -629,6 +652,13 @@ class EmployerVerificationController extends Controller
                 'viewed_at' => $document->viewed_at ?? now(),
             ]);
 
+            // Deciding on a document counts as this account having reviewed it,
+            // matching the shared viewed_at stamp above.
+            $reviewer = $request->user();
+            if ($reviewer instanceof \App\Models\Administrator) {
+                EmployerDocumentView::record((int) $document->document_id, (int) $reviewer->getKey());
+            }
+
             ActivityLogger::logAs($request->user(), 'reviewed_employer_document', sprintf(
                 'Marked employer document #%d (%s) as %s for employer #%d.%s',
                 $document->document_id,
@@ -666,6 +696,9 @@ class EmployerVerificationController extends Controller
                 'verification_status' => $document->verification_status,
                 'admin_notes' => $document->admin_notes,
                 'viewed_at' => $document->viewed_at?->toISOString(),
+                'viewed_by_me_at' => $reviewer instanceof \App\Models\Administrator
+                    ? EmployerDocumentView::summarizeFor([$document->document_id], $reviewer)[$document->document_id]['viewed_by_me_at']
+                    : null,
                 'notification_queued' => $notificationQueued,
             ], 200);
         } catch (\Exception $e) {

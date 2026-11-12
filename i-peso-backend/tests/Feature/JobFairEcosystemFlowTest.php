@@ -1010,6 +1010,41 @@ class JobFairEcosystemFlowTest extends TestCase
         $this->assertNull($response->json('confirmation_slip.vacancies.0.job_vacancy_id'));
     }
 
+    public function test_admin_can_download_the_formal_attendance_pdf_with_and_without_attendees(): void
+    {
+        $admin = Administrator::create([
+            'first_name' => 'PESO', 'last_name' => 'Staff', 'email' => 'attendance-pdf-admin@example.test',
+            'password' => 'password123', 'role' => 'administrator', 'status' => 'active', 'email_verified_at' => now(),
+        ]);
+        // Created directly rather than through the API so the fixture's dates
+        // don't trip the "start date must not be in the past" create rules.
+        $fair = \App\Models\JobFair::create([
+            'admin_id' => $admin->admin_id, 'title' => 'December Avenue Job Fair', 'venue' => 'CB Mall Event Center',
+            'start_date' => '2026-11-02', 'end_date' => '2026-11-02', 'start_time' => '08:00', 'end_time' => '17:00',
+            'city_municipality' => 'Urdaneta City', 'province' => 'Pangasinan', 'target_sector' => 'Multi-sector',
+            'partner_agencies' => ['DOLE'], 'status' => 'completed',
+        ]);
+        $emptyFair = \App\Models\JobFair::create([
+            'admin_id' => $admin->admin_id, 'title' => 'Quiet Job Fair', 'venue' => 'City Hall', 'start_date' => '2026-11-03',
+        ]);
+        $seekerId = DB::table('job_seekers')->insertGetId([
+            'first_name' => 'Ana', 'last_name' => 'Santos', 'sex' => 'female', 'mobile_number' => '09171234567',
+            'educ_attainment' => 'College Graduate', 'created_at' => now(), 'updated_at' => now(),
+        ]);
+        DB::table('job_fair_attendees')->insert([
+            'job_fair_id' => $fair->job_fair_id, 'seeker_id' => $seekerId, 'qr_code_uuid' => (string) \Illuminate\Support\Str::uuid(),
+            'scanned_at' => now(), 'is_attended' => true, 'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        Sanctum::actingAs($admin);
+        foreach ([$fair, $emptyFair] as $event) {
+            $response = $this->get("/api/admin/job-fairs/{$event->job_fair_id}/download-attendance-pdf")
+                ->assertOk()
+                ->assertHeader('content-type', 'application/pdf');
+            $this->assertStringStartsWith('%PDF', $response->getContent());
+        }
+    }
+
     private function setUpFairWithEmployer(string $slug): array
     {
         $admin = Administrator::create([
