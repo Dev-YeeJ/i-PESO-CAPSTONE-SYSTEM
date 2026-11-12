@@ -20,9 +20,9 @@ import RouteErrorBoundary from './RouteErrorBoundary'
 
 // --- LAZY LOADED PAGES ---
 const LandingPage        = lazy(() => import('@/pages/landing/LandingPage'))
-const PrivacyPolicyPage  = lazy(() => import('@/pages/legal/PrivacyPolicyPage'))
-const ReviewGuidelinesPage = lazy(() => import('@/pages/legal/ReviewGuidelinesPage'))
-const TermsOfServicePage = lazy(() => import('@/pages/legal/TermsOfServicePage'))
+// Policy pages: the published version from Site Content → Policy pages, or the original text.
+const PolicyRoute = lazy(() => import('@/pages/legal/PolicyRoute'))
+const PublicHelpPage = lazy(() => import('@/pages/help/PublicHelpPage'))
 const LoginPage          = lazy(() => import('@/pages/auth/LoginPage'))
 const AdminLoginPage     = lazy(() => import('@/pages/auth/AdminLoginPage'))
 const AdminSetPasswordPage = lazy(() => import('@/pages/auth/AdminSetPasswordPage'))
@@ -61,6 +61,8 @@ const SeekerProgramDetails = lazy(() => import('@/pages/seeker/ProgramDetailsPag
 const SeekerApplications = lazy(() => import('@/pages/seeker/MyApplications'))
 const SeekerReviews = lazy(() => import('@/pages/seeker/MyReviewsPage'))
 const MySafetyReports = lazy(() => import('@/pages/shared/MySafetyReportsPage'))
+const AnnouncementsFeed = lazy(() => import('@/pages/shared/AnnouncementsFeedPage'))
+const HelpPage = lazy(() => import('@/pages/shared/HelpPage'))
 const SeekerOnboarding  = lazy(() => import('@/pages/auth/onboarding/SeekerOnboarding'))
 
 // Admin Pages - CATEGORY 1: OVERVIEW
@@ -104,7 +106,8 @@ const AdminStaffList = lazy(() => import('@/pages/admin/6-configuration/staff/St
 const AdminRolePermissions = lazy(() => import('@/pages/admin/6-configuration/staff/RolePermissionsPage'))
 const AdminMyOjt = lazy(() => import('@/pages/admin/6-configuration/ojt/MyOjtPage'))
 const AdminAnnouncements = lazy(() => import('@/pages/admin/6-configuration/content/AnnouncementsPage'))
-const AdminContentModules = lazy(() => import('@/pages/admin/6-configuration/content/ContentModuleListPage'))
+const AdminAnnouncementForm = lazy(() => import('@/pages/admin/6-configuration/content/AnnouncementFormPage'))
+const AdminSiteContent = lazy(() => import('@/pages/admin/6-configuration/content/SiteContentPage'))
 const AdminSystemSettings = lazy(() => import('@/pages/admin/6-configuration/settings/SystemSettingsPage'))
 
 // --- SUSPENSE HELPER ---
@@ -126,9 +129,10 @@ export const router = createBrowserRouter([
         children: [
           { path: '/', element: S(LandingPage) },
           { path: '/verify-email', element: S(VerifyEmailPage) },
-          { path: '/privacy-policy', element: S(PrivacyPolicyPage) },
-          { path: '/review-guidelines', element: S(ReviewGuidelinesPage) },
-          { path: '/terms-of-service', element: S(TermsOfServicePage) },
+          { path: '/privacy-policy', element: S(PolicyRoute, { slug: 'privacy-policy' }) },
+          { path: '/review-guidelines', element: S(PolicyRoute, { slug: 'review-guidelines' }) },
+          { path: '/terms-of-service', element: S(PolicyRoute, { slug: 'terms-of-service' }) },
+          { path: '/help', element: S(PublicHelpPage) },
           {
             element: <GuestOnly />,
             children: [
@@ -170,6 +174,8 @@ export const router = createBrowserRouter([
                     children: [
                       { index: true, element: <Navigate to="dashboard" replace /> },
                       { path: 'dashboard', element: S(EmployerDashboard) },
+                      { path: 'announcements', element: S(AnnouncementsFeed, { role: 'employer' }) },
+                      { path: 'help', element: S(HelpPage, { role: 'employer' }) },
                       {
                         element: <RequireApprovedEmployer />,
                         children: [
@@ -249,7 +255,10 @@ export const router = createBrowserRouter([
                       { path: 'ojt-interns', element: <Navigate to="/admin/staff?tab=ojt" replace /> },
                       { path: 'my-ojt', element: S(AdminMyOjt) },
                       { path: 'announcements', element: S(AdminAnnouncements) },
-                      { path: 'content-modules', element: S(AdminContentModules) },
+                      { path: 'announcements/new', element: S(AdminAnnouncementForm) },
+                      { path: 'announcements/:id', element: S(AdminAnnouncementForm) },
+                      { path: 'site-content', element: S(AdminSiteContent) },
+                      { path: 'content-modules', element: <Navigate to="/admin/site-content" replace /> },
                       { path: 'settings', element: S(AdminSystemSettings) },
                     ],
                   }
@@ -276,6 +285,8 @@ export const router = createBrowserRouter([
                           { path: 'applications', element: S(SeekerApplications) },
                           { path: 'reviews', element: S(SeekerReviews) },
                           { path: 'safety-reports', element: S(MySafetyReports, { role: 'seeker' }) },
+                          { path: 'announcements', element: S(AnnouncementsFeed, { role: 'seeker' }) },
+                          { path: 'help', element: S(HelpPage, { role: 'seeker' }) },
                           { path: 'profile', element: S(SeekerProfile) },
                           { path: 'profile/edit', element: S(SeekerProfileEdit) },
                           { path: 'employers/:id', element: S(SeekerEmployerProfile) },

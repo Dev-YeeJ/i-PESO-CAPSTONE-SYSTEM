@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Bell, CheckCheck, CircleCheck, Clock3, FileCheck2, TriangleAlert } from 'lucide-react'
+import { Bell, CheckCheck, CircleCheck, Clock3, FileCheck2, Megaphone, TriangleAlert } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import {
@@ -194,6 +194,10 @@ export default function NotificationBell() {
 }
 
 function notificationAppearance(data) {
+  if (data?.type === 'announcement') {
+    return { icon: Megaphone, classes: data?.priority === 'urgent' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700' }
+  }
+
   if (data?.status === 'verified') {
     return { icon: CircleCheck, classes: 'bg-green-100 text-green-700' }
   }

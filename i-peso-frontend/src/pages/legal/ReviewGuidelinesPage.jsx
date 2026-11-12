@@ -19,7 +19,7 @@ const SECTIONS = [
 ]
 
 /** The rules every review, reply and report is checked against. */
-export default function ReviewGuidelinesPage() {
+export default function ReviewGuidelinesPage({ notice = null, after = null }) {
   return (
     <LegalPageLayout
       badge="Verified reviews · i-PESO Urdaneta City"
@@ -29,6 +29,8 @@ export default function ReviewGuidelinesPage() {
       effectiveDate={EFFECTIVE_DATE}
       sections={SECTIONS}
       crossLink={{ to: '/privacy-policy', label: 'Privacy Policy' }}
+      notice={notice}
+      after={after}
     >
       <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-950">
         <p className="font-bold">Buod (Filipino)</p>

@@ -271,7 +271,7 @@ class JobFairService
             'submission_deadline' => $fair->submission_deadline?->toIso8601String(),
             // Per-fair override still supported, but the field is no longer
             // asked for at creation — PESO's office email is constant.
-            'contact_email' => $fair->contact_email ?: config('peso_knowledge.office.email'),
+            'contact_email' => $fair->contact_email ?: app(SiteContentService::class)->office()['email'],
             'maximum_representatives' => $fair->maximum_representatives ?? 2,
             'status' => $fair->status,
             'is_public' => (bool) $fair->is_public,

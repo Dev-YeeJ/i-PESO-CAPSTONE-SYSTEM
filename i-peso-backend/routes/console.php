@@ -18,8 +18,12 @@ Schedule::call(fn () => Artisan::call('permits:notify-expiring'))->dailyAt('08:0
 Schedule::call(fn () => Artisan::call('placements:notify-missing'))->dailyAt('08:30');
 // Mid-morning Philippine time: invite new hires to review the workplace once they've started.
 Schedule::call(fn () => Artisan::call('reviews:invite-employment'))->dailyAt('09:00')->timezone('Asia/Manila')->name('reviews-invite-employment');
+// Bell + push for scheduled announcements whose publish time has just arrived.
+Schedule::call(fn () => Artisan::call('announcements:deliver-due'))->everyMinute()->name('announcements-deliver-due')->withoutOverlapping();
 // Just after midnight Philippine time, close intern accounts whose internship ended yesterday.
 Schedule::call(fn () => Artisan::call('ojt:end-internships'))->dailyAt('00:05')->timezone('Asia/Manila')->name('ojt-end-internships');
+// Site Content keeps the newest 20 versions of each section and FAQ.
+Schedule::call(fn () => Artisan::call('site-content:prune-history'))->dailyAt('02:15')->timezone('Asia/Manila')->name('site-content-prune-history');
 
 // There is no persistent queue worker on this host (no Supervisor on shared
 // hosting), so queued notifications (application status, interview, employer

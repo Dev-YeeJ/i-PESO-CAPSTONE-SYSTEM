@@ -79,3 +79,16 @@ describe('adminLandingPath', () => {
     expect(adminLandingPath(manager, '/admin/set-password')).toBe('/admin/dashboard')
   })
 })
+
+describe('pages shared by several modules', () => {
+  const frontDesk = { access: { constituent_crm: 'manage', configuration: 'none' } }
+  const configViewer = { access: { configuration: 'view', constituent_crm: 'none' } }
+
+  it('opens Site Content for Configuration or Constituent CRM staff, at the higher of their levels', () => {
+    expect(moduleForPath('/admin/site-content')).toEqual(['configuration', 'constituent_crm'])
+    expect(canOpenPath(frontDesk, '/admin/site-content')).toBe(true)
+    expect(accessLevel(frontDesk, ['configuration', 'constituent_crm'])).toBe('manage')
+    expect(accessLevel(configViewer, ['configuration', 'constituent_crm'])).toBe('view')
+    expect(canOpenPath({ access: { employment_hub: 'manage' } }, '/admin/site-content')).toBe(false)
+  })
+})

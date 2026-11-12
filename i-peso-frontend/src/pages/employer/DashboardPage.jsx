@@ -4,6 +4,7 @@ import { BriefcaseBusiness, Building2, CheckCircle2, Clock3, UsersRound, Calenda
 import { Link } from 'react-router-dom'
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import PendingVerificationBanner from './components/PendingVerificationBanner'
+import AnnouncementBanner from '@/components/announcements/AnnouncementBanner'
 import { AlertBox, Badge, Button, Card, CardHeader, LoadingSkeleton, StatCard } from '@/components/ui'
 import LazyImage from '@/components/common/LazyImage'
 import * as employerService from '@/services/employerService'
@@ -168,6 +169,8 @@ export default function EmployerDashboard() {
           </div>
         </div>
       </motion.div>
+
+      <AnnouncementBanner className="w-full" />
 
       {error && <motion.div variants={itemVariants}><AlertBox variant="danger" title="Employer workspace unavailable">{error}</AlertBox></motion.div>}
       {reuploadError && <motion.div variants={itemVariants}><AlertBox variant="danger" title="Document re-upload failed">{reuploadError}</AlertBox></motion.div>}

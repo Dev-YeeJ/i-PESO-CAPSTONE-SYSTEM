@@ -29,7 +29,7 @@ export function ConfirmNote({ children }) {
  * hero, "on this page" anchor card, light paper body band, and footer.
  * `children` renders the PolicySection list.
  */
-export default function LegalPageLayout({ badge, badgeIcon: BadgeIcon, title, description, effectiveDate, sections, crossLink, children }) {
+export default function LegalPageLayout({ badge, badgeIcon: BadgeIcon, title, description, effectiveDate, sections, crossLink, notice = null, after = null, children }) {
   const navigate = useNavigate();
 
   return (
@@ -65,6 +65,8 @@ export default function LegalPageLayout({ badge, badgeIcon: BadgeIcon, title, de
       {/* ── Body ── */}
       <div className="relative z-10 bg-[#F8F7F2]">
         <div className="mx-auto max-w-4xl px-6 py-12 sm:px-8">
+          {/* Version notices from Site Content → Policy pages (an upcoming or older version). */}
+          {notice}
           <div className="mb-10 rounded-2xl border border-[#0A192F]/10 bg-white p-5">
             <p className="text-xs font-black uppercase tracking-wide text-slate-400">On this page</p>
             <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2 text-sm">
@@ -77,6 +79,7 @@ export default function LegalPageLayout({ badge, badgeIcon: BadgeIcon, title, de
           </div>
 
           {children}
+          {after}
         </div>
       </div>
 

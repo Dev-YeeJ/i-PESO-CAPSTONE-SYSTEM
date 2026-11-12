@@ -20,7 +20,8 @@ export const ACCESS_LABELS = {
 }
 
 // Longest prefix wins. Paths not listed (the dashboard, set-password) are open
-// to every staff account.
+// to every staff account. A list of modules means "any of these" (Site Content:
+// FAQs are kept up to date by Configuration or front-desk CRM staff).
 const PATH_MODULES = [
   ['/admin/verification-queue', 'constituent_crm'],
   ['/admin/job-seekers', 'constituent_crm'],
@@ -45,7 +46,8 @@ const PATH_MODULES = [
   ['/admin/role-permissions', 'configuration'],
   ['/admin/ojt-interns', 'configuration'],
   ['/admin/announcements', 'configuration'],
-  ['/admin/content-modules', 'configuration'],
+  ['/admin/site-content', ['configuration', 'constituent_crm']],
+  ['/admin/content-modules', ['configuration', 'constituent_crm']],
   ['/admin/settings', 'configuration'],
 ]
 
@@ -59,7 +61,12 @@ export function moduleForPath(pathname = '') {
   return match?.[1] ?? null
 }
 
+const LEVEL_RANK = { none: 0, view: 1, manage: 2 }
+
 export function accessLevel(user, module) {
+  if (Array.isArray(module)) {
+    return module.map((m) => accessLevel(user, m)).reduce((best, level) => (LEVEL_RANK[level] > LEVEL_RANK[best] ? level : best), 'none')
+  }
   if (!module) return 'manage'
   if (user?.is_system_administrator) return 'manage'
   // Sessions from before access levels existed carry no map: don't hide

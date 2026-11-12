@@ -1,0 +1,67 @@
+{
+  "slug": "terms-of-service",
+  "effective_date": "2026-09-09",
+  "summary": null,
+  "sections": [
+    {
+      "id": "acceptance",
+      "title": "Acceptance of Terms",
+      "body": "These Terms of Service (\"Terms\") govern your use of the i-PESO Urdaneta City Employment Portal and its associated mobile app (together, the \"Portal\"), operated by the Public Employment Service Office (PESO) of Urdaneta City, Pangasinan. By creating an account or otherwise using the Portal, you agree to these Terms. If you do not agree, please do not use the Portal.\n\nSee also our Privacy Policy, which explains how we handle your personal data and is incorporated into these Terms by reference."
+    },
+    {
+      "id": "eligibility",
+      "title": "Eligibility",
+      "body": "You may register as a job seeker if you are legally allowed to work in the Philippines under the Labor Code and related child-labor protections. You may register as an employer only if you are authorized to represent and bind the business, organization, or agency you register on behalf of.\n\nEmployer accounts are reviewed and verified by a PESO administrator before job postings are enabled. We may request additional documents or decline to verify an account that does not meet our requirements."
+    },
+    {
+      "id": "accounts",
+      "title": "Your Account",
+      "body": "- You must provide accurate, current information when registering and keep it up to date.\n- You are responsible for keeping your password confidential and for all activity under your account.\n- Each person or business should maintain only one account, unless PESO approves otherwise (for example, an employer with more than one authorized representative).\n- Notify us promptly if you suspect unauthorized use of your account."
+    },
+    {
+      "id": "seeker-terms",
+      "title": "For Job Seekers",
+      "body": "- All PESO services on the Portal are free of charge. No job seeker will ever be asked to pay a fee to register, apply, or be considered for a job, program, or job fair listed here.\n- Submitting an application does not guarantee an interview, a job offer, or any employment outcome. Hiring decisions are made solely by the employer.\n- You are responsible for the accuracy of the profile, work history, and documents you submit. Misrepresenting your qualifications may result in account suspension.\n- You may withdraw an application at any time before it reaches a final status (hired or rejected)."
+    },
+    {
+      "id": "employer-terms",
+      "title": "For Employers",
+      "body": "- Job postings must be accurate, lawful, and for genuine vacancies. Do not post fictitious, duplicate, or misleading listings.\n- Postings and hiring decisions must comply with applicable Philippine labor law, including the Anti-Age Discrimination in Employment Act (Republic Act No. 10911) — candidates must be evaluated on merit and qualifications, not on age, sex, or other protected characteristics disclosed through the Portal.\n- You may not charge a job seeker any placement, processing, or referral fee for a position posted through the Portal.\n- You are responsible for keeping your vacancy postings current, including closing or updating a listing once a position is filled.\n- Verification documents you submit (SEC/DTI/CDA registration, business permit, BIR certificate, representative ID) must be genuine and current."
+    },
+    {
+      "id": "acceptable-use",
+      "title": "Acceptable Use",
+      "body": "You agree not to:\n\n- Provide false information, impersonate another person or business, or create an account on someone else's behalf without authorization.\n- Post fraudulent, discriminatory, or unlawful job listings or content.\n- Harass, threaten, or discriminate against another user of the Portal.\n- Scrape, data-mine, or use automated tools to extract data from the Portal outside of its normal use.\n- Attempt to gain unauthorized access to another account or to any part of the Portal's systems.\n- Use the Portal for any purpose other than legitimate job seeking, hiring, or government program participation.\n\nWe may investigate and take action, including account suspension, for violations of this section."
+    },
+    {
+      "id": "your-content",
+      "title": "Content You Submit",
+      "body": "You retain ownership of the profile information, resumes, company documents, and other content you submit to the Portal (\"Your Content\"). By submitting it, you give PESO a license to use, store, and share Your Content solely to operate the Portal — for example, showing your job seeker profile to an employer you apply to, or your company profile to job seekers browsing your vacancies — and to meet PESO's DOLE reporting obligations.\n\nWe do not sell Your Content or use it for advertising."
+    },
+    {
+      "id": "our-role",
+      "title": "Our Role & Disclaimers",
+      "body": "PESO operates the Portal as a facilitator that connects job seekers, employers, and government employment programs. PESO is not the employer of any job seeker who applies through the Portal, and using the Portal does not create an employment relationship between PESO and any user.\n\nWe do our best to verify employer accounts and keep vacancy and program listings accurate, but we do not guarantee the accuracy, completeness, or outcome of any listing, application, or hire. Job seekers and employers are each responsible for their own decisions made through the Portal.\n\nThe Portal is provided on an \"as is\" and \"as available\" basis, without warranties of any kind, to the extent permitted by law."
+    },
+    {
+      "id": "suspension",
+      "title": "Suspension & Termination",
+      "body": "We may suspend or terminate an account that violates these Terms, submits fraudulent information or documents, or misuses the Portal. You may close your own account at any time by contacting your PESO administrator. Some records may be retained after account closure as described in our Privacy Policy."
+    },
+    {
+      "id": "liability",
+      "title": "Limitation of Liability",
+      "body": "PESO's liability for any claim arising from or related to your use of the Portal, to the extent permitted by Philippine law, does not extend beyond PESO's own direct fault or negligence in operating the Portal. PESO is not liable for indirect, incidental, consequential, or exemplary damages, or for any loss arising from the acts, omissions, representations, or conduct of another user — including an employer's hiring decision or a job seeker's application — made through the Portal.\n\nPESO is an instrumentality of the City Government of Urdaneta operating the Portal as part of its public employment-facilitation mandate under the Public Employment Service Office Act of 1999 (Republic Act No. 8759). Its liability is further limited and qualified by the laws governing the liability of local government units and their instrumentalities for acts performed in a governmental capacity."
+    },
+    {
+      "id": "governing-law",
+      "title": "Governing Law & Dispute Resolution",
+      "body": "These Terms are governed by the laws of the Republic of the Philippines.\n\nWhere both parties to a dispute — for example, a job seeker and an employer — reside or operate within the same city or municipality, the dispute must first be referred to barangay conciliation under the Katarungang Pambarangay system (Sections 399–422, Local Government Code of 1991) before any court action is filed, except as otherwise allowed by law. This requirement does not apply to a dispute involving PESO itself, since it is a government instrumentality, or to parties who do not reside or operate in the same city or municipality.\n\nSubject to the foregoing, any dispute relating to the Portal shall be brought before the proper courts of Urdaneta City, Pangasinan."
+    },
+    {
+      "id": "changes",
+      "title": "Changes to These Terms",
+      "body": "We may update these Terms as the Portal or applicable law changes. Material changes will update the effective date at the top of this page. Continuing to use the Portal after a change takes effect means you accept the updated Terms."
+    }
+  ]
+}

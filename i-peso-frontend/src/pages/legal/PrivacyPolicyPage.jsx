@@ -1,5 +1,6 @@
 import { ShieldCheck } from 'lucide-react';
 import LegalPageLayout, { PolicySection } from './LegalPageLayout';
+import { useOfficeInfo } from '@/components/site-content/useSiteContent';
 
 // Effective date of this policy text. Bump this whenever the content below
 // changes materially — it is the only date on the page that is not a
@@ -21,7 +22,9 @@ const SECTIONS = [
   { id: 'changes', label: 'Changes to This Policy' },
 ];
 
-export default function PrivacyPolicyPage() {
+export default function PrivacyPolicyPage({ notice = null, after = null }) {
+  const office = useOfficeInfo();
+
   return (
     <LegalPageLayout
       badge="Republic Act No. 10173 · Data Privacy Act of 2012"
@@ -31,6 +34,8 @@ export default function PrivacyPolicyPage() {
       effectiveDate={EFFECTIVE_DATE}
       sections={SECTIONS}
       crossLink={{ to: '/terms-of-service', label: 'Terms of Service' }}
+      notice={notice}
+      after={after}
     >
       <PolicySection id="introduction" number={1} title="Introduction & Scope">
         <p>
@@ -52,19 +57,22 @@ export default function PrivacyPolicyPage() {
           The Public Employment Service Office (PESO) of Urdaneta City is the personal information
           controller responsible for the data described in this policy.
         </p>
+        {/* Contact details come from Site Content → Office info. */}
         <p>
-          Office address: XHG8+FV3, Alexander St, Urdaneta City, Pangasinan. Phone: 0923 810 2011. Email:{' '}
-          <a href="mailto:pesourdanetacity@gmail.com" className={inlineLinkClass}>
-            pesourdanetacity@gmail.com
-          </a>. Facebook:{' '}
-          <a
-            href="https://www.facebook.com/profile.php?id=100069233858883"
-            target="_blank"
-            rel="noreferrer"
-            className={inlineLinkClass}
-          >
-            PESO — Urdaneta City
-          </a>.
+          Office address: {office.address || 'not on record'}. Phone: {office.phone || 'not on record'}. Email:{' '}
+          {office.email ? (
+            <a href={`mailto:${office.email}`} className={inlineLinkClass}>
+              {office.email}
+            </a>
+          ) : 'not on record'}
+          {office.facebook && (
+            <>
+              . Facebook:{' '}
+              <a href={office.facebook} target="_blank" rel="noreferrer" className={inlineLinkClass}>
+                PESO — Urdaneta City
+              </a>
+            </>
+          )}.
         </p>
         <p>
           Privacy inquiries and data subject requests (access, correction, and similar concerns) are handled

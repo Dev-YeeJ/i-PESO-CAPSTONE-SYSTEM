@@ -8,6 +8,7 @@ use Illuminate\Foundation\Auth\User;
 use App\Models\JobSeeker;
 use App\Models\Employer;
 use App\Models\Administrator;
+use App\Services\SiteContentService;
 
 /**
  * Drives one assistant turn against the Gemini API.
@@ -132,7 +133,7 @@ class GeminiChatService
      */
     private function officeLocationIfAsked(string $text, string $question): ?array
     {
-        $address = config('peso_knowledge.office.address');
+        $address = $this->office()['address'] ?? null;
 
         if (blank($address) || ! str_contains($text, (string) $address)) {
             return null;
@@ -250,9 +251,13 @@ class GeminiChatService
      * will still improvise an address, whereas one shown the exact list of
      * blanks reliably defers on them.
      */
-    private function knowledgeSection(): string
+    private function knowledgeSection(?User $user = null): string
     {
         $knowledge = config('peso_knowledge', ['site' => [], 'office' => []]);
+        // Office facts are maintained by PESO staff in Site Content → Office info
+        // (config/peso_knowledge.php is only the fallback). The map link and the
+        // office's formal name are not things people ask the assistant for.
+        $knowledge['office'] = collect($this->office())->except(['map_url', 'office_name'])->all();
 
         $label = fn (string $key) => str_replace('_', ' ', $key);
 
@@ -283,8 +288,37 @@ class GeminiChatService
         {$site}
 
         About the PESO office:
-        {$office}{$blanks}
+        {$office}{$blanks}{$this->faqSection($user)}
         KNOWLEDGE;
+    }
+
+    /** Office details as PESO staff last saved them (Site Content → Office info). */
+    private function office(): array
+    {
+        return app(SiteContentService::class)->office();
+    }
+
+    /**
+     * Published FAQs for the reader's audience, written by PESO staff in
+     * Site Content → FAQs. Capped (count and length) so the prompt cost stays
+     * predictable; unpublished drafts never reach the assistant.
+     */
+    private function faqSection(?User $user): string
+    {
+        $role = match (true) {
+            $user instanceof JobSeeker => 'seeker',
+            $user instanceof Employer => 'employer',
+            default => null,
+        };
+
+        $faqs = app(SiteContentService::class)->faqsForChatbot($role);
+        if ($faqs->isEmpty()) {
+            return '';
+        }
+
+        $lines = $faqs->map(fn (array $faq) => "- Q: {$faq['question']}\n  A: {$faq['answer']}")->implode("\n");
+
+        return "\n\nFrequently asked questions, answered by the PESO office (reference data — you may state these answers directly):\n{$lines}";
     }
 
     /**
@@ -404,7 +438,7 @@ class GeminiChatService
         make real decisions about work based on your answers, and a wrong address, fee, or made-up
         listing sends someone on a wasted trip.
 
-        {$this->knowledgeSection()}
+        {$this->knowledgeSection($user)}
 
         WHAT YOU CANNOT DO
         You cannot check application status, verify or approve an account, reset a password, or see

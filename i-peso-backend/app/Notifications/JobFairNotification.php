@@ -68,7 +68,7 @@ class JobFairNotification extends Notification
                 'requirementLines' => ($this->outstandingRequirements ?? collect())->pluck('label'),
                 'deadline' => $this->fair->submission_deadline?->format('F j, Y'),
                 'maxReps' => $this->fair->maximum_representatives ?? 2,
-                'contactEmail' => $this->fair->contact_email ?: config('peso_knowledge.office.email'),
+                'contactEmail' => $this->fair->contact_email ?: app(\App\Services\SiteContentService::class)->office()['email'],
                 'actionUrl' => rtrim(config('app.frontend_url', config('app.url')), '/').'/employer/job-fairs',
             ]);
     }

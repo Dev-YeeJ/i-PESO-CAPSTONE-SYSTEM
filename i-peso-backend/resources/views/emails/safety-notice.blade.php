@@ -21,6 +21,7 @@
     @endif
     <p class="helper text-center">
         This decision was made by an authorized PESO administrator after a review.
-        For questions or to respond, visit the PESO office at Urdaneta City Hall or email pesourdaneta@gmail.com.
+        @php($office = app(\App\Services\SiteContentService::class)->office())
+        For questions or to respond, visit the PESO office{{ $office['address'] ? ' at '.$office['address'] : '' }}@if($office['email']) or email {{ $office['email'] }}@endif.
     </p>
 @endsection

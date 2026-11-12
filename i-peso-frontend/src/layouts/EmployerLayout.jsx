@@ -8,7 +8,9 @@ import {
   ChevronLeft,
   CircleCheck,
   LayoutDashboard,
+  LifeBuoy,
   LogOut,
+  Megaphone,
   Menu,
   PlusCircle,
   ShieldAlert,
@@ -24,6 +26,8 @@ import SignOutConfirmDialog from '@/components/common/SignOutConfirmDialog'
 
 const navItems = [
   { to: '/employer/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  // Not `protected`: employers still being verified need PESO notices too.
+  { to: '/employer/announcements', label: 'Announcements', icon: Megaphone },
   { to: '/employer/profile', label: 'Company Profile', icon: Building2, protected: true },
   { to: '/employer/post-job', label: 'Create Job Post', icon: PlusCircle, protected: true },
   { to: '/employer/vacancies', label: 'My Vacancies', icon: BriefcaseBusiness, protected: true },
@@ -34,6 +38,8 @@ const navItems = [
   { to: '/employer/calendar', label: 'Calendar', icon: CalendarIcon, protected: true },
   { to: '/employer/reviews', label: 'Reviews', icon: Star, protected: true },
   { to: '/employer/safety-reports', label: 'Safety Reports', icon: ShieldAlert, protected: true },
+  // Not `protected`: pending employers ask the most questions.
+  { to: '/employer/help', label: 'Help & FAQs', icon: LifeBuoy },
 ]
 
 const pageNames = {

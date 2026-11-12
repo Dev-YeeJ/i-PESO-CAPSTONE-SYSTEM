@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import JobSeekerHome from './JobSeekerHome'
 import JobFairBulletin from './components/JobFairBulletin'
+import AnnouncementBanner from '@/components/announcements/AnnouncementBanner'
 import { getNearbyJobs, getSeekerAnalytics, getSeekerDashboardSummary } from '@/services/seekerService'
 import { useAuthStore } from '@/stores/authStore'
 import { listJobFairs } from '@/services/jobFairService'
@@ -94,6 +95,7 @@ export default function SeekerDashboard() {
 
   return (
     <>
+      <AnnouncementBanner />
       <JobFairBulletin fairs={jobFairs} />
       <JobSeekerHome
         profile={profile}

@@ -24,7 +24,7 @@ const SECTIONS = [
   { id: 'changes', label: 'Changes to These Terms' },
 ];
 
-export default function TermsOfServicePage() {
+export default function TermsOfServicePage({ notice = null, after = null }) {
   return (
     <LegalPageLayout
       badge="Terms of Service Agreement"
@@ -34,6 +34,8 @@ export default function TermsOfServicePage() {
       effectiveDate={EFFECTIVE_DATE}
       sections={SECTIONS}
       crossLink={{ to: '/privacy-policy', label: 'Privacy Policy' }}
+      notice={notice}
+      after={after}
     >
       <PolicySection id="acceptance" number={1} title="Acceptance of Terms">
         <p>

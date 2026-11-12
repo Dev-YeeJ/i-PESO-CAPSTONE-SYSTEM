@@ -66,6 +66,16 @@ Route::get('/health', function () {
 Route::get('/occupations', [OccupationController::class, 'index'])->middleware('throttle:60,1');
 Route::get('/skills', [SkillCatalogController::class, 'index'])->middleware('throttle:60,1');
 Route::get('/public/government-programs', [\App\Http\Controllers\Api\PublicGovernmentProgramController::class, 'index'])->middleware('throttle:60,1');
+// Landing page: live announcements addressed to the Public audience.
+Route::get('/public/announcements', [\App\Http\Controllers\Api\PublicAnnouncementController::class, 'index'])->middleware('throttle:60,1');
+Route::get('/public/announcements/{announcement}/attachment', [\App\Http\Controllers\Api\PublicAnnouncementController::class, 'attachment'])->middleware('throttle:60,1');
+// Site Content: landing text + office details, the public Help page, and the versioned policy pages.
+Route::controller(\App\Http\Controllers\Api\PublicSiteContentController::class)->middleware('throttle:60,1')->group(function () {
+    Route::get('/public/site-content', 'show');
+    Route::get('/public/faqs', 'faqs');
+    Route::get('/public/policies/{policy}', 'policy');
+    Route::get('/public/policies/{policy}/versions/{version}', 'policyVersion')->whereNumber('version');
+});
 Route::post('/cookie-consent', [\App\Http\Controllers\Api\CookieConsentController::class, 'store'])->middleware('throttle:20,1');
 
 // Public assistant for visitors without an account (landing / login / register).
@@ -85,6 +95,20 @@ Route::prefix('auth')->group(function () {
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/auth/me', [AuthController::class, 'me']);
     Route::post('/auth/logout', [AuthController::class, 'logout']);
+
+    // PESO announcements for the signed-in job seeker or employer (web + seeker app).
+    Route::prefix('announcements')->controller(\App\Http\Controllers\Api\AnnouncementFeedController::class)->group(function () {
+        Route::get('/', 'index');
+        Route::get('/banner', 'banner');
+        Route::get('/unread-count', 'unread');
+        Route::post('/read-all', 'readAll')->middleware('throttle:20,1');
+        Route::get('/{announcement}', 'show');
+        Route::post('/{announcement}/dismiss', 'dismiss')->middleware('throttle:60,1');
+        Route::get('/{announcement}/attachment', 'attachment');
+    });
+
+    // Help page (FAQs for Everyone + the reader's role, office contact) — web and seeker app.
+    Route::get('/help', \App\Http\Controllers\Api\HelpController::class);
 
     Route::get('/job-fairs', [JobFairController::class, 'index']);
     Route::post('/job-fairs/{id}/rsvp', [JobFairController::class, 'rsvp']);
@@ -436,6 +460,68 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::get('/reports/{id}', [AdminReportController::class, 'show']);
             Route::delete('/reports/{id}', [AdminReportController::class, 'destroy']);
         });
+
+        // Announcements (Configuration → Announcements). Reading needs view,
+        // anything that changes an announcement needs full access.
+        Route::middleware('admin.permission:configuration')
+            ->prefix('announcements')
+            ->controller(\App\Http\Controllers\Api\Admin\Configuration\AnnouncementController::class)
+            ->group(function () {
+                Route::get('/', 'index');
+                Route::get('/options', 'options');
+                Route::post('/', 'store');
+                Route::get('/{announcement}', 'show');
+                Route::put('/{announcement}', 'update');
+                Route::post('/{announcement}/publish', 'publish');
+                Route::post('/{announcement}/unpublish', 'unpublish');
+                Route::post('/{announcement}/archive', 'archive');
+                Route::post('/{announcement}/restore', 'restore');
+                Route::delete('/{announcement}', 'destroy');
+                Route::get('/{announcement}/attachment', 'attachment');
+            });
+
+        // Site Content (Configuration → Site Content): Office info, Landing page
+        // text and the versioned Policy pages need Configuration access.
+        Route::middleware('admin.permission:configuration')->group(function () {
+            Route::controller(\App\Http\Controllers\Api\Admin\Configuration\SiteContentController::class)
+                ->prefix('site-content')
+                ->group(function () {
+                    Route::get('/', 'index');
+                    Route::put('/{key}', 'update');
+                    Route::post('/{key}/reset', 'reset');
+                    Route::get('/{key}/revisions', 'revisions');
+                    Route::post('/{key}/revisions/{revision}/restore', 'restore');
+                });
+
+            Route::controller(\App\Http\Controllers\Api\Admin\Configuration\PolicyController::class)
+                ->prefix('policies')
+                ->group(function () {
+                    Route::get('/', 'index');
+                    Route::get('/{policy}', 'show');
+                    Route::get('/{policy}/versions/{version}', 'version')->whereNumber('version');
+                    Route::post('/{policy}/draft', 'startDraft');
+                    Route::put('/{policy}/draft', 'saveDraft');
+                    Route::post('/{policy}/draft/publish', 'publish');
+                    Route::delete('/{policy}/draft', 'discardDraft');
+                });
+        });
+
+        // FAQs are kept up to date by Configuration OR Constituent CRM (front desk) staff.
+        Route::middleware('admin.permission:configuration|constituent_crm')
+            ->prefix('faqs')
+            ->controller(\App\Http\Controllers\Api\Admin\Configuration\FaqController::class)
+            ->group(function () {
+                Route::get('/', 'index');
+                Route::post('/', 'store');
+                Route::put('/reorder', 'reorder');
+                Route::post('/starter-pack', 'starterPack');
+                Route::put('/{faq}', 'update');
+                Route::post('/{faq}/publish', 'publish');
+                Route::post('/{faq}/unpublish', 'unpublish');
+                Route::post('/{faq}/feature', 'feature');
+                Route::get('/{faq}/revisions', 'revisions');
+                Route::delete('/{faq}', 'destroy');
+            });
 
         // Viewing staff, roles and the org chart: Configuration access
         // (the Office Manager has view).

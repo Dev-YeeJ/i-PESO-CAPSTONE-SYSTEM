@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { motion as Motion, useReducedMotion, AnimatePresence } from 'framer-motion';
 import governmentProgramService from '@/services/governmentProgramService';
 import PublicProgramCard from '@/components/government-programs/PublicProgramCard';
+import PublicAnnouncementsSection from '@/components/announcements/PublicAnnouncementsSection';
 import {
   ArrowRight,
   Briefcase,
@@ -18,29 +19,18 @@ import {
   Users,
 } from 'lucide-react';
 import IPesoLogo from '@/components/branding/IPesoLogo';
+import { useSiteContent } from '@/components/site-content/useSiteContent';
+import LandingFaqSection from '@/components/site-content/LandingFaqSection';
+import { telHref } from '@/components/site-content/siteContentDefaults';
+import {
+  FEATURE_CARD_CLASS,
+  FeatureCardContent,
+  HeroBadgeIcon,
+  HeroHeadlineContent,
+  HeroHighlights,
+  HeroSubheadlineContent,
+} from '@/components/site-content/LandingBlocks';
 
-const UNIFIED_FEATURES = [
-  {
-    icon: Target,
-    title: 'Skill-tag matching',
-    body: 'Stop guessing keywords. We score your skills against requirements to show you the best fits.',
-  },
-  {
-    icon: MapPin,
-    title: 'Location-Aware',
-    body: 'See jobs available in your immediate vicinity and across the region, instantly sorted by distance.',
-  },
-  {
-    icon: FileSearch,
-    title: 'Ranked Applicants',
-    body: 'Instantly see who actually has the required skills with our automated matching score.',
-  },
-  {
-    icon: Users,
-    title: 'Centralized Screening',
-    body: 'Review applications, schedule interviews, and hire directly from your dashboard.',
-  },
-];
 
 function useSectionMotion() {
   const reduceMotion = useReducedMotion();
@@ -56,6 +46,9 @@ function useSectionMotion() {
 const LandingPage = () => {
   const navigate = useNavigate();
   const sectionMotion = useSectionMotion();
+  // Text PESO staff edit in Site Content → Landing page / Office info.
+  // Falls back to the built-in wording, so the page is never blank.
+  const { landing, office, featuredFaqs } = useSiteContent();
   const [activeTab, setActiveTab] = useState('seeker');
   const [programs, setPrograms] = useState([]);
   const [programsLoading, setProgramsLoading] = useState(true);
@@ -151,26 +144,17 @@ const LandingPage = () => {
         >
           <Motion.div variants={itemVariants} className="mb-8">
             <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-slate-700/50 bg-slate-800/30 backdrop-blur-sm text-xs font-medium text-slate-300">
-              <svg className="w-4 h-4 text-yellow-500" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M2.166 4.999A11.954 11.954 0 0010 1.944 11.954 11.954 0 0017.834 5c.11.65.166 1.32.166 2.001 0 5.225-3.34 9.67-8 11.317C5.34 16.67 2 12.225 2 7c0-.682.057-1.35.166-2.001zm11.541 3.708a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-              </svg>
-              Urdaneta City PESO Employment Portal
+              <HeroBadgeIcon />
+              {landing.hero_badge}
             </span>
           </Motion.div>
 
           <Motion.h1 variants={itemVariants} className="text-5xl md:text-7xl font-extrabold tracking-tight text-white mb-6 leading-tight">
-            Find Your <span className="relative inline-block text-yellow-400">
-              Perfect Match
-              <svg className="absolute w-full h-4 -bottom-1 left-0 text-yellow-500/80" viewBox="0 0 200 9" fill="none">
-                <path d="M2.00035 7.15854C47.0142 3.12519 123.633 -1.25883 198.056 4.54226" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
-              </svg>
-            </span> <br />
-            Powered by Smart Technology
+            <HeroHeadlineContent landing={landing} />
           </Motion.h1>
 
           <Motion.p variants={itemVariants} className="text-lg md:text-xl text-slate-400 max-w-3xl mb-12 leading-relaxed">
-            Browse job openings, join local job fairs, and browse government programs like SPES and
-            TUPAD — all from one <span className="text-white font-medium">i-PESO</span> account.
+            <HeroSubheadlineContent landing={landing} />
           </Motion.p>
 
           <Motion.div variants={itemVariants} className="flex flex-col sm:flex-row items-center gap-4 mb-14">
@@ -199,16 +183,8 @@ const LandingPage = () => {
             </Motion.button>
           </Motion.div>
 
-          <Motion.div variants={itemVariants} className="flex flex-wrap justify-center gap-6 md:gap-10 text-sm font-medium text-slate-400">
-            <span className="flex items-center gap-2">
-              <span className="w-1.5 h-1.5 rounded-full bg-blue-400"></span> Free to Use
-            </span>
-            <span className="flex items-center gap-2">
-              <span className="w-1.5 h-1.5 rounded-full bg-yellow-400"></span> Skill-Tag Matching
-            </span>
-            <span className="flex items-center gap-2">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> Verified Opportunities
-            </span>
+          <Motion.div variants={itemVariants}>
+            <HeroHighlights landing={landing} />
           </Motion.div>
 
           {/* Interactive Dashboard Preview Graphic */}
@@ -390,39 +366,35 @@ const LandingPage = () => {
         </Motion.div>
       </main>
 
+      {/* ── Announcements (Public audience; renders nothing when there are none) ── */}
+      <PublicAnnouncementsSection />
+
       {/* ── Features ── */}
       <Motion.section id="features" {...sectionMotion} className="relative z-10 bg-[#0D1F38] border-t border-white/5 px-6 py-24">
         <div className="max-w-6xl mx-auto">
           <div className="flex flex-col md:flex-row md:items-end justify-between mb-14 gap-8">
             <div className="max-w-2xl">
-              <p className="text-xs font-bold uppercase tracking-[0.2em] text-yellow-400">What you get</p>
+              <p className="text-xs font-bold uppercase tracking-[0.2em] text-yellow-400">{landing.features_eyebrow}</p>
               <h2 className="mt-3 text-3xl md:text-4xl font-extrabold tracking-tight text-white">
-                Built for finding work and talent.
+                {landing.features_heading}
               </h2>
             </div>
           </div>
 
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
             <AnimatePresence mode="popLayout">
-              {UNIFIED_FEATURES.map((feature, i) => {
-                const Icon = feature.icon;
-                return (
-                  <Motion.div 
-                    key={feature.title}
-                    initial={{ opacity: 0, scale: 0.95 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.95 }}
-                    transition={{ duration: 0.3, delay: i * 0.05 }}
-                    className="rounded-2xl border border-white/10 bg-white/[0.03] p-6 transition-all hover:border-white/20 hover:bg-white/[0.05] hover:-translate-y-1"
-                  >
-                    <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-500/15 text-blue-400">
-                      <Icon className="h-5 w-5" aria-hidden="true" />
-                    </span>
-                    <h3 className="mt-4 font-bold text-white">{feature.title}</h3>
-                    <p className="mt-2 text-sm leading-relaxed text-slate-400">{feature.body}</p>
-                  </Motion.div>
-                )
-              })}
+              {landing.features.map((feature, i) => (
+                <Motion.div
+                  key={`${i}-${feature.title}`}
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.95 }}
+                  transition={{ duration: 0.3, delay: i * 0.05 }}
+                  className={FEATURE_CARD_CLASS}
+                >
+                  <FeatureCardContent feature={feature} />
+                </Motion.div>
+              ))}
             </AnimatePresence>
           </div>
         </div>
@@ -541,6 +513,8 @@ const LandingPage = () => {
         </div>
       </Motion.section>
 
+      <LandingFaqSection faqs={featuredFaqs} office={office} />
+
       {/* ── Footer ── */}
       <footer className="relative z-10 border-t border-white/5 bg-[#071122] px-6 py-12">
         <div className="max-w-6xl mx-auto flex flex-col gap-8 sm:flex-row sm:items-start sm:justify-between">
@@ -550,7 +524,7 @@ const LandingPage = () => {
             </div>
             <div>
               <p className="font-bold leading-none text-white">i-PESO</p>
-              <p className="mt-1 text-xs text-slate-500">Urdaneta City PESO Employment Portal</p>
+              <p className="mt-1 text-xs text-slate-500">{landing.footer_tagline}</p>
             </div>
           </div>
 
@@ -569,13 +543,26 @@ const LandingPage = () => {
                 <a href="#features" className="hover:text-white transition-colors">Features</a>
                 <a href="#jobs" className="hover:text-white transition-colors">Discovery</a>
                 <a href="#programs" className="hover:text-white transition-colors">Programs</a>
+                <Link to="/help" className="hover:text-white transition-colors">Help &amp; FAQs</Link>
               </div>
             </div>
+            {(office.address || office.phone || office.email || office.hours) && (
+              <div className="max-w-xs">
+                <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Visit or contact PESO</p>
+                <div className="mt-2.5 flex flex-col gap-2 text-slate-400">
+                  {office.address && <span>{office.address}</span>}
+                  {office.hours && <span>{office.hours}</span>}
+                  {office.phone && <a href={telHref(office.phone)} className="hover:text-white transition-colors">{office.phone}</a>}
+                  {office.email && <a href={`mailto:${office.email}`} className="break-all hover:text-white transition-colors">{office.email}</a>}
+                  {office.facebook && <a href={office.facebook} target="_blank" rel="noreferrer" className="hover:text-white transition-colors">Facebook page</a>}
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
         <div className="max-w-6xl mx-auto mt-10 flex flex-col gap-3 border-t border-white/5 pt-6 text-xs text-slate-600 sm:flex-row sm:items-center sm:justify-between">
-          <p>Urdaneta City PESO Employment Portal · Pangasinan, Philippines</p>
+          <p>{landing.footer_tagline} · Pangasinan, Philippines</p>
           <div className="flex items-center gap-3">
             <Link to="/privacy-policy" className="hover:text-white transition-colors">Privacy Policy</Link>
             <span aria-hidden="true" className="text-slate-700">·</span>

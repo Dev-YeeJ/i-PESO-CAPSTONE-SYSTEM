@@ -1,0 +1,57 @@
+{
+  "slug": "privacy-policy",
+  "effective_date": "2026-09-09",
+  "summary": null,
+  "sections": [
+    {
+      "id": "introduction",
+      "title": "Introduction & Scope",
+      "body": "i-PESO is the online employment portal of the Public Employment Service Office (PESO) of Urdaneta City, Pangasinan. This policy applies to job seekers, employers, and visitors who use the portal, and to the associated i-PESO mobile app. It describes how we collect, use, share, and protect personal data in compliance with the Data Privacy Act of 2012 (Republic Act No. 10173), its Implementing Rules and Regulations, and issuances of the National Privacy Commission (NPC).\n\nAnyone may browse job vacancies, job fairs, and government program listings without an account. An account — and the personal data described below — is only required to apply for a job, be matched with employers, or be notified of new openings."
+    },
+    {
+      "id": "who-we-are",
+      "title": "Who We Are",
+      "body": "The Public Employment Service Office (PESO) of Urdaneta City is the personal information controller responsible for the data described in this policy.\n\nOffice address: {office.address}. Phone: {office.phone}. Email: {office.email}. Facebook: {office.facebook}.\n\nPrivacy inquiries and data subject requests (access, correction, and similar concerns) are handled directly by the PESO Urdaneta City office through the contact details above. Complaints that cannot be resolved at the office level are escalated to the Department of Labor and Employment (DOLE). PESO has not designated a separately named Data Protection Officer; this section will be updated if one is appointed."
+    },
+    {
+      "id": "data-we-collect",
+      "title": "What Personal Data We Collect",
+      "body": "**If you register as a job seeker**, we collect the information used to build your National Skills Registration Program (NSRP) profile: your name, date of birth, sex, contact number, email address, complete home address, employment status, job preferences, language skills, educational attainment, training and eligibility records, and work experience. A Tax Identification Number (TIN) may be provided but is optional.\n\n**If you register as an employer**, we collect your company profile (name, industry, size, address), Tax Identification Number, legal registration documents (SEC, DTI, or CDA registration; Mayor's/business permit; BIR Certificate of Registration), and the name, position, and valid ID of your authorized company representative.\n\n**When you use the portal**, we also record the applications you submit, interview schedules and outcomes, messages and remarks exchanged through the applicant tracking system, job fair attendance, and standard activity logs (sign-ins, status changes) for accountability."
+    },
+    {
+      "id": "why-we-collect",
+      "title": "Why We Collect and Use Your Data",
+      "body": "- To create and verify your job seeker or employer account.\n- To match job seekers with suitable vacancies and to let employers evaluate applicants.\n- To administer government employment and livelihood programs (e.g., SPES, TUPAD, GIP) and job fairs you apply to or join.\n- To schedule interviews and record hiring/placement outcomes.\n- To meet DOLE reporting obligations, including placement and establishment reports (such as the RO1-JF Establishment Report) that PESO offices are required to submit.\n- To communicate with you about your account, applications, or program eligibility.\n- To maintain the security, integrity, and audit trail of the portal."
+    },
+    {
+      "id": "legal-basis",
+      "title": "Legal Basis for Processing",
+      "body": "We process your personal data on one or more of the following legal bases recognized under Sections 12 and 13 of the Data Privacy Act:\n\n- **Consent** — when you register an account and submit your profile information.\n- **Contract necessity** — to provide the job-matching and application services you request.\n- **Legal obligation** — to comply with DOLE and PESO reporting requirements under the PESO Act and related labor and employment issuances.\n- **Legitimate interest** — to keep the portal secure and to improve how vacancies are matched to job seekers."
+    },
+    {
+      "id": "data-sharing",
+      "title": "Who We Share Your Data With",
+      "body": "A job seeker's profile is shared with an employer only after that job seeker applies to one of that employer's vacancies. An employer's verification documents are reviewed by authorized PESO administrators. Placement and establishment data may be reported to the DOLE Regional Office as required by law.\n\nWe do not sell, rent, or trade your personal data to any third party for marketing purposes.\n\nWe do not use cookies for tracking or advertising, and the portal has no analytics or advertising scripts. Signing in relies on your browser's local storage, not cookies, to keep you signed in."
+    },
+    {
+      "id": "retention",
+      "title": "How Long We Keep Your Data",
+      "body": "We keep your job seeker or employer data for as long as your account remains active. After your account is closed, or after three (3) years of continuous inactivity, your personal data is deleted or anonymized — except where a longer period is needed to complete an active DOLE report, resolve an ongoing dispute or complaint, or comply with a legal obligation, in which case we keep only what is needed for that purpose.\n\nThis three-year period is aligned with the prescriptive period for employment-related money claims under Article 306 of the Labor Code, and follows the National Privacy Commission's general principle that personal data should not be kept longer than necessary for the purpose it was collected for."
+    },
+    {
+      "id": "security",
+      "title": "How We Protect Your Data",
+      "body": "- Role-based access: job seeker, employer, and administrator accounts can only see the data relevant to their role.\n- Passwords are stored using one-way cryptographic hashing — no one at PESO can view a user's actual password.\n- Administrator actions (approvals, rejections, document reviews) are recorded in an internal activity log for accountability.\n- Data submitted to the portal is transmitted over encrypted (HTTPS) connections.\n- Employer verification documents are only accessible to authorized PESO administrators."
+    },
+    {
+      "id": "your-rights",
+      "title": "Your Rights & How to File a Request",
+      "body": "Under Section 16 of the Data Privacy Act, you have the right to:\n\n- Be informed that your personal data will be, is being, or was processed.\n- Access your personal data on file.\n- Object to or withdraw consent for processing, where applicable.\n- Request correction of inaccurate or outdated data.\n- Request erasure or blocking of data that was unlawfully obtained or is no longer necessary.\n- Be indemnified for damages from inaccurate, incomplete, or unlawfully obtained data.\n- Data portability, where technically feasible.\n- File a complaint with the National Privacy Commission (NPC).\n\nRequests to exercise these rights may be filed at the office contact details in Section 2. National Privacy Commission registration and the Public Employment Information System (PEIS) are administered by the Department of Labor and Employment (DOLE) at the national level rather than registered separately by this local PESO office; inquiries about national-level registration may be directed to DOLE."
+    },
+    {
+      "id": "changes",
+      "title": "Changes to This Policy",
+      "body": "We may update this policy as the portal or applicable law changes. Material changes will update the effective date at the top of this page. We encourage you to review this page periodically."
+    }
+  ]
+}

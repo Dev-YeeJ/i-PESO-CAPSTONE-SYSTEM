@@ -81,7 +81,9 @@ trait HasAccountRestriction
             ? ' until '.$this->restriction_ends_at->timezone('Asia/Manila')->format('F j, Y')
             : '';
 
+        $email = app(\App\Services\SiteContentService::class)->office()['email'] ?? null;
+
         return "This account has been suspended by PESO Urdaneta{$until} following a review. "
-            .'For questions, contact the PESO office or email pesourdaneta@gmail.com.';
+            .'For questions, contact the PESO office'.($email ? " or email {$email}" : '').'.';
     }
 }
