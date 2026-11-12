@@ -2,6 +2,7 @@ import { createElement, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useQuery } from '@tanstack/react-query'
+import { companyLogoUrl } from '@/utils/companyLogoUrl'
 import {
   AlertTriangle,
   Bookmark,
@@ -863,20 +864,14 @@ function JobDetailModal({ job, saved, applying = false, onClose, onSave, onQuick
             Match explanation
           </span>
           <div className="mt-4 flex items-center gap-4">
-            {job.companyLogoPath && (
-              <button
-                type="button"
-                onClick={onViewEmployer}
-                className="shrink-0 transition-transform hover:scale-105 focus:outline-none"
-                title={`View ${job.company} profile`}
-              >
-                <img
-                  src={job.companyLogoPath.startsWith('http') ? job.companyLogoPath : `${import.meta.env.VITE_API_BASE_URL?.replace('/api', '') || 'http://localhost:8000'}/storage/${job.companyLogoPath}`}
-                  alt={job.company}
-                  className="h-12 w-12 shrink-0 rounded-lg border border-slate-200 bg-white object-cover p-1 shadow-sm"
-                />
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={onViewEmployer}
+              className="shrink-0 transition-transform hover:scale-105 focus:outline-none"
+              title={`View ${job.company} profile`}
+            >
+              <CompanyMark company={job.company} logoPath={job.companyLogoPath} sizeClass="h-12 w-12" />
+            </button>
             <div>
               <DialogTitle>{job.title}</DialogTitle>
               <DialogDescription className="mt-1">
@@ -1067,17 +1062,23 @@ function ScoreRow({ label, value }) {
   )
 }
 
-function CompanyMark({ company, logoPath }) {
-  if (logoPath) {
-    const baseUrl = import.meta.env.VITE_API_BASE_URL?.replace('/api', '') || 'http://localhost:8000'
-    const logoUrl = logoPath.startsWith('http') ? logoPath : `${baseUrl}/storage/${logoPath}`
+function CompanyMark({ company, logoPath, sizeClass = 'h-14 w-14' }) {
+  const [imageFailed, setImageFailed] = useState(false)
+  const logoUrl = companyLogoUrl(logoPath)
+
+  if (logoUrl && !imageFailed) {
     return (
-      <img src={logoUrl} alt={company} className="flex h-14 w-14 shrink-0 items-center justify-center rounded-lg bg-white object-cover p-1 shadow-sm border border-slate-200" />
+      <img
+        src={logoUrl}
+        alt={company}
+        onError={() => setImageFailed(true)}
+        className={`flex ${sizeClass} shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white object-cover p-1 shadow-sm`}
+      />
     )
   }
 
   return (
-    <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 shadow-sm text-sm font-black text-slate-500">
+    <div className={`flex ${sizeClass} shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-sm font-black text-slate-500 shadow-sm`}>
       {companyMonogram(company)}
     </div>
   )
@@ -1154,7 +1155,7 @@ function normalizeApiJobs(rows) {
       employerId: row.employer_id ?? row.employer?.id ?? row.employer?.employer_id,
       title: row.job_title ?? 'Untitled vacancy',
       company: row.employer?.company_name ?? 'PESO Partner Employer',
-      companyLogoPath: row.employer?.company_logo,
+      companyLogoPath: row.employer?.company_logo_url ?? row.employer?.company_logo,
       location: [row.barangay, row.city_municipality, row.province].filter(Boolean).join(', ') || row.location || 'Location not specified',
       distanceKm: Number(row.distance_km ?? 0),
       salaryMin: Number(row.salary_min ?? 0),

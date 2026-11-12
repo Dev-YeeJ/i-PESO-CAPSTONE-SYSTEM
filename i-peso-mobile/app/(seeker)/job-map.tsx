@@ -699,7 +699,7 @@ const styles = StyleSheet.create({
   listWrap: { flex: 1 },
   listContent: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xxxl },
   footerSpinner: { marginTop: spacing.md },
-  sheetBody: { paddingBottom: spacing.xl },
+  sheetBody: { paddingHorizontal: spacing.xl, paddingBottom: spacing.xl },
   sheetFooter: { flexDirection: 'row', gap: spacing.md },
   resetBtn: { flex: 1 },
   filterLabel: { color: colors.textSecondary, fontSize: typography.small, fontFamily: typography.family.bold, marginTop: spacing.md, marginBottom: spacing.sm },

@@ -29,7 +29,6 @@ const CATEGORY_LABELS: Record<string, string> = {
   livelihood_program: 'Livelihood',
   tech_voc_training: 'Tech-Voc Training',
   career_guidance: 'Career Guidance',
-  citizen_charter: 'Citizen Charter',
   other: 'Other',
 }
 const CATEGORIES = Object.keys(CATEGORY_LABELS)
@@ -81,12 +80,6 @@ export default function GovernmentProgramsScreen() {
     queryFn: () => seekerService.getGovernmentPrograms({ search: debouncedSearch || undefined, category, status: status || undefined, page }),
   })
 
-  const { data: charterItems = [], error: charterError } = useQuery({
-    queryKey: ['citizenCharter'],
-    queryFn: () => seekerService.getCitizenCharter(),
-    select: (items) => items.slice(0, 3),
-  })
-
   useEffect(() => {
     if (!data) return
     setProgramItems((prev) => {
@@ -121,6 +114,11 @@ export default function GovernmentProgramsScreen() {
     }
   }
 
+  const submitSearch = () => {
+    setPage(1)
+    setDebouncedSearch(search.trim())
+  }
+
   const errorMessage = error ? apiErrorMessage(error, 'Unable to load Government Programs. Please try again.') : ''
 
   const hasMore = data ? page < data.programs.last_page : false
@@ -132,19 +130,34 @@ export default function GovernmentProgramsScreen() {
       contentContainerStyle={styles.content}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.info} />}
       showsVerticalScrollIndicator={false}
+      keyboardShouldPersistTaps="handled"
     >
       <Text style={styles.kicker}>PESO Programs Center</Text>
       <Text style={styles.subtitle}>
         Browse DOLE and PESO programs — SPES, TUPAD, GIP, livelihood, training, and OFW assistance. Your profile shows a preliminary eligibility estimate; PESO confirms eligibility in person.
       </Text>
 
-      <TextInput
-        style={styles.search}
-        value={search}
-        onChangeText={setSearch}
-        placeholder="Search programs by title or keyword"
-        placeholderTextColor={colors.subtle}
-      />
+      <View style={styles.searchRow}>
+        <TextInput
+          style={styles.search}
+          value={search}
+          onChangeText={setSearch}
+          onSubmitEditing={submitSearch}
+          returnKeyType="search"
+          accessibilityLabel="Search government programs"
+          placeholder="Search programs by title or keyword"
+          placeholderTextColor={colors.subtle}
+        />
+        <PressableScale
+          style={styles.searchButton}
+          onPress={submitSearch}
+          accessibilityRole="button"
+          accessibilityLabel="Search programs"
+          ripple={null}
+        >
+          <MaterialIcons name="search" size={22} color={colors.white} />
+        </PressableScale>
+      </View>
 
       {/* Status filter chips */}
       <View style={styles.chipWrapper}>
@@ -304,36 +317,6 @@ export default function GovernmentProgramsScreen() {
         ) : null}
       </QueryState>
 
-      {charterError ? (
-        <AlertBox variant="warning" style={styles.alertBox}>
-          {apiErrorMessage(charterError, 'Unable to load PESO Citizen Charter services.')}
-        </AlertBox>
-      ) : null}
-
-      {charterItems.length > 0 ? (
-        <View style={styles.charterSection}>
-          <Text style={styles.charterTitle}>PESO Citizen Charter</Text>
-          <Text style={styles.charterDescription}>
-            Service requirements, processing commitments, and responsible offices to guide your walk-in applications.
-          </Text>
-          {charterItems.map((service) => (
-            <Card key={String(service.service_id)} padding="md" style={styles.charterCard}>
-              <Text style={styles.charterServiceTitle}>{service.service_name}</Text>
-              {service.description ? <Text style={styles.charterServiceDescription}>{service.description}</Text> : null}
-              <View style={styles.charterDetails}>
-                <View style={styles.charterDetail}>
-                  <Text style={styles.charterDetailLabel}>Processing</Text>
-                  <Text style={styles.charterDetailValue}>{textFrom(service.processing_time, 'Not specified')}</Text>
-                </View>
-                <View style={styles.charterDetail}>
-                  <Text style={styles.charterDetailLabel}>Fees</Text>
-                  <Text style={styles.charterDetailValue}>{textFrom(service.fees, 'None')}</Text>
-                </View>
-              </View>
-            </Card>
-          ))}
-        </View>
-      ) : null}
     </ScrollView>
     </View>
   )
@@ -372,7 +355,9 @@ const styles = StyleSheet.create({
   content: { paddingHorizontal: spacing.lg, paddingTop: spacing.xl, paddingBottom: spacing.xxxl },
   kicker: { color: colors.secondary, fontSize: typography.small, fontFamily: typography.family.bold, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: spacing.xs },
   subtitle: { color: colors.textSecondary, fontSize: typography.body, lineHeight: 20, marginBottom: spacing.lg },
-  search: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radii.md, paddingHorizontal: spacing.md, paddingVertical: spacing.md, color: colors.textPrimary, fontSize: typography.body, marginBottom: spacing.md },
+  searchRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.md },
+  search: { flex: 1, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radii.md, paddingHorizontal: spacing.md, paddingVertical: spacing.md, color: colors.textPrimary, fontSize: typography.body },
+  searchButton: { width: 48, height: 48, borderRadius: radii.md, backgroundColor: colors.secondary, alignItems: 'center', justifyContent: 'center' },
   chipWrapper: { marginHorizontal: -spacing.lg, marginBottom: spacing.xs },
   chipScrollContent: { paddingHorizontal: spacing.lg, paddingVertical: spacing.xs, gap: spacing.sm, flexDirection: 'row', alignItems: 'center' },
   chip: { borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, borderRadius: radii.pill, paddingVertical: spacing.sm, paddingHorizontal: spacing.md, justifyContent: 'center', alignItems: 'center' },
@@ -396,14 +381,4 @@ const styles = StyleSheet.create({
   programMeta: { color: colors.textSecondary, fontSize: typography.small, fontFamily: typography.family.bold },
   programLocation: { color: colors.textSecondary, fontSize: typography.small, marginTop: spacing.sm },
   loadMoreBtn: { marginTop: spacing.sm },
-  charterSection: { marginTop: spacing.xl },
-  charterTitle: { color: colors.textPrimary, fontSize: typography.heading, fontFamily: typography.family.bold, textAlign: 'center' },
-  charterDescription: { color: colors.textSecondary, fontSize: typography.body, lineHeight: 20, textAlign: 'center', marginTop: spacing.xs, marginBottom: spacing.md },
-  charterCard: { marginBottom: spacing.sm },
-  charterServiceTitle: { color: colors.textPrimary, fontSize: typography.title, fontFamily: typography.family.bold },
-  charterServiceDescription: { color: colors.textSecondary, fontSize: typography.small, lineHeight: 20, marginTop: spacing.sm },
-  charterDetails: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md, paddingTop: spacing.md, borderTopWidth: 1, borderTopColor: colors.border },
-  charterDetail: { flex: 1 },
-  charterDetailLabel: { color: colors.subtle, fontSize: typography.small, fontFamily: typography.family.bold, marginBottom: spacing.xs },
-  charterDetailValue: { color: colors.textPrimary, fontSize: typography.small, fontFamily: typography.family.medium },
 })

@@ -736,10 +736,8 @@ class SeekerNearbyJobController extends Controller
     }
 
     /**
-     * The employer's logo for job cards. The query already loads company_logo; it was never
-     * sent, so web and mobile cards always fell back to initials. company_logo is the stored
-     * path (what the website's CompanyMark reads); company_logo_url is the full URL (what the
-     * mobile JobFeedCard reads), built the same way as getPublicEmployerProfile().
+     * The employer's logo for job cards. Include both the stored path and full URL so web and
+     * mobile clients can render the logo consistently.
      */
     private function employerLogo(JobVacancy $job): array
     {

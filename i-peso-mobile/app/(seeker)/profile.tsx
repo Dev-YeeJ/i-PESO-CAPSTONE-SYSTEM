@@ -880,7 +880,7 @@ export default function ProfileScreen() {
           Edit profile details
         </Button>
 
-        <Button variant="danger" fullWidth onPress={confirmSignOut} disabled={signingOut} style={styles.signOutBtn}>
+        <Button variant="outline" fullWidth onPress={confirmSignOut} disabled={signingOut} style={styles.signOutBtn}>
           {signingOut ? 'Signing out...' : 'Sign out'}
         </Button>
       </ScrollView>
@@ -899,7 +899,7 @@ export default function ProfileScreen() {
         <View style={styles.signOutModalOverlay}>
           <View style={styles.signOutModalContent}>
             <View style={styles.signOutModalIconWrap}>
-              <MaterialIcons name="logout" size={32} color={colors.danger} />
+              <MaterialIcons name="logout" size={32} color={colors.subtle} />
             </View>
             <Text style={styles.signOutModalTitle}>Sign out of i-PESO?</Text>
             <Text style={styles.signOutModalDesc}>
@@ -915,7 +915,7 @@ export default function ProfileScreen() {
                 Cancel
               </Button>
               <Button
-                variant="danger"
+                variant="outline"
                 onPress={handleSignOut}
                 loading={signingOut}
                 disabled={signingOut}

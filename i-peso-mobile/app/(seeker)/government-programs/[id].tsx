@@ -27,7 +27,6 @@ const CATEGORY_LABELS: Record<string, string> = {
   livelihood_program: 'Livelihood',
   tech_voc_training: 'Tech-Voc Training',
   career_guidance: 'Career Guidance',
-  citizen_charter: 'Citizen Charter',
   other: 'Other',
 }
 
