@@ -6,6 +6,8 @@ import { Button, Card, CardHeader, LoadingSkeleton } from '@/components/ui'
 import PageHeader from '@/pages/admin/_components/PageHeader'
 import AddressPicker from '@/components/maps/AddressPicker'
 import { adminService } from '@/services/adminService'
+import { useAuthStore } from '@/stores/authStore'
+import { canManage } from '@/utils/adminAccess'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import * as z from 'zod'
@@ -75,6 +77,8 @@ const schema = z.object({
 export default function JobFairFormPage() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const user = useAuthStore((state) => state.user)
+  const canAct = canManage(user, 'government_dole')
   
   const { register, handleSubmit, setValue, watch, reset, formState: { errors, isSubmitting } } = useForm({
     resolver: zodResolver(schema),
@@ -233,6 +237,19 @@ export default function JobFairFormPage() {
 
   const backTarget = id ? `/admin/job-fairs/${id}` : '/admin/job-fairs'
   const todayDate = useMemo(() => new Date().toISOString().slice(0, 10), [])
+
+  if (!canAct) {
+    return (
+      <div className="portal-page">
+        <PageHeader title={id ? 'Edit Job Fair' : 'Create Job Fair'} eyebrow="Government & DOLE" />
+        <Card className="mt-6">
+          <p className="text-sm font-bold text-slate-900">Full access is required to change job fairs.</p>
+          <p className="mt-1 text-sm text-slate-600">Your role can view job-fair information but cannot create or edit events.</p>
+          <Button className="mt-4" variant="outline" icon={ArrowLeft} onClick={() => navigate(backTarget)}>Back</Button>
+        </Card>
+      </div>
+    )
+  }
 
   return (
     <div className="portal-page">

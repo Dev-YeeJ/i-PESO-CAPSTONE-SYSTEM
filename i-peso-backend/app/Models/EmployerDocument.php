@@ -22,12 +22,14 @@ class EmployerDocument extends Model
         'admin_notes',
         'expiration_date',
         'viewed_at',
+        'staff_viewed_at',
     ];
 
     protected $casts = [
         'uploaded_at' => 'datetime',
         'expiration_date' => 'date',
         'viewed_at' => 'datetime',
+        'staff_viewed_at' => 'datetime',
     ];
 
     /**

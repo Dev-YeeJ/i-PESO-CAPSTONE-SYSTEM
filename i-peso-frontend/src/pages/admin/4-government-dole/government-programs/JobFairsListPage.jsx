@@ -9,6 +9,8 @@ import { ConfirmModal, StatusBadge } from '@/pages/admin/_components'
 import { adminService } from '@/services/adminService'
 import JobFairsCalendar from './components/JobFairsCalendar'
 import { LayoutList, Calendar as CalendarIcon } from 'lucide-react'
+import { useAuthStore } from '@/stores/authStore'
+import { canManage } from '@/utils/adminAccess'
 
 const MotionDiv = motion.div
 
@@ -41,6 +43,8 @@ export default function JobFairsListPage() {
   const [pendingDelete, setPendingDelete] = useState(null)
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const user = useAuthStore((state) => state.user)
+  const canAct = canManage(user, 'government_dole')
 
   const queryParams = useMemo(() => ({ page, per_page: 10, sort: 'newest' }), [page])
 
@@ -117,9 +121,11 @@ export default function JobFairsListPage() {
             <button type="button" onClick={refresh} className="rounded-xl border border-white/20 bg-white/5 px-5 py-2.5 text-sm font-bold text-white backdrop-blur-md transition hover:bg-white/10 hover:border-white/40 shadow-sm">
               Refresh
             </button>
-            <Button variant="primary" icon={Plus} onClick={() => navigate('/admin/job-fairs/create')} className="shadow-lg shadow-blue-500/20">
-              Create Job Fair
-            </Button>
+            {canAct && (
+              <Button variant="primary" icon={Plus} onClick={() => navigate('/admin/job-fairs/create')} className="shadow-lg shadow-blue-500/20">
+                Create Job Fair
+              </Button>
+            )}
           </div>
         </div>
       </MotionDiv>
@@ -226,15 +232,19 @@ export default function JobFairsListPage() {
                   <Button variant="outline" size="sm" icon={FileText} onClick={() => blobDownload(() => adminService.downloadJobFairAttendancePdf(fair.job_fair_id), `job-fair-attendance-${fair.job_fair_id}.pdf`)}>PDF</Button>
                   <Button variant="outline" size="sm" icon={FileSpreadsheet} onClick={() => blobDownload(() => adminService.downloadJobFairAttendanceExcel(fair.job_fair_id), `job-fair-attendance-${fair.job_fair_id}.csv`)}>CSV</Button>
                   <Button variant="outline" icon={UsersRound} onClick={() => navigate(`/admin/job-fairs/${fair.job_fair_id}`)}>Manage</Button>
-                  <Button variant="outline" icon={Pencil} onClick={() => navigate(`/admin/job-fairs/${fair.job_fair_id}/edit`)}>Edit</Button>
-                  <button
-                    type="button"
-                    onClick={() => setPendingDelete(fair)}
-                    aria-label="Delete job fair"
-                    className="flex h-10 w-10 items-center justify-center rounded-xl text-slate-400 transition-colors hover:bg-red-50 hover:text-red-600 border border-transparent hover:border-red-100"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
+                  {canAct && (
+                    <>
+                      <Button variant="outline" icon={Pencil} onClick={() => navigate(`/admin/job-fairs/${fair.job_fair_id}/edit`)}>Edit</Button>
+                      <button
+                        type="button"
+                        onClick={() => setPendingDelete(fair)}
+                        aria-label="Delete job fair"
+                        className="flex h-10 w-10 items-center justify-center rounded-xl text-slate-400 transition-colors hover:bg-red-50 hover:text-red-600 border border-transparent hover:border-red-100"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
 
@@ -272,16 +282,18 @@ export default function JobFairsListPage() {
         </div>
       )}
 
-      <ConfirmModal
-        isOpen={Boolean(pendingDelete)}
-        isDangerous
-        title="Delete this job fair?"
-        message={`"${pendingDelete?.title ?? 'This job fair'}" and its employer participation records will no longer be available in the portal. This cannot be undone.`}
-        confirmText="Delete job fair"
-        loading={removeFair.isPending}
-        onCancel={() => setPendingDelete(null)}
-        onConfirm={() => removeFair.mutate(pendingDelete.job_fair_id)}
-      />
+      {canAct && (
+        <ConfirmModal
+          isOpen={Boolean(pendingDelete)}
+          isDangerous
+          title="Delete this job fair?"
+          message={`"${pendingDelete?.title ?? 'This job fair'}" and its employer participation records will no longer be available in the portal. This cannot be undone.`}
+          confirmText="Delete job fair"
+          loading={removeFair.isPending}
+          onCancel={() => setPendingDelete(null)}
+          onConfirm={() => removeFair.mutate(pendingDelete.job_fair_id)}
+        />
+      )}
     </div>
   )
 }

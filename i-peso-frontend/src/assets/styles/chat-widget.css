@@ -266,6 +266,47 @@
   filter: drop-shadow(0 2px 4px rgba(29, 78, 216, 0.25));
 }
 
+.ipeso-chat-response {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.2rem;
+}
+
+.ipeso-chat-response .ipeso-chat-bubble {
+  margin: 0;
+}
+
+.ipeso-chat-msg.is-user .ipeso-chat-response {
+  align-items: flex-end;
+}
+
+.ipeso-chat-draft-label {
+  margin: 0;
+  color: var(--ace-text-2);
+  font-size: 0.62rem;
+  text-align: right;
+}
+
+.ipeso-chat-voice-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  border: 0;
+  border-radius: 0.5rem;
+  padding: 0.2rem 0.4rem;
+  color: var(--ace-blue);
+  background: transparent;
+  font: inherit;
+  font-size: 0.68rem;
+  cursor: pointer;
+}
+
+.ipeso-chat-voice-action:hover { background: #DBEAFE; }
+.ipeso-chat-voice-action:focus-visible { outline: 2px solid var(--ace-blue); outline-offset: 1px; }
+
 /* ── Bubbles ── */
 
 .ipeso-chat-bubble {
@@ -443,6 +484,7 @@
 
 .ipeso-chat-form {
   display: flex;
+  align-items: center;
   gap: 0.45rem;
   border-top: 1px solid var(--ace-border);
   padding: 0.65rem 0.75rem;
@@ -504,6 +546,30 @@
 }
 
 .ipeso-chat-form button:focus-visible { outline: 2px solid var(--ace-blue); outline-offset: 2px; }
+
+.ipeso-chat-form .ipeso-chat-mic.is-listening {
+  background: #B91C1C;
+}
+
+.ipeso-chat-voice-status {
+  margin: 0;
+  padding: 0 0.75rem;
+  color: var(--ace-text-2);
+  background: var(--ace-surface);
+  font-size: 0.65rem;
+  line-height: 1.4;
+}
+
+.ipeso-chat-voice-status:empty { display: none; }
+
+.ipeso-chat-voice-disclosure {
+  margin: 0;
+  padding: 0 0.75rem 0.3rem;
+  color: var(--ace-text-2);
+  background: var(--ace-surface);
+  font-size: 0.58rem;
+  line-height: 1.35;
+}
 
 /* ── Footer ── */
 

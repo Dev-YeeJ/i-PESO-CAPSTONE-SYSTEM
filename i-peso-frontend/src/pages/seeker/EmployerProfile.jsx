@@ -5,12 +5,11 @@ import { ArrowLeft, BriefcaseBusiness, Flag, ShieldCheck } from 'lucide-react'
 import { Button, Card, CardHeader, EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui'
 import JobDetailModal from '@/components/JobDetailModal'
 import ReportEmployerModal from '@/components/ReportEmployerModal'
-import CompanyFacts from '@/components/employers/CompanyFacts'
-import CompanyLogo from '@/components/employers/CompanyLogo'
+import EmployerProfilePreview from '@/components/employers/EmployerProfilePreview'
 import VacancyRow from '@/components/employers/VacancyRow'
 import CompanyReviews from '@/components/reviews/CompanyReviews'
 import { getPublicEmployerProfile } from '@/services/seekerService'
-import { employerDisplayName, employerRegisteredName, formatIndustry, publicEmployerQueryKey } from '@/utils/employerProfile'
+import { employerDisplayName, publicEmployerQueryKey } from '@/utils/employerProfile'
 
 /**
  * Full-page company profile (/seeker/employers/:id), reached from the
@@ -95,42 +94,15 @@ export default function EmployerProfile() {
 
   const { employer, vacancies = [] } = data
   const name = employerDisplayName(employer)
-  const registeredName = employerRegisteredName(employer)
-  const industry = formatIndustry(employer.industry)
 
   return (
     <div className="space-y-6">
       {backButton}
 
-      <header className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200">
-        <div className="h-24 bg-brand-navy sm:h-32" />
-        <div className="flex flex-col gap-4 px-5 pb-6 sm:flex-row sm:items-end sm:px-7">
-          <CompanyLogo src={employer.company_logo_url} name={name} size="xl" className="-mt-12 sm:-mt-14" />
-          <div className="min-w-0 flex-1">
-            <h1 className="break-words text-2xl font-black leading-tight text-slate-950 sm:text-3xl">{name}</h1>
-            {registeredName && <p className="mt-1 text-sm text-slate-500">Registered as {registeredName}</p>}
-            <div className="mt-3 flex flex-wrap items-center gap-2">
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700">
-                <ShieldCheck className="h-3.5 w-3.5" aria-hidden="true" />
-                Verified by PESO
-              </span>
-              {industry && <span className="text-sm font-semibold text-slate-600">{industry}</span>}
-            </div>
-          </div>
-        </div>
-      </header>
+      <EmployerProfilePreview employer={employer} />
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
         <main className="min-w-0 space-y-6">
-          <Card>
-            <CardHeader title="About the company" />
-            {employer.company_description ? (
-              <p className="max-w-prose whitespace-pre-wrap text-sm leading-7 text-slate-700">{employer.company_description}</p>
-            ) : (
-              <p className="text-sm text-slate-500">This employer hasn't added a description yet.</p>
-            )}
-          </Card>
-
           <Card>
             <CardHeader
               title="Open jobs"
@@ -163,11 +135,6 @@ export default function EmployerProfile() {
         </main>
 
         <aside className="space-y-6">
-          <Card>
-            <CardHeader title="Company facts" />
-            <CompanyFacts employer={employer} columns={1} />
-          </Card>
-
           <Card>
             <CardHeader title="How to apply" />
             <p className="text-sm leading-6 text-slate-600">
