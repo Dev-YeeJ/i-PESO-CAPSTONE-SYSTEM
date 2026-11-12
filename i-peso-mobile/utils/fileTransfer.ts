@@ -40,8 +40,8 @@ function arrayBufferToBase64(buffer: ArrayBuffer) {
   return result
 }
 
-/** Downloads an authenticated GET file endpoint (image/PDF) to local cache and opens the share sheet. */
-export async function downloadAndShare(url: string, fileName: string) {
+/** Downloads an authenticated file endpoint to local cache and opens it through the system share sheet. */
+export async function downloadAndShare(url: string, fileName: string, mimeType?: string, dialogTitle?: string) {
   const headers = await authHeader()
   const target = `${FileSystem.cacheDirectory}${safeFileName(fileName)}`
   const result = await FileSystem.downloadAsync(url, target, { headers })
@@ -50,9 +50,15 @@ export async function downloadAndShare(url: string, fileName: string) {
     throw new Error(`Unable to download file (status ${result.status}).`)
   }
 
-  if (await Sharing.isAvailableAsync()) {
-    await Sharing.shareAsync(result.uri)
+  if (!await Sharing.isAvailableAsync()) {
+    throw new Error('The system cannot open or share this attachment on this device.')
   }
+
+  await Sharing.shareAsync(result.uri, {
+    ...(dialogTitle ? { dialogTitle } : {}),
+    ...(mimeType ? { mimeType } : {}),
+    ...(mimeType === 'application/pdf' ? { UTI: 'com.adobe.pdf' } : {}),
+  })
 
   return result.uri
 }

@@ -4,12 +4,16 @@ import { Check, CircleHelp, X } from 'lucide-react'
 // Each item: { label, met, required, detail }.
 export default function EligibilityBreakdown({ eligibility, title = 'Eligibility estimate' }) {
   const items = eligibility?.breakdown ?? []
-  if (!items.length) return null
+  if (!eligibility) return null
 
   return (
     <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
       <h3 className="text-sm font-black text-slate-950">{title}</h3>
-      {eligibility.status === 'profile_incomplete' ? (
+      {!items.length ? (
+        <p className="mt-2 text-xs leading-5 text-slate-500">
+          No profile-based criteria are configured for this category. Review the listed requirements and confirm eligibility with PESO in person.
+        </p>
+      ) : eligibility.status === 'profile_incomplete' ? (
         <p className="mt-2 text-xs leading-5 text-amber-800">
           Preliminary match: {typeof eligibility.score === 'number' ? `${eligibility.score}%` : 'not enough profile data'} using {eligibility.evaluated_rules} of {eligibility.total_rules} criteria.
           Update your profile to check the missing criteria. PESO confirms eligibility in person.

@@ -104,39 +104,39 @@ export function BottomSheet({
           />
         </Animated.View>
 
-        <GestureDetector gesture={panGesture}>
-          <Animated.View
-            style={[
-              styles.sheet,
-              { height: sheetHeight, paddingBottom: insets.bottom || spacing.lg },
-              sheetStyle,
-            ]}
-            accessibilityViewIsModal
-          >
-            <View style={styles.grabberWrap}>
+        <Animated.View
+          style={[
+            styles.sheet,
+            { height: sheetHeight, paddingBottom: insets.bottom || spacing.lg },
+            sheetStyle,
+          ]}
+          accessibilityViewIsModal
+        >
+          <GestureDetector gesture={panGesture}>
+            <View style={styles.grabberWrap} collapsable={false}>
               <View style={styles.grabber} />
             </View>
+          </GestureDetector>
 
-            {title ? (
-              <View style={styles.header}>
-                <Text style={styles.title} numberOfLines={2}>{title}</Text>
-                <Pressable
-                  onPress={dismiss}
-                  hitSlop={12}
-                  style={styles.closeButton}
-                  accessibilityRole="button"
-                  accessibilityLabel="Close"
-                >
-                  <MaterialIcons name="close" size={20} color={colors.textSecondary} />
-                </Pressable>
-              </View>
-            ) : null}
+          {title ? (
+            <View style={styles.header}>
+              <Text style={styles.title} numberOfLines={2}>{title}</Text>
+              <Pressable
+                onPress={dismiss}
+                hitSlop={12}
+                style={styles.closeButton}
+                accessibilityRole="button"
+                accessibilityLabel="Close"
+              >
+                <MaterialIcons name="close" size={20} color={colors.textSecondary} />
+              </Pressable>
+            </View>
+          ) : null}
 
-            <View style={styles.body}>{children}</View>
+          <View style={styles.body}>{children}</View>
 
-            {footer ? <View style={styles.footer}>{footer}</View> : null}
-          </Animated.View>
-        </GestureDetector>
+          {footer ? <View style={styles.footer}>{footer}</View> : null}
+        </Animated.View>
       </GestureHandlerRootView>
     </Modal>
   )

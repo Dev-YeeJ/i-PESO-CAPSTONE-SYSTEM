@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import PublicProgramCard from '../PublicProgramCard'
 import ProgramCard from '../ProgramCard'
+import EligibilityBreakdown from '../EligibilityBreakdown'
 
 // Mirrors what /api/public/government-programs actually returns.
 const PROGRAM = {
@@ -33,7 +34,8 @@ describe('PublicProgramCard', () => {
     render(<PublicProgramCard program={PROGRAM} />)
 
     expect(screen.getByText('SPES Summer Batch 2026')).toBeInTheDocument()
-    expect(screen.getByText(/12 of 50 slots left/)).toBeInTheDocument()
+    expect(screen.getByText(/50 slots/)).toBeInTheDocument()
+    expect(screen.queryByText(/12 of 50 slots left/)).not.toBeInTheDocument()
     expect(screen.getByText(/Until/)).toBeInTheDocument()
   })
 
@@ -44,6 +46,36 @@ describe('PublicProgramCard', () => {
     }}} />)
 
     expect(screen.getByText('Age requirement — Your age is outside the allowed range.')).toBeInTheDocument()
+  })
+
+  it('renders the structured, automatically generated age requirement', async () => {
+    const user = userEvent.setup()
+    render(<PublicProgramCard program={{
+      ...PROGRAM,
+      eligibility_requirements: [{ type: 'age_range', min: 18, max: 24, label: '18 to 24 years old' }],
+    }} />)
+
+    await user.click(screen.getByRole('button', { expanded: false }))
+
+    expect(screen.getByText('18 to 24 years old')).toBeInTheDocument()
+  })
+
+  it('does not show linked skills on seeker program cards', () => {
+    render(<ProgramCard program={{
+      ...PROGRAM,
+      title: PROGRAM.name,
+      status: 'open',
+      skills: [{ id: 1, name: 'SMAW Welding', type: 'taught' }],
+    }} />)
+
+    expect(screen.queryByText('SMAW Welding')).not.toBeInTheDocument()
+  })
+
+  it('still explains the eligibility estimate when a category has no profile checks', () => {
+    render(<EligibilityBreakdown eligibility={{ status: 'eligible', score: 100, breakdown: [] }} />)
+
+    expect(screen.getByText('Eligibility estimate')).toBeInTheDocument()
+    expect(screen.getByText(/No profile-based criteria are configured/)).toBeInTheDocument()
   })
 
   it('reveals requirements, documents and PESO steps in place, with no account', async () => {

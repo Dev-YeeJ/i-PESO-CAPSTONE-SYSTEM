@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Http\Controllers\Api\Concerns\FormatsGovernmentPrograms;
 use App\Http\Controllers\Controller;
 use App\Models\GovernmentProgram;
 use Illuminate\Http\JsonResponse;
@@ -23,6 +24,8 @@ use Illuminate\Http\JsonResponse;
  */
 class PublicGovernmentProgramController extends Controller
 {
+    use FormatsGovernmentPrograms;
+
     public function index(): JsonResponse
     {
         $programs = GovernmentProgram::query()
@@ -50,7 +53,7 @@ class PublicGovernmentProgramController extends Controller
                 'blurb' => $program->short_description,
                 'description' => $program->description,
                 'target_beneficiaries' => $program->target_beneficiaries,
-                'eligibility_requirements' => $program->eligibility_requirements ?? [],
+                'eligibility_requirements' => $this->formatEligibilityRequirements($program),
                 'required_documents' => $program->required_documents ?? [],
                 'citizen_charter_steps' => $program->citizen_charter_steps ?? [],
                 'start_date' => $program->start_date?->format('Y-m-d'),

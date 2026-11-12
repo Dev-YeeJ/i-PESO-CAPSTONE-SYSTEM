@@ -27,7 +27,7 @@ export default function PublicProgramCard({ program }) {
 
   const deadline = formatDate(program.application_deadline)
   const start = formatDate(program.start_date)
-  const slotsLeft = program.total_slots > 0 ? program.available_slots : null
+  const slots = program.total_slots > 0 ? `${program.total_slots} slots` : 'Open capacity'
 
   const requirements = program.eligibility_requirements ?? []
   const documents = program.required_documents ?? []
@@ -61,11 +61,9 @@ export default function PublicProgramCard({ program }) {
               <CalendarDays className="h-3 w-3" /> Until {deadline}
             </span>
           )}
-          {slotsLeft !== null && (
-            <span className="inline-flex items-center gap-1">
-              <Users className="h-3 w-3" /> {slotsLeft} of {program.total_slots} slots left
-            </span>
-          )}
+          <span className="inline-flex items-center gap-1">
+            <Users className="h-3 w-3" /> {slots}
+          </span>
           {program.venue && (
             <span className="inline-flex items-center gap-1">
               <MapPin className="h-3 w-3" /> {program.venue}
@@ -118,7 +116,7 @@ function DetailList({ icon, title, items, ordered = false }) {
     <div>
       <p className="flex items-center gap-1.5 font-bold text-[#0A192F]">{icon} {title}</p>
       <ListTag className={`mt-1.5 space-y-1 pl-4 ${ordered ? 'list-decimal' : 'list-disc'}`}>
-        {items.map((item, index) => <li key={index}>{item}</li>)}
+        {items.map((item, index) => <li key={index}>{typeof item === 'string' ? item : item?.label}</li>)}
       </ListTag>
     </div>
   )

@@ -17,7 +17,7 @@ trait FormatsGovernmentPrograms
             'slug' => $program->slug,
             'category' => $program->category,
             'description' => $program->description,
-            'eligibility_requirements' => $program->eligibility_requirements ?? [],
+            'eligibility_requirements' => $this->formatEligibilityRequirements($program),
             'target_industry' => $program->target_industry,
             'target_occupation' => $program->targetOccupation ? [
                 'id' => $program->targetOccupation->id,
@@ -39,6 +39,9 @@ trait FormatsGovernmentPrograms
             'status' => $program->program_status,
             'visibility' => $program->visibility,
             'has_attachment' => filled($program->attachment_path),
+            'attachment_extension' => $program->attachment_path
+                ? strtolower(pathinfo($program->attachment_path, PATHINFO_EXTENSION))
+                : null,
             'eligibility' => $seeker ? app(EligibilityMatchingService::class)->evaluate($seeker, $program) : null,
             'recommendation_score' => $program->getAttribute('recommendation_score'),
             'recommendation_reason' => $program->getAttribute('recommendation_reason'),
@@ -53,5 +56,35 @@ trait FormatsGovernmentPrograms
         }
 
         return $formatted;
+    }
+
+    private function formatEligibilityRequirements(GovernmentProgram $program): array
+    {
+        $requirements = $program->eligibility_requirements ?? [];
+        $legacyAgeRequirements = config("government_program_presets.{$program->category}.legacy_age_requirements", []);
+        $requirements = array_values(array_filter(
+            $requirements,
+            static fn ($requirement) => ! (is_array($requirement) && ($requirement['type'] ?? null) === 'age_range')
+                && ! in_array($requirement, $legacyAgeRequirements, true),
+        ));
+
+        $ageRule = collect($program->eligibility_rules ?? [])
+            ->first(fn ($rule) => is_array($rule) && ($rule['field'] ?? null) === 'age');
+        if ($ageRule) {
+            $min = (int) ($ageRule['min'] ?? 0);
+            $max = (int) ($ageRule['max'] ?? 200);
+            $label = $max >= 200
+                ? "At least {$min} years old"
+                : ($min === $max ? "Age {$min} years old" : "{$min} to {$max} years old");
+
+            $requirements[] = [
+                'type' => 'age_range',
+                'min' => $min,
+                'max' => $max,
+                'label' => $label,
+            ];
+        }
+
+        return $requirements;
     }
 }

@@ -5,16 +5,19 @@
 | Government Program Presets
 |--------------------------------------------------------------------------
 |
-| PESO programs are national programs whose criteria are fixed by statute or
-| DOLE guidelines, so an administrator posting one should not be authoring
-| eligibility logic by hand. Picking a category pre-fills everything standard;
-| the admin then supplies only what is local to the batch — dates, slots,
-| venue and contact.
+| Category-aware recommendations are starting points, not official or
+| immutable requirements. Administrators review and add applicable suggestions
+| to each posting; the final requirements must be checked against current DOLE
+| guidance and the Urdaneta City PESO Citizen's Charter.
 |
-| Everything here is a starting point, not a constraint: the posting form
-| lets an admin edit or clear any pre-filled value for a batch that differs.
+| Eligibility rules are applied automatically by category. The age range may
+| be adjusted for a batch and is mirrored into its seeker-facing requirements.
 |
-| `eligibility_rules` are scored by EligibilityMatchingService. That engine
+| `eligibility_requirements` are recommendations for the posting form, not
+| automatically published requirements. Age is generated from the structured
+| age restriction so changing it cannot leave stale requirement text behind.
+|
+| `eligibility_rules` are scored equally by EligibilityMatchingService. That engine
 | can only read what is on a seeker's profile, so criteria it cannot check —
 | "is an enrolled student", "parents' income below the poverty threshold" —
 | are listed under `eligibility_requirements` as plain text instead. Those
@@ -29,7 +32,7 @@
 |   sex              => value
 |   civil_status     => values[]
 |   residency        => value (city/municipality)
-| plus label, weight (default 1) and required (default false).
+| plus label and required (default false).
 |
 */
 
@@ -40,11 +43,11 @@ return [
         'target_beneficiaries' => 'Poor but deserving students, out-of-school youth (OSY) and dependents of displaced workers, 15 to 30 years old.',
         'description' => "The Special Program for Employment of Students (SPES) gives poor but deserving students, out-of-school youth and dependents of displaced workers paid work during school breaks so they can help fund their education.\n\nParticipants are paid the applicable wage for the duration of their engagement, with a portion shouldered by the employer and the balance issued by DOLE as an education voucher. Under RA 10917 a student may render up to 78 working days.",
         'eligibility_requirements' => [
-            '15 to 30 years old at the time of application',
             'Currently an enrolled student, an out-of-school youth, or a dependent of a displaced worker',
             "Combined parents' income does not exceed the regional poverty threshold",
             'No failing grades in the immediately preceding school term',
         ],
+        'legacy_age_requirements' => ['15 to 30 years old at the time of application'],
         'required_documents' => [
             'PSA Birth Certificate (photocopy)',
             'School ID, or Certificate of Registration / Enrolment',
@@ -60,7 +63,7 @@ return [
             "Report to the employer on the agreed start date. At the end of the engagement the employer issues your Student's Employment Record (SPES Form 04).",
         ],
         'eligibility_rules' => [
-            ['field' => 'age', 'op' => 'between', 'min' => 15, 'max' => 30, 'label' => '15 to 30 years old', 'weight' => 2, 'required' => true],
+            ['field' => 'age', 'op' => 'between', 'min' => 15, 'max' => 30, 'label' => '15 to 30 years old', 'required' => true],
         ],
     ],
 
@@ -69,11 +72,11 @@ return [
         'target_beneficiaries' => 'Displaced, underemployed and seasonal workers, and the self-employed who lost their livelihood.',
         'description' => "TUPAD (Tulong Panghanapbuhay sa Ating Disadvantaged/Displaced Workers) is a community-based safety net that provides short-term emergency employment to workers in the informal sector.\n\nBeneficiaries render community work for the scheduled number of days and are paid the prevailing minimum wage for the locality, with accident insurance and an orientation on safety and health.",
         'eligibility_requirements' => [
-            'At least 18 years old',
             'A displaced, underemployed or seasonal worker, or self-employed and has lost livelihood',
             'A resident of the barangay covered by this batch',
             'Not a beneficiary of another DOLE emergency employment program within the same year',
         ],
+        'legacy_age_requirements' => ['At least 18 years old'],
         'required_documents' => [
             'Valid government-issued ID',
             'Barangay Certificate of Residency',
@@ -87,8 +90,8 @@ return [
             'Render the community work for the scheduled number of days. Wages are released after the work period.',
         ],
         'eligibility_rules' => [
-            ['field' => 'age', 'op' => 'between', 'min' => 18, 'max' => 200, 'label' => 'At least 18 years old', 'weight' => 2, 'required' => true],
-            ['field' => 'employment_status', 'op' => 'in', 'values' => ['unemployed'], 'label' => 'Currently unemployed or underemployed', 'weight' => 1, 'required' => false],
+            ['field' => 'age', 'op' => 'between', 'min' => 18, 'max' => 200, 'label' => 'At least 18 years old', 'required' => true],
+            ['field' => 'employment_status', 'op' => 'in', 'values' => ['unemployed'], 'label' => 'Currently unemployed or underemployed', 'required' => false],
         ],
     ],
 
@@ -97,11 +100,11 @@ return [
         'target_beneficiaries' => 'Youth 18 to 30 years old, preferably from poor families, who are at least high school graduates.',
         'description' => "The Government Internship Program (GIP) engages young workers in government offices so they gain work experience and exposure to public service while earning.\n\nInterns are paid a percentage of the prevailing minimum wage for the duration of the engagement and are covered by an endorsement from DOLE.",
         'eligibility_requirements' => [
-            '18 to 30 years old',
             'At least a high school graduate',
             'Preferably from a poor or indigent family',
             'Willing to render the full engagement period',
         ],
+        'legacy_age_requirements' => ['18 to 30 years old'],
         'required_documents' => [
             'Accomplished DOLE-GIP Form A',
             'PSA Birth Certificate (photocopy)',
@@ -117,8 +120,8 @@ return [
             'Submit the Accomplishment Report and other documents in the format provided by DOLE at the end of the engagement.',
         ],
         'eligibility_rules' => [
-            ['field' => 'age', 'op' => 'between', 'min' => 18, 'max' => 30, 'label' => '18 to 30 years old', 'weight' => 2, 'required' => true],
-            ['field' => 'educ_attainment', 'op' => 'min_level', 'value' => 'high school graduate', 'label' => 'At least a high school graduate', 'weight' => 1, 'required' => false],
+            ['field' => 'age', 'op' => 'between', 'min' => 18, 'max' => 30, 'label' => '18 to 30 years old', 'required' => true],
+            ['field' => 'educ_attainment', 'op' => 'min_level', 'value' => 'high school graduate', 'label' => 'At least a high school graduate', 'required' => false],
         ],
     ],
 
@@ -144,7 +147,7 @@ return [
             'Undergo the interview with the agency representative. Other documents, if any, are prepared once your qualifications have been assessed.',
         ],
         'eligibility_rules' => [
-            ['field' => 'is_ofw', 'op' => 'equals', 'value' => true, 'label' => 'OFW or former OFW', 'weight' => 2, 'required' => true],
+            ['field' => 'is_ofw', 'op' => 'equals', 'value' => true, 'label' => 'OFW or former OFW', 'required' => true],
         ],
     ],
 
@@ -153,11 +156,11 @@ return [
         'target_beneficiaries' => 'Self-employed, marginalised and informal-sector workers, individually or as an organised group.',
         'description' => "The DOLE Integrated Livelihood Program (Kabuhayan) helps marginalised and informal-sector workers start or restore a livelihood through starter kits, equipment and capacity building.\n\nAssistance may be granted to an individual or to an accredited workers' association, and is released after the proposal is validated and approved by DOLE.",
         'eligibility_requirements' => [
-            'At least 18 years old',
             "Self-employed or a marginalised worker, or a member of an accredited workers' association",
             'Has a viable livelihood or business plan',
             'Has not received the same livelihood assistance within the same year',
         ],
+        'legacy_age_requirements' => ['At least 18 years old'],
         'required_documents' => [
             'Livelihood or business plan',
             'Valid government-issued ID',
@@ -172,7 +175,7 @@ return [
             'Attend the orientation before the release of the starter kit or assistance.',
         ],
         'eligibility_rules' => [
-            ['field' => 'age', 'op' => 'between', 'min' => 18, 'max' => 200, 'label' => 'At least 18 years old', 'weight' => 2, 'required' => true],
+            ['field' => 'age', 'op' => 'between', 'min' => 18, 'max' => 200, 'label' => 'At least 18 years old', 'required' => true],
         ],
     ],
 
@@ -181,11 +184,11 @@ return [
         'target_beneficiaries' => 'Job seekers and out-of-school youth who want a technical-vocational qualification.',
         'description' => "Technical-vocational training and scholarship programs let job seekers gain a recognised qualification in an in-demand trade, improving their chances of placement.\n\nPESO assesses and endorses qualified applicants to the accredited training institution. Training slots are limited and are filled on a first-qualified basis.",
         'eligibility_requirements' => [
-            'At least 15 years old',
             'Physically and mentally fit to undergo the training',
             'Able to complete the full training schedule',
             'Meets any additional entry requirement set by the training institution',
         ],
+        'legacy_age_requirements' => ['At least 15 years old'],
         'required_documents' => [
             'PSA Birth Certificate (photocopy)',
             'School records or proof of highest educational attainment',
@@ -200,7 +203,7 @@ return [
             'Attend the scheduled orientation and the start of training.',
         ],
         'eligibility_rules' => [
-            ['field' => 'age', 'op' => 'between', 'min' => 15, 'max' => 200, 'label' => 'At least 15 years old', 'weight' => 2, 'required' => true],
+            ['field' => 'age', 'op' => 'between', 'min' => 15, 'max' => 200, 'label' => 'At least 15 years old', 'required' => true],
         ],
     ],
 

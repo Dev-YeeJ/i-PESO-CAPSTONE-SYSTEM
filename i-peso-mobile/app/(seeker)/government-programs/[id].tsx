@@ -27,7 +27,6 @@ const CATEGORY_LABELS: Record<string, string> = {
   livelihood_program: 'Livelihood',
   tech_voc_training: 'Tech-Voc Training',
   career_guidance: 'Career Guidance',
-  citizen_charter: 'Citizen Charter',
   other: 'Other',
 }
 
@@ -41,6 +40,20 @@ function statusVariant(status?: string | null): 'success' | 'info' | 'neutral' {
   if (value === 'open') return 'success'
   if (value === 'completed') return 'info'
   return 'neutral'
+}
+
+function attachmentMimeType(extension: string): string {
+  const mimeTypes: Record<string, string> = {
+    pdf: 'application/pdf',
+    doc: 'application/msword',
+    docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    xls: 'application/vnd.ms-excel',
+    xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    jpg: 'image/jpeg',
+    jpeg: 'image/jpeg',
+    png: 'image/png',
+  }
+  return mimeTypes[extension] || 'application/octet-stream'
 }
 
 export default function ProgramDetailScreen() {
@@ -84,9 +97,16 @@ export default function ProgramDetailScreen() {
     setAttachmentError('')
     setAttachmentBusy(true)
     try {
-      await downloadAndShare(seekerService.programAttachmentUrl(id), `${textFrom(program.title, 'program')}.pdf`)
-    } catch {
-      setAttachmentError('Unable to open the attachment. Please try again.')
+      const extension = (program.attachment_extension || 'pdf').toLowerCase()
+      const mimeType = attachmentMimeType(extension)
+      await downloadAndShare(
+        seekerService.programAttachmentUrl(id),
+        `${textFrom(program.title, 'program')}-attachment.${extension}`,
+        mimeType,
+        'Open program attachment',
+      )
+    } catch (error) {
+      setAttachmentError(error instanceof Error ? error.message : 'Unable to open the attachment. Please try again.')
     } finally {
       setAttachmentBusy(false)
     }
@@ -116,14 +136,13 @@ export default function ProgramDetailScreen() {
   }
 
   const eligibility = Array.isArray(program.eligibility_requirements) ? program.eligibility_requirements : []
-  const skills = Array.isArray(program.skills) ? program.skills : []
   const applicationSteps = [
     'Review the eligibility requirements and your profile-based estimate on this page.',
-    `Confirm current availability, schedule, and required documents with PESO at ${program.location_address || program.venue || 'the PESO Office, Urdaneta City Hall'} before visiting.`,
-    `Submit your application in person at the listed location${program.application_deadline ? ` by ${formatDate(program.application_deadline)}` : ''}. PESO will verify your eligibility.`,
+    `Confirm the current checklist, forms, schedule, and processing time in the PESO Citizen's Charter with PESO at ${program.location_address || program.venue || 'the PESO Office, Urdaneta City Hall'}.`,
+    `Submit your application in person${program.application_deadline ? ` by ${formatDate(program.application_deadline)}` : ''}. PESO will verify your eligibility and explain the next steps.`,
   ]
   const totalSlots = program.total_slots ?? 0
-  const slotsText = totalSlots > 0 ? `${program.available_slots ?? 0}/${totalSlots} slots available` : 'Open slots (unlimited)'
+  const slotsText = totalSlots > 0 ? `${totalSlots} slots` : 'Open capacity'
 
   return (
     <View style={styles.flex}>
@@ -139,7 +158,7 @@ export default function ProgramDetailScreen() {
         </View>
 
         {program.description ? (
-          <Text style={styles.description} numberOfLines={3} ellipsizeMode="tail">
+          <Text style={styles.description}>
             {textFrom(program.description, '')}
           </Text>
         ) : null}
@@ -153,11 +172,15 @@ export default function ProgramDetailScreen() {
           ) : null}
         </Card>
 
-        {program.eligibility?.breakdown?.length ? (
+        {program.eligibility ? (
           <>
-            <SectionHeader title="Your Eligibility" />
+            <SectionHeader title="Eligibility Estimate" />
             <Card padding="md" style={styles.infoCard}>
-              {program.eligibility.status === 'profile_incomplete' ? (
+              {!program.eligibility.breakdown.length ? (
+                <AlertBox variant="info" style={styles.eligibilityNotice}>
+                  No profile-based criteria are configured for this category. Review the listed requirements and confirm eligibility with PESO in person.
+                </AlertBox>
+              ) : program.eligibility.status === 'profile_incomplete' ? (
                 <AlertBox variant="warning" style={styles.eligibilityNotice}>
                   Preliminary match: {typeof program.eligibility.score === 'number' ? `${program.eligibility.score}%` : 'not enough profile data'} using {program.eligibility.evaluated_rules ?? 0} of {program.eligibility.total_rules ?? program.eligibility.breakdown.length} criteria. Complete your profile to check missing criteria. PESO confirms eligibility in person.
                 </AlertBox>
@@ -189,7 +212,10 @@ export default function ProgramDetailScreen() {
           <>
             <SectionHeader title="Eligibility Requirements" />
             {eligibility.map((item, index) => (
-              <BulletRow key={`${item}-${index}`} text={item} />
+              <BulletRow
+                key={`${typeof item === 'string' ? item : item.label}-${index}`}
+                text={typeof item === 'string' ? item : item.label || 'Age requirement'}
+              />
             ))}
           </>
         )}
@@ -200,17 +226,6 @@ export default function ProgramDetailScreen() {
         {applicationSteps.map((step, index) => (
           <BulletRow key={`${step}-${index}`} text={`${index + 1}. ${step}`} />
         ))}
-
-        {skills.length > 0 && (
-          <>
-            <SectionHeader title="Related Skills" />
-            <View style={styles.tagRow}>
-              {skills.map((skill) => (
-                <Badge key={String(skill.id)} variant="info">{textFrom(skill.name, 'Skill')}</Badge>
-              ))}
-            </View>
-          </>
-        )}
 
         <SectionHeader title="Contact" />
         <Card padding="md" style={styles.infoCard}>
@@ -282,7 +297,6 @@ const styles = StyleSheet.create({
   bulletRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.xs },
   bulletDot: { color: colors.info, fontSize: typography.body },
   bulletText: { color: colors.secondaryText, fontSize: typography.body, lineHeight: 20, flex: 1 },
-  tagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   attachmentBtn: { marginTop: spacing.lg },
   alertBox: { marginTop: spacing.lg },
 })
