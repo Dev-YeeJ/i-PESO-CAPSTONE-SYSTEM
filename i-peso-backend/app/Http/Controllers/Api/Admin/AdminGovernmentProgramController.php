@@ -34,6 +34,19 @@ class AdminGovernmentProgramController extends Controller
         'other',
     ];
 
+    private const RULE_FIELDS = [
+        'age',
+        'employment_status',
+        'educ_attainment',
+        'is_4ps_beneficiary',
+        'is_ofw',
+        'sex',
+        'civil_status',
+        'residency',
+    ];
+
+    private const RULE_OPS = ['between', 'gte', 'lte', 'in', 'equals', 'min_level'];
+
     public function index(Request $request): JsonResponse
     {
         $query = GovernmentProgram::query()
@@ -67,10 +80,11 @@ class AdminGovernmentProgramController extends Controller
     /**
      * Per-category defaults for the posting form.
      *
-     * Category recommendations and scoring criteria come from one server-side
-     * source. The form presents recommendations for administrator review and
-     * generates scoring rules automatically; it does not expose weights or a
-     * hand-authored rule editor.
+     * PESO programs have criteria fixed by statute or DOLE guidelines, so the
+     * form pre-fills the standard parts when a category is chosen and leaves
+     * the administrator to supply only what is local to the batch. Served from
+     * config rather than duplicated in the client so the posting form, and
+     * anything else that needs them later, read the same source.
      */
     public function presets(): JsonResponse
     {
@@ -192,6 +206,12 @@ class AdminGovernmentProgramController extends Controller
             $request->merge(['program_name' => $request->input('title')]);
         }
 
+        // The rules builder posts eligibility_rules as a JSON string (nested arrays
+        // don't survive multipart form encoding cleanly). Decode it before validating.
+        if ($request->has('eligibility_rules') && is_string($request->input('eligibility_rules'))) {
+            $decoded = json_decode($request->input('eligibility_rules'), true);
+            $request->merge(['eligibility_rules' => is_array($decoded) ? $decoded : []]);
+        }
         if ($request->is('api/admin/programs*')) {
             $legacyStatus = $request->input('status');
             $request->merge(array_filter([
@@ -218,11 +238,17 @@ class AdminGovernmentProgramController extends Controller
             'category' => [$program ? 'sometimes' : 'required', Rule::in(self::CATEGORIES)],
             'description' => [$program ? 'sometimes' : 'required', 'string', 'max:30000'],
             'eligibility_requirements' => ['nullable', 'array', 'max:50'],
-            'eligibility_requirements.*' => ['string', 'max:1000'],
-            'eligibility_rules' => ['prohibited'],
-            'age_restriction_enabled' => ['sometimes', 'boolean'],
-            'age_min' => ['nullable', 'integer', 'min:0', 'max:200'],
-            'age_max' => ['nullable', 'integer', 'min:0', 'max:200'],
+            'eligibility_rules' => ['nullable', 'array', 'max:50'],
+            'eligibility_rules.*.field' => ['required_with:eligibility_rules', 'string', Rule::in(self::RULE_FIELDS)],
+            'eligibility_rules.*.op' => ['required_with:eligibility_rules', 'string', Rule::in(self::RULE_OPS)],
+            'eligibility_rules.*.label' => ['nullable', 'string', 'max:200'],
+            'eligibility_rules.*.weight' => ['nullable', 'numeric', 'min:0.01', 'max:100'],
+            'eligibility_rules.*.required' => ['nullable', 'boolean'],
+            'eligibility_rules.*.min' => ['nullable', 'numeric', 'min:0'],
+            'eligibility_rules.*.max' => ['nullable', 'numeric', 'min:0', 'max:200'],
+            'eligibility_rules.*.value' => ['nullable'],
+            'eligibility_rules.*.values' => ['nullable', 'array', 'max:20'],
+            'eligibility_rules.*.values.*' => ['string', 'max:100'],
             'target_industry' => ['nullable', 'string', 'max:255'],
             'target_occupation_id' => ['nullable', 'integer', 'exists:occupations,id'],
             'location_address' => ['nullable', 'string', 'max:1000'],
@@ -239,94 +265,64 @@ class AdminGovernmentProgramController extends Controller
             'skills.*.type' => ['nullable', Rule::in(['taught', 'required', 'target'])],
         ]);
 
-        $category = $data['category'] ?? $program?->category ?? 'other';
-        $ageEnabledWasProvided = $request->exists('age_restriction_enabled');
-        $ageEnabled = $ageEnabledWasProvided
-            ? $request->boolean('age_restriction_enabled')
-            : null;
-        $ageMin = $request->input('age_min');
-        $ageMax = $request->input('age_max');
-
-        if ($ageEnabled === true && ($ageMin === null || $ageMax === null)) {
-            throw \Illuminate\Validation\ValidationException::withMessages([
-                'age_min' => 'Enter both the minimum and maximum age.',
-                'age_max' => 'Enter both the minimum and maximum age.',
-            ]);
-        }
-        if ($ageEnabled === true && (int) $ageMin > (int) $ageMax) {
-            throw \Illuminate\Validation\ValidationException::withMessages([
-                'age_max' => 'Maximum age cannot be less than minimum age.',
-            ]);
-        }
-
-        $presetRules = config("government_program_presets.{$category}.eligibility_rules", []);
-        $rules = array_map(static function (array $rule): array {
-            unset($rule['weight']);
-            return $rule;
-        }, array_values(array_filter($presetRules, 'is_array')));
-
-        if ($ageEnabled === null && $program && $category === $program->category) {
-            $existingAgeRule = collect($program->eligibility_rules ?? [])
-                ->first(fn ($rule) => is_array($rule) && ($rule['field'] ?? null) === 'age');
-            if ($existingAgeRule) {
-                $ageEnabled = true;
-                $ageMin = $existingAgeRule['min'] ?? null;
-                $ageMax = $existingAgeRule['max'] ?? null;
-            }
-        }
-        if ($ageEnabled === null) {
-            $defaultAgeRule = collect($rules)->first(fn ($rule) => ($rule['field'] ?? null) === 'age');
-            $ageEnabled = (bool) $defaultAgeRule;
-            $ageMin = $defaultAgeRule['min'] ?? null;
-            $ageMax = $defaultAgeRule['max'] ?? null;
-        }
-
-        if ($ageEnabled !== null) {
-            $rules = array_values(array_filter($rules, fn ($rule) => ($rule['field'] ?? null) !== 'age'));
-            if ($ageEnabled) {
-                $rules[] = [
-                    'field' => 'age',
-                    'op' => 'between',
-                    'min' => (int) $ageMin,
-                    'max' => (int) $ageMax,
-                    'label' => $this->ageRuleLabel((int) $ageMin, (int) $ageMax),
-                    'required' => true,
-                ];
-            }
-        }
-
-        $requirements = array_values($data['eligibility_requirements'] ?? []);
-        $legacyAgeRequirements = config("government_program_presets.{$category}.legacy_age_requirements", []);
-        $requirements = array_values(array_filter(
-            $requirements,
-            static fn ($requirement) => (! is_array($requirement) || ($requirement['type'] ?? null) !== 'age_range')
-                && ! in_array($requirement, $legacyAgeRequirements, true),
-        ));
-        if ($ageEnabled === true) {
-            $requirements[] = [
-                'type' => 'age_range',
-                'min' => (int) $ageMin,
-                'max' => (int) $ageMax,
-                'label' => $this->ageRuleLabel((int) $ageMin, (int) $ageMax),
-            ];
-        }
-
-        $data['eligibility_rules'] = $rules;
-        $data['eligibility_requirements'] = $requirements;
-        unset($data['age_restriction_enabled'], $data['age_min'], $data['age_max']);
+        $this->validateEligibilityRuleConfiguration($data['eligibility_rules'] ?? []);
 
         return $data;
     }
 
-    private function ageRuleLabel(int $min, int $max): string
+    /**
+     * The scoring engine must never receive a rule that it cannot evaluate.
+     * Reject inconsistent field/operator pairs and incomplete ranges instead
+     * of silently assigning a misleading score to every seeker.
+     */
+    private function validateEligibilityRuleConfiguration(array $rules): void
     {
-        if ($max >= 200) {
-            return "At least {$min} years old";
+        $expectedOperators = [
+            'age' => ['between'],
+            'employment_status' => ['in'],
+            'educ_attainment' => ['min_level'],
+            'is_4ps_beneficiary' => ['equals'],
+            'is_ofw' => ['equals'],
+            'sex' => ['equals'],
+            'civil_status' => ['in'],
+            'residency' => ['equals'],
+        ];
+        $errors = [];
+
+        foreach ($rules as $index => $rule) {
+            $field = $rule['field'] ?? '';
+            $operator = $rule['op'] ?? '';
+
+            if (isset($expectedOperators[$field]) && ! in_array($operator, $expectedOperators[$field], true)) {
+                $errors["eligibility_rules.{$index}.op"] = 'Choose a supported operator for this eligibility rule.';
+            }
+
+            if ($field === 'age') {
+                $min = $rule['min'] ?? null;
+                $max = $rule['max'] ?? null;
+                if ($min === null || $max === null || (float) $min > (float) $max) {
+                    $errors["eligibility_rules.{$index}.max"] = 'Enter a valid age range where the maximum is not less than the minimum.';
+                }
+            }
+
+            if (in_array($field, ['is_4ps_beneficiary', 'is_ofw'], true) && isset($rule['value']) && ! is_bool($rule['value'])) {
+                $errors["eligibility_rules.{$index}.value"] = 'Choose yes or no for this eligibility rule.';
+            }
+
+            if (in_array($field, ['employment_status', 'civil_status'], true) && empty($rule['values'])) {
+                $errors["eligibility_rules.{$index}.values"] = 'Select at least one accepted value.';
+            }
+
+            if (in_array($field, ['educ_attainment', 'sex', 'residency'], true) && blank($rule['value'] ?? null)) {
+                $errors["eligibility_rules.{$index}.value"] = 'Enter a value for this eligibility rule.';
+            } elseif (in_array($field, ['educ_attainment', 'sex', 'residency'], true) && ! is_string($rule['value'])) {
+                $errors["eligibility_rules.{$index}.value"] = 'Enter a text value for this eligibility rule.';
+            }
         }
 
-        return $min === $max
-            ? "Age {$min} years old"
-            : "{$min} to {$max} years old";
+        if ($errors !== []) {
+            throw \Illuminate\Validation\ValidationException::withMessages($errors);
+        }
     }
 
     private function syncSkills(GovernmentProgram $program, array $skills, SkillTaxonomyService $taxonomy): void

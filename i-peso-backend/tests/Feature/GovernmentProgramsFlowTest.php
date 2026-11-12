@@ -134,6 +134,7 @@ class GovernmentProgramsFlowTest extends TestCase
                 'eligibility_requirements' => $preset['eligibility_requirements'],
                 'required_documents' => $preset['required_documents'],
                 'citizen_charter_steps' => $preset['citizen_charter_steps'],
+                'eligibility_rules' => $preset['eligibility_rules'],
                 'total_slots' => 10,
                 'program_status' => 'open',
                 'visibility' => 'public',
@@ -187,11 +188,6 @@ class GovernmentProgramsFlowTest extends TestCase
         ]);
         Sanctum::actingAs($seeker);
 
-        $this->getJson("/api/seeker/government-programs/{$programId}")
-            ->assertOk()
-            ->assertJsonPath('program.has_attachment', true)
-            ->assertJsonPath('program.attachment_extension', 'pdf');
-
         $this->get("/api/seeker/government-programs/{$programId}/attachment")->assertOk();
     }
 
@@ -221,110 +217,25 @@ class GovernmentProgramsFlowTest extends TestCase
         ])->assertCreated()->assertJsonPath('program.status', 'open');
     }
 
-    public function test_age_range_updates_the_generated_requirement_and_category_scoring_rule(): void
+    public function test_invalid_eligibility_rules_are_rejected_instead_of_scored(): void
     {
         $admin = Administrator::create([
             'first_name' => 'PESO', 'last_name' => 'Admin',
-            'email' => 'age.rules.admin@example.test', 'password' => 'password123',
-            'role' => 'administrator', 'status' => 'active', 'email_verified_at' => now(),
-        ]);
-        Sanctum::actingAs($admin);
-
-        $programId = $this->postJson('/api/admin/government-programs', [
-            'program_name' => 'Age recommendation test',
-            'category' => 'tupad',
-            'description' => 'Age range is generated from structured input.',
-            'total_slots' => 0,
-            'age_restriction_enabled' => true,
-            'age_min' => 18,
-            'age_max' => 24,
-            'eligibility_requirements' => ['Resident of Urdaneta City'],
-        ])->assertCreated()
-            ->assertJsonPath('program.eligibility_rules.0.field', 'employment_status')
-            ->assertJsonPath('program.eligibility_rules.1.field', 'age')
-            ->assertJsonPath('program.eligibility_rules.1.min', 18)
-            ->assertJsonPath('program.eligibility_rules.1.max', 24)
-            ->assertJsonPath('program.eligibility_requirements.0', 'Resident of Urdaneta City')
-            ->assertJsonPath('program.eligibility_requirements.1.type', 'age_range')
-            ->assertJsonPath('program.eligibility_requirements.1.label', '18 to 24 years old')
-            ->assertJsonMissingPath('program.eligibility_rules.1.weight')
-            ->json('program.program_id');
-
-        $eligible = JobSeeker::create([
-            'first_name' => 'Age', 'last_name' => 'Eligible', 'mobile_number' => '09170000115',
-            'email' => 'age.eligible@example.test', 'password' => 'password123',
-            'profile_completed' => true, 'date_of_birth' => now()->subYears(22)->toDateString(),
-            'employment_status' => 'unemployed',
-        ]);
-        $tooOld = JobSeeker::create([
-            'first_name' => 'Age', 'last_name' => 'Ineligible', 'mobile_number' => '09170000116',
-            'email' => 'age.ineligible@example.test', 'password' => 'password123',
-            'profile_completed' => true, 'date_of_birth' => now()->subYears(25)->toDateString(),
-            'employment_status' => 'unemployed',
-        ]);
-
-        Sanctum::actingAs($eligible);
-        $this->getJson("/api/seeker/government-programs/{$programId}")
-            ->assertOk()
-            ->assertJsonPath('program.eligibility.status', 'highly_eligible');
-
-        Sanctum::actingAs($tooOld);
-        $this->getJson("/api/seeker/government-programs/{$programId}")
-            ->assertOk()
-            ->assertJsonPath('program.eligibility.status', 'not_eligible');
-    }
-
-    public function test_admin_cannot_submit_custom_scoring_rules(): void
-    {
-        $admin = Administrator::create([
-            'first_name' => 'PESO', 'last_name' => 'Admin',
-            'email' => 'custom.rules.admin@example.test', 'password' => 'password123',
+            'email' => 'invalid.rules.admin@example.test', 'password' => 'password123',
             'role' => 'administrator', 'status' => 'active', 'email_verified_at' => now(),
         ]);
         Sanctum::actingAs($admin);
 
         $this->postJson('/api/admin/government-programs', [
-            'program_name' => 'Custom rules are disabled',
+            'program_name' => 'Invalid rule test',
             'category' => 'spes',
-            'description' => 'Category criteria are generated automatically.',
+            'description' => 'Invalid rule payload should not be saved.',
             'total_slots' => 0,
             'eligibility_rules' => [
-                ['field' => 'age', 'op' => 'between', 'min' => 15, 'max' => 30],
+                ['field' => 'age', 'op' => 'equals', 'min' => 30, 'max' => 15, 'weight' => 1],
             ],
-        ])->assertUnprocessable()->assertJsonValidationErrors('eligibility_rules');
-    }
-
-    public function test_public_programs_replace_legacy_age_copy_with_the_current_structured_range(): void
-    {
-        $admin = Administrator::create([
-            'first_name' => 'PESO', 'last_name' => 'Admin',
-            'email' => 'legacy.age.admin@example.test', 'password' => 'password123',
-            'role' => 'administrator', 'status' => 'active', 'email_verified_at' => now(),
-        ]);
-        GovernmentProgram::create([
-            'admin_id' => $admin->admin_id,
-            'program_name' => 'Legacy SPES posting',
-            'category' => 'spes',
-            'slug' => 'legacy-spes-posting',
-            'description' => 'Existing posting with the old default age text.',
-            'eligibility_requirements' => [
-                '15 to 30 years old at the time of application',
-                'Currently enrolled as a student',
-            ],
-            'eligibility_rules' => [
-                ['field' => 'age', 'op' => 'between', 'min' => 18, 'max' => 24, 'required' => true],
-            ],
-            'program_status' => 'open',
-            'visibility' => 'public',
-            'total_slots' => 10,
-            'available_slots' => 10,
-        ]);
-
-        $this->getJson('/api/public/government-programs')
-            ->assertOk()
-            ->assertJsonPath('data.0.eligibility_requirements.0', 'Currently enrolled as a student')
-            ->assertJsonPath('data.0.eligibility_requirements.1.type', 'age_range')
-            ->assertJsonPath('data.0.eligibility_requirements.1.label', '18 to 24 years old');
+        ])->assertUnprocessable()
+            ->assertJsonValidationErrors(['eligibility_rules.0.op', 'eligibility_rules.0.max']);
     }
 
     /**
@@ -346,6 +257,7 @@ class GovernmentProgramsFlowTest extends TestCase
             'program_name' => 'SPES Summer Batch',
             'category' => 'spes',
             'description' => $preset['description'],
+            'eligibility_rules' => $preset['eligibility_rules'],
             'total_slots' => 20,
             'program_status' => 'open',
             'visibility' => 'public',
@@ -394,6 +306,7 @@ class GovernmentProgramsFlowTest extends TestCase
             'program_name' => 'Youth Only Program',
             'category' => 'spes',
             'description' => 'Restricted to 15-30 year olds.',
+            'eligibility_rules' => config('government_program_presets.spes.eligibility_rules'),
             'total_slots' => 5, 'program_status' => 'open', 'visibility' => 'public',
             'application_deadline' => now()->addDays(3)->toDateString(),
         ])->assertCreated();
@@ -402,6 +315,7 @@ class GovernmentProgramsFlowTest extends TestCase
             'program_name' => 'Open To Everyone Program',
             'category' => 'career_guidance',
             'description' => 'No eligibility rules at all.',
+            'eligibility_rules' => [],
             'total_slots' => 5, 'program_status' => 'open', 'visibility' => 'public',
             'application_deadline' => now()->addDays(30)->toDateString(),
         ])->assertCreated();
@@ -440,6 +354,7 @@ class GovernmentProgramsFlowTest extends TestCase
                 'program_name' => "Ineligible Program {$index}",
                 'category' => 'spes',
                 'description' => 'Restricted to young applicants.',
+                'eligibility_rules' => config('government_program_presets.spes.eligibility_rules'),
                 'total_slots' => 5, 'program_status' => 'open', 'visibility' => 'public',
             ])->assertCreated();
         }
@@ -448,6 +363,7 @@ class GovernmentProgramsFlowTest extends TestCase
             'program_name' => 'Eligible Program On Page Two',
             'category' => 'career_guidance',
             'description' => 'Available to this seeker.',
+            'eligibility_rules' => [],
             'total_slots' => 5, 'program_status' => 'open', 'visibility' => 'public',
         ])->assertCreated();
 

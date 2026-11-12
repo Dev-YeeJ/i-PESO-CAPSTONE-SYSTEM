@@ -63,7 +63,8 @@ class EligibilityMatchingServiceTest extends TestCase
 
     public function test_a_seeker_missing_only_optional_rules_is_partially_eligible(): void
     {
-        // Three of four known criteria pass; criteria contribute equally.
+        // Required rules pass (age + unemployed) + educ met; only optional 4Ps fails
+        // => met weight 5 of 6 total = 83%.
         $seeker = new JobSeeker([
             'date_of_birth' => now()->subYears(20)->toDateString(),
             'employment_status' => 'unemployed',
@@ -75,7 +76,7 @@ class EligibilityMatchingServiceTest extends TestCase
         $result = $this->svc->evaluate($seeker, $this->spesProgram());
 
         $this->assertSame('partially_eligible', $result['status']);
-        $this->assertSame(75, $result['score']);
+        $this->assertSame(83, $result['score']);
     }
 
     public function test_missing_profile_data_is_unknown_not_a_failed_eligibility_rule(): void
