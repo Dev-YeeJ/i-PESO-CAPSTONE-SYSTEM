@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Image, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { ScrollView, StyleSheet, Text, View } from 'react-native'
 import Animated, { FadeInUp } from 'react-native-reanimated'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useQuery } from '@tanstack/react-query'
@@ -8,7 +8,6 @@ import MaterialIcons from '@expo/vector-icons/MaterialIcons'
 import { seekerService } from '@/services/seekerService'
 import { textFrom, titleCase } from '@/utils/seekerView'
 import { useMotion } from '@/hooks/useMotion'
-import { Badge } from '@/components/ui/Badge'
 import { EmployerPreferenceChip } from '@/components/ui/EmployerPreferenceChip'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
@@ -18,7 +17,9 @@ import { ScreenHeader } from '@/components/ui/ScreenHeader'
 import { ScreenSkeleton } from '@/components/ui/ScreenSkeleton'
 import { ReportConcernSheet } from '@/components/safety/ReportConcernSheet'
 import { CompanyReviews } from '@/components/reviews/CompanyReviews'
-import { colors, radii, spacing, typography } from '@/theme'
+import { CompanyLogo } from '@/components/seeker/CompanyLogo'
+import { LinearGradient } from 'expo-linear-gradient'
+import { colors, gradients, radii, spacing, typography } from '@/theme'
 
 // Display rules mirror i-peso-frontend's utils/employerProfile.js (shared by the web panel,
 // full page and admin view) so a company reads the same on every surface. Each formatter
@@ -165,31 +166,50 @@ export default function EmployerProfileScreen() {
     <View style={styles.flex}>
       {header}
       <ScrollView contentContainerStyle={styles.content}>
-        <View style={styles.header}>
-          <View style={styles.logoWrap}>
-            {employer.company_logo_url ? (
-              <Image source={{ uri: employer.company_logo_url }} style={styles.logo} accessibilityLabel={`${name} logo`} />
-            ) : (
-              <MaterialIcons name="business" size={36} color={colors.subtle} />
-            )}
+        {/* Mirrors EmployerProfilePreview's header on the website. The website also shows a
+            city chip, but the public profile API doesn't send city_municipality, so it never
+            appears for job seekers there either. */}
+        <LinearGradient colors={[...gradients.brand]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.hero}>
+          <CompanyLogo uri={employer.company_logo_url} name={name} size={72} style={styles.heroLogo} />
+          <View style={styles.statusPill}>
+            <MaterialIcons name="verified-user" size={14} color={colors.white} />
+            <Text style={styles.statusPillText}>Verified by PESO</Text>
           </View>
-          <View style={styles.headerText}>
-            <Text style={styles.name} numberOfLines={2}>{name}</Text>
-            {registeredName ? <Text style={styles.registeredName}>Registered as {registeredName}</Text> : null}
-            <View style={styles.badgeRow}>
-              <Badge variant="success">Verified by PESO</Badge>
-              {industry ? <Text style={styles.industry}>{industry}</Text> : null}
+          <Text style={styles.heroName} accessibilityRole="header">{name}</Text>
+          {registeredName ? <Text style={styles.heroRegistered}>Registered as {registeredName}</Text> : null}
+          {industry || employer.company_size ? (
+            <View style={styles.chipRow} accessibilityLabel="Company highlights">
+              {industry ? (
+                <View style={styles.chip}>
+                  <MaterialIcons name="business" size={14} color={colors.blue50} />
+                  <Text style={styles.chipText}>{industry}</Text>
+                </View>
+              ) : null}
+              {employer.company_size ? (
+                <View style={styles.chip}>
+                  <MaterialIcons name="groups" size={14} color={colors.blue50} />
+                  <Text style={styles.chipText}>{formatCompanySize(employer.company_size)}</Text>
+                </View>
+              ) : null}
             </View>
-          </View>
-        </View>
+          ) : null}
+        </LinearGradient>
 
         <Card padding="md" style={styles.sectionCard}>
           <Text style={styles.sectionTitle}>About the company</Text>
-          {employer.company_description ? (
+          {employer.company_description?.trim() ? (
             <Text style={styles.description}>{employer.company_description}</Text>
           ) : (
-            <Text style={styles.mutedText}>This employer hasn&apos;t added a description yet.</Text>
+            <Text style={styles.mutedText}>This employer hasn&apos;t added a company description yet.</Text>
           )}
+        </Card>
+
+        <Card padding="md" style={styles.sectionCard}>
+          <Text style={styles.sectionTitle}>Company facts</Text>
+          <Fact icon="track-changes" label="Industry" value={industry} />
+          <Fact icon="groups" label="Company size" value={formatCompanySize(employer.company_size)} />
+          <Fact icon="place" label="Location" value={employer.full_address || null} />
+          <Fact icon="calendar-today" label="On i-PESO since" value={formatMemberSince(employer.created_at)} last />
         </Card>
 
         <View style={styles.jobsHeader}>
@@ -268,14 +288,6 @@ export default function EmployerProfileScreen() {
         </Card>
 
         <Card padding="md" style={styles.sectionCard}>
-          <Text style={styles.sectionTitle}>Company facts</Text>
-          <Fact icon="track-changes" label="Industry" value={industry} />
-          <Fact icon="groups" label="Company size" value={formatCompanySize(employer.company_size)} />
-          <Fact icon="place" label="Location" value={employer.full_address || null} />
-          <Fact icon="calendar-today" label="On i-PESO since" value={formatMemberSince(employer.created_at)} last />
-        </Card>
-
-        <Card padding="md" style={styles.sectionCard}>
           <Text style={styles.sectionTitle}>How to apply</Text>
           <Text style={styles.description}>
             Open a job above and apply from its details. Your application goes straight to this employer through i-PESO.
@@ -323,14 +335,15 @@ const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: colors.background },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: spacing.md, padding: spacing.xl },
   content: { padding: spacing.lg, paddingBottom: spacing.xxxl },
-  header: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginBottom: spacing.lg },
-  logoWrap: { width: 64, height: 64, borderRadius: radii.md, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
-  logo: { width: '100%', height: '100%', resizeMode: 'contain' },
-  headerText: { flex: 1 },
-  name: { color: colors.textPrimary, fontSize: typography.heading, fontFamily: typography.family.bold },
-  registeredName: { color: colors.textSecondary, fontSize: typography.small, marginTop: spacing.xs },
-  badgeRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.sm },
-  industry: { color: colors.textSecondary, fontSize: typography.small, fontFamily: typography.family.bold },
+  hero: { borderRadius: radii.xl, padding: spacing.xl, marginBottom: spacing.lg, overflow: 'hidden' },
+  heroLogo: { borderRadius: radii.lg, borderColor: colors.white },
+  statusPill: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, alignSelf: 'flex-start', marginTop: spacing.lg, backgroundColor: colors.heroChip, borderRadius: radii.pill, paddingHorizontal: spacing.md, paddingVertical: spacing.xs },
+  statusPillText: { color: colors.white, fontSize: typography.small, fontFamily: typography.family.bold },
+  heroName: { color: colors.white, fontSize: typography.heading, fontFamily: typography.family.bold, marginTop: spacing.md },
+  heroRegistered: { color: colors.blue100, fontSize: typography.small, marginTop: spacing.xs },
+  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.md },
+  chip: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, backgroundColor: colors.heroChip, borderRadius: radii.pill, paddingHorizontal: spacing.md, paddingVertical: spacing.xs },
+  chipText: { color: colors.blue50, fontSize: typography.small, fontFamily: typography.family.bold },
   sectionCard: { marginBottom: spacing.lg },
   afterJobs: { marginTop: spacing.sm },
   reviewsSubtitle: { color: colors.textSecondary, fontSize: typography.small, marginTop: -spacing.xs, marginBottom: spacing.md },

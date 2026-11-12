@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Alert, Image, Linking, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { Alert, Linking, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -17,6 +17,7 @@ import { PressableScale } from '@/components/ui/PressableScale'
 import { ScreenHeader } from '@/components/ui/ScreenHeader'
 import { ScreenSkeleton } from '@/components/ui/ScreenSkeleton'
 import { ApplicationReviewActions } from '@/components/reviews/ApplicationReviewActions'
+import { CompanyLogo } from '@/components/seeker/CompanyLogo'
 import { ReportConcernSheet } from '@/components/safety/ReportConcernSheet'
 import MaterialIcons from '@expo/vector-icons/MaterialIcons'
 import { colors, radii, spacing, typography } from '@/theme'
@@ -108,9 +109,7 @@ export default function ApplicationDetailScreen() {
         {withdrawError ? <AlertBox variant="danger" style={styles.alertBox}>{withdrawError}</AlertBox> : null}
 
         <View style={styles.titleRow}>
-          {job?.employer?.company_logo_url ? (
-            <Image source={{ uri: job.employer.company_logo_url }} style={styles.employerLogo} />
-          ) : null}
+          <CompanyLogo uri={job?.employer?.company_logo_url} name={job ? jobCompany(job) : null} size={56} fallback="none" style={styles.employerLogo} />
           <View style={styles.titleTextWrap}>
             <Text style={styles.jobTitle}>{textFrom(job?.job_title, 'Untitled job')}</Text>
             {job?.employer?.employer_id ? (
@@ -278,7 +277,7 @@ const styles = StyleSheet.create({
   alertBox: { marginBottom: spacing.lg },
   titleRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md },
   titleTextWrap: { flex: 1 },
-  employerLogo: { width: 56, height: 56, borderRadius: radii.lg, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, resizeMode: 'contain' },
+  employerLogo: { borderRadius: radii.lg },
   jobTitle: { color: colors.textPrimary, fontSize: typography.heading, lineHeight: 30, fontFamily: typography.family.bold },
   company: { color: colors.secondaryText, fontSize: typography.title, fontFamily: typography.family.bold, marginTop: spacing.xs },
   companyLink: { color: colors.info, textDecorationLine: 'underline' },

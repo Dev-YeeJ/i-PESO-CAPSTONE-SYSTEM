@@ -1,7 +1,8 @@
 import { useEffect, useRef } from 'react'
 import MaterialIcons from '@expo/vector-icons/MaterialIcons'
 import * as Haptics from 'expo-haptics'
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native'
+import { Pressable, StyleSheet, Text, View } from 'react-native'
+import { CompanyLogo } from '@/components/seeker/CompanyLogo'
 import { useRouter } from 'expo-router'
 import { Gesture, GestureDetector } from 'react-native-gesture-handler'
 import Animated, {
@@ -141,13 +142,7 @@ export function JobFeedCard({ job, index = 0, saving = false, onPress, onToggleS
               <Pressable
                 onPress={() => job.employer?.employer_id && router.push({ pathname: '/(seeker)/employers/[id]', params: { id: String(job.employer.employer_id), from: 'feed' } })}
               >
-                {job.employer?.company_logo_url ? (
-                  <Image source={{ uri: job.employer.company_logo_url }} style={styles.employerLogo} />
-                ) : (
-                  <View style={styles.logo}>
-                    <Text style={styles.logoText}>{companyInitials(jobCompany(job))}</Text>
-                  </View>
-                )}
+                <CompanyLogo uri={job.employer?.company_logo_url} name={jobCompany(job)} size={48} />
               </Pressable>
               <View style={styles.titleWrap}>
                 <Text style={styles.title} numberOfLines={2}>{textFrom(job.job_title, 'Untitled job')}</Text>
@@ -246,15 +241,6 @@ function Meta({ icon, text }: { icon: React.ComponentProps<typeof MaterialIcons>
   )
 }
 
-function companyInitials(value: string) {
-  return value
-    .split(' ')
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase() ?? '')
-    .join('') || 'PE'
-}
-
 const styles = StyleSheet.create({
   wrap: {
     marginBottom: spacing.md,
@@ -285,27 +271,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: spacing.md,
-  },
-  logo: {
-    width: 48,
-    height: 48,
-    borderRadius: radii.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.blue50,
-  },
-  employerLogo: {
-    width: 48,
-    height: 48,
-    borderRadius: radii.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
-    resizeMode: 'contain',
-  },
-  logoText: {
-    ...textStyles.smallBold,
-    color: colors.blue700,
   },
   titleWrap: {
     flex: 1,
