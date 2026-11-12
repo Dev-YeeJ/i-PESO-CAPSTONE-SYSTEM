@@ -369,7 +369,7 @@ export function FileList({ files, onRemove }: { files: EvidenceFile[]; onRemove:
 }
 
 const styles = StyleSheet.create({
-  body: { paddingBottom: spacing.xl },
+  body: { paddingHorizontal: spacing.xl, paddingBottom: spacing.xl },
   flex: { flex: 1 },
   center: { alignItems: 'center', paddingTop: spacing.md },
   doneLead: { ...textStyles.body, color: colors.textPrimary, marginTop: spacing.md, textAlign: 'center' },
