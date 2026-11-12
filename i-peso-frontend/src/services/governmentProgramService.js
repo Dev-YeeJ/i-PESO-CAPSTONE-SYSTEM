@@ -20,13 +20,10 @@ const programFormData = (payload) => {
   const form = new FormData()
   const arrays = ['eligibility_requirements', 'required_documents', 'skills']
   Object.entries(payload).forEach(([key, value]) => {
-    if (key === 'eligibility_rules') {
-      // Nested arrays (e.g. `values`) don't survive multipart encoding — send JSON.
-      form.append('eligibility_rules', JSON.stringify(Array.isArray(value) ? value : []))
-    } else if (arrays.includes(key)) {
+    if (arrays.includes(key)) {
       appendArray(form, key, value)
     } else if (value !== null && value !== undefined && value !== '') {
-      form.append(key, value)
+      form.append(key, typeof value === 'boolean' ? (value ? '1' : '0') : value)
     }
   })
   return form

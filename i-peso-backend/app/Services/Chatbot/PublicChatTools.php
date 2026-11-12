@@ -445,7 +445,7 @@ class PublicChatTools
                 'schedule' => $program->schedule,
                 'venue' => $program->venue,
                 'deadline' => optional($program->application_deadline)->toDateString(),
-                'slots_left' => $program->available_slots,
+                'slots' => $program->total_slots > 0 ? (int) $program->total_slots : 'Open capacity',
             ])->all();
 
         return [
@@ -454,7 +454,7 @@ class PublicChatTools
             'retrieved_at' => now()->toIso8601String(),
             'note' => $programs === []
                 ? 'No open program matches. Suggest the user check back or ask about job vacancies instead.'
-                : 'Applying requires a free i-PESO account. Invite the user to register.',
+                : 'Government Programs are announcements only; applicants must confirm requirements and apply in person at PESO.',
         ];
     }
 

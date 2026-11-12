@@ -48,8 +48,7 @@ function statusVariant(status?: string | null): 'success' | 'info' | 'neutral' {
 
 function slotsLabel(program: GovernmentProgram) {
   if (!program.total_slots || program.total_slots <= 0) return 'Open slots'
-  const available = program.available_slots ?? 0
-  return `${available}/${program.total_slots} slots`
+  return `${program.total_slots} slots`
 }
 
 export default function GovernmentProgramsScreen() {

@@ -136,7 +136,7 @@ function ProgramListRow({ program }) {
         )}
       </div>
       <div className="text-sm font-semibold text-slate-500 bg-slate-50 rounded-xl px-4 py-2 border border-slate-100">
-        <p className="flex items-center gap-2"><UsersRound className="h-4 w-4 text-emerald-400" />{program.total_slots === 0 ? 'Open capacity' : `${program.available_slots} slots left`}</p>
+        <p className="flex items-center gap-2"><UsersRound className="h-4 w-4 text-emerald-400" />{program.total_slots === 0 ? 'Open capacity' : `${program.total_slots} slots`}</p>
         <p className="mt-1 flex items-center gap-2"><Clock3 className="h-4 w-4 text-blue-400" />Deadline {program.application_deadline || 'not set'}</p>
       </div>
       <Link to={`/seeker/government-programs/${program.program_id}`} className="inline-flex h-full min-h-[44px] items-center justify-center rounded-xl bg-slate-900 px-6 text-sm font-extrabold text-white transition hover:bg-blue-900 shadow-sm">

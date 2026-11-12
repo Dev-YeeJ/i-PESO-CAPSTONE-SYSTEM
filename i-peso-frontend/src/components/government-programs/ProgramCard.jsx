@@ -8,8 +8,7 @@ const dateText = (value) => value
   : 'No deadline'
 
 export default function ProgramCard({ program, to, actionLabel = 'View program', compact = false }) {
-  const skills = program.skills?.filter((skill) => skill.type === 'taught' || skill.type === 'target').slice(0, 4) ?? []
-  const slots = Number(program.total_slots) === 0 ? 'Open capacity' : `${program.available_slots} of ${program.total_slots} slots left`
+  const slots = Number(program.total_slots) === 0 ? 'Open capacity' : `${program.total_slots} slots`
   const reasons = eligibilityReasons(program.eligibility)
 
   return (
@@ -31,12 +30,6 @@ export default function ProgramCard({ program, to, actionLabel = 'View program',
 
       <h2 className="mt-1 text-xl font-black leading-tight text-slate-900 group-hover:text-blue-900 transition-colors">{program.title}</h2>
       {!compact && <p className="mt-3 line-clamp-2 text-sm leading-relaxed text-slate-600">{program.short_description || program.description}</p>}
-
-      {skills.length > 0 && (
-        <div className="mt-5 flex flex-wrap gap-2">
-          {skills.map((skill) => <span key={`${skill.id}-${skill.name}`} className="rounded-xl bg-slate-100/80 px-2.5 py-1 text-xs font-bold text-slate-600">{skill.name}</span>)}
-        </div>
-      )}
 
       {program.recommendation_reason && !compact && (
         <div className="mt-5 rounded-2xl bg-amber-50/50 border border-amber-100 p-3">

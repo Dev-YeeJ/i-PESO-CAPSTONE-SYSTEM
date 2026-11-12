@@ -16,7 +16,6 @@ import {
 import PageHeader from '@/pages/admin/_components/PageHeader'
 import { LoadingSkeleton } from '@/components/ui'
 import { PROGRAM_CATEGORIES, categoryLabel } from '@/components/government-programs/programConstants'
-import EligibilityRulesBuilder from '@/components/government-programs/EligibilityRulesBuilder'
 import governmentProgramService from '@/services/governmentProgramService'
 
 const steps = [
@@ -29,17 +28,24 @@ const BLANK = {
   program_name: '', category: 'other', description: '',
   application_deadline: '', total_slots: 0, location_address: '',
   visibility: 'public',
-  eligibility_requirements: [], eligibility_rules: [],
+  eligibility_requirements: [],
+  age_restriction_enabled: false, age_min: '', age_max: '',
 }
 
-// Everything a category preset owns. Switching category replaces exactly these
-// and nothing else, so the dates, slots, venue and contact an admin has
-// already typed survive changing their mind about the category.
-const PRESET_FIELDS = [
-  'description', 'eligibility_requirements', 'eligibility_rules',
-]
+const toStringList = (items = []) => (Array.isArray(items) ? items : [])
+  .filter((item) => !(item && typeof item === 'object' && item.type === 'age_range'))
+  .map((item) => (typeof item === 'string' ? item : item?.label ?? ''))
+  .filter(Boolean)
 
-const toStringList = (items = []) => items.map((item) => (typeof item === 'string' ? item : item?.label ?? '')).filter(Boolean)
+const ageRuleFor = (rules = []) => (Array.isArray(rules) ? rules : []).find((rule) => rule?.field === 'age')
+
+const ageRecommendation = (min, max) => {
+  if (min === '' || max === '') return ''
+  if (Number(max) >= 200) return `At least ${min} years old`
+  return Number(min) === Number(max)
+    ? `Age ${min} years old`
+    : `${min} to ${max} years old`
+}
 
 export default function GovernmentProgramFormPage() {
   const { id } = useParams()
@@ -57,9 +63,10 @@ export default function GovernmentProgramFormPage() {
   useEffect(() => {
     governmentProgramService.adminProgramPresets()
       .then(setPresets)
-      // A missing preset is not worth blocking the form over — the admin can
-      // still type everything by hand, which is what they did before.
-      .catch(() => setPresets({}))
+      .catch(() => {
+        setPresets({})
+        toast.error('Unable to load program recommendations. You can still add requirements manually.')
+      })
   }, [])
 
   useEffect(() => {
@@ -72,8 +79,11 @@ export default function GovernmentProgramFormPage() {
           program_name: program.program_name ?? program.title ?? '',
           total_slots: program.total_slots ?? 0,
           visibility: 'public',
+          eligibility_rules: undefined,
           eligibility_requirements: toStringList(program.eligibility_requirements),
-          eligibility_rules: Array.isArray(program.eligibility_rules) ? program.eligibility_rules : [],
+          age_restriction_enabled: !!ageRuleFor(program.eligibility_rules),
+          age_min: ageRuleFor(program.eligibility_rules)?.min ?? '',
+          age_max: ageRuleFor(program.eligibility_rules)?.max ?? '',
         })
       })
       .catch(() => toast.error('Unable to load the program.'))
@@ -83,29 +93,20 @@ export default function GovernmentProgramFormPage() {
   const set = useCallback((name, value) => setForm((f) => ({ ...f, [name]: value })), [])
   const handleChange = useCallback((e) => set(e.target.name, e.target.value), [set])
 
-  /**
-   * Applies the category's preset over the fields the preset owns.
-   *
-   * Only offered when creating: on an edit the stored program is the source of
-   * truth, and silently overwriting a published posting because someone opened
-   * the category dropdown would be its own bug.
-   */
+  // Category changes update the automatic age defaults without clearing
+  // batch-specific requirements, schedule, slots, attachment or location.
   const applyPreset = useCallback((category) => {
     const preset = presets[category]
-    set('category', category)
-
-    if (id || !preset) {
-      return
-    }
-
-    setForm((current) => {
-      const next = { ...current, category }
-      for (const field of PRESET_FIELDS) {
-        if (preset[field] !== undefined) next[field] = preset[field]
-      }
-      return next
-    })
-  }, [presets, id, set])
+    const ageRule = ageRuleFor(preset?.eligibility_rules)
+    setForm((current) => ({
+      ...current,
+      category,
+      ...(!id && preset?.description !== undefined ? { description: preset.description } : {}),
+      age_restriction_enabled: preset ? !!ageRule : null,
+      age_min: ageRule?.min ?? '',
+      age_max: ageRule?.max ?? '',
+    }))
+  }, [presets, id])
 
   const validate = useCallback((target) => {
     if (target >= 1 && !form.program_name.trim()) {
@@ -124,15 +125,19 @@ export default function GovernmentProgramFormPage() {
       return false
     }
     if (target >= 3) {
-      const eligibilityError = validateEligibilityRules(form.eligibility_rules ?? [])
-      if (eligibilityError) {
-        toast.error(eligibilityError)
+      if (form.age_restriction_enabled && (
+        form.age_min === '' || form.age_max === '' ||
+        !Number.isInteger(Number(form.age_min)) || !Number.isInteger(Number(form.age_max)) ||
+        Number(form.age_min) < 0 || Number(form.age_max) > 200 ||
+        Number(form.age_min) > Number(form.age_max)
+      )) {
+        toast.error('Enter a valid age range where the maximum is not less than the minimum.')
         setStep(3)
         return false
       }
     }
     return true
-  }, [form.program_name, form.description, form.application_deadline, form.eligibility_rules])
+  }, [form.program_name, form.description, form.application_deadline, form.age_restriction_enabled, form.age_min, form.age_max])
 
   const handleSubmit = useCallback(async (e) => {
     e.preventDefault()
@@ -140,15 +145,13 @@ export default function GovernmentProgramFormPage() {
 
     setSubmitting(true)
     try {
-      const rules = (form.eligibility_rules ?? [])
-        .filter((rule) => rule.field)
-        .map((rule) => ({ ...rule, weight: rule.weight === '' || rule.weight == null ? 1 : Number(rule.weight) }))
-
       const payload = {
         ...form,
         total_slots: Number(form.total_slots) || 0,
         eligibility_requirements: toStringList(form.eligibility_requirements),
-        eligibility_rules: rules,
+        age_min: form.age_restriction_enabled ? Number(form.age_min) : '',
+        age_max: form.age_restriction_enabled ? Number(form.age_max) : '',
+        ...(form.age_restriction_enabled == null ? {} : { age_restriction_enabled: form.age_restriction_enabled }),
         ...(attachment ? { attachment } : {}),
       }
 
@@ -176,7 +179,7 @@ export default function GovernmentProgramFormPage() {
     <div className="space-y-6">
       <PageHeader
         title={id ? 'Edit Government Program' : 'Post a Government Program'}
-        subtitle="Pick the program type and the standard details fill themselves in. You only add what changes per batch."
+        subtitle="Choose a program category, review its smart recommendations, and confirm the requirements for this batch."
       />
 
       <form onSubmit={handleSubmit} className="space-y-6">
@@ -225,7 +228,7 @@ export default function GovernmentProgramFormPage() {
                 {id && (
                   <div className="flex items-start gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs leading-5 text-slate-600">
                     <Info className="mt-0.5 h-4 w-4 shrink-0" />
-                    <p>Editing a posted program. Changing the type will not overwrite what is already published — adjust the details yourself on the last step.</p>
+                    <p>Changing the type updates category recommendations and automatic eligibility criteria. Review all batch-specific details before saving.</p>
                   </div>
                 )}
 
@@ -266,19 +269,64 @@ export default function GovernmentProgramFormPage() {
               <div className="space-y-6">
                 <div className="flex items-start gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs leading-5 text-slate-600">
                   <Info className="mt-0.5 h-4 w-4 shrink-0" />
-                  <p>
-                    These came from the {categoryLabel(form.category)} defaults. Edit anything that differs for this batch.
-                    Criteria PESO verifies in person — being an enrolled student, household income — belong under Requirements, not the scoring rules.
-                  </p>
+                  <p>Recommendations are a starting point, not an official eligibility decision. Check this batch against current DOLE guidance and the Urdaneta City PESO Citizen&apos;s Charter. PESO verifies eligibility in person.</p>
                 </div>
 
-                <Group title="Requirements" subtitle="Shown to job seekers as a checklist on the posting.">
-                  <StringList items={form.eligibility_requirements} onChange={(v) => set('eligibility_requirements', v)} placeholder="e.g. Resident of Urdaneta City" addLabel="Add requirement" />
+                <Group title="Age eligibility" subtitle="The displayed age requirement and seeker estimate update automatically when you change this range.">
+                  <label className="inline-flex items-center gap-2 text-sm font-semibold text-slate-700">
+                    <input
+                      type="checkbox"
+                      checked={!!form.age_restriction_enabled}
+                      onChange={(e) => set('age_restriction_enabled', e.target.checked)}
+                    />
+                    This batch has an age restriction
+                  </label>
+                  {form.age_restriction_enabled && (
+                    <>
+                      <div className="mt-3 grid max-w-sm gap-3 sm:grid-cols-2">
+                        <Field label="Minimum age" required>
+                          <input type="number" min="0" max="200" value={form.age_min} onChange={(e) => set('age_min', e.target.value)} className={inputCls} />
+                        </Field>
+                        <Field label="Maximum age" required>
+                          <input type="number" min="0" max="200" value={form.age_max} onChange={(e) => set('age_max', e.target.value)} className={inputCls} />
+                        </Field>
+                      </div>
+                      <p className="mt-2 rounded-lg bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-900">
+                        Job seeker requirement: {ageRecommendation(form.age_min, form.age_max) || 'Enter both ages'}
+                      </p>
+                    </>
+                  )}
                 </Group>
 
-                <Group title="Eligibility rules (scoring)" subtitle="A failed required rule means the known profile data does not meet a gate. Other rules contribute to the match score. Missing profile data stays unknown, not a failure; PESO confirms eligibility in person.">
-                  <EligibilityRulesBuilder rules={form.eligibility_rules} onChange={(v) => set('eligibility_rules', v)} />
+                <Group title="Smart recommendations" subtitle={`Suggested checks for ${categoryLabel(form.category)}. Review each one against the current program rules, then add only those that apply.`}>
+                  {(presets[form.category]?.eligibility_requirements ?? []).length > 0 ? (
+                    <div className="flex flex-wrap gap-2">
+                      {(presets[form.category]?.eligibility_requirements ?? []).map((suggestion) => {
+                        const alreadyAdded = form.eligibility_requirements.includes(suggestion)
+                        return (
+                          <button
+                            key={suggestion}
+                            type="button"
+                            disabled={alreadyAdded}
+                            onClick={() => set('eligibility_requirements', [...form.eligibility_requirements, suggestion])}
+                            className="rounded-full border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-bold text-blue-800 disabled:cursor-default disabled:border-emerald-200 disabled:bg-emerald-50 disabled:text-emerald-800"
+                          >
+                            {alreadyAdded ? 'Added: ' : '+ '}{suggestion}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  ) : (
+                    <p className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-500">No category-specific suggestions are available. Add only requirements confirmed for this batch.</p>
+                  )}
+                  <div className="mt-4">
+                    <Field label="Requirements for this batch" hint="Only the items listed here will be shown to job seekers.">
+                      <StringList items={form.eligibility_requirements} onChange={(v) => set('eligibility_requirements', v)} placeholder="e.g. Resident of Urdaneta City" addLabel="Add requirement" />
+                    </Field>
+                  </div>
                 </Group>
+
+                <p className="text-xs leading-5 text-slate-500">Eligibility estimates compare the seeker&apos;s known profile data with the selected program category criteria. Criteria are scored equally; missing profile data is shown as unknown. The estimate is advisory, and PESO makes the final decision.</p>
 
                 <Group title="Program location" subtitle="Where job seekers should go for the in-person orientation, assessment, or application. Leave blank to use the PESO Office, Urdaneta City Hall.">
                   <Field label="Location or service point">
@@ -327,29 +375,6 @@ function formatFileSize(bytes) {
   return bytes < 1024 * 1024
     ? `${Math.max(1, Math.round(bytes / 1024))} KB`
     : `${(bytes / (1024 * 1024)).toFixed(1)} MB`
-}
-
-function validateEligibilityRules(rules) {
-  for (const rule of rules) {
-    if (!rule.field) return 'Choose a field for each eligibility rule.'
-    if (!Number.isFinite(Number(rule.weight)) || Number(rule.weight) <= 0) {
-      return 'Each eligibility rule needs a positive scoring weight.'
-    }
-    if (rule.field === 'age' && (
-      rule.min === '' || rule.max === '' ||
-      !Number.isFinite(Number(rule.min)) || !Number.isFinite(Number(rule.max)) ||
-      Number(rule.min) < 0 || Number(rule.max) > 200 || Number(rule.min) > Number(rule.max)
-    )) {
-      return 'Enter a valid age range where the maximum is not less than the minimum.'
-    }
-    if (['employment_status', 'civil_status'].includes(rule.field) && !(rule.values?.length)) {
-      return 'Select at least one accepted value for each employment or civil status rule.'
-    }
-    if (['educ_attainment', 'sex', 'residency'].includes(rule.field) && !String(rule.value ?? '').trim()) {
-      return 'Enter a value for each education, sex, or residency rule.'
-    }
-  }
-  return ''
 }
 
 function Group({ title, subtitle, children }) {

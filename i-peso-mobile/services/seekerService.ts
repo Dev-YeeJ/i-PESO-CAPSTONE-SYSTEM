@@ -423,7 +423,7 @@ export interface GovernmentProgram {
   program_name?: string
   category?: string
   description?: string | null
-  eligibility_requirements?: string[] | null
+  eligibility_requirements?: (string | { type?: string; label?: string; min?: number; max?: number })[] | null
   eligibility?: ProgramEligibility | null
   target_industry?: string | null
   skills?: Array<{ id: number | string; name?: string; type?: string }>
@@ -436,6 +436,7 @@ export interface GovernmentProgram {
   status: string
   visibility?: string
   has_attachment?: boolean
+  attachment_extension?: string | null
   recommendation_score?: number | null
   recommendation_reason?: string | null
 }
