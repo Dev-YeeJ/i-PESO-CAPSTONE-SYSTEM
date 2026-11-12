@@ -63,7 +63,7 @@ return [
             "Report to the employer on the agreed start date. At the end of the engagement the employer issues your Student's Employment Record (SPES Form 04).",
         ],
         'eligibility_rules' => [
-            ['field' => 'age', 'op' => 'between', 'min' => 15, 'max' => 30, 'label' => '15 to 30 years old', 'required' => true],
+            ['field' => 'age', 'op' => 'between', 'min' => 15, 'max' => 30, 'label' => '15 to 30 years old', 'weight' => 2, 'required' => true],
         ],
     ],
 
@@ -90,8 +90,8 @@ return [
             'Render the community work for the scheduled number of days. Wages are released after the work period.',
         ],
         'eligibility_rules' => [
-            ['field' => 'age', 'op' => 'between', 'min' => 18, 'max' => 200, 'label' => 'At least 18 years old', 'required' => true],
-            ['field' => 'employment_status', 'op' => 'in', 'values' => ['unemployed'], 'label' => 'Currently unemployed or underemployed', 'required' => false],
+            ['field' => 'age', 'op' => 'between', 'min' => 18, 'max' => 200, 'label' => 'At least 18 years old', 'weight' => 2, 'required' => true],
+            ['field' => 'employment_status', 'op' => 'in', 'values' => ['unemployed'], 'label' => 'Currently unemployed or underemployed', 'weight' => 1, 'required' => false],
         ],
     ],
 
@@ -120,8 +120,8 @@ return [
             'Submit the Accomplishment Report and other documents in the format provided by DOLE at the end of the engagement.',
         ],
         'eligibility_rules' => [
-            ['field' => 'age', 'op' => 'between', 'min' => 18, 'max' => 30, 'label' => '18 to 30 years old', 'required' => true],
-            ['field' => 'educ_attainment', 'op' => 'min_level', 'value' => 'high school graduate', 'label' => 'At least a high school graduate', 'required' => false],
+            ['field' => 'age', 'op' => 'between', 'min' => 18, 'max' => 30, 'label' => '18 to 30 years old', 'weight' => 2, 'required' => true],
+            ['field' => 'educ_attainment', 'op' => 'min_level', 'value' => 'high school graduate', 'label' => 'At least a high school graduate', 'weight' => 1, 'required' => false],
         ],
     ],
 
@@ -147,7 +147,7 @@ return [
             'Undergo the interview with the agency representative. Other documents, if any, are prepared once your qualifications have been assessed.',
         ],
         'eligibility_rules' => [
-            ['field' => 'is_ofw', 'op' => 'equals', 'value' => true, 'label' => 'OFW or former OFW', 'required' => true],
+            ['field' => 'is_ofw', 'op' => 'equals', 'value' => true, 'label' => 'OFW or former OFW', 'weight' => 2, 'required' => true],
         ],
     ],
 
@@ -175,7 +175,7 @@ return [
             'Attend the orientation before the release of the starter kit or assistance.',
         ],
         'eligibility_rules' => [
-            ['field' => 'age', 'op' => 'between', 'min' => 18, 'max' => 200, 'label' => 'At least 18 years old', 'required' => true],
+            ['field' => 'age', 'op' => 'between', 'min' => 18, 'max' => 200, 'label' => 'At least 18 years old', 'weight' => 2, 'required' => true],
         ],
     ],
 
@@ -203,7 +203,7 @@ return [
             'Attend the scheduled orientation and the start of training.',
         ],
         'eligibility_rules' => [
-            ['field' => 'age', 'op' => 'between', 'min' => 15, 'max' => 200, 'label' => 'At least 15 years old', 'required' => true],
+            ['field' => 'age', 'op' => 'between', 'min' => 15, 'max' => 200, 'label' => 'At least 15 years old', 'weight' => 2, 'required' => true],
         ],
     ],
 

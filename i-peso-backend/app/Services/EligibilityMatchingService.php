@@ -7,12 +7,12 @@ use App\Models\JobSeeker;
 use Illuminate\Support\Carbon;
 
 /**
- * Compares a job seeker's profile against the category-generated eligibility
- * rules stored in government_programs.eligibility_rules and returns an
- * equally weighted score, status and per-rule breakdown.
+ * Compares a job seeker's profile against a government program's typed
+ * eligibility rules (stored in government_programs.eligibility_rules) and
+ * returns a score, status and per-rule breakdown for the "why".
  *
  * Rule shape (one object per requirement):
- *   { field, op, [min,max|value|values], label, required=false }
+ *   { field, op, [min,max|value|values], label, weight=1, required=false }
  *
  * Scoring uses only rules with known profile values. Missing profile data is
  * reported as incomplete, never treated as proof that a seeker fails a rule.
@@ -58,7 +58,8 @@ class EligibilityMatchingService
             return ['score' => null, 'status' => 'unknown', 'label' => 'Sign in to check eligibility', 'breakdown' => [], 'coverage' => 0, 'evaluated_rules' => 0, 'total_rules' => count($rules)];
         }
 
-        $metRules = 0;
+        $totalWeight = 0.0;
+        $metWeight = 0.0;
         $requiredFailed = false;
         $unknownRules = 0;
         $evaluatedRules = 0;
@@ -68,14 +69,16 @@ class EligibilityMatchingService
             if (! is_array($rule) || empty($rule['field'])) {
                 continue;
             }
+            $weight = (float) ($rule['weight'] ?? 1);
             [$met, $detail] = $this->checkRule($seeker, $rule);
             if ($met === null) {
                 $unknownRules++;
             } else {
                 $evaluatedRules++;
+                $totalWeight += $weight;
             }
             if ($met === true) {
-                $metRules++;
+                $metWeight += $weight;
             } elseif ($met === false && ($rule['required'] ?? false)) {
                 $requiredFailed = true;
             }
@@ -89,7 +92,7 @@ class EligibilityMatchingService
             ];
         }
 
-        $score = $evaluatedRules > 0 ? (int) round(($metRules / $evaluatedRules) * 100) : null;
+        $score = $totalWeight > 0 ? (int) round(($metWeight / $totalWeight) * 100) : null;
         $coverage = (int) round(($evaluatedRules / max(1, count($breakdown))) * 100);
 
         if ($requiredFailed) {
