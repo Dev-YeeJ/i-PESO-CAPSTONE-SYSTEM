@@ -54,9 +54,14 @@ class FaqController extends Controller
 
         $all = Faq::query()->get(['id', 'is_published', 'is_featured', 'audience']);
         $chatbotLimit = SiteContentService::CHATBOT_FAQ_LIMIT;
+        $votes = $this->votes();
 
         return response()->json([
-            'data' => Faq::sortForDisplay($query->get())->map(fn (Faq $faq) => $this->present($faq))->values(),
+            'data' => Faq::sortForDisplay($query->get())->map(fn (Faq $faq) => [
+                ...$this->present($faq),
+                'helpful_votes' => (int) ($votes[$faq->id]->helpful ?? 0),
+                'unhelpful_votes' => (int) ($votes[$faq->id]->not_helpful ?? 0),
+            ])->values(),
             'summary' => [
                 'total' => $all->count(),
                 'published' => $all->where('is_published', true)->count(),
@@ -280,6 +285,20 @@ class FaqController extends Controller
         $data['link_url'] ??= null;
 
         return $data;
+    }
+
+    /** "Was this helpful?" totals per FAQ (empty if the insight tables are not migrated yet). */
+    private function votes(): \Illuminate\Support\Collection
+    {
+        try {
+            return DB::table('faq_feedback')
+                ->select('faq_id', DB::raw('SUM(CASE WHEN helpful THEN 1 ELSE 0 END) as helpful'), DB::raw('SUM(CASE WHEN helpful THEN 0 ELSE 1 END) as not_helpful'))
+                ->groupBy('faq_id')
+                ->get()
+                ->keyBy('faq_id');
+        } catch (\Illuminate\Database\QueryException) {
+            return collect();
+        }
     }
 
     private function present(Faq $faq): array

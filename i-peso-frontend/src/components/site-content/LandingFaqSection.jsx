@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom'
 import { ArrowRight, MessageCircleQuestion } from 'lucide-react'
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
 import RichText from './RichText'
-import { FaqLink } from './HelpCenter'
+import { FaqFeedback, FaqLink } from './HelpCenter'
 
 /**
  * Landing page "Common questions": the (at most five) FAQs PESO staff marked
@@ -34,6 +34,7 @@ export default function LandingFaqSection({ faqs = [], office }) {
                 <AccordionContent>
                   <RichText text={faq.answer} office={office} className="space-y-3 leading-6 text-slate-700" />
                   <FaqLink faq={faq} className="mt-4" />
+                  <FaqFeedback faqId={faq.id} />
                 </AccordionContent>
               </AccordionItem>
             ))}

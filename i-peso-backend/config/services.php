@@ -76,6 +76,15 @@ return [
         'timeout' => (int) env('GEMINI_TIMEOUT', 20),
     ],
 
+    /*
+     | Content Modules → Insights: record (without names, emails or numbers)
+     | the questions the assistant could not answer, so PESO can write the
+     | missing FAQs. Kept 90 days. Set CHATBOT_GAP_LOGGING=false to stop.
+     */
+    'chatbot' => [
+        'gap_logging' => (bool) env('CHATBOT_GAP_LOGGING', true),
+    ],
+
     'google' => [
         'client_id' => env('GOOGLE_CLIENT_ID'),
         'client_secret' => env('GOOGLE_CLIENT_SECRET'),

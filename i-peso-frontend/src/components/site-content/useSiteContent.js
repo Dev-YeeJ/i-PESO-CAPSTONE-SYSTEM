@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { publicSiteContentService } from '@/services/siteContentService'
-import { LANDING_DEFAULTS, OFFICE_DEFAULTS, withDefaults } from './siteContentDefaults'
+import { ABOUT_DEFAULTS, LANDING_DEFAULTS, OFFICE_DEFAULTS, withDefaults } from './siteContentDefaults'
 
 /**
  * Landing text, office details and featured FAQs for public pages.
@@ -18,6 +18,7 @@ export function useSiteContent() {
   return {
     office: withDefaults(OFFICE_DEFAULTS, query.data?.office),
     landing: withDefaults(LANDING_DEFAULTS, query.data?.landing),
+    about: withDefaults(ABOUT_DEFAULTS, query.data?.about),
     featuredFaqs: query.data?.featured_faqs ?? [],
     isLoading: query.isLoading,
   }

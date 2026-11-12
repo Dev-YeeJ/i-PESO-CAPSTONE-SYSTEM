@@ -8,6 +8,7 @@ use Illuminate\Foundation\Auth\User;
 use App\Models\JobSeeker;
 use App\Models\Employer;
 use App\Models\Administrator;
+use App\Services\ContentInsightService;
 use App\Services\SiteContentService;
 
 /**
@@ -74,6 +75,7 @@ class GeminiChatService
             // No tool requested — this is the actual answer.
             if ($calls === []) {
                 $text = $this->extractText($parts, $fixedLanguage);
+                $text = $this->takeGapMarker($text, $lastQuestion, $user);
                 if ($refusal = $this->policy->actionClaimRefusal($text, $fixedLanguage)) {
                     $text = $refusal;
                 }
@@ -110,6 +112,7 @@ class GeminiChatService
         }
 
         Log::warning('[chatbot] tool loop hit MAX_TOOL_ROUNDS without a final answer.');
+        $this->recordGap($lastQuestion, $user);
 
         return [
             'text' => ChatbotMessages::get('unresolved', $fixedLanguage),
@@ -292,6 +295,40 @@ class GeminiChatService
         KNOWLEDGE;
     }
 
+    /** Marker the model adds when it could not answer (docs/content-module-plan.md §9). */
+    private function gapMarker(): string
+    {
+        return '[[NO_ANSWER]]';
+    }
+
+    /**
+     * Strip the "could not answer" marker from the reply and, when it was
+     * there, record the question for Content Modules → Insights. The marker
+     * is removed even when gap logging is switched off.
+     */
+    private function takeGapMarker(string $text, string $question, ?User $user): string
+    {
+        if (! str_contains($text, '[[NO_ANSWER')) {
+            return $text;
+        }
+
+        $this->recordGap($question, $user);
+        $clean = trim(preg_replace('/\s*\[\[NO_ANSWER\]?\]?/', '', $text));
+
+        return $clean !== '' ? $clean : $text;
+    }
+
+    private function recordGap(string $question, ?User $user): void
+    {
+        $audience = match (true) {
+            $user instanceof JobSeeker => 'seeker',
+            $user instanceof Employer => 'employer',
+            default => 'guest',
+        };
+
+        app(ContentInsightService::class)->recordChatbotGap($question, $audience);
+    }
+
     /** Office details as PESO staff last saved them (Site Content → Office info). */
     private function office(): array
     {
@@ -436,7 +473,9 @@ class GeminiChatService
         plainly that you do not have that information and point them to the PESO office of
         Urdaneta City. An honest "I don't know" is always better than a confident guess — people
         make real decisions about work based on your answers, and a wrong address, fee, or made-up
-        listing sends someone on a wasted trip.
+        listing sends someone on a wasted trip. Whenever you have to say you do not have the
+        information, end that reply with the marker {$this->gapMarker()} — it is removed before the
+        visitor sees it and tells PESO which answers to add.
 
         {$this->knowledgeSection($user)}
 

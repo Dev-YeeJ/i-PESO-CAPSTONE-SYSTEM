@@ -27,6 +27,7 @@ class SiteContentController extends Controller
         return response()->json([
             'sections' => collect(SiteContentRegistry::KEYS)->mapWithKeys(fn (string $key) => [$key => $this->section($key)]),
             'feature_icons' => SiteContentRegistry::FEATURE_ICONS,
+            'landing_sections' => SiteContentRegistry::LANDING_SECTIONS,
         ]);
     }
 
@@ -147,7 +148,12 @@ class SiteContentController extends Controller
 
     private function sectionName(string $key): string
     {
-        return $key === SiteContentRegistry::OFFICE ? 'office information' : 'landing page text';
+        return match ($key) {
+            SiteContentRegistry::OFFICE => 'office information',
+            SiteContentRegistry::LANDING => 'landing page text',
+            SiteContentRegistry::ABOUT => 'the About PESO page',
+            default => $key,
+        };
     }
 
     private function changedList(string $key, array $fields): string

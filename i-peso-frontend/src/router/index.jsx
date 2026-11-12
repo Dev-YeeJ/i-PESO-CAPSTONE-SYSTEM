@@ -23,6 +23,7 @@ const LandingPage        = lazy(() => import('@/pages/landing/LandingPage'))
 // Policy pages: the published version from Site Content → Policy pages, or the original text.
 const PolicyRoute = lazy(() => import('@/pages/legal/PolicyRoute'))
 const PublicHelpPage = lazy(() => import('@/pages/help/PublicHelpPage'))
+const AboutPage = lazy(() => import('@/pages/about/AboutPage'))
 const LoginPage          = lazy(() => import('@/pages/auth/LoginPage'))
 const AdminLoginPage     = lazy(() => import('@/pages/auth/AdminLoginPage'))
 const AdminSetPasswordPage = lazy(() => import('@/pages/auth/AdminSetPasswordPage'))
@@ -107,7 +108,7 @@ const AdminRolePermissions = lazy(() => import('@/pages/admin/6-configuration/st
 const AdminMyOjt = lazy(() => import('@/pages/admin/6-configuration/ojt/MyOjtPage'))
 const AdminAnnouncements = lazy(() => import('@/pages/admin/6-configuration/content/AnnouncementsPage'))
 const AdminAnnouncementForm = lazy(() => import('@/pages/admin/6-configuration/content/AnnouncementFormPage'))
-const AdminSiteContent = lazy(() => import('@/pages/admin/6-configuration/content/SiteContentPage'))
+const AdminContentModules = lazy(() => import('@/pages/admin/6-configuration/content/ContentModulesPage'))
 const AdminSystemSettings = lazy(() => import('@/pages/admin/6-configuration/settings/SystemSettingsPage'))
 
 // --- SUSPENSE HELPER ---
@@ -133,6 +134,7 @@ export const router = createBrowserRouter([
           { path: '/review-guidelines', element: S(PolicyRoute, { slug: 'review-guidelines' }) },
           { path: '/terms-of-service', element: S(PolicyRoute, { slug: 'terms-of-service' }) },
           { path: '/help', element: S(PublicHelpPage) },
+          { path: '/about', element: S(AboutPage) },
           {
             element: <GuestOnly />,
             children: [
@@ -257,8 +259,8 @@ export const router = createBrowserRouter([
                       { path: 'announcements', element: S(AdminAnnouncements) },
                       { path: 'announcements/new', element: S(AdminAnnouncementForm) },
                       { path: 'announcements/:id', element: S(AdminAnnouncementForm) },
-                      { path: 'site-content', element: S(AdminSiteContent) },
-                      { path: 'content-modules', element: <Navigate to="/admin/site-content" replace /> },
+                      { path: 'content-modules', element: S(AdminContentModules) },
+                      { path: 'site-content', element: <Navigate to="/admin/content-modules" replace /> },
                       { path: 'settings', element: S(AdminSystemSettings) },
                     ],
                   }

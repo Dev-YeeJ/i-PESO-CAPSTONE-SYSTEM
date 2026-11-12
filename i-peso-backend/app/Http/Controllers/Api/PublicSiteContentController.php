@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Services\PolicyService;
 use App\Services\SiteContentService;
 use App\Support\PolicyRegistry;
+use App\Support\SiteContentRegistry;
 use Illuminate\Http\JsonResponse;
 
 /**
@@ -20,12 +21,16 @@ class PublicSiteContentController extends Controller
     ) {
     }
 
-    /** One call for the landing page and its footer. */
+    /**
+     * Everything public in one cached call: the landing page and footer,
+     * and the About page.
+     */
     public function show(): JsonResponse
     {
         return response()->json([
             'office' => $this->content->office(),
             'landing' => $this->content->landing(),
+            'about' => $this->content->get(SiteContentRegistry::ABOUT),
             'featured_faqs' => $this->content->featuredFaqs(),
         ]);
     }

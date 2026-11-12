@@ -1,10 +1,11 @@
 import { createElement, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
-import { Eye, History, PenLine, Save } from 'lucide-react'
+import { AlertTriangle, Eye, History, Languages, PenLine, Save, Sparkles, WandSparkles, X } from 'lucide-react'
 import { Button } from '@/components/ui'
 import { Sheet, SheetBody, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from '@/components/ui/sheet'
-import { adminFaqService } from '@/services/siteContentService'
+import { adminContentInsightService, adminFaqService } from '@/services/siteContentService'
+import { similarQuestions } from '@/components/site-content/textSimilarity'
 import RichText from '@/components/site-content/RichText'
 import { FaqLink } from '@/components/site-content/HelpCenter'
 import { FAQ_AUDIENCES, FAQ_TOPICS } from '@/components/site-content/siteContentDefaults'
@@ -16,19 +17,44 @@ const QUESTION_MAX = 200
 const ANSWER_MAX = 2000
 
 /** Create or edit one FAQ. `faq` null = new. */
-export default function FaqEditorSheet({ open, onOpenChange, faq, canEdit, office }) {
+export default function FaqEditorSheet({ open, onOpenChange, faq, canEdit, office, initialQuestion = '', allFaqs = [] }) {
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="max-w-2xl">
-        {open && <FaqEditorBody key={faq?.id ?? 'new'} faq={faq} canEdit={canEdit} office={office} onDone={() => onOpenChange(false)} />}
+        {open && <FaqEditorBody key={faq?.id ?? `new-${initialQuestion}`} faq={faq} initialQuestion={initialQuestion} allFaqs={allFaqs} canEdit={canEdit} office={office} onDone={() => onOpenChange(false)} />}
       </SheetContent>
     </Sheet>
   )
 }
 
-function FaqEditorBody({ faq, canEdit, office, onDone }) {
+const AI_TASKS = {
+  draft_answer: { label: 'Draft answer', icon: Sparkles },
+  simplify: { label: 'Simplify', icon: WandSparkles },
+  translate_filipino: { label: 'Filipino version', icon: Languages },
+}
+
+function FaqEditorBody({ faq, initialQuestion, allFaqs, canEdit, office, onDone }) {
   const queryClient = useQueryClient()
-  const [form, setForm] = useState(() => (faq ? { ...EMPTY, ...faq, link_label: faq.link_label ?? '', link_url: faq.link_url ?? '' } : EMPTY))
+  const [form, setForm] = useState(() => (faq ? { ...EMPTY, ...faq, link_label: faq.link_label ?? '', link_url: faq.link_url ?? '' } : { ...EMPTY, question: initialQuestion ?? '' }))
+  const [suggestion, setSuggestion] = useState(null) // { task, text, note }
+  const duplicates = similarQuestions(form.question, allFaqs, { excludeId: faq?.id ?? null })
+
+  const ai = useMutation({
+    mutationFn: (task) => adminContentInsightService.assist(
+      task === 'draft_answer'
+        ? { task, question: form.question, audience: form.audience }
+        : { task, text: form.answer },
+    ),
+    onSuccess: (data, task) => setSuggestion({ task, text: data.suggestion, note: data.note }),
+    onError: (error) => toast.error(error?.response?.data?.errors?.ai?.[0] ?? apiMessage(error, 'The AI writing helper is not available right now.')),
+  })
+
+  const applySuggestion = (mode) => {
+    if (!suggestion) return
+    const text = mode === 'append' ? `${form.answer.trim()}\n\n${suggestion.text}` : suggestion.text
+    setForm((current) => ({ ...current, answer: text.slice(0, ANSWER_MAX) }))
+    setSuggestion(null)
+  }
   const [errors, setErrors] = useState({})
   const [mode, setMode] = useState('edit')
   const [showHistory, setShowHistory] = useState(false)
@@ -121,6 +147,17 @@ function FaqEditorBody({ faq, canEdit, office, onDone }) {
           <div className="space-y-5">
             <Field label="Question" max={QUESTION_MAX} count={form.question.length} error={errors.question}>
               <input value={form.question} onChange={(e) => set('question', e.target.value.slice(0, QUESTION_MAX))} disabled={!canEdit} className={inputClass} placeholder="e.g. Do I pay anything to register?" aria-label="Question" />
+              {duplicates.length > 0 && (
+                <div role="status" className="mt-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                  <p className="flex items-center gap-1.5 font-bold"><AlertTriangle className="h-3.5 w-3.5" aria-hidden="true" /> Looks like an FAQ you already have</p>
+                  <ul className="mt-1 space-y-0.5">
+                    {duplicates.map(({ faq: other }) => (
+                      <li key={other.id}>“{other.question}” <span className="text-amber-700">({other.is_published ? 'published' : 'unpublished'} · {other.audience_label ?? other.audience})</span></li>
+                    ))}
+                  </ul>
+                  <p className="mt-1">Edit that one instead, so readers get one clear answer.</p>
+                </div>
+              )}
             </Field>
 
             <Field
@@ -132,6 +169,43 @@ function FaqEditorBody({ faq, canEdit, office, onDone }) {
             >
               <textarea value={form.answer} onChange={(e) => set('answer', e.target.value.slice(0, ANSWER_MAX))} disabled={!canEdit} rows={8} className={inputClass} placeholder="Write a short, direct answer." aria-label="Answer" />
             </Field>
+
+            {canEdit && (
+              <div className="rounded-xl border border-blue-100 bg-blue-50/50 p-3">
+                <p className="text-xs font-extrabold uppercase tracking-wide text-blue-900">AI writing helper</p>
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {Object.entries(AI_TASKS).map(([task, meta]) => (
+                    <Button
+                      key={task}
+                      size="sm"
+                      variant="outline"
+                      icon={meta.icon}
+                      loading={ai.isPending && ai.variables === task}
+                      disabled={ai.isPending || (task === 'draft_answer' ? form.question.trim().length < 8 : !form.answer.trim())}
+                      onClick={() => ai.mutate(task)}
+                    >
+                      {meta.label}
+                    </Button>
+                  ))}
+                </div>
+                <p className="mt-1.5 text-[11px] text-blue-900/70">Drafts use only what i-PESO knows — it won’t guess fees, dates or requirements. You review before saving.</p>
+                {suggestion && (
+                  <div className="mt-3 rounded-lg border border-slate-200 bg-white p-3" aria-label="AI suggestion">
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="text-xs font-bold text-slate-700">{AI_TASKS[suggestion.task].label} — suggestion</p>
+                      <button type="button" onClick={() => setSuggestion(null)} aria-label="Discard suggestion" className="text-slate-400 hover:text-slate-700"><X className="h-4 w-4" /></button>
+                    </div>
+                    <RichText text={suggestion.text} office={office} className="mt-2 space-y-2 text-sm leading-6 text-slate-800" />
+                    <p className="mt-2 text-[11px] text-slate-500">{suggestion.note}</p>
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      <Button size="sm" variant="navy" onClick={() => applySuggestion('replace')}>Use this</Button>
+                      {suggestion.task === 'translate_filipino' && form.answer.trim() && <Button size="sm" variant="outline" onClick={() => applySuggestion('append')}>Add below the English</Button>}
+                      <Button size="sm" variant="ghost" onClick={() => setSuggestion(null)}>Discard</Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
 
             <div>
               <span className={labelClass}>Who it’s for</span>

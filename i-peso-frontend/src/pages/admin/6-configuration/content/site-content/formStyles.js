@@ -24,6 +24,10 @@ export function formatWhen(iso) {
 /** Plain-language rendering of a section value for "before → after" lists. */
 export function describeValue(value) {
   if (value === null || value === undefined || value === '') return '(not on record)'
+  if (value && typeof value === 'object' && !Array.isArray(value)) {
+    const on = Object.entries(value).filter(([, v]) => v === true).map(([k]) => k.replace(/_/g, ' '))
+    return on.length ? `Shown: ${on.join(', ')}` : 'All switched off'
+  }
   if (Array.isArray(value)) {
     return value.map((item) => (typeof item === 'object' && item !== null ? item.title ?? JSON.stringify(item) : String(item))).join(' · ')
   }

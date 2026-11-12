@@ -1,8 +1,8 @@
 # Content Module — Plan
 
 **System:** i-PESO Smart Employment System (Urdaneta City PESO)
-**Module owner:** Admin side, under **Configuration → Site Content** at `/admin/site-content` (the old `/admin/content-modules` link redirects there)
-**Status:** Implemented on the backend and website, all phases (Office info, FAQs, Landing page, Policy pages). Mobile Help screen handed off — see `JUNIOR_DEV_MOBILE_HELP_PROMPT.md`. Section 8 lists where the build differs from this plan.
+**Module owner:** Admin side, under **Configuration → Content Modules** at `/admin/content-modules` (the interim `/admin/site-content` link redirects there)
+**Status:** Implemented on the backend and website, all phases, plus the wider content types and smart features in §9 (2026-11-13). Mobile side handed off — see `JUNIOR_DEV_MOBILE_HELP_PROMPT.md`. Section 8 lists where the build differs from this plan. (The module was briefly called "Site Content"; API paths under `/admin/site-content/*` keep that name.)
 **Related:** [Announcement module](announcement-module-plan.md). Announcements are *news*; this module is the *standing information* that does not expire.
 
 ---
@@ -411,4 +411,97 @@ The original open questions are kept below for the record.
   - `pages/admin/6-configuration/content/SiteContentPage.jsx` and its `site-content/*` tabs
   - `pages/help/PublicHelpPage.jsx`, `pages/shared/HelpPage.jsx`
   - `pages/legal/PolicyRoute.jsx`, `pages/legal/policyMeta.js`
+
+---
+
+## 9. Wider and smarter (added 2026-11-13)
+
+The user asked to name it back to **Content Modules**, "widen it", and "make it as smart as possible". They chose both a wider layout and more content types, and all four smart features. (A mobile-app Welcome screens module was added and then reverted at the user's request on 2026-11-13, together with that round's mobile hand-off additions; the mobile app itself was never changed.)
+
+### 9.1 Layout
+
+- **Full width.** The page uses the full width of the admin area, with a **module sidebar** grouped as:
+  - Overview (Health check, Reader insights)
+  - Information (Office info, About PESO)
+  - Help (FAQs)
+  - Pages (Landing page, Policy pages)
+- **Phones:** the sidebar becomes one scrolling row.
+- **Badges:** the sidebar counts warnings, unanswered reports and unpublished FAQs.
+- **Links between modules:** `?tab=` picks the module. Other modules can link straight into an FAQ with `?tab=faqs&faq=<id>`, or start a new FAQ with `?tab=faqs&new=<question>`.
+- **Who sees what:** Configuration staff see everything. Constituent CRM (front desk) staff see Health check, Reader insights and FAQs.
+
+### 9.2 More content types
+
+| Module | What | Public surface |
+|---|---|---|
+| **About PESO** | Heading, intro, mission, vision, legal mandate, and up to 12 **PESO services**. Each service has a name, description, who it's for and an optional link. | New page `/about`, linked from the landing nav and footer. Mission and vision start **blank and stay hidden** until PESO supplies its official wording; they are never invented. |
+| **Landing page → Sections shown** | On/off switches for Announcements, Features, Job discovery, Government programs and Common questions. The hero always shows. | A section that is switched off is removed from the landing page, along with its menu link. |
+
+Both use the same section machinery as Office info: registry limits and defaults, a version number for edit conflicts, history with restore, and the Activity Log.
+
+### 9.3 Smart features
+
+**AI writing helper** (FAQ editor):
+- **What it does:** *Draft answer*, *Simplify* and *Filipino version*, through the existing AI service (`VertexAiSuggestionService::generateText`).
+- **Grounded drafts:** a draft may only use how i-PESO works (`peso_knowledge.site`), the saved Office info and the published FAQs. When those don't cover the question, the model replies `NOT_ENOUGH_INFO`, and staff are told to write the answer themselves or fill in Office info.
+- **Staff stay in control:** the suggestion shows in a box with *Use this*, *Add below the English* (for translations) and *Discard*. Nothing is saved automatically.
+- **Access:** `POST /admin/content-modules/ai-assist` requires full access and is throttled to 20 requests a minute. If AI is off on the server, it returns 503 with a plain message.
+- **Not on policy pages, on purpose:** legal text should not be rewritten by AI.
+
+**Learning from readers:**
+- **"Was this helpful?"** appears under every answer: Help pages and the landing page's Common questions. There is one vote per reader per FAQ, and a reader can change their vote. The server keeps only an HMAC of (account, or IP + browser), so it can stop repeat votes without storing who voted. Vote counts show on each FAQ row and in Insights; an answer with at least 5 votes and less than 50% helpful is flagged **Rewrite**.
+- **Searches that found nothing:** reported after the reader pauses typing (terms of 3+ characters), once per wording per reader per day.
+
+**Chatbot gap report:**
+- **How it works:** the assistant is told to end any "I don't have that information" reply with `[[NO_ANSWER]]`. `GeminiChatService::takeGapMarker` strips the marker, so visitors never see it, and records the question. Questions are also recorded when the tool loop runs out of rounds.
+- **Switch:** `CHATBOT_GAP_LOGGING=false` turns recording off. The marker is still stripped.
+
+**Reader insights** (`/admin/content-modules/insights?days=7|30|90`):
+- **What it shows:** missed searches and unanswered chat questions grouped by their normalized wording (most frequent first, with sources), plus the vote table.
+- **Closest FAQ:** each report shows the FAQ that probably answers it, or a note that it is unpublished.
+- **Write FAQ:** asks the AI to turn the reader's words into a clean question, then opens the FAQ editor with it. Without AI, the raw words are used.
+- **Dealt with:** resolves every report with that wording.
+
+**Content health check** (`/admin/content-modules/health`): a score (ok ÷ (ok + warn)) and a checklist with action buttons. It checks for:
+- blank Office info the assistant can't answer;
+- no published FAQs;
+- FAQs not reviewed in 6 months;
+- unpublished FAQs older than 2 weeks;
+- FAQ links to pages i-PESO doesn't have;
+- near-duplicate questions (the editor also warns while you type, using the same similarity rule);
+- unhelpful answers;
+- searches that came up empty 3+ times;
+- assistant questions unanswered 2+ times;
+- a Privacy Policy that doesn't mention question logging;
+- a Common questions section that is on but has no featured FAQs;
+- a blank mission or vision;
+- policy drafts left open for 30+ days.
+
+### 9.4 Privacy
+
+Nothing in the insight tables identifies a person:
+- **Votes** store a salted hash only.
+- **Search terms and chatbot questions** are stored with emails, phone and ID numbers removed (`ContentInsightService::redact`).
+- **Retention:** everything is deleted after **90 days** by the nightly `site-content:prune-history` job.
+
+**Action for PESO:** publish a Privacy Policy version (Content Modules → Policy pages) that says unanswered assistant questions and empty Help searches are recorded without names, emails or numbers, kept 90 days, and used only to improve the Help content. The health check shows this as a warning until a published Privacy Policy mentions the assistant. Suggested wording for the "What We Collect" section:
+
+> **When you use Help or the assistant**, we record — without your name, email or phone number — the questions the assistant could not answer and the Help searches that found nothing, and whether you marked an answer helpful. We keep these for 90 days and use them only to improve the answers on i-PESO.
+
+### 9.5 Files
+
+- **Backend:**
+  - Migration `2026_11_13_000006_create_content_insight_tables.php` (`faq_feedback`, `help_search_misses`, `chatbot_gaps`)
+  - `app/Services/ContentInsightService.php` (redaction, similarity, insights, health)
+  - `app/Services/ContentAiService.php`
+  - `app/Http/Controllers/Api/Admin/Configuration/ContentInsightController.php`, `app/Http/Controllers/Api/HelpFeedbackController.php`
+  - Registry sections `about` and `landing.show_sections`
+  - `services.chatbot.gap_logging` config
+  - Tests: `tests/Feature/ContentModulesSmartTest.php`
+- **Frontend:**
+  - `pages/admin/6-configuration/content/ContentModulesPage.jsx`
+  - `site-content/` modules: `OverviewModule`, `InsightsModule`, `AboutTab`, `useSectionEditor`
+  - `pages/about/AboutPage.jsx`
+  - `components/site-content/textSimilarity.js`
+  - `FaqFeedback` and search-miss reporting in `HelpCenter.jsx`
 

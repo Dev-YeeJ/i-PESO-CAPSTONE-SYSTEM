@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
-import { ArrowDown, ArrowUp, Bot, Eye, EyeOff, Home, Pencil, Plus, Search, Sparkles, Trash2 } from 'lucide-react'
+import { ArrowDown, ArrowUp, Bot, Eye, EyeOff, Home, Pencil, Plus, Search, Sparkles, ThumbsDown, ThumbsUp, Trash2 } from 'lucide-react'
 import { Badge, Button, Card, ConfirmDialog, ErrorState, LoadingSkeleton } from '@/components/ui'
 import { adminFaqService } from '@/services/siteContentService'
 import { FAQ_AUDIENCES, FAQ_TOPICS } from '@/components/site-content/siteContentDefaults'
@@ -25,6 +26,22 @@ export default function FaqsTab({ canEdit, office }) {
   const faqs = useMemo(() => query.data?.data ?? [], [query.data])
   const summary = query.data?.summary
   const filtering = Boolean(filters.search || filters.audience || filters.status)
+
+  // Other modules link here: ?faq=12 opens that FAQ, ?new=question starts one.
+  const [params, setParams] = useSearchParams()
+  const paramFaq = params.get('faq')
+  const paramNew = params.get('new')
+  const fromUrl = paramFaq ? faqs.find((faq) => String(faq.id) === paramFaq) ?? null : paramNew !== null ? 'new' : null
+  const current = editing ?? fromUrl
+  const closeEditor = () => {
+    setEditing(null)
+    if (paramFaq || paramNew !== null) {
+      const next = new URLSearchParams(params)
+      next.delete('faq')
+      next.delete('new')
+      setParams(next, { replace: true })
+    }
+  }
 
   const refresh = () => {
     queryClient.invalidateQueries({ queryKey: ['admin-faqs'] })
@@ -152,6 +169,12 @@ export default function FaqsTab({ canEdit, office }) {
                       <Badge variant={faq.is_published ? 'active' : 'draft'}>{faq.is_published ? 'Published' : 'Unpublished'}</Badge>
                       <Badge variant="neutral">{faq.audience_label}</Badge>
                       {faq.is_featured && <Badge variant="warning">On landing page</Badge>}
+                      {faq.helpful_votes + faq.unhelpful_votes > 0 && (
+                        <span className={`inline-flex items-center gap-1.5 text-xs font-bold ${faq.unhelpful_votes > faq.helpful_votes ? 'text-red-600' : 'text-slate-500'}`} title="“Was this helpful?” votes">
+                          <ThumbsUp className="h-3 w-3" aria-hidden="true" />{faq.helpful_votes}
+                          <ThumbsDown className="h-3 w-3" aria-hidden="true" />{faq.unhelpful_votes}
+                        </span>
+                      )}
                       <span className="text-xs text-slate-400">Updated {formatWhen(faq.updated_at)}{faq.updated_by ? ` by ${faq.updated_by}` : ''}</span>
                     </div>
                   </div>
@@ -180,7 +203,15 @@ export default function FaqsTab({ canEdit, office }) {
         ))
       )}
 
-      <FaqEditorSheet open={editing !== null} onOpenChange={(open) => !open && setEditing(null)} faq={editing === 'new' ? null : editing} canEdit={canEdit} office={office} />
+      <FaqEditorSheet
+        open={current !== null}
+        onOpenChange={(open) => !open && closeEditor()}
+        faq={current === 'new' ? null : current}
+        initialQuestion={current === 'new' && editing === null ? paramNew ?? '' : ''}
+        allFaqs={faqs}
+        canEdit={canEdit}
+        office={office}
+      />
       <ConfirmDialog
         open={Boolean(deleting)}
         onOpenChange={(open) => !open && setDeleting(null)}

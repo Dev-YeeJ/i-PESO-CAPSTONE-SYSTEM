@@ -49,6 +49,8 @@ const LandingPage = () => {
   // Text PESO staff edit in Site Content → Landing page / Office info.
   // Falls back to the built-in wording, so the page is never blank.
   const { landing, office, featuredFaqs } = useSiteContent();
+  // Sections staff switched off in Content Modules → Landing page (the hero always shows).
+  const show = { announcements: true, features: true, jobs: true, programs: true, faq: true, ...(landing.show_sections ?? {}) };
   const [activeTab, setActiveTab] = useState('seeker');
   const [programs, setPrograms] = useState([]);
   const [programsLoading, setProgramsLoading] = useState(true);
@@ -112,9 +114,10 @@ const LandingPage = () => {
         </div>
 
         <div className="hidden md:flex items-center gap-8 text-sm font-medium text-slate-300">
-          <a href="#features" className="hover:text-white transition-colors">Features</a>
-          <a href="#jobs" className="hover:text-white transition-colors">Discovery</a>
-          <a href="#programs" className="hover:text-white transition-colors">Programs</a>
+          {show.features && <a href="#features" className="hover:text-white transition-colors">Features</a>}
+          {show.jobs && <a href="#jobs" className="hover:text-white transition-colors">Discovery</a>}
+          {show.programs && <a href="#programs" className="hover:text-white transition-colors">Programs</a>}
+          <Link to="/about" className="hover:text-white transition-colors">About PESO</Link>
         </div>
 
         <div className="flex items-center gap-6">
@@ -367,9 +370,12 @@ const LandingPage = () => {
       </main>
 
       {/* ── Announcements (Public audience; renders nothing when there are none) ── */}
+      {show.announcements && (
       <PublicAnnouncementsSection />
+      )}
 
       {/* ── Features ── */}
+      {show.features && (
       <Motion.section id="features" {...sectionMotion} className="relative z-10 bg-[#0D1F38] border-t border-white/5 px-6 py-24">
         <div className="max-w-6xl mx-auto">
           <div className="flex flex-col md:flex-row md:items-end justify-between mb-14 gap-8">
@@ -399,8 +405,10 @@ const LandingPage = () => {
           </div>
         </div>
       </Motion.section>
+      )}
 
       {/* ── Jobs Discovery ── */}
+      {show.jobs && (
       <Motion.section id="jobs" {...sectionMotion} className="relative z-10 bg-[#0A192F] border-t border-white/5 px-6 py-24">
         <div className="max-w-6xl mx-auto grid items-center gap-14 md:grid-cols-2">
           <div>
@@ -457,8 +465,10 @@ const LandingPage = () => {
           </div>
         </div>
       </Motion.section>
+      )}
 
       {/* ── Programs ── */}
+      {show.programs && (
       <Motion.section id="programs" {...sectionMotion} className="relative z-10 bg-[#F8F7F2] px-6 py-24 text-[#0A192F]">
         <div className="max-w-6xl mx-auto">
           <div className="max-w-2xl mb-14">
@@ -512,8 +522,11 @@ const LandingPage = () => {
           </p>
         </div>
       </Motion.section>
+      )}
 
+      {show.faq && (
       <LandingFaqSection faqs={featuredFaqs} office={office} />
+      )}
 
       {/* ── Footer ── */}
       <footer className="relative z-10 border-t border-white/5 bg-[#071122] px-6 py-12">
@@ -540,9 +553,10 @@ const LandingPage = () => {
             <div>
               <p className="text-xs font-bold uppercase tracking-wide text-slate-500">On this page</p>
               <div className="mt-2.5 flex flex-col gap-2 text-slate-400">
-                <a href="#features" className="hover:text-white transition-colors">Features</a>
-                <a href="#jobs" className="hover:text-white transition-colors">Discovery</a>
-                <a href="#programs" className="hover:text-white transition-colors">Programs</a>
+                {show.features && <a href="#features" className="hover:text-white transition-colors">Features</a>}
+                {show.jobs && <a href="#jobs" className="hover:text-white transition-colors">Discovery</a>}
+                {show.programs && <a href="#programs" className="hover:text-white transition-colors">Programs</a>}
+                <Link to="/about" className="hover:text-white transition-colors">About PESO</Link>
                 <Link to="/help" className="hover:text-white transition-colors">Help &amp; FAQs</Link>
               </div>
             </div>

@@ -46,7 +46,41 @@ export const LANDING_DEFAULTS = {
     { icon: 'users', title: 'Centralized Screening', body: 'Review applications, schedule interviews, and hire directly from your dashboard.' },
   ],
   footer_tagline: 'Urdaneta City PESO Employment Portal',
+  show_sections: { announcements: true, features: true, jobs: true, programs: true, faq: true },
 }
+
+export const LANDING_SECTIONS = [
+  { key: 'announcements', label: 'PESO announcements', help: 'Live announcements for the Public audience.' },
+  { key: 'features', label: '“What you get” feature cards', help: 'The four cards edited above.' },
+  { key: 'jobs', label: 'Job discovery', help: 'The seeker/employer preview.' },
+  { key: 'programs', label: 'Government programs', help: 'Open programs from Government & DOLE.' },
+  { key: 'faq', label: 'Common questions', help: 'Up to 5 FAQs marked “Show on home”.' },
+]
+
+// Mission and vision stay blank until PESO Urdaneta supplies its own wording.
+export const ABOUT_DEFAULTS = {
+  headline: 'About PESO Urdaneta City',
+  intro: 'The Public Employment Service Office (PESO) of Urdaneta City connects job seekers with employers, runs job fairs, and brings government employment and livelihood programs to the people of Urdaneta. i-PESO is its online employment portal.',
+  mission: null,
+  vision: null,
+  mandate: 'PESOs are established under Republic Act No. 8759, the Public Employment Service Office Act of 1999, as amended by Republic Act No. 10691, to provide free employment facilitation services in every province, city and municipality.',
+  services: [
+    { title: 'Job matching and referral', description: 'Register once, build your NSRP profile, and get matched with vacancies that fit your skills and location.', audience: 'seekers', link_label: 'Register as a job seeker', link_url: '/register/seeker' },
+    { title: 'Job fairs', description: 'Local and special job fairs where you can meet several employers in one day.', audience: 'everyone', link_label: null, link_url: null },
+    { title: 'Government employment programs', description: 'Programs such as SPES and TUPAD, with their requirements and schedules in one place.', audience: 'seekers', link_label: null, link_url: null },
+    { title: 'Employer accreditation and job posting', description: 'Verified employers can post vacancies, screen ranked applicants and join PESO job fairs.', audience: 'employers', link_label: 'Register your company', link_url: '/register/employer' },
+    { title: 'Placement reporting', description: 'Employers file a simple monthly placement report so PESO can track local employment.', audience: 'employers', link_label: null, link_url: null },
+  ],
+}
+
+export const ABOUT_LIMITS = { headline: 80, intro: 600, mission: 600, vision: 600, mandate: 600, service_title: 80, service_description: 300, max_services: 12 }
+
+export const SERVICE_AUDIENCES = [
+  { value: 'everyone', label: 'Everyone' },
+  { value: 'seekers', label: 'Job seekers' },
+  { value: 'employers', label: 'Employers' },
+]
+
 
 /** Character limits — the same numbers the API enforces. */
 export const OFFICE_LIMITS = {

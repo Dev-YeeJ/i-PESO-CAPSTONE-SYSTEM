@@ -166,6 +166,34 @@ class VertexAiSuggestionService
 
 
     /**
+     * Free-text generation for admin writing helpers (Content Modules → AI
+     * writing helper). Returns the model's text, trimmed; throws
+     * RuntimeException with a reader-safe message when AI is unavailable.
+     */
+    public function generateText(string $prompt, int $maxTokens = 700, float $temperature = 0.3): string
+    {
+        if (! config('services.vertex_ai.enabled')) {
+            throw new RuntimeException('The AI writing helper is turned off on this server.');
+        }
+
+        $response = $this->send([
+            'contents' => [['role' => 'user', 'parts' => [['text' => $prompt]]]],
+            'generationConfig' => ['temperature' => $temperature, 'maxOutputTokens' => $maxTokens],
+        ], (int) config('services.vertex_ai.timeout', 20));
+
+        if (! $response->successful()) {
+            $this->failUpstream('The AI writing helper could not respond. Please try again in a moment.', $response);
+        }
+
+        $text = collect(data_get($response->json(), 'candidates.0.content.parts', []))
+            ->pluck('text')
+            ->filter(fn ($part) => is_string($part))
+            ->implode('');
+
+        return trim($text);
+    }
+
+    /**
      * Sends one generateContent call, surviving a transient upstream spike.
      *
      * Google answers 503 "This model is currently experiencing high demand"

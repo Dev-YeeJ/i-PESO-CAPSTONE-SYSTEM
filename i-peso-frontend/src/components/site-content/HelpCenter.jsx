@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { ArrowRight, ExternalLink, Info, Search, X } from 'lucide-react'
+import { ArrowRight, ExternalLink, Info, Search, ThumbsDown, ThumbsUp, X } from 'lucide-react'
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
 import { ErrorState, LoadingSkeleton } from '@/components/ui'
 import RichText from './RichText'
 import OfficeContactCard from './OfficeContactCard'
+import { publicSiteContentService } from '@/services/siteContentService'
 
 const isInternal = (url) => typeof url === 'string' && url.startsWith('/') && !url.startsWith('//')
 
@@ -15,6 +16,59 @@ export function FaqLink({ faq, className = '' }) {
   return isInternal(faq.link_url)
     ? <Link to={faq.link_url} className={classes}>{label} <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" /></Link>
     : <a href={faq.link_url} target="_blank" rel="noreferrer" className={classes}>{label} <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" /></a>
+}
+
+const voteKey = (id) => `ipeso-faq-vote-${id}`
+const readVote = (id) => {
+  try { return window.localStorage.getItem(voteKey(id)) } catch { return null }
+}
+
+/**
+ * "Was this helpful?" under an answer. One vote per reader (the server keeps
+ * an anonymous hash); the choice is remembered in this browser so the
+ * buttons show it, and it can be changed.
+ */
+export function FaqFeedback({ faqId }) {
+  const [vote, setVote] = useState(() => readVote(faqId))
+  const [busy, setBusy] = useState(false)
+
+  const send = async (helpful) => {
+    const value = helpful ? 'yes' : 'no'
+    setBusy(true)
+    setVote(value)
+    try {
+      window.localStorage.setItem(voteKey(faqId), value)
+    } catch { /* private window: the vote still counts */ }
+    try {
+      await publicSiteContentService.voteFaq(faqId, helpful)
+    } catch { /* feedback is best-effort */ }
+    setBusy(false)
+  }
+
+  const button = (helpful, Icon, label) => {
+    const active = vote === (helpful ? 'yes' : 'no')
+    return (
+      <button
+        type="button"
+        disabled={busy}
+        aria-pressed={active}
+        onClick={() => send(helpful)}
+        className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-bold transition ${
+          active ? 'border-brand-navy bg-brand-navy text-white' : 'border-slate-200 bg-white text-slate-600 hover:border-brand-navy hover:text-brand-navy'
+        }`}
+      >
+        <Icon className="h-3.5 w-3.5" aria-hidden="true" /> {label}
+      </button>
+    )
+  }
+
+  return (
+    <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-3 text-xs text-slate-500">
+      <span>{vote === 'yes' ? 'Thanks — glad it helped.' : vote === 'no' ? 'Thanks — PESO will improve this answer.' : 'Was this helpful?'}</span>
+      {button(true, ThumbsUp, 'Yes')}
+      {button(false, ThumbsDown, 'No')}
+    </div>
+  )
 }
 
 const matches = (faq, term) => {
@@ -46,11 +100,34 @@ export default function HelpCenter({ faqs = [], topics = [], office, role = null
     window.requestAnimationFrame(() => document.getElementById(`faq-${hashTarget.id}`)?.scrollIntoView?.({ behavior: 'smooth', block: 'center' }))
   }, [hashTarget])
 
-  const topicsInUse = useMemo(() => topics.filter((t) => faqs.some((faq) => faq.topic === t.value)), [topics, faqs])
+  // Known topics in their order, plus any topic an FAQ uses that the list doesn't
+  // know — so no question can ever drop out of the page.
+  const topicsInUse = useMemo(() => {
+    const known = topics.filter((t) => faqs.some((faq) => faq.topic === t.value))
+    const extra = [...new Set(faqs.map((faq) => faq.topic).filter((value) => !topics.some((t) => t.value === value)))]
+      .map((value) => ({ value, label: faqs.find((faq) => faq.topic === value)?.topic_label ?? 'Other questions' }))
+    return [...known, ...extra]
+  }, [topics, faqs])
   const visible = useMemo(
     () => faqs.filter((faq) => (topic === 'all' || faq.topic === topic) && matches(faq, term.trim())),
     [faqs, topic, term],
   )
+  // A search that finds nothing tells PESO which FAQ to write next. Reported
+  // once per wording, after the reader pauses typing; never blocks the page.
+  const reported = useRef(new Set())
+  const trimmed = term.trim()
+  const noResults = !isLoading && !isError && faqs.length > 0 && trimmed.length >= 3 && visible.length === 0
+  useEffect(() => {
+    if (!noResults) return undefined
+    const key = trimmed.toLowerCase()
+    const timer = window.setTimeout(() => {
+      if (reported.current.has(key)) return
+      reported.current.add(key)
+      publicSiteContentService.reportSearchMiss(trimmed).catch(() => {})
+    }, 1500)
+    return () => window.clearTimeout(timer)
+  }, [noResults, trimmed])
+
   const groups = useMemo(() => {
     if (term.trim() || topic !== 'all') return [{ value: 'results', label: null, items: visible }]
     return topicsInUse.map((t) => ({ ...t, items: visible.filter((faq) => faq.topic === t.value) })).filter((g) => g.items.length)
@@ -121,6 +198,7 @@ export default function HelpCenter({ faqs = [], topics = [], office, role = null
                     <AccordionContent>
                       <RichText text={faq.answer} office={office} className="space-y-3 leading-6 text-slate-700" />
                       <FaqLink faq={faq} className="mt-4" />
+                      <FaqFeedback faqId={faq.id} />
                     </AccordionContent>
                   </AccordionItem>
                 ))}

@@ -16,8 +16,20 @@ final class SiteContentRegistry
 {
     public const OFFICE = 'office';
     public const LANDING = 'landing';
+    public const ABOUT = 'about';
 
-    public const KEYS = [self::OFFICE, self::LANDING];
+    public const KEYS = [self::OFFICE, self::LANDING, self::ABOUT];
+
+    /** Landing page sections staff can switch off (the hero always shows). */
+    public const LANDING_SECTIONS = ['announcements', 'features', 'jobs', 'programs', 'faq'];
+
+    /** Who a PESO service is for (About page). */
+    public const SERVICE_AUDIENCES = ['everyone', 'seekers', 'employers'];
+
+    public const MAX_SERVICES = 12;
+
+    /** Same rule as FAQ and announcement links: an internal path or an https:// link. */
+    public const LINK_PATTERN = '#^(/(?!/)[^\s]*|https://[^\s]+)$#i';
 
     /** Icons a landing feature card may use (lucide names, drawn by the frontend). */
     public const FEATURE_ICONS = [
@@ -59,6 +71,15 @@ final class SiteContentRegistry
                 'features_heading' => 'Features heading',
                 'features' => 'Feature cards',
                 'footer_tagline' => 'Footer tagline',
+                'show_sections' => 'Sections shown',
+            ],
+            self::ABOUT => [
+                'headline' => 'Page heading',
+                'intro' => 'Introduction',
+                'mission' => 'Mission',
+                'vision' => 'Vision',
+                'mandate' => 'Legal mandate',
+                'services' => 'PESO services',
             ],
         };
     }
@@ -100,6 +121,23 @@ final class SiteContentRegistry
                     ['icon' => 'users', 'title' => 'Centralized Screening', 'body' => 'Review applications, schedule interviews, and hire directly from your dashboard.'],
                 ],
                 'footer_tagline' => 'Urdaneta City PESO Employment Portal',
+                'show_sections' => array_fill_keys(self::LANDING_SECTIONS, true),
+            ],
+            // Mission and vision are PESO Urdaneta's own words: left blank (and
+            // hidden on the page) until the office supplies them, never invented.
+            self::ABOUT => [
+                'headline' => 'About PESO Urdaneta City',
+                'intro' => 'The Public Employment Service Office (PESO) of Urdaneta City connects job seekers with employers, runs job fairs, and brings government employment and livelihood programs to the people of Urdaneta. i-PESO is its online employment portal.',
+                'mission' => null,
+                'vision' => null,
+                'mandate' => 'PESOs are established under Republic Act No. 8759, the Public Employment Service Office Act of 1999, as amended by Republic Act No. 10691, to provide free employment facilitation services in every province, city and municipality.',
+                'services' => [
+                    ['title' => 'Job matching and referral', 'description' => 'Register once, build your NSRP profile, and get matched with vacancies that fit your skills and location.', 'audience' => 'seekers', 'link_label' => 'Register as a job seeker', 'link_url' => '/register/seeker'],
+                    ['title' => 'Job fairs', 'description' => 'Local and special job fairs where you can meet several employers in one day.', 'audience' => 'everyone', 'link_label' => null, 'link_url' => null],
+                    ['title' => 'Government employment programs', 'description' => 'Programs such as SPES and TUPAD, with their requirements and schedules in one place.', 'audience' => 'seekers', 'link_label' => null, 'link_url' => null],
+                    ['title' => 'Employer accreditation and job posting', 'description' => 'Verified employers can post vacancies, screen ranked applicants and join PESO job fairs.', 'audience' => 'employers', 'link_label' => 'Register your company', 'link_url' => '/register/employer'],
+                    ['title' => 'Placement reporting', 'description' => 'Employers file a simple monthly placement report so PESO can track local employment.', 'audience' => 'employers', 'link_label' => null, 'link_url' => null],
+                ],
             ],
         };
     }
@@ -137,6 +175,21 @@ final class SiteContentRegistry
                 'features.*.title' => ['required', 'string', 'max:40'],
                 'features.*.body' => ['required', 'string', 'max:160'],
                 'footer_tagline' => ['required', 'string', 'max:100'],
+                'show_sections' => ['required', 'array:'.implode(',', self::LANDING_SECTIONS)],
+                ...collect(self::LANDING_SECTIONS)->mapWithKeys(fn ($section) => ["show_sections.{$section}" => ['required', 'boolean']])->all(),
+            ],
+            self::ABOUT => [
+                'headline' => ['required', 'string', 'max:80'],
+                'intro' => ['required', 'string', 'max:600'],
+                'mission' => ['nullable', 'string', 'max:600'],
+                'vision' => ['nullable', 'string', 'max:600'],
+                'mandate' => ['nullable', 'string', 'max:600'],
+                'services' => ['present', 'array', 'max:'.self::MAX_SERVICES],
+                'services.*.title' => ['required', 'string', 'max:80'],
+                'services.*.description' => ['required', 'string', 'max:300'],
+                'services.*.audience' => ['required', Rule::in(self::SERVICE_AUDIENCES)],
+                'services.*.link_label' => ['nullable', 'string', 'max:60', 'required_with:values.services.*.link_url'],
+                'services.*.link_url' => ['nullable', 'string', 'max:500', 'regex:'.self::LINK_PATTERN, 'required_with:values.services.*.link_label'],
             ],
         };
 
@@ -153,6 +206,12 @@ final class SiteContentRegistry
             $attributes['values.features.*.icon'] = 'card icon';
             $attributes['values.features.*.title'] = 'card title';
             $attributes['values.features.*.body'] = 'card text';
+        }
+        if ($key === self::ABOUT) {
+            $attributes['values.services.*.title'] = 'service name';
+            $attributes['values.services.*.description'] = 'service description';
+            $attributes['values.services.*.link_label'] = 'link button';
+            $attributes['values.services.*.link_url'] = 'link';
         }
 
         return $attributes;
@@ -179,6 +238,23 @@ final class SiteContentRegistry
             if (array_key_exists($field, $values)) {
                 $normalized[$field] = $clean($values[$field]);
             }
+        }
+
+        $keepShape = function (string $field, array $keys) use (&$normalized) {
+            if (isset($normalized[$field]) && is_array($normalized[$field])) {
+                $normalized[$field] = array_values(array_map(
+                    fn ($item) => is_array($item) ? array_replace(array_fill_keys($keys, null), array_intersect_key($item, array_flip($keys))) : $item,
+                    $normalized[$field]
+                ));
+            }
+        };
+        if ($key === self::ABOUT) {
+            $keepShape('services', ['title', 'description', 'audience', 'link_label', 'link_url']);
+        }
+        if ($key === self::LANDING && isset($normalized['show_sections']) && is_array($normalized['show_sections'])) {
+            $normalized['show_sections'] = collect(self::LANDING_SECTIONS)
+                ->mapWithKeys(fn ($section) => [$section => filter_var($normalized['show_sections'][$section] ?? true, FILTER_VALIDATE_BOOLEAN)])
+                ->all();
         }
 
         if ($key === self::LANDING && isset($normalized['features']) && is_array($normalized['features'])) {

@@ -13,6 +13,10 @@ export const publicSiteContentService = {
   faqs: async () => (await api.get('/public/faqs')).data,
   policy: async (slug) => (await api.get(`/public/policies/${slug}`)).data,
   policyVersion: async (slug, version) => (await api.get(`/public/policies/${slug}/versions/${version}`)).data,
+  /** "Was this helpful?" — one vote per reader; voting again changes it. */
+  voteFaq: async (faqId, helpful) => (await api.post(`/public/faqs/${faqId}/feedback`, { helpful })).data,
+  /** A Help search that found nothing — tells PESO which FAQ to write next. */
+  reportSearchMiss: async (term) => (await api.post('/public/help/search-misses', { term })).data,
 }
 
 /** Signed-in job seeker or employer: the Help page inside their portal. */
@@ -26,6 +30,15 @@ export const adminSiteContentService = {
   reset: async (key, fields, version) => (await api.post(`/admin/site-content/${key}/reset`, { fields, version })).data,
   revisions: async (key) => (await api.get(`/admin/site-content/${key}/revisions`)).data,
   restore: async (key, revisionId, version) => (await api.post(`/admin/site-content/${key}/revisions/${revisionId}/restore`, { version })).data,
+}
+
+/** Content Modules → Overview, Insights and the AI writing helper. */
+export const adminContentInsightService = {
+  health: async () => (await api.get('/admin/content-modules/health')).data,
+  insights: async (days = 30) => (await api.get('/admin/content-modules/insights', { params: { days } })).data,
+  resolve: async (kind, normalized) => (await api.post('/admin/content-modules/insights/resolve', { kind, normalized })).data,
+  /** task: draft_answer | simplify | translate_filipino | suggest_question */
+  assist: async (payload) => (await api.post('/admin/content-modules/ai-assist', payload)).data,
 }
 
 export const adminFaqService = {

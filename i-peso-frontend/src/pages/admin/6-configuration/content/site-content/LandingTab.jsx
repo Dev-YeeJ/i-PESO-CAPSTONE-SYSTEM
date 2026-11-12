@@ -4,12 +4,12 @@ import toast from 'react-hot-toast'
 import { ExternalLink, History, Monitor, RotateCcw, Save, Smartphone, Undo2 } from 'lucide-react'
 import { Button, Card, ConfirmDialog } from '@/components/ui'
 import { adminSiteContentService } from '@/services/siteContentService'
-import { FEATURE_ICONS, LANDING_LIMITS } from '@/components/site-content/siteContentDefaults'
+import { FEATURE_ICONS, LANDING_LIMITS, LANDING_SECTIONS } from '@/components/site-content/siteContentDefaults'
 import { FeatureCardContent, HeroBadgeIcon, HeroHeadlineContent, HeroHighlights, HeroSubheadlineContent } from '@/components/site-content/LandingBlocks'
 import { ChangesDialog, Field, ReadOnlyNote, SectionHistoryDialog } from './SiteContentBits'
 import { apiMessage, changedKeys, fieldErrorsOf, formatWhen, inputClass, isConflict, sameValue } from './formStyles'
 
-const KEYS = ['hero_badge', 'headline_lead', 'headline_highlight', 'headline_tail', 'subheadline', 'highlights', 'features_eyebrow', 'features_heading', 'features', 'footer_tagline']
+const KEYS = ['hero_badge', 'headline_lead', 'headline_highlight', 'headline_tail', 'subheadline', 'highlights', 'features_eyebrow', 'features_heading', 'features', 'footer_tagline', 'show_sections']
 
 export default function LandingTab({ section, canEdit }) {
   return <LandingForm key={section.version} section={section} canEdit={canEdit} />
@@ -151,6 +151,28 @@ function LandingForm({ section, canEdit }) {
             ))}
           </div>
           {defaultButton('features')}
+        </fieldset>
+
+        <fieldset className="mt-6 border-t border-slate-100 pt-5">
+          <legend className="text-sm font-black text-slate-950">Sections shown</legend>
+          <p className="mt-1 text-xs text-slate-500">Switch off a section to hide it (and its menu link) from the landing page. The hero always shows.</p>
+          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+            {LANDING_SECTIONS.map((item) => (
+              <label key={item.key} className="flex items-start gap-3 rounded-xl border border-slate-200 p-3">
+                <input
+                  type="checkbox"
+                  checked={form.show_sections?.[item.key] ?? true}
+                  onChange={(e) => set('show_sections', { ...(form.show_sections ?? {}), [item.key]: e.target.checked })}
+                  disabled={!canEdit}
+                  className="mt-0.5 h-4 w-4 rounded border-slate-300"
+                />
+                <span className="text-sm">
+                  <span className="block font-bold text-slate-900">{item.label}</span>
+                  <span className="text-xs text-slate-500">{item.help}</span>
+                </span>
+              </label>
+            ))}
+          </div>
         </fieldset>
 
         <fieldset className="mt-6 border-t border-slate-100 pt-5">

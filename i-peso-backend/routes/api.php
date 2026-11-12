@@ -76,6 +76,11 @@ Route::controller(\App\Http\Controllers\Api\PublicSiteContentController::class)-
     Route::get('/public/policies/{policy}', 'policy');
     Route::get('/public/policies/{policy}/versions/{version}', 'policyVersion')->whereNumber('version');
 });
+// Help-page readers: "Was this helpful?" and searches that found nothing (Content Modules → Insights).
+Route::controller(\App\Http\Controllers\Api\HelpFeedbackController::class)->middleware('throttle:30,1')->group(function () {
+    Route::post('/public/faqs/{faq}/feedback', 'vote');
+    Route::post('/public/help/search-misses', 'searchMiss');
+});
 Route::post('/cookie-consent', [\App\Http\Controllers\Api\CookieConsentController::class, 'store'])->middleware('throttle:20,1');
 
 // Public assistant for visitors without an account (landing / login / register).
@@ -505,6 +510,18 @@ Route::middleware('auth:sanctum')->group(function () {
                     Route::delete('/{policy}/draft', 'discardDraft');
                 });
         });
+
+        // Content Modules → Overview, Insights and the AI writing helper: anyone who keeps FAQs.
+        Route::middleware('admin.permission:configuration|constituent_crm')
+            ->prefix('content-modules')
+            ->controller(\App\Http\Controllers\Api\Admin\Configuration\ContentInsightController::class)
+            ->group(function () {
+                Route::get('/health', 'health');
+                Route::get('/insights', 'insights');
+                Route::post('/insights/resolve', 'resolve');
+                // Only staff who can edit have a reason to draft text, so this POST keeps full access.
+                Route::post('/ai-assist', 'assist')->middleware('throttle:20,1');
+            });
 
         // FAQs are kept up to date by Configuration OR Constituent CRM (front desk) staff.
         Route::middleware('admin.permission:configuration|constituent_crm')
