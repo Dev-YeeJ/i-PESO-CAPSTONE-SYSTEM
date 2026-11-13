@@ -1,7 +1,9 @@
 <?php
 
+use App\Services\SystemStatusService;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Schedule;
 
 Artisan::command('inspire', function () {
@@ -34,4 +36,10 @@ Schedule::call(fn () => Artisan::call('queue:work', [
     '--stop-when-empty' => true,
     '--tries' => 3,
     '--max-time' => 50,
-]))->everyMinute()->name('queue-worker')->withoutOverlapping();
+]))->everyMinute()->name('queue-worker')->withoutOverlapping()
+    ->after(fn () => Cache::put(SystemStatusService::QUEUE_HEARTBEAT, now()->toIso8601String(), now()->addDay()));
+
+// Heartbeat for System Settings → System status: on shared hosting a stopped
+// cron job fails silently, so the status page checks when this last ran.
+Schedule::call(fn () => Cache::put(SystemStatusService::SCHEDULER_HEARTBEAT, now()->toIso8601String(), now()->addDay()))
+    ->everyMinute()->name('system-heartbeat');

@@ -66,6 +66,11 @@ apiClient.interceptors.response.use(
       })
     }
 
+    // Maintenance mode switched on in System Settings: let the app show its notice.
+    if (error.response?.status === 503 && error.response?.data?.maintenance) {
+      window.dispatchEvent(new CustomEvent('ipeso:maintenance'))
+    }
+
     // Signed in on a temporary password: flag it so the admin guard sends the
     // user to the Set-password screen.
     if (error.response?.status === 403 && error.response?.data?.must_change_password) {

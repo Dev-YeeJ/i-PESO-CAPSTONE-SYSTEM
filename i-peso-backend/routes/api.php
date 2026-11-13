@@ -81,6 +81,8 @@ Route::controller(\App\Http\Controllers\Api\HelpFeedbackController::class)->midd
     Route::post('/public/faqs/{faq}/feedback', 'vote');
     Route::post('/public/help/search-misses', 'searchMiss');
 });
+// Maintenance / registration / assistant switches (System Settings). Open even during maintenance.
+Route::get('/public/system-status', \App\Http\Controllers\Api\PublicSystemStatusController::class)->middleware('throttle:120,1');
 Route::post('/cookie-consent', [\App\Http\Controllers\Api\CookieConsentController::class, 'store'])->middleware('throttle:20,1');
 
 // Public assistant for visitors without an account (landing / login / register).
@@ -548,6 +550,18 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::get('/roles', [AdminRoleController::class, 'index']);
             Route::get('/ojt/interns', [AdminOjtController::class, 'interns']);
             Route::get('/ojt/interns/{intern}/logs', [AdminOjtController::class, 'logs']);
+        });
+
+        // System Settings: Configuration access can look; only the system administrator changes.
+        Route::middleware('admin.permission:configuration')->group(function () {
+            Route::get('/system-settings', [\App\Http\Controllers\Api\Admin\Configuration\SystemSettingsController::class, 'index']);
+            Route::get('/system-settings/status', [\App\Http\Controllers\Api\Admin\Configuration\SystemSettingsController::class, 'status']);
+        });
+        Route::middleware('admin.system')->prefix('system-settings')->controller(\App\Http\Controllers\Api\Admin\Configuration\SystemSettingsController::class)->group(function () {
+            Route::put('/', 'update');
+            Route::post('/test-email', 'testEmail')->middleware('throttle:5,1');
+            Route::post('/test-sms', 'testSms')->middleware('throttle:3,1');
+            Route::post('/test-ai', 'testAi')->middleware('throttle:5,1');
         });
 
         // Changing accounts or roles is reserved for the system administrator,

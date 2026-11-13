@@ -56,6 +56,13 @@ class SmsService
             ));
         }
 
+        // System Settings → SMS: master switch, per-type switches, monthly limit.
+        // Recorded as "skipped" with the reason, so the SMS log shows why.
+        $blocked = app(\App\Services\SystemSettings::class)->smsBlockReason($purpose, fn () => $this->sentThisMonth());
+        if ($blocked !== null) {
+            return $this->finish($record, SmsSendResult::make('skipped', $providerName, error: $blocked));
+        }
+
         if (! filled($phoneNumber)) {
             return $this->finish($record, SmsSendResult::make('skipped', $providerName, error: 'Recipient has no phone number.'));
         }
@@ -72,6 +79,19 @@ class SmsService
         } catch (\Throwable) {
             return $this->finish($record, SmsSendResult::make('failed', $providerName, error: 'SMS provider processing failed safely.'));
         }
+    }
+
+    /** Messages actually delivered to the provider since the 1st of this month. */
+    public function sentThisMonth(): int
+    {
+        if (! Schema::hasTable('sms_notifications')) {
+            return 0;
+        }
+
+        return SmsNotification::query()
+            ->where('gateway_status', 'sent')
+            ->where('created_at', '>=', now()->startOfMonth())
+            ->count();
     }
 
     private function createRecord(array $attributes): ?SmsNotification

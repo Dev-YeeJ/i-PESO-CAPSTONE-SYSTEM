@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\EnforceSystemAccess;
 use App\Http\Middleware\EnsureAdministrator;
 use App\Http\Middleware\EnsureAdminPermission;
 use App\Http\Middleware\EnsureSystemAdministrator;
@@ -25,6 +26,9 @@ return Application::configure(basePath: dirname(__DIR__))
         // no default limiter at all — not Laravel's usual 60/min, literally
         // none — so routes with no explicit throttle are wide open.
         $middleware->throttleApi();
+
+        // Maintenance mode (System Settings → Access): blocks everyone but staff.
+        $middleware->appendToGroup('api', EnforceSystemAccess::class);
 
         // Every signed-in user's changes (and personal-data views) go to the activity log.
         $middleware->appendToGroup('api', RecordActivity::class);

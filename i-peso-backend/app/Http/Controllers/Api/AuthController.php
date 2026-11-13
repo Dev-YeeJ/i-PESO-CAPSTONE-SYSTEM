@@ -188,6 +188,15 @@ class AuthController extends Controller
     public function register(Request $request): JsonResponse
     {
         $role = $request->input('role');
+
+        // Registration can be paused per role in System Settings → Access.
+        $settings = app(\App\Services\SystemSettings::class);
+        if (in_array($role, ['seeker', 'employer'], true) && ! $settings->registrationOpen($role)) {
+            return response()->json([
+                'message' => (string) $settings->get('registration.closed_message'),
+                'registration_closed' => true,
+            ], 403);
+        }
         $request->merge([
             'email' => mb_strtolower(trim((string) $request->input('email'))),
             'first_name' => Str::of((string) $request->input('first_name'))->squish()->toString(),

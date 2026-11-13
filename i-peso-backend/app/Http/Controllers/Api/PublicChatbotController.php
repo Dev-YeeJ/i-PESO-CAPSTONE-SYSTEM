@@ -28,6 +28,14 @@ class PublicChatbotController extends Controller
 
     public function __invoke(Request $request, GeminiChatService $chat, ChatbotPolicy $policy): JsonResponse
     {
+        // Switched off in System Settings → Access: answer without spending AI quota.
+        if (! app(\App\Services\SystemSettings::class)->bool('chatbot.enabled')) {
+            return response()->json([
+                'message' => 'The assistant is switched off right now. Please see the Help page or contact the PESO office.',
+                'assistant_disabled' => true,
+            ], 503);
+        }
+
         $data = $request->validate([
             'message' => ['required', 'string', 'max:500'],
             'history' => ['sometimes', 'array', 'max:' . self::MAX_HISTORY_TURNS],

@@ -1,11 +1,14 @@
 import { useEffect, useRef } from 'react'
 import { Outlet, useLocation } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
 import { Toaster, toast } from 'react-hot-toast'
 import { useAuthStore } from '@/stores/authStore'
 import Echo from 'laravel-echo'
 import Pusher from 'pusher-js'
 import UnifiedChatWidget from '@/components/chatbot/UnifiedChatWidget'
 import CookieConsent from '@/components/common/CookieConsent'
+import { MaintenanceScreen } from '@/components/system/SystemNotices'
+import { useSystemStatus } from '@/components/system/useSystemStatus'
 window.Pusher = Pusher
 
 // Initialize Echo only if Reverb key is available
@@ -28,6 +31,19 @@ export default function App() {
   const location = useLocation()
 
   const user = useAuthStore((s) => s.user)
+  const queryClient = useQueryClient()
+  const systemStatus = useSystemStatus()
+
+  // The API answers 503 {maintenance: true} once maintenance starts: re-check the status.
+  useEffect(() => {
+    const onMaintenance = () => queryClient.invalidateQueries({ queryKey: ['system-status'] })
+    window.addEventListener('ipeso:maintenance', onMaintenance)
+    return () => window.removeEventListener('ipeso:maintenance', onMaintenance)
+  }, [queryClient])
+
+  // Staff pages (and staff accounts) keep working during maintenance.
+  const isStaffArea = location.pathname.startsWith('/admin') || location.pathname.startsWith('/administrator')
+  const underMaintenance = systemStatus.maintenance.enabled && !isStaffArea && user?.role !== 'administrator'
 
   useEffect(() => {
     if (!hasInitialized.current) {
@@ -54,7 +70,7 @@ export default function App() {
 
   return (
     <>
-      <Outlet />
+      {underMaintenance ? <MaintenanceScreen message={systemStatus.maintenance.message} /> : <Outlet />}
       <Toaster
         position="top-right"
         toastOptions={{
@@ -65,7 +81,7 @@ export default function App() {
           },
         }}
       />
-      {!(location.pathname.startsWith('/admin') || location.pathname.startsWith('/administrator')) && <UnifiedChatWidget />}
+      {!isStaffArea && !underMaintenance && systemStatus.chatbot_enabled && <UnifiedChatWidget />}
       <CookieConsent />
     </>
   )

@@ -17,6 +17,7 @@ import SeekerLayout   from '@/layouts/SeekerLayout'
 import AdminLayout    from '@/layouts/AdminLayout'
 import App            from '@/App'
 import RouteErrorBoundary from './RouteErrorBoundary'
+import { RegistrationGate } from '@/components/system/SystemNotices'
 
 // --- LAZY LOADED PAGES ---
 const LandingPage        = lazy(() => import('@/pages/landing/LandingPage'))
@@ -139,9 +140,10 @@ export const router = createBrowserRouter([
             element: <GuestOnly />,
             children: [
               { path: '/login',             element: S(LoginPage) },
-              { path: '/register',          element: S(RegisterGateway) },
-              { path: '/register/seeker',   element: S(SeekerRegistration) },
-              { path: '/register/employer', element: S(EmployerRegistration) },
+              // Registration can be paused per role in System Settings → Access.
+              { path: '/register',          element: <RegistrationGate role="any">{S(RegisterGateway)}</RegistrationGate> },
+              { path: '/register/seeker',   element: <RegistrationGate role="seeker">{S(SeekerRegistration)}</RegistrationGate> },
+              { path: '/register/employer', element: <RegistrationGate role="employer">{S(EmployerRegistration)}</RegistrationGate> },
               { path: '/forgot-password',   element: S(ForgotPasswordPage) },
               { path: '/reset-password',    element: S(ResetPasswordPage) },
             ],

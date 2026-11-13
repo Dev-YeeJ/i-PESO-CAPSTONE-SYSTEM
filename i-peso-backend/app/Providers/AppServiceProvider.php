@@ -20,6 +20,9 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
+        // One instance per request, so settings are read from the cache once.
+        $this->app->singleton(\App\Services\SystemSettings::class);
+
         $this->app->bind(SmsProviderInterface::class, function ($app) {
             $liveRequested = config('services.sms.driver') === 'unisms'
                 && config('services.sms.provider') === 'unisms'
@@ -38,6 +41,14 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // System Settings that replace config values (placement deadline,
+        // reminder days, chatbot gap logging) — see SystemSettingsRegistry.
+        // Skipped for setup commands (package:discover runs from composer,
+        // often with no database), where a DB attempt would only slow them down.
+        if (! $this->isSetupCommand()) {
+            $this->app->make(\App\Services\SystemSettings::class)->applyToConfig();
+        }
+
         // Throws in local/testing the instant a relation is accessed without
         // being eager-loaded, instead of silently firing an extra query.
         // Off in production: an unnoticed N+1 there should degrade
@@ -62,5 +73,18 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('api', function (Request $request) {
             return Limit::perMinute(6000)->by($request->user()?->getAuthIdentifier() ?: $request->ip());
         });
+    }
+
+    /** Artisan commands that set the app up rather than run it. */
+    private function isSetupCommand(): bool
+    {
+        if (! $this->app->runningInConsole() || $this->app->runningUnitTests()) {
+            return false;
+        }
+
+        $command = (string) ($_SERVER['argv'][1] ?? '');
+
+        return $command === ''
+            || preg_match('/^(package:|config:|route:|view:|event:|optimize|key:|migrate|db:|storage:link|vendor:|clear-compiled|about|list|help)/', $command) === 1;
     }
 }

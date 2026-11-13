@@ -9,12 +9,6 @@ use Illuminate\Support\Carbon;
 
 class NotifyExpiringMayorsPermits extends Command
 {
-    /**
-     * Reminders fire at these day-offsets from expiry (plus on the day it expires).
-     * Using fixed thresholds keeps the job idempotent without a "notified_at" column.
-     */
-    private const THRESHOLDS = [30, 14, 7, 1, 0];
-
     protected $signature = 'permits:notify-expiring';
 
     protected $description = "Notify employers whose Mayor's Permit is about to expire (or has expired).";
@@ -24,7 +18,11 @@ class NotifyExpiringMayorsPermits extends Command
         $today = Carbon::today();
         $sent = 0;
 
-        foreach (self::THRESHOLDS as $daysLeft) {
+        // Day-offsets from expiry (config/permits.php, overridable in System Settings).
+        // Fixed offsets keep the job idempotent without a "notified_at" column.
+        $thresholds = collect((array) config('permits.reminder_days', [30, 14, 7, 1, 0]))->map(fn ($d) => (int) $d)->unique();
+
+        foreach ($thresholds as $daysLeft) {
             $targetDate = $today->copy()->addDays($daysLeft)->toDateString();
 
             $documents = EmployerDocument::with('employer')
