@@ -123,7 +123,7 @@ export function ReportReviewSheet({ review, onClose }: ReportReviewSheetProps) {
 }
 
 const styles = StyleSheet.create({
-  sheetBody: { paddingBottom: spacing.xl },
+  sheetBody: { paddingHorizontal: spacing.xl, paddingBottom: spacing.xl },
   subtitle: { ...textStyles.small, color: colors.textSecondary, lineHeight: 18, marginBottom: spacing.sm },
   link: { ...textStyles.smallBold, color: colors.secondary, textDecorationLine: 'underline' },
   label: { ...textStyles.smallBold, color: colors.textPrimary, marginTop: spacing.md, marginBottom: spacing.sm },

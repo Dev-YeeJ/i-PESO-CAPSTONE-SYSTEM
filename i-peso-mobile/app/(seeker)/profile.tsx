@@ -48,6 +48,7 @@ import { SectionHeader } from '@/components/ui/SectionHeader'
 import { MatchRing } from '@/components/ui/MatchRing'
 import { ScreenSkeleton } from '@/components/ui/ScreenSkeleton'
 import { colors, radii, spacing, typography, shadows } from '@/theme'
+import { openInBrowser, PRIVACY_POLICY_URL, REVIEW_GUIDELINES_URL, TERMS_OF_SERVICE_URL } from '@/utils/links'
 
 const CERTIFICATE_CATEGORIES = [
   'training_certificate', 'tesda_nc_certificate', 'professional_certificate',
@@ -876,6 +877,42 @@ export default function ProfileScreen() {
           </Button>
         </Card>
 
+        <SectionHeader title="Announcements" />
+        <Card padding="md">
+          <Text style={styles.muted}>
+            Official notices from PESO Urdaneta: office advisories, events, programs and system updates.
+          </Text>
+          <Button
+            variant="outline"
+            fullWidth
+            onPress={() => router.push({ pathname: '/(seeker)/announcements', params: { from: 'profile' } })}
+            style={styles.updateBtn}
+          >
+            Open Announcements
+          </Button>
+        </Card>
+
+        <SectionHeader title="Help & FAQs" />
+        <Card padding="md">
+          <Text style={styles.muted}>
+            Answers from the PESO office to common questions, and the office&apos;s contact details.
+          </Text>
+          <Button
+            variant="outline"
+            fullWidth
+            onPress={() => router.push('/(seeker)/help')}
+            style={styles.updateBtn}
+          >
+            Open Help &amp; FAQs
+          </Button>
+          {/* Versioned on the website, so the app opens them there instead of copying the text. */}
+          <View style={styles.policyLinks}>
+            <Text style={styles.policyLink} onPress={() => openInBrowser(PRIVACY_POLICY_URL)} accessibilityRole="link">Privacy Policy</Text>
+            <Text style={styles.policyLink} onPress={() => openInBrowser(TERMS_OF_SERVICE_URL)} accessibilityRole="link">Terms of Service</Text>
+            <Text style={styles.policyLink} onPress={() => openInBrowser(REVIEW_GUIDELINES_URL)} accessibilityRole="link">Review Guidelines</Text>
+          </View>
+        </Card>
+
         <Button variant="primary" fullWidth onPress={() => router.push('/(seeker)/profile/edit')} style={styles.editAllBtn}>
           Edit profile details
         </Button>
@@ -1203,6 +1240,8 @@ const styles = StyleSheet.create({
   checkText: { color: colors.textSecondary, fontSize: typography.body },
   checkTextDone: { color: colors.textPrimary, fontFamily: typography.family.medium },
   updateBtn: { marginTop: spacing.md },
+  policyLinks: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', columnGap: spacing.lg, rowGap: spacing.sm, marginTop: spacing.md },
+  policyLink: { color: colors.secondary, fontSize: typography.small, fontFamily: typography.family.bold, paddingVertical: spacing.xs },
   editAllBtn: { marginTop: spacing.xl },
   signOutBtn: { marginTop: spacing.md, marginBottom: spacing.xl },
   editLinkText: { color: colors.secondary, fontSize: typography.small, fontFamily: typography.family.bold },

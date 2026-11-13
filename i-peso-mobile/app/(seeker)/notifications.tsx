@@ -33,6 +33,8 @@ function iconForNotification(data?: SeekerNotification['data']): React.Component
       return 'new-releases'
     case 'interview':
       return 'event-available'
+    case 'announcement':
+      return 'campaign'
     default:
       if (data?.application_id) return 'work'
       if (data?.program_id) return 'school'
@@ -108,6 +110,12 @@ export default function NotificationsScreen() {
     } else if (notificationType === 'safety_action_notice') {
       // A notice from PESO about this account: no screen of its own. Marked read above;
       // stay here rather than falling through to another branch.
+    } else if (notificationType === 'announcement') {
+      // Before the job_fair_id / program_id fallbacks; action_url is a web path, so not used.
+      router.push({
+        pathname: '/(seeker)/announcements',
+        params: notification.data?.announcement_id ? { open: String(notification.data.announcement_id), from: 'notifications' } : { from: 'notifications' },
+      })
     } else if (notification.data?.type === 'interview' && notification.data?.application_id) {
       router.push(`/(seeker)/applications/${notification.data.application_id}` as any)
     } else if (notification.data?.application_id) {

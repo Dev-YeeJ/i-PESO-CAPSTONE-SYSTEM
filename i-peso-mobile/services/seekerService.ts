@@ -288,6 +288,9 @@ export interface SeekerNotification {
     report_id?: number | string
     case_number?: string
     action?: string
+    // Announcements — type 'announcement'.
+    announcement_id?: number | string
+    priority?: string
   }
   read_at: string | null
   created_at: string
@@ -881,6 +884,82 @@ export interface ReviewUpdatePayload {
   comment: string | null
 }
 
+// ── Announcements (mirrors AnnouncementPresenter::forReader) ──────────────
+// The API only returns what this seeker may see (audience, schedule, expiry);
+// the app never filters beyond the category the user picked.
+
+export type AnnouncementCategory = 'general' | 'job_fair' | 'program' | 'advisory' | 'system'
+export type AnnouncementPriority = 'normal' | 'important' | 'urgent'
+
+export interface Announcement {
+  id: number
+  title: string
+  body: string
+  excerpt: string
+  category: AnnouncementCategory | string
+  category_label: string
+  priority: AnnouncementPriority | string
+  priority_label: string
+  is_pinned: boolean
+  publish_at: string | null
+  expires_at: string | null
+  link_label: string | null
+  link_url: string | null
+  has_attachment: boolean
+  attachment_name: string | null
+  attachment_is_image: boolean
+  is_read: boolean
+  is_dismissed: boolean
+}
+
+export interface AnnouncementFeed {
+  data: Announcement[]
+  unread_count: number
+  total: number
+  last_page: number
+  current_page: number
+}
+
+// ── Help & FAQs (GET /help) ───────────────────────────────────────────────
+
+export interface Faq {
+  id: number
+  question: string
+  answer: string
+  audience: string
+  topic: string
+  topic_label: string
+  link_label: string | null
+  link_url: string | null
+  is_featured: boolean
+  sort_order: number
+}
+
+/** Office info from Site Content. `null` means PESO hasn't filled it in — never show it. */
+export interface OfficeInfo {
+  office_name: string | null
+  address: string | null
+  map_url: string | null
+  hours: string | null
+  phone: string | null
+  email: string | null
+  facebook: string | null
+  fees_policy: string | null
+  employer_approval_time: string | null
+}
+
+export interface HelpTopic {
+  value: string
+  label: string
+}
+
+export interface HelpResponse {
+  role: string | null
+  office: OfficeInfo
+  faqs: Faq[]
+  topics: HelpTopic[]
+}
+
 export const seekerService = {
   // ── Profile ────────────────────────────────────────────────────────────
   async getProfile(): Promise<SeekerProfile> {
@@ -1040,6 +1119,61 @@ export const seekerService = {
     const form = safetyFormData({ details: payload.details }, payload.attachments)
     const res = await apiClient.post(`/seeker/safety-reports/${id}/details`, form, { headers: { 'Content-Type': 'multipart/form-data' } })
     return res.data as { message: string; report: SafetyReportDetail }
+  },
+
+  // ── Announcements (mirrors announcementService in announcementService.js) ─
+  async announcements(params: { category?: string; page?: number } = {}): Promise<AnnouncementFeed> {
+    const res = await apiClient.get('/announcements', { params: { ...(params.category ? { category: params.category } : {}), page: params.page ?? 1 } })
+    return res.data
+  },
+
+  async announcementBanner(): Promise<{ data: Announcement[]; unread_count: number }> {
+    const res = await apiClient.get('/announcements/banner')
+    return res.data
+  },
+
+  async announcementUnreadCount(): Promise<number> {
+    const res = await apiClient.get('/announcements/unread-count')
+    return Number(res.data?.unread_count ?? 0)
+  },
+
+  /** Opening an announcement is what marks it read. */
+  async announcement(id: number | string): Promise<{ announcement: Announcement; unread_count: number }> {
+    const res = await apiClient.get(`/announcements/${id}`)
+    return res.data
+  },
+
+  /** Hides it from the home banner only; it stays on the Announcements screen. */
+  async dismissAnnouncement(id: number | string) {
+    const res = await apiClient.post(`/announcements/${id}/dismiss`)
+    return res.data as { message: string; announcement: Announcement }
+  },
+
+  async readAllAnnouncements() {
+    const res = await apiClient.post('/announcements/read-all')
+    return res.data as { message: string; unread_count: number }
+  },
+
+  announcementAttachmentUrl(id: number | string) {
+    return `${API_BASE_URL}/announcements/${id}/attachment`
+  },
+
+  // ── Help & FAQs (mirrors helpService.get in siteContentService.js) ─────
+  async help(): Promise<HelpResponse> {
+    const res = await apiClient.get('/help')
+    return res.data
+  },
+
+  /** "Was this helpful?" — one vote per reader (the server keeps an anonymous hash); voting again changes it. */
+  async voteFaq(faqId: number, helpful: boolean) {
+    const res = await apiClient.post(`/public/faqs/${faqId}/feedback`, { helpful })
+    return res.data as { message: string }
+  },
+
+  /** A search that found nothing — tells PESO which FAQ to write next. */
+  async reportHelpSearchMiss(term: string) {
+    const res = await apiClient.post('/public/help/search-misses', { term })
+    return res.data
   },
 
   // ── Reviews (mirrors i-peso-frontend's reviewService.js) ───────────────

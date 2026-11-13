@@ -181,6 +181,15 @@ apiClient.interceptors.response.use(
       console.log('Response Status:', status);
       console.log('Response Data:', error.response.data);
 
+      // Maintenance mode switched on in System Settings: the app shows a full-screen notice
+      // (the website's 'ipeso:maintenance' event). Lazy import avoids a require cycle.
+      if (status === 503 && error.response.data?.maintenance) {
+        const message = typeof error.response.data?.message === 'string' ? error.response.data.message : null;
+        void import('@/hooks/useSystemStatus').then(({ useMaintenanceSignal }) => {
+          useMaintenanceSignal.getState().signal(message);
+        });
+      }
+
       if (status === 401) {
         await SecureStore.deleteItemAsync('ipeso_token');
 

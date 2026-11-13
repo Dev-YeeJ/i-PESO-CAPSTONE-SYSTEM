@@ -20,6 +20,9 @@ import type { NearbyJob, NearbyJobsResponse, ProfileStrengthItem, SeekerProfile 
 import { seekerService } from '@/services/seekerService'
 import { useProfilePhotoUri } from '@/hooks/useProfilePhotoUri'
 import { useEmployerRatings } from '@/hooks/useEmployerRatings'
+import { AnnouncementBanner } from '@/components/announcements/AnnouncementBanner'
+import { ANNOUNCEMENT_KEYS } from '@/utils/announcements'
+import { useSystemStatus } from '@/hooks/useSystemStatus'
 import { useAuthStore } from '@/stores/authStore'
 import { useMotion } from '@/hooks/useMotion'
 import { firstName, listFrom } from '@/utils/seekerView'
@@ -152,6 +155,14 @@ export default function SeekerHomeScreen() {
     [recommendedQuery.data, nearbyQuery.data, latestQuery.data],
   )
   const employerRatings = useEmployerRatings(allFeedJobs)
+  const systemStatus = useSystemStatus()
+  // Unread PESO announcements for the Home shortcut; a failed request just hides the count.
+  const { data: announcementUnread = 0 } = useQuery({
+    queryKey: ANNOUNCEMENT_KEYS.unread,
+    queryFn: () => seekerService.announcementUnreadCount(),
+    staleTime: 60_000,
+    retry: false,
+  })
   const feedCounts = {
     recommended: recommendedQuery.data?.jobs?.length ?? 0,
     nearby: nearbyQuery.data?.jobs?.length ?? 0,
@@ -326,6 +337,27 @@ export default function SeekerHomeScreen() {
           </AlertBox>
         ) : null}
 
+        {/* Important/Urgent PESO announcements; renders nothing when there are none. */}
+        <AnnouncementBanner />
+
+        <PressableScale
+          scaleTo="buttonPress"
+          ripple={null}
+          style={styles.shortcut}
+          onPress={() => router.push('/(seeker)/announcements')}
+          accessibilityRole="button"
+          accessibilityLabel={announcementUnread > 0 ? `Announcements, ${announcementUnread} unread` : 'Announcements'}
+        >
+          <MaterialIcons name="campaign" size={20} color={colors.blue700} />
+          <Text style={styles.shortcutText}>Announcements</Text>
+          {announcementUnread > 0 ? (
+            <View style={styles.shortcutCount}>
+              <Text style={styles.shortcutCountText}>{announcementUnread > 99 ? '99+' : announcementUnread}</Text>
+            </View>
+          ) : null}
+          <MaterialIcons name="chevron-right" size={20} color={colors.subtle} style={styles.shortcutChevron} />
+        </PressableScale>
+
         {upcomingFairs.length ? (
           <PressableScale
             scaleTo="buttonPress"
@@ -362,9 +394,21 @@ export default function SeekerHomeScreen() {
           </PressableScale>
         ) : null}
 
+        <PressableScale
+          scaleTo="buttonPress"
+          ripple={null}
+          style={styles.helpLink}
+          onPress={() => router.push('/(seeker)/help')}
+          accessibilityRole="button"
+        >
+          <MaterialIcons name="help-outline" size={16} color={colors.secondary} />
+          <Text style={styles.helpLinkText}>Questions? Help &amp; FAQs</Text>
+        </PressableScale>
+
         {/* Quick actions were removed: Job Fairs opens from the bulletin above, Job Map from
             the Jobs tab's Map button, and Applications is the "Applied" tab. */}
-        <AceBanner />
+        {/* Hidden when PESO switches the assistant off in System Settings, as the website hides its chat button. */}
+        {systemStatus.chatbot_enabled ? <AceBanner /> : null}
 
         <View style={styles.searchBox}>
           <MaterialIcons name="search" size={20} color={colors.subtle} />
@@ -602,6 +646,13 @@ const styles = StyleSheet.create({
 
   alertBox: { marginHorizontal: spacing.lg, marginBottom: spacing.lg },
 
+  shortcut: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginHorizontal: spacing.lg, marginBottom: spacing.md, minHeight: 48, paddingHorizontal: spacing.md, borderWidth: 1, borderColor: colors.border, borderRadius: radii.lg, backgroundColor: colors.surface },
+  shortcutText: { ...textStyles.bodyBold, color: colors.textPrimary },
+  shortcutCount: { minWidth: 22, height: 22, borderRadius: 11, paddingHorizontal: 6, backgroundColor: colors.secondary, alignItems: 'center', justifyContent: 'center' },
+  shortcutCountText: { ...textStyles.label, color: colors.white },
+  shortcutChevron: { marginLeft: 'auto' },
+  helpLink: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs, marginBottom: spacing.lg, minHeight: 36 },
+  helpLinkText: { ...textStyles.smallBold, color: colors.secondary },
   bulletinCard: {
     marginHorizontal: spacing.lg,
     marginBottom: spacing.lg,

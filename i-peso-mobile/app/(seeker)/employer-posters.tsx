@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { PROTECTED_IMAGE_KEY } from '@/hooks/useProtectedImageUri'
 import { useRouter } from 'expo-router'
 import { seekerService } from '@/services/seekerService'
 import { ScreenHeader } from '@/components/ui/ScreenHeader'
@@ -10,6 +11,7 @@ import { colors, spacing, typography } from '@/theme'
 
 export default function EmployerPostersScreen() {
   const router = useRouter()
+  const queryClient = useQueryClient()
   const [refreshing, setRefreshing] = useState(false)
 
   const { data: posters = [], isLoading, error, refetch } = useQuery({
@@ -19,7 +21,7 @@ export default function EmployerPostersScreen() {
 
   const onRefresh = async () => {
     setRefreshing(true)
-    await refetch()
+    await Promise.all([refetch(), queryClient.invalidateQueries({ queryKey: PROTECTED_IMAGE_KEY })])
     setRefreshing(false)
   }
 

@@ -266,7 +266,7 @@ function Checkbox({ checked, onToggle, label, onOpenLink, children }: {
 }
 
 const styles = StyleSheet.create({
-  body: { paddingBottom: spacing.xl },
+  body: { paddingHorizontal: spacing.xl, paddingBottom: spacing.xl },
   description: { ...textStyles.small, color: colors.textSecondary, marginBottom: spacing.md },
   anonNote: { flexDirection: 'row', gap: spacing.sm, borderWidth: 1, borderColor: colors.infoBorder, backgroundColor: colors.infoBackground, borderRadius: radii.md, padding: spacing.md },
   noteIcon: { marginTop: 1 },

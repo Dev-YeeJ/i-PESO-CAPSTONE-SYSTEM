@@ -4,8 +4,8 @@ import type { OwnReview, ReviewOpportunity, ReviewSource, ReviewType } from '@/s
 
 export const MY_REVIEWS_KEY = ['seeker', 'reviews'] as const
 
-/** Community guidelines live on the website; the app opens them in the browser. */
-export const REVIEW_GUIDELINES_URL = 'https://ipeso.website/review-guidelines'
+/** Community guidelines live on the website; the app opens them in the browser. Defined in utils/links.ts. */
+export { REVIEW_GUIDELINES_URL } from './links'
 
 export const RECRUITMENT_ASPECTS: Record<string, string> = {
   communication: 'Communication',

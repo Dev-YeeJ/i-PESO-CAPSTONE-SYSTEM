@@ -14,6 +14,8 @@ import { Button } from '@/components/ui/Button'
 import { normalizeMobileNumber, registerSchema, type RegisterFormValues } from '@/schemas/authSchemas'
 import { colors, spacing, typography } from '@/theme'
 import { useToast } from '@/stores/toastStore'
+import { AlertBox } from '@/components/ui/AlertBox'
+import { useSystemStatus } from '@/hooks/useSystemStatus'
 
 interface ApiErrorBody {
   message?: string
@@ -40,6 +42,7 @@ const DEFAULT_VALUES: RegisterFormValues = {
 
 export default function RegisterScreen() {
   const { showToast } = useToast()
+  const systemStatus = useSystemStatus()
 
   const {
     control,
@@ -96,6 +99,19 @@ export default function RegisterScreen() {
   }
 
   const onInvalid = () => showToast('Please complete the required registration fields.', 'error')
+
+  // Paused in System Settings → Access: show the office's notice instead of the form, as the
+  // website does, rather than letting someone fill everything in and get a 403.
+  if (!systemStatus.registration.seekers_open) {
+    return (
+      <AuthShell title="Registration is paused" subtitle="Job seeker registration" onBack={() => router.back()}>
+        <AlertBox variant="info" style={styles.pausedNotice}>
+          {systemStatus.registration.closed_message || 'New job seeker accounts are temporarily paused. Please check back soon.'}
+        </AlertBox>
+        <Button fullWidth onPress={() => router.replace('/(auth)/login')}>Sign in to an existing account</Button>
+      </AuthShell>
+    )
+  }
 
   return (
     <AuthShell
@@ -246,6 +262,7 @@ const styles = StyleSheet.create({
     marginTop: -spacing.sm,
     marginBottom: spacing.md,
   },
+  pausedNotice: { marginBottom: spacing.lg },
   footer: {
     flexDirection: 'row',
     justifyContent: 'center',

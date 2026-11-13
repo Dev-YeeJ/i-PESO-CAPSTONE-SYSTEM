@@ -1,4 +1,4 @@
-import { StyleSheet, Text, TextInput, View } from 'react-native'
+import { ScrollView, StyleSheet, Text, TextInput, View } from 'react-native'
 import { AlertBox } from '@/components/ui/AlertBox'
 import { BottomSheet } from '@/components/ui/BottomSheet'
 import { Button } from '@/components/ui/Button'
@@ -49,34 +49,41 @@ export function GenerateResumeModal({
         </View>
       }
     >
-      <Text style={styles.modalHint}>Write a short professional summary (max 1200 characters). It will appear at the top of your generated PDF resume.</Text>
-      <TextInput
-        style={styles.modalTextarea}
-        value={summary}
-        onChangeText={onChangeSummary}
-        placeholder="e.g. Detail-oriented administrative professional with 3 years of experience..."
-        placeholderTextColor={colors.subtle}
-        multiline
-        maxLength={1200}
-      />
-      <Button variant="outline" onPress={onGenerateSummaryAI} disabled={aiSummaryBusy} loading={aiSummaryBusy} style={styles.aiSummaryBtn}>
-        Generate with Smart Assistant
-      </Button>
-      {aiSummaryNotice ? (
-        <AlertBox variant="info" style={styles.modalError}>
-          {aiSummaryNotice}
-        </AlertBox>
-      ) : null}
-      {actionError ? (
-        <AlertBox variant="danger" style={styles.modalError}>
-          {actionError}
-        </AlertBox>
-      ) : null}
+      <ScrollView
+        contentContainerStyle={styles.modalContent}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
+        <Text style={styles.modalHint}>Write a short professional summary (max 1200 characters). It will appear at the top of your generated PDF resume.</Text>
+        <TextInput
+          style={styles.modalTextarea}
+          value={summary}
+          onChangeText={onChangeSummary}
+          placeholder="e.g. Detail-oriented administrative professional with 3 years of experience..."
+          placeholderTextColor={colors.subtle}
+          multiline
+          maxLength={1200}
+        />
+        <Button variant="outline" onPress={onGenerateSummaryAI} disabled={aiSummaryBusy} loading={aiSummaryBusy} style={styles.aiSummaryBtn}>
+          Generate with Smart Assistant
+        </Button>
+        {aiSummaryNotice ? (
+          <AlertBox variant="info" style={styles.modalError}>
+            {aiSummaryNotice}
+          </AlertBox>
+        ) : null}
+        {actionError ? (
+          <AlertBox variant="danger" style={styles.modalError}>
+            {actionError}
+          </AlertBox>
+        ) : null}
+      </ScrollView>
     </BottomSheet>
   )
 }
 
 const styles = StyleSheet.create({
+  modalContent: { paddingHorizontal: spacing.xl, paddingBottom: spacing.xl },
   modalHint: { color: colors.textSecondary, fontSize: typography.small, lineHeight: 18, marginBottom: spacing.md },
   modalTextarea: { borderWidth: 1, borderColor: colors.border, borderRadius: radii.md, padding: spacing.md, minHeight: 120, textAlignVertical: 'top', color: colors.textPrimary, fontSize: typography.body },
   aiSummaryBtn: { marginTop: spacing.md, marginBottom: 0 },

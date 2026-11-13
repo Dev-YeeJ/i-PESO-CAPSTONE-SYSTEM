@@ -141,6 +141,9 @@ export interface PushNotificationData {
   // Report & Safety — safety_report_update carries report_id; safety_action_notice carries action.
   report_id?: number | string
   action?: string
+  // Announcements — type 'announcement'.
+  announcement_id?: number | string
+  priority?: string
 }
 
 /**
@@ -167,6 +170,12 @@ export function routeForPushData(data: PushNotificationData): string | null {
   }
   // A PESO notice about the seeker's own account has no screen; open Notifications to read it.
   if (data.type === 'safety_action_notice') return '/(seeker)/notifications'
+  // Before the program/job-fair fallbacks below; action_url is a web path, so it isn't used.
+  if (data.type === 'announcement') {
+    return data.announcement_id
+      ? `/(seeker)/announcements?open=${encodeURIComponent(String(data.announcement_id))}&from=notifications`
+      : '/(seeker)/announcements?from=notifications'
+  }
   if (data.type === 'interview' && data.application_id) {
     return `/(seeker)/applications/${data.application_id}`
   }

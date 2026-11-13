@@ -5,7 +5,7 @@ import { useQuery } from '@tanstack/react-query'
 import MaterialIcons from '@expo/vector-icons/MaterialIcons'
 import type { EmployerBoothVacancy } from '@/services/seekerService'
 import { seekerService } from '@/services/seekerService'
-import { useAuthStore } from '@/stores/authStore'
+import { useProtectedImageUri } from '@/hooks/useProtectedImageUri'
 import { downloadAndShare } from '@/utils/fileTransfer'
 import { textFrom } from '@/utils/seekerView'
 import { AlertBox } from '@/components/ui/AlertBox'
@@ -40,7 +40,6 @@ function timeAgo(iso?: string | null): string {
 
 export default function EmployerBoothScreen() {
   const router = useRouter()
-  const token = useAuthStore((state) => state.token)
   const { jobFairId, employerId, from, fromId } = useLocalSearchParams<{
     jobFairId: string
     employerId: string
@@ -62,6 +61,7 @@ export default function EmployerBoothScreen() {
   const poster = posters.length > 0 ? posters[Math.min(activePosterIndex, posters.length - 1)] : null
   const posterUrl = poster ? seekerService.jobFairPosterUrl(poster.id) : null
   const isImagePoster = (poster?.mime_type || '').startsWith('image/')
+  const posterImage = useProtectedImageUri(isImagePoster ? posterUrl : null, `poster-${poster?.id}`)
 
   const openJob = (postId: number | string) => {
     // jobs/[id]'s backTargetFor only carries one id in `fromId`, but returning to this booth
@@ -95,8 +95,9 @@ export default function EmployerBoothScreen() {
                 <View style={styles.posterMediaWrap}>
                   <PosterView
                     isImage={isImagePoster}
-                    posterUrl={posterUrl!}
-                    token={token}
+                    imageUri={posterImage.uri}
+                    imageError={posterImage.isError}
+                    onRetryImage={() => posterImage.retry()}
                     onOpenImage={() => setPreviewOpen(true)}
                     onOpenDocument={() => downloadAndShare(posterUrl!, poster.original_filename || `poster-${poster.id}`)}
                     displayName={displayName}
@@ -164,13 +165,8 @@ export default function EmployerBoothScreen() {
         </ScrollView>
       )}
 
-      {poster && isImagePoster && token ? (
-        <ImagePreviewModal
-          visible={previewOpen}
-          uri={posterUrl}
-          headers={{ Authorization: `Bearer ${token}` }}
-          onClose={() => setPreviewOpen(false)}
-        />
+      {poster && isImagePoster && posterImage.uri ? (
+        <ImagePreviewModal visible={previewOpen} uri={posterImage.uri} onClose={() => setPreviewOpen(false)} />
       ) : null}
     </View>
   )
@@ -178,31 +174,56 @@ export default function EmployerBoothScreen() {
 
 function PosterView({
   isImage,
-  posterUrl,
-  token,
+  imageUri,
+  imageError,
+  onRetryImage,
   onOpenImage,
   onOpenDocument,
   displayName,
 }: {
   isImage: boolean
-  posterUrl: string
-  token: string | null
+  imageUri: string | null
+  imageError: boolean
+  onRetryImage: () => void
   onOpenImage: () => void
   onOpenDocument: () => Promise<string>
   displayName: string
 }) {
   const [opening, setOpening] = useState(false)
 
-  if (isImage && token) {
+  if (isImage) {
+    // Downloaded with the session token first (useProtectedImageUri); a protected URL with a
+    // `headers` prop on <Image> drew an empty box on device.
+    if (imageUri) {
+      return (
+        <PressableScale
+          onPress={onOpenImage}
+          ripple={null}
+          accessibilityRole="button"
+          accessibilityLabel={`Open ${displayName} job fair poster image`}
+        >
+          <Image source={{ uri: imageUri }} style={styles.posterImage} resizeMode="cover" />
+        </PressableScale>
+      )
+    }
+    if (imageError) {
+      return (
+        <PressableScale
+          onPress={onRetryImage}
+          ripple={null}
+          style={[styles.posterImage, styles.posterState]}
+          accessibilityRole="button"
+          accessibilityLabel="Poster could not be loaded. Tap to try again."
+        >
+          <MaterialIcons name="broken-image" size={24} color={colors.subtle} />
+          <Text style={styles.docHint}>Poster could not be loaded. Tap to try again.</Text>
+        </PressableScale>
+      )
+    }
     return (
-      <PressableScale
-        onPress={onOpenImage}
-        ripple={null}
-        accessibilityRole="button"
-        accessibilityLabel={`Open ${displayName} job fair poster image`}
-      >
-        <Image source={{ uri: posterUrl, headers: { Authorization: `Bearer ${token}` } }} style={styles.posterImage} resizeMode="cover" />
-      </PressableScale>
+      <View style={[styles.posterImage, styles.posterState]}>
+        <ActivityIndicator size="small" color={colors.info} />
+      </View>
     )
   }
 
@@ -317,6 +338,7 @@ const styles = StyleSheet.create({
   },
   posterCounterText: { color: colors.white, fontSize: 11, fontFamily: typography.family.bold },
   posterImage: { width: '100%', aspectRatio: 4 / 3, borderRadius: radii.md, backgroundColor: colors.background },
+  posterState: { alignItems: 'center', justifyContent: 'center', gap: spacing.xs, paddingHorizontal: spacing.lg },
   docRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.xl, backgroundColor: colors.background, borderRadius: radii.md },
   docTitle: { color: colors.textPrimary, fontSize: typography.body, fontFamily: typography.family.bold },
   docHint: { color: colors.subtle, fontSize: 11, marginTop: 1 },

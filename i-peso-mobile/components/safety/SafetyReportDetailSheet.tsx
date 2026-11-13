@@ -186,7 +186,7 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
 }
 
 const styles = StyleSheet.create({
-  body: { paddingBottom: spacing.xl },
+  body: { paddingHorizontal: spacing.xl, paddingBottom: spacing.xl },
   flex: { flex: 1 },
   headRow: { flexDirection: 'row' },
   meta: { ...textStyles.small, color: colors.textSecondary, marginTop: spacing.xs },

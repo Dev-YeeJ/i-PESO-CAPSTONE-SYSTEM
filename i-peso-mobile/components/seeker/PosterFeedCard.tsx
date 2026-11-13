@@ -5,7 +5,7 @@ import { useRouter } from 'expo-router'
 import MaterialIcons from '@expo/vector-icons/MaterialIcons'
 import type { JobFairPoster } from '@/services/seekerService'
 import { seekerService } from '@/services/seekerService'
-import { useAuthStore } from '@/stores/authStore'
+import { useProtectedImageUri } from '@/hooks/useProtectedImageUri'
 import { downloadAndShare } from '@/utils/fileTransfer'
 import { useMotion } from '@/hooks/useMotion'
 import { useToast } from '@/stores/toastStore'
@@ -37,7 +37,6 @@ function timeAgo(iso?: string | null): string {
 
 export function PosterFeedCard({ poster, index }: { poster: JobFairPoster; index?: number }) {
   const router = useRouter()
-  const token = useAuthStore((state) => state.token)
   const m = useMotion()
   const { showToast } = useToast()
   const [previewOpen, setPreviewOpen] = useState(false)
@@ -52,6 +51,10 @@ export function PosterFeedCard({ poster, index }: { poster: JobFairPoster; index
   const metaLine = [poster.job_fair_title, poster.venue, timeAgo(poster.posted_at)].filter(Boolean).join(' · ')
   const posterUrl = currentFile ? seekerService.jobFairPosterUrl(currentFile.id) : null
   const canViewBooth = poster.job_fair_id != null && poster.employer_id != null
+  const { uri: imageUri, isError: imageError, retry: retryImage } = useProtectedImageUri(
+    isImage ? posterUrl : null,
+    `poster-${currentFile?.id}`,
+  )
 
   // React Native has no window.open — a document poster is downloaded (authenticated, same
   // as the image thumbnail) to local cache and handed to the OS share sheet, which lets the
@@ -108,19 +111,32 @@ export function PosterFeedCard({ poster, index }: { poster: JobFairPoster; index
             <MaterialIcons name="image-not-supported" size={20} color={colors.subtle} />
             <Text style={styles.emptyFilesText}>No files uploaded</Text>
           </View>
-        ) : isImage && token ? (
-          <PressableScale
-            onPress={() => setPreviewOpen(true)}
-            ripple={null}
-            accessibilityRole="button"
-            accessibilityLabel={`Open ${poster.company_name || 'employer'} poster image`}
-          >
-            <Image
-              source={{ uri: posterUrl!, headers: { Authorization: `Bearer ${token}` } }}
-              style={styles.poster}
-              resizeMode="cover"
-            />
-          </PressableScale>
+        ) : isImage ? (
+          imageUri ? (
+            <PressableScale
+              onPress={() => setPreviewOpen(true)}
+              ripple={null}
+              accessibilityRole="button"
+              accessibilityLabel={`Open ${poster.company_name || 'employer'} poster image`}
+            >
+              <Image source={{ uri: imageUri }} style={styles.poster} resizeMode="cover" />
+            </PressableScale>
+          ) : imageError ? (
+            <PressableScale
+              onPress={() => retryImage()}
+              ripple={null}
+              style={[styles.poster, styles.posterState]}
+              accessibilityRole="button"
+              accessibilityLabel="Poster could not be loaded. Tap to try again."
+            >
+              <MaterialIcons name="broken-image" size={24} color={colors.subtle} />
+              <Text style={styles.emptyFilesText}>Poster could not be loaded. Tap to try again.</Text>
+            </PressableScale>
+          ) : (
+            <View style={[styles.poster, styles.posterState]}>
+              <ActivityIndicator size="small" color={colors.info} />
+            </View>
+          )
         ) : (
           <PressableScale
             onPress={openDocument}
@@ -205,13 +221,8 @@ export function PosterFeedCard({ poster, index }: { poster: JobFairPoster; index
         ) : null}
       </View>
 
-      {isImage && token && posterUrl ? (
-        <ImagePreviewModal
-          visible={previewOpen}
-          uri={posterUrl}
-          headers={{ Authorization: `Bearer ${token}` }}
-          onClose={() => setPreviewOpen(false)}
-        />
+      {isImage && imageUri ? (
+        <ImagePreviewModal visible={previewOpen} uri={imageUri} onClose={() => setPreviewOpen(false)} />
       ) : null}
     </Card>
     </Animated.View>
@@ -234,6 +245,7 @@ const styles = StyleSheet.create({
   emptyFiles: { alignItems: 'center', justifyContent: 'center', gap: spacing.xs, paddingVertical: spacing.xxl, backgroundColor: colors.background, borderRadius: radii.md },
   emptyFilesText: { color: colors.subtle, fontSize: typography.small, fontFamily: typography.family.medium },
   poster: { width: '100%', aspectRatio: 4 / 3, borderRadius: radii.md, backgroundColor: colors.background },
+  posterState: { alignItems: 'center', justifyContent: 'center', gap: spacing.xs, paddingHorizontal: spacing.lg },
   docRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: spacing.lg, backgroundColor: colors.background, borderRadius: radii.md },
   docTextWrap: { flex: 1 },
   docName: { color: colors.textPrimary, fontSize: typography.small, fontFamily: typography.family.bold },

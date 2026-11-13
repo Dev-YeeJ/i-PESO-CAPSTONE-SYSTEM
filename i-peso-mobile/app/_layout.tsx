@@ -9,6 +9,7 @@ import { useAuthStore } from '@/stores/authStore'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { syncPushToken, routeForPushData, addPushResponseListener } from '@/services/pushNotifications'
 import { Toast } from '@/components/ui/Toast'
+import { MaintenanceGate } from '@/components/system/MaintenanceGate'
 
 const queryClient = new QueryClient()
 SplashScreen.preventAutoHideAsync()
@@ -79,6 +80,8 @@ export default function RootLayout() {
           <Stack.Screen name="(auth)" />
           <Stack.Screen name="(seeker)" />
         </Stack>
+        {/* Covers everything while System Settings → Maintenance mode is on. */}
+        <MaintenanceGate />
         <Toast />
       </QueryClientProvider>
     </GestureHandlerRootView>
