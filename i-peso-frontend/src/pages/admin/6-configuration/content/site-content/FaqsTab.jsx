@@ -93,10 +93,10 @@ export default function FaqsTab({ canEdit, office }) {
 
         {summary && (
           <div className="mt-4 flex flex-wrap gap-2 text-xs font-bold">
-            <span className="rounded-full bg-emerald-50 px-3 py-1 text-emerald-700">{summary.published} published</span>
+            <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-700">{summary.published} published</span>
             <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-600">{summary.unpublished} unpublished</span>
-            <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-3 py-1 text-amber-800"><Home className="h-3 w-3" aria-hidden="true" /> {summary.featured}/{summary.max_featured} on the landing page</span>
-            <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-3 py-1 text-blue-800"><Bot className="h-3 w-3" aria-hidden="true" /> {summary.in_assistant}/{summary.assistant_limit} in the assistant</span>
+            <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1 text-slate-700"><Home className="h-3 w-3" aria-hidden="true" /> {summary.featured}/{summary.max_featured} on the landing page</span>
+            <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1 text-slate-700"><Bot className="h-3 w-3" aria-hidden="true" /> {summary.in_assistant}/{summary.assistant_limit} in the assistant</span>
           </div>
         )}
 
@@ -168,9 +168,9 @@ export default function FaqsTab({ canEdit, office }) {
                     <div className="mt-2 flex flex-wrap items-center gap-1.5">
                       <Badge variant={faq.is_published ? 'active' : 'draft'}>{faq.is_published ? 'Published' : 'Unpublished'}</Badge>
                       <Badge variant="neutral">{faq.audience_label}</Badge>
-                      {faq.is_featured && <Badge variant="warning">On landing page</Badge>}
+                      {faq.is_featured && <Badge variant="neutral">On landing page</Badge>}
                       {faq.helpful_votes + faq.unhelpful_votes > 0 && (
-                        <span className={`inline-flex items-center gap-1.5 text-xs font-bold ${faq.unhelpful_votes > faq.helpful_votes ? 'text-red-600' : 'text-slate-500'}`} title="“Was this helpful?” votes">
+                        <span className={`inline-flex items-center gap-1.5 text-xs font-bold ${faq.unhelpful_votes > faq.helpful_votes ? 'text-slate-700' : 'text-slate-500'}`} title="“Was this helpful?” votes">
                           <ThumbsUp className="h-3 w-3" aria-hidden="true" />{faq.helpful_votes}
                           <ThumbsDown className="h-3 w-3" aria-hidden="true" />{faq.unhelpful_votes}
                         </span>
@@ -181,7 +181,7 @@ export default function FaqsTab({ canEdit, office }) {
                   <div className="flex shrink-0 flex-wrap gap-1.5">
                     {canEdit ? (
                       <>
-                        <Button size="sm" variant={faq.is_published ? 'outline' : 'navy'} icon={faq.is_published ? EyeOff : Eye} loading={toggle.isPending && toggle.variables?.faq.id === faq.id} onClick={() => toggle.mutate({ faq })}>
+                        <Button size="sm" variant="outline" icon={faq.is_published ? EyeOff : Eye} loading={toggle.isPending && toggle.variables?.faq.id === faq.id} onClick={() => toggle.mutate({ faq })}>
                           {faq.is_published ? 'Unpublish' : 'Publish'}
                         </Button>
                         {faq.audience === 'everyone' && (

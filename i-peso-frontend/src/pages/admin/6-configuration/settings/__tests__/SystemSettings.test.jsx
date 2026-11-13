@@ -58,18 +58,28 @@ describe('System Settings', () => {
     await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Test email sent.', expect.anything()))
   })
 
-  it('asks before turning maintenance mode on and saves only what changed', async () => {
+  it('asks only before turning maintenance mode on', async () => {
     adminSystemSettingsService.save.mockResolvedValue({ message: 'Settings saved.', changed: ['maintenance.enabled'] })
     renderWithProviders(<SystemSettingsPage />, { route: '/admin/settings?section=access' })
 
     await userEvent.click(await screen.findByRole('switch', { name: 'Maintenance mode' }))
-    await userEvent.click(screen.getByRole('button', { name: /save \(1\)/i }))
+    expect(adminSystemSettingsService.save).not.toHaveBeenCalled()
 
     const dialog = await screen.findByRole('dialog')
     expect(within(dialog).getByText('Turn on maintenance mode?')).toBeInTheDocument()
     await userEvent.click(within(dialog).getByRole('button', { name: /turn on maintenance/i }))
 
     await waitFor(() => expect(adminSystemSettingsService.save).toHaveBeenCalledWith({ 'maintenance.enabled': true }))
+  })
+
+  it('saves any other switch the moment it is flipped', async () => {
+    adminSystemSettingsService.save.mockResolvedValue({ message: 'Settings saved.', changed: ['sms.types.interview'] })
+    renderWithProviders(<SystemSettingsPage />, { route: '/admin/settings?section=sms' })
+
+    await userEvent.click(await screen.findByRole('switch', { name: 'Interview messages' }))
+
+    await waitFor(() => expect(adminSystemSettingsService.save).toHaveBeenCalledWith({ 'sms.types.interview': false }))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
   it('reads reminder days out in words and keeps them in order', async () => {
@@ -83,13 +93,13 @@ describe('System Settings', () => {
     expect(screen.getByText('= 5 days before')).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: 'Add' }))
     await userEvent.click(screen.getByRole('button', { name: /remove on the due day/i }))
-    await userEvent.click(screen.getByRole('button', { name: /save \(1\)/i }))
-    await userEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: /save settings/i }))
+    await userEvent.click(screen.getByRole('button', { name: /^save$/i }))
 
     await waitFor(() => expect(adminSystemSettingsService.save).toHaveBeenCalledWith({ 'placement.reminder_offsets': [5, 3, -7] }))
   })
 
   it('greys out the SMS types while SMS is switched off and shows this month’s usage', async () => {
+    adminSystemSettingsService.save.mockResolvedValue({ message: 'Settings saved.', changed: ['sms.enabled'] })
     renderWithProviders(<SystemSettingsPage />, { route: '/admin/settings?section=sms' })
 
     const interview = await screen.findByRole('switch', { name: 'Interview messages' })

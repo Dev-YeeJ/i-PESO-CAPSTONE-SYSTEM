@@ -74,7 +74,7 @@ export default function InsightsModule({ onGo, canEdit, allowed }) {
               {canEdit && (
                 <div className="flex shrink-0 gap-1.5">
                   {allowed.includes('faqs') && (
-                    <Button size="sm" variant="navy" icon={PenLine} loading={writing === key} onClick={() => writeFaq(key, item.text)}>Write FAQ</Button>
+                    <Button size="sm" variant="outline" icon={PenLine} loading={writing === key} onClick={() => writeFaq(key, item.text)}>Write FAQ</Button>
                   )}
                   <Button size="sm" variant="ghost" icon={Check} loading={resolve.isPending && resolve.variables?.normalized === item.normalized} onClick={() => resolve.mutate({ kind, normalized: item.normalized })}>
                     Dealt with
@@ -101,7 +101,7 @@ export default function InsightsModule({ onGo, canEdit, allowed }) {
           <div role="radiogroup" aria-label="Period" className="flex rounded-lg border border-slate-200 bg-white p-0.5">
             {[7, 30, 90].map((value) => (
               <button key={value} type="button" role="radio" aria-checked={days === value} onClick={() => setDays(value)}
-                className={`rounded-md px-2.5 py-1 text-xs font-bold ${days === value ? 'bg-brand-navy text-white' : 'text-slate-600 hover:text-slate-900'}`}>
+                className={`rounded-md px-2.5 py-1 text-xs font-bold ${days === value ? 'bg-white text-slate-900 shadow-sm ring-1 ring-slate-200' : 'text-slate-600 hover:text-slate-900'}`}>
                 {value} days
               </button>
             ))}
@@ -152,12 +152,12 @@ export default function InsightsModule({ onGo, canEdit, allowed }) {
                   <tr key={row.faq_id}>
                     <td className="py-2.5 pr-3">
                       <span className="font-semibold text-slate-900">{row.question}</span>
-                      {row.needs_work && <Badge variant="warning" className="ml-2">Rewrite</Badge>}
+                      {row.needs_work && <Badge variant="neutral" className="ml-2">Rewrite</Badge>}
                     </td>
                     <td className="py-2.5 pr-3">
                       <div className="flex items-center gap-2">
-                        <div className="h-2 w-24 overflow-hidden rounded-full bg-red-100" aria-hidden="true">
-                          <div className="h-full bg-emerald-500" style={{ width: `${row.score}%` }} />
+                        <div className="h-2 w-24 overflow-hidden rounded-full bg-slate-200" aria-hidden="true">
+                          <div className="h-full bg-slate-500" style={{ width: `${row.score}%` }} />
                         </div>
                         <span className="tabular-nums font-bold text-slate-800">{row.score}%</span>
                       </div>

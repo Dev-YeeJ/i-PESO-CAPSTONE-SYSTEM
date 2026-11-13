@@ -74,6 +74,18 @@ describe('Admin announcement form', () => {
     expect(values).toMatchObject({ title: 'Office closed Friday', body: 'Holiday closure.', audience: 'seekers', notify_users: true, publish_at: '' })
   })
 
+  it('publishes straight away when no notification is sent', async () => {
+    adminAnnouncementService.create.mockResolvedValue({ message: 'Announcement published.', announcement: { id: 8 } })
+    renderWithProviders(<AnnouncementFormPage />)
+
+    await userEvent.type(screen.getByPlaceholderText(/PESO office closed/i), 'Office closed Friday')
+    await userEvent.type(screen.getByPlaceholderText(/Write the full announcement/i), 'Holiday closure.')
+    await userEvent.click(screen.getByRole('button', { name: /publish now/i }))
+
+    await waitFor(() => expect(adminAnnouncementService.create).toHaveBeenCalledWith(expect.objectContaining({ notify_users: false }), 'publish'))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
   it('keeps optional settings folded away until asked for', async () => {
     renderWithProviders(<AnnouncementFormPage />)
 

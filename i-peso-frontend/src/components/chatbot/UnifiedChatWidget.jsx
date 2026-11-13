@@ -120,7 +120,6 @@ export default function UnifiedChatWidget() {
   const [greetingVisible, setGreetingVisible] = useState(false)
   const [listening, setListening] = useState(false)
   const [voiceProcessing, setVoiceProcessing] = useState(false)
-  const [voiceDraft, setVoiceDraft] = useState(false)
   const [speakingMessage, setSpeakingMessage] = useState(null)
   const [voiceError, setVoiceError] = useState('')
   const user = useAuthStore((state) => state.user)
@@ -189,7 +188,7 @@ export default function UnifiedChatWidget() {
 
   useEffect(() => {
     logEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
-  }, [messages, busy, voiceDraft])
+  }, [messages, busy])
 
   useEffect(() => () => {
     recognitionRef.current?.abort()
@@ -217,7 +216,6 @@ export default function UnifiedChatWidget() {
     recognitionRef.current?.abort()
     stopSpeaking()
     setVoiceError('')
-    setVoiceDraft(false)
     setVoiceProcessing(false)
 
     const recognition = new SpeechRecognition()
@@ -264,9 +262,9 @@ export default function UnifiedChatWidget() {
       const transcript = recognitionTranscriptRef.current
       if (!recognitionErrorRef.current) {
         if (transcript) {
-          setInput([recognitionInputRef.current, transcript].filter(Boolean).join(' ').slice(0, 500))
-          setVoiceDraft(true)
+          // Spoken questions are sent as soon as the speaker stops — no extra tap on Send.
           setVoiceError('')
+          sendRef.current([recognitionInputRef.current, transcript].filter(Boolean).join(' ').slice(0, 500), { fromVoice: true })
         } else {
           setVoiceError('I couldn’t understand that. Please try speaking again, or type your message instead.')
         }
@@ -319,15 +317,18 @@ export default function UnifiedChatWidget() {
     window.speechSynthesis.speak(utterance)
   }
 
-  const send = async (text) => {
+  /**
+   * `fromVoice`: called by the speech recogniser as it finishes, while React
+   * still has it marked as listening — so only `busy` may block it.
+   */
+  const send = async (text, { fromVoice = false } = {}) => {
     const question = text.trim()
-    if (!question || busy || listening || voiceProcessing) return
+    if (!question || busy || (!fromVoice && (listening || voiceProcessing))) return
 
-    recognitionRef.current?.abort()
+    if (!fromVoice) recognitionRef.current?.abort()
     recognitionRef.current = null
     setListening(false)
     setVoiceProcessing(false)
-    setVoiceDraft(false)
     stopSpeaking()
     setVoiceError('')
 
@@ -350,6 +351,11 @@ export default function UnifiedChatWidget() {
     setBusy(false)
   }
 
+  // The recogniser's onend fires long after it was set up; this always points at the
+  // current send (with the current conversation history).
+  const sendRef = useRef(send)
+  useEffect(() => { sendRef.current = send })
+
   const onSubmit = (event) => {
     event.preventDefault()
     send(input)
@@ -361,16 +367,14 @@ export default function UnifiedChatWidget() {
     voiceProcessing
       ? 'Processing your speech…'
       : listening
-        ? 'Listening… Speak now, then review your transcript before sending.'
+        ? 'Listening… Speak now — your question is sent when you stop talking.'
         : busy
           ? 'ACE is processing your message…'
           : speakingMessage
             ? 'ACE is speaking. Select Stop to interrupt.'
-            : voiceDraft
-              ? 'Review the voice draft above. Edit it if needed, then select Send.'
-              : (!SpeechRecognition || !speechSynthesisAvailable)
-                ? 'Some voice features are not supported by this browser. You can still chat by typing.'
-                : ''
+            : (!SpeechRecognition || !speechSynthesisAvailable)
+              ? 'Some voice features are not supported by this browser. You can still chat by typing.'
+              : ''
   )
 
   return (
@@ -482,15 +486,6 @@ export default function UnifiedChatWidget() {
                 </div>
               )
             })}
-
-            {voiceDraft && input.trim() && (
-              <div className="ipeso-chat-msg is-user">
-                <div className="ipeso-chat-response">
-                  <p className="ipeso-chat-draft-label">Voice message draft · Not sent</p>
-                  <p className="ipeso-chat-bubble is-user">{input}</p>
-                </div>
-              </div>
-            )}
 
             {busy && (
               <div className="ipeso-chat-msg is-ace">

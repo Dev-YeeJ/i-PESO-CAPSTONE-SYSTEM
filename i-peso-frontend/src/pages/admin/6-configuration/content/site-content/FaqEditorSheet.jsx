@@ -1,7 +1,7 @@
 import { createElement, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
-import { AlertTriangle, Eye, History, Languages, PenLine, Save, Sparkles, WandSparkles, X } from 'lucide-react'
+import { AlertTriangle, Eye, History, Languages, Link2, PenLine, Save, Send, Sparkles, WandSparkles, X } from 'lucide-react'
 import { Button } from '@/components/ui'
 import { Sheet, SheetBody, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { adminContentInsightService, adminFaqService } from '@/services/siteContentService'
@@ -27,6 +27,17 @@ export default function FaqEditorSheet({ open, onOpenChange, faq, canEdit, offic
   )
 }
 
+/** Guess the topic from the question's words, so most FAQs need no topic choice. */
+const TOPIC_HINTS = [
+  ['job_fairs', /job ?fair|fair|booth|event/i],
+  ['reports', /placement|establishment|report|nil|ro1|form 3/i],
+  ['verification', /permit|document|requirement|verif|approv|accredit|sec|dti|bir|license|company/i],
+  ['programs', /spes|tupad|gip|program|scholar|training|livelihood|tesda/i],
+  ['account', /register|sign ?up|account|password|log ?in|sign ?in|email|verification code|otp|profile/i],
+  ['jobs', /apply|application|job|vacanc|hire|hiring|interview|resume|work/i],
+]
+const guessTopic = (question) => TOPIC_HINTS.find(([, pattern]) => pattern.test(question))?.[0] ?? 'office'
+
 const AI_TASKS = {
   draft_answer: { label: 'Draft answer', icon: Sparkles },
   simplify: { label: 'Simplify', icon: WandSparkles },
@@ -35,8 +46,11 @@ const AI_TASKS = {
 
 function FaqEditorBody({ faq, initialQuestion, allFaqs, canEdit, office, onDone }) {
   const queryClient = useQueryClient()
-  const [form, setForm] = useState(() => (faq ? { ...EMPTY, ...faq, link_label: faq.link_label ?? '', link_url: faq.link_url ?? '' } : { ...EMPTY, question: initialQuestion ?? '' }))
+  const [form, setForm] = useState(() => (faq ? { ...EMPTY, ...faq, link_label: faq.link_label ?? '', link_url: faq.link_url ?? '' } : { ...EMPTY, question: initialQuestion ?? '', topic: guessTopic(initialQuestion ?? '') }))
   const [suggestion, setSuggestion] = useState(null) // { task, text, note }
+  // Topic follows the question until someone picks one by hand.
+  const [topicTouched, setTopicTouched] = useState(Boolean(faq))
+  const [showLink, setShowLink] = useState(Boolean(faq?.link_url))
   const duplicates = similarQuestions(form.question, allFaqs, { excludeId: faq?.id ?? null })
 
   const ai = useMutation({
@@ -66,12 +80,17 @@ function FaqEditorBody({ faq, initialQuestion, allFaqs, canEdit, office, onDone 
   })
 
   const set = (key, value) => {
-    setForm((current) => ({ ...current, [key]: value }))
+    setForm((current) => ({
+      ...current,
+      [key]: value,
+      ...(key === 'question' && !topicTouched ? { topic: guessTopic(value) } : {}),
+    }))
     if (errors[key]) setErrors((current) => ({ ...current, [key]: undefined }))
   }
 
+  /** `publish`: also publish it in the same click (no separate trip to the list). */
   const save = useMutation({
-    mutationFn: () => {
+    mutationFn: async ({ publish = false } = {}) => {
       const payload = {
         question: form.question,
         answer: form.answer,
@@ -80,7 +99,11 @@ function FaqEditorBody({ faq, initialQuestion, allFaqs, canEdit, office, onDone 
         link_label: form.link_label || null,
         link_url: form.link_url || null,
       }
-      return faq ? adminFaqService.update(faq.id, payload) : adminFaqService.create(payload)
+      const saved = faq ? await adminFaqService.update(faq.id, payload) : await adminFaqService.create(payload)
+      if (publish && !saved.faq?.is_published) {
+        return adminFaqService.publish(saved.faq.id)
+      }
+      return saved
     },
     onSuccess: (data) => {
       toast.success(data.message)
@@ -95,7 +118,7 @@ function FaqEditorBody({ faq, initialQuestion, allFaqs, canEdit, office, onDone 
     },
   })
 
-  const submit = () => {
+  const submit = (options = {}) => {
     const next = {}
     if (!form.question.trim()) next.question = 'Write the question.'
     if (!form.answer.trim()) next.answer = 'Write the answer.'
@@ -104,9 +127,10 @@ function FaqEditorBody({ faq, initialQuestion, allFaqs, canEdit, office, onDone 
     setErrors(next)
     if (Object.keys(next).length) {
       setMode('edit')
+      if (next.link_label || next.link_url) setShowLink(true)
       return
     }
-    save.mutate()
+    save.mutate(options)
   }
 
   const audienceHelp = FAQ_AUDIENCES.find((a) => a.value === form.audience)?.help
@@ -118,7 +142,7 @@ function FaqEditorBody({ faq, initialQuestion, allFaqs, canEdit, office, onDone 
         <SheetDescription>
           {faq
             ? faq.is_published ? 'This FAQ is published — saving updates it on the Help pages right away.' : 'Unpublished — readers can’t see it until you publish it.'
-            : 'New FAQs are saved unpublished, so you can check them before readers see them.'}
+            : 'Write it, then publish it straight away or save it as a draft.'}
         </SheetDescription>
         <div className="mt-3 flex gap-1" role="tablist" aria-label="Editor mode">
           {[['edit', PenLine, 'Write'], ['preview', Eye, 'Preview']].map(([value, icon, label]) => (
@@ -128,7 +152,7 @@ function FaqEditorBody({ faq, initialQuestion, allFaqs, canEdit, office, onDone 
               role="tab"
               aria-selected={mode === value}
               onClick={() => setMode(value)}
-              className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold ${mode === value ? 'bg-brand-navy text-white' : 'text-slate-600 hover:bg-slate-100'}`}
+              className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold ${mode === value ? 'bg-white text-slate-900 shadow-sm ring-1 ring-slate-200' : 'text-slate-600 hover:bg-slate-100'}`}
             >
               {createElement(icon, { className: 'h-3.5 w-3.5', 'aria-hidden': true })} {label}
             </button>
@@ -148,11 +172,11 @@ function FaqEditorBody({ faq, initialQuestion, allFaqs, canEdit, office, onDone 
             <Field label="Question" max={QUESTION_MAX} count={form.question.length} error={errors.question}>
               <input value={form.question} onChange={(e) => set('question', e.target.value.slice(0, QUESTION_MAX))} disabled={!canEdit} className={inputClass} placeholder="e.g. Do I pay anything to register?" aria-label="Question" />
               {duplicates.length > 0 && (
-                <div role="status" className="mt-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-                  <p className="flex items-center gap-1.5 font-bold"><AlertTriangle className="h-3.5 w-3.5" aria-hidden="true" /> Looks like an FAQ you already have</p>
+                <div role="status" className="mt-2 rounded-xl border border-slate-200 bg-slate-50 text-slate-700 px-3 py-2 text-xs">
+                  <p className="flex items-center gap-1.5 font-bold"><AlertTriangle className="h-3.5 w-3.5 text-amber-500" aria-hidden="true" /> Looks like an FAQ you already have</p>
                   <ul className="mt-1 space-y-0.5">
                     {duplicates.map(({ faq: other }) => (
-                      <li key={other.id}>“{other.question}” <span className="text-amber-700">({other.is_published ? 'published' : 'unpublished'} · {other.audience_label ?? other.audience})</span></li>
+                      <li key={other.id}>“{other.question}” <span className="text-slate-500">({other.is_published ? 'published' : 'unpublished'} · {other.audience_label ?? other.audience})</span></li>
                     ))}
                   </ul>
                   <p className="mt-1">Edit that one instead, so readers get one clear answer.</p>
@@ -171,8 +195,8 @@ function FaqEditorBody({ faq, initialQuestion, allFaqs, canEdit, office, onDone 
             </Field>
 
             {canEdit && (
-              <div className="rounded-xl border border-blue-100 bg-blue-50/50 p-3">
-                <p className="text-xs font-extrabold uppercase tracking-wide text-blue-900">AI writing helper</p>
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                <p className="text-xs font-extrabold uppercase tracking-wide text-slate-500">AI writing helper</p>
                 <div className="mt-2 flex flex-wrap gap-1.5">
                   {Object.entries(AI_TASKS).map(([task, meta]) => (
                     <Button
@@ -188,7 +212,7 @@ function FaqEditorBody({ faq, initialQuestion, allFaqs, canEdit, office, onDone 
                     </Button>
                   ))}
                 </div>
-                <p className="mt-1.5 text-[11px] text-blue-900/70">Drafts use only what i-PESO knows — it won’t guess fees, dates or requirements. You review before saving.</p>
+                <p className="mt-1.5 text-[11px] text-slate-500">Drafts use only what i-PESO knows — it won’t guess fees, dates or requirements. You review before saving.</p>
                 {suggestion && (
                   <div className="mt-3 rounded-lg border border-slate-200 bg-white p-3" aria-label="AI suggestion">
                     <div className="flex items-start justify-between gap-2">
@@ -198,7 +222,7 @@ function FaqEditorBody({ faq, initialQuestion, allFaqs, canEdit, office, onDone 
                     <RichText text={suggestion.text} office={office} className="mt-2 space-y-2 text-sm leading-6 text-slate-800" />
                     <p className="mt-2 text-[11px] text-slate-500">{suggestion.note}</p>
                     <div className="mt-2 flex flex-wrap gap-1.5">
-                      <Button size="sm" variant="navy" onClick={() => applySuggestion('replace')}>Use this</Button>
+                      <Button size="sm" variant="outline" onClick={() => applySuggestion('replace')}>Use this</Button>
                       {suggestion.task === 'translate_filipino' && form.answer.trim() && <Button size="sm" variant="outline" onClick={() => applySuggestion('append')}>Add below the English</Button>}
                       <Button size="sm" variant="ghost" onClick={() => setSuggestion(null)}>Discard</Button>
                     </div>
@@ -227,20 +251,26 @@ function FaqEditorBody({ faq, initialQuestion, allFaqs, canEdit, office, onDone 
               <p className="mt-1 text-xs text-slate-500">{audienceHelp}</p>
             </div>
 
-            <Field label="Topic" error={errors.topic}>
-              <select value={form.topic} onChange={(e) => set('topic', e.target.value)} disabled={!canEdit} className={inputClass} aria-label="Topic">
+            <Field label="Topic" error={errors.topic} hint={!topicTouched ? 'Picked from the question — change it if it’s wrong.' : null}>
+              <select value={form.topic} onChange={(e) => { setTopicTouched(true); set('topic', e.target.value) }} disabled={!canEdit} className={inputClass} aria-label="Topic">
                 {FAQ_TOPICS.map((topic) => <option key={topic.value} value={topic.value}>{topic.label}</option>)}
               </select>
             </Field>
 
-            <div className="grid gap-4 sm:grid-cols-[1fr_2fr]">
-              <Field label="Link button (optional)" error={errors.link_label}>
-                <input value={form.link_label} onChange={(e) => set('link_label', e.target.value.slice(0, 60))} disabled={!canEdit} className={inputClass} placeholder="See job fairs" aria-label="Link button label" />
-              </Field>
-              <Field label="Link" error={errors.link_url}>
-                <input value={form.link_url} onChange={(e) => set('link_url', e.target.value)} disabled={!canEdit} className={inputClass} placeholder="/seeker/job-fairs or https://…" aria-label="Link" />
-              </Field>
-            </div>
+            {showLink ? (
+              <div className="grid gap-4 sm:grid-cols-[1fr_2fr]">
+                <Field label="Link button" error={errors.link_label}>
+                  <input value={form.link_label} onChange={(e) => set('link_label', e.target.value.slice(0, 60))} disabled={!canEdit} className={inputClass} placeholder="See job fairs" aria-label="Link button label" />
+                </Field>
+                <Field label="Link" error={errors.link_url}>
+                  <input value={form.link_url} onChange={(e) => set('link_url', e.target.value)} disabled={!canEdit} className={inputClass} placeholder="/seeker/job-fairs or https://…" aria-label="Link" />
+                </Field>
+              </div>
+            ) : canEdit ? (
+              <button type="button" onClick={() => setShowLink(true)} className="inline-flex items-center gap-1 text-xs font-bold text-slate-500 hover:text-slate-900">
+                <Link2 className="h-3.5 w-3.5" aria-hidden="true" /> Add a link button
+              </button>
+            ) : null}
 
             {faq && (
               <div className="border-t border-slate-100 pt-4">
@@ -276,8 +306,15 @@ function FaqEditorBody({ faq, initialQuestion, allFaqs, canEdit, office, onDone 
       </SheetBody>
 
       <SheetFooter>
-        <Button variant="outline" onClick={onDone} disabled={save.isPending}>{canEdit ? 'Cancel' : 'Close'}</Button>
-        {canEdit && <Button variant="navy" icon={Save} loading={save.isPending} onClick={submit}>{faq ? 'Save FAQ' : 'Save as unpublished'}</Button>}
+        <Button variant="ghost" onClick={onDone} disabled={save.isPending}>{canEdit ? 'Cancel' : 'Close'}</Button>
+        {canEdit && (faq?.is_published ? (
+          <Button variant="navy" icon={Save} loading={save.isPending} onClick={() => submit()}>Save</Button>
+        ) : (
+          <>
+            <Button variant="outline" icon={Save} loading={save.isPending && !save.variables?.publish} disabled={save.isPending} onClick={() => submit()}>Save as draft</Button>
+            <Button variant="navy" icon={Send} loading={save.isPending && save.variables?.publish} disabled={save.isPending} onClick={() => submit({ publish: true })}>Save &amp; publish</Button>
+          </>
+        ))}
       </SheetFooter>
     </>
   )

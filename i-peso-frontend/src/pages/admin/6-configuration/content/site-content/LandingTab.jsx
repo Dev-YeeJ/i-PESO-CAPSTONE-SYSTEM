@@ -6,10 +6,13 @@ import { Button, Card, ConfirmDialog } from '@/components/ui'
 import { adminSiteContentService } from '@/services/siteContentService'
 import { FEATURE_ICONS, LANDING_LIMITS, LANDING_SECTIONS } from '@/components/site-content/siteContentDefaults'
 import { FeatureCardContent, HeroBadgeIcon, HeroHeadlineContent, HeroHighlights, HeroSubheadlineContent } from '@/components/site-content/LandingBlocks'
-import { ChangesDialog, Field, ReadOnlyNote, SectionHistoryDialog } from './SiteContentBits'
+import { Field, MoreSection, ReadOnlyNote, SectionHistoryDialog } from './SiteContentBits'
 import { apiMessage, changedKeys, fieldErrorsOf, formatWhen, inputClass, isConflict, sameValue } from './formStyles'
 
 const KEYS = ['hero_badge', 'headline_lead', 'headline_highlight', 'headline_tail', 'subheadline', 'highlights', 'features_eyebrow', 'features_heading', 'features', 'footer_tagline', 'show_sections']
+
+/** Fields under "More options" — used to open it when one of them has an error. */
+const MORE_KEYS = ['hero_badge', 'highlights', 'features_eyebrow', 'features_heading', 'features', 'footer_tagline']
 
 export default function LandingTab({ section, canEdit }) {
   return <LandingForm key={section.version} section={section} canEdit={canEdit} />
@@ -21,7 +24,6 @@ function LandingForm({ section, canEdit }) {
   const defaults = section.defaults
   const [form, setForm] = useState(saved)
   const [errors, setErrors] = useState({})
-  const [confirmOpen, setConfirmOpen] = useState(false)
   const [resetOpen, setResetOpen] = useState(false)
   const [historyOpen, setHistoryOpen] = useState(false)
   const [device, setDevice] = useState('desktop')
@@ -36,9 +38,9 @@ function LandingForm({ section, canEdit }) {
   const refresh = () => {
     queryClient.invalidateQueries({ queryKey: ['admin-site-content'] })
     queryClient.invalidateQueries({ queryKey: ['site-content'] })
+    queryClient.invalidateQueries({ queryKey: ['admin-site-content-revisions', 'landing'] })
   }
   const onError = (error) => {
-    setConfirmOpen(false)
     setResetOpen(false)
     if (isConflict(error)) {
       toast.error(apiMessage(error, 'Someone else saved changes. Reloading.'))
@@ -50,48 +52,38 @@ function LandingForm({ section, canEdit }) {
     toast.error(apiMessage(error, 'Could not save the landing page text.'))
   }
   const onSaved = (data) => {
-    setConfirmOpen(false)
     setResetOpen(false)
     setHistoryOpen(false)
-    toast.success(data.message)
+    toast.success(data.message ?? 'Saved. Undo any time from History.')
     refresh()
-    queryClient.invalidateQueries({ queryKey: ['admin-site-content-revisions', 'landing'] })
   }
 
   const save = useMutation({ mutationFn: () => adminSiteContentService.save('landing', form, section.version), onSuccess: onSaved, onError })
   const resetAll = useMutation({ mutationFn: () => adminSiteContentService.reset('landing', null, section.version), onSuccess: onSaved, onError })
   const restore = useMutation({ mutationFn: (revision) => adminSiteContentService.restore('landing', revision.id, section.version), onSuccess: onSaved, onError })
 
-  const defaultButton = (field) =>
-    canEdit && !sameValue(form[field], defaults[field]) ? (
-      <button type="button" onClick={() => set(field, defaults[field])} className="mt-1 inline-flex items-center gap-1 text-xs font-bold text-brand-navy hover:underline">
-        <RotateCcw className="h-3 w-3" aria-hidden="true" /> Use the original text
-      </button>
-    ) : null
-
-  const text = (field, limit, props = {}) => (
-    <Field label={section.labels[field]} max={limit} count={(form[field] ?? '').length} error={err(field)}>
-      {createElement(props.multiline ? 'textarea' : 'input', {
+  const text = (field, limit, { multiline = false, label } = {}) => (
+    <Field label={label ?? section.labels[field]} max={limit} count={(form[field] ?? '').length} error={err(field)}>
+      {createElement(multiline ? 'textarea' : 'input', {
         value: form[field] ?? '',
         onChange: (e) => set(field, e.target.value.slice(0, limit)),
         disabled: !canEdit,
-        rows: props.multiline ? 3 : undefined,
+        rows: multiline ? 2 : undefined,
         'aria-label': section.labels[field],
         className: inputClass,
       })}
-      {defaultButton(field)}
     </Field>
   )
+
+  const moreHasError = Object.keys(errors).some((key) => MORE_KEYS.some((k) => key.startsWith(`values.${k}`)))
 
   return (
     <div className="grid gap-6 2xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
       <Card>
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h2 className="text-lg font-black text-slate-950">Landing page text</h2>
-            <p className="mt-1 max-w-xl text-sm text-slate-600">
-              Change the words in fixed places. The layout, colours and buttons stay as designed; the limits keep the text fitting on phones.
-            </p>
+            <h2 className="text-lg font-black text-slate-950">Landing page</h2>
+            <p className="mt-1 max-w-xl text-sm text-slate-600">The words on the home page and which sections show. The design stays as it is.</p>
           </div>
           <div className="flex gap-1">
             <Button size="sm" variant="ghost" icon={ExternalLink} to="/" target="_blank">Open</Button>
@@ -100,97 +92,75 @@ function LandingForm({ section, canEdit }) {
         </div>
         {!canEdit && <div className="mt-4"><ReadOnlyNote>You can view the landing page text but not change it.</ReadOnlyNote></div>}
 
-        <fieldset className="mt-5 space-y-4">
-          <legend className="text-sm font-black text-slate-950">Hero</legend>
-          {text('hero_badge', LANDING_LIMITS.hero_badge)}
-          <div className="grid gap-4 sm:grid-cols-2">
-            {text('headline_lead', LANDING_LIMITS.headline_lead)}
-            {text('headline_highlight', LANDING_LIMITS.headline_highlight)}
+        <div className="mt-5 space-y-4">
+          <div className="grid gap-3 sm:grid-cols-3">
+            {text('headline_lead', LANDING_LIMITS.headline_lead, { label: 'Headline' })}
+            {text('headline_highlight', LANDING_LIMITS.headline_highlight, { label: 'Highlighted words' })}
+            {text('headline_tail', LANDING_LIMITS.headline_tail, { label: 'Second line' })}
           </div>
-          {text('headline_tail', LANDING_LIMITS.headline_tail)}
-          {text('subheadline', LANDING_LIMITS.subheadline, { multiline: true })}
-          <Field label={section.labels.highlights} error={err('highlights') ?? err('highlights.0') ?? err('highlights.1') ?? err('highlights.2')} hint={`Three short phrases, up to ${LANDING_LIMITS.highlight} characters each.`}>
-            <div className="grid gap-2 sm:grid-cols-3">
-              {form.highlights.map((value, index) => (
-                <input key={index} value={value ?? ''} onChange={(e) => setHighlight(index, e.target.value.slice(0, LANDING_LIMITS.highlight))} disabled={!canEdit} aria-label={`Highlight ${index + 1}`} className={inputClass} />
+          {text('subheadline', LANDING_LIMITS.subheadline, { multiline: true, label: 'Sub-headline' })}
+
+          <fieldset>
+            <legend className="text-xs font-extrabold uppercase tracking-wide text-slate-600">Sections shown</legend>
+            <div className="mt-2 flex flex-wrap gap-x-5 gap-y-2">
+              {LANDING_SECTIONS.map((item) => (
+                <label key={item.key} className="flex items-center gap-2 text-sm text-slate-800" title={item.help}>
+                  <input
+                    type="checkbox"
+                    checked={form.show_sections?.[item.key] ?? true}
+                    onChange={(e) => set('show_sections', { ...(form.show_sections ?? {}), [item.key]: e.target.checked })}
+                    disabled={!canEdit}
+                    className="h-4 w-4 rounded border-slate-300"
+                  />
+                  {item.label}
+                </label>
               ))}
             </div>
-            {defaultButton('highlights')}
-          </Field>
-        </fieldset>
+          </fieldset>
+        </div>
 
-        <fieldset className="mt-6 space-y-4 border-t border-slate-100 pt-5">
-          <legend className="sr-only">Features</legend>
-          <p className="text-sm font-black text-slate-950">“What you get” section</p>
-          <div className="grid gap-4 sm:grid-cols-[1fr_2fr]">
-            {text('features_eyebrow', LANDING_LIMITS.features_eyebrow)}
-            {text('features_heading', LANDING_LIMITS.features_heading)}
-          </div>
-          <div className="grid gap-3 sm:grid-cols-2">
-            {form.features.map((feature, index) => (
-              <div key={index} className="rounded-xl border border-slate-200 bg-slate-50/60 p-3">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-xs font-extrabold uppercase tracking-wide text-slate-500">Card {index + 1}</span>
-                  <select
-                    value={feature.icon}
-                    onChange={(e) => setFeature(index, { icon: e.target.value })}
-                    disabled={!canEdit}
-                    aria-label={`Card ${index + 1} icon`}
-                    className="rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs"
-                  >
-                    {Object.entries(FEATURE_ICONS).map(([value, meta]) => <option key={value} value={value}>{meta.label}</option>)}
-                  </select>
-                </div>
-                <Field label="Title" max={LANDING_LIMITS.feature_title} count={feature.title?.length ?? 0} error={err(`features.${index}.title`)} className="mt-2">
-                  <input value={feature.title ?? ''} onChange={(e) => setFeature(index, { title: e.target.value.slice(0, LANDING_LIMITS.feature_title) })} disabled={!canEdit} aria-label={`Card ${index + 1} title`} className={inputClass} />
-                </Field>
-                <Field label="Text" max={LANDING_LIMITS.feature_body} count={feature.body?.length ?? 0} error={err(`features.${index}.body`)} className="mt-2">
-                  <textarea value={feature.body ?? ''} onChange={(e) => setFeature(index, { body: e.target.value.slice(0, LANDING_LIMITS.feature_body) })} disabled={!canEdit} rows={3} aria-label={`Card ${index + 1} text`} className={inputClass} />
-                </Field>
+        <MoreSection summary="badge, highlights, feature cards, footer" forceOpen={moreHasError}>
+          <div className="space-y-4">
+            {text('hero_badge', LANDING_LIMITS.hero_badge)}
+            <Field label={section.labels.highlights} error={err('highlights') ?? err('highlights.0') ?? err('highlights.1') ?? err('highlights.2')}>
+              <div className="grid gap-2 sm:grid-cols-3">
+                {form.highlights.map((value, index) => (
+                  <input key={index} value={value ?? ''} onChange={(e) => setHighlight(index, e.target.value.slice(0, LANDING_LIMITS.highlight))} disabled={!canEdit} aria-label={`Highlight ${index + 1}`} className={inputClass} />
+                ))}
               </div>
-            ))}
+            </Field>
+            <div className="grid gap-4 sm:grid-cols-[1fr_2fr]">
+              {text('features_eyebrow', LANDING_LIMITS.features_eyebrow)}
+              {text('features_heading', LANDING_LIMITS.features_heading)}
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {form.features.map((feature, index) => (
+                <div key={index} className="rounded-xl border border-slate-200 bg-slate-50/60 p-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs font-extrabold uppercase tracking-wide text-slate-500">Card {index + 1}</span>
+                    <select value={feature.icon} onChange={(e) => setFeature(index, { icon: e.target.value })} disabled={!canEdit} aria-label={`Card ${index + 1} icon`} className="rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs">
+                      {Object.entries(FEATURE_ICONS).map(([value, meta]) => <option key={value} value={value}>{meta.label}</option>)}
+                    </select>
+                  </div>
+                  <input value={feature.title ?? ''} onChange={(e) => setFeature(index, { title: e.target.value.slice(0, LANDING_LIMITS.feature_title) })} disabled={!canEdit} aria-label={`Card ${index + 1} title`} placeholder="Title" className={inputClass} />
+                  <textarea value={feature.body ?? ''} onChange={(e) => setFeature(index, { body: e.target.value.slice(0, LANDING_LIMITS.feature_body) })} disabled={!canEdit} rows={2} aria-label={`Card ${index + 1} text`} placeholder="Text" className={inputClass} />
+                  {(err(`features.${index}.title`) || err(`features.${index}.body`)) && <p className="mt-1 text-xs font-semibold text-red-600">{err(`features.${index}.title`) ?? err(`features.${index}.body`)}</p>}
+                </div>
+              ))}
+            </div>
+            {text('footer_tagline', LANDING_LIMITS.footer_tagline)}
           </div>
-          {defaultButton('features')}
-        </fieldset>
-
-        <fieldset className="mt-6 border-t border-slate-100 pt-5">
-          <legend className="text-sm font-black text-slate-950">Sections shown</legend>
-          <p className="mt-1 text-xs text-slate-500">Switch off a section to hide it (and its menu link) from the landing page. The hero always shows.</p>
-          <div className="mt-3 grid gap-2 sm:grid-cols-2">
-            {LANDING_SECTIONS.map((item) => (
-              <label key={item.key} className="flex items-start gap-3 rounded-xl border border-slate-200 p-3">
-                <input
-                  type="checkbox"
-                  checked={form.show_sections?.[item.key] ?? true}
-                  onChange={(e) => set('show_sections', { ...(form.show_sections ?? {}), [item.key]: e.target.checked })}
-                  disabled={!canEdit}
-                  className="mt-0.5 h-4 w-4 rounded border-slate-300"
-                />
-                <span className="text-sm">
-                  <span className="block font-bold text-slate-900">{item.label}</span>
-                  <span className="text-xs text-slate-500">{item.help}</span>
-                </span>
-              </label>
-            ))}
-          </div>
-        </fieldset>
-
-        <fieldset className="mt-6 border-t border-slate-100 pt-5">
-          <legend className="sr-only">Footer</legend>
-          {text('footer_tagline', LANDING_LIMITS.footer_tagline)}
-        </fieldset>
+        </MoreSection>
 
         <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4">
           <p className="text-xs text-slate-500">
-            {section.updated_at ? `Last saved ${formatWhen(section.updated_at)}${section.updated_by ? ` by ${section.updated_by}` : ''}.` : 'Showing the original text — nothing changed yet.'}
+            {section.updated_at ? `Last saved ${formatWhen(section.updated_at)}${section.updated_by ? ` by ${section.updated_by}` : ''}.` : 'Showing the original text.'}
           </p>
           {canEdit && (
             <div className="flex flex-wrap gap-2">
-              {section.version > 0 && <Button variant="ghost" size="sm" icon={RotateCcw} onClick={() => setResetOpen(true)}>Reset all</Button>}
-              {dirty.length > 0 && <Button variant="ghost" size="sm" icon={Undo2} onClick={() => { setForm(saved); setErrors({}) }}>Discard changes</Button>}
-              <Button variant="navy" icon={Save} disabled={dirty.length === 0} onClick={() => setConfirmOpen(true)}>
-                Save{dirty.length ? ` (${dirty.length})` : ''}
-              </Button>
+              {!sameValue(form, defaults) && section.version > 0 && <Button variant="ghost" size="sm" icon={RotateCcw} onClick={() => setResetOpen(true)}>Use the original text</Button>}
+              {dirty.length > 0 && <Button variant="ghost" size="sm" icon={Undo2} onClick={() => { setForm(saved); setErrors({}) }}>Discard</Button>}
+              <Button variant="navy" icon={Save} loading={save.isPending} disabled={dirty.length === 0} onClick={() => save.mutate()}>Save</Button>
             </div>
           )}
         </div>
@@ -199,17 +169,17 @@ function LandingForm({ section, canEdit }) {
       <div className="space-y-3 2xl:sticky 2xl:top-6 2xl:self-start">
         <div className="flex items-center justify-between">
           <p className="text-xs font-extrabold uppercase tracking-wide text-slate-500">Live preview</p>
-          <div role="radiogroup" aria-label="Preview size" className="flex rounded-lg border border-slate-200 bg-white p-0.5">
-            {[['desktop', Monitor, 'Desktop'], ['phone', Smartphone, 'Phone']].map(([value, Icon, label]) => (
+          <div role="radiogroup" aria-label="Preview size" className="flex rounded-lg bg-slate-100 p-0.5">
+            {[['desktop', Monitor, 'Desktop'], ['phone', Smartphone, 'Phone']].map(([value, icon, label]) => (
               <button
                 key={value}
                 type="button"
                 role="radio"
                 aria-checked={device === value}
                 onClick={() => setDevice(value)}
-                className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-bold ${device === value ? 'bg-brand-navy text-white' : 'text-slate-600 hover:text-slate-900'}`}
+                className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-bold ${device === value ? 'bg-white text-slate-900 shadow-sm ring-1 ring-slate-200' : 'text-slate-600 hover:text-slate-900'}`}
               >
-                {createElement(Icon, { className: 'h-3.5 w-3.5', 'aria-hidden': true })} {label}
+                {createElement(icon, { className: 'h-3.5 w-3.5', 'aria-hidden': true })} {label}
               </button>
             ))}
           </div>
@@ -217,20 +187,12 @@ function LandingForm({ section, canEdit }) {
         <LandingPreview landing={form} device={device} />
       </div>
 
-      <ChangesDialog
-        open={confirmOpen}
-        onOpenChange={setConfirmOpen}
-        title="Update the landing page?"
-        changes={dirty.map((key) => ({ key, label: section.labels[key], before: saved[key], after: form[key] }))}
-        busy={save.isPending}
-        onConfirm={() => save.mutate()}
-      />
       <ConfirmDialog
         open={resetOpen}
         onOpenChange={setResetOpen}
-        title="Reset all landing page text?"
-        description="Every slot goes back to the original wording. You can undo this from History."
-        confirmLabel="Reset to original"
+        title="Go back to the original landing page text?"
+        description="Every slot returns to the wording i-PESO shipped with. You can undo this from History."
+        confirmLabel="Use the original text"
         variant="navy"
         busy={resetAll.isPending}
         onConfirm={() => resetAll.mutate()}

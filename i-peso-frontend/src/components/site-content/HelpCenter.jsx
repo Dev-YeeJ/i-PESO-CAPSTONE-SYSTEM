@@ -54,7 +54,7 @@ export function FaqFeedback({ faqId }) {
         aria-pressed={active}
         onClick={() => send(helpful)}
         className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-bold transition ${
-          active ? 'border-brand-navy bg-brand-navy text-white' : 'border-slate-200 bg-white text-slate-600 hover:border-brand-navy hover:text-brand-navy'
+          active ? 'border-slate-300 bg-slate-100 text-slate-900' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-400 hover:text-slate-900'
         }`}
       >
         <Icon className="h-3.5 w-3.5" aria-hidden="true" /> {label}
@@ -164,7 +164,7 @@ export default function HelpCenter({ faqs = [], topics = [], office, role = null
                 aria-pressed={topic === t.value}
                 onClick={() => setTopic(t.value)}
                 className={`rounded-full border px-3 py-1.5 text-xs font-bold transition ${
-                  topic === t.value ? 'border-brand-navy bg-brand-navy text-white' : 'border-slate-200 bg-white text-slate-700 hover:border-brand-navy hover:text-brand-navy'
+                  topic === t.value ? 'border-slate-300 bg-slate-100 text-slate-900' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-400 hover:text-slate-900'
                 }`}
               >
                 {t.label}

@@ -6,48 +6,57 @@ import { Button, Card } from '@/components/ui'
 import { adminSiteContentService } from '@/services/siteContentService'
 import OfficeContactCard from '@/components/site-content/OfficeContactCard'
 import { OFFICE_LIMITS } from '@/components/site-content/siteContentDefaults'
-import { ChangesDialog, Field, ReadOnlyNote, SectionHistoryDialog } from './SiteContentBits'
+import { Field, MoreSection, ReadOnlyNote, SectionHistoryDialog } from './SiteContentBits'
 import { apiMessage, changedKeys, fieldErrorsOf, formatWhen, inputClass, isConflict } from './formStyles'
 
-/** Fields in form order, with what each one is used for. */
-const FIELDS = [
-  { key: 'office_name', hint: 'Shown on Help pages and contact cards.' },
-  { key: 'address', hint: 'Footer, Help pages, Privacy Policy, emails, and the assistant’s “where is the office?” answer.' },
-  { key: 'map_url', hint: 'Optional Google Maps link for “Get directions”. Leave blank to search the address.', placeholder: 'https://maps.app.goo.gl/…' },
-  { key: 'hours', hint: 'e.g. Monday to Friday, 8:00 AM – 5:00 PM (closed on holidays)' },
-  { key: 'phone', hint: 'Mobile or landline.' },
-  { key: 'email', hint: 'Also the reply-to address in job fair emails and suspension notices.' },
-  { key: 'facebook', hint: 'The office’s Facebook page link.', placeholder: 'https://www.facebook.com/…' },
-  { key: 'fees_policy', hint: 'e.g. All PESO services are free of charge.', multiline: true },
-  { key: 'employer_approval_time', hint: 'Shown to employers waiting for approval, e.g. 3–5 working days after complete documents.' },
+/** What people change and ask about most — always on screen. */
+const MAIN_FIELDS = [
+  { key: 'address', wide: true },
+  { key: 'hours', placeholder: 'Monday to Friday, 8:00 AM – 5:00 PM' },
+  { key: 'phone' },
+  { key: 'email' },
+  { key: 'facebook', placeholder: 'https://www.facebook.com/…' },
 ]
+
+/** Rarely changed — folded under "More options". */
+const MORE_FIELDS = [
+  { key: 'fees_policy', placeholder: 'All PESO services are free of charge.', wide: true },
+  { key: 'employer_approval_time', placeholder: '3–5 working days after complete documents', wide: true },
+  { key: 'office_name' },
+  { key: 'map_url', placeholder: 'Leave blank to search the address' },
+]
+
+const ALL_KEYS = [...MAIN_FIELDS, ...MORE_FIELDS].map((f) => f.key)
 
 /** Blank fields the assistant must not guess (it tells people to contact the office). */
 const ASSISTANT_FIELDS = ['address', 'hours', 'phone', 'email', 'facebook', 'fees_policy', 'employer_approval_time']
 
 export default function OfficeInfoTab({ section, canEdit }) {
-  const queryClient = useQueryClient()
   // Keyed by the saved version, so a save, restore or reload resets the form.
-  return <OfficeInfoForm key={section.version} section={section} canEdit={canEdit} queryClient={queryClient} />
+  return <OfficeInfoForm key={section.version} section={section} canEdit={canEdit} />
 }
 
-function OfficeInfoForm({ section, canEdit, queryClient }) {
+function OfficeInfoForm({ section, canEdit }) {
+  const queryClient = useQueryClient()
   const saved = section.values
   const [form, setForm] = useState(saved)
   const [errors, setErrors] = useState({})
-  const [confirmOpen, setConfirmOpen] = useState(false)
   const [historyOpen, setHistoryOpen] = useState(false)
 
-  const keys = FIELDS.map((f) => f.key)
-  const normalized = Object.fromEntries(keys.map((key) => [key, form[key]?.trim?.() ? form[key].trim() : null]))
-  const dirty = changedKeys(saved, normalized, keys)
+  const normalized = Object.fromEntries(ALL_KEYS.map((key) => [key, form[key]?.trim?.() ? form[key].trim() : null]))
+  const dirty = changedKeys(saved, normalized, ALL_KEYS)
 
   const set = (key, value) => {
     setForm((current) => ({ ...current, [key]: value }))
     if (errors[`values.${key}`]) setErrors((current) => ({ ...current, [`values.${key}`]: undefined }))
   }
 
-  const refresh = () => queryClient.invalidateQueries({ queryKey: ['admin-site-content'] })
+  const refresh = () => {
+    queryClient.invalidateQueries({ queryKey: ['admin-site-content'] })
+    queryClient.invalidateQueries({ queryKey: ['site-content'] })
+    queryClient.invalidateQueries({ queryKey: ['content-health'] })
+    queryClient.invalidateQueries({ queryKey: ['admin-site-content-revisions', 'office'] })
+  }
   const onError = (error) => {
     if (isConflict(error)) {
       toast.error(apiMessage(error, 'Someone else saved changes. Reloading.'))
@@ -58,30 +67,41 @@ function OfficeInfoForm({ section, canEdit, queryClient }) {
     if (fieldErrors) setErrors(fieldErrors)
     toast.error(apiMessage(error, 'Could not save the office information.'))
   }
+  const onSaved = (data) => {
+    setHistoryOpen(false)
+    toast.success(data.message ?? 'Saved. Undo any time from History.')
+    refresh()
+  }
 
-  const save = useMutation({
-    mutationFn: () => adminSiteContentService.save('office', normalized, section.version),
-    onSuccess: (data) => {
-      setConfirmOpen(false)
-      toast.success(data.message)
-      queryClient.setQueryData(['admin-site-content'], (current) => current && ({ ...current, sections: { ...current.sections, office: data.section } }))
-      queryClient.invalidateQueries({ queryKey: ['site-content'] })
-    },
-    onError: (error) => { setConfirmOpen(false); onError(error) },
-  })
-
-  const restore = useMutation({
-    mutationFn: (revision) => adminSiteContentService.restore('office', revision.id, section.version),
-    onSuccess: (data) => {
-      setHistoryOpen(false)
-      toast.success(data.message)
-      refresh()
-      queryClient.invalidateQueries({ queryKey: ['admin-site-content-revisions', 'office'] })
-    },
-    onError,
-  })
+  const save = useMutation({ mutationFn: () => adminSiteContentService.save('office', normalized, section.version), onSuccess: onSaved, onError })
+  const restore = useMutation({ mutationFn: (revision) => adminSiteContentService.restore('office', revision.id, section.version), onSuccess: onSaved, onError })
 
   const blanks = ASSISTANT_FIELDS.filter((key) => !normalized[key])
+  const moreHasError = MORE_FIELDS.some((f) => errors[`values.${f.key}`])
+  const moreBlank = MORE_FIELDS.filter((f) => ASSISTANT_FIELDS.includes(f.key) && !normalized[f.key]).length
+
+  const field = (item) => {
+    const value = form[item.key] ?? ''
+    const max = OFFICE_LIMITS[item.key]
+    return (
+      <Field
+        key={item.key}
+        label={section.labels[item.key]}
+        error={errors[`values.${item.key}`]}
+        hint={!value.trim() && ASSISTANT_FIELDS.includes(item.key) ? 'Blank — hidden on the site; the assistant will say to contact the office.' : null}
+        className={item.wide ? 'sm:col-span-2' : ''}
+      >
+        <input
+          value={value}
+          onChange={(e) => set(item.key, e.target.value.slice(0, max))}
+          disabled={!canEdit}
+          placeholder={item.placeholder}
+          aria-label={section.labels[item.key]}
+          className={inputClass}
+        />
+      </Field>
+    )
+  }
 
   return (
     <div className="grid gap-6 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
@@ -89,89 +109,46 @@ function OfficeInfoForm({ section, canEdit, queryClient }) {
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h2 className="text-lg font-black text-slate-950">Office information</h2>
-            <p className="mt-1 max-w-xl text-sm text-slate-600">
-              Entered once, used everywhere: the footer, Help pages, Privacy Policy, emails and the assistant.
-            </p>
+            <p className="mt-1 max-w-xl text-sm text-slate-600">Entered once, used everywhere: footer, Help pages, Privacy Policy, emails and the assistant.</p>
           </div>
           <Button size="sm" variant="ghost" icon={History} onClick={() => setHistoryOpen(true)}>History</Button>
         </div>
 
-        {!canEdit && <ReadOnlyNote>You can view the office information but not change it.</ReadOnlyNote>}
+        {!canEdit && <div className="mt-4"><ReadOnlyNote>You can view the office information but not change it.</ReadOnlyNote></div>}
 
-        <div className="mt-5 grid gap-5 sm:grid-cols-2">
-          {FIELDS.map((field) => {
-            const value = form[field.key] ?? ''
-            const max = OFFICE_LIMITS[field.key]
-            const blank = !value.trim()
-            const Input = field.multiline ? 'textarea' : 'input'
-            return (
-              <Field
-                key={field.key}
-                label={section.labels[field.key]}
-                max={max}
-                count={value.length}
-                error={errors[`values.${field.key}`]}
-                hint={blank && ASSISTANT_FIELDS.includes(field.key) ? 'Left blank — hidden on the site, and the assistant will tell people to contact the office.' : field.hint}
-                className={field.multiline || field.key === 'address' ? 'sm:col-span-2' : ''}
-              >
-                <Input
-                  value={value}
-                  onChange={(e) => set(field.key, e.target.value.slice(0, max))}
-                  disabled={!canEdit}
-                  placeholder={field.placeholder}
-                  rows={field.multiline ? 2 : undefined}
-                  aria-label={section.labels[field.key]}
-                  className={inputClass}
-                />
-              </Field>
-            )
-          })}
-        </div>
+        <div className="mt-5 grid gap-5 sm:grid-cols-2">{MAIN_FIELDS.map(field)}</div>
+
+        <MoreSection summary={moreBlank ? `${moreBlank} not filled in` : 'fees, approval time, office name, map link'} forceOpen={moreHasError}>
+          <div className="grid gap-5 sm:grid-cols-2">{MORE_FIELDS.map(field)}</div>
+        </MoreSection>
 
         <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4">
           <p className="text-xs text-slate-500">
-            {section.updated_at ? `Last saved ${formatWhen(section.updated_at)}${section.updated_by ? ` by ${section.updated_by}` : ''}.` : 'Showing the starting values from the system setup — nothing saved yet.'}
+            {section.updated_at ? `Last saved ${formatWhen(section.updated_at)}${section.updated_by ? ` by ${section.updated_by}` : ''}.` : 'Nothing saved yet.'}
           </p>
           {canEdit && (
             <div className="flex gap-2">
-              {dirty.length > 0 && <Button variant="ghost" size="sm" icon={Undo2} onClick={() => { setForm(saved); setErrors({}) }}>Discard changes</Button>}
-              <Button variant="navy" icon={Save} disabled={dirty.length === 0} onClick={() => setConfirmOpen(true)}>
-                Save{dirty.length ? ` (${dirty.length})` : ''}
-              </Button>
+              {dirty.length > 0 && <Button variant="ghost" size="sm" icon={Undo2} onClick={() => { setForm(saved); setErrors({}) }}>Discard</Button>}
+              <Button variant="navy" icon={Save} loading={save.isPending} disabled={dirty.length === 0} onClick={() => save.mutate()}>Save</Button>
             </div>
           )}
         </div>
       </Card>
 
       <div className="space-y-4 xl:sticky xl:top-6 xl:self-start">
-        <p className="text-xs font-extrabold uppercase tracking-wide text-slate-500">Preview — Help page contact card</p>
+        <p className="text-xs font-extrabold uppercase tracking-wide text-slate-500">Preview</p>
         <OfficeContactCard office={normalized} role="employer" />
-        <div className="flex gap-3 rounded-2xl border border-slate-200 bg-white p-4 text-sm">
-          <Bot className="mt-0.5 h-5 w-5 shrink-0 text-brand-navy" aria-hidden="true" />
-          <p className="text-slate-700">
-            {blanks.length === 0
-              ? 'The assistant can answer every office question from these details.'
-              : <>The assistant can’t answer questions about <strong>{blanks.map((key) => section.labels[key].toLowerCase()).join(', ')}</strong> yet — it will refer people to the office until you fill them in.</>}
-          </p>
-        </div>
+        {blanks.length > 0 && (
+          <div className="flex gap-3 rounded-2xl border border-slate-200 bg-white p-4 text-sm">
+            <Bot className="mt-0.5 h-5 w-5 shrink-0 text-slate-400" aria-hidden="true" />
+            <p className="text-slate-600">
+              The assistant can’t answer about <strong>{blanks.map((key) => section.labels[key].toLowerCase()).join(', ')}</strong> until these are filled in.
+            </p>
+          </div>
+        )}
       </div>
 
-      <ChangesDialog
-        open={confirmOpen}
-        onOpenChange={setConfirmOpen}
-        title="Save office information?"
-        changes={dirty.map((key) => ({ key, label: section.labels[key], before: saved[key], after: normalized[key] }))}
-        busy={save.isPending}
-        onConfirm={() => save.mutate()}
-      />
-      <SectionHistoryDialog
-        sectionKey="office"
-        open={historyOpen}
-        onOpenChange={setHistoryOpen}
-        canEdit={canEdit}
-        busy={restore.isPending}
-        onRestore={(revision) => restore.mutate(revision)}
-      />
+      <SectionHistoryDialog sectionKey="office" open={historyOpen} onOpenChange={setHistoryOpen} canEdit={canEdit} busy={restore.isPending} onRestore={(revision) => restore.mutate(revision)} />
     </div>
   )
 }

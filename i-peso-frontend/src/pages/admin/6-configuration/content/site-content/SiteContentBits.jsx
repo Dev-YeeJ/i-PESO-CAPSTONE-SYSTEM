@@ -1,10 +1,10 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { History, RotateCcw } from 'lucide-react'
+import { ChevronDown, History, RotateCcw, SlidersHorizontal } from 'lucide-react'
 import { Button, ErrorState, LoadingSkeleton } from '@/components/ui'
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { adminSiteContentService } from '@/services/siteContentService'
-import { describeValue, formatWhen, labelClass } from './formStyles'
+import { formatWhen, labelClass } from './formStyles'
 
 /** A labelled field with a character counter and an error line. */
 export function Field({ label, hint, error, count, max, children, className = '' }) {
@@ -17,33 +17,6 @@ export function Field({ label, hint, error, count, max, children, className = ''
       {children}
       {error ? <p className="mt-1 text-xs font-semibold text-red-600">{error}</p> : hint ? <p className="mt-1 text-xs text-slate-500">{hint}</p> : null}
     </div>
-  )
-}
-
-/** "Phone: 0923… → 0917…" — shown before a save goes live. */
-export function ChangesDialog({ open, onOpenChange, title, changes, busy, onConfirm, confirmLabel = 'Save and publish' }) {
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
-        <DialogHeader>
-          <DialogTitle>{title}</DialogTitle>
-          <DialogDescription>These changes show on the site as soon as you save.</DialogDescription>
-        </DialogHeader>
-        <ul className="max-h-80 space-y-3 overflow-y-auto text-sm">
-          {changes.map((change) => (
-            <li key={change.key} className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-              <p className="text-xs font-extrabold uppercase tracking-wide text-slate-500">{change.label}</p>
-              <p className="mt-1 break-words text-slate-500 line-through decoration-slate-400">{describeValue(change.before)}</p>
-              <p className="mt-0.5 break-words font-semibold text-slate-950">{describeValue(change.after)}</p>
-            </li>
-          ))}
-        </ul>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>Keep editing</Button>
-          <Button variant="navy" loading={busy} onClick={onConfirm}>{confirmLabel}</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
   )
 }
 
@@ -82,7 +55,7 @@ export function SectionHistoryDialog({ sectionKey, open, onOpenChange, canEdit, 
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <p className="font-bold text-slate-950">
                       {formatWhen(revision.created_at)}
-                      {index === 0 && <span className="ml-2 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-bold text-emerald-700">Current</span>}
+                      {index === 0 && <span className="ml-2 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-slate-600">Current</span>}
                     </p>
                     {canEdit && index > 0 && (
                       confirming === revision.id ? (
@@ -114,6 +87,34 @@ export function ReadOnlyNote({ children }) {
   return (
     <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
       {children}
+    </div>
+  )
+}
+
+/**
+ * Optional fields folded away so a form shows only what people change often.
+ * Opens by itself when `forceOpen` (e.g. one of its fields has an error).
+ */
+export function MoreSection({ summary, forceOpen = false, children, defaultOpen = false }) {
+  const [open, setOpen] = useState(defaultOpen)
+  const shown = open || forceOpen
+
+  return (
+    <div className="mt-5 border-t border-slate-100 pt-4">
+      <button
+        type="button"
+        onClick={() => setOpen((value) => !value)}
+        aria-expanded={shown}
+        className="flex w-full items-center justify-between text-left text-sm font-extrabold text-slate-700 hover:text-slate-950"
+      >
+        <span className="flex items-center gap-2">
+          <SlidersHorizontal className="h-4 w-4 text-slate-400" aria-hidden="true" />
+          More options
+          {summary && <span className="text-xs font-semibold text-slate-400">{summary}</span>}
+        </span>
+        <ChevronDown className={`h-4 w-4 text-slate-400 transition-transform ${shown ? 'rotate-180' : ''}`} aria-hidden="true" />
+      </button>
+      {shown && <div className="mt-4">{children}</div>}
     </div>
   )
 }

@@ -90,7 +90,7 @@ export default function AnnouncementsPage() {
           <div className="min-w-28 text-xs">
             <p className="font-bold text-slate-800">Seen by {num(value)} of {num(row.targeted)}</p>
             <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-slate-100" role="progressbar" aria-valuenow={rate} aria-valuemin={0} aria-valuemax={100} aria-label="Share of the audience that opened it">
-              <div className="h-full rounded-full bg-brand-navy" style={{ width: `${Math.max(rate, 2)}%` }} />
+              <div className="h-full rounded-full bg-slate-500" style={{ width: `${Math.max(rate, 2)}%` }} />
             </div>
           </div>
         )
@@ -111,10 +111,10 @@ export default function AnnouncementsPage() {
       />
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard icon={Radio} color="green" label="Live now" value={num(summary.live)} subtitle="Visible to readers" />
-        <StatCard icon={CalendarClock} color="blue" label="Scheduled" value={num(summary.scheduled)} subtitle="Will go live automatically" />
-        <StatCard icon={FilePen} color="amber" label="Drafts" value={num(summary.draft)} subtitle="Not visible to anyone yet" />
-        <StatCard icon={Megaphone} color="violet" label="Ended & archived" value={num((summary.expired ?? 0) + (summary.archived ?? 0))} subtitle={`${num(summary.expired)} ended · ${num(summary.archived)} archived`} />
+        <StatCard icon={Radio} color="slate" label="Live now" value={num(summary.live)} subtitle="Visible to readers" />
+        <StatCard icon={CalendarClock} color="slate" label="Scheduled" value={num(summary.scheduled)} subtitle="Will go live automatically" />
+        <StatCard icon={FilePen} color="slate" label="Drafts" value={num(summary.draft)} subtitle="Not visible to anyone yet" />
+        <StatCard icon={Megaphone} color="slate" label="Ended & archived" value={num((summary.expired ?? 0) + (summary.archived ?? 0))} subtitle={`${num(summary.expired)} ended · ${num(summary.archived)} archived`} />
       </div>
 
       <Card padding="sm" className="mt-6">
@@ -127,7 +127,7 @@ export default function AnnouncementsPage() {
               aria-selected={state === tab.value}
               onClick={() => { setState(tab.value); setPage(1) }}
               className={`rounded-full border px-3.5 py-1.5 text-xs font-bold transition ${
-                state === tab.value ? 'border-brand-navy bg-brand-navy text-white' : 'border-slate-300 bg-white text-slate-700 hover:border-brand-navy'
+                state === tab.value ? 'border-slate-300 bg-slate-100 text-slate-900' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-400'
               }`}
             >
               {tab.label} <span className={state === tab.value ? 'text-blue-100' : 'text-slate-400'}>{num(tab.count(summary))}</span>
@@ -158,7 +158,7 @@ export default function AnnouncementsPage() {
       </Card>
 
       {error && (
-        <div className="mt-6 flex items-center justify-between gap-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+        <div className="mt-6 flex items-center justify-between gap-4 rounded-xl border border-slate-200 bg-slate-50 text-slate-700 p-4 text-sm">
           <span className="flex items-center gap-2"><AlertTriangle className="h-4 w-4" />{error}</span>
           <button type="button" onClick={() => listQuery.refetch()} className="font-extrabold hover:underline">Try again</button>
         </div>

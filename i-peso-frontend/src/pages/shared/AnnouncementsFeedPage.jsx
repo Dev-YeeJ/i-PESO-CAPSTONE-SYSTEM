@@ -86,7 +86,7 @@ export default function AnnouncementsFeedPage({ role }) {
                   type="button"
                   onClick={() => open(item.id)}
                   className={`group block w-full rounded-xl border bg-white p-4 text-left shadow-sm transition hover:border-brand-navy hover:shadow-md sm:p-5 ${
-                    item.is_read ? 'border-slate-200' : 'border-blue-300 ring-1 ring-blue-100'
+                    item.is_read ? 'border-slate-200' : 'border-slate-300'
                   }`}
                 >
                   <div className="flex flex-wrap items-center gap-2">
@@ -129,7 +129,7 @@ function FilterButton({ active, onClick, children }) {
       onClick={onClick}
       aria-pressed={active}
       className={`rounded-full border px-3 py-1.5 text-xs font-bold transition ${
-        active ? 'border-brand-navy bg-brand-navy text-white' : 'border-slate-300 bg-white text-slate-700 hover:border-brand-navy hover:text-brand-navy'
+        active ? 'border-slate-300 bg-slate-100 text-slate-900' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-400 hover:text-slate-900'
       }`}
     >
       {children}

@@ -205,6 +205,12 @@ export default function AnnouncementFormPage() {
 
   const askPublish = () => {
     if (!clientCheck()) return
+    // Publishing can be undone (Unpublish), so it goes straight through. Only a
+    // notification blast — which cannot be recalled — asks first.
+    if (!form.notify_users || alreadyNotified) {
+      save('publish')
+      return
+    }
     const audienceText = `${AUDIENCE_SHORT[form.audience]} (${audienceSize.toLocaleString()} ${audienceSize === 1 ? 'account' : 'accounts'}${form.audience === 'public' ? ' plus anyone visiting the landing page' : ''})`
     const notifyText = form.notify_users && !alreadyNotified
       ? ` Everyone in the audience will also get a bell notification${form.audience !== 'employers' ? ', and job seekers a push on the mobile app' : ''}. Sent notifications cannot be recalled.`
@@ -251,7 +257,7 @@ export default function AnnouncementFormPage() {
       </div>
 
       {!canEdit && (
-        <div className="mt-4 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">Your account can view announcements but not change them.</div>
+        <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 text-slate-700 px-4 py-3 text-sm">Your account can view announcements but not change them.</div>
       )}
       {canEdit && state === 'archived' && (
         <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">This announcement is archived. Restore it to a draft to edit or republish it.</div>
@@ -419,7 +425,7 @@ export default function AnnouncementFormPage() {
                             }
                             set('attachment', file)
                           }}
-                          className="block w-full text-sm text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-brand-navy file:px-3 file:py-2 file:text-xs file:font-bold file:text-white"
+                          className="block w-full text-sm text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-slate-100 file:px-3 file:py-2 file:text-xs file:font-bold file:text-slate-800"
                         />
                         <span className="mt-1 block text-xs text-slate-500">One image or PDF, up to 5 MB.</span>
                         {err('attachment')}
@@ -435,7 +441,7 @@ export default function AnnouncementFormPage() {
           {canEdit && (
             <div className="flex flex-wrap items-center gap-2">
               {state === 'archived' ? (
-                <Button variant="navy" icon={RotateCcw} loading={busy === 'restore'} onClick={() => runAction('restore')}>Restore as draft</Button>
+                <Button variant="outline" icon={RotateCcw} loading={busy === 'restore'} onClick={() => runAction('restore')}>Restore as draft</Button>
               ) : (
                 <>
                   {!isPublished && (
@@ -600,12 +606,12 @@ function StatusPanel({ announcement }) {
           <p className="mt-1 text-2xl font-black text-brand-navy">{reach.rate ?? 0}%</p>
           <p className="text-xs text-slate-600">Seen by {(reach.seen ?? 0).toLocaleString()} of {(reach.targeted ?? 0).toLocaleString()} accounts in the audience</p>
           <div className="mt-2 h-2 overflow-hidden rounded-full bg-white" role="progressbar" aria-valuenow={reach.rate ?? 0} aria-valuemin={0} aria-valuemax={100} aria-label="Reach">
-            <div className="h-full rounded-full bg-brand-navy" style={{ width: `${Math.max(reach.rate ?? 0, 2)}%` }} />
+            <div className="h-full rounded-full bg-slate-500" style={{ width: `${Math.max(reach.rate ?? 0, 2)}%` }} />
           </div>
           <p className="mt-2 text-xs text-slate-500">{(reach.seen_seekers ?? 0).toLocaleString()} job seekers · {(reach.seen_employers ?? 0).toLocaleString()} employers · {(reach.dismissed ?? 0).toLocaleString()} dismissed the banner</p>
         </div>
       ) : (
-        <p className="mt-4 flex items-start gap-2 rounded-xl bg-amber-50 p-3 text-xs text-amber-800">
+        <p className="mt-4 flex items-start gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
           <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" /> Not published yet — nobody outside PESO can see it.
         </p>
       )}

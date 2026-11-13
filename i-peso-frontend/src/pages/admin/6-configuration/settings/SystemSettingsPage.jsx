@@ -9,7 +9,6 @@ import { Button, Card, ErrorState, LoadingSkeleton } from '@/components/ui'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import PageHeader from '@/pages/admin/_components/PageHeader'
 import { adminSystemSettingsService } from '@/services/systemSettingsService'
-import { ChangesDialog } from '@/pages/admin/6-configuration/content/site-content/SiteContentBits'
 import { formatWhen, inputClass, labelClass } from '@/pages/admin/6-configuration/content/site-content/formStyles'
 
 const SECTIONS = [
@@ -20,9 +19,9 @@ const SECTIONS = [
 ]
 
 const STATUS_META = {
-  ok: { icon: CheckCircle2, className: 'text-emerald-600', ring: 'border-slate-200 bg-white', label: 'Working' },
-  warn: { icon: AlertTriangle, className: 'text-amber-600', ring: 'border-amber-200 bg-amber-50/50', label: 'Check this' },
-  error: { icon: XCircle, className: 'text-red-600', ring: 'border-red-200 bg-red-50/60', label: 'Not working' },
+  ok: { icon: CheckCircle2, className: 'text-emerald-500', ring: 'border-slate-200 bg-white', label: 'Working' },
+  warn: { icon: AlertTriangle, className: 'text-amber-500', ring: 'border-slate-200 bg-white', label: 'Check this' },
+  error: { icon: XCircle, className: 'text-red-500', ring: 'border-slate-200 border-l-4 border-l-red-300 bg-white', label: 'Not working' },
 }
 
 /** How a reminder-day number reads to a person. */
@@ -34,12 +33,6 @@ const describeOffset = (key, day) => {
   return day === 0 ? 'on the expiry day' : `${day} day${day === 1 ? '' : 's'} before`
 }
 
-const describe = (setting, value) => {
-  if (setting.type === 'bool') return value ? 'On' : 'Off'
-  if (setting.type === 'int_list') return value.length ? value.map((d) => describeOffset(setting.key, d)).join(', ') : 'No reminders'
-  if (setting.type === 'int' && setting.key === 'sms.monthly_cap' && Number(value) === 0) return 'No limit'
-  return String(value)
-}
 
 /**
  * Configuration → System Settings: how i-PESO behaves — whether each service
@@ -74,13 +67,13 @@ export default function SystemSettingsPage() {
                   aria-current={selected ? 'page' : undefined}
                   onClick={() => setParams(section.value === 'status' ? {} : { section: section.value })}
                   className={`flex shrink-0 items-center gap-2.5 rounded-xl px-3 py-2 text-left text-sm font-bold transition ${
-                    selected ? 'bg-brand-navy text-white shadow-sm' : 'border border-slate-200 bg-white text-slate-700 hover:border-brand-navy hover:text-brand-navy lg:border-transparent lg:bg-transparent'
+                    selected ? 'bg-white text-slate-950 shadow-sm ring-1 ring-slate-200' : 'border border-slate-200 bg-white text-slate-600 hover:text-slate-900 lg:border-transparent lg:bg-transparent lg:hover:bg-white/70'
                   }`}
                 >
                   {createElement(section.icon, { className: 'h-4 w-4 shrink-0', 'aria-hidden': true })}
                   <span className="flex-1 whitespace-nowrap">{section.label}</span>
                   {section.value === 'status' && problems > 0 && (
-                    <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-black ${selected ? 'bg-white/20 text-white' : 'bg-amber-100 text-amber-800'}`} aria-label={`${problems} to check`}>{problems}</span>
+                    <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-black bg-slate-200 text-slate-700`} aria-label={`${problems} to check`}>{problems}</span>
                   )}
                 </button>
               )
@@ -105,7 +98,7 @@ export default function SystemSettingsPage() {
                 <StatusPanel status={status} canEdit={settings.data.can_edit} />
               ) : (
                 <SettingsGroup
-                  key={`${active}-${JSON.stringify(settings.data.settings.filter((s) => s.group === active).map((s) => s.value))}`}
+                  key={active}
                   group={active}
                   title={settings.data.groups[active]}
                   settings={settings.data.settings.filter((s) => s.group === active)}
@@ -236,49 +229,73 @@ function SettingsGroup({ group, title, settings, canEdit, smsUsage }) {
   const initial = Object.fromEntries(settings.map((s) => [s.key, s.value]))
   const [form, setForm] = useState(initial)
   const [errors, setErrors] = useState({})
-  const [confirmOpen, setConfirmOpen] = useState(false)
+  const [confirmMaintenance, setConfirmMaintenance] = useState(false)
 
-  const changed = settings.filter((s) => JSON.stringify(form[s.key]) !== JSON.stringify(initial[s.key]))
+  // Switches save on their own; only text, numbers and day lists wait for Save.
+  const typed = settings.filter((s) => s.type !== 'bool')
+  const changed = typed.filter((s) => JSON.stringify(form[s.key]) !== JSON.stringify(initial[s.key]))
   const set = (key, value) => {
     setForm((current) => ({ ...current, [key]: value }))
     if (errors[`values.${key}`]) setErrors((current) => ({ ...current, [`values.${key}`]: undefined }))
   }
 
+  const refresh = () => {
+    queryClient.invalidateQueries({ queryKey: ['admin-system-settings'] })
+    queryClient.invalidateQueries({ queryKey: ['admin-system-status'] })
+    queryClient.invalidateQueries({ queryKey: ['system-status'] })
+  }
+  const showErrors = (error) => {
+    if (error?.response?.data?.errors) setErrors(Object.fromEntries(Object.entries(error.response.data.errors).map(([k, v]) => [k, Array.isArray(v) ? v[0] : v])))
+    toast.error(error?.response?.data?.message ?? 'Could not save the settings.')
+  }
+
   const save = useMutation({
     mutationFn: () => adminSystemSettingsService.save(Object.fromEntries(changed.map((s) => [s.key, form[s.key]]))),
-    onSuccess: (data) => {
-      setConfirmOpen(false)
-      toast.success(data.message)
-      queryClient.invalidateQueries({ queryKey: ['admin-system-settings'] })
-      queryClient.invalidateQueries({ queryKey: ['admin-system-status'] })
-      queryClient.invalidateQueries({ queryKey: ['system-status'] })
+    onSuccess: (data) => { toast.success(data.message); refresh() },
+    onError: showErrors,
+  })
+
+  const flip = useMutation({
+    mutationFn: ({ key, value }) => adminSystemSettingsService.save({ [key]: value }),
+    onSuccess: (_, { key, value }) => {
+      const label = settings.find((s) => s.key === key)?.label ?? 'Setting'
+      toast.success(`${label}: ${value ? 'on' : 'off'}.`)
+      refresh()
     },
-    onError: (error) => {
-      setConfirmOpen(false)
-      if (error?.response?.data?.errors) setErrors(Object.fromEntries(Object.entries(error.response.data.errors).map(([k, v]) => [k, Array.isArray(v) ? v[0] : v])))
-      toast.error(error?.response?.data?.message ?? 'Could not save the settings.')
+    onError: (error, { key, value }) => {
+      setForm((current) => ({ ...current, [key]: !value })) // put the switch back
+      showErrors(error)
     },
   })
 
-  const maintenanceTurningOn = group === 'access' && form['maintenance.enabled'] && !initial['maintenance.enabled']
-  const smsTypeKeys = settings.filter((s) => s.key.startsWith('sms.types.'))
+  const toggle = (setting, value) => {
+    if (setting.key === 'maintenance.enabled' && value) {
+      setConfirmMaintenance(true)
+      return
+    }
+    set(setting.key, value)
+    flip.mutate({ key: setting.key, value })
+  }
 
   const renderSetting = (setting) => (
     <SettingField
       key={setting.key}
       setting={setting}
       value={form[setting.key]}
-      onChange={(value) => set(setting.key, value)}
+      onChange={(value) => (setting.type === 'bool' ? toggle(setting, value) : set(setting.key, value))}
       error={errors[`values.${setting.key}`]}
       disabled={!canEdit || (setting.key.startsWith('sms.types.') && !form['sms.enabled'])}
       extra={setting.key === 'sms.monthly_cap' && smsUsage ? `Sent so far this month: ${smsUsage['Sent this month'] ?? 0}.` : null}
     />
   )
 
+  const smsTypeKeys = settings.filter((s) => s.key.startsWith('sms.types.'))
+
   return (
     <Card>
       <h2 className="text-lg font-black text-slate-950">{title}</h2>
-      <div className="mt-4 divide-y divide-slate-100">
+      {canEdit && <p className="mt-1 text-xs text-slate-500">Switches apply as soon as you flip them.</p>}
+      <div className="mt-2 divide-y divide-slate-100">
         {group === 'sms' ? (
           <>
             {settings.filter((s) => s.key === 'sms.enabled').map(renderSetting)}
@@ -293,22 +310,37 @@ function SettingsGroup({ group, title, settings, canEdit, smsUsage }) {
         )}
       </div>
 
-      {canEdit && (
+      {canEdit && typed.length > 0 && (
         <div className="mt-4 flex flex-wrap items-center justify-end gap-2 border-t border-slate-100 pt-4">
-          {changed.length > 0 && <Button variant="ghost" size="sm" icon={Undo2} onClick={() => { setForm(initial); setErrors({}) }}>Discard changes</Button>}
-          <Button variant="navy" icon={Save} disabled={changed.length === 0} onClick={() => setConfirmOpen(true)}>Save{changed.length ? ` (${changed.length})` : ''}</Button>
+          {changed.length > 0 && <Button variant="ghost" size="sm" icon={Undo2} onClick={() => { setForm((current) => ({ ...current, ...Object.fromEntries(typed.map((s) => [s.key, initial[s.key]])) })); setErrors({}) }}>Discard</Button>}
+          <Button variant="navy" icon={Save} loading={save.isPending} disabled={changed.length === 0} onClick={() => save.mutate()}>Save</Button>
         </div>
       )}
 
-      <ChangesDialog
-        open={confirmOpen}
-        onOpenChange={setConfirmOpen}
-        title={maintenanceTurningOn ? 'Turn on maintenance mode?' : `Save ${title.toLowerCase()} settings?`}
-        changes={changed.map((s) => ({ key: s.key, label: s.label, before: describe(s, initial[s.key]), after: describe(s, form[s.key]) }))}
-        busy={save.isPending}
-        confirmLabel={maintenanceTurningOn ? 'Turn on maintenance' : 'Save settings'}
-        onConfirm={() => save.mutate()}
-      />
+      <Dialog open={confirmMaintenance} onOpenChange={setConfirmMaintenance}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Turn on maintenance mode?</DialogTitle>
+            <DialogDescription>
+              Job seekers, employers and visitors will only see this message until you turn it off. PESO staff can keep working.
+            </DialogDescription>
+          </DialogHeader>
+          <p className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">{form['maintenance.message']}</p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirmMaintenance(false)}>Cancel</Button>
+            <Button
+              variant="navy"
+              loading={flip.isPending}
+              onClick={() => {
+                set('maintenance.enabled', true)
+                flip.mutate({ key: 'maintenance.enabled', value: true }, { onSettled: () => setConfirmMaintenance(false) })
+              }}
+            >
+              Turn on maintenance
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   )
 }
@@ -333,7 +365,7 @@ function SettingField({ setting, value, onChange, error, disabled, extra }) {
           aria-labelledby={`${id}-label`}
           disabled={disabled}
           onClick={() => onChange(!value)}
-          className={`relative mt-0.5 inline-flex h-6 w-11 shrink-0 items-center rounded-full transition disabled:opacity-50 ${value ? 'bg-brand-navy' : 'bg-slate-300'}`}
+          className={`relative mt-0.5 inline-flex h-6 w-11 shrink-0 items-center rounded-full transition disabled:opacity-50 ${value ? 'bg-slate-700' : 'bg-slate-300'}`}
         >
           <span className={`inline-block h-5 w-5 rounded-full bg-white shadow transition ${value ? 'translate-x-5' : 'translate-x-0.5'}`} />
         </button>

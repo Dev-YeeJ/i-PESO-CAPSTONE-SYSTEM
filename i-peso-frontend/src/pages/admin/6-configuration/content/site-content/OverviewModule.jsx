@@ -2,9 +2,9 @@ import { AlertTriangle, ArrowRight, CheckCircle2, Info, RefreshCw } from 'lucide
 import { Button, Card, ErrorState, LoadingSkeleton } from '@/components/ui'
 
 const STATUS = {
-  warn: { icon: AlertTriangle, ring: 'border-amber-200 bg-amber-50/60', iconClass: 'text-amber-600', label: 'Needs attention' },
-  info: { icon: Info, ring: 'border-blue-200 bg-blue-50/50', iconClass: 'text-blue-600', label: 'Good to know' },
-  ok: { icon: CheckCircle2, ring: 'border-emerald-200 bg-white', iconClass: 'text-emerald-600', label: 'All good' },
+  warn: { icon: AlertTriangle, ring: 'border-slate-200 bg-white', iconClass: 'text-amber-500', label: 'Needs attention' },
+  info: { icon: Info, ring: 'border-slate-200 bg-slate-50/60', iconClass: 'text-slate-400', label: 'Good to know' },
+  ok: { icon: CheckCircle2, ring: 'border-slate-200 bg-white', iconClass: 'text-emerald-500', label: 'All good' },
 }
 
 /** Where a check's items open: FAQ items open the FAQ editor. */
@@ -21,8 +21,8 @@ export default function OverviewModule({ health, onGo, allowed }) {
 
   const { score, checks, counts } = health.data
   const warnings = checks.filter((check) => check.status === 'warn')
-  const tone = score >= 85 ? 'text-emerald-600' : score >= 60 ? 'text-amber-600' : 'text-red-600'
-  const bar = score >= 85 ? 'bg-emerald-500' : score >= 60 ? 'bg-amber-500' : 'bg-red-500'
+  const tone = 'text-slate-950'
+  const bar = 'bg-slate-500'
 
   return (
     <div className="space-y-5">
@@ -85,7 +85,7 @@ export default function OverviewModule({ health, onGo, allowed }) {
                   )}
                 </div>
                 {check.action && canAct && (
-                  <Button size="sm" variant={check.status === 'warn' ? 'navy' : 'outline'} onClick={() => onGo(check.module)} className="shrink-0">
+                  <Button size="sm" variant="outline" onClick={() => onGo(check.module)} className="shrink-0">
                     {check.action} <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
                   </Button>
                 )}

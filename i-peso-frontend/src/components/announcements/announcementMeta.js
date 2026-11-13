@@ -2,10 +2,10 @@
 import { CalendarDays, GraduationCap, Info, Megaphone, MonitorCog, Building } from 'lucide-react'
 
 export const CATEGORY_META = {
-  general: { label: 'General update', icon: Megaphone, chip: 'bg-blue-50 text-blue-800 border-blue-200' },
-  job_fair: { label: 'Job fairs & events', icon: CalendarDays, chip: 'bg-violet-50 text-violet-800 border-violet-200' },
-  program: { label: 'Programs & services', icon: GraduationCap, chip: 'bg-emerald-50 text-emerald-800 border-emerald-200' },
-  advisory: { label: 'Office advisory', icon: Building, chip: 'bg-amber-50 text-amber-800 border-amber-200' },
+  general: { label: 'General update', icon: Megaphone, chip: 'bg-slate-50 text-slate-700 border-slate-200' },
+  job_fair: { label: 'Job fairs & events', icon: CalendarDays, chip: 'bg-slate-50 text-slate-700 border-slate-200' },
+  program: { label: 'Programs & services', icon: GraduationCap, chip: 'bg-slate-50 text-slate-700 border-slate-200' },
+  advisory: { label: 'Office advisory', icon: Building, chip: 'bg-slate-50 text-slate-700 border-slate-200' },
   system: { label: 'System notice', icon: MonitorCog, chip: 'bg-slate-100 text-slate-700 border-slate-200' },
 }
 
@@ -15,17 +15,17 @@ export const PRIORITY_META = {
   normal: { label: 'Normal', pill: 'bg-slate-100 text-slate-600 border-slate-200' },
   important: {
     label: 'Important',
-    pill: 'bg-amber-100 text-amber-800 border-amber-300',
-    banner: 'border-amber-300 bg-amber-50',
-    bannerAccent: 'bg-amber-500',
-    bannerText: 'text-amber-900',
+    pill: 'bg-white text-amber-700 border-amber-200',
+    banner: 'border-slate-200 bg-white',
+    bannerAccent: 'bg-amber-400',
+    bannerText: 'text-amber-700',
   },
   urgent: {
     label: 'Urgent',
-    pill: 'bg-red-100 text-red-700 border-red-300',
-    banner: 'border-red-300 bg-red-50',
-    bannerAccent: 'bg-red-600',
-    bannerText: 'text-red-900',
+    pill: 'bg-white text-red-700 border-red-200',
+    banner: 'border-slate-200 bg-white',
+    bannerAccent: 'bg-red-400',
+    bannerText: 'text-red-700',
   },
 }
 

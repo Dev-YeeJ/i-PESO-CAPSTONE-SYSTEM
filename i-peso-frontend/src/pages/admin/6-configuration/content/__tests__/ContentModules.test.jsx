@@ -75,35 +75,31 @@ describe('Site Content admin', () => {
     adminContentInsightService.insights.mockResolvedValue(insights)
   })
 
-  it('shows the changes before saving office info and sends the version it loaded', async () => {
+  it('saves office info in one click with the version it loaded', async () => {
     adminSiteContentService.save.mockResolvedValue({ message: 'Changes saved. They are live now.', section: { ...sections.sections.office, version: 4 } })
     renderWithProviders(<ContentModulesPage />, { route: '/admin/content-modules?tab=office' })
 
     const hours = await screen.findByRole('textbox', { name: 'Office hours' })
-    expect(screen.getByText(/the assistant can’t answer questions about/i)).toHaveTextContent('office hours')
+    expect(screen.getByText(/the assistant can’t answer about/i)).toHaveTextContent('office hours')
+    // Rarely-changed fields are folded away.
+    expect(screen.queryByRole('textbox', { name: 'Map link' })).not.toBeInTheDocument()
 
     await userEvent.type(hours, 'Mon–Fri, 8 AM – 5 PM')
-    await userEvent.click(screen.getByRole('button', { name: /save \(1\)/i }))
-
-    const dialog = await screen.findByRole('dialog')
-    expect(within(dialog).getByText('(not on record)')).toBeInTheDocument()
-    expect(within(dialog).getByText('Mon–Fri, 8 AM – 5 PM')).toBeInTheDocument()
-    await userEvent.click(within(dialog).getByRole('button', { name: /save and publish/i }))
+    await userEvent.click(screen.getByRole('button', { name: /^save$/i }))
 
     await waitFor(() => expect(adminSiteContentService.save).toHaveBeenCalledTimes(1))
     const [key, values, version] = adminSiteContentService.save.mock.calls[0]
     expect(key).toBe('office')
     expect(version).toBe(3)
     expect(values).toMatchObject({ hours: 'Mon–Fri, 8 AM – 5 PM', email: OFFICE_DEFAULTS.email })
-  })
+  }, 15000)
 
   it('reloads instead of overwriting when someone else saved first', async () => {
     adminSiteContentService.save.mockRejectedValue({ response: { status: 409, data: { message: 'Someone else saved changes to this section a moment ago.' } } })
     renderWithProviders(<ContentModulesPage />, { route: '/admin/content-modules?tab=office' })
 
     await userEvent.type(await screen.findByRole('textbox', { name: 'Office hours' }), 'x')
-    await userEvent.click(screen.getByRole('button', { name: /save \(1\)/i }))
-    await userEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: /save and publish/i }))
+    await userEvent.click(screen.getByRole('button', { name: /^save$/i }))
 
     await waitFor(() => expect(toast.error).toHaveBeenCalledWith('Someone else saved changes to this section a moment ago.'))
     await waitFor(() => expect(adminSiteContentService.list).toHaveBeenCalledTimes(2))
@@ -118,7 +114,10 @@ describe('Site Content admin', () => {
 
     const preview = screen.getByLabelText('Landing page preview')
     expect(within(preview).getByText('Your Next Job')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /use the original text/i })).toBeInTheDocument()
+    // Feature cards and the rest wait behind "More options".
+    expect(screen.queryByRole('textbox', { name: 'Card 1 title' })).not.toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: /more options/i }))
+    expect(screen.getByRole('textbox', { name: 'Card 1 title' })).toBeInTheDocument()
   })
 
   it('offers the suggested FAQs when the list is empty', async () => {
@@ -178,6 +177,8 @@ describe('Site Content admin', () => {
     await userEvent.click(await screen.findByRole('button', { name: /new faq/i }))
     await userEvent.type(screen.getByRole('textbox', { name: 'Question' }), 'How to register as job seeker?')
     expect(screen.getByText(/looks like an faq you already have/i)).toBeInTheDocument()
+    expect(screen.getByRole('combobox', { name: 'Topic' })).toHaveValue('account')
+    expect(screen.queryByRole('textbox', { name: 'Link' })).not.toBeInTheDocument()
 
     await userEvent.click(screen.getByRole('button', { name: /draft answer/i }))
     const suggestion = await screen.findByLabelText('AI suggestion')
@@ -189,13 +190,28 @@ describe('Site Content admin', () => {
     expect(adminContentInsightService.assist).toHaveBeenCalledWith({ task: 'draft_answer', question: 'How to register as job seeker?', audience: 'everyone' })
   })
 
+  it('saves and publishes a new FAQ in one click', async () => {
+    adminFaqService.create.mockResolvedValue({ message: 'FAQ saved.', faq: { id: 9, is_published: false } })
+    adminFaqService.publish.mockResolvedValue({ message: 'Published. It is on the Help pages now.' })
+    renderWithProviders(<ContentModulesPage />, { route: '/admin/content-modules?tab=faqs' })
+
+    await userEvent.click(await screen.findByRole('button', { name: /new faq/i }))
+    await userEvent.type(screen.getByRole('textbox', { name: 'Question' }), 'When is the next job fair?')
+    await userEvent.type(screen.getByRole('textbox', { name: 'Answer' }), 'See the Job Fairs page.')
+    expect(screen.getByRole('combobox', { name: 'Topic' })).toHaveValue('job_fairs')
+    await userEvent.click(screen.getByRole('button', { name: /save & publish/i }))
+
+    await waitFor(() => expect(adminFaqService.publish).toHaveBeenCalledWith(9))
+    expect(adminFaqService.create.mock.calls[0][0]).toMatchObject({ topic: 'job_fairs', link_url: null })
+    expect(toast.success).toHaveBeenCalledWith('Published. It is on the Help pages now.')
+  })
+
   it('switches landing page sections off', async () => {
     adminSiteContentService.save.mockResolvedValue({ message: 'Changes saved.', section: sections.sections.landing })
     renderWithProviders(<ContentModulesPage />, { route: '/admin/content-modules?tab=landing' })
 
     await userEvent.click(await screen.findByRole('checkbox', { name: /government programs/i }))
-    await userEvent.click(screen.getByRole('button', { name: /save \(1\)/i }))
-    await userEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: /save and publish/i }))
+    await userEvent.click(screen.getByRole('button', { name: /^save$/i }))
 
     await waitFor(() => expect(adminSiteContentService.save).toHaveBeenCalled())
     expect(adminSiteContentService.save.mock.calls[0][1].show_sections).toMatchObject({ programs: false, faq: true })

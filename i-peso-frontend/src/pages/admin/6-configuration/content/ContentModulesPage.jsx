@@ -127,13 +127,13 @@ export default function ContentModulesPage() {
                       aria-current={selected ? 'page' : undefined}
                       onClick={() => go(item.value)}
                       className={`flex shrink-0 items-center gap-2.5 rounded-xl px-3 py-2 text-left text-sm font-bold transition ${
-                        selected ? 'bg-brand-navy text-white shadow-sm' : 'border border-slate-200 bg-white text-slate-700 hover:border-brand-navy hover:text-brand-navy lg:border-transparent lg:bg-transparent'
+                        selected ? 'bg-white text-slate-950 shadow-sm ring-1 ring-slate-200' : 'border border-slate-200 bg-white text-slate-600 hover:text-slate-900 lg:border-transparent lg:bg-transparent lg:hover:bg-white/70'
                       }`}
                     >
                       {createElement(item.icon, { className: 'h-4 w-4 shrink-0', 'aria-hidden': true })}
                       <span className="flex-1 whitespace-nowrap">{item.label}</span>
                       {badge ? (
-                        <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-black ${selected ? 'bg-white/20 text-white' : 'bg-amber-100 text-amber-800'}`} aria-label={`${badge} to look at`}>
+                        <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-black bg-slate-200 text-slate-700`} aria-label={`${badge} to look at`}>
                           {badge}
                         </span>
                       ) : null}

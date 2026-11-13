@@ -259,7 +259,7 @@ function PolicyPreview({ version, office, className = '' }) {
   return (
     <div className={`rounded-2xl border border-[#0A192F]/10 bg-[#F8F7F2] p-5 sm:p-8 ${className}`}>
       {version.summary?.body && (
-        <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-950">
+        <div className="mb-6 rounded-xl border border-slate-200 bg-white p-4 text-sm leading-6 text-slate-800">
           <p className="font-bold">{version.summary.title || 'Summary'}</p>
           <RichText text={version.summary.body} office={office} className="mt-1 space-y-2" />
         </div>

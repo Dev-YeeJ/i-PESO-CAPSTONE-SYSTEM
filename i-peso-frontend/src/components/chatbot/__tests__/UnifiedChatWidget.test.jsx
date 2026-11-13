@@ -62,7 +62,7 @@ describe('UnifiedChatWidget voice controls', () => {
     })
   })
 
-  it('puts a recognized transcript in the composer without sending it', () => {
+  it('sends a spoken question as soon as the speaker stops', async () => {
     askPublic.mockResolvedValue({
       reply: 'Here are some job opportunities.',
       officeLocation: null,
@@ -82,18 +82,42 @@ describe('UnifiedChatWidget voice controls', () => {
       })
     })
 
+    // While still speaking: shown live in the box, not sent yet.
     expect(screen.getByRole('textbox', { name: 'Your question' })).toHaveValue('Find me a job')
     expect(askPublic).not.toHaveBeenCalled()
-    act(() => recognition.onend())
-    expect(screen.getByText('Voice message draft · Not sent')).toBeInTheDocument()
-    expect(screen.getByText('Find me a job')).toBeInTheDocument()
-    expect(askPublic).not.toHaveBeenCalled()
 
-    fireEvent.change(screen.getByRole('textbox', { name: 'Your question' }), {
-      target: { value: 'Find me a job in Urdaneta' },
-    })
-    fireEvent.click(screen.getByRole('button', { name: 'Send message' }))
-    return waitFor(() => expect(askPublic).toHaveBeenCalledWith('Find me a job in Urdaneta', []))
+    act(() => recognition.onend())
+
+    await waitFor(() => expect(askPublic).toHaveBeenCalledWith('Find me a job', []))
+    expect(askPublic).toHaveBeenCalledTimes(1)
+    expect(await screen.findByText('Here are some job opportunities.')).toBeInTheDocument()
+    expect(screen.getByRole('textbox', { name: 'Your question' })).toHaveValue('')
+  })
+
+  it('adds speech to what was already typed and sends both', async () => {
+    askPublic.mockResolvedValue({ reply: 'Okay.', officeLocation: null, retryable: false, toolResults: {} })
+    render(<UnifiedChatWidget />)
+    fireEvent.click(screen.getByRole('button', { name: 'Ask ACE' }))
+    fireEvent.change(screen.getByRole('textbox', { name: 'Your question' }), { target: { value: 'Paano po' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Start voice input' }))
+
+    const [recognition] = MockSpeechRecognition.instances
+    act(() => recognition.onresult({ results: [{ 0: { transcript: 'mag-register sa job fair' } }] }))
+    act(() => recognition.onend())
+
+    await waitFor(() => expect(askPublic).toHaveBeenCalledWith('Paano po mag-register sa job fair', []))
+  })
+
+  it('sends nothing when no speech was heard', () => {
+    render(<UnifiedChatWidget />)
+    fireEvent.click(screen.getByRole('button', { name: 'Ask ACE' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Start voice input' }))
+
+    const [recognition] = MockSpeechRecognition.instances
+    act(() => recognition.onend())
+
+    expect(askPublic).not.toHaveBeenCalled()
+    expect(screen.getByRole('status')).toHaveTextContent('couldn’t understand that')
   })
 
   it('keeps the microphone actionable and explains when recognition is unsupported', () => {
