@@ -116,11 +116,16 @@ class ActivityLog extends Model
         foreach ($logs->groupBy('user_type') as $userType => $group) {
             $names = self::resolveNames((string) $userType, $group->pluck('user_id')->unique()->all());
 
+            // Deleted staff keep their name in the trail, marked as former staff.
             $roles = $userType === Administrator::class
-                ? Administrator::query()
+                ? Administrator::withTrashed()
                     ->whereIn('admin_id', $group->pluck('user_id')->unique()->all())
-                    ->get(['admin_id', 'position'])
-                    ->mapWithKeys(fn (Administrator $admin) => [$admin->admin_id => StaffPositions::label($admin->position) ?? 'PESO staff'])
+                    ->get(['admin_id', 'position', 'deleted_at'])
+                    ->mapWithKeys(function (Administrator $admin) {
+                        $position = StaffPositions::label($admin->position) ?? 'PESO staff';
+
+                        return [$admin->admin_id => $admin->trashed() ? "Former {$position} (account deleted)" : $position];
+                    })
                     ->all()
                 : [];
 
@@ -142,7 +147,9 @@ class ActivityLog extends Model
             return [];
         }
 
-        return $userType::query()
+        $query = $userType === Administrator::class ? Administrator::withTrashed() : $userType::query();
+
+        return $query
             ->whereIn((new $userType)->getKeyName(), $ids)
             ->get()
             ->mapWithKeys(fn (Model $actor) => [$actor->getKey() => self::labelFor($actor)])

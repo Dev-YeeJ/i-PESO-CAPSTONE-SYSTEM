@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
-import { ArrowDown, ArrowUp, Bot, Eye, EyeOff, Home, Pencil, Plus, Search, Sparkles, ThumbsDown, ThumbsUp, Trash2 } from 'lucide-react'
+import { ArrowDown, ArrowUp, Bot, Eye, EyeOff, Pencil, Plus, Search, Sparkles, Trash2 } from 'lucide-react'
 import { Badge, Button, Card, ConfirmDialog, ErrorState, LoadingSkeleton } from '@/components/ui'
 import { adminFaqService } from '@/services/siteContentService'
 import { FAQ_AUDIENCES, FAQ_TOPICS } from '@/components/site-content/siteContentDefaults'
@@ -54,7 +54,6 @@ export default function FaqsTab({ canEdit, office }) {
   })
 
   const toggle = useMutation(run(({ faq }) => (faq.is_published ? adminFaqService.unpublish(faq.id) : adminFaqService.publish(faq.id)), 'Could not change the FAQ.'))
-  const feature = useMutation(run(({ faq }) => adminFaqService.feature(faq.id, !faq.is_featured), 'Could not change the landing page questions.'))
   const reorder = useMutation(run((ids) => adminFaqService.reorder(ids), 'Could not save the order.'))
   const starter = useMutation(run(() => adminFaqService.starterPack(), 'Could not add the suggested FAQs.'))
   const remove = useMutation({
@@ -83,9 +82,10 @@ export default function FaqsTab({ canEdit, office }) {
       <Card>
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h2 className="text-lg font-black text-slate-950">Frequently asked questions</h2>
+            <h2 className="text-lg font-black text-slate-950">Assistant answers (FAQs)</h2>
             <p className="mt-1 max-w-2xl text-sm text-slate-600">
-              Shown on the public Help page, the job seeker and employer Help pages, and — once published — used by the assistant to answer questions.
+              What the i-PESO assistant answers from. Once published, an FAQ is used by the chat assistant for the audience you pick —
+              there is no separate Help page, so write each answer the way you would want the assistant to say it.
             </p>
           </div>
           {canEdit && <Button variant="navy" icon={Plus} onClick={() => setEditing('new')}>New FAQ</Button>}
@@ -95,7 +95,6 @@ export default function FaqsTab({ canEdit, office }) {
           <div className="mt-4 flex flex-wrap gap-2 text-xs font-bold">
             <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-700">{summary.published} published</span>
             <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-600">{summary.unpublished} unpublished</span>
-            <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1 text-slate-700"><Home className="h-3 w-3" aria-hidden="true" /> {summary.featured}/{summary.max_featured} on the landing page</span>
             <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1 text-slate-700"><Bot className="h-3 w-3" aria-hidden="true" /> {summary.in_assistant}/{summary.assistant_limit} in the assistant</span>
           </div>
         )}
@@ -168,13 +167,6 @@ export default function FaqsTab({ canEdit, office }) {
                     <div className="mt-2 flex flex-wrap items-center gap-1.5">
                       <Badge variant={faq.is_published ? 'active' : 'draft'}>{faq.is_published ? 'Published' : 'Unpublished'}</Badge>
                       <Badge variant="neutral">{faq.audience_label}</Badge>
-                      {faq.is_featured && <Badge variant="neutral">On landing page</Badge>}
-                      {faq.helpful_votes + faq.unhelpful_votes > 0 && (
-                        <span className={`inline-flex items-center gap-1.5 text-xs font-bold ${faq.unhelpful_votes > faq.helpful_votes ? 'text-slate-700' : 'text-slate-500'}`} title="“Was this helpful?” votes">
-                          <ThumbsUp className="h-3 w-3" aria-hidden="true" />{faq.helpful_votes}
-                          <ThumbsDown className="h-3 w-3" aria-hidden="true" />{faq.unhelpful_votes}
-                        </span>
-                      )}
                       <span className="text-xs text-slate-400">Updated {formatWhen(faq.updated_at)}{faq.updated_by ? ` by ${faq.updated_by}` : ''}</span>
                     </div>
                   </div>
@@ -184,11 +176,6 @@ export default function FaqsTab({ canEdit, office }) {
                         <Button size="sm" variant="outline" icon={faq.is_published ? EyeOff : Eye} loading={toggle.isPending && toggle.variables?.faq.id === faq.id} onClick={() => toggle.mutate({ faq })}>
                           {faq.is_published ? 'Unpublish' : 'Publish'}
                         </Button>
-                        {faq.audience === 'everyone' && (
-                          <Button size="sm" variant="ghost" icon={Home} loading={feature.isPending && feature.variables?.faq.id === faq.id} onClick={() => feature.mutate({ faq })} title="Show on the landing page (up to 5)">
-                            {faq.is_featured ? 'Remove from home' : 'Show on home'}
-                          </Button>
-                        )}
                         <Button size="sm" variant="ghost" icon={Pencil} onClick={() => setEditing(faq)}>Edit</Button>
                         <Button size="sm" variant="ghost" icon={Trash2} onClick={() => setDeleting(faq)} aria-label={`Delete “${faq.question}”`} className="text-red-600 hover:bg-red-50 hover:text-red-700" />
                       </>
@@ -216,7 +203,7 @@ export default function FaqsTab({ canEdit, office }) {
         open={Boolean(deleting)}
         onOpenChange={(open) => !open && setDeleting(null)}
         title="Delete this FAQ?"
-        description={deleting ? `“${deleting.question}” will be removed from every Help page and the assistant. This can’t be undone — unpublish it instead if you may need it again.` : ''}
+        description={deleting ? `“${deleting.question}” will be removed from the assistant. This can’t be undone — unpublish it instead if you may need it again.` : ''}
         confirmLabel="Delete FAQ"
         busy={remove.isPending}
         onConfirm={() => remove.mutate(deleting)}

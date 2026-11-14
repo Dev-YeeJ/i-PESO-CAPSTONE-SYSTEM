@@ -220,8 +220,10 @@ class AnnouncementService
     /** Where a reader opens an announcement in the web app. */
     public static function readerPath(Model $reader, int $announcementId): string
     {
-        $base = $reader instanceof Employer ? '/employer/announcements' : '/seeker/announcements';
+        // Announcements live on each reader's dashboard (no separate page);
+        // the dashboard opens the one named here.
+        $base = $reader instanceof Employer ? '/employer/dashboard' : '/seeker/dashboard';
 
-        return $base.'?open='.$announcementId;
+        return $base.'?announcement='.$announcementId;
     }
 }

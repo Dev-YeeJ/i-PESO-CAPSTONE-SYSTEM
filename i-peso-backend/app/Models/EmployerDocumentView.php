@@ -31,7 +31,7 @@ class EmployerDocumentView extends Model
 
     public function administrator(): BelongsTo
     {
-        return $this->belongsTo(Administrator::class, 'administrator_id', 'admin_id');
+        return $this->belongsTo(Administrator::class, 'administrator_id', 'admin_id')->withTrashed();
     }
 
     /**

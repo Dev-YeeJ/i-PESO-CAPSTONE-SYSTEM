@@ -12,8 +12,8 @@ const itemTarget = (check, item) => (['faqs', 'insights'].includes(check.module)
 
 /**
  * The content health check: a score and an automatic checklist of what to
- * fix — blank office details, stale or duplicate FAQs, broken links, what
- * readers can't find, what the assistant can't answer.
+ * fix — blank office details, stale or duplicate FAQs, what the assistant
+ * can't answer.
  */
 export default function OverviewModule({ health, onGo, allowed }) {
   if (health.isLoading) return <LoadingSkeleton variant="card" rows={4} />
@@ -37,14 +37,13 @@ export default function OverviewModule({ health, onGo, allowed }) {
             <div className={`h-full rounded-full ${bar}`} style={{ width: `${score}%` }} />
           </div>
           <p className="mt-3 text-sm text-slate-600">
-            {warnings.length === 0 ? 'Nothing needs attention. Readers and the assistant have what they need.' : `${warnings.length} thing${warnings.length === 1 ? '' : 's'} to fix — most important first.`}
+            {warnings.length === 0 ? 'Nothing needs attention. The assistant has what it needs.' : `${warnings.length} thing${warnings.length === 1 ? '' : 's'} to fix — most important first.`}
           </p>
         </Card>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="grid grid-cols-3 gap-3">
           {[
             ['FAQs published', counts.faqs_published],
             ['Unpublished drafts', counts.faqs_unpublished],
-            ['Empty searches (30 days)', counts.missed_searches],
             ['Unanswered in chat (30 days)', counts.chatbot_gaps],
           ].map(([label, value]) => (
             <Card key={label} padding="sm">

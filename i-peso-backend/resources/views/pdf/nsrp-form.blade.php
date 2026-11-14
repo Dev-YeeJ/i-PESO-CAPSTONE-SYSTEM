@@ -271,6 +271,35 @@
         .dotted {
             border-top: 1pt dashed #000;
         }
+
+        .page-footer {
+            margin-top: 7pt;
+            width: 100%;
+        }
+
+        .page-footer td {
+            border: 0;
+            padding: 0;
+            font-size: 6.6pt;
+            color: #333;
+        }
+
+        .page-footer .page-number {
+            margin: 0;
+        }
+
+        .extra-note {
+            font-size: 7.2pt;
+            line-height: 1.3;
+            padding: 3pt 4pt;
+        }
+
+        .extra td,
+        .extra th {
+            padding: 2.5pt 3pt;
+            font-size: 7.4pt;
+            vertical-align: top;
+        }
     </style>
 </head>
 <body>
@@ -292,18 +321,23 @@
         $seeker->disabilities->firstWhere('disability_type', 'others')
     )->disability_specification;
 
-    $occupations = $seeker->occupations->take(3)->values();
-    $preferredLocations = collect($seeker->preferred_locations_details ?? [])
-        ->filter()
-        ->take(3)
+    // Preferred occupations in the order the applicant ranked them.
+    $allOccupations = $seeker->occupations
+        ->sortBy(static fn ($occupation) => $occupation->preference_order ?? PHP_INT_MAX)
         ->values();
-    if ($preferredLocations->isEmpty()) {
-        $preferredLocations = $seeker->workLocations
+    $occupations = $allOccupations->take(3)->values();
+    $extraOccupations = $allOccupations->slice(3)->values();
+    $allPreferredLocations = collect($seeker->preferred_locations_details ?? [])
+        ->filter()
+        ->values();
+    if ($allPreferredLocations->isEmpty()) {
+        $allPreferredLocations = $seeker->workLocations
             ->pluck('location_name')
             ->filter()
-            ->take(3)
             ->values();
     }
+    $preferredLocations = $allPreferredLocations->take(3)->values();
+    $extraLocations = $allPreferredLocations->slice(3)->values();
 
     $languageRecords = $seeker->languages->mapWithKeys(function ($language) {
         $name = strtolower($language->language === 'others'
@@ -313,28 +347,76 @@
         return [$name => $language];
     });
     $namedLanguageKeys = ['english', 'filipino', 'mandarin'];
-    $otherLanguages = $languageRecords->reject(
-        static fn ($language, $key) => in_array($key, $namedLanguageKeys, true)
-    );
-    $otherLanguageNames = $otherLanguages->keys()
-        ->map(static fn ($name) => ucwords($name))
-        ->implode(', ');
-    $otherLanguage = $otherLanguages->first();
+    // Every other language gets its own row and its own checkboxes (two fit on
+    // the form; the rest continue on the extra sheet).
+    $otherLanguages = $languageRecords
+        ->reject(static fn ($language, $key) => in_array($key, $namedLanguageKeys, true))
+        ->map(static fn ($language, $key) => ['name' => ucwords($key), 'record' => $language])
+        ->values();
+    $formOtherLanguages = $otherLanguages->take(2)->values();
+    $extraLanguages = $otherLanguages->slice(2)->values();
 
-    $educationByLevel = $seeker->educations->keyBy('level');
+    // Older records were saved as "graduate" / "senior_high" before the levels were renamed.
+    $normalizeLevel = static fn ($level) => match ($level) {
+        'graduate' => 'graduate_studies',
+        'senior_high' => 'senior_high_strand',
+        default => $level,
+    };
+    $educations = $seeker->educations
+        ->map(static function ($education) use ($normalizeLevel) {
+            $education->nsrp_level = $normalizeLevel($education->level);
+            return $education;
+        })
+        ->sortByDesc(static fn ($education) => $education->year_graduated ?? $education->undergrad_year_last_attended ?? 0)
+        ->values();
+    $educationByLevel = $educations->groupBy('nsrp_level')->map->first();
+    $formLevels = ['elementary', 'secondary_non_k12', 'secondary_k12', 'senior_high_strand', 'tertiary', 'graduate_studies'];
+    $shownEducationIds = collect([
+        $educationByLevel->get('elementary'),
+        $educationByLevel->get('secondary_non_k12') ?: ($educationByLevel->get('secondary_k12') ?: $educationByLevel->get('senior_high_strand')),
+        $educationByLevel->get('senior_high_strand') ?: $educationByLevel->get('secondary_k12'),
+        $educationByLevel->get('tertiary'),
+        $educationByLevel->get('graduate_studies'),
+    ])->filter()->map(static fn ($education) => spl_object_id($education))->unique()->all();
+    $extraEducations = $educations
+        ->reject(static fn ($education) => in_array(spl_object_id($education), $shownEducationIds, true))
+        ->values();
+
     $trainings = $seeker->trainings->take(3)->values();
-    $civilEligibilities = $seeker->eligibilities
-        ->where('type', 'civil_service')
-        ->take(2)
-        ->values();
-    $professionalLicenses = $seeker->eligibilities
-        ->where('type', 'professional_license')
-        ->take(2)
-        ->values();
-    $workExperiences = $seeker->workExperiences->take(3)->values();
+    $extraTrainings = $seeker->trainings->slice(3)->values();
+    $allCivil = $seeker->eligibilities->where('type', 'civil_service')->values();
+    $allLicenses = $seeker->eligibilities->where('type', 'professional_license')->values();
+    $civilEligibilities = $allCivil->take(2)->values();
+    $professionalLicenses = $allLicenses->take(2)->values();
+    $extraEligibilities = $allCivil->slice(2)->merge($allLicenses->slice(2))->values();
 
-    $standardSkills = collect($skillsByType['dole_standard'] ?? [])
-        ->map(static fn ($skill) => strtolower(trim((string) $skill)))
+    // Section VII: most recent first, limited to the last 10 years (as the form says).
+    $tenYearsAgo = now()->subYears(10);
+    $sortedExperiences = $seeker->workExperiences
+        ->sortByDesc(static fn ($experience) => [
+            $experience->currently_employed ? 1 : 0,
+            optional($experience->end_date)->timestamp ?? optional($experience->start_date)->timestamp ?? 0,
+        ])
+        ->values();
+    $recentExperiences = $sortedExperiences
+        ->reject(static fn ($experience) => ! $experience->currently_employed && $experience->end_date && $experience->end_date->lt($tenYearsAgo))
+        ->values();
+    $workExperiences = $recentExperiences->take(3)->values();
+    $extraExperiences = $recentExperiences->slice(3)->values();
+    $olderExperiences = $sortedExperiences
+        ->reject(static fn ($experience) => $recentExperiences->contains(static fn ($recent) => $recent === $experience))
+        ->values();
+
+    // Section VIII reads both places these skills have been stored: the skills
+    // table (dole_standard) and the older other_skills list on the profile.
+    $doleSkills = collect($skillsByType['dole_standard'] ?? [])
+        ->merge(collect($seeker->other_skills ?? [])->filter(static fn ($skill) => is_string($skill)))
+        ->map(static fn ($skill) => trim((string) $skill))
+        ->filter(static fn ($skill) => $skill !== '' && strtolower($skill) !== 'others')
+        ->unique(static fn ($skill) => strtolower($skill))
+        ->values();
+    $standardSkills = $doleSkills
+        ->map(static fn ($skill) => strtolower($skill))
         ->all();
     $standardSkillLabels = [
         'auto_mechanic' => 'Auto Mechanic',
@@ -372,9 +454,28 @@
         ])
         ->unique()
         ->all();
-    $otherStandardSkills = collect($skillsByType['dole_standard'] ?? [])
-        ->reject(static fn ($skill) => in_array(strtolower(trim((string) $skill)), $knownSkillValues, true))
+    $otherStandardSkills = $doleSkills
+        ->reject(static fn ($skill) => in_array(strtolower($skill), $knownSkillValues, true))
+        ->map(static fn ($skill) => ucwords(str_replace('_', ' ', $skill)))
         ->implode(', ');
+    $profileSkills = collect($skillsByType['technical'] ?? [])->merge($skillsByType['soft'] ?? [])->filter()->unique()->values();
+
+    // Anything the two printed pages can't hold goes on an extra sheet — the
+    // form itself says "You may use extra sheet if needed".
+    $hasExtraSheet = $extraOccupations->isNotEmpty() || $extraLocations->isNotEmpty() || $extraLanguages->isNotEmpty()
+        || $extraEducations->isNotEmpty() || $extraTrainings->isNotEmpty() || $extraEligibilities->isNotEmpty()
+        || $extraExperiences->isNotEmpty() || $olderExperiences->isNotEmpty() || $profileSkills->isNotEmpty();
+    $totalPages = $hasExtraSheet ? 3 : 2;
+    $footerNote = sprintf(
+        'i-PESO Jobseeker ID %s · Generated %s%s',
+        str_pad((string) $seeker->seeker_id, 6, '0', STR_PAD_LEFT),
+        \Illuminate\Support\Carbon::parse($generatedDate)->timezone('Asia/Manila')->format('M d, Y g:i A'),
+        filled($generatedBy ?? null) ? ' by '.$generatedBy : ''
+    );
+    $disabilitySpecifications = $seeker->disabilities
+        ->pluck('disability_specification')
+        ->filter()
+        ->implode('; ');
 
     $heightInches = filled($seeker->height_ft)
         ? (int) round(((float) $seeker->height_ft) * 12)
@@ -484,7 +585,7 @@
                 <span class="choice"><span class="box">{{ $checked(in_array('hearing', $disabilityTypes, true)) }}</span>Hearing</span>
                 <span class="choice"><span class="box">{{ $checked(in_array('physical', $disabilityTypes, true)) }}</span>Physical</span>
                 <span class="choice"><span class="box">{{ $checked(in_array('others', $disabilityTypes, true)) }}</span>Others</span>
-                Please specify: <span class="line">{{ $text($otherDisability, '') }}</span>
+                Please specify: <span class="line">{{ $text($disabilitySpecifications ?: $otherDisability, '') }}</span>
             </td>
             <td colspan="2" class="label">CONTACT<br>NUMBER/S</td>
             <td colspan="2" class="value">{{ $text($seeker->mobile_number) }}</td>
@@ -612,16 +713,27 @@
                 <td class="center"><span class="box">{{ $checked(optional($language)->can_understand) }}</span></td>
             </tr>
         @endforeach
-        <tr class="row-17">
-            <td class="label">Others: <span class="line">{{ $otherLanguageNames }}</span></td>
-            <td class="center"><span class="box">{{ $checked(optional($otherLanguage)->can_read) }}</span></td>
-            <td class="center"><span class="box">{{ $checked(optional($otherLanguage)->can_write) }}</span></td>
-            <td class="center"><span class="box">{{ $checked(optional($otherLanguage)->can_speak) }}</span></td>
-            <td class="center"><span class="box">{{ $checked(optional($otherLanguage)->can_understand) }}</span></td>
-        </tr>
+        @for($i = 0; $i < 2; $i++)
+            @php
+                $other = $formOtherLanguages->get($i);
+                $otherRecord = $other['record'] ?? null;
+            @endphp
+            <tr class="{{ $i === 0 ? 'row-17' : 'row-14' }}">
+                <td class="label">Others: <span class="line">{{ $other['name'] ?? '' }}{{ $i === 1 && $extraLanguages->isNotEmpty() ? ' (more on extra sheet)' : '' }}</span></td>
+                <td class="center"><span class="box">{{ $checked(optional($otherRecord)->can_read) }}</span></td>
+                <td class="center"><span class="box">{{ $checked(optional($otherRecord)->can_write) }}</span></td>
+                <td class="center"><span class="box">{{ $checked(optional($otherRecord)->can_speak) }}</span></td>
+                <td class="center"><span class="box">{{ $checked(optional($otherRecord)->can_understand) }}</span></td>
+            </tr>
+        @endfor
     </table>
 
-    <div class="page-number">Page 1 of 2</div>
+    <table class="page-footer">
+        <tr>
+            <td>{{ $footerNote }}</td>
+            <td class="right"><div class="page-number">Page 1 of {{ $totalPages }}</div></td>
+        </tr>
+    </table>
 </div>
 
 <div class="page">
@@ -861,7 +973,153 @@
         </tr>
     </table>
 
-    <div class="page-number">Page 2 of 2</div>
+    <table class="page-footer">
+        <tr>
+            <td>{{ $footerNote }}</td>
+            <td class="right"><div class="page-number">Page 2 of {{ $totalPages }}</div></td>
+        </tr>
+    </table>
 </div>
+
+@if($hasExtraSheet)
+<div class="page" style="page-break-before: always;">
+    <table class="tight">
+        <tr>
+            <td style="width: 15%;" class="form-code">NSRP Form 1<br>Extra sheet</td>
+            <td class="agency-header">
+                ADDITIONAL INFORMATION<br>
+                <span style="font-weight: 600;">{{ strtoupper($text($seeker->last_name)) }}, {{ strtoupper($text($seeker->first_name)) }} {{ strtoupper($text($seeker->middle_name, '')) }}</span>
+            </td>
+        </tr>
+        <tr>
+            <td colspan="2" class="extra-note">
+                Continuation of NSRP Form 1 for entries that did not fit on the printed form. Every entry below was
+                provided by the applicant through i-PESO.
+            </td>
+        </tr>
+    </table>
+
+    @if($extraOccupations->isNotEmpty() || $extraLocations->isNotEmpty())
+        <table class="tight extra">
+            <tr><td colspan="2" class="section">II. JOB PREFERENCE (continued)</td></tr>
+            <tr><th>PREFERRED OCCUPATION</th><th>PREFERRED WORK LOCATION</th></tr>
+            @for($i = 0; $i < max($extraOccupations->count(), $extraLocations->count()); $i++)
+                <tr>
+                    <td>{{ $extraOccupations->get($i) ? ($i + 4).'. '.$extraOccupations->get($i)->occupation_title : '' }}</td>
+                    <td>{{ $extraLocations->get($i) ? ($i + 4).'. '.$extraLocations->get($i) : '' }}</td>
+                </tr>
+            @endfor
+        </table>
+    @endif
+
+    @if($extraLanguages->isNotEmpty())
+        <table class="tight extra">
+            <tr><td colspan="5" class="section">III. LANGUAGE / DIALECT PROFICIENCY (continued)</td></tr>
+            <tr><th>LANGUAGE/DIALECT</th><th>READ</th><th>WRITE</th><th>SPEAK</th><th>UNDERSTAND</th></tr>
+            @foreach($extraLanguages as $other)
+                <tr>
+                    <td class="label">{{ $other['name'] }}</td>
+                    <td class="center"><span class="box">{{ $checked($other['record']->can_read) }}</span></td>
+                    <td class="center"><span class="box">{{ $checked($other['record']->can_write) }}</span></td>
+                    <td class="center"><span class="box">{{ $checked($other['record']->can_speak) }}</span></td>
+                    <td class="center"><span class="box">{{ $checked($other['record']->can_understand) }}</span></td>
+                </tr>
+            @endforeach
+        </table>
+    @endif
+
+    @if($extraEducations->isNotEmpty())
+        <table class="tight extra">
+            <tr><td colspan="5" class="section">IV. EDUCATIONAL BACKGROUND (continued)</td></tr>
+            <tr><th>LEVEL</th><th>SCHOOL</th><th>COURSE / STRAND</th><th>YEAR GRADUATED</th><th>IF UNDERGRADUATE<br>(level reached · year last attended)</th></tr>
+            @foreach($extraEducations as $education)
+                <tr>
+                    <td>{{ $enum($education->nsrp_level) }}</td>
+                    <td>{{ $education->institution_name }}</td>
+                    <td>{{ $education->course_strand }}</td>
+                    <td class="center">{{ $education->year_graduated }}</td>
+                    <td class="center">{{ collect([$education->undergrad_level_reached, $education->undergrad_year_last_attended])->filter()->implode(' · ') }}</td>
+                </tr>
+            @endforeach
+        </table>
+    @endif
+
+    @if($extraTrainings->isNotEmpty())
+        <table class="tight extra">
+            <tr><td colspan="5" class="section">V. TECHNICAL/VOCATIONAL AND OTHER TRAINING (continued)</td></tr>
+            <tr><th>TRAINING/VOCATIONAL COURSE</th><th>HOURS</th><th>INSTITUTION</th><th>SKILLS ACQUIRED</th><th>CERTIFICATES RECEIVED</th></tr>
+            @foreach($extraTrainings as $index => $training)
+                <tr>
+                    <td>{{ $index + 4 }}. {{ $training->course }}</td>
+                    <td class="center">{{ $training->hours_of_training }}</td>
+                    <td>{{ $training->training_institution }}</td>
+                    <td>{{ $training->skills_acquired }}</td>
+                    <td>{{ $training->certificates_received }}</td>
+                </tr>
+            @endforeach
+        </table>
+    @endif
+
+    @if($extraEligibilities->isNotEmpty())
+        <table class="tight extra">
+            <tr><td colspan="3" class="section">VI. ELIGIBILITY / PROFESSIONAL LICENSE (continued)</td></tr>
+            <tr><th>TYPE</th><th>NAME</th><th>DATE TAKEN / VALID UNTIL</th></tr>
+            @foreach($extraEligibilities as $eligibility)
+                <tr>
+                    <td>{{ $eligibility->type === 'civil_service' ? 'Civil Service Eligibility' : 'Professional License (PRC)' }}</td>
+                    <td>{{ $eligibility->name }}</td>
+                    <td class="center">
+                        {{ $eligibility->type === 'civil_service'
+                            ? ($eligibility->date_taken ? 'Taken '.$date($eligibility->date_taken) : '')
+                            : ($eligibility->valid_until ? 'Valid until '.$date($eligibility->valid_until) : '') }}
+                    </td>
+                </tr>
+            @endforeach
+        </table>
+    @endif
+
+    @if($extraExperiences->isNotEmpty() || $olderExperiences->isNotEmpty())
+        <table class="tight extra">
+            <tr><td colspan="5" class="section">VII. WORK EXPERIENCE (continued)</td></tr>
+            <tr><th>COMPANY NAME</th><th>ADDRESS (City/Municipality)</th><th>POSITION</th><th>NUMBER OF MONTHS</th><th>STATUS</th></tr>
+            @foreach($extraExperiences as $experience)
+                <tr>
+                    <td>{{ $experience->company_name }}</td>
+                    <td>{{ $experience->company_address }}</td>
+                    <td>{{ $experience->position }}</td>
+                    <td class="center">{{ $experience->number_of_months }}</td>
+                    <td class="center">{{ filled($experience->employment_status) ? $enum($experience->employment_status) : '' }}</td>
+                </tr>
+            @endforeach
+            @if($olderExperiences->isNotEmpty())
+                <tr><td colspan="5" class="label">Earlier work experience (more than 10 years ago, for reference)</td></tr>
+                @foreach($olderExperiences as $experience)
+                    <tr>
+                        <td>{{ $experience->company_name }}</td>
+                        <td>{{ $experience->company_address }}</td>
+                        <td>{{ $experience->position }}</td>
+                        <td class="center">{{ $experience->number_of_months }}</td>
+                        <td class="center">{{ filled($experience->employment_status) ? $enum($experience->employment_status) : '' }}</td>
+                    </tr>
+                @endforeach
+            @endif
+        </table>
+    @endif
+
+    @if($profileSkills->isNotEmpty())
+        <table class="tight extra">
+            <tr><td class="section">OTHER SKILLS LISTED ON THE APPLICANT'S i-PESO PROFILE</td></tr>
+            <tr><td>{{ $profileSkills->implode(', ') }}</td></tr>
+        </table>
+    @endif
+
+    <table class="page-footer">
+        <tr>
+            <td>{{ $footerNote }}</td>
+            <td class="right"><div class="page-number">Page 3 of {{ $totalPages }}</div></td>
+        </tr>
+    </table>
+</div>
+@endif
 </body>
 </html>

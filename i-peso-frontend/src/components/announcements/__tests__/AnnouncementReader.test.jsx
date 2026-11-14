@@ -2,7 +2,9 @@ import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import AnnouncementBanner from '../AnnouncementBanner'
-import AnnouncementsFeedPage from '@/pages/shared/AnnouncementsFeedPage'
+import { Route, Routes, useLocation } from 'react-router-dom'
+import DashboardAnnouncements from '../DashboardAnnouncements'
+import AnnouncementsRedirect from '../AnnouncementsRedirect'
 import { renderWithProviders } from '@/test/utils'
 import { announcementService } from '@/services/announcementService'
 
@@ -70,18 +72,24 @@ describe('Dashboard announcement banner', () => {
   })
 })
 
-describe('Announcements page', () => {
-  beforeEach(() => vi.clearAllMocks())
+describe('Dashboard announcements (no separate Announcements page)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    announcementService.banner.mockResolvedValue({ data: [], unread_count: 0 })
+  })
 
-  it('lists announcements and opening one shows the full message and link', async () => {
-    announcementService.list.mockResolvedValue({ data: [item({ priority: 'normal' })], unread_count: 1, last_page: 1 })
+  const page = (items, { current = 1, last = 1, unread = 1 } = {}) => ({ data: items, unread_count: unread, current_page: current, last_page: last })
+
+  it('lists every announcement with unread marks and opens the full message', async () => {
+    announcementService.list.mockResolvedValue(page([item({ priority: 'normal' })]))
     announcementService.get.mockResolvedValue({ announcement: item({ priority: 'normal', is_read: true }), unread_count: 0 })
 
-    renderWithProviders(<AnnouncementsFeedPage role="seeker" />)
+    renderWithProviders(<DashboardAnnouncements />, { route: '/seeker/dashboard' })
 
-    expect(await screen.findByText('PESO office closed Friday')).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: /PESO announcements/ })).toHaveTextContent('1 new')
+    expect(screen.getByText('PESO office closed Friday')).toBeInTheDocument()
     expect(screen.getByLabelText('Unread')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /mark all as read \(1\)/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /mark all as read/i })).toBeInTheDocument()
 
     await userEvent.click(screen.getByRole('button', { name: /PESO office closed Friday/i }))
 
@@ -90,13 +98,59 @@ describe('Announcements page', () => {
     expect(screen.getByRole('link', { name: 'View job fairs' })).toHaveAttribute('href', '/seeker/job-fairs')
   })
 
-  it('opens the announcement named in ?open= (the bell notification link)', async () => {
-    announcementService.list.mockResolvedValue({ data: [item()], unread_count: 1, last_page: 1 })
+  it('opens the announcement a bell notification points to (?announcement=)', async () => {
+    announcementService.list.mockResolvedValue(page([item()]))
     announcementService.get.mockResolvedValue({ announcement: item({ is_read: true }), unread_count: 0 })
 
-    renderWithProviders(<AnnouncementsFeedPage role="employer" />, { route: '/employer/announcements?open=1' })
+    renderWithProviders(<DashboardAnnouncements />, { route: '/employer/dashboard?announcement=1' })
 
     await waitFor(() => expect(screen.getByRole('dialog')).toHaveTextContent('Regular hours resume Monday.'))
     expect(announcementService.get).toHaveBeenCalledWith('1')
+  })
+
+  it('shows three at first and loads older ones on request', async () => {
+    const many = Array.from({ length: 10 }, (_, index) => item({ id: index + 1, title: `Notice ${index + 1}`, priority: 'normal' }))
+    announcementService.list
+      .mockResolvedValueOnce(page(many, { current: 1, last: 2 }))
+      .mockResolvedValueOnce(page([item({ id: 11, title: 'Notice 11', priority: 'normal' })], { current: 2, last: 2 }))
+
+    renderWithProviders(<DashboardAnnouncements />, { route: '/seeker/dashboard' })
+
+    expect(await screen.findByText('Notice 3')).toBeInTheDocument()
+    expect(screen.queryByText('Notice 4')).not.toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: /show older announcements/i }))
+    expect(screen.getByText('Notice 8')).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: /show older announcements/i }))
+    expect(await screen.findByText('Notice 11')).toBeInTheDocument()
+    expect(announcementService.list).toHaveBeenLastCalledWith({ page: 2, per_page: 10 })
+    expect(screen.queryByRole('button', { name: /show older announcements/i })).not.toBeInTheDocument()
+  })
+
+  it('stays out of the way when nothing has been announced', async () => {
+    announcementService.list.mockResolvedValue(page([], { unread: 0 }))
+
+    renderWithProviders(<DashboardAnnouncements />, { route: '/seeker/dashboard' })
+
+    await waitFor(() => expect(announcementService.list).toHaveBeenCalled())
+    expect(screen.queryByRole('heading', { name: /PESO announcements/ })).not.toBeInTheDocument()
+  })
+
+  it('sends an old /announcements?open= link to the dashboard with that announcement', async () => {
+    function Where() {
+      const location = useLocation()
+      return <p>at {location.pathname}{location.search}</p>
+    }
+
+    renderWithProviders(
+      <Routes>
+        <Route path="/employer/announcements" element={<AnnouncementsRedirect to="/employer/dashboard" />} />
+        <Route path="/employer/dashboard" element={<Where />} />
+      </Routes>,
+      { route: '/employer/announcements?open=7' },
+    )
+
+    expect(await screen.findByText('at /employer/dashboard?announcement=7')).toBeInTheDocument()
   })
 })

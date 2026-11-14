@@ -18,7 +18,28 @@ export interface ChatReply {
 
 const MAX_HISTORY_TURNS = 12
 
+/** Languages the Translate button offers — the ones ACE understands (same as the website). */
+export const TRANSLATE_LANGUAGES = [
+  { value: 'english', label: 'English' },
+  { value: 'filipino', label: 'Filipino' },
+  { value: 'pangasinan', label: 'Pangasinan' },
+  { value: 'ilocano', label: 'Ilocano' },
+] as const
+
+export type TranslateLanguage = (typeof TRANSLATE_LANGUAGES)[number]['value']
+
 export const chatbotService = {
+  /** Translate one of ACE's replies. Throws an Error with a visitor-safe message. */
+  async translate(text: string, language: TranslateLanguage): Promise<string> {
+    try {
+      const { data } = await apiClient.post('/chat/translate', { text, language })
+      return data.translation as string
+    } catch (error: unknown) {
+      const message = (error as { response?: { data?: { message?: string } } }).response?.data?.message
+      throw new Error(message ?? 'Could not translate right now. Please check your connection and try again.')
+    }
+  },
+
   async askAssistant(message: string, history: ChatTurn[] = []): Promise<ChatReply> {
     try {
       const { data } = await apiClient.post('/chat/public', {

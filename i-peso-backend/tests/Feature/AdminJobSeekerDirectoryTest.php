@@ -21,6 +21,7 @@ class AdminJobSeekerDirectoryTest extends TestCase
         parent::setUp();
 
         Schema::create('administrators', function (Blueprint $table) {
+            $table->softDeletes();
             $table->id('admin_id');
             $table->string('first_name');
             $table->string('last_name');

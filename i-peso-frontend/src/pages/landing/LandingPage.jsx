@@ -20,7 +20,6 @@ import {
 } from 'lucide-react';
 import IPesoLogo from '@/components/branding/IPesoLogo';
 import { useSiteContent } from '@/components/site-content/useSiteContent';
-import LandingFaqSection from '@/components/site-content/LandingFaqSection';
 import { telHref } from '@/components/site-content/siteContentDefaults';
 import {
   FEATURE_CARD_CLASS,
@@ -48,9 +47,9 @@ const LandingPage = () => {
   const sectionMotion = useSectionMotion();
   // Text PESO staff edit in Site Content → Landing page / Office info.
   // Falls back to the built-in wording, so the page is never blank.
-  const { landing, office, featuredFaqs } = useSiteContent();
+  const { landing, office } = useSiteContent();
   // Sections staff switched off in Content Modules → Landing page (the hero always shows).
-  const show = { announcements: true, features: true, jobs: true, programs: true, faq: true, ...(landing.show_sections ?? {}) };
+  const show = { announcements: true, features: true, jobs: true, programs: true, ...(landing.show_sections ?? {}) };
   const [activeTab, setActiveTab] = useState('seeker');
   const [programs, setPrograms] = useState([]);
   const [programsLoading, setProgramsLoading] = useState(true);
@@ -524,10 +523,6 @@ const LandingPage = () => {
       </Motion.section>
       )}
 
-      {show.faq && (
-      <LandingFaqSection faqs={featuredFaqs} office={office} />
-      )}
-
       {/* ── Footer ── */}
       <footer className="relative z-10 border-t border-white/5 bg-[#071122] px-6 py-12">
         <div className="max-w-6xl mx-auto flex flex-col gap-8 sm:flex-row sm:items-start sm:justify-between">
@@ -557,7 +552,6 @@ const LandingPage = () => {
                 {show.jobs && <a href="#jobs" className="hover:text-white transition-colors">Discovery</a>}
                 {show.programs && <a href="#programs" className="hover:text-white transition-colors">Programs</a>}
                 <Link to="/about" className="hover:text-white transition-colors">About PESO</Link>
-                <Link to="/help" className="hover:text-white transition-colors">Help &amp; FAQs</Link>
               </div>
             </div>
             {(office.address || office.phone || office.email || office.hours) && (

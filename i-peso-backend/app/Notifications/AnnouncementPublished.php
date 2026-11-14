@@ -11,9 +11,10 @@ use Illuminate\Notifications\Notification;
 use Illuminate\Support\Str;
 
 /**
- * The optional "Also notify" half of an announcement: a bell entry for every
- * reader in the audience, plus a mobile push for job seekers (the only role
- * with the app). No email/SMS by decision — see docs/announcement-module-plan.md.
+ * Sent for every published announcement (no longer optional, 2026-11-14): a
+ * bell entry for every reader in the audience, plus a mobile push for job
+ * seekers (the only role with the app). Clicking it opens the announcement on
+ * the reader's dashboard. No email/SMS by decision — see docs/announcement-module-plan.md.
  *
  * Not ShouldQueue, like JobFairPublished: AnnouncementService::deliver() is
  * already running after the response / from the scheduler, so it sends inline.

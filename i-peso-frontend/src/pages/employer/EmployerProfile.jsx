@@ -204,10 +204,15 @@ export default function EmployerProfile() {
                 <Fact icon={Factory} label="Industry" muted={!industries.length}>{industries.length ? industries.join(', ') : 'Not set'}</Fact>
                 <Fact icon={UsersRound} label="Company size" muted={!profile.company_size}>{sizeLabel(profile.company_size) ?? 'Not set'}</Fact>
                 <Fact icon={Mail} label="Account email">{profile.email}</Fact>
-                <Fact icon={MapPin} label="Business address" muted={!address.length}>{address.length ? address.join(', ') : 'Not set'}</Fact>
+                <Fact icon={MapPin} label="Business address" muted={!address.length}>
+                  {address.length ? address.join(', ') : 'Not set'}
+                  <button type="button" onClick={() => setEditing({ focus: 'address' })} className="ml-2 inline-flex items-center gap-1 text-xs font-bold text-brand-navy hover:underline">
+                    <Pencil className="h-3 w-3" aria-hidden /> Edit
+                  </button>
+                </Fact>
               </dl>
               <p className="mt-6 rounded-2xl bg-slate-50 px-4 py-3 text-xs leading-5 text-slate-500">
-                The registered name, business type, TIN and address match your permits. To change them, contact the PESO office so they can re-verify your documents.
+                The registered name, business type and TIN match your permits. To change them, contact the PESO office so they can re-verify your documents. You can update your address yourself if you move.
               </p>
             </SectionCard>
 

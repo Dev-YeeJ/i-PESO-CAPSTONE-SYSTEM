@@ -64,7 +64,8 @@ class SiteContentModuleTest extends TestCase
 
         $this->app['auth']->forgetGuards();
         $this->getJson('/api/public/site-content')->assertOk()->assertJsonPath('office.hours', 'Monday to Friday, 8:00 AM - 5:00 PM');
-        $this->getJson('/api/public/faqs')->assertOk()->assertJsonPath('office.phone', '0917 123 4567');
+        // The assistant reads office details through the same service.
+        $this->assertSame('0917 123 4567', app(SiteContentService::class)->office()['phone']);
 
         $this->assertDatabaseHas('activity_logs', ['action' => 'site_content_updated', 'description' => 'Updated office information (office hours, phone).']);
         $this->assertSame(1, SiteContentRevision::query()->where('content_key', 'office')->count());
@@ -195,22 +196,18 @@ class SiteContentModuleTest extends TestCase
         $seekers = $this->postJson('/api/admin/faqs', $this->faqPayload(['question' => 'How do I apply?', 'audience' => 'seekers', 'topic' => 'jobs']))->json('faq.id');
         $employers = $this->postJson('/api/admin/faqs', $this->faqPayload(['question' => 'What documents?', 'audience' => 'employers', 'topic' => 'verification']))->json('faq.id');
 
-        $this->app['auth']->forgetGuards();
-        $this->getJson('/api/public/faqs')->assertOk()->assertJsonCount(0, 'faqs');
+        // FAQs reach readers only through the assistant, filtered by who is asking.
+        $assistantQuestions = fn (?string $role) => app(SiteContentService::class)->faqsForChatbot($role)->pluck('question')->all();
+        $this->assertSame([], $assistantQuestions(null));
 
         Sanctum::actingAs($this->admin('second-admin@example.test'));
         foreach ([$everyone, $seekers, $employers] as $id) {
-            $this->postJson("/api/admin/faqs/{$id}/publish")->assertOk();
+            $this->postJson("/api/admin/faqs/{$id}/publish")->assertOk()->assertJsonPath('message', 'Published. The assistant can use it now.');
         }
 
-        $this->app['auth']->forgetGuards();
-        $this->assertSame([$everyone], array_column($this->getJson('/api/public/faqs')->json('faqs'), 'id'));
-
-        Sanctum::actingAs($this->seeker());
-        $this->assertEqualsCanonicalizing([$everyone, $seekers], array_column($this->getJson('/api/help')->assertOk()->assertJsonPath('role', 'seeker')->json('faqs'), 'id'));
-
-        Sanctum::actingAs($this->employer());
-        $this->assertEqualsCanonicalizing([$everyone, $employers], array_column($this->getJson('/api/help')->assertOk()->json('faqs'), 'id'));
+        $this->assertSame(['Is it free?'], $assistantQuestions(null));
+        $this->assertEqualsCanonicalizing(['Is it free?', 'How do I apply?'], $assistantQuestions('seeker'));
+        $this->assertEqualsCanonicalizing(['Is it free?', 'What documents?'], $assistantQuestions('employer'));
     }
 
     public function test_faq_links_are_limited_to_internal_paths_and_https(): void
@@ -225,29 +222,30 @@ class SiteContentModuleTest extends TestCase
         $this->postJson('/api/admin/faqs', $this->faqPayload(['link_label' => 'Open', 'link_url' => '/seeker/job-fairs']))->assertCreated();
     }
 
-    public function test_only_five_everyone_faqs_can_be_featured_on_the_landing_page(): void
+    public function test_the_help_and_faq_pages_are_gone_and_faqs_only_feed_the_assistant(): void
     {
         Sanctum::actingAs($this->admin());
-        $ids = [];
-        for ($i = 1; $i <= 6; $i++) {
-            $ids[] = $id = $this->postJson('/api/admin/faqs', $this->faqPayload(['question' => "Question {$i}"]))->json('faq.id');
-            $this->postJson("/api/admin/faqs/{$id}/publish")->assertOk();
-        }
-        foreach (array_slice($ids, 0, 5) as $id) {
-            $this->postJson("/api/admin/faqs/{$id}/feature", ['featured' => true])->assertOk();
-        }
+        $id = $this->postJson('/api/admin/faqs', $this->faqPayload(['question' => 'Is it free?']))->json('faq.id');
+        $this->postJson("/api/admin/faqs/{$id}/publish")->assertOk();
 
-        $this->postJson("/api/admin/faqs/{$ids[5]}/feature", ['featured' => true])
-            ->assertStatus(422)->assertJsonValidationErrors(['featured']);
+        // No landing-page "Common questions" toggle any more.
+        $this->postJson("/api/admin/faqs/{$id}/feature", ['featured' => true])->assertNotFound();
+        $this->getJson('/api/admin/faqs')->assertOk()
+            ->assertJsonMissingPath('summary.featured')
+            ->assertJsonMissingPath('data.0.helpful_votes');
 
-        $seekerOnly = $this->postJson('/api/admin/faqs', $this->faqPayload(['audience' => 'seekers']))->json('faq.id');
-        $this->postJson("/api/admin/faqs/{$seekerOnly}/feature", ['featured' => true])->assertStatus(422);
-
+        // Readers have no Help page, FAQ list, votes or search reports — public or signed in.
         $this->app['auth']->forgetGuards();
-        $this->getJson('/api/public/site-content')->assertOk()->assertJsonCount(5, 'featured_faqs');
+        $this->getJson('/api/public/faqs')->assertNotFound();
+        $this->postJson("/api/public/faqs/{$id}/feedback", ['helpful' => true])->assertNotFound();
+        $this->postJson('/api/public/help/search-misses', ['term' => 'tesda'])->assertNotFound();
+        $this->getJson('/api/public/site-content')->assertOk()->assertJsonMissingPath('featured_faqs');
+
+        Sanctum::actingAs($this->seeker());
+        $this->getJson('/api/help')->assertNotFound();
     }
 
-    public function test_reordering_changes_the_reader_order(): void
+    public function test_reordering_changes_the_order_the_assistant_reads(): void
     {
         Sanctum::actingAs($this->admin());
         $a = $this->postJson('/api/admin/faqs', $this->faqPayload(['question' => 'A']))->json('faq.id');
@@ -257,8 +255,7 @@ class SiteContentModuleTest extends TestCase
 
         $this->putJson('/api/admin/faqs/reorder', ['ids' => [$b, $a]])->assertOk();
 
-        $this->app['auth']->forgetGuards();
-        $this->assertSame([$b, $a], array_column($this->getJson('/api/public/faqs')->json('faqs'), 'id'));
+        $this->assertSame(['B', 'A'], app(SiteContentService::class)->faqsForChatbot(null)->pluck('question')->all());
     }
 
     public function test_the_starter_pack_adds_unpublished_drafts_only_once(): void

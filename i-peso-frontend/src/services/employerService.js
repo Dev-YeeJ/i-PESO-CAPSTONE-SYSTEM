@@ -80,6 +80,12 @@ export const getNotificationUnreadCount = async () => {
   return response.data
 }
 
+// Sidebar "Applicants" badge: { new, active, total }.
+export const getApplicantCounts = async () => {
+  const response = await apiClient.get('/employer/applications/counts')
+  return response.data
+}
+
 export const markNotificationRead = async (id) => {
   const response = await apiClient.patch(`/employer/notifications/${id}/read`)
   return response.data

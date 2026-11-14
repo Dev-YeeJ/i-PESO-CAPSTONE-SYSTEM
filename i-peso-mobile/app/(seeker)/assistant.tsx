@@ -24,6 +24,7 @@ import { useMotion } from '@/hooks/useMotion'
 import { AceMascot, type AceState } from '@/components/chat/AceMascot'
 import { AceAvatarMark } from '@/components/chat/AceAvatarMark'
 import { TypingDots } from '@/components/chat/TypingDots'
+import { TranslateBar } from '@/components/chat/TranslateBar'
 import { PressableScale } from '@/components/ui/PressableScale'
 import { JobFeedCard } from '@/components/seeker/JobFeedCard'
 import { formatDate } from '@/utils/seekerView'
@@ -105,6 +106,15 @@ export default function AssistantScreen() {
   const listRef = useRef<FlatList<DisplayMessage>>(null)
 
   const [messages, setMessages] = useState<DisplayMessage[]>([])
+  // Translate button: message id ('greeting' for the welcome) → translated text.
+  const [translations, setTranslations] = useState<Record<string, string>>({})
+  const setTranslation = (id: string, text: string | null) =>
+    setTranslations((current) => {
+      const next = { ...current }
+      if (text === null) delete next[id]
+      else next[id] = text
+      return next
+    })
   const [input, setInput] = useState('')
   const [sending, setSending] = useState(false)
   const [greetingVisible, setGreetingVisible] = useState(false)
@@ -193,6 +203,7 @@ export default function AssistantScreen() {
           ref={listRef}
           data={messages}
           keyExtractor={(item) => item.id}
+          extraData={translations}
           contentContainerStyle={styles.messageList}
           onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: true })}
           ListHeaderComponent={
@@ -201,13 +212,16 @@ export default function AssistantScreen() {
               <View style={styles.bubbleColumn}>
                 {greetingVisible ? (
                   <Animated.View entering={m.enabled ? FadeInUp.duration(260) : undefined} style={[styles.bubble, styles.modelBubble]}>
-                    <Text style={styles.modelText}>{greetingText}</Text>
+                    <Text style={styles.modelText}>{translations.greeting ?? greetingText}</Text>
                   </Animated.View>
                 ) : (
                   <View style={[styles.bubble, styles.modelBubble, styles.typingBubble]}>
                     <TypingDots />
                   </View>
                 )}
+                {greetingVisible ? (
+                  <TranslateBar original={greetingText} onTranslated={(text) => setTranslation('greeting', text)} />
+                ) : null}
               </View>
             </View>
           }
@@ -221,7 +235,7 @@ export default function AssistantScreen() {
                 {item.role !== 'user' ? <AceAvatarMark size={26} /> : null}
                 <View style={styles.bubbleColumn}>
                   <View style={[styles.bubble, item.role === 'user' ? styles.userBubble : styles.modelBubble]}>
-                    <Text style={textStyle}>{renderLinkedText(item.text, textStyle)}</Text>
+                    <Text style={textStyle}>{renderLinkedText(item.role === 'model' ? translations[item.id] ?? item.text : item.text, textStyle)}</Text>
                     {item.role === 'model' && Boolean(item.toolResults?.search_job_vacancies?.vacancies?.length) && (
                       <View style={{ marginTop: spacing.md, gap: spacing.sm }}>
                         {item.toolResults?.search_job_vacancies?.vacancies?.slice(0, 3).map((job: any) => (
@@ -260,6 +274,9 @@ export default function AssistantScreen() {
                       </PressableScale>
                     ) : null}
                   </View>
+                  {item.role === 'model' && !item.retryable ? (
+                    <TranslateBar original={item.text} onTranslated={(text) => setTranslation(item.id, text)} />
+                  ) : null}
                   {item.officeLocation ? <OfficeLocationCard address={item.officeLocation.address} /> : null}
                 </View>
               </Animated.View>

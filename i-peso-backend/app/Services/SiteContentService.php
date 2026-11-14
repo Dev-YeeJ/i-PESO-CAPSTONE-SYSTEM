@@ -16,7 +16,7 @@ use Symfony\Component\HttpKernel\Exception\HttpException;
 /**
  * Reads and writes the portal's standing content (docs/content-module-plan.md).
  *
- * Everything that shows office details — the footer, Help pages, emails, the
+ * Everything that shows office details — the footer, About page, emails, the
  * chatbot — reads through office() so a change is made once. Saved values
  * are cached forever and flushed on every admin write, so a change shows on
  * the very next request with no expiry to wait for.
@@ -46,6 +46,16 @@ class SiteContentService
             if (array_key_exists($field, $saved)) {
                 $merged[$field] = $saved[$field];
             }
+        }
+
+        // Saved landing switches may name a section that no longer exists (the
+        // "Common questions" FAQ section, removed 2026-11-14). Keep only known
+        // ones, so the admin form never sends back a key the validator rejects.
+        if ($key === SiteContentRegistry::LANDING && is_array($merged['show_sections'] ?? null)) {
+            $merged['show_sections'] = array_replace(
+                array_fill_keys(SiteContentRegistry::LANDING_SECTIONS, true),
+                array_intersect_key($merged['show_sections'], array_flip(SiteContentRegistry::LANDING_SECTIONS))
+            );
         }
 
         return $merged;
@@ -164,11 +174,6 @@ class SiteContentService
         $audiences = Faq::audiencesFor($role);
 
         return $this->publishedFaqs()->filter(fn (array $faq) => in_array($faq['audience'], $audiences, true))->values();
-    }
-
-    public function featuredFaqs(): Collection
-    {
-        return $this->faqsFor(null)->filter(fn (array $faq) => $faq['is_featured'])->take(Faq::MAX_FEATURED)->values();
     }
 
     /** What the chatbot may quote: published, capped, answers trimmed. */

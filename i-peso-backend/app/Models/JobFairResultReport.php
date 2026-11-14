@@ -28,5 +28,5 @@ class JobFairResultReport extends Model
     public function participation(): BelongsTo { return $this->belongsTo(JobFairEmployer::class, 'job_fair_employer_id'); }
     public function entries(): HasMany { return $this->hasMany(JobFairResultEntry::class, 'result_report_id'); }
     public function mismatchTallies(): HasMany { return $this->hasMany(JobFairResultMismatchTally::class, 'result_report_id'); }
-    public function encodedByAdmin(): BelongsTo { return $this->belongsTo(Administrator::class, 'encoded_by_admin_id', 'admin_id'); }
+    public function encodedByAdmin(): BelongsTo { return $this->belongsTo(Administrator::class, 'encoded_by_admin_id', 'admin_id')->withTrashed(); }
 }

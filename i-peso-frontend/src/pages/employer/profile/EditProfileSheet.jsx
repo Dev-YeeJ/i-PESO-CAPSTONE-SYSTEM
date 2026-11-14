@@ -5,6 +5,7 @@ import { z } from 'zod'
 import { Check, Lock, Plus, X } from 'lucide-react'
 import { Button, ConfirmDialog } from '@/components/ui'
 import { Sheet, SheetBody, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from '@/components/ui/sheet'
+import AddressPicker from '@/components/maps/AddressPicker'
 import { INDUSTRIES } from '@/utils/constants'
 import { COMPANY_SIZES, MIN_DESCRIPTION, industriesOf } from '@/utils/employerProfileStrength'
 import { cn } from '@/lib/utils'
@@ -21,9 +22,54 @@ const schema = z.object({
   representative_designation: z.string().trim().min(2, 'Enter their position, e.g. HR Manager.').max(255),
   mobile_number: z.string().trim().regex(PHONE, phoneMessage),
   representative_contact_number: z.string().trim().refine((value) => value === '' || PHONE.test(value), phoneMessage),
+  // Checked in submit() only when the address was edited, so an older account
+  // with an incomplete address can still save its other details.
+  address: z.object({}).passthrough(),
+})
+
+/** Same parts registration requires; the codes and pin come from the picker. */
+const ADDRESS_PARTS = [
+  ['province', 'Choose the province.'],
+  ['city', 'Choose the city or municipality.'],
+  ['barangay', 'Choose the barangay.'],
+  ['street', 'Enter the building, street or house number.'],
+]
+
+/** Address fields the server sends back as validation errors, all shown on the one picker. */
+const ADDRESS_FIELDS = ['province', 'city_municipality', 'barangay', 'house_unit_street', 'latitude', 'longitude', 'province_code', 'city_code', 'barangay_code']
+
+const toAddress = (profile) => ({
+  province: profile?.province ?? '',
+  province_code: profile?.province_code ?? '',
+  city: profile?.city_municipality ?? '',
+  city_code: profile?.city_code ?? '',
+  barangay: profile?.barangay ?? '',
+  barangay_code: profile?.barangay_code ?? '',
+  street: profile?.house_unit_street ?? '',
+  latitude: profile?.latitude ?? null,
+  longitude: profile?.longitude ?? null,
+  location_accuracy: profile?.location_accuracy ?? null,
+  google_place_id: profile?.google_place_id ?? null,
+})
+
+/** The picker's shape → the API's field names. The pin is sent only as a pair. */
+const addressPayload = (address) => ({
+  province: address.province.trim(),
+  province_code: address.province_code || null,
+  city_municipality: address.city.trim(),
+  city_code: address.city_code || null,
+  barangay: address.barangay.trim(),
+  barangay_code: address.barangay_code || null,
+  house_unit_street: address.street.trim(),
+  ...(address.latitude != null && address.longitude != null
+    ? { latitude: Number(address.latitude), longitude: Number(address.longitude) }
+    : {}),
+  location_accuracy: address.location_accuracy ?? null,
+  google_place_id: address.google_place_id ?? null,
 })
 
 const toForm = (profile) => ({
+  address: toAddress(profile),
   company_description: profile?.company_description ?? '',
   industry: industriesOf(profile),
   company_size: profile?.company_size ?? undefined,
@@ -121,8 +167,8 @@ function IndustryPicker({ value, onChange, error }) {
 export default function EditProfileSheet({ open, onOpenChange, profile, focusField, onSave }) {
   const [confirmDiscard, setConfirmDiscard] = useState(false)
   const {
-    register, control, handleSubmit, reset, setError, setFocus,
-    formState: { errors, isDirty, isSubmitting },
+    register, control, handleSubmit, reset, setError, clearErrors, setFocus,
+    formState: { errors, isDirty, isSubmitting, dirtyFields },
   } = useForm({ resolver: zodResolver(schema), mode: 'onTouched', defaultValues: toForm(profile) })
 
   // Start from the saved profile every time the panel opens.
@@ -132,10 +178,20 @@ export default function EditProfileSheet({ open, onOpenChange, profile, focusFie
 
   const requestClose = () => (isDirty ? setConfirmDiscard(true) : onOpenChange(false))
 
-  const submit = handleSubmit(async (values) => {
+  const submit = handleSubmit(async ({ address, ...values }) => {
+    const addressEdited = Boolean(dirtyFields.address)
+    if (addressEdited) {
+      const missing = ADDRESS_PARTS.find(([part]) => !String(address[part] ?? '').trim())
+      if (missing) {
+        setError('address', { type: 'manual', message: missing[1] })
+        document.getElementById('address')?.scrollIntoView({ block: 'center' })
+        return
+      }
+    }
     try {
       await onSave({
         ...values,
+        ...(addressEdited ? addressPayload(address) : {}),
         company_description: values.company_description.trim() || null,
         representative_contact_number: values.representative_contact_number || null,
       })
@@ -143,7 +199,10 @@ export default function EditProfileSheet({ open, onOpenChange, profile, focusFie
     } catch (error) {
       const fieldErrors = error?.response?.data?.errors ?? {}
       const entries = Object.entries(fieldErrors)
-      entries.forEach(([field, messages]) => setError(field.split('.')[0], { type: 'server', message: [messages].flat()[0] }))
+      entries.forEach(([field, messages]) => {
+        const name = field.split('.')[0]
+        setError(ADDRESS_FIELDS.includes(name) ? 'address' : name, { type: 'server', message: [messages].flat()[0] })
+      })
       if (!entries.length) setError('root', { type: 'server', message: error?.response?.data?.message ?? error?.response?.data?.error ?? 'Your changes could not be saved. Try again.' })
     }
   })
@@ -158,8 +217,11 @@ export default function EditProfileSheet({ open, onOpenChange, profile, focusFie
           onOpenAutoFocus={(event) => {
             if (!focusField) return
             event.preventDefault()
-            if (focusField === 'industry') document.getElementById('industry')?.focus()
-            else setFocus(focusField)
+            if (focusField === 'industry' || focusField === 'address') {
+              const target = document.getElementById(focusField)
+              target?.focus()
+              target?.scrollIntoView({ block: 'start' })
+            } else setFocus(focusField)
           }}
         >
           <form onSubmit={submit} className="flex h-full flex-col" noValidate>
@@ -228,6 +290,50 @@ export default function EditProfileSheet({ open, onOpenChange, profile, focusFie
                 )} />
               </Group>
 
+              <Group title="Business address">
+                <Controller name="address" control={control} render={({ field }) => {
+                  const value = field.value ?? toAddress(null)
+                  const addressError = errors.address?.message
+                  return (
+                    <div id="address" tabIndex={-1} aria-describedby={addressError ? 'address-error' : 'address-hint'} className="focus:outline-none">
+                      <AddressPicker
+                        title="Company office address"
+                        province={value.province}
+                        provinceCode={value.province_code}
+                        city={value.city}
+                        cityCode={value.city_code}
+                        barangay={value.barangay}
+                        barangayCode={value.barangay_code}
+                        street={value.street}
+                        latitude={value.latitude}
+                        longitude={value.longitude}
+                        location_accuracy={value.location_accuracy}
+                        google_place_id={value.google_place_id}
+                        onChange={(next) => { clearErrors('address'); field.onChange({
+                          ...value,
+                          province: next.province ?? value.province,
+                          province_code: next.province_code ?? value.province_code,
+                          city: next.city ?? value.city,
+                          city_code: next.city_code ?? value.city_code,
+                          barangay: next.barangay ?? value.barangay,
+                          barangay_code: next.barangay_code ?? value.barangay_code,
+                          street: next.street ?? value.street,
+                          latitude: next.latitude ?? value.latitude,
+                          longitude: next.longitude ?? value.longitude,
+                          location_accuracy: next.location_accuracy ?? value.location_accuracy,
+                          google_place_id: next.google_place_id ?? value.google_place_id,
+                        }) }}
+                      />
+                      {addressError ? (
+                        <p id="address-error" className="mt-1.5 text-xs font-semibold text-red-600">{addressError}</p>
+                      ) : (
+                        <p id="address-hint" className="mt-1.5 text-xs text-slate-500">Moved? Update it here. Job seekers see this address and the map pin, and PESO is told about the change.</p>
+                      )}
+                    </div>
+                  )
+                }} />
+              </Group>
+
               <Group title="Representative">
                 <div className="grid gap-5 sm:grid-cols-2">
                   <Field id="representative_name" label="Full name" error={errors.representative_name?.message}>
@@ -247,7 +353,7 @@ export default function EditProfileSheet({ open, onOpenChange, profile, focusFie
 
               <p className="flex gap-2.5 rounded-2xl bg-slate-50 p-4 text-xs leading-5 text-slate-600">
                 <Lock className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" aria-hidden />
-                Your registered name, business type, TIN and address are checked against your permits. To change them, contact the PESO office so they can re-verify your documents.
+                Your registered name, business type and TIN are checked against your permits. To change them, contact the PESO office so they can re-verify your documents.
               </p>
             </SheetBody>
 

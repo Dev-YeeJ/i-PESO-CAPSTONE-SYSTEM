@@ -47,6 +47,8 @@ class NSRPPdfExportController extends Controller
             'seeker' => $seeker,
             'skillsByType' => $skillsByType,
             'generatedDate' => now(),
+            // Printed in the footer so a filed copy shows who produced it and when.
+            'generatedBy' => trim(($admin->first_name ?? '').' '.($admin->last_name ?? '')) ?: null,
         ]);
 
         // Configure PDF options

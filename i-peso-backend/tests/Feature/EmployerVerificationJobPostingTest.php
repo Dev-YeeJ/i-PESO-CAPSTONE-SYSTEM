@@ -1318,6 +1318,7 @@ class EmployerVerificationJobPostingTest extends TestCase
 
         if (! Schema::hasTable('administrators')) {
             Schema::create('administrators', function (Blueprint $table) {
+                $table->softDeletes();
                 $table->id('admin_id');
                 $table->string('first_name');
                 $table->string('last_name');

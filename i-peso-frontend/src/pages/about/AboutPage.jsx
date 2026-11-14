@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { ArrowLeft, ArrowRight, Compass, ExternalLink, Landmark, Target } from 'lucide-react'
 import IPesoLogo from '@/components/branding/IPesoLogo'
 import { useSiteContent } from '@/components/site-content/useSiteContent'
+import { useSystemStatus } from '@/components/system/useSystemStatus'
 import OfficeContactCard from '@/components/site-content/OfficeContactCard'
 import RichText from '@/components/site-content/RichText'
 import { SERVICE_AUDIENCES } from '@/components/site-content/siteContentDefaults'
@@ -18,6 +19,7 @@ const audienceLabel = (value) => SERVICE_AUDIENCES.find((a) => a.value === value
 export default function AboutPage() {
   const navigate = useNavigate()
   const { about, office } = useSiteContent()
+  const { chatbot_enabled: assistantOn } = useSystemStatus()
   const statements = [
     about.mission && { icon: Target, label: 'Mission', text: about.mission },
     about.vision && { icon: Compass, label: 'Vision', text: about.vision },
@@ -99,9 +101,11 @@ export default function AboutPage() {
           )}
 
           <OfficeContactCard office={office} />
-          <p className="text-center text-sm text-slate-600">
-            Have a question? See the <Link to="/help" className="font-bold text-[#0A192F] underline decoration-[#B45309] decoration-2 underline-offset-2">Help &amp; FAQs</Link>.
-          </p>
+          {assistantOn && (
+            <p className="text-center text-sm text-slate-600">
+              Have a question? Ask the <strong className="text-[#0A192F]">i-PESO assistant</strong> — the chat button at the bottom right of the page.
+            </p>
+          )}
         </div>
       </main>
 

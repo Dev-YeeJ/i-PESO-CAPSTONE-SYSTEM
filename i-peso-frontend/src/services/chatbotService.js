@@ -58,6 +58,31 @@ export const chatbotService = {
       }
     }
   },
+
+  /**
+   * Translate one of ACE's replies (the "Translate" button). Throws with a
+   * visitor-safe `message` when the translation can't be made.
+   *
+   * @param {string} text
+   * @param {'english'|'filipino'|'pangasinan'|'ilocano'} language
+   * @returns {Promise<string>} the translated text
+   */
+  async translate(text, language) {
+    try {
+      const { data } = await apiClient.post('/chat/translate', { text, language })
+      return data.translation
+    } catch (error) {
+      throw new Error(error.response?.data?.message ?? 'Could not translate right now. Please check your connection and try again.')
+    }
+  },
 }
+
+/** Languages the Translate button offers — the ones ACE understands. */
+export const TRANSLATE_LANGUAGES = [
+  { value: 'english', label: 'English' },
+  { value: 'filipino', label: 'Filipino' },
+  { value: 'pangasinan', label: 'Pangasinan' },
+  { value: 'ilocano', label: 'Ilocano' },
+]
 
 export default chatbotService

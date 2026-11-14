@@ -69,17 +69,12 @@ Route::get('/public/government-programs', [\App\Http\Controllers\Api\PublicGover
 // Landing page: live announcements addressed to the Public audience.
 Route::get('/public/announcements', [\App\Http\Controllers\Api\PublicAnnouncementController::class, 'index'])->middleware('throttle:60,1');
 Route::get('/public/announcements/{announcement}/attachment', [\App\Http\Controllers\Api\PublicAnnouncementController::class, 'attachment'])->middleware('throttle:60,1');
-// Site Content: landing text + office details, the public Help page, and the versioned policy pages.
+// Site Content: landing text + office details, and the versioned policy pages.
+// (There is no Help & FAQs page any more — FAQs only feed the assistant.)
 Route::controller(\App\Http\Controllers\Api\PublicSiteContentController::class)->middleware('throttle:60,1')->group(function () {
     Route::get('/public/site-content', 'show');
-    Route::get('/public/faqs', 'faqs');
     Route::get('/public/policies/{policy}', 'policy');
     Route::get('/public/policies/{policy}/versions/{version}', 'policyVersion')->whereNumber('version');
-});
-// Help-page readers: "Was this helpful?" and searches that found nothing (Content Modules → Insights).
-Route::controller(\App\Http\Controllers\Api\HelpFeedbackController::class)->middleware('throttle:30,1')->group(function () {
-    Route::post('/public/faqs/{faq}/feedback', 'vote');
-    Route::post('/public/help/search-misses', 'searchMiss');
 });
 // Maintenance / registration / assistant switches (System Settings). Open even during maintenance.
 Route::get('/public/system-status', \App\Http\Controllers\Api\PublicSystemStatusController::class)->middleware('throttle:120,1');
@@ -89,6 +84,8 @@ Route::post('/cookie-consent', [\App\Http\Controllers\Api\CookieConsentControlle
 // The throttle is deliberately tight: every call spends Gemini free-tier quota,
 // and an unauthenticated route is the easiest place to burn a day's worth of it.
 Route::post('/chat/public', PublicChatbotController::class)->middleware('throttle:10,1');
+// "Translate" under each ACE reply: English, Filipino, Pangasinan, Ilocano.
+Route::post('/chat/translate', \App\Http\Controllers\Api\ChatTranslationController::class)->middleware('throttle:20,1');
 
 Route::prefix('auth')->group(function () {
     Route::post('/register', [AuthController::class, 'register'])->middleware('throttle:5,1');
@@ -113,9 +110,6 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/{announcement}/dismiss', 'dismiss')->middleware('throttle:60,1');
         Route::get('/{announcement}/attachment', 'attachment');
     });
-
-    // Help page (FAQs for Everyone + the reader's role, office contact) — web and seeker app.
-    Route::get('/help', \App\Http\Controllers\Api\HelpController::class);
 
     Route::get('/job-fairs', [JobFairController::class, 'index']);
     Route::post('/job-fairs/{id}/rsvp', [JobFairController::class, 'rsvp']);
@@ -196,6 +190,8 @@ Route::middleware('auth:sanctum')->group(function () {
                 ->middleware('throttle:10,1');
             Route::apiResource('vacancies', EmployerJobVacancyController::class);
             Route::get('/applications', [EmployerApplicationController::class, 'index']);
+            // Sidebar "Applicants" badge (before {application} so it isn't read as an id).
+            Route::get('/applications/counts', [EmployerApplicationController::class, 'counts']);
             Route::get('/applications/{application}', [EmployerApplicationController::class, 'show']);
             Route::get('/applications/{application}/seeker-profile-image', [EmployerApplicationController::class, 'seekerProfileImage']);
             Route::get('/applications/{application}/resume', [EmployerApplicationController::class, 'seekerResume']);
@@ -525,7 +521,8 @@ Route::middleware('auth:sanctum')->group(function () {
                 Route::post('/ai-assist', 'assist')->middleware('throttle:20,1');
             });
 
-        // FAQs are kept up to date by Configuration OR Constituent CRM (front desk) staff.
+        // FAQs are the assistant's answer bank, kept up to date by Configuration
+        // OR Constituent CRM (front desk) staff. Readers never see them as a page.
         Route::middleware('admin.permission:configuration|constituent_crm')
             ->prefix('faqs')
             ->controller(\App\Http\Controllers\Api\Admin\Configuration\FaqController::class)
@@ -537,7 +534,6 @@ Route::middleware('auth:sanctum')->group(function () {
                 Route::put('/{faq}', 'update');
                 Route::post('/{faq}/publish', 'publish');
                 Route::post('/{faq}/unpublish', 'unpublish');
-                Route::post('/{faq}/feature', 'feature');
                 Route::get('/{faq}/revisions', 'revisions');
                 Route::delete('/{faq}', 'destroy');
             });
@@ -565,11 +561,13 @@ Route::middleware('auth:sanctum')->group(function () {
         });
 
         // Changing accounts or roles is reserved for the system administrator,
-        // whatever their Configuration access. Staff are deactivated, never
-        // deleted, so the job fairs, programs and reports they created are kept.
+        // whatever their Configuration access. Deleting a staff account is a
+        // soft delete (personal details wiped, row kept), so the job fairs,
+        // programs and reports they created are never cascade-deleted.
         Route::middleware('admin.system')->group(function () {
             Route::post('/staff', [AdminStaffController::class, 'store']);
             Route::put('/staff/{staffMember}', [AdminStaffController::class, 'update']);
+            Route::delete('/staff/{staffMember}', [AdminStaffController::class, 'destroy']);
             Route::post('/staff/{staffMember}/deactivate', [AdminStaffController::class, 'deactivate']);
             Route::post('/staff/{staffMember}/reactivate', [AdminStaffController::class, 'reactivate']);
             Route::post('/staff/{staffMember}/send-password', [AdminStaffController::class, 'sendPassword'])

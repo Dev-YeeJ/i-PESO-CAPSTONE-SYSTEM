@@ -79,5 +79,23 @@ describe('EmployerProfile', () => {
     await waitFor(() => expect(employerProfileService.updateProfile).toHaveBeenCalledWith(
       expect.objectContaining({ mobile_number: '09998887777', industry: ['Manufacturing'] }),
     ))
+    // The address wasn't touched (and this older account's address is incomplete),
+    // so it is neither required nor sent.
+    expect(employerProfileService.updateProfile.mock.calls[0][0]).not.toHaveProperty('province')
+    expect(employerProfileService.updateProfile.mock.calls[0][0]).not.toHaveProperty('house_unit_street')
+  })
+
+  it('lets the employer edit their business address', async () => {
+    renderWithProviders(<EmployerProfile />)
+
+    expect(await screen.findByText(/you can update your address yourself/i)).toBeInTheDocument()
+    expect(screen.queryByText(/TIN and address match your permits/i)).not.toBeInTheDocument()
+
+    const addressRow = screen.getByText('Business address', { selector: 'dt' }).parentElement
+    await userEvent.click(within(addressRow).getByRole('button', { name: /edit/i }))
+    const sheet = await screen.findByRole('dialog', { name: 'Edit company profile' })
+    expect(within(sheet).getByText('Business address')).toBeInTheDocument()
+    expect(within(sheet).getByText('Company office address')).toBeInTheDocument()
+    expect(within(sheet).queryByText(/TIN and address are checked/i)).not.toBeInTheDocument()
   })
 })

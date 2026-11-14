@@ -10,6 +10,7 @@ use App\Models\JobVacancy;
 use App\Models\Occupation;
 use App\Notifications\ApplicationWithdrawnNotification;
 use App\Notifications\InterviewReminderNotification;
+use App\Notifications\NewApplicationReceivedNotification;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
@@ -406,6 +407,57 @@ class HiringApplicationFlowTest extends TestCase
         return [$employer, $seeker, $application];
     }
 
+    public function test_the_employer_is_notified_when_a_job_seeker_applies(): void
+    {
+        Notification::fake();
+        $employer = $this->createEmployer();
+        $otherEmployer = $this->createEmployer();
+        $vacancy = $this->createVacancy($employer);
+
+        Sanctum::actingAs($this->createSeeker());
+        $this->postJson("/api/seeker/jobs/{$vacancy->post_id}/apply")->assertCreated();
+        // Applying twice is not a second application, so no second notification.
+        $this->postJson("/api/seeker/jobs/{$vacancy->post_id}/apply")->assertOk();
+
+        Notification::assertSentToTimes($employer, NewApplicationReceivedNotification::class, 1);
+        Notification::assertNotSentTo($otherEmployer, NewApplicationReceivedNotification::class);
+        Notification::assertSentTo($employer, NewApplicationReceivedNotification::class, function ($notification, array $channels) use ($employer, $vacancy) {
+            $data = $notification->toArray($employer);
+
+            return $channels === ['database']
+                && $data['type'] === 'application_received'
+                && str_starts_with($data['message'], 'Juan Dela Cruz applied for Software Developer.')
+                && $data['action_url'] === "/employer/ats?vacancy_id={$vacancy->post_id}";
+        });
+    }
+
+    public function test_the_applicants_badge_counts_new_active_and_total_for_this_employer_only(): void
+    {
+        Notification::fake();
+        $employer = $this->createEmployer();
+        $vacancy = $this->createVacancy($employer);
+        $otherVacancy = $this->createVacancy($this->createEmployer());
+
+        foreach (range(1, 3) as $i) {
+            Sanctum::actingAs($this->createSeeker());
+            $this->postJson("/api/seeker/jobs/{$vacancy->post_id}/apply")->assertCreated();
+        }
+        Sanctum::actingAs($this->createSeeker());
+        $this->postJson("/api/seeker/jobs/{$otherVacancy->post_id}/apply")->assertCreated();
+
+        $applications = Application::query()->where('post_id', $vacancy->post_id)->orderBy('apply_id')->get();
+        $applications[0]->update(['status' => 'reviewed']);
+        $applications[1]->update(['status' => 'rejected']);
+
+        Sanctum::actingAs($employer);
+        $this->getJson('/api/employer/applications/counts')
+            ->assertOk()
+            ->assertExactJson(['new' => 1, 'active' => 2, 'total' => 3]);
+
+        Sanctum::actingAs($this->createSeeker());
+        $this->getJson('/api/employer/applications/counts')->assertForbidden();
+    }
+
     public function test_seekers_can_view_application_timeline_and_withdraw(): void
     {
         $employer = $this->createEmployer();
@@ -639,6 +691,7 @@ class HiringApplicationFlowTest extends TestCase
 
         if (! Schema::hasTable('administrators')) {
             Schema::create('administrators', function (Blueprint $table) {
+                $table->softDeletes();
                 $table->id('admin_id');
                 $table->string('first_name');
                 $table->string('last_name');

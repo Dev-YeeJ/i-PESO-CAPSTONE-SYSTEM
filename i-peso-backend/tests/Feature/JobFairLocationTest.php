@@ -267,6 +267,7 @@ class JobFairLocationTest extends TestCase
         });
 
         Schema::create('administrators', function (Blueprint $t) {
+            $t->softDeletes();
             $t->id('admin_id');
             $t->string('first_name');
             $t->string('last_name');

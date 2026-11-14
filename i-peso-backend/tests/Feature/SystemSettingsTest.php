@@ -111,7 +111,7 @@ class SystemSettingsTest extends TestCase
             ->assertOk()
             ->assertJsonPath('maintenance.enabled', true)
             ->assertJsonPath('maintenance.message', 'We are moving to a new server until 5 PM today.');
-        $this->getJson('/api/public/faqs')
+        $this->getJson('/api/public/site-content')
             ->assertStatus(503)
             ->assertJsonPath('maintenance', true)
             ->assertJsonPath('message', 'We are moving to a new server until 5 PM today.');
@@ -119,14 +119,14 @@ class SystemSettingsTest extends TestCase
         $this->assertNotSame(503, $this->postJson('/api/auth/login', ['email' => 'nobody@example.test', 'password' => 'x'])->status());
 
         Sanctum::actingAs($this->seeker());
-        $this->getJson('/api/help')->assertStatus(503);
+        $this->getJson('/api/job-fairs')->assertStatus(503);
 
         Sanctum::actingAs($admin);
         $this->getJson('/api/admin/system-settings')->assertOk();
         $this->putJson('/api/admin/system-settings', ['values' => ['maintenance.enabled' => false]])->assertOk();
 
         $this->app['auth']->forgetGuards();
-        $this->assertNotSame(503, $this->getJson('/api/public/faqs')->status());
+        $this->assertNotSame(503, $this->getJson('/api/public/site-content')->status());
     }
 
     public function test_registration_can_be_paused_per_role(): void

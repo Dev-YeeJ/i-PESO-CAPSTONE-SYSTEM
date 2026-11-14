@@ -8,9 +8,7 @@ import {
   ChevronLeft,
   CircleCheck,
   LayoutDashboard,
-  LifeBuoy,
-  LogOut,
-  Megaphone,
+  LogOut,
   Menu,
   PlusCircle,
   ShieldAlert,
@@ -19,6 +17,9 @@ import {
   X,
 } from 'lucide-react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
+import { getApplicantCounts } from '@/services/employerService'
+import { APPLICANTS_CHANGED_EVENT } from '@/services/employerApplicationService'
 import NotificationBell from '@/pages/employer/components/NotificationBell'
 import { useAuthStore } from '@/stores/authStore'
 import IPesoLogo from '@/components/branding/IPesoLogo'
@@ -26,8 +27,6 @@ import SignOutConfirmDialog from '@/components/common/SignOutConfirmDialog'
 
 const navItems = [
   { to: '/employer/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  // Not `protected`: employers still being verified need PESO notices too.
-  { to: '/employer/announcements', label: 'Announcements', icon: Megaphone },
   { to: '/employer/profile', label: 'Company Profile', icon: Building2, protected: true },
   { to: '/employer/post-job', label: 'Create Job Post', icon: PlusCircle, protected: true },
   { to: '/employer/vacancies', label: 'My Vacancies', icon: BriefcaseBusiness, protected: true },
@@ -39,7 +38,6 @@ const navItems = [
   { to: '/employer/reviews', label: 'Reviews', icon: Star, protected: true },
   { to: '/employer/safety-reports', label: 'Safety Reports', icon: ShieldAlert, protected: true },
   // Not `protected`: pending employers ask the most questions.
-  { to: '/employer/help', label: 'Help & FAQs', icon: LifeBuoy },
 ]
 
 const pageNames = {
@@ -63,6 +61,27 @@ export default function EmployerLayout() {
   const [signOutOpen, setSignOutOpen] = useState(false)
   const approved = user?.verification_status === 'verified'
   const visibleItems = navItems.filter((item) => !item.protected || approved)
+
+  // "Applicants" badge: applicants nobody has reviewed yet. Polled like the bell.
+  const applicantCounts = useQuery({
+    queryKey: ['employer', 'applicantCounts'],
+    queryFn: getApplicantCounts,
+    enabled: approved,
+    refetchInterval: 30000,
+    staleTime: 15000,
+  })
+  const refetchApplicantCounts = applicantCounts.refetch
+  useEffect(() => {
+    if (!approved) return undefined
+    const refresh = () => refetchApplicantCounts()
+    window.addEventListener(APPLICANTS_CHANGED_EVENT, refresh)
+    return () => window.removeEventListener(APPLICANTS_CHANGED_EVENT, refresh)
+  }, [approved, refetchApplicantCounts])
+  const newApplicants = applicantCounts.data?.new ?? 0
+  const badgeFor = (to) => (to === '/employer/ats' && newApplicants > 0 ? newApplicants : 0)
+  const badgeTitle = applicantCounts.data
+    ? `${newApplicants} new applicant${newApplicants === 1 ? '' : 's'} waiting for review · ${applicantCounts.data.total} in total`
+    : undefined
   
   const logoUrl = user?.employer?.logo_url
   const companyName = user?.employer?.company_name || user?.name
@@ -108,12 +127,15 @@ export default function EmployerLayout() {
       <nav className="flex-1 overflow-y-auto px-3 py-5">
         {!collapsed && <p className="px-3 pb-3 text-[11px] font-extrabold uppercase tracking-[0.16em] text-blue-300/70">My Company</p>}
         <div className="space-y-1.5">
-          {visibleItems.map(({ to, label, icon }) => (
+          {visibleItems.map(({ to, label, icon }) => {
+            const badge = badgeFor(to)
+            return (
             <NavLink
               key={to}
               to={to}
               end={to.endsWith('dashboard')}
-              title={collapsed ? label : undefined}
+              title={badge ? `${label} — ${badgeTitle}` : collapsed ? label : undefined}
+              aria-label={badge ? `${label}, ${badge} new` : undefined}
               onClick={() => setMobileOpen(false)}
               className={({ isActive }) => `flex min-h-12 items-center rounded-xl text-sm font-bold transition ${
                 collapsed ? 'justify-center px-2' : 'gap-3 px-4'
@@ -122,10 +144,23 @@ export default function EmployerLayout() {
                 : 'portal-sidebar-link'
               }`}
             >
-              {createElement(icon, { className: 'h-5 w-5 shrink-0' })}
+              <span className="relative shrink-0">
+                {createElement(icon, { className: 'h-5 w-5' })}
+                {badge > 0 && collapsed && (
+                  <span className="absolute -right-2 -top-2 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-extrabold leading-none text-white ring-2 ring-[#0A192F]">
+                    {badge > 99 ? '99+' : badge}
+                  </span>
+                )}
+              </span>
               {!collapsed && label}
+              {badge > 0 && !collapsed && (
+                <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-[11px] font-extrabold leading-none text-white">
+                  {badge > 99 ? '99+' : badge}
+                </span>
+              )}
             </NavLink>
-          ))}
+            )
+          })}
         </div>
 
         {!approved && !collapsed && (

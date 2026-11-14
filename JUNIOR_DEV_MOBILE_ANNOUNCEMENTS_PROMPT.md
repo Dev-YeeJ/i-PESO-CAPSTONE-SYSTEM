@@ -1,5 +1,12 @@
 # Master prompt: PESO Announcements in the i-PESO mobile app (job seeker)
 
+> **UPDATED 2026-11-14: read this first. It overrides the steps below where they disagree.**
+> The website no longer has an Announcements page or sidebar item. Announcements now live in two places only: the **notification bell** and the **dashboard (Home)**. Build the app the same way:
+> - **Do not build** `app/(seeker)/announcements.tsx` (Step 3) or the Profile entry point (Step 6). `AnnouncementsFeedPage.jsx` was deleted.
+> - **Home (Step 4):** rebuild `i-peso-frontend/src/components/announcements/DashboardAnnouncements.jsx`. It shows the urgent/important banner on top, then a "PESO announcements" card that lists *every* announcement (unread dots, "Mark all as read", first 3 shown, "Show older announcements" loads more via `GET /api/announcements?page=N&per_page=10`).
+> - **Notifications:** every published announcement now sends a bell notification and a push. There is no "Also notify" switch any more. The bell's `action_url` is `/seeker/dashboard?announcement={id}`. Push `data` is still `{ type: 'announcement', announcement_id }`. A tap should open Home and show that announcement's sheet.
+> - Steps 1 (service/types), 2 (announcement sheet) and 5 (notification taps → Home + sheet) still apply.
+
 Paste everything below the line into your AI coding assistant, opened in the `i-PESO-CAPSTONE-SYSTEM` repository. Pull the latest `main` first.
 
 ---

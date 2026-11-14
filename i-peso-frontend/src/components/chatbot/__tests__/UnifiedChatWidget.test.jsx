@@ -2,10 +2,16 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import UnifiedChatWidget from '../UnifiedChatWidget'
 
-const { askPublic } = vi.hoisted(() => ({ askPublic: vi.fn() }))
+const { askPublic, translate } = vi.hoisted(() => ({ askPublic: vi.fn(), translate: vi.fn() }))
 
 vi.mock('@/services/chatbotService', () => ({
-  chatbotService: { askPublic },
+  chatbotService: { askPublic, translate },
+  TRANSLATE_LANGUAGES: [
+    { value: 'english', label: 'English' },
+    { value: 'filipino', label: 'Filipino' },
+    { value: 'pangasinan', label: 'Pangasinan' },
+    { value: 'ilocano', label: 'Ilocano' },
+  ],
 }))
 
 vi.mock('@/stores/authStore', () => ({
@@ -35,6 +41,7 @@ MockSpeechRecognition.instances = []
 describe('UnifiedChatWidget voice controls', () => {
   beforeEach(() => {
     askPublic.mockReset()
+    translate.mockReset()
     MockSpeechRecognition.instances = []
     Object.defineProperty(window, 'SpeechRecognition', {
       configurable: true,
@@ -168,5 +175,56 @@ describe('UnifiedChatWidget voice controls', () => {
     expect(utterance.lang).toBe(navigator.languages?.[0] || navigator.language || 'fil-PH')
     fireEvent.click(screen.getByRole('button', { name: 'Stop speaking reply' }))
     expect(window.speechSynthesis.cancel).toHaveBeenCalled()
+  })
+})
+
+describe('UnifiedChatWidget translate', () => {
+  beforeEach(() => {
+    askPublic.mockReset()
+    translate.mockReset()
+    Object.defineProperty(window, 'speechSynthesis', { configurable: true, value: { cancel: vi.fn(), speak: vi.fn() } })
+    Object.defineProperty(window, 'SpeechSynthesisUtterance', { configurable: true, value: class { constructor(text) { this.text = text } } })
+  })
+
+  it('translates a reply into any language ACE understands, reads the translation aloud, and can go back', async () => {
+    askPublic.mockResolvedValue({ reply: 'Registration is free.', officeLocation: null, retryable: false, toolResults: {} })
+    translate.mockResolvedValue('Awan bayadna ti panagrehistro.')
+    render(<UnifiedChatWidget />)
+    fireEvent.click(screen.getByRole('button', { name: 'Ask ACE' }))
+    fireEvent.change(screen.getByRole('textbox', { name: 'Your question' }), { target: { value: 'Is it free?' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Send message' }))
+    await screen.findByText('Registration is free.')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Translate reply' }))
+    const menu = screen.getByRole('menu', { name: 'Translate to' })
+    expect(Array.from(menu.querySelectorAll('[role="menuitemradio"]'), (item) => item.textContent)).toEqual(['English', 'Filipino', 'Pangasinan', 'Ilocano'])
+    fireEvent.click(screen.getByRole('menuitemradio', { name: 'Ilocano' }))
+
+    expect(await screen.findByText('Awan bayadna ti panagrehistro.')).toBeInTheDocument()
+    expect(translate).toHaveBeenCalledWith('Registration is free.', 'ilocano')
+    expect(screen.queryByText('Registration is free.')).not.toBeInTheDocument()
+    expect(screen.getByText(/Translated to Ilocano/)).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Read reply aloud' }))
+    expect(window.speechSynthesis.speak.mock.calls[0][0].text).toBe('Awan bayadna ti panagrehistro.')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Show original' }))
+    expect(screen.getByText('Registration is free.')).toBeInTheDocument()
+  })
+
+  it('keeps the original and explains when a translation fails', async () => {
+    askPublic.mockResolvedValue({ reply: 'Registration is free.', officeLocation: null, retryable: false, toolResults: {} })
+    translate.mockRejectedValue(new Error('The translation is not available right now. Please try again.'))
+    render(<UnifiedChatWidget />)
+    fireEvent.click(screen.getByRole('button', { name: 'Ask ACE' }))
+    fireEvent.change(screen.getByRole('textbox', { name: 'Your question' }), { target: { value: 'Is it free?' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Send message' }))
+    await screen.findByText('Registration is free.')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Translate reply' }))
+    fireEvent.click(screen.getByRole('menuitemradio', { name: 'Pangasinan' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('The translation is not available right now.')
+    expect(screen.getByText('Registration is free.')).toBeInTheDocument()
   })
 })

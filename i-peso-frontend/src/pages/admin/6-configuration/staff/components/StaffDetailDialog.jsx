@@ -2,17 +2,19 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
-import { KeyRound, Pencil, UserCheck, UserX } from 'lucide-react'
+import { KeyRound, Pencil, Trash2, UserCheck, UserX } from 'lucide-react'
 import { Badge, Button, ConfirmDialog } from '@/components/ui'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { staffService } from '@/services/staffService'
 import { adminService } from '@/services/adminService'
 import { ACCESS_LABELS, MODULE_LABELS } from '@/utils/adminAccess'
 import { accountStatus, errorMessage, formatDate, formatDateTime, initialsOf } from '../staffDisplay'
+import DeleteStaffDialog from './DeleteStaffDialog'
 
 /** One staff member's profile, with the system administrator's account actions. */
-export default function StaffDetailDialog({ staff, canManageAccounts, canViewActivity, isSelf, onOpenChange, onEdit, onChanged }) {
+export default function StaffDetailDialog({ staff, canManageAccounts, canViewActivity, isSelf, onOpenChange, onEdit, onChanged, onDeleted }) {
   const [confirm, setConfirm] = useState(null)
+  const [deleting, setDeleting] = useState(false)
   const open = !!staff
 
   const run = useMutation({
@@ -36,6 +38,8 @@ export default function StaffDetailDialog({ staff, canManageAccounts, canViewAct
 
   const status = accountStatus(staff)
   const setupPending = staff.account_status === 'invited' || staff.account_status === 'invite_expired'
+  // Same rule as the API: deactivate first, unless the invite was never used.
+  const canDelete = staff.status !== 'active' || !staff.last_login_at
   const access = Object.entries(staff.access ?? {})
 
   const confirmations = {
@@ -66,7 +70,7 @@ export default function StaffDetailDialog({ staff, canManageAccounts, canViewAct
 
   return (
     <>
-      <Dialog open={open && !confirm} onOpenChange={onOpenChange}>
+      <Dialog open={open && !confirm && !deleting} onOpenChange={onOpenChange}>
         <DialogContent className="max-h-[92vh] max-w-xl overflow-y-auto">
           <DialogHeader>
             <div className="flex items-center gap-4">
@@ -145,12 +149,20 @@ export default function StaffDetailDialog({ staff, canManageAccounts, canViewAct
               ) : (
                 <Button variant="outline" size="sm" icon={UserCheck} onClick={() => setConfirm('reactivate')}>Reactivate</Button>
               )}
+              {canDelete && (
+                <Button variant="ghost" size="sm" icon={Trash2} className="text-red-700 hover:bg-red-50 hover:text-red-800 sm:ml-auto" onClick={() => setDeleting(true)}>
+                  Delete account
+                </Button>
+              )}
+              {!canDelete && (
+                <p className="w-full text-xs text-slate-500">To delete this account permanently, deactivate it first.</p>
+              )}
             </div>
           )}
           {canManageAccounts && isSelf && (
             <div className="flex flex-wrap items-center gap-3 border-t border-slate-200 pt-4">
               <Button variant="outline" size="sm" icon={Pencil} onClick={onEdit}>Edit my details</Button>
-              <p className="text-xs text-slate-500">You can't deactivate your own account or change your own position.</p>
+              <p className="text-xs text-slate-500">You can't deactivate or delete your own account, or change your own position.</p>
             </div>
           )}
         </DialogContent>
@@ -165,6 +177,16 @@ export default function StaffDetailDialog({ staff, canManageAccounts, canViewAct
         variant={pending?.variant}
         busy={run.isPending}
         onConfirm={() => run.mutate({ action: confirm })}
+      />
+
+      <DeleteStaffDialog
+        staff={staff}
+        open={deleting}
+        onOpenChange={setDeleting}
+        onDeleted={(data) => {
+          setDeleting(false)
+          onDeleted(data)
+        }}
       />
     </>
   )

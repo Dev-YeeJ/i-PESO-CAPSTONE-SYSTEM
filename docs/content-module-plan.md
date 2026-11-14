@@ -2,7 +2,9 @@
 
 **System:** i-PESO Smart Employment System (Urdaneta City PESO)
 **Module owner:** Admin side, under **Configuration → Content Modules** at `/admin/content-modules` (the interim `/admin/site-content` link redirects there)
-**Status:** Implemented on the backend and website, all phases, plus the wider content types and smart features in §9 (2026-11-13). Mobile side handed off — see `JUNIOR_DEV_MOBILE_HELP_PROMPT.md`. Section 8 lists where the build differs from this plan. (The module was briefly called "Site Content"; API paths under `/admin/site-content/*` keep that name.)
+**Status:** Implemented on the backend and website, all phases, plus the wider content types and smart features in §9 (2026-11-13). Mobile side handed off — see `JUNIOR_DEV_MOBILE_HELP_PROMPT.md` (now cancelled).
+
+> **Update 2026-11-14 — Help & FAQs removed.** The reader-facing Help pages (`/help`, `/seeker/help`, `/employer/help`), the landing "Common questions" section, "Was this helpful?" votes, empty-search reports, "Show on home" featuring and FAQ link buttons were all removed: the assistant (chatbot) covers that job. FAQs remain as the **assistant's answer bank** (Content Modules → Assistant → FAQs), and the chatbot gap report remains (Assistant insights). Where this plan describes Help pages, votes or search reports, it is historical. Section 8 lists where the build differs from this plan. (The module was briefly called "Site Content"; API paths under `/admin/site-content/*` keep that name.)
 **Related:** [Announcement module](announcement-module-plan.md). Announcements are *news*; this module is the *standing information* that does not expire.
 
 ---

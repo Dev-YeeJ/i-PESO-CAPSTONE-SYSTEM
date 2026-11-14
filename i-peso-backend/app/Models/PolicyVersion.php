@@ -32,12 +32,12 @@ class PolicyVersion extends Model
 
     public function publisher(): BelongsTo
     {
-        return $this->belongsTo(Administrator::class, 'published_by', 'admin_id');
+        return $this->belongsTo(Administrator::class, 'published_by', 'admin_id')->withTrashed();
     }
 
     public function editor(): BelongsTo
     {
-        return $this->belongsTo(Administrator::class, 'updated_by', 'admin_id');
+        return $this->belongsTo(Administrator::class, 'updated_by', 'admin_id')->withTrashed();
     }
 
     public function scopeFor(Builder $query, string $policy): Builder

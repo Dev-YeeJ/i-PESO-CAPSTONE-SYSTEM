@@ -109,7 +109,7 @@ function OfficeInfoForm({ section, canEdit }) {
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h2 className="text-lg font-black text-slate-950">Office information</h2>
-            <p className="mt-1 max-w-xl text-sm text-slate-600">Entered once, used everywhere: footer, Help pages, Privacy Policy, emails and the assistant.</p>
+            <p className="mt-1 max-w-xl text-sm text-slate-600">Entered once, used everywhere: footer, About page, assistant, Privacy Policy, emails and the assistant.</p>
           </div>
           <Button size="sm" variant="ghost" icon={History} onClick={() => setHistoryOpen(true)}>History</Button>
         </div>

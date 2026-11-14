@@ -22,7 +22,7 @@ const EMPTY = {
   priority: 'normal',
   audience: 'all',
   is_pinned: false,
-  notify_users: false,
+  notify_users: true, // always on: every announcement reaches the audience's bell
   schedule: false,
   publish_at: '',
   has_expiry: false,
@@ -322,23 +322,19 @@ export default function AnnouncementFormPage() {
                 </div>
               )}
 
-              <label className="flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3.5">
-                <input
-                  type="checkbox"
-                  checked={form.notify_users}
-                  onChange={(e) => set('notify_users', e.target.checked)}
-                  disabled={readOnly || alreadyNotified}
-                  className="mt-0.5 h-4 w-4 rounded border-slate-300"
-                />
-                <span className="text-sm">
-                  <span className="flex items-center gap-2 font-extrabold text-slate-950"><BellRing className="h-4 w-4 text-slate-400" /> Also notify the audience</span>
+              <div className="flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3.5">
+                <BellRing className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" aria-hidden="true" />
+                <p className="text-sm">
+                  <span className="block font-extrabold text-slate-950">How readers get it</span>
                   <span className="mt-0.5 block text-xs text-slate-600">
                     {alreadyNotified
-                      ? `Sent to ${announcement.notified_count.toLocaleString()} users on ${formatDateTime(announcement.notified_at)} — notifications are only sent once.`
-                      : `Bell notification${form.audience !== 'employers' ? ' + mobile push for job seekers' : ''}, sent once when it goes live.`}
+                      ? `Notified ${announcement.notified_count.toLocaleString()} users on ${formatDateTime(announcement.notified_at)} — notifications are only sent once.`
+                      : !form.notify_users
+                        ? 'Published before notifications were automatic, so saving changes will not notify anyone. It still shows on their dashboards.'
+                        : `Automatically: a bell notification${form.audience !== 'employers' ? ' (and a mobile push for job seekers)' : ''}, sent once when it goes live, and a card on each reader's dashboard.`}
                   </span>
-                </span>
-              </label>
+                </p>
+              </div>
             </div>
 
             {/* ── Optional settings, collapsed by default ── */}
@@ -596,7 +592,7 @@ function StatusPanel({ announcement }) {
         <Row label="Notifications">
           {announcement.notified_at
             ? `Sent to ${announcement.notified_count.toLocaleString()} · ${formatDateTime(announcement.notified_at)}`
-            : announcement.notify_users ? (announcement.state === 'scheduled' ? 'Will send when it goes live' : 'Sending…') : 'Not requested'}
+            : announcement.notify_users ? (announcement.state === 'scheduled' ? 'Will send when it goes live' : 'Sending…') : 'Not sent (published before notifications were automatic)'}
         </Row>
       </dl>
 

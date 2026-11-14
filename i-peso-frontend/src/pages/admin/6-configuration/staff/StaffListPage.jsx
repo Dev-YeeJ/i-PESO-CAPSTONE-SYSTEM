@@ -216,6 +216,11 @@ export default function StaffListPage() {
         onOpenChange={(open) => !open && setSelectedId(null)}
         onEdit={() => { setForm({ staff: selected }); setSelectedId(null) }}
         onChanged={handleChanged}
+        onDeleted={() => {
+          setSelectedId(null)
+          refresh() // includes the org chart (['admin', 'staff', …])
+          queryClient.invalidateQueries({ queryKey: ['admin', 'ojt'] })
+        }}
       />
 
       {form && (

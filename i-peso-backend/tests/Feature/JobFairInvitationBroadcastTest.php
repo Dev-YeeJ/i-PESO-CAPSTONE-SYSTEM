@@ -474,6 +474,7 @@ class JobFairInvitationBroadcastTest extends TestCase
     private function createTables(): void
     {
         Schema::create('administrators', function (Blueprint $t) {
+            $t->softDeletes();
             $t->id('admin_id'); $t->string('first_name'); $t->string('last_name'); $t->string('email')->unique();
             $t->string('password'); $t->string('role')->nullable(); $t->string('status')->nullable();
             $t->timestamp('email_verified_at')->nullable(); $t->rememberToken(); $t->timestamps();

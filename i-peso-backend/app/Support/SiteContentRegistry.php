@@ -21,7 +21,7 @@ final class SiteContentRegistry
     public const KEYS = [self::OFFICE, self::LANDING, self::ABOUT];
 
     /** Landing page sections staff can switch off (the hero always shows). */
-    public const LANDING_SECTIONS = ['announcements', 'features', 'jobs', 'programs', 'faq'];
+    public const LANDING_SECTIONS = ['announcements', 'features', 'jobs', 'programs'];
 
     /** Who a PESO service is for (About page). */
     public const SERVICE_AUDIENCES = ['everyone', 'seekers', 'employers'];

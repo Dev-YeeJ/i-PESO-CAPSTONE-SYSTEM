@@ -31,7 +31,7 @@ class PublicChatbotController extends Controller
         // Switched off in System Settings → Access: answer without spending AI quota.
         if (! app(\App\Services\SystemSettings::class)->bool('chatbot.enabled')) {
             return response()->json([
-                'message' => 'The assistant is switched off right now. Please see the Help page or contact the PESO office.',
+                'message' => 'The assistant is switched off right now. Please contact the PESO office — the details are at the bottom of the home page.',
                 'assistant_disabled' => true,
             ], 503);
         }

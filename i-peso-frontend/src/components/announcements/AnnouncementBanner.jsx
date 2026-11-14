@@ -10,10 +10,15 @@ import { priorityMeta } from './announcementMeta'
  * announcements this person hasn't dismissed (max 3, urgent first). Renders
  * nothing — and never blocks the dashboard — when there are none or the
  * request fails.
+ *
+ * `onOpen(id)`: when given (the dashboard), "Read more" is handed to the parent
+ * so the page has one announcement dialog; otherwise the banner opens its own.
  */
-export default function AnnouncementBanner({ className = 'mb-4 sm:mb-5' }) {
+export default function AnnouncementBanner({ className = 'mb-4 sm:mb-5', onOpen }) {
   const queryClient = useQueryClient()
-  const [openId, setOpenId] = useState(null)
+  const [ownOpenId, setOwnOpenId] = useState(null)
+  const openId = onOpen ? null : ownOpenId
+  const setOpenId = onOpen ?? setOwnOpenId
   const [hidden, setHidden] = useState(() => new Set())
 
   const bannerQuery = useQuery({
@@ -25,7 +30,7 @@ export default function AnnouncementBanner({ className = 'mb-4 sm:mb-5' }) {
 
   const items = (bannerQuery.data?.data ?? []).filter((item) => !hidden.has(item.id))
   if (!items.length) {
-    return openId ? <AnnouncementDetailDialog announcementId={openId} onClose={() => setOpenId(null)} /> : null
+    return openId ? <AnnouncementDetailDialog announcementId={openId} onClose={() => setOwnOpenId(null)} /> : null
   }
 
   const dismiss = async (id) => {
@@ -75,7 +80,7 @@ export default function AnnouncementBanner({ className = 'mb-4 sm:mb-5' }) {
           )
         })}
       </section>
-      <AnnouncementDetailDialog announcementId={openId} onClose={() => setOpenId(null)} />
+      {!onOpen && <AnnouncementDetailDialog announcementId={openId} onClose={() => setOwnOpenId(null)} />}
     </>
   )
 }

@@ -108,6 +108,7 @@ class AdminAnalyticsDashboardTest extends TestCase
     private function createSchema(): void
     {
         Schema::create('administrators', function (Blueprint $table) {
+            $table->softDeletes();
             $table->id('admin_id'); $table->string('first_name'); $table->string('last_name'); $table->string('email')->unique();
             $table->string('password'); $table->string('role'); $table->string('status'); $table->timestamps();
         });

@@ -35,6 +35,12 @@ export const staffService = {
     return data
   },
 
+  // Permanent: wipes their contact details and sign-in; records they handled stay.
+  deleteStaff: async (id) => {
+    const { data } = await api.delete(`/admin/staff/${id}`)
+    return data
+  },
+
   // Emails a new temporary password (a fresh invite if they never set up).
   sendPassword: async (id) => {
     const { data } = await api.post(`/admin/staff/${id}/send-password`)

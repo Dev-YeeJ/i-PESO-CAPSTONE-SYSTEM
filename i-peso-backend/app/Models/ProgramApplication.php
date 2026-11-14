@@ -58,7 +58,7 @@ class ProgramApplication extends Model
 
     public function reviewer(): BelongsTo
     {
-        return $this->belongsTo(Administrator::class, 'reviewed_by_admin_id', 'admin_id');
+        return $this->belongsTo(Administrator::class, 'reviewed_by_admin_id', 'admin_id')->withTrashed();
     }
 
     public function documents(): HasMany

@@ -44,12 +44,12 @@ class OjtTimeLog extends Model
 
     public function intern(): BelongsTo
     {
-        return $this->belongsTo(Administrator::class, 'admin_id', 'admin_id');
+        return $this->belongsTo(Administrator::class, 'admin_id', 'admin_id')->withTrashed();
     }
 
     public function reviewer(): BelongsTo
     {
-        return $this->belongsTo(Administrator::class, 'reviewed_by', 'admin_id');
+        return $this->belongsTo(Administrator::class, 'reviewed_by', 'admin_id')->withTrashed();
     }
 
     /**

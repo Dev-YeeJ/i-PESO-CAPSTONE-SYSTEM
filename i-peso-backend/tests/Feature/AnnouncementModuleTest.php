@@ -121,7 +121,7 @@ class AnnouncementModuleTest extends TestCase
             ->assertJsonPath('data.1.id', $important->id);
     }
 
-    public function test_publishing_with_notify_sends_once_to_the_audience_after_the_response(): void
+    public function test_every_published_announcement_notifies_its_audience_once_after_the_response(): void
     {
         $this->withoutDefer();
         $admin = $this->admin();
@@ -129,7 +129,8 @@ class AnnouncementModuleTest extends TestCase
         $employer = $this->employer();
 
         Sanctum::actingAs($admin);
-        $id = $this->postJson('/api/admin/announcements', $this->payload(['audience' => 'seekers', 'notify_users' => true, 'intent' => 'publish']))
+        // No "Also notify" needed (and asking not to is ignored): every announcement notifies.
+        $id = $this->postJson('/api/admin/announcements', $this->payload(['audience' => 'seekers', 'notify_users' => false, 'intent' => 'publish']))
             ->assertCreated()
             ->json('announcement.id');
 
@@ -137,7 +138,8 @@ class AnnouncementModuleTest extends TestCase
             $this->assertSame(1, $seeker->notifications()->count());
             $data = $seeker->notifications()->first()->data;
             $this->assertSame('announcement', $data['type']);
-            $this->assertSame("/seeker/announcements?open={$id}", $data['action_url']);
+            // The bell opens it on the dashboard (there is no Announcements page).
+            $this->assertSame("/seeker/dashboard?announcement={$id}", $data['action_url']);
         }
         $this->assertSame(0, $employer->notifications()->count());
         $this->assertSame(2, Announcement::find($id)->notified_count);
@@ -174,7 +176,28 @@ class AnnouncementModuleTest extends TestCase
         Artisan::call('announcements:deliver-due');
         Artisan::call('announcements:deliver-due');
         $this->assertSame(1, $employer->notifications()->count());
-        $this->assertSame("/employer/announcements?open={$id}", $employer->notifications()->first()->data['action_url']);
+        $this->assertSame("/employer/dashboard?announcement={$id}", $employer->notifications()->first()->data['action_url']);
+    }
+
+    public function test_editing_an_old_live_announcement_published_without_notifying_does_not_notify_now(): void
+    {
+        $this->withoutDefer();
+        $admin = $this->admin();
+        $seeker = $this->seeker();
+
+        // Published before notifications were automatic, with "Also notify" off.
+        $announcement = Announcement::forceCreate([
+            'title' => 'Old notice', 'body' => 'From before.', 'category' => 'advisory', 'priority' => 'normal',
+            'audience' => 'seekers', 'status' => Announcement::STATUS_PUBLISHED, 'publish_at' => now()->subWeek(),
+            'notify_users' => false, 'created_by' => $admin->admin_id, 'updated_by' => $admin->admin_id,
+        ]);
+
+        Sanctum::actingAs($admin);
+        $this->putJson("/api/admin/announcements/{$announcement->id}", $this->payload(['audience' => 'seekers', 'title' => 'Old notice (corrected)']))->assertOk();
+        Artisan::call('announcements:deliver-due');
+
+        $this->assertSame(0, $seeker->notifications()->count());
+        $this->assertFalse((bool) $announcement->fresh()->notify_users);
     }
 
     public function test_expired_unpublished_and_archived_announcements_disappear_for_readers(): void

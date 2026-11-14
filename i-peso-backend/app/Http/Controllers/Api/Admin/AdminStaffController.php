@@ -6,11 +6,15 @@ use App\Http\Controllers\Controller;
 use App\Mail\StaffAccountMail;
 use App\Models\AdminRole;
 use App\Models\Administrator;
+use App\Models\SafetyReport;
+use App\Models\SafetyReportEvent;
 use App\Services\ActivityLogger;
 use App\Support\StaffPositions;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
@@ -262,6 +266,94 @@ class AdminStaffController extends Controller
         ));
 
         return response()->json(['message' => 'Staff account reactivated.', 'staff' => $this->formatStaff($staffMember->fresh('adminRole'))]);
+    }
+
+    /**
+     * Deletes a staff account for good. The row stays as a hidden tombstone
+     * (see the 2026_11_14 migration) so nothing they created is cascade-deleted
+     * and their reviews and approvals still name them; everything personal
+     * (email, mobile, password, sessions, notifications) is removed, and the
+     * email is free to be used again.
+     */
+    public function destroy(Request $request, Administrator $staffMember): JsonResponse
+    {
+        abort_if($this->isSelf($request, $staffMember), 422, 'You cannot delete your own account.');
+
+        // Two steps for anyone who has used the account; an invite that was
+        // never used (e.g. a mistyped email) can go straight away.
+        abort_if(
+            $staffMember->isActive() && $staffMember->last_login_at !== null,
+            422,
+            'Deactivate this account before deleting it.'
+        );
+
+        $this->ensureAnotherActiveAdministrator($staffMember, 'At least one active system administrator must remain.');
+
+        $name = $this->displayName($staffMember);
+        $email = $staffMember->email;
+        $position = StaffPositions::label($staffMember->position) ?? 'no position';
+
+        $releasedCases = DB::transaction(function () use ($request, $staffMember) {
+            $releasedCases = $this->releaseOpenSafetyCases($staffMember, $request->user());
+
+            $staffMember->tokens()->delete();
+            if (Schema::hasTable('notifications')) {
+                $staffMember->notifications()->delete();
+            }
+
+            $staffMember->forceFill([
+                // .invalid can never receive mail, and the id keeps it unique.
+                'email' => "deleted-{$staffMember->admin_id}@deleted.invalid",
+                'mobile_number' => '',
+                'password' => Str::random(64),
+                'remember_token' => null,
+                'must_change_password' => false,
+                'temporary_password_expires_at' => null,
+                'status' => 'inactive',
+                'deactivated_reason' => 'deleted',
+            ])->save();
+
+            $staffMember->delete();
+
+            return $releasedCases;
+        });
+
+        ActivityLogger::log('deleted_staff', sprintf(
+            'Deleted staff account %s (%s), %s. Their contact details were removed; records they handled were kept.%s',
+            $name,
+            $email,
+            $position,
+            $releasedCases > 0 ? " {$releasedCases} open safety case(s) assigned to them were returned to the unassigned queue." : ''
+        ));
+
+        return response()->json([
+            'message' => "{$name}'s account was deleted.",
+            'deleted_id' => $staffMember->admin_id,
+            'released_cases' => $releasedCases,
+        ]);
+    }
+
+    /** Open safety cases can't sit with someone who is gone; they go back to the queue. */
+    private function releaseOpenSafetyCases(Administrator $staffMember, Administrator $actor): int
+    {
+        if (! Schema::hasTable('safety_reports')) {
+            return 0;
+        }
+
+        $cases = SafetyReport::query()->open()->where('assigned_admin_id', $staffMember->admin_id)->get();
+
+        foreach ($cases as $case) {
+            $case->update(['assigned_admin_id' => null]);
+            $case->events()->create([
+                'actor_type' => 'admin',
+                'actor_admin_id' => $actor->admin_id,
+                'kind' => SafetyReportEvent::KIND_ASSIGNED,
+                'to_value' => null,
+                'body' => 'Unassigned — the assigned staff account was deleted',
+            ]);
+        }
+
+        return $cases->count();
     }
 
     private function sendAccountEmail(Administrator $staff, string $temporaryPassword, string $kind): bool

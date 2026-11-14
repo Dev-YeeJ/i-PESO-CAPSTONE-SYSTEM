@@ -11,7 +11,7 @@ use Illuminate\Http\JsonResponse;
 
 /**
  * Public (no sign-in) reads of Site Content: the landing page text, office
- * details for the footer, the public FAQ page and the policy pages.
+ * details for the footer, the About page and the policy pages.
  */
 class PublicSiteContentController extends Controller
 {
@@ -31,17 +31,6 @@ class PublicSiteContentController extends Controller
             'office' => $this->content->office(),
             'landing' => $this->content->landing(),
             'about' => $this->content->get(SiteContentRegistry::ABOUT),
-            'featured_faqs' => $this->content->featuredFaqs(),
-        ]);
-    }
-
-    /** The public Help page: FAQs for Everyone plus office contact. */
-    public function faqs(): JsonResponse
-    {
-        return response()->json([
-            'office' => $this->content->office(),
-            'faqs' => $this->content->faqsFor(null),
-            'topics' => $this->content->topics(),
         ]);
     }
 

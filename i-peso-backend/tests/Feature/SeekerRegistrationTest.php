@@ -43,6 +43,7 @@ class SeekerRegistrationTest extends TestCase
 
         if (! Schema::hasTable('administrators')) {
             Schema::create('administrators', function (Blueprint $table) {
+                $table->softDeletes();
                 $table->id('admin_id');
                 $table->string('email')->unique();
                 $table->string('password');

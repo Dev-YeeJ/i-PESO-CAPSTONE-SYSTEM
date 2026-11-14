@@ -8,6 +8,8 @@ import { chatbotService } from '@/services/chatbotService'
 import { useAuthStore } from '@/stores/authStore'
 import AceMascot from './AceMascot'
 import AceAvatarMark from './AceAvatarMark'
+import TranslateAction from './TranslateAction'
+import { TRANSLATE_LANGUAGES } from '@/services/chatbotService'
 
 import JobCardList from './RichComponents/JobCardList'
 import InteractiveMap from './RichComponents/InteractiveMap'
@@ -121,6 +123,8 @@ export default function UnifiedChatWidget() {
   const [listening, setListening] = useState(false)
   const [voiceProcessing, setVoiceProcessing] = useState(false)
   const [speakingMessage, setSpeakingMessage] = useState(null)
+  // Translate button: { [messageKey]: { language, text } | { busy: true, language } }
+  const [translations, setTranslations] = useState({})
   const [voiceError, setVoiceError] = useState('')
   const user = useAuthStore((state) => state.user)
 
@@ -289,6 +293,61 @@ export default function UnifiedChatWidget() {
     }
   }
 
+  /** What a message shows right now: its translation if one was picked, else the original. */
+  const shownText = (key, original) => translations[key]?.text ?? original
+
+  const translateMessage = async (key, original, language) => {
+    setTranslations((current) => ({ ...current, [key]: { ...current[key], busy: true } }))
+    try {
+      const text = await chatbotService.translate(original, language)
+      setTranslations((current) => ({ ...current, [key]: { language, text } }))
+    } catch (error) {
+      setTranslations((current) => ({ ...current, [key]: { ...current[key], busy: false, error: error.message } }))
+    }
+  }
+
+  const showOriginal = (key) => setTranslations((current) => {
+    const next = { ...current }
+    delete next[key]
+    return next
+  })
+
+  /** Listen + Translate under one of ACE's messages, and the "Translated to …" note. */
+  const messageActions = (key, original, label) => {
+    const state = translations[key]
+    const languageLabel = TRANSLATE_LANGUAGES.find((language) => language.value === state?.language)?.label
+    return (
+      <>
+        {state?.text && (
+          <p className="ipeso-chat-translated-note">
+            Translated to {languageLabel} by ACE ·{' '}
+            <button type="button" onClick={() => showOriginal(key)}>Show original</button>
+          </p>
+        )}
+        {state?.error && <p className="ipeso-chat-translated-note is-error" role="alert">{state.error}</p>}
+        <div className="ipeso-chat-message-actions">
+          {speechSynthesisAvailable && (
+            <button
+              type="button"
+              className="ipeso-chat-voice-action"
+              onClick={() => (speakingMessage === key ? stopSpeaking() : speakText(shownText(key, original), key))}
+              aria-label={speakingMessage === key ? `Stop speaking ${label}` : `Read ${label} aloud`}
+            >
+              {speakingMessage === key ? <VolumeX size={14} /> : <Volume2 size={14} />}
+              {speakingMessage === key ? 'Stop' : 'Listen'}
+            </button>
+          )}
+          <TranslateAction
+            label={label}
+            current={state?.text ? state.language : null}
+            busy={Boolean(state?.busy)}
+            onPick={(language) => translateMessage(key, original, language)}
+          />
+        </div>
+      </>
+    )
+  }
+
   const speakText = (text, messageId) => {
     if (!speechSynthesisAvailable) {
       setVoiceError('Spoken replies are not supported by this browser.')
@@ -415,20 +474,8 @@ export default function UnifiedChatWidget() {
               <div className="ipeso-chat-response">
                 {greetingVisible ? (
                   <>
-                    <p className="ipeso-chat-bubble is-model">{greetingText}</p>
-                    {speechSynthesisAvailable && (
-                      <button
-                        type="button"
-                        className="ipeso-chat-voice-action"
-                        onClick={() => speakingMessage === 'greeting'
-                          ? stopSpeaking()
-                          : speakText(greetingText, 'greeting')}
-                        aria-label={speakingMessage === 'greeting' ? 'Stop speaking greeting' : 'Read greeting aloud'}
-                      >
-                        {speakingMessage === 'greeting' ? <VolumeX size={14} /> : <Volume2 size={14} />}
-                        {speakingMessage === 'greeting' ? 'Stop' : 'Listen'}
-                      </button>
-                    )}
+                    <p className="ipeso-chat-bubble is-model">{shownText('greeting', greetingText)}</p>
+                    {messageActions('greeting', greetingText, 'greeting')}
                   </>
                 ) : (
                   <p className="ipeso-chat-bubble is-model is-typing" aria-label="ACE is greeting you">
@@ -449,22 +496,10 @@ export default function UnifiedChatWidget() {
                     
                     <div className="ipeso-chat-response">
                       <p className={`ipeso-chat-bubble ${message.role === 'user' ? 'is-user' : 'is-model'}`}>
-                        {linkifyText(message.text)}
+                        {linkifyText(message.role === 'model' ? shownText(`reply-${index}`, message.text) : message.text)}
                       </p>
 
-                      {message.role === 'model' && speechSynthesisAvailable && (
-                        <button
-                          type="button"
-                          className="ipeso-chat-voice-action"
-                          onClick={() => speakingMessage === `reply-${index}`
-                            ? stopSpeaking()
-                            : speakText(message.text, `reply-${index}`)}
-                          aria-label={speakingMessage === `reply-${index}` ? 'Stop speaking reply' : 'Read reply aloud'}
-                        >
-                          {speakingMessage === `reply-${index}` ? <VolumeX size={14} /> : <Volume2 size={14} />}
-                          {speakingMessage === `reply-${index}` ? 'Stop' : 'Listen'}
-                        </button>
-                      )}
+                      {message.role === 'model' && messageActions(`reply-${index}`, message.text, 'reply')}
 
                       {message.role === 'model' && hasJobs && (
                         <div className="mt-2 w-full max-w-sm">

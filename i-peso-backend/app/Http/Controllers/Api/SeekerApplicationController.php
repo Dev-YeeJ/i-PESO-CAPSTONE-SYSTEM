@@ -9,6 +9,7 @@ use App\Models\Application;
 use App\Models\JobSeeker;
 use App\Models\JobVacancy;
 use App\Notifications\ApplicationWithdrawnNotification;
+use App\Notifications\NewApplicationReceivedNotification;
 use App\Services\ActivityLogger;
 use App\Services\EnhancedJobMatchingService;
 use Illuminate\Http\JsonResponse;
@@ -161,6 +162,16 @@ class SeekerApplicationController extends Controller
             $vacancy->job_title,
             $vacancy->post_id
         ));
+
+        // Tell the employer. A notification failure must never undo or 500 an
+        // application that is already saved (same rule as withdraw()).
+        try {
+            $application->setRelation('jobVacancy', $vacancy)->setRelation('jobSeeker', $seeker);
+            $vacancy->loadMissing('employer');
+            $vacancy->employer?->notify(new NewApplicationReceivedNotification($application));
+        } catch (\Throwable $exception) {
+            report($exception);
+        }
 
         return response()->json([
             'message' => 'Application submitted successfully.',
