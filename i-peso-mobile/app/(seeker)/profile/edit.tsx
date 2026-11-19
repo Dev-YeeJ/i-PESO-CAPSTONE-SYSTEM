@@ -9,6 +9,7 @@ import {
   View,
 } from 'react-native'
 import Animated, { FadeInLeft, FadeInRight } from 'react-native-reanimated'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useFocusEffect } from '@react-navigation/native'
 import type { AxiosError } from 'axios'
 import { router, useLocalSearchParams } from 'expo-router'
@@ -76,6 +77,7 @@ const SectionTabs = memo(function SectionTabs({ activeStep, onChange }: { active
 })
 
 export default function ProfileEditScreen() {
+  const insets = useSafeAreaInsets()
   const params = useLocalSearchParams<{ section?: string; from?: string }>()
   const updateUser = useAuthStore((state) => state.updateUser)
   const m = useMotion()
@@ -240,11 +242,13 @@ export default function ProfileEditScreen() {
           {activeStep === 6 && <Step6Training value={form.step6} onChange={(step6) => setForm((f) => ({ ...f, step6 }))} errors={errors} />}
           {activeStep === 7 && <Step7Experience value={form.step7} onChange={(step7) => setForm((f) => ({ ...f, step7 }))} errors={errors} />}
         </Animated.View>
+      </ScrollView>
 
-        <Button size="lg" fullWidth onPress={save} loading={saving} style={styles.saveButton}>
+      <View style={[styles.saveBar, { paddingBottom: insets.bottom + spacing.md }]}>
+        <Button size="lg" fullWidth onPress={save} loading={saving}>
           Save {SECTIONS.find((s) => s.step === activeStep)?.label}
         </Button>
-      </ScrollView>
+      </View>
     </KeyboardAvoidingView>
   )
 }
@@ -280,10 +284,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     borderRadius: radii.pill,
     borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.background,
+    borderColor: colors.tintBorder,
+    backgroundColor: colors.surface,
   },
-  tabActive: { borderColor: colors.info, backgroundColor: colors.infoBackground },
+  // Redesign: the selected section is a solid blue chip, like every other selected filter.
+  tabActive: { borderColor: colors.secondary, backgroundColor: colors.secondary },
   // A generous lineHeight (well above fontSize) is what actually prevents Android from
   // clipping the custom DM Sans bold face's ascenders here. `includeFontPadding: false` +
   // `textAlignVertical: 'center'` was tried and made it worse on-device — that combination
@@ -293,11 +298,12 @@ const styles = StyleSheet.create({
     fontSize: typography.small,
     lineHeight: 20,
     fontFamily: typography.family.bold,
-    color: colors.muted,
+    color: colors.iconBlue,
   },
-  tabTextActive: { color: colors.info },
-  container: { paddingHorizontal: spacing.xl, paddingTop: spacing.lg, paddingBottom: spacing.xxxl },
+  tabTextActive: { color: colors.white },
+  container: { paddingHorizontal: spacing.lg, paddingTop: spacing.lg, paddingBottom: spacing.xxl },
   alertBox: { marginBottom: spacing.lg },
-  card: { borderRadius: radii.xl, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, padding: spacing.lg },
-  saveButton: { marginTop: spacing.lg },
+  card: { borderRadius: radii.lg, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, padding: spacing.lg },
+  // Sticky save bar (redesign "23 — Edit profile"): always reachable, never lost under a long form.
+  saveBar: { paddingHorizontal: spacing.lg, paddingTop: spacing.md, backgroundColor: colors.surface, borderTopWidth: 1, borderTopColor: colors.border },
 })

@@ -2,19 +2,25 @@ import { useState } from 'react'
 import { FlatList, StyleSheet, Text, View } from 'react-native'
 import Animated, { FadeInUp } from 'react-native-reanimated'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useRouter } from 'expo-router'
+import { useLocalSearchParams, useRouter } from 'expo-router'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import MaterialIcons from '@expo/vector-icons/MaterialIcons'
 import type { SeekerNotification } from '@/services/seekerService'
 import { seekerService } from '@/services/seekerService'
 import { useMotion } from '@/hooks/useMotion'
-import { Card } from '@/components/ui/Card'
 import { PressableScale } from '@/components/ui/PressableScale'
 import { ScreenHeader } from '@/components/ui/ScreenHeader'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { ScreenSkeleton } from '@/components/ui/ScreenSkeleton'
-import { colors, spacing, typography } from '@/theme'
-import { formatDistanceToNow } from 'date-fns'
+import { colors, radii, spacing, typography } from '@/theme'
+import { formatDistanceToNow, isToday } from 'date-fns'
 import { reviewKeyFromNotification } from '@/utils/reviews'
+
+function groupFor(createdAt?: string | null) {
+  if (!createdAt) return 'Earlier'
+  const date = new Date(createdAt)
+  return !Number.isNaN(date.getTime()) && isToday(date) ? 'Today' : 'Earlier'
+}
 
 // Every backend Notification class (ApplicationStatusNotification, GovernmentProgramNotification,
 // InterviewBaseNotification, JobFairNotification/JobFairPublished) keys this as `data.type` — it
@@ -44,8 +50,17 @@ function iconForNotification(data?: SeekerNotification['data']): React.Component
   }
 }
 
+// Notifications is a hidden sibling in the Tabs navigator, so router.back() has no history and
+// lands on the first tab (Home). Go back to where the visitor opened it from instead. The origin
+// is remembered because returning from a screen opened here (job, review…) arrives without it.
+let openedFrom: 'home' | 'profile' = 'home'
+
 export default function NotificationsScreen() {
   const router = useRouter()
+  const insets = useSafeAreaInsets()
+  const { from } = useLocalSearchParams<{ from?: string }>()
+  if (from === 'profile' || from === 'home') openedFrom = from
+  const goBack = () => router.replace(openedFrom === 'profile' ? '/(seeker)/profile' : '/(seeker)')
   const queryClient = useQueryClient()
   const m = useMotion()
   const [refreshing, setRefreshing] = useState(false)
@@ -62,18 +77,62 @@ export default function NotificationsScreen() {
   const notifications = data?.notifications ?? []
   const unreadCount = data?.unread_count ?? 0
 
+  // Optimistic mark-read (redesign UX rule): the dots clear and the Home bell count drops at
+  // once; both caches roll back if the request fails, and re-sync from the server afterwards.
+  type NotificationsCache = typeof data
+  const applyRead = (ids: string[] | 'all') => {
+    const now = new Date().toISOString()
+    queryClient.setQueryData<NotificationsCache>(['notifications'], (current) => {
+      if (!current) return current
+      let cleared = 0
+      const next = (current.notifications ?? []).map((n) => {
+        if (n.read_at || (ids !== 'all' && !ids.includes(n.id))) return n
+        cleared += 1
+        return { ...n, read_at: now }
+      })
+      return { ...current, notifications: next, unread_count: Math.max(0, (current.unread_count ?? 0) - cleared) }
+    })
+    queryClient.setQueryData<number>(['notificationsUnreadCount'], (count) =>
+      ids === 'all' ? 0 : Math.max(0, (count ?? 0) - ids.length)
+    )
+  }
+  const snapshot = async () => {
+    await queryClient.cancelQueries({ queryKey: ['notifications'] })
+    return {
+      list: queryClient.getQueryData<NotificationsCache>(['notifications']),
+      count: queryClient.getQueryData<number>(['notificationsUnreadCount']),
+    }
+  }
+  const rollback = (context?: { list: NotificationsCache; count: number | undefined }) => {
+    if (!context) return
+    queryClient.setQueryData(['notifications'], context.list)
+    queryClient.setQueryData(['notificationsUnreadCount'], context.count)
+  }
+  const resync = () => {
+    queryClient.invalidateQueries({ queryKey: ['notifications'] })
+    queryClient.invalidateQueries({ queryKey: ['notificationsUnreadCount'] })
+  }
+
   const markAllReadMutation = useMutation({
     mutationFn: () => seekerService.markNotificationsRead(),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['notifications'] })
+    onMutate: async () => {
+      const context = await snapshot()
+      applyRead('all')
+      return context
     },
+    onError: (_error, _vars, context) => rollback(context),
+    onSettled: resync,
   })
 
   const markReadMutation = useMutation({
     mutationFn: (id: string) => seekerService.markNotificationRead(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['notifications'] })
+    onMutate: async (id) => {
+      const context = await snapshot()
+      applyRead([id])
+      return context
     },
+    onError: (_error, _vars, context) => rollback(context),
+    onSettled: resync,
   })
 
   const onRefresh = async () => {
@@ -133,10 +192,10 @@ export default function NotificationsScreen() {
     <View style={styles.flex}>
       <ScreenHeader
         title="Notifications"
-        onBack={() => router.back()}
+        onBack={goBack}
         right={
           unreadCount > 0 ? (
-            <PressableScale scaleTo="buttonPress" ripple={null} onPress={() => markAllReadMutation.mutate()} disabled={markAllReadMutation.isPending} accessibilityRole="button">
+            <PressableScale scaleTo="buttonPress" ripple={null} haptics onPress={() => markAllReadMutation.mutate()} disabled={markAllReadMutation.isPending} style={styles.markAllBtn} accessibilityRole="button">
               <Text style={styles.markAllText}>Mark all read</Text>
             </PressableScale>
           ) : null
@@ -151,46 +210,45 @@ export default function NotificationsScreen() {
           keyExtractor={(item) => item.id}
           refreshing={refreshing}
           onRefresh={onRefresh}
-          contentContainerStyle={styles.listContent}
+          contentContainerStyle={[styles.listContent, { paddingBottom: spacing.xxxl + insets.bottom }]}
           ListEmptyComponent={
             <EmptyState
-              icon="notifications-none"
+              art="bell"
               title="No notifications yet"
               message="We'll let you know when employers update your applications or when matching jobs are posted."
             />
           }
           renderItem={({ item, index }) => {
             const isUnread = !item.read_at
+            // Today / Earlier group headings (redesign "25 — Notifications"); the list is
+            // newest-first, so a heading shows where the group changes.
+            const group = groupFor(item.created_at)
+            const showHeading = index === 0 || groupFor(notifications[index - 1]?.created_at) !== group
 
             return (
-              <Animated.View entering={m.enabled ? FadeInUp.delay(m.stagger(index)).duration(240) : undefined}>
+              <Animated.View entering={m.enabled ? FadeInUp.delay(m.stagger(index)).duration(m.duration('normal')) : undefined}>
+                {showHeading ? <Text style={styles.groupHeading} accessibilityRole="header">{group}</Text> : null}
                 <PressableScale
                   scaleTo="cardPress"
                   ripple={null}
                   onPress={() => handleNotificationPress(item)}
+                  style={[styles.row, isUnread && styles.rowUnread]}
                   accessibilityRole="button"
-                  accessibilityLabel={item.data?.title || 'Notification'}
+                  accessibilityLabel={`${isUnread ? 'Unread. ' : ''}${item.data?.title || 'Notification'}. ${item.data?.message ?? ''}`}
                 >
-                  <Card style={[styles.notificationCard, isUnread && styles.unreadCard]} padding="md">
-                    <View style={styles.notificationHeader}>
-                      <View style={styles.iconContainer}>
-                        <MaterialIcons
-                          name={iconForNotification(item.data)}
-                          size={20}
-                          color={isUnread ? colors.secondary : colors.muted}
-                        />
-                      </View>
-                      <View style={styles.contentContainer}>
-                        <View style={styles.titleRow}>
-                          <Text style={[styles.itemTitle, isUnread && styles.unreadText]}>{item.data?.title || 'Notification'}</Text>
-                          <Text style={styles.timeText}>
-                            {item.created_at ? formatDistanceToNow(new Date(item.created_at), { addSuffix: true }) : ''}
-                          </Text>
-                        </View>
-                        <Text style={styles.itemMessage}>{item.data?.message}</Text>
-                      </View>
+                  <View style={styles.iconContainer}>
+                    <MaterialIcons name={iconForNotification(item.data)} size={22} color={colors.iconBlue} />
+                  </View>
+                  <View style={styles.contentContainer}>
+                    <View style={styles.titleRow}>
+                      <Text style={[styles.itemTitle, isUnread && styles.unreadText]}>{item.data?.title || 'Notification'}</Text>
+                      <Text style={styles.timeText}>
+                        {item.created_at ? formatDistanceToNow(new Date(item.created_at), { addSuffix: true }) : ''}
+                      </Text>
                     </View>
-                  </Card>
+                    <Text style={styles.itemMessage}>{item.data?.message}</Text>
+                  </View>
+                  {isUnread ? <View style={styles.unreadDot} /> : <View style={styles.dotSpacer} />}
                 </PressableScale>
               </Animated.View>
             )
@@ -204,23 +262,27 @@ export default function NotificationsScreen() {
 const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: colors.background },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  markAllText: { color: colors.secondary, fontSize: typography.small, fontFamily: typography.family.bold },
-  listContent: { padding: spacing.lg, gap: spacing.sm, paddingBottom: spacing.xxxl },
-  notificationCard: { marginBottom: 0 },
-  unreadCard: { borderColor: colors.blue200, borderWidth: 1, backgroundColor: colors.blue50 },
-  notificationHeader: { flexDirection: 'row', gap: spacing.md },
+  markAllText: { color: colors.link, fontSize: 13, fontFamily: typography.family.bold },
+  markAllBtn: { minHeight: 44, justifyContent: 'center', paddingHorizontal: spacing.xs },
+  listContent: { paddingBottom: spacing.xxxl },
+  groupHeading: { fontSize: typography.label, lineHeight: 14, letterSpacing: 0.4, fontFamily: typography.family.bold, color: colors.subtle, paddingHorizontal: spacing.lg, paddingTop: spacing.lg, paddingBottom: spacing.sm },
+  // Full-width rows; unread = sunken tint + blue dot (the dot, not colour alone, carries it).
+  row: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md, paddingHorizontal: spacing.lg, paddingVertical: spacing.md + 2, backgroundColor: colors.surface },
+  rowUnread: { backgroundColor: colors.sunken },
   iconContainer: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: colors.blue50,
+    width: 44,
+    height: 44,
+    borderRadius: radii.md + 2,
+    backgroundColor: colors.tint,
     justifyContent: 'center',
     alignItems: 'center',
   },
   contentContainer: { flex: 1 },
-  titleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 },
-  itemTitle: { fontSize: typography.title, color: colors.textPrimary, fontFamily: typography.family.bold, flex: 1, marginRight: spacing.sm },
-  unreadText: { fontFamily: typography.family.bold, color: colors.secondary },
-  timeText: { fontSize: 11, color: colors.textSecondary, marginTop: 2 },
-  itemMessage: { fontSize: typography.body, color: colors.textSecondary, lineHeight: 20 },
+  titleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: spacing.sm, marginBottom: 2 },
+  itemTitle: { fontSize: typography.body, lineHeight: 20, color: colors.textPrimary, fontFamily: typography.family.medium, flex: 1 },
+  unreadText: { fontFamily: typography.family.bold },
+  timeText: { fontSize: 11, lineHeight: 16, color: colors.subtle },
+  itemMessage: { fontSize: typography.small, color: colors.textSecondary, lineHeight: 18 },
+  unreadDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.secondary, marginTop: 6 },
+  dotSpacer: { width: 8 },
 })

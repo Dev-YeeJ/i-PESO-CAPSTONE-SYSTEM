@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import MaterialIcons from '@expo/vector-icons/MaterialIcons'
 import { seekerService } from '@/services/seekerService'
@@ -27,6 +28,7 @@ function backTargetFor(from: string | undefined): string {
 
 export default function AnnouncementsScreen() {
   const router = useRouter()
+  const insets = useSafeAreaInsets()
   const queryClient = useQueryClient()
   const { showToast } = useToast()
   // A bell notification or push links here as open=12 (the website's ?open=).
@@ -63,7 +65,7 @@ export default function AnnouncementsScreen() {
     <View style={styles.flex}>
       <ScreenHeader title="Announcements" onBack={() => router.replace(backTargetFor(from) as never)} />
       <ScrollView
-        contentContainerStyle={styles.content}
+        contentContainerStyle={[styles.content, { paddingBottom: spacing.xxxl + insets.bottom }]}
         refreshControl={<RefreshControl refreshing={feed.isRefetching && !feed.isFetchingNextPage} onRefresh={() => feed.refetch()} tintColor={colors.info} />}
       >
         <Text style={styles.kicker}>PESO Urdaneta</Text>
@@ -151,7 +153,7 @@ export default function AnnouncementsScreen() {
 const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: colors.background },
   content: { padding: spacing.lg, paddingBottom: spacing.xxxl },
-  kicker: { ...textStyles.label, color: colors.secondary, textTransform: 'uppercase', letterSpacing: 1 },
+  kicker: { ...textStyles.label, color: colors.link, textTransform: 'uppercase', letterSpacing: 1 },
   intro: { ...textStyles.small, color: colors.textSecondary, lineHeight: 18, marginTop: spacing.xs },
   readAll: { alignSelf: 'flex-start', marginTop: spacing.md },
   chips: { gap: spacing.sm, paddingVertical: spacing.md },

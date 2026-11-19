@@ -4,6 +4,7 @@ import Animated, { FadeInUp } from 'react-native-reanimated'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useQueryClient } from '@tanstack/react-query'
 import MaterialIcons from '@expo/vector-icons/MaterialIcons'
+import { LinearGradient } from 'expo-linear-gradient'
 import type { JobFair, JobFairPass } from '@/services/seekerService'
 import { seekerService } from '@/services/seekerService'
 import { apiErrorMessage } from '@/utils/apiError'
@@ -17,22 +18,35 @@ import { EmptyState } from '@/components/ui/EmptyState'
 import { PressableScale } from '@/components/ui/PressableScale'
 import { ScreenHeader } from '@/components/ui/ScreenHeader'
 import { DigitalQrPass } from '@/components/seeker/DigitalQrPass'
-import { colors, radii, spacing, typography } from '@/theme'
+import { colors, gradients, radii, shadows, spacing, typography } from '@/theme'
+
+/** "08:00:00" → "8:00 AM" (the API sends 24-hour clock strings). */
+function clock(value?: string | null) {
+  const match = /^(\d{1,2}):(\d{2})/.exec(value ?? '')
+  if (!match) return value ?? ''
+  const hour = Number(match[1])
+  return `${hour % 12 || 12}:${match[2]} ${hour < 12 ? 'AM' : 'PM'}`
+}
+
+function HeroMeta({ icon, text }: { icon: React.ComponentProps<typeof MaterialIcons>['name']; text: string }) {
+  return (
+    <View style={styles.heroMeta}>
+      <MaterialIcons name={icon} size={16} color={colors.blue100} />
+      <Text style={styles.heroMetaText}>{text}</Text>
+    </View>
+  )
+}
 
 // Mirrors JobFairService::MAP_STATUSES on the backend — the set of statuses
 // where the fair is still upcoming or in progress, so RSVP still makes sense.
 const registrableStatuses = ['published', 'accepting_employers', 'upcoming', 'ongoing']
 
-function statusVariant(status?: string | null): 'info' | 'success' | 'neutral' {
-  const value = textFrom(status, '').toLowerCase()
-  if (['published', 'accepting_employers', 'upcoming'].includes(value)) return 'info'
-  if (['ongoing', 'active'].includes(value)) return 'success'
-  return 'neutral'
-}
-
 export default function JobFairDetailScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>()
+  const { id, from } = useLocalSearchParams<{ id: string; from?: string }>()
   const router = useRouter()
+  // Home's "Upcoming job fair" card opens this directly; back should return there, not to
+  // the list the seeker never saw. Every other entry point comes from the list.
+  const backTarget = from === 'home' ? '/(seeker)' : '/(seeker)/job-fairs'
   const queryClient = useQueryClient()
   const m = useMotion()
   const [pass, setPass] = useState<JobFairPass | null>(null)
@@ -61,7 +75,7 @@ export default function JobFairDetailScreen() {
   if (!fair) {
     return (
       <View style={styles.flex}>
-        <ScreenHeader title="Job Fair" onBack={() => router.replace('/(seeker)/job-fairs')} />
+        <ScreenHeader title="Job Fair" onBack={() => router.replace(backTarget as never)} />
         <View style={styles.center}>
           <EmptyState
             icon="event-busy"
@@ -87,29 +101,41 @@ export default function JobFairDetailScreen() {
       {/* Same router.replace fix as the not-found branch above and as job-fairs.tsx's
           own header — this screen is also a flat Tabs-navigator sibling, so back()
           jumps to Home instead of the Job Fairs list it was actually opened from. */}
-      <ScreenHeader title="Job Fair" onBack={() => router.replace('/(seeker)/job-fairs')} />
+      <ScreenHeader title="Job Fair" onBack={() => router.replace(backTarget as never)} />
       <ScrollView contentContainerStyle={styles.content}>
-      <View style={styles.header}>
-        <Text style={styles.title}>{textFrom(fair.title, 'Untitled job fair')}</Text>
-        <Badge variant={statusVariant(fair.status)} style={styles.statusBadge}>
-          {titleCase(fair.status, 'Scheduled')}
-        </Badge>
-      </View>
+      {/* Hero (redesign "20 — Job fair details"): status, title, when and where. */}
+      {/* `brand`, not `hero`: the light meta text failed AA (3.4:1) over hero's lightest stop. */}
+      <LinearGradient colors={[...gradients.brand]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.hero}>
+        <View style={styles.heroDecor} pointerEvents="none" />
+        <View style={styles.heroBadges}>
+          <View style={styles.heroPill}>
+            <Text style={styles.heroPillText}>{titleCase(fair.status, 'Scheduled')}</Text>
+          </View>
+          {fair.is_rsvped ? (
+            <View style={styles.heroPill}>
+              <MaterialIcons name="check" size={14} color={colors.white} />
+              <Text style={styles.heroPillText}>You&apos;re registered</Text>
+            </View>
+          ) : null}
+        </View>
+        <Text style={styles.heroTitle} accessibilityRole="header">{textFrom(fair.title, 'Untitled job fair')}</Text>
+        <HeroMeta icon="event" text={`${formatDate(fair.start_date || fair.event_date)}${fair.end_date ? ` – ${formatDate(fair.end_date)}` : ''}`} />
+        {fair.start_time || fair.end_time ? (
+          <HeroMeta icon="schedule" text={[clock(fair.start_time), clock(fair.end_time)].filter(Boolean).join(' – ')} />
+        ) : null}
+        <HeroMeta icon="place" text={textFrom(fair.venue, 'Venue to be announced')} />
+      </LinearGradient>
+
+      {fair.target_sector ? (
+        <View style={styles.audienceRow}>
+          <MaterialIcons name="groups" size={18} color={colors.iconBlue} />
+          <Text style={styles.audienceText}>For: {titleCase(fair.target_sector, 'Everyone')}</Text>
+        </View>
+      ) : null}
 
       {fair.description ? (
         <Text style={styles.description}>{textFrom(fair.description, '')}</Text>
       ) : null}
-
-      <Card padding="md" style={styles.infoCard}>
-        <Detail label="Dates" value={`${formatDate(fair.start_date || fair.event_date)}${fair.end_date ? ` - ${formatDate(fair.end_date)}` : ''}`} />
-        {(fair.start_time || fair.end_time) ? (
-          <Detail label="Time" value={`${textFrom(fair.start_time, '')}${fair.end_time ? ` - ${textFrom(fair.end_time, '')}` : ''}`} />
-        ) : null}
-        <Detail label="Venue" value={textFrom(fair.venue, 'Not listed')} />
-        {fair.target_sector ? (
-          <Detail label="Target Audience" value={titleCase(fair.target_sector, 'Not listed')} />
-        ) : null}
-      </Card>
 
       {pass ? (
         <Animated.View
@@ -187,18 +213,19 @@ export default function JobFairDetailScreen() {
   )
 }
 
-function Detail({ label, value }: { label: string; value: string }) {
-  return (
-    <View style={styles.detailRow}>
-      <Text style={styles.detailLabel}>{label}</Text>
-      <Text style={styles.detailValue}>{value}</Text>
-    </View>
-  )
-}
-
 const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: colors.background },
-  content: { padding: spacing.xl, paddingBottom: spacing.xxxl },
+  content: { padding: spacing.lg, paddingBottom: spacing.xxxl },
+  hero: { borderRadius: radii.xl, padding: spacing.xl, overflow: 'hidden', marginBottom: spacing.lg, ...shadows.md },
+  heroDecor: { position: 'absolute', top: -50, right: -40, width: 170, height: 170, borderRadius: 85, backgroundColor: colors.white, opacity: 0.1 },
+  heroBadges: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs + 2 },
+  heroPill: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.heroChipActive, borderRadius: radii.pill, paddingHorizontal: spacing.sm + 2, paddingVertical: 4 },
+  heroPillText: { color: colors.white, fontSize: typography.small, fontFamily: typography.family.bold },
+  heroTitle: { color: colors.white, fontSize: typography.heading + 2, lineHeight: 30, fontFamily: typography.family.bold, marginTop: spacing.sm + 2, marginBottom: spacing.xs },
+  heroMeta: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs + 2, marginTop: spacing.xs + 2 },
+  heroMetaText: { flex: 1, color: colors.blue50, fontSize: 13, lineHeight: 18, fontFamily: typography.family.medium },
+  audienceRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.md, padding: spacing.md, borderRadius: radii.md, backgroundColor: colors.tint },
+  audienceText: { flex: 1, color: colors.figure, fontSize: typography.small, fontFamily: typography.family.bold },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: spacing.md, padding: spacing.xl, backgroundColor: colors.background },
   passWrap: { marginBottom: spacing.lg },
   registerCard: { marginBottom: spacing.lg, backgroundColor: colors.infoBackground, borderColor: colors.infoBorder },

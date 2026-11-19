@@ -9,6 +9,7 @@ import { seekerService } from '@/services/seekerService'
 import { formatDate, textFrom, titleCase } from '@/utils/seekerView'
 import { useMotion } from '@/hooks/useMotion'
 import { Badge } from '@/components/ui/Badge'
+import { DateBadge } from '@/components/ui/DateBadge'
 import { Card } from '@/components/ui/Card'
 import { PressableScale } from '@/components/ui/PressableScale'
 import { ScreenHeader } from '@/components/ui/ScreenHeader'
@@ -93,11 +94,15 @@ export default function JobFairsScreen() {
                   accessibilityRole="button"
                   accessibilityLabel={`View ${textFrom(fair.title, 'job fair')} details`}
                 >
+                  {/* Date tile + title (redesign "19 — Job fairs"). */}
                   <View style={styles.fairHeader}>
-                    <Text style={styles.fairTitle} numberOfLines={2}>{textFrom(fair.title, 'Untitled job fair')}</Text>
-                    <View style={styles.badgeStack}>
-                      <Badge variant={statusVariant(fair.status)}>{titleCase(fair.status, 'Scheduled')}</Badge>
-                      {fair.is_rsvped ? <Badge variant="success">Registered</Badge> : null}
+                    <DateBadge date={fair.start_date || fair.event_date} />
+                    <View style={styles.fairHeadText}>
+                      <View style={styles.badgeStack}>
+                        <Badge variant={statusVariant(fair.status)}>{titleCase(fair.status, 'Scheduled')}</Badge>
+                        {fair.is_rsvped ? <Badge variant="brand">✓ Registered</Badge> : null}
+                      </View>
+                      <Text style={styles.fairTitle} numberOfLines={2}>{textFrom(fair.title, 'Untitled job fair')}</Text>
                     </View>
                   </View>
 
@@ -141,14 +146,15 @@ export default function JobFairsScreen() {
 const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: colors.background },
   content: { paddingHorizontal: spacing.lg, paddingTop: spacing.xl, paddingBottom: spacing.xxxl },
-  kicker: { color: colors.secondary, fontSize: typography.small, fontFamily: typography.family.bold, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: spacing.xs },
+  kicker: { color: colors.link, fontSize: typography.small, fontFamily: typography.family.bold, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: spacing.xs },
   subtitle: { color: colors.textSecondary, fontSize: typography.body, lineHeight: 20, marginBottom: spacing.lg },
   fairCard: { marginBottom: spacing.md },
   fairBanner: { width: '100%', height: 140, borderTopLeftRadius: radii.lg, borderTopRightRadius: radii.lg, backgroundColor: colors.background },
   fairCardWithBanner: { borderTopLeftRadius: 0, borderTopRightRadius: 0, marginTop: 0 },
-  fairHeader: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: spacing.md, marginBottom: spacing.sm },
-  badgeStack: { alignItems: 'flex-end', gap: spacing.xs },
-  fairTitle: { flex: 1, color: colors.textPrimary, fontSize: typography.title, lineHeight: 22, fontFamily: typography.family.bold },
+  fairHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md + 2, marginBottom: spacing.sm },
+  fairHeadText: { flex: 1 },
+  badgeStack: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs + 2, marginBottom: spacing.xs + 2 },
+  fairTitle: { color: colors.textPrimary, fontSize: 16, lineHeight: 22, fontFamily: typography.family.bold },
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: spacing.xs },
   meta: { color: colors.textSecondary, fontSize: typography.small, lineHeight: 18 },
 })

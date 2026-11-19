@@ -443,7 +443,7 @@ const styles = StyleSheet.create({
   selectInput: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   selectValueText: { color: colors.primary, fontSize: typography.body, flex: 1 },
   selectPlaceholderText: { color: colors.subtle, fontSize: typography.body, flex: 1 },
-  selectOverlay: { flex: 1, backgroundColor: 'rgba(15,23,42,0.5)', justifyContent: 'flex-end' },
+  selectOverlay: { flex: 1, backgroundColor: colors.scrim, justifyContent: 'flex-end' },
   selectSheet: { backgroundColor: colors.surface, borderTopLeftRadius: radii.xl, borderTopRightRadius: radii.xl, paddingTop: spacing.lg, paddingHorizontal: spacing.lg, paddingBottom: spacing.xl, maxHeight: '70%' },
   selectSheetTitle: { color: colors.primary, fontSize: typography.title, fontFamily: typography.family.bold, marginBottom: spacing.md },
   selectList: { flexGrow: 0 },

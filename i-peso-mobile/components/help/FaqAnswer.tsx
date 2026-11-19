@@ -107,7 +107,7 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   text: { ...textStyles.small, color: colors.textPrimary, lineHeight: 20 },
   bold: { fontFamily: textStyles.smallBold.fontFamily },
-  link: { color: colors.secondary, textDecorationLine: 'underline', fontFamily: textStyles.smallBold.fontFamily },
+  link: { color: colors.link, textDecorationLine: 'underline', fontFamily: textStyles.smallBold.fontFamily },
   list: { gap: spacing.xs },
   bulletRow: { flexDirection: 'row', gap: spacing.sm, paddingLeft: spacing.xs },
 })

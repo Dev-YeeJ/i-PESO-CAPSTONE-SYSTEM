@@ -10,6 +10,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { syncPushToken, routeForPushData, addPushResponseListener } from '@/services/pushNotifications'
 import { Toast } from '@/components/ui/Toast'
 import { MaintenanceGate } from '@/components/system/MaintenanceGate'
+import { ThemeProvider } from '@/theme/ThemeProvider'
+import { colors, isDark } from '@/theme'
 
 const queryClient = new QueryClient()
 SplashScreen.preventAutoHideAsync()
@@ -72,8 +74,9 @@ export default function RootLayout() {
     // root here, gesture-handler silently no-ops on Android.
     <GestureHandlerRootView style={{ flex: 1 }}>
       <QueryClientProvider client={queryClient}>
-        <StatusBar style="dark" />
-        <Stack screenOptions={{ headerShown: false }}>
+        <ThemeProvider>
+        <StatusBar style={isDark ? 'light' : 'dark'} />
+        <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.background } }}>
           <Stack.Screen name="index" />
           <Stack.Screen name="welcome" />
           <Stack.Screen name="onboarding" />
@@ -83,6 +86,7 @@ export default function RootLayout() {
         {/* Covers everything while System Settings → Maintenance mode is on. */}
         <MaintenanceGate />
         <Toast />
+        </ThemeProvider>
       </QueryClientProvider>
     </GestureHandlerRootView>
   )

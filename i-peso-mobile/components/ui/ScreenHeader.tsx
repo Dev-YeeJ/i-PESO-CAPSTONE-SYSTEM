@@ -15,7 +15,7 @@ export function ScreenHeader({ title, onBack, backLabel = 'Back', right }: Scree
   const insets = useSafeAreaInsets()
 
   return (
-    <View style={[styles.header, { paddingTop: insets.top + spacing.md }]}>
+    <View style={[styles.header, { paddingTop: insets.top + spacing.xs }]}>
       <View style={styles.side}>
         {onBack ? (
           <TouchableOpacity
@@ -25,46 +25,53 @@ export function ScreenHeader({ title, onBack, backLabel = 'Back', right }: Scree
             accessibilityRole="button"
             accessibilityLabel={backLabel}
           >
-            <MaterialIcons name="arrow-back" size={22} color={colors.primary} />
+            <MaterialIcons name="arrow-back" size={24} color={colors.primary} />
           </TouchableOpacity>
         ) : null}
       </View>
-      <Text style={styles.title} numberOfLines={1}>{title}</Text>
+      <Text style={[styles.title, !onBack && styles.titleNoBack]} numberOfLines={1} accessibilityRole="header">{title}</Text>
       <View style={[styles.side, styles.sideRight]}>{right}</View>
     </View>
   )
 }
 
+// Redesign: 44pt back button (was 36 — under the touch-target minimum) and a left-aligned
+// title next to it, like the drafts' detail headers.
 const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingBottom: spacing.md,
-    paddingHorizontal: spacing.lg,
+    gap: spacing.xs,
+    minHeight: 56,
+    paddingBottom: spacing.sm,
+    paddingLeft: spacing.sm,
+    paddingRight: spacing.md,
     backgroundColor: colors.surface,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
   side: {
-    minWidth: 40,
     alignItems: 'flex-start',
   },
   sideRight: {
     alignItems: 'flex-end',
+    flexDirection: 'row',
   },
   backBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.background,
   },
   title: {
     flex: 1,
-    textAlign: 'center',
     fontSize: typography.title,
+    lineHeight: 24,
     fontFamily: typography.family.bold,
-    color: colors.primary,
+    color: colors.textPrimary,
+  },
+  titleNoBack: {
+    marginLeft: spacing.sm,
   },
 })

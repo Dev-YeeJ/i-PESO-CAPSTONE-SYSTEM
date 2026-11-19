@@ -1,3 +1,5 @@
+import { Appearance } from 'react-native'
+
 // i-PESO mobile design tokens.
 //
 // Direction — **white carries the space, blue carries the meaning.**
@@ -26,7 +28,7 @@ const blue = {
   // types here would make `darkColors` unassignable to `typeof colors`.
 }
 
-export const colors = {
+const lightColors = {
   // Brand / primary palette
   primary: blue[800],
   primaryDark: blue[900],
@@ -85,7 +87,9 @@ export const colors = {
   textSecondary: '#5A6B85',
   secondaryText: '#5A6B85',
   neutralText: blue[800],
-  subtle: '#8697AE',
+  // Darkened from #8697AE in the Phase 6 a11y pass: that was 2.7–3.0:1 on white/sunken/tint
+  // (fails WCAG AA for the 11–12px meta text it's used for). This is ≥ 4.6:1 on all three.
+  subtle: '#5F7089',
 
   // Utility colors
   info: blue[600],
@@ -104,7 +108,98 @@ export const colors = {
   dangerBackground: '#FEF2F2',
   dangerBorder: '#FECACA',
   muted: '#475569',
+
+  // ── Theme-aware blue roles (Phase 6 dark mode) ──────────────────────────────────────────
+  // The raw blue scale above is identical in both themes because it also paints the
+  // gradients and the light text that sits on them. These roles are what a *surface* should
+  // use instead, so they can turn dark navy in dark mode:
+  /** Soft blue fill: icon tiles, soft chips, info tints (light: blue50). */
+  tint: blue[50],
+  /** Slightly stronger fill: tracks, matched-skill chips (light: blue100). */
+  tintStrong: blue[100],
+  /** Border for tinted surfaces / outlined blue chips (light: blue200). */
+  tintBorder: blue[200],
+  /** Blue icon / link-ish text on a surface (light: blue700). */
+  iconBlue: blue[700],
+  /** Serif figures and strong navy text on a surface (light: blue800). */
+  figure: blue[800],
+  /**
+   * Link / interactive *text* on a surface (light: blue600, same as `secondary`). Split from
+   * `secondary` because in dark mode a fill behind white text and text on a dark surface need
+   * different blues to both pass WCAG AA.
+   */
+  link: blue[600],
 }
+
+// Dark palette. Grounded in navy-black rather than pure black so the brand temperature
+// survives the switch. Every key exists in both palettes, so screens import `colors` by the
+// same names in either theme.
+export const darkColors: typeof lightColors = {
+  ...lightColors,
+
+  primary: blue[400],
+  primaryDark: blue[900],
+  // Fills (selected chips, badges, buttons) carry white text: blue600 keeps that at 5.2:1.
+  // Blue *text* on dark surfaces uses `link` (blue400) instead.
+  secondary: blue[600],
+
+  accent: '#FBBF24',
+  accentPressed: '#F59E0B',
+  accentSoft: '#3A2C0C',
+  accentText: blue[900],
+
+  background: '#0A1628',
+  canvas: '#0A1628',
+  sunken: '#0E1C31',
+  surface: '#122238',
+  white: '#FFFFFF',
+
+  border: '#1F3350',
+  borderStrong: '#2C4769',
+  overlay: 'rgba(255, 255, 255, 0.05)',
+  scrim: 'rgba(5, 15, 31, 0.6)',
+
+  textPrimary: '#E8EEF7',
+  textSecondary: '#A3B4CC',
+  secondaryText: '#A3B4CC',
+  neutralText: '#E8EEF7',
+  subtle: '#8FA1BA',
+
+  info: blue[400],
+  infoBackground: '#15263D',
+  infoBorder: '#27405F',
+  success: '#4ADE80',
+  successBackground: '#0E2A1A',
+  successBorder: '#1C4D31',
+  warning: '#FBBF24',
+  warningBackground: '#2E2410',
+  warningBorder: '#4D3D18',
+  error: '#F87171',
+  errorBackground: '#2E1414',
+  errorBorder: '#4D2020',
+  danger: '#F87171',
+  dangerBackground: '#2E1414',
+  dangerBorder: '#4D2020',
+  muted: '#94A3B8',
+
+  tint: '#15263D',
+  tintStrong: '#1B3150',
+  tintBorder: '#27405F',
+  iconBlue: blue[300],
+  figure: blue[200],
+  link: blue[400],
+}
+
+/**
+ * The theme for this session, read from the OS setting before any screen builds its styles.
+ * Screens create StyleSheets at import time, so the palette is fixed per launch: a change to
+ * the system theme applies the next time the app starts (see theme/ThemeProvider.tsx).
+ */
+export const colorScheme: 'light' | 'dark' = Appearance.getColorScheme() === 'dark' ? 'dark' : 'light'
+export const isDark = colorScheme === 'dark'
+
+export const colors: typeof lightColors = isDark ? darkColors : lightColors
+export { lightColors }
 
 // ── Gradients ───────────────────────────────────────────────────────────────────────────
 // Tuples for expo-linear-gradient's `colors` prop. Every stop is dark enough to carry white
@@ -126,56 +221,6 @@ export const gradients = {
   wash: [blue[50], '#FFFFFF'] as const,
   /** Overlay for imagery or map surfaces so white text stays readable on top. */
   scrim: ['rgba(11,34,66,0)', 'rgba(11,34,66,0.72)'] as const,
-}
-
-// Dark palette. Grounded in navy-black rather than pure black so the brand temperature
-// survives the switch. Not yet wired to screens — see the theme provider work in Phase 6;
-// screens still import `colors` directly.
-export const darkColors: typeof colors = {
-  ...colors,
-
-  primary: blue[400],
-  primaryDark: blue[900],
-  secondary: blue[400],
-
-  accent: '#FBBF24',
-  accentPressed: '#F59E0B',
-  accentSoft: '#3A2C0C',
-  accentText: blue[900],
-
-  background: '#0A1628',
-  canvas: '#0A1628',
-  sunken: '#08111F',
-  surface: '#122238',
-  white: '#FFFFFF',
-
-  border: '#1F3350',
-  borderStrong: '#2C4769',
-  overlay: 'rgba(255, 255, 255, 0.05)',
-  scrim: 'rgba(5, 15, 31, 0.6)',
-
-  textPrimary: '#E8EEF7',
-  textSecondary: '#A3B4CC',
-  secondaryText: '#A3B4CC',
-  neutralText: '#E8EEF7',
-  subtle: '#7A8DA6',
-
-  info: blue[400],
-  infoBackground: '#15263D',
-  infoBorder: '#27405F',
-  success: '#4ADE80',
-  successBackground: '#0E2A1A',
-  successBorder: '#1C4D31',
-  warning: '#FBBF24',
-  warningBackground: '#2E2410',
-  warningBorder: '#4D3D18',
-  error: '#F87171',
-  errorBackground: '#2E1414',
-  errorBorder: '#4D2020',
-  danger: '#F87171',
-  dangerBackground: '#2E1414',
-  dangerBorder: '#4D2020',
-  muted: '#94A3B8',
 }
 
 export const spacing = {

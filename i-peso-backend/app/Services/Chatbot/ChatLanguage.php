@@ -15,10 +15,13 @@ namespace App\Services\Chatbot;
  *    such as a job title has nothing telling the model to stay in Pangasinan.
  *
  *  - guessed(): a rough English-vs-Filipino read of the latest message from common
- *    function words. It is ONLY used to pick the language of the fixed, non-model replies
- *    (ChatbotMessages). It is never sent to the model as an instruction: Pangasinan shares
- *    words such as "ko", "mo" and "na" with Tagalog, so a word count could easily mislabel
- *    Pangasinan as Filipino, and the model is better placed to recognise it.
+ *    function words. It picks the language of the fixed, non-model replies
+ *    (ChatbotMessages). It never PINS the model's reply language: Pangasinan shares words
+ *    such as "ko", "mo" and "na" with Tagalog, so a word count could easily mislabel
+ *    Pangasinan as Filipino, and the model is better placed to recognise it. Only its
+ *    UNKNOWN and MIXED results are passed on, as soft steering ("not clearly English or
+ *    Tagalog — may be Pangasinan or Ilocano"; "mirror the mix") — see
+ *    GeminiChatService::latestMessageLanguageCheck().
  *
  * There is deliberately no Pangasinan word list here: the repository has no reliable
  * Pangasinan reference material, and a home-made lexicon would be guesswork. Pangasinan is
@@ -97,9 +100,27 @@ final class ChatLanguage
      * ("ko", "mo", "na" and "sa" are left out for that reason).
      */
     private const FILIPINO_MARKERS = [
+        // "wala" is not here: Pangasinan uses it all the time ("Wala ray bakante ed
+        // Urdaneta?" — "Are there vacancies…?"), so it is not Tagalog-only.
         'ang', 'ng', 'mga', 'po', 'ba', 'ako', 'ikaw', 'kayo', 'ninyo', 'paano', 'saan',
-        'ano', 'kailan', 'bakit', 'wala', 'meron', 'ito', 'iyan', 'yung', 'lang', 'naman',
+        'ano', 'kailan', 'bakit', 'meron', 'ito', 'iyan', 'yung', 'lang', 'naman',
         'pwede', 'puwede', 'kailangan', 'gusto', 'opo', 'hindi', 'nasaan', 'magkano',
+    ];
+
+    /**
+     * The subset of FILIPINO_MARKERS that only ever appears in a Tagalog *sentence* (question
+     * particles and question words, negation, Tagalog-only pronouns) — unlike "ng"/"mga"/"ang",
+     * which also turn up inside a noun phrase in otherwise mixed speech ("recipe ng adobo").
+     * One of these is enough to say the visitor is writing Tagalog now.
+     *
+     * Deliberately left out: Tagalog words Pangasinan speakers commonly borrow — "po",
+     * "pwede"/"puwede", "gusto", "kailangan", "meron", "kayo" ("Pwede ak man-apply ed job
+     * fair?", "…ed TUPAD po?"). They are still Tagalog markers for guessed(), but on their own
+     * they never decide that a Pangasinan speaker has switched to Tagalog.
+     */
+    private const TAGALOG_SENTENCE_MARKERS = [
+        'ba', 'opo', 'paano', 'saan', 'nasaan', 'ano', 'kailan', 'bakit', 'magkano',
+        'hindi', 'ako', 'ikaw', 'ninyo',
     ];
 
     /** @param  array<int, string>  $userMessages  The visitor's messages, oldest first. */
@@ -125,16 +146,54 @@ final class ChatLanguage
         return null;
     }
 
+    /**
+     * The explicit request that still applies to the latest message, or null.
+     *
+     * A request keeps applying to later short or neutral messages ("Production operator",
+     * "recipe ng adobo"), but it ends when the visitor has clearly switched away from it: two
+     * Tagalog-only words, or one Tagalog sentence word such as "ba" or "paano"
+     * (TAGALOG_SENTENCE_MARKERS), end a Pangasinan/Ilocano/English request — the marker lists
+     * leave out words Pangasinan shares, so this never mistakes Pangasinan for Tagalog — and a
+     * clearly English message ends a Filipino/Pangasinan/Ilocano one. A request made in the
+     * latest message itself always applies.
+     */
+    public function activeRequest(): ?string
+    {
+        $requested = $this->explicit();
+        if ($requested === null) {
+            return null;
+        }
+
+        $latest = $this->latestMessage();
+        if (self::requestIn($latest) !== null) {
+            return $requested;
+        }
+
+        [$english, $filipino] = $this->latestCounts();
+        $switchedToTagalog = $this->latestIsClearlyTagalog() && $requested !== self::FILIPINO;
+        $switchedToEnglish = $english >= 2 && $filipino === 0 && $requested !== self::ENGLISH;
+
+        return ($switchedToTagalog || $switchedToEnglish) ? null : $requested;
+    }
+
+    /**
+     * Whether the latest message is clearly written in Tagalog: two Tagalog-only words, or one
+     * Tagalog sentence word (TAGALOG_SENTENCE_MARKERS). A borrowed "po" or "pwede" inside a
+     * Pangasinan sentence is not enough. One definition for both uses — ending an earlier
+     * language request, and holding back the "may be Pangasinan" caution — so they never
+     * disagree.
+     */
+    public function latestIsClearlyTagalog(): bool
+    {
+        [, $filipino, $sentence] = $this->latestCounts();
+
+        return $filipino >= 2 || $sentence >= 1;
+    }
+
     /** A rough read of the latest message. For fixed replies only — see the class comment. */
     public function guessed(): string
     {
-        // Not end(): it moves the array pointer, which counts as writing a readonly property.
-        $latest = $this->userMessages[array_key_last($this->userMessages)] ?? '';
-        preg_match_all('/[\p{L}\']+/u', mb_strtolower($latest), $matches);
-        $words = $matches[0];
-
-        $english = count(array_intersect($words, self::ENGLISH_MARKERS));
-        $filipino = count(array_intersect($words, self::FILIPINO_MARKERS));
+        [$english, $filipino] = $this->latestCounts();
 
         return match (true) {
             $english >= 1 && $filipino >= 1 => self::MIXED,
@@ -144,10 +203,29 @@ final class ChatLanguage
         };
     }
 
-    /** What the fixed, non-model replies should use: an explicit request beats the guess. */
+    /** What the fixed, non-model replies should use: a request still in force beats the guess. */
     public function forFixedReplies(): string
     {
-        return $this->explicit() ?? $this->guessed();
+        return $this->activeRequest() ?? $this->guessed();
+    }
+
+    private function latestMessage(): string
+    {
+        // Not end(): it moves the array pointer, which counts as writing a readonly property.
+        return $this->userMessages[array_key_last($this->userMessages)] ?? '';
+    }
+
+    /** @return array{0: int, 1: int, 2: int} English, Tagalog and Tagalog-sentence marker counts in the latest message. */
+    private function latestCounts(): array
+    {
+        preg_match_all('/[\p{L}\']+/u', mb_strtolower($this->latestMessage()), $matches);
+        $words = $matches[0];
+
+        return [
+            count(array_intersect($words, self::ENGLISH_MARKERS)),
+            count(array_intersect($words, self::FILIPINO_MARKERS)),
+            count(array_intersect($words, self::TAGALOG_SENTENCE_MARKERS)),
+        ];
     }
 
     private static function requestIn(string $message): ?string

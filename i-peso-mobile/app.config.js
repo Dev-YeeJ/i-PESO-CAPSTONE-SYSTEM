@@ -8,14 +8,13 @@ if (fs.existsSync(envFile)) {
   dotenvExpand.expand(dotenv.config({ path: envFile }))
 }
 
-const appJson = require('./app.json')
-
+// `config` is app.json's "expo" block, which Expo passes in already loaded.
 module.exports = ({ config }) => ({
-  ...appJson.expo,
-  plugins: [...(appJson.expo.plugins || []), '@react-native-community/datetimepicker'],
+  ...config,
+  plugins: [...(config.plugins || []), '@react-native-community/datetimepicker'],
   extra: {
-    ...appJson.expo.extra,
-    EXPO_PUBLIC_API_URL: process.env.EXPO_PUBLIC_API_URL || appJson.expo.extra?.EXPO_PUBLIC_API_URL,
-    apiBaseUrl: process.env.EXPO_PUBLIC_API_URL || appJson.expo.extra?.apiBaseUrl,
+    ...config.extra,
+    EXPO_PUBLIC_API_URL: process.env.EXPO_PUBLIC_API_URL || config.extra?.EXPO_PUBLIC_API_URL,
+    apiBaseUrl: process.env.EXPO_PUBLIC_API_URL || config.extra?.apiBaseUrl,
   },
 })

@@ -1,59 +1,52 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import {
-  Image,
-  RefreshControl,
-  ScrollView,
-  StatusBar,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from 'react-native'
+import { Image, RefreshControl, ScrollView, StatusBar, StyleSheet, Text, View } from 'react-native'
 import { router } from 'expo-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import MaterialIcons from '@expo/vector-icons/MaterialIcons'
 import { LinearGradient } from 'expo-linear-gradient'
 import Animated, { FadeInUp } from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import type { NearbyJob, NearbyJobsResponse, ProfileStrengthItem, SeekerProfile } from '@/services/seekerService'
+import type { JobFair, NearbyJob, NearbyJobsResponse, ProfileStrengthItem, SeekerProfile } from '@/services/seekerService'
 import { seekerService } from '@/services/seekerService'
 import { useProfilePhotoUri } from '@/hooks/useProfilePhotoUri'
-import { useEmployerRatings } from '@/hooks/useEmployerRatings'
 import { AnnouncementBanner } from '@/components/announcements/AnnouncementBanner'
-import { ANNOUNCEMENT_KEYS } from '@/utils/announcements'
 import { useSystemStatus } from '@/hooks/useSystemStatus'
 import { useAuthStore } from '@/stores/authStore'
 import { useMotion } from '@/hooks/useMotion'
-import { firstName, listFrom } from '@/utils/seekerView'
+import { firstName } from '@/utils/seekerView'
 import { Button } from '@/components/ui/Button'
-import { Card } from '@/components/ui/Card'
-import { Badge } from '@/components/ui/Badge'
 import { AlertBox } from '@/components/ui/AlertBox'
+import { Chip } from '@/components/ui/Chip'
+import { DateBadge } from '@/components/ui/DateBadge'
+import { EmptyArt } from '@/components/ui/EmptyArt'
 import { PressableScale } from '@/components/ui/PressableScale'
 import { MatchRing } from '@/components/ui/MatchRing'
-import { AceMascot } from '@/components/chat/AceMascot'
 import { Skeleton, SkeletonGroup } from '@/components/ui/Skeleton'
-import { JobFeedCard } from '@/components/seeker/JobFeedCard'
-import { colors, gradients, radii, shadows, spacing, textStyles, typography } from '@/theme'
+import { HOME_JOB_CARD_WIDTH, HomeJobCard } from '@/components/seeker/HomeJobCard'
+import { colors, gradients, isDark, radii, shadows, spacing, textStyles, typography } from '@/theme'
 
 type IconName = React.ComponentProps<typeof MaterialIcons>['name']
 type FeedMode = 'recommended' | 'nearby' | 'latest'
 
-// Mirrors web's JobFeedSelector — title + description per feed, with a live count badge.
-const FEED_SELECTOR_ITEMS: { value: FeedMode; title: string; description: string }[] = [
-  { value: 'recommended', title: 'Recommended Jobs', description: 'Ranked by your profile and skills' },
-  { value: 'nearby', title: 'Nearby Jobs', description: 'Based on your saved GPS location' },
-  { value: 'latest', title: 'Latest Active Vacancies', description: 'Broader fallback across active postings' },
+// Redesigned Home (Superdesign draft "Home — Redesign (base)"). Search, sort, the Saved view and
+// the full job list live on the Jobs tab; Home is a calm summary with one primary action — the
+// seeker's next best step — inside the profile-strength hero.
+
+const FEED_CHIPS: { value: FeedMode; label: string }[] = [
+  { value: 'recommended', label: 'For you' },
+  { value: 'nearby', label: 'Nearby' },
+  { value: 'latest', label: 'Latest' },
+]
+
+const QUICK_ACTIONS: { label: string; icon: IconName; href: string }[] = [
+  { label: 'Job Map', icon: 'map', href: '/(seeker)/job-map?from=home' },
+  { label: 'Job Fairs', icon: 'event', href: '/(seeker)/job-fairs?from=home' },
+  { label: 'Resume Studio', icon: 'description', href: '/(seeker)/profile/resume-studio?from=home' },
+  { label: 'Safety Reports', icon: 'shield', href: '/(seeker)/safety-reports?from=home' },
 ]
 
 const EMPTY_JOBS: NearbyJob[] = []
-
-const SORT_ITEMS: { value: 'match' | 'distance' | 'newest'; label: string }[] = [
-  { value: 'match', label: 'Match' },
-  { value: 'distance', label: 'Distance' },
-  { value: 'newest', label: 'Newest' },
-]
+const CAROUSEL_LIMIT = 8
 
 // "Next Best Action" — each incomplete profile-strength item maps to one concrete
 // suggestion. Section numbers match the tabs in app/(seeker)/profile/edit.tsx.
@@ -77,25 +70,31 @@ function pickNextBestAction(items?: ProfileStrengthItem[]) {
   return { ...NEXT_ACTION_COPY[top.key as string], label: top.label }
 }
 
+/** "08:00:00" → "8:00 AM". */
+function clock(value?: string | null) {
+  const match = /^(\d{1,2}):(\d{2})/.exec(value ?? '')
+  if (!match) return ''
+  const hour = Number(match[1])
+  return `${hour % 12 || 12}:${match[2]} ${hour < 12 ? 'AM' : 'PM'}`
+}
+
 export default function SeekerHomeScreen() {
   const insets = useSafeAreaInsets()
   const user = useAuthStore((state) => state.user)
-
   const queryClient = useQueryClient()
+
   // Shares the ['seekerProfile'] query with the Profile screen, which invalidates it after a
   // photo upload/removal — so the header avatar here updates without a manual pull-to-refresh.
-  // (Tabs stay mounted, so a one-shot fetch on mount kept showing initials after an upload.)
   const profileQuery = useQuery({ queryKey: ['seekerProfile'], queryFn: () => seekerService.getProfile() })
   const profile: SeekerProfile | null = profileQuery.data ?? null
-  const profileFetchedAt = profileQuery.dataUpdatedAt
-  const loadProfile = profileQuery.refetch
-  const error = profileQuery.isError && !profile ? 'Unable to load your profile. Check the backend connection.' : ''
+  const error = profileQuery.isError && !profile ? 'Unable to load your profile. Check your connection and pull down to try again.' : ''
   const [refreshing, setRefreshing] = useState(false)
   const [jobsMessage, setJobsMessage] = useState('')
   const [feedMode, setFeedMode] = useState<FeedMode>('nearby')
-  const [searchQuery, setSearchQuery] = useState('')
-  const [activeTab, setActiveTab] = useState<'jobs' | 'saved'>('jobs')
-  const [sort, setSort] = useState<'match' | 'distance' | 'newest'>('match')
+  // A horizontal ScrollView nested in this vertical one can collapse to ~0 height on Android
+  // unless the ScrollView itself has a height (the old Home's feed selector hit this). Measure
+  // the cards and pin it; tracks dynamic type because it re-measures on every content change.
+  const [carouselHeight, setCarouselHeight] = useState<number | undefined>(undefined)
 
   const flipSavedInFeeds = (jobId: string) => {
     (['recommended', 'nearby', 'latest'] as const).forEach((mode) => {
@@ -107,6 +106,7 @@ export default function SeekerHomeScreen() {
     })
   }
 
+  // Optimistic: the bookmark flips at once and flips back if the request fails.
   const toggleSaveMutation = useMutation({
     mutationFn: (jobId: string) => seekerService.toggleSavedJob(jobId),
     onMutate: (jobId) => flipSavedInFeeds(jobId),
@@ -120,61 +120,34 @@ export default function SeekerHomeScreen() {
     refetchOnWindowFocus: false,
   })
 
-  const { data: jobFairs = [] } = useQuery({
-    queryKey: ['jobFairs'],
-    queryFn: () => seekerService.getJobFairs(),
-  })
-  const upcomingFairs = jobFairs.slice(0, 2)
+  const jobFairsQuery = useQuery({ queryKey: ['jobFairs'], queryFn: () => seekerService.getJobFairs() })
+  const nextFair: JobFair | undefined = jobFairsQuery.data?.[0]
 
-  const greeting = useMemo(() => {
-    const hour = new Date().getHours()
-    if (hour < 12) return 'Good morning'
-    if (hour < 18) return 'Good afternoon'
-    return 'Good evening'
-  }, [])
-
-  // Fetched in parallel (not just the active tab) so the feed-selector cards can show a count
-  // per feed the way web's JobFeedSelector does, rather than only knowing the active one.
+  // Fetched in parallel so switching chips is instant and the empty-feed fallback below can
+  // tell whether Latest has anything to offer.
   const recommendedQuery = useQuery({
     queryKey: ['homeFeed', 'recommended'],
-    queryFn: () => seekerService.searchJobs({ radiusKm: 20, limit: 8, feedMode: 'recommended' }),
+    queryFn: () => seekerService.searchJobs({ radiusKm: 20, limit: CAROUSEL_LIMIT, feedMode: 'recommended' }),
   })
   const nearbyQuery = useQuery({
     queryKey: ['homeFeed', 'nearby'],
-    queryFn: () => seekerService.searchJobs({ radiusKm: 20, limit: 8, feedMode: 'nearby' }),
+    queryFn: () => seekerService.searchJobs({ radiusKm: 20, limit: CAROUSEL_LIMIT, feedMode: 'nearby' }),
   })
   const latestQuery = useQuery({
     queryKey: ['homeFeed', 'latest'],
-    queryFn: () => seekerService.searchJobs({ radiusKm: 20, limit: 8, feedMode: 'latest' }),
+    queryFn: () => seekerService.searchJobs({ radiusKm: 20, limit: CAROUSEL_LIMIT, feedMode: 'latest' }),
   })
   const feedQueries = { recommended: recommendedQuery, nearby: nearbyQuery, latest: latestQuery }
-  // Verified-review ratings for every employer across the three feeds, in one request
-  // (JobSeekerHome.jsx's ratingEmployerIds / employerRatings).
-  const allFeedJobs = useMemo(
-    () => [...(recommendedQuery.data?.jobs ?? []), ...(nearbyQuery.data?.jobs ?? []), ...(latestQuery.data?.jobs ?? [])],
-    [recommendedQuery.data, nearbyQuery.data, latestQuery.data],
-  )
-  const employerRatings = useEmployerRatings(allFeedJobs)
   const systemStatus = useSystemStatus()
-  // Unread PESO announcements for the Home shortcut; a failed request just hides the count.
-  const { data: announcementUnread = 0 } = useQuery({
-    queryKey: ANNOUNCEMENT_KEYS.unread,
-    queryFn: () => seekerService.announcementUnreadCount(),
-    staleTime: 60_000,
-    retry: false,
-  })
   const feedCounts = {
     recommended: recommendedQuery.data?.jobs?.length ?? 0,
     nearby: nearbyQuery.data?.jobs?.length ?? 0,
     latest: latestQuery.data?.jobs?.length ?? 0,
   }
 
-  // Mirrors the website's feed fallback, generalized to every tab: if the active feed comes
-  // back empty or errored (no saved location for "Nearby", profile too new for "Recommended"),
-  // fall back to the broadest feed — Latest — instead of leaving Home showing nothing at all.
-  // Previously this only covered "Recommended", so a seeker with no saved address landed on
-  // the default "Nearby" tab and saw an empty Home with no way out short of tapping a
-  // different feed card themselves.
+  // Mirrors the website's feed fallback: if the active feed comes back empty or errored (no
+  // saved location for "Nearby", profile too new for "For you"), fall back to the broadest
+  // feed — Latest — instead of leaving Home with nothing to show.
   const activeQuery = feedQueries[feedMode]
   const activeFeedEmpty = activeQuery.isSuccess && feedCounts[feedMode] === 0
   const activeFeedFailed = activeQuery.isError
@@ -188,423 +161,321 @@ export default function SeekerHomeScreen() {
     if (feedMode === 'nearby') {
       setJobsMessage(
         activeFeedFailed
-          ? 'Nearby jobs need your saved address location — showing the latest active vacancies instead.'
-          : 'No nearby jobs found in range — showing the latest active vacancies instead.'
+          ? 'Nearby jobs need your saved address — showing the latest openings instead.'
+          : 'No nearby jobs in range — showing the latest openings instead.'
       )
     } else {
-      setJobsMessage('No personalized recommendations yet — showing the latest active vacancies instead.')
+      setJobsMessage('No personal recommendations yet — showing the latest openings instead.')
     }
   }, [shouldFallbackToLatest, feedMode, activeFeedFailed])
 
   const effectiveFeedMode: FeedMode = shouldFallbackToLatest ? 'latest' : feedMode
   const jobs = feedQueries[effectiveFeedMode].data?.jobs ?? EMPTY_JOBS
   const jobsLoading = activeQuery.isLoading || (shouldFallbackToLatest && latestQuery.isLoading)
+  const jobsFailed = activeFeedFailed && !shouldFallbackToLatest && !jobsLoading
+  // Best match first, as the old Home's default sort did.
+  const carouselJobs = useMemo(
+    () => [...jobs].sort((a, b) => Number(b.match_percentage ?? b.match?.percentage ?? 0) - Number(a.match_percentage ?? a.match?.percentage ?? 0)),
+    [jobs],
+  )
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true)
-    await Promise.allSettled([loadProfile(), recommendedQuery.refetch(), nearbyQuery.refetch(), latestQuery.refetch()])
+    await Promise.allSettled([profileQuery.refetch(), recommendedQuery.refetch(), nearbyQuery.refetch(), latestQuery.refetch(), jobFairsQuery.refetch()])
     setRefreshing(false)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loadProfile])
+  }, [])
+
+  const greeting = useMemo(() => {
+    const hour = new Date().getHours()
+    if (hour < 12) return 'Magandang umaga'
+    if (hour < 18) return 'Magandang hapon'
+    return 'Magandang gabi'
+  }, [])
 
   const activeProfile = profile ?? user
-  // profileFetchedAt (the query's dataUpdatedAt, new on every fetch) is part of the cache key —
-  // profile.id alone never changes for the same account, so a photo uploaded from the Profile
-  // screen (which refetches ['seekerProfile']) gets downloaded fresh here too. The photo is
-  // fetched with the session token first (see useProfilePhotoUri); until then the initial shows.
-  const avatarUri = useProfilePhotoUri(Boolean(profile?.has_profile_image), `${profile?.id ?? 'me'}-${profileFetchedAt}`)
+  // dataUpdatedAt is part of the cache key so a photo uploaded from Profile is fetched fresh.
+  const avatarUri = useProfilePhotoUri(Boolean(profile?.has_profile_image), `${profile?.id ?? 'me'}-${profileQuery.dataUpdatedAt}`)
+  const name = firstName(activeProfile)
   const strength = profile?.profile_strength?.percentage ?? 0
-  const filteredJobs = useMemo(() => {
-    const query = searchQuery.trim().toLowerCase()
-    const base = activeTab === 'saved' ? jobs.filter((job) => job.is_saved) : jobs
-    if (!query) return base
-    return base.filter((job) => {
-      const haystack = [
-        job.job_title,
-        job.employer?.company_name,
-        job.barangay,
-        job.city_municipality,
-        job.province,
-        ...listFrom(job.required_skills),
-      ].filter(Boolean).join(' ').toLowerCase()
-      return haystack.includes(query)
-    })
-  }, [activeTab, jobs, searchQuery])
-  const sortedJobs = useMemo(() => {
-    const withMatch = (job: NearbyJob) => Number(job.match_percentage ?? job.match?.percentage ?? 0)
-    const withDistance = (job: NearbyJob) => Number(job.distance_km ?? Number.MAX_SAFE_INTEGER)
-    const withDate = (job: NearbyJob) => (job.posted_at ? new Date(job.posted_at).getTime() : 0)
-    return [...filteredJobs].sort((left, right) => {
-      if (sort === 'distance') return withDistance(left) - withDistance(right) || withMatch(right) - withMatch(left)
-      if (sort === 'newest') return withDate(right) - withDate(left) || withMatch(right) - withMatch(left)
-      return withMatch(right) - withMatch(left) || withDistance(left) - withDistance(right)
-    })
-  }, [filteredJobs, sort])
-  const topJobs = sortedJobs.slice(0, 3)
   const nextAction = pickNextBestAction(profile?.profile_strength?.items)
+  const heroTitle = strength >= 80 ? 'Your profile is ready' : strength >= 40 ? 'Almost there' : "Let's build your profile"
+  const heroMessage = nextAction
+    ? nextAction.message
+    : strength < 100
+    ? 'Complete your profile to get better matches.'
+    : 'Your profile is complete. Check your top matches below.'
+  const heroCta = nextAction ? `Update ${nextAction.label}` : strength < 100 ? 'Complete profile' : 'Browse jobs'
+  const onHeroCta = () => {
+    if (nextAction) {
+      router.push(
+        nextAction.section
+          ? { pathname: '/(seeker)/profile/edit', params: { section: String(nextAction.section), from: 'home' } }
+          : '/(seeker)/profile'
+      )
+    } else {
+      router.push(strength < 100 ? '/(seeker)/profile' : '/(seeker)/jobs')
+    }
+  }
 
-  const readinessStatus = strength >= 80 ? 'Ready' : (strength >= 40 ? 'In Progress' : 'Needs Attention')
-  const readinessVariant = readinessStatus === 'Ready' ? 'success' : readinessStatus === 'In Progress' ? 'info' : 'warning'
+  // The tab bar is laid out below the screen (not floating over it), so the FAB only needs a
+  // gutter above the screen's bottom edge.
+  const fabBottom = spacing.lg
 
   return (
     <View style={styles.flex}>
-      <StatusBar barStyle="light-content" backgroundColor={colors.blue800} />
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.background} />
       <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={styles.content}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.blue600} progressViewOffset={140} />}
+        style={styles.flex}
+        contentContainerStyle={{ paddingTop: insets.top + spacing.sm, paddingBottom: fabBottom + 56 + spacing.xl }}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.blue600} colors={[colors.blue600]} />}
         showsVerticalScrollIndicator={false}
       >
-        {/* Gradient hero. The Profile Strength card overlaps its bottom edge, which ties the
-            two together and gives the screen a single focal point on open. */}
-        <LinearGradient
-          colors={[...gradients.hero]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={[styles.hero, { paddingTop: insets.top + spacing.lg }]}
-        >
-          <View style={styles.heroDecor} pointerEvents="none" />
-          <View style={styles.heroTop}>
-            <View style={styles.headerLeft}>
-              <View style={styles.avatarCircle}>
-                {avatarUri ? (
-                  <Image source={{ uri: avatarUri }} style={styles.avatarImage} />
-                ) : (
-                  <Text style={styles.avatarText}>{firstName(activeProfile).charAt(0).toUpperCase()}</Text>
-                )}
-              </View>
-              <View style={styles.headerText}>
-                <Text style={styles.greetingText}>{greeting}</Text>
-                <Text style={styles.nameText} numberOfLines={1}>{firstName(activeProfile)}</Text>
-              </View>
-            </View>
-            <TouchableOpacity
-              onPress={() => router.push('/(seeker)/notifications')}
-              style={styles.bellBtn}
-              hitSlop={8}
-              accessibilityRole="button"
-              accessibilityLabel={unreadCount > 0 ? `Notifications, ${unreadCount} unread` : 'Notifications'}
-            >
-              <MaterialIcons name="notifications" size={22} color={colors.white} />
-              {unreadCount > 0 ? (
-                <View style={styles.bellBadge}>
-                  <Text style={styles.bellBadgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
-                </View>
-              ) : null}
-            </TouchableOpacity>
-          </View>
-        </LinearGradient>
-
-        <Card padding="md" style={styles.strengthCard}>
-          <View style={styles.strengthRow}>
-            <MatchRing percentage={strength} size={72} strokeWidth={6} />
-            <View style={styles.strengthText}>
-              <View style={styles.strengthTitleRow}>
-                <Text style={styles.strengthTitle}>Profile strength</Text>
-                <Badge variant={readinessVariant}>{readinessStatus}</Badge>
-              </View>
-              <Text style={styles.strengthSub} numberOfLines={2}>
-                {nextAction
-                  ? nextAction.message
-                  : strength < 100
-                  ? 'Complete your profile to get better matches.'
-                  : 'Your profile is fully updated. Check your top matches below.'}
-              </Text>
-            </View>
-          </View>
-          <Button
-            variant="ghost"
-            size="sm"
-            onPress={() =>
-              nextAction
-                ? router.push(
-                    nextAction.section
-                      ? { pathname: '/(seeker)/profile/edit', params: { section: String(nextAction.section), from: 'home' } }
-                      : '/(seeker)/profile'
-                  )
-                : router.push(strength < 100 ? '/(seeker)/profile' : '/(seeker)/jobs')
-            }
-            style={styles.strengthCta}
-            textStyle={styles.strengthCtaText}
-          >
-            {(nextAction ? `Update ${nextAction.label}` : strength < 100 ? 'Complete profile' : 'Browse jobs') + '  →'}
-          </Button>
-        </Card>
-
-        {error ? (
-          <AlertBox variant="danger" style={styles.alertBox}>
-            {error}
-          </AlertBox>
-        ) : null}
-
-        {/* Important/Urgent PESO announcements; renders nothing when there are none. */}
-        <AnnouncementBanner />
-
-        <PressableScale
-          scaleTo="buttonPress"
-          ripple={null}
-          style={styles.shortcut}
-          onPress={() => router.push('/(seeker)/announcements')}
-          accessibilityRole="button"
-          accessibilityLabel={announcementUnread > 0 ? `Announcements, ${announcementUnread} unread` : 'Announcements'}
-        >
-          <MaterialIcons name="campaign" size={20} color={colors.blue700} />
-          <Text style={styles.shortcutText}>Announcements</Text>
-          {announcementUnread > 0 ? (
-            <View style={styles.shortcutCount}>
-              <Text style={styles.shortcutCountText}>{announcementUnread > 99 ? '99+' : announcementUnread}</Text>
-            </View>
-          ) : null}
-          <MaterialIcons name="chevron-right" size={20} color={colors.subtle} style={styles.shortcutChevron} />
-        </PressableScale>
-
-        {upcomingFairs.length ? (
+        {/* (1) Greeting header — white */}
+        <View style={styles.header}>
           <PressableScale
             scaleTo="buttonPress"
             ripple={null}
-            style={styles.bulletinCard}
-            onPress={() => router.push('/(seeker)/job-fairs')}
+            onPress={() => router.push('/(seeker)/profile')}
+            style={styles.headerLeft}
             accessibilityRole="button"
-            accessibilityLabel="Open PESO Job Fair Bulletin"
+            accessibilityLabel={`${greeting}, ${name}. Open your profile`}
           >
-            <View style={styles.bulletinHeader}>
-              <View style={styles.flexOne}>
-                <Text style={styles.bulletinKicker}>PESO Job Fair Bulletin</Text>
-                <Text style={styles.bulletinTitle}>Upcoming employment events</Text>
-              </View>
-              <MaterialIcons name="chevron-right" size={22} color={colors.blue700} />
+            <View style={styles.avatar}>
+              {avatarUri ? (
+                <Image source={{ uri: avatarUri }} style={styles.avatarImage} />
+              ) : (
+                <Text style={styles.avatarText}>{name.charAt(0).toUpperCase()}</Text>
+              )}
             </View>
-            {upcomingFairs.map((fair) => (
-              <View key={String(fair.job_fair_id)} style={styles.bulletinRow}>
-                <Text style={styles.bulletinFairTitle} numberOfLines={1}>{fair.title}</Text>
-                <View style={styles.bulletinMetaRow}>
-                  <MaterialIcons name="event" size={13} color={colors.blue700} />
-                  <Text style={styles.bulletinMeta} numberOfLines={1}>
-                    {[fair.start_date, fair.start_time?.slice(0, 5)].filter(Boolean).join(' · ')}
-                  </Text>
+            <View style={styles.flexOne}>
+              <Text style={styles.greeting}>{greeting}</Text>
+              <Text style={styles.name} numberOfLines={1}>{name}</Text>
+            </View>
+          </PressableScale>
+          <PressableScale
+            scaleTo="buttonPress"
+            ripple={null}
+            onPress={() => router.push({ pathname: '/(seeker)/notifications', params: { from: 'home' } })}
+            style={styles.bellBtn}
+            hitSlop={4}
+            accessibilityRole="button"
+            accessibilityLabel={unreadCount > 0 ? `Notifications, ${unreadCount} unread` : 'Notifications'}
+          >
+            <MaterialIcons name="notifications-none" size={24} color={colors.iconBlue} />
+            {unreadCount > 0 ? (
+              // Amber: the count badge is one of amber's three sanctioned uses. Navy text, never white.
+              <View style={styles.bellBadge}>
+                <Text style={styles.bellBadgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
+              </View>
+            ) : null}
+          </PressableScale>
+        </View>
+
+        {/* (2) Profile strength hero — the screen's one primary action */}
+        <View style={styles.heroWrap}>
+          <LinearGradient colors={[...gradients.brand]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.hero}>
+            <View style={styles.heroDecorA} pointerEvents="none" />
+            <View style={styles.heroDecorB} pointerEvents="none" />
+            <View style={styles.heroRow}>
+              <MatchRing percentage={strength} size={84} strokeWidth={7} onDark showPercent accessibilityLabel="Profile strength" />
+              <View style={styles.flexOne}>
+                <Text style={styles.heroKicker}>PROFILE STRENGTH</Text>
+                <Text style={styles.heroTitle}>{heroTitle}</Text>
+                <Text style={styles.heroMessage}>{heroMessage}</Text>
+              </View>
+            </View>
+            <Button variant="inverse" size="md" fullWidth iconRight="arrow-forward" onPress={onHeroCta} style={styles.heroCta}>
+              {heroCta}
+            </Button>
+          </LinearGradient>
+        </View>
+
+        {error ? <AlertBox variant="danger" style={styles.errorBox}>{error}</AlertBox> : null}
+
+        {/* (3) PESO announcements (bell + push sourced). Renders nothing when there are none, and
+            carries its own bottom margin when it does — so it gets no wrapper margin here; the hero's
+            bottom margin is the gap above it either way. */}
+        <AnnouncementBanner />
+
+        {/* (4) Quick actions */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle} accessibilityRole="header">Quick actions</Text>
+          <View style={styles.quickRow}>
+            {QUICK_ACTIONS.map((action) => (
+              <PressableScale
+                key={action.label}
+                scaleTo="buttonPress"
+                ripple={null}
+                onPress={() => router.push(action.href as never)}
+                style={styles.quickItem}
+                accessibilityRole="button"
+                accessibilityLabel={action.label}
+              >
+                <View style={styles.quickTile}>
+                  <MaterialIcons name={action.icon} size={26} color={colors.iconBlue} />
                 </View>
-                {fair.venue ? (
-                  <View style={styles.bulletinMetaRow}>
-                    <MaterialIcons name="place" size={13} color={colors.blue700} />
-                    <Text style={styles.bulletinMeta} numberOfLines={1}>{fair.venue}</Text>
+                <Text style={styles.quickLabel}>{action.label}</Text>
+              </PressableScale>
+            ))}
+          </View>
+        </View>
+
+        {/* (5) Jobs for you */}
+        <View style={styles.sectionTight}>
+          <View style={[styles.sectionHead, styles.gutter]}>
+            <Text style={styles.sectionTitle} accessibilityRole="header">Jobs for you</Text>
+            <PressableScale scaleTo="buttonPress" ripple={null} onPress={() => router.push('/(seeker)/jobs')} style={styles.linkBtn} accessibilityRole="link">
+              <Text style={styles.linkText}>See all</Text>
+              <MaterialIcons name="chevron-right" size={20} color={colors.link} />
+            </PressableScale>
+          </View>
+          <View style={[styles.chipRow, styles.gutter]}>
+            {FEED_CHIPS.map((chip) => (
+              <Chip key={chip.value} label={chip.label} selected={feedMode === chip.value} onPress={() => setFeedMode(chip.value)} />
+            ))}
+          </View>
+
+          {jobsMessage ? <AlertBox variant="info" style={styles.alertBox}>{jobsMessage}</AlertBox> : null}
+
+          {jobsLoading ? (
+            <SkeletonGroup label="Loading jobs for you" style={styles.carouselSkeleton}>
+              {[0, 1].map((row) => (
+                <View key={row} style={styles.skeletonCard}>
+                  <View style={styles.skeletonTop}>
+                    <Skeleton width={44} height={44} radius={radii.md} />
+                    <Skeleton width={52} height={52} radius={26} />
+                  </View>
+                  <Skeleton width="80%" height={14} style={styles.skeletonGap} />
+                  <Skeleton width="55%" height={11} style={styles.skeletonGapSm} />
+                  <Skeleton width="65%" height={11} style={styles.skeletonGap} />
+                  <Skeleton width={120} height={20} style={styles.skeletonGap} />
+                </View>
+              ))}
+            </SkeletonGroup>
+          ) : jobsFailed ? (
+            <View style={[styles.stateCard, styles.gutterMargin]}>
+              <EmptyArt kind="cloud" size={64} />
+              <View style={styles.flexOne}>
+                <Text style={styles.stateTitle}>Couldn&apos;t load jobs</Text>
+                <Text style={styles.stateBody}>Check your connection, then try again.</Text>
+                <Button variant="outline" size="sm" icon="refresh" onPress={() => activeQuery.refetch()} style={styles.stateBtn}>Try again</Button>
+              </View>
+            </View>
+          ) : carouselJobs.length ? (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              snapToInterval={HOME_JOB_CARD_WIDTH + spacing.md}
+              decelerationRate="fast"
+              style={[styles.carousel, carouselHeight ? { height: carouselHeight } : null]}
+              contentContainerStyle={styles.carouselContent}
+              onContentSizeChange={(_width, height) => {
+                if (height > 0 && height !== carouselHeight) setCarouselHeight(height)
+              }}
+            >
+              {carouselJobs.map((job) => (
+                <HomeJobCard
+                  key={String(job.post_id)}
+                  job={job}
+                  saving={toggleSaveMutation.isPending && String(toggleSaveMutation.variables) === String(job.post_id)}
+                  onPress={() => router.push({ pathname: '/(seeker)/jobs/[id]', params: { id: String(job.post_id), from: 'home' } })}
+                  onToggleSave={() => toggleSaveMutation.mutate(String(job.post_id))}
+                />
+              ))}
+            </ScrollView>
+          ) : (
+            <View style={[styles.stateCard, styles.gutterMargin]}>
+              <EmptyArt kind="search" size={64} />
+              <View style={styles.flexOne}>
+                <Text style={styles.stateTitle}>No jobs here yet</Text>
+                <Text style={styles.stateBody}>New openings from PESO employers show up here. Browse all jobs in the meantime.</Text>
+                <Button variant="outline" size="sm" onPress={() => router.push('/(seeker)/jobs')} style={styles.stateBtn}>Browse jobs</Button>
+              </View>
+            </View>
+          )}
+        </View>
+
+        {/* (6) Upcoming job fair */}
+        {nextFair ? (
+          <View style={styles.sectionTight}>
+            <View style={[styles.sectionHead, styles.gutter]}>
+              <Text style={styles.sectionTitle} accessibilityRole="header">Upcoming job fair</Text>
+              <PressableScale scaleTo="buttonPress" ripple={null} onPress={() => router.push('/(seeker)/job-fairs?from=home')} style={styles.linkBtn} accessibilityRole="link">
+                <Text style={styles.linkText}>All fairs</Text>
+                <MaterialIcons name="chevron-right" size={20} color={colors.link} />
+              </PressableScale>
+            </View>
+            <PressableScale
+              onPress={() => router.push({ pathname: '/(seeker)/job-fairs/[id]', params: { id: String(nextFair.job_fair_id), from: 'home' } })}
+              style={[styles.fairCard, styles.gutterMargin]}
+              accessibilityRole="button"
+              accessibilityLabel={`Job fair: ${nextFair.title}`}
+            >
+              <DateBadge date={nextFair.start_date ?? nextFair.event_date} />
+              <View style={styles.flexOne}>
+                {nextFair.is_rsvped ? (
+                  <View style={styles.registeredPill}>
+                    <MaterialIcons name="check" size={13} color={colors.white} />
+                    <Text style={styles.registeredText}>Registered</Text>
+                  </View>
+                ) : null}
+                <Text style={styles.fairTitle} numberOfLines={2}>{nextFair.title}</Text>
+                {nextFair.start_time ? (
+                  <FairMeta icon="schedule" text={[clock(nextFair.start_time), clock(nextFair.end_time)].filter(Boolean).join(' – ')} />
+                ) : null}
+                {nextFair.venue ? <FairMeta icon="place" text={nextFair.venue} /> : null}
+                {nextFair.participating_employers?.length ? (
+                  <View style={styles.employersPill}>
+                    <MaterialIcons name="storefront" size={14} color={colors.iconBlue} />
+                    <Text style={styles.employersText}>
+                      {nextFair.participating_employers.length} employer{nextFair.participating_employers.length === 1 ? '' : 's'}
+                    </Text>
                   </View>
                 ) : null}
               </View>
-            ))}
-          </PressableScale>
+              <MaterialIcons name="chevron-right" size={24} color={colors.subtle} />
+            </PressableScale>
+          </View>
         ) : null}
 
-        <PressableScale
-          scaleTo="buttonPress"
-          ripple={null}
-          style={styles.helpLink}
-          onPress={() => router.push('/(seeker)/help')}
-          accessibilityRole="button"
-        >
-          <MaterialIcons name="help-outline" size={16} color={colors.secondary} />
+        <PressableScale scaleTo="buttonPress" ripple={null} style={styles.helpLink} onPress={() => router.push({ pathname: '/(seeker)/help', params: { from: 'home' } })} accessibilityRole="link">
+          <MaterialIcons name="help-outline" size={18} color={colors.link} />
           <Text style={styles.helpLinkText}>Questions? Help &amp; FAQs</Text>
         </PressableScale>
-
-        {/* Quick actions were removed: Job Fairs opens from the bulletin above, Job Map from
-            the Jobs tab's Map button, and Applications is the "Applied" tab. */}
-        {/* Hidden when PESO switches the assistant off in System Settings, as the website hides its chat button. */}
-        {systemStatus.chatbot_enabled ? <AceBanner /> : null}
-
-        <View style={styles.searchBox}>
-          <MaterialIcons name="search" size={20} color={colors.subtle} />
-          <TextInput
-            style={styles.searchInput}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            placeholder="Search jobs, skills, or employers"
-            placeholderTextColor={colors.subtle}
-            returnKeyType="search"
-          />
-          {searchQuery ? (
-            <TouchableOpacity onPress={() => setSearchQuery('')} hitSlop={8} accessibilityRole="button" accessibilityLabel="Clear search">
-              <MaterialIcons name="close" size={18} color={colors.subtle} />
-            </TouchableOpacity>
-          ) : null}
-        </View>
-
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.feedSelectorScroll} contentContainerStyle={styles.feedSelectorRow}>
-          {FEED_SELECTOR_ITEMS.map((item) => {
-            const active = feedMode === item.value
-            return (
-              <PressableScale
-                key={item.value}
-                scaleTo="buttonPress"
-                ripple={null}
-                style={[styles.feedSelectorCard, active && styles.feedSelectorCardActive]}
-                onPress={() => setFeedMode(item.value)}
-                accessibilityRole="button"
-                accessibilityState={{ selected: active }}
-              >
-                <View style={styles.feedSelectorTop}>
-                  <Text style={[styles.feedSelectorTitle, active && styles.feedSelectorTitleActive]} numberOfLines={1}>{item.title}</Text>
-                  <View style={[styles.feedSelectorCount, active && styles.feedSelectorCountActive]}>
-                    <Text style={[styles.feedSelectorCountText, active && styles.feedSelectorCountTextActive]}>{feedCounts[item.value]}</Text>
-                  </View>
-                </View>
-                <Text style={[styles.feedSelectorDesc, active && styles.feedSelectorDescActive]} numberOfLines={1}>{item.description}</Text>
-              </PressableScale>
-            )
-          })}
-        </ScrollView>
-
-        <View style={styles.feedControlsRow}>
-          <View style={styles.tabRow}>
-            <TabButton label="Jobs" icon="star" active={activeTab === 'jobs'} onPress={() => setActiveTab('jobs')} />
-            <TabButton
-              label="Saved Jobs"
-              icon="bookmark"
-              active={activeTab === 'saved'}
-              count={jobs.filter((job) => job.is_saved).length}
-              onPress={() => setActiveTab('saved')}
-            />
-          </View>
-          <TouchableOpacity onPress={() => router.push('/(seeker)/jobs')} hitSlop={8} accessibilityRole="button">
-            <Text style={styles.viewAllText}>View all →</Text>
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.sortRow}>
-          <Text style={styles.resultCountText}>{sortedJobs.length} result{sortedJobs.length === 1 ? '' : 's'}</Text>
-          <View style={styles.sortChipsRow}>
-            {SORT_ITEMS.map((item) => (
-              <TouchableOpacity
-                key={item.value}
-                onPress={() => setSort(item.value)}
-                style={[styles.sortChip, sort === item.value && styles.sortChipActive]}
-                accessibilityRole="button"
-                accessibilityState={{ selected: sort === item.value }}
-              >
-                <Text style={[styles.sortChipText, sort === item.value && styles.sortChipTextActive]}>{item.label}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
-
-        {jobsMessage ? (
-          <AlertBox variant="info" style={styles.alertBox}>
-            {jobsMessage}
-          </AlertBox>
-        ) : null}
-
-        {jobsLoading ? (
-          <SkeletonGroup label="Loading your matches" style={styles.jobSkeletons}>
-            {[0, 1, 2].map((row) => (
-              <View key={row} style={styles.jobSkeletonCard}>
-                <View style={styles.jobSkeletonTop}>
-                  <Skeleton width={40} height={40} radius={radii.md} />
-                  <View style={styles.flexOne}>
-                    <Skeleton width="80%" height={14} />
-                    <Skeleton width="50%" height={11} style={styles.skeletonGap} />
-                  </View>
-                  <Skeleton width={40} height={40} radius={20} />
-                </View>
-                <Skeleton width="70%" height={11} style={styles.skeletonRow} />
-                <Skeleton width={96} height={22} style={styles.skeletonRow} />
-              </View>
-            ))}
-          </SkeletonGroup>
-        ) : topJobs.length ? (
-          <View style={styles.feedListWrap}>
-            {topJobs.map((job, index) => (
-              <JobFeedCard
-                key={String(job.post_id)}
-                job={job}
-                index={index}
-                saving={toggleSaveMutation.isPending && String(toggleSaveMutation.variables) === String(job.post_id)}
-                onPress={() => router.push(`/(seeker)/jobs/${job.post_id}`)}
-                onToggleSave={() => toggleSaveMutation.mutate(String(job.post_id))}
-                rating={job.employer?.employer_id ? employerRatings[String(job.employer.employer_id)] : undefined}
-              />
-            ))}
-          </View>
-        ) : (
-          <Card padding="md" style={styles.emptyCard}>
-            <Text style={styles.emptyTitle}>
-              {searchQuery ? 'No jobs match your search' : activeTab === 'saved' ? 'No saved jobs yet' : 'No nearby jobs yet'}
-            </Text>
-            <Text style={styles.emptySub}>
-              {searchQuery
-                ? 'Try another keyword, or clear the search to see your full feed.'
-                : activeTab === 'saved'
-                ? 'Save promising vacancies so you can compare them later.'
-                : 'Jobs appear here when employers post active vacancies near your saved address.'}
-            </Text>
-          </Card>
-        )}
       </ScrollView>
+
+      {/* (7) Floating assistant — hidden when PESO switches it off in System Settings. */}
+      {systemStatus.chatbot_enabled ? <AskAceButton bottom={fabBottom} /> : null}
     </View>
   )
 }
 
-function TabButton({
-  label,
-  icon,
-  active,
-  count,
-  onPress,
-}: {
-  label: string
-  icon: IconName
-  active: boolean
-  count?: number
-  onPress: () => void
-}) {
+function FairMeta({ icon, text }: { icon: IconName; text: string }) {
   return (
-    <TouchableOpacity
-      onPress={onPress}
-      style={[styles.tabBtn, active && styles.tabBtnActive]}
-      accessibilityRole="button"
-      accessibilityState={{ selected: active }}
-    >
-      <MaterialIcons name={icon} size={15} color={active ? colors.white : colors.textSecondary} />
-      <Text style={[styles.tabBtnText, active && styles.tabBtnTextActive]}>{label}</Text>
-      {count ? (
-        <View style={[styles.tabBtnCount, active && styles.tabBtnCountActive]}>
-          <Text style={[styles.tabBtnCountText, active && styles.tabBtnCountTextActive]}>{count}</Text>
-        </View>
-      ) : null}
-    </TouchableOpacity>
+    <View style={styles.fairMeta}>
+      <MaterialIcons name={icon} size={15} color={colors.iconBlue} />
+      <Text style={styles.fairMetaText} numberOfLines={1}>{text}</Text>
+    </View>
   )
 }
 
-/**
- * Ace's one prominent entry point on Home — previously just a same-weight icon lost in the
- * secondary actions row (see the comment on MORE_ACTIONS above). Uses `gradients.brand`
- * rather than `gradients.hero` (already spent on the header just above) or a gold gradient
- * (the theme rations amber to single accent touches, never gradients — see theme/index.ts).
- * Ace's own antenna mark already carries that one gold touch.
- */
-function AceBanner() {
+function AskAceButton({ bottom }: { bottom: number }) {
   const m = useMotion()
-
   return (
-    <Animated.View
-      style={styles.aceBannerWrap}
-      entering={m.enabled ? FadeInUp.delay(m.stagger(0)).duration(240) : undefined}
-    >
+    <Animated.View style={[styles.fabWrap, { bottom }]} entering={m.enabled ? FadeInUp.delay(m.stagger(2)).duration(m.duration('normal')) : undefined}>
       <PressableScale
         scaleTo="buttonPress"
         ripple={null}
+        haptics
         onPress={() => router.push('/(seeker)/assistant')}
         accessibilityRole="button"
         accessibilityLabel="Ask ACE, your i-PESO assistant"
+        style={styles.fabShadow}
       >
-        <LinearGradient colors={[...gradients.brand]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.aceBanner}>
-          <View style={styles.aceMascotWrap}>
-            <AceMascot state="idle" size={64} />
-          </View>
-          <View style={styles.aceBannerText}>
-            <Text style={styles.aceBannerTitle}>Ask ACE</Text>
-            <Text style={styles.aceBannerSubtitle} numberOfLines={2}>
-              Get instant help with your job search
-            </Text>
-          </View>
-          <MaterialIcons name="chevron-right" size={22} color={colors.white} />
+        <LinearGradient colors={[...gradients.cta]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.fab}>
+          <MaterialIcons name="chat-bubble-outline" size={22} color={colors.white} />
+          <Text style={styles.fabText}>Ask ACE</Text>
         </LinearGradient>
       </PressableScale>
     </Animated.View>
@@ -614,146 +485,75 @@ function AceBanner() {
 const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: colors.background },
   flexOne: { flex: 1 },
-  scroll: { flex: 1 },
-  content: { paddingBottom: spacing.xxxl },
+  gutter: { paddingHorizontal: spacing.lg },
+  gutterMargin: { marginHorizontal: spacing.lg },
 
-  hero: {
-    paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.xxxl + spacing.lg,
-    overflow: 'hidden',
-  },
-  heroDecor: { position: 'absolute', top: -60, right: -40, width: 180, height: 180, borderRadius: 90, backgroundColor: colors.white, opacity: 0.08 },
-  heroTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  headerLeft: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, flex: 1 },
-  headerText: { flex: 1 },
-  bellBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.heroChip, alignItems: 'center', justifyContent: 'center' },
-  bellBadge: { position: 'absolute', top: -4, right: -4, minWidth: 18, height: 18, borderRadius: 9, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4, borderWidth: 2, borderColor: colors.blue700 },
-  bellBadgeText: { ...textStyles.smallBold, color: colors.accentText, fontSize: 10, lineHeight: undefined },
-  avatarCircle: { width: 48, height: 48, borderRadius: 24, backgroundColor: colors.heroChip, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.32)', justifyContent: 'center', alignItems: 'center', overflow: 'hidden' },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md, paddingHorizontal: spacing.lg, paddingBottom: spacing.lg },
+  headerLeft: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, flex: 1, minHeight: 48 },
+  avatar: { width: 48, height: 48, borderRadius: 24, backgroundColor: colors.tint, borderWidth: 2, borderColor: colors.tintBorder, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
   avatarImage: { width: '100%', height: '100%' },
-  avatarText: { ...textStyles.title, color: colors.white, fontSize: 20, lineHeight: undefined },
-  greetingText: { ...textStyles.small, color: colors.blue200 },
-  nameText: { ...textStyles.heading, color: colors.white, fontSize: 22, lineHeight: undefined },
+  avatarText: { ...textStyles.title, color: colors.figure, lineHeight: undefined },
+  greeting: { ...textStyles.small, color: colors.textSecondary },
+  name: { ...textStyles.heading, color: colors.textPrimary },
+  bellBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.tint, alignItems: 'center', justifyContent: 'center' },
+  bellBadge: { position: 'absolute', top: -2, right: -2, minWidth: 20, height: 20, borderRadius: 10, paddingHorizontal: 5, backgroundColor: colors.accent, borderWidth: 2, borderColor: colors.background, alignItems: 'center', justifyContent: 'center' },
+  bellBadgeText: { fontSize: 11, fontFamily: typography.family.bold, color: colors.accentText },
 
-  strengthCard: { marginHorizontal: spacing.lg, marginTop: -spacing.xxl, marginBottom: spacing.lg, ...shadows.lg },
-  strengthRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.lg },
-  strengthText: { flex: 1 },
-  strengthTitleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm, marginBottom: spacing.xs },
-  strengthTitle: { ...textStyles.title, color: colors.textPrimary },
-  strengthSub: { ...textStyles.small, color: colors.textSecondary, lineHeight: 17 },
-  strengthCta: { marginTop: spacing.md, marginBottom: 0, alignSelf: 'flex-start', paddingHorizontal: 0 },
-  strengthCtaText: { color: colors.blue600, ...textStyles.smallBold, lineHeight: undefined },
+  heroWrap: { paddingHorizontal: spacing.lg, marginBottom: spacing.lg },
+  hero: { borderRadius: radii.xl, padding: spacing.xl, overflow: 'hidden', ...shadows.lg },
+  heroDecorA: { position: 'absolute', top: -50, right: -40, width: 160, height: 160, borderRadius: 80, backgroundColor: colors.white, opacity: 0.06 },
+  heroDecorB: { position: 'absolute', bottom: -70, right: 40, width: 120, height: 120, borderRadius: 60, backgroundColor: colors.blue400, opacity: 0.1 },
+  heroRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.lg },
+  heroKicker: { ...textStyles.label, color: colors.blue200 },
+  heroTitle: { ...textStyles.title, color: colors.white, marginTop: spacing.xs },
+  heroMessage: { fontSize: 13, lineHeight: 18, fontFamily: typography.family.regular, color: colors.blue100, marginTop: 2 },
+  heroCta: { marginTop: spacing.lg + 2 },
 
-  alertBox: { marginHorizontal: spacing.lg, marginBottom: spacing.lg },
+  alertBox: { marginHorizontal: spacing.lg, marginBottom: spacing.md },
+  errorBox: { marginHorizontal: spacing.lg, marginBottom: spacing.lg },
 
-  shortcut: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginHorizontal: spacing.lg, marginBottom: spacing.md, minHeight: 48, paddingHorizontal: spacing.md, borderWidth: 1, borderColor: colors.border, borderRadius: radii.lg, backgroundColor: colors.surface },
-  shortcutText: { ...textStyles.bodyBold, color: colors.textPrimary },
-  shortcutCount: { minWidth: 22, height: 22, borderRadius: 11, paddingHorizontal: 6, backgroundColor: colors.secondary, alignItems: 'center', justifyContent: 'center' },
-  shortcutCountText: { ...textStyles.label, color: colors.white },
-  shortcutChevron: { marginLeft: 'auto' },
-  helpLink: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs, marginBottom: spacing.lg, minHeight: 36 },
-  helpLinkText: { ...textStyles.smallBold, color: colors.secondary },
-  bulletinCard: {
-    marginHorizontal: spacing.lg,
-    marginBottom: spacing.lg,
-    borderRadius: radii.lg,
-    borderWidth: 1,
-    borderColor: colors.blue200,
-    backgroundColor: colors.blue50,
-    padding: spacing.lg,
-    gap: spacing.md,
-  },
-  bulletinHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  bulletinKicker: { ...textStyles.label, color: colors.blue700, letterSpacing: 0.6 },
-  bulletinTitle: { ...textStyles.titleMedium, color: colors.blue900, marginTop: 2 },
-  bulletinRow: { backgroundColor: colors.surface, borderRadius: radii.md, padding: spacing.md, gap: 4, ...shadows.xs },
-  bulletinFairTitle: { ...textStyles.smallBold, color: colors.textPrimary },
-  bulletinMetaRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
-  bulletinMeta: { ...textStyles.small, color: colors.textSecondary, flexShrink: 1 },
+  // Hero margin (16) + this (8) = the 24pt section gap, with or without the announcement banner
+  // (which ends with its own 16pt margin).
+  section: { paddingHorizontal: spacing.lg, paddingTop: spacing.sm },
+  sectionTight: { paddingTop: spacing.xl },
+  sectionHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  sectionTitle: { ...textStyles.title, color: colors.textPrimary },
+  linkBtn: { flexDirection: 'row', alignItems: 'center', minHeight: 44, paddingLeft: spacing.md },
+  linkText: { ...textStyles.bodyBold, color: colors.link },
 
+  quickRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md },
+  quickItem: { flex: 1, alignItems: 'center', gap: spacing.sm, minHeight: 84, paddingVertical: spacing.xs },
+  quickTile: { width: 56, height: 56, borderRadius: radii.lg, backgroundColor: colors.tint, alignItems: 'center', justifyContent: 'center' },
+  quickLabel: { ...textStyles.smallMedium, color: colors.textPrimary, textAlign: 'center' },
 
-  statsRow: { flexDirection: 'row', gap: spacing.sm, paddingHorizontal: spacing.lg },
+  chipRow: { flexDirection: 'row', gap: spacing.sm, paddingBottom: spacing.md },
+  carousel: { flexGrow: 0 },
+  carouselContent: { gap: spacing.md, paddingHorizontal: spacing.lg, paddingTop: spacing.xs, paddingBottom: spacing.md },
+  carouselSkeleton: { flexDirection: 'row', gap: spacing.md, paddingHorizontal: spacing.lg, paddingBottom: spacing.md },
+  skeletonCard: { width: HOME_JOB_CARD_WIDTH, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radii.lg, padding: spacing.lg },
+  skeletonTop: { flexDirection: 'row', justifyContent: 'space-between' },
+  skeletonGap: { marginTop: spacing.md },
+  skeletonGapSm: { marginTop: spacing.sm },
 
-  aceBannerWrap: { marginHorizontal: spacing.lg, marginTop: spacing.md },
-  aceBanner: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, borderRadius: radii.lg, padding: spacing.lg, ...shadows.md },
-  aceMascotWrap: { width: 64, height: 64, alignItems: 'center', justifyContent: 'center' },
-  aceBannerText: { flex: 1 },
-  aceBannerTitle: { ...textStyles.titleMedium, color: colors.white },
-  aceBannerSubtitle: { ...textStyles.small, color: colors.blue100, marginTop: 2 },
+  stateCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.lg, borderRadius: radii.lg, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.sunken },
+  stateTitle: { ...textStyles.bodyBold, color: colors.textPrimary },
+  stateBody: { ...textStyles.small, color: colors.textSecondary, marginTop: 2 },
+  stateBtn: { alignSelf: 'flex-start', marginTop: spacing.sm },
 
-  secondaryActionsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, paddingHorizontal: spacing.lg, marginTop: spacing.sm },
-  secondaryAction: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, backgroundColor: colors.blue50, borderRadius: radii.pill, paddingVertical: spacing.sm, paddingHorizontal: spacing.md },
-  secondaryActionLabel: { color: colors.blue700, ...textStyles.smallMedium, lineHeight: undefined },
+  fairCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.md + 2, padding: spacing.md + 2, borderRadius: radii.lg, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, ...shadows.sm },
+  registeredPill: { flexDirection: 'row', alignItems: 'center', gap: 3, alignSelf: 'flex-start', backgroundColor: colors.secondary, borderRadius: radii.pill, paddingHorizontal: spacing.sm, paddingVertical: 2, marginBottom: spacing.xs },
+  registeredText: { fontSize: 11, fontFamily: typography.family.bold, color: colors.white },
+  fairTitle: { ...textStyles.bodyBold, fontSize: 15, color: colors.textPrimary },
+  fairMeta: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: spacing.xs + 2 },
+  fairMetaText: { ...textStyles.small, color: colors.textSecondary, flexShrink: 1 },
+  employersPill: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, alignSelf: 'flex-start', backgroundColor: colors.tint, borderRadius: radii.pill, paddingHorizontal: spacing.sm, paddingVertical: 3, marginTop: spacing.sm },
+  employersText: { fontSize: 11, fontFamily: typography.family.bold, color: colors.iconBlue },
 
-  viewAllText: { color: colors.blue600, ...textStyles.smallBold, lineHeight: undefined },
+  helpLink: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs + 2, minHeight: 44, marginTop: spacing.lg },
+  helpLinkText: { ...textStyles.smallBold, color: colors.link, fontSize: 13 },
 
-  // A horizontal ScrollView nested inside this screen's outer vertical ScrollView has no
-  // intrinsic height of its own on Android unless the ScrollView itself (not just its
-  // contentContainerStyle) is given one — without this it collapses to near-zero height and
-  // the cards bleed into whatever renders next instead of occupying their own row.
-  feedSelectorScroll: { marginTop: spacing.lg, height: 92 },
-  feedSelectorRow: { flexDirection: 'row', gap: spacing.sm, paddingHorizontal: spacing.lg },
-  feedSelectorCard: { width: 190, borderRadius: radii.md, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, padding: spacing.md, justifyContent: 'center' },
-  feedSelectorCardActive: { backgroundColor: colors.blue700, borderColor: colors.blue700 },
-  feedSelectorTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
-  feedSelectorTitle: { ...textStyles.smallBold, color: colors.textPrimary, flexShrink: 1 },
-  feedSelectorTitleActive: { color: colors.white },
-  feedSelectorCount: { minWidth: 22, borderRadius: radii.pill, backgroundColor: colors.background, paddingHorizontal: 6, paddingVertical: 2, alignItems: 'center' },
-  feedSelectorCountActive: { backgroundColor: colors.heroChipActive },
-  feedSelectorCountText: { ...textStyles.label, fontSize: 10, color: colors.textSecondary },
-  feedSelectorCountTextActive: { color: colors.white },
-  feedSelectorDesc: { ...textStyles.small, fontSize: 11, color: colors.textSecondary, marginTop: spacing.xs },
-  feedSelectorDescActive: { color: colors.blue200 },
-
-  feedControlsRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm, paddingHorizontal: spacing.lg, marginTop: spacing.xl },
-  tabRow: { flexDirection: 'row', gap: spacing.sm, flexShrink: 1 },
-  tabBtn: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, borderWidth: 1, borderColor: colors.border, borderRadius: radii.md, paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
-  tabBtnActive: { backgroundColor: colors.blue600, borderColor: colors.blue600 },
-  tabBtnText: { ...textStyles.smallBold, color: colors.textSecondary },
-  tabBtnTextActive: { color: colors.white },
-  tabBtnCount: { minWidth: 18, borderRadius: radii.pill, backgroundColor: colors.background, paddingHorizontal: 5, alignItems: 'center' },
-  tabBtnCountActive: { backgroundColor: colors.heroChipActive },
-  tabBtnCountText: { ...textStyles.label, fontSize: 10, color: colors.textSecondary },
-  tabBtnCountTextActive: { color: colors.white },
-
-  sortRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm, paddingHorizontal: spacing.lg, marginTop: spacing.md, marginBottom: spacing.md },
-  resultCountText: { ...textStyles.small, color: colors.textSecondary },
-  sortChipsRow: { flexDirection: 'row', gap: spacing.xs },
-  sortChip: { borderRadius: radii.pill, borderWidth: 1, borderColor: colors.border, paddingHorizontal: spacing.sm, paddingVertical: 4 },
-  sortChipActive: { backgroundColor: colors.blue50, borderColor: colors.blue200 },
-  sortChipText: { ...textStyles.small, fontSize: 11, color: colors.textSecondary },
-  sortChipTextActive: { color: colors.blue700, fontFamily: typography.family.bold },
-
-  searchBox: {
-    marginTop: spacing.xl,
-    marginHorizontal: spacing.lg,
-    height: 48,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    borderRadius: radii.md,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    paddingHorizontal: spacing.md,
-  },
-  searchInput: { flex: 1, color: colors.textPrimary, fontSize: typography.body, fontFamily: typography.family.medium },
-
-  feedListWrap: { paddingHorizontal: spacing.lg },
-
-  jobSkeletons: { paddingHorizontal: spacing.lg, gap: spacing.md },
-  jobSkeletonCard: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radii.lg,
-    padding: spacing.lg,
-  },
-  jobSkeletonTop: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md },
-  skeletonGap: { marginTop: spacing.sm },
-  skeletonRow: { marginTop: spacing.md },
-
-  emptyCard: { marginHorizontal: spacing.lg, marginBottom: spacing.lg },
-  emptyTitle: { color: colors.textPrimary, ...textStyles.title, marginBottom: spacing.sm },
-  emptySub: { color: colors.textSecondary, ...textStyles.body, textAlign: 'center' },
+  fabWrap: { position: 'absolute', right: spacing.lg },
+  fabShadow: { borderRadius: radii.pill, ...shadows.ctaGlow },
+  fab: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, height: 56, paddingLeft: spacing.lg, paddingRight: spacing.xl, borderRadius: radii.pill },
+  fabText: { ...textStyles.bodyBold, color: colors.white },
 })

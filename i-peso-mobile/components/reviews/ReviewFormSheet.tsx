@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native'
+import { useRef, useState } from 'react'
+import { Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import type { AxiosError } from 'axios'
 import MaterialIcons from '@expo/vector-icons/MaterialIcons'
@@ -59,6 +59,20 @@ export function ReviewFormSheet({ target, existing, onClose, onSaved }: ReviewFo
   const [agree, setAgree] = useState(isEdit)
   const [confirmStarted, setConfirmStarted] = useState(isEdit)
   const [errors, setErrors] = useState<FieldErrors>({})
+
+  // Keeps the comment box above the keyboard. The sheet is a Modal, whose Android window does
+  // not resize for the keyboard and may not report it to JS either, so this does not rely on
+  // keyboard events: while the box is focused, extra room is added below the form and the box
+  // is scrolled to the top of the sheet, which stays clear of any keyboard.
+  const { height: screenHeight } = useWindowDimensions()
+  const scrollRef = useRef<ScrollView>(null)
+  const commentY = useRef(0)
+  const [commentFocused, setCommentFocused] = useState(false)
+  const revealComment = () => {
+    setCommentFocused(true)
+    // Wait for the spacer to render and the keyboard to start opening.
+    setTimeout(() => scrollRef.current?.scrollTo({ y: Math.max(0, commentY.current - spacing.sm), animated: true }), 150)
+  }
 
   const clearError = (key: string) => setErrors((current) => ({ ...current, [key]: undefined }))
 
@@ -127,7 +141,7 @@ export function ReviewFormSheet({ target, existing, onClose, onSaved }: ReviewFo
         </View>
       }
     >
-      <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+      <ScrollView ref={scrollRef} contentContainerStyle={styles.body} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         <Text style={styles.description}>
           {jobTitle ? `${jobTitle} · ` : ''}{employment ? 'Employment experience' : 'Recruitment experience'}
         </Text>
@@ -184,7 +198,7 @@ export function ReviewFormSheet({ target, existing, onClose, onSaved }: ReviewFo
           {errors.recommend ? <Text style={styles.error}>{errors.recommend}</Text> : null}
         </View>
 
-        <View style={styles.field}>
+        <View style={styles.field} onLayout={(event) => { commentY.current = event.nativeEvent.layout.y }}>
           <Text style={styles.legend}>
             Your experience <Text style={styles.optional}>(optional)</Text>
           </Text>
@@ -192,7 +206,11 @@ export function ReviewFormSheet({ target, existing, onClose, onSaved }: ReviewFo
             style={styles.textArea}
             value={comment}
             onChangeText={setComment}
+            onFocus={revealComment}
+            onBlur={() => setCommentFocused(false)}
             editable={!save.isPending}
+            selectionColor={colors.link}
+            cursorColor={colors.link}
             multiline
             maxLength={2000}
             placeholder={employment ? 'What is it like to work there?' : 'What went well, and what could be better?'}
@@ -233,6 +251,7 @@ export function ReviewFormSheet({ target, existing, onClose, onSaved }: ReviewFo
             {errors.agree_guidelines ? <Text style={styles.error}>{errors.agree_guidelines}</Text> : null}
           </View>
         ) : null}
+        {commentFocused ? <View style={{ height: screenHeight * 0.5 }} /> : null}
       </ScrollView>
     </BottomSheet>
   )
@@ -259,7 +278,7 @@ function Checkbox({ checked, onToggle, label, onOpenLink, children }: {
         else if (event.nativeEvent.actionName === 'activate') onToggle()
       }}
     >
-      <MaterialIcons name={checked ? 'check-box' : 'check-box-outline-blank'} size={22} color={checked ? colors.secondary : colors.subtle} />
+      <MaterialIcons name={checked ? 'check-box' : 'check-box-outline-blank'} size={22} color={checked ? colors.link : colors.subtle} />
       <View style={styles.checkBody}>{children}</View>
     </Pressable>
   )
@@ -283,14 +302,14 @@ const styles = StyleSheet.create({
   choiceSelected: { borderColor: colors.blue700, backgroundColor: colors.blue700 },
   choiceText: { ...textStyles.smallBold, color: colors.textPrimary },
   choiceTextSelected: { color: colors.white },
-  textArea: { ...textStyles.body, marginTop: spacing.sm, borderWidth: 1, borderColor: colors.borderStrong, borderRadius: radii.md, padding: spacing.md, color: colors.textPrimary, minHeight: 104, textAlignVertical: 'top' },
+  textArea: { ...textStyles.body, backgroundColor: colors.surface, marginTop: spacing.sm, borderWidth: 1, borderColor: colors.borderStrong, borderRadius: radii.md, padding: spacing.md, color: colors.textPrimary, minHeight: 104, textAlignVertical: 'top' },
   commentMeta: { flexDirection: 'row', justifyContent: 'space-between', gap: spacing.md },
   commentHint: { flex: 1 },
   confirmBox: { marginTop: spacing.lg, gap: spacing.sm, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.sunken, borderRadius: radii.md, padding: spacing.md },
   checkRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, minHeight: 44 },
   checkBody: { flex: 1, paddingTop: 2 },
   checkText: { ...textStyles.small, color: colors.textPrimary, lineHeight: 18 },
-  link: { ...textStyles.smallBold, color: colors.secondary, textDecorationLine: 'underline' },
+  link: { ...textStyles.smallBold, color: colors.link, textDecorationLine: 'underline' },
   actions: { flexDirection: 'row', gap: spacing.md },
   actionBtn: { flex: 1, marginBottom: 0 },
 })

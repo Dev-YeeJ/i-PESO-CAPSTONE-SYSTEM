@@ -135,7 +135,7 @@ function PublicReviewCard({ review, onReport }: { review: PublicReview; onReport
       {review.reply ? (
         <View style={styles.reply}>
           <View style={styles.inline}>
-            <MaterialIcons name="reply" size={14} color={colors.blue700} />
+            <MaterialIcons name="reply" size={14} color={colors.iconBlue} />
             <Text style={styles.replyTitle}>Employer&apos;s reply{review.reply.edited ? ' · edited' : ''}</Text>
           </View>
           <Text style={styles.replyBody}>{review.reply.body}</Text>
@@ -163,7 +163,7 @@ const styles = StyleSheet.create({
   mutedText: { ...textStyles.small, color: colors.textSecondary },
   showMore: { alignSelf: 'center' },
   footer: { ...textStyles.small, color: colors.textSecondary, lineHeight: 18 },
-  link: { ...textStyles.smallBold, color: colors.secondary, textDecorationLine: 'underline' },
+  link: { ...textStyles.smallBold, color: colors.link, textDecorationLine: 'underline' },
   reviewCard: { borderWidth: 1, borderColor: colors.border, borderRadius: radii.lg, backgroundColor: colors.surface, padding: spacing.lg },
   reviewTop: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
   inline: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
@@ -176,7 +176,7 @@ const styles = StyleSheet.create({
   aspectList: { flexDirection: 'row', flexWrap: 'wrap', columnGap: spacing.lg, rowGap: spacing.xs, marginTop: spacing.sm },
   aspectValue: { ...textStyles.smallBold, color: colors.textPrimary },
   comment: { ...textStyles.body, color: colors.textPrimary, lineHeight: 20, marginTop: spacing.sm },
-  reply: { marginTop: spacing.md, borderLeftWidth: 4, borderLeftColor: colors.blue200, backgroundColor: colors.blue50, borderRadius: radii.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
+  reply: { marginTop: spacing.md, borderLeftWidth: 4, borderLeftColor: colors.tintBorder, backgroundColor: colors.tint, borderRadius: radii.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
   replyTitle: { ...textStyles.smallBold, color: colors.blue900 },
   replyBody: { ...textStyles.small, color: colors.textPrimary, lineHeight: 18, marginTop: spacing.xs },
   reportBtn: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, alignSelf: 'flex-end', minHeight: 44, paddingHorizontal: spacing.sm, marginBottom: -spacing.sm },

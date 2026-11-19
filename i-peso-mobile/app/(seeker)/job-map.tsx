@@ -28,9 +28,10 @@ import { colors, radii, shadows, spacing, typography } from '@/theme'
 type MatchTier = 'high' | 'medium' | 'low'
 
 const TIER_THRESHOLDS: { tier: MatchTier; min: number; label: string; color: string }[] = [
-  { tier: 'high', min: 80, label: 'High', color: colors.success },
-  { tier: 'medium', min: 50, label: 'Medium', color: colors.warning },
-  { tier: 'low', min: 0, label: 'Low', color: colors.subtle },
+  // Redesign palette: amber marks a strong (earned, 80%+) match; everything else is blue.
+  { tier: 'high', min: 80, label: '80%+', color: colors.accent },
+  { tier: 'medium', min: 50, label: '50–79%', color: colors.link },
+  { tier: 'low', min: 0, label: 'Under 50%', color: colors.blue300 },
 ]
 
 function tierFor(job: NearbyJob): MatchTier {
@@ -465,7 +466,7 @@ export default function JobMapScreen() {
               <Text style={styles.previewMeta} numberOfLines={2}>{jobLocation(selectedMapJob)}</Text>
             </View>
             <View style={styles.previewMetaRow}>
-              <MaterialIcons name="payments" size={16} color={colors.success} />
+              <MaterialIcons name="payments" size={16} color={colors.info} />
               <Text style={styles.previewMeta} numberOfLines={1}>{formatSalary(selectedMapJob)}</Text>
             </View>
             <View style={styles.previewBadges}>
@@ -586,8 +587,9 @@ export default function JobMapScreen() {
 }
 
 function FloatingNotice({ text }: { text: string }) {
+  const m = useMotion()
   return (
-    <Animated.View entering={FadeInDown.duration(200)} style={styles.floatingNotice}>
+    <Animated.View entering={m.enabled ? FadeInDown.duration(m.duration('quick')) : undefined} style={styles.floatingNotice}>
       <Text style={styles.floatingNoticeText}>{text}</Text>
     </Animated.View>
   )
@@ -639,7 +641,7 @@ function Chip({ label, active, onPress }: { label: string; active: boolean; onPr
 const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: colors.background },
   stage: { flex: 1, position: 'relative', overflow: 'hidden' },
-  mapLoading: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.4)' },
+  mapLoading: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.overlay },
 
   floatingTop: { position: 'absolute', top: spacing.md, left: spacing.lg, right: spacing.lg, gap: spacing.xs },
   searchBar: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
@@ -647,7 +649,7 @@ const styles = StyleSheet.create({
   searchInput: { flex: 1, color: colors.textPrimary, fontSize: typography.small },
   iconBtn: { width: 44, height: 44, borderRadius: radii.md, backgroundColor: colors.secondary, alignItems: 'center', justifyContent: 'center', ...shadows.md },
   iconBtnOutline: { width: 44, height: 44, borderRadius: radii.md, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center', ...shadows.md },
-  filterDot: { position: 'absolute', top: 6, right: 6, width: 8, height: 8, borderRadius: 4, backgroundColor: colors.error },
+  filterDot: { position: 'absolute', top: 6, right: 6, width: 8, height: 8, borderRadius: 4, backgroundColor: colors.secondary },
 
   floatingNotice: { backgroundColor: colors.surface, borderRadius: radii.md, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, ...shadows.sm },
   floatingNoticeText: { color: colors.textSecondary, fontSize: typography.small, lineHeight: 17 },
@@ -660,8 +662,8 @@ const styles = StyleSheet.create({
   previewMetaRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.sm },
   previewMeta: { flex: 1, color: colors.textSecondary, fontSize: typography.small },
   previewBadges: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.sm },
-  previewBadge: { borderRadius: radii.pill, backgroundColor: colors.successBackground, paddingHorizontal: spacing.md, paddingVertical: spacing.xs },
-  previewBadgeText: { color: colors.success, fontSize: 11, fontFamily: typography.family.bold },
+  previewBadge: { borderRadius: radii.pill, backgroundColor: colors.tint, paddingHorizontal: spacing.md, paddingVertical: spacing.xs },
+  previewBadgeText: { color: colors.iconBlue, fontSize: 11, fontFamily: typography.family.bold },
   previewBadgeNeutral: { borderRadius: radii.pill, backgroundColor: colors.background, paddingHorizontal: spacing.md, paddingVertical: spacing.xs },
   previewBadgeNeutralText: { color: colors.textSecondary, fontSize: 11, fontFamily: typography.family.medium },
 
@@ -669,7 +671,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: spacing.lg,
     bottom: PEEK_HEIGHT + spacing.md,
-    backgroundColor: 'rgba(255,255,255,0.96)',
+    backgroundColor: colors.surface,
     borderRadius: radii.lg,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,

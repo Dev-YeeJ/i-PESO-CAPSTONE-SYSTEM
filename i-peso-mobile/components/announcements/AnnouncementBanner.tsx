@@ -4,7 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import MaterialIcons from '@expo/vector-icons/MaterialIcons'
 import { seekerService } from '@/services/seekerService'
 import { ANNOUNCEMENT_KEYS } from '@/utils/announcements'
-import { colors, radii, spacing, textStyles } from '@/theme'
+import { colors, radii, shadows, spacing, textStyles } from '@/theme'
 import { AnnouncementSheet } from './AnnouncementSheet'
 
 // Rebuilt from i-peso-frontend/src/components/announcements/AnnouncementBanner.jsx.
@@ -85,15 +85,17 @@ const styles = StyleSheet.create({
   list: { gap: spacing.sm, paddingHorizontal: spacing.lg, marginBottom: spacing.lg },
   flex: { flex: 1 },
   card: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md, borderWidth: 1, borderRadius: radii.lg, padding: spacing.md },
-  cardImportant: { backgroundColor: colors.warningBackground, borderColor: colors.warningBorder },
+  // Important = white card on the blue scale (redesign Home strip). Urgent keeps red: it is a
+  // genuine alert, the one case the palette allows it outside status chips.
+  cardImportant: { backgroundColor: colors.surface, borderColor: colors.border, ...shadows.xs },
   cardUrgent: { backgroundColor: colors.errorBackground, borderColor: colors.errorBorder },
-  iconWrap: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' },
-  iconWrapUrgent: {},
-  kicker: { ...textStyles.label, color: colors.primary, textTransform: 'uppercase', letterSpacing: 0.5 },
+  iconWrap: { width: 40, height: 40, borderRadius: radii.md, backgroundColor: colors.tint, alignItems: 'center', justifyContent: 'center' },
+  iconWrapUrgent: { backgroundColor: colors.surface },
+  kicker: { ...textStyles.label, color: colors.link, textTransform: 'uppercase', letterSpacing: 0.5 },
   kickerUrgent: { color: colors.error },
   title: { ...textStyles.bodyBold, color: colors.textPrimary, marginTop: 2 },
   excerpt: { ...textStyles.small, color: colors.textSecondary, lineHeight: 18, marginTop: 2 },
   readMore: { alignSelf: 'flex-start', marginTop: spacing.sm, minHeight: 24, justifyContent: 'center' },
-  readMoreText: { ...textStyles.smallBold, color: colors.secondary, textDecorationLine: 'underline' },
+  readMoreText: { ...textStyles.smallBold, color: colors.link, textDecorationLine: 'underline' },
   dismiss: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', marginTop: -spacing.sm, marginRight: -spacing.sm },
 })

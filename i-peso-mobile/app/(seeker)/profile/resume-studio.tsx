@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from 'react'
 import { BackHandler, Image, ScrollView, StyleSheet, Text, View } from 'react-native'
-import { useRouter } from 'expo-router'
+import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useFocusEffect } from '@react-navigation/native'
 import { useQuery } from '@tanstack/react-query'
 import MaterialIcons from '@expo/vector-icons/MaterialIcons'
@@ -38,15 +38,16 @@ const SECTION = { personal: 1, skills: 5, work: 7 }
 
 export default function ResumeStudioScreen() {
   const router = useRouter()
+  const { from } = useLocalSearchParams<{ from?: string }>()
   const [resumeModalOpen, setResumeModalOpen] = useState(false)
 
   // router.replace, not router.back(): resume-studio is a flat sibling in the Tabs
   // navigator (see job-fairs.tsx for the same reasoning) — back() has no real history to
-  // pop and falls through to the first tab (Home) instead of returning to Profile, which
-  // is this screen's one entry point.
+  // pop and falls through to the first tab (Home). Opened from Home's Quick actions it
+  // returns to Home; otherwise (Profile, its original entry point) to Profile.
   const goBackToProfile = useCallback(() => {
-    router.replace('/(seeker)/profile')
-  }, [router])
+    router.replace(from === 'home' ? '/(seeker)' : '/(seeker)/profile')
+  }, [router, from])
 
   // The custom back arrow above only covers a tap on ScreenHeader's own button — Android's
   // hardware/system back key bypasses that entirely and goes straight to React Navigation,
@@ -173,7 +174,7 @@ export default function ResumeStudioScreen() {
                 accessibilityLabel={`${item.label}, ${item.complete ? 'complete' : 'incomplete'}`}
               >
                 <View style={[styles.checkIcon, item.complete ? styles.checkIconDone : styles.checkIconTodo]}>
-                  <MaterialIcons name={item.complete ? 'check' : 'priority-high'} size={13} color={item.complete ? colors.success : colors.warning} />
+                  <MaterialIcons name={item.complete ? 'check' : 'add'} size={13} color={item.complete ? colors.white : colors.iconBlue} />
                 </View>
                 <View style={styles.checkTextWrap}>
                   <Text style={[styles.checkLabel, item.complete && styles.checkLabelDone]}>{item.label}</Text>
@@ -353,14 +354,15 @@ const styles = StyleSheet.create({
   readinessCount: { color: colors.textSecondary, fontSize: typography.small },
   checkRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.sm },
   checkIcon: { width: 22, height: 22, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
-  checkIconDone: { backgroundColor: colors.successBackground },
-  checkIconTodo: { backgroundColor: colors.warningBackground },
+  // Done = solid blue check; to-do = blue outline "+" (redesign "24 — Resume Studio").
+  checkIconDone: { backgroundColor: colors.secondary },
+  checkIconTodo: { backgroundColor: colors.surface, borderWidth: 1.5, borderColor: colors.blue300 },
   checkTextWrap: { flex: 1 },
   checkLabel: { color: colors.textSecondary, fontSize: typography.body },
   checkLabelDone: { color: colors.textPrimary, fontFamily: typography.family.medium },
   checkHint: { color: colors.subtle, fontSize: 11, lineHeight: 15, marginTop: 2 },
 
-  previewKicker: { color: colors.secondary, fontSize: typography.small, fontFamily: typography.family.bold, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: spacing.sm },
+  previewKicker: { color: colors.link, fontSize: typography.small, fontFamily: typography.family.bold, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: spacing.sm },
   previewCard: { marginBottom: spacing.lg },
   previewHeaderRow: { flexDirection: 'row', gap: spacing.md, alignItems: 'center', paddingBottom: spacing.md, borderBottomWidth: 2, borderBottomColor: colors.textPrimary },
   previewAvatar: { width: 60, height: 60, borderRadius: radii.md, backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },

@@ -77,12 +77,12 @@ export function NearbyJobsArt({ active }: IllustrationProps) {
       <Animated.View style={[StyleSheet.absoluteFill, panel]}>
         <Svg viewBox={VIEW_BOX} style={styles.svg}>
           <BlueGradient id="nearbyGrad" />
-          <Rect x="20" y="26" width="200" height="148" rx="20" fill={colors.blue50} />
+          <Rect x="20" y="26" width="200" height="148" rx="20" fill={colors.tint} />
           {/* Street grid, kept faint so the pins stay the subject. */}
-          <Path d="M20 92 H220" stroke={colors.blue200} strokeWidth="3" strokeLinecap="round" />
-          <Path d="M96 26 V174" stroke={colors.blue200} strokeWidth="3" strokeLinecap="round" />
-          <Path d="M160 26 V174" stroke={colors.blue100} strokeWidth="3" strokeLinecap="round" />
-          <Path d="M20 138 H220" stroke={colors.blue100} strokeWidth="3" strokeLinecap="round" />
+          <Path d="M20 92 H220" stroke={colors.tintBorder} strokeWidth="3" strokeLinecap="round" />
+          <Path d="M96 26 V174" stroke={colors.tintBorder} strokeWidth="3" strokeLinecap="round" />
+          <Path d="M160 26 V174" stroke={colors.tintStrong} strokeWidth="3" strokeLinecap="round" />
+          <Path d="M20 138 H220" stroke={colors.tintStrong} strokeWidth="3" strokeLinecap="round" />
           {/* Search radius around the seeker. */}
           <Circle
             cx="96"
@@ -166,7 +166,7 @@ export function MatchScoreArt({ active }: IllustrationProps) {
       <Animated.View style={[StyleSheet.absoluteFill, ring]}>
         <Svg viewBox={VIEW_BOX} style={styles.svg}>
           <BlueGradient id="matchGrad" />
-          <Circle cx="120" cy="94" r="58" stroke={colors.blue100} strokeWidth="14" fill="none" />
+          <Circle cx="120" cy="94" r="58" stroke={colors.tintStrong} strokeWidth="14" fill="none" />
           <AnimatedCircle
             cx="120"
             cy="94"
@@ -203,7 +203,7 @@ export function ProgramsArt({ active }: IllustrationProps) {
       <Animated.View style={[StyleSheet.absoluteFill, cap]}>
         <Svg viewBox={VIEW_BOX} style={styles.svg}>
           <BlueGradient id="capGrad" />
-          <Rect x="28" y="34" width="184" height="106" rx="18" fill={colors.blue50} />
+          <Rect x="28" y="34" width="184" height="106" rx="18" fill={colors.tint} />
           {/* Graduation cap */}
           <Path d="M120 52 L182 78 L120 104 L58 78 Z" fill="url(#capGrad)" />
           <Path
@@ -236,12 +236,12 @@ export function TrackingArt({ active }: IllustrationProps) {
     <View style={styles.wrap}>
       <Animated.View style={[StyleSheet.absoluteFill, cardBack]}>
         <Svg viewBox={VIEW_BOX} style={styles.svg}>
-          <Rect x="52" y="30" width="136" height="44" rx="12" fill={colors.blue100} />
+          <Rect x="52" y="30" width="136" height="44" rx="12" fill={colors.tintStrong} />
         </Svg>
       </Animated.View>
       <Animated.View style={[StyleSheet.absoluteFill, cardMid]}>
         <Svg viewBox={VIEW_BOX} style={styles.svg}>
-          <Rect x="42" y="62" width="156" height="48" rx="13" fill={colors.blue200} />
+          <Rect x="42" y="62" width="156" height="48" rx="13" fill={colors.tintBorder} />
         </Svg>
       </Animated.View>
       <Animated.View style={[StyleSheet.absoluteFill, cardFront]}>
@@ -283,7 +283,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     height: 20,
     borderRadius: 10,
-    backgroundColor: colors.blue100,
+    backgroundColor: colors.tintStrong,
   },
   chipLeft: {
     width: 62,

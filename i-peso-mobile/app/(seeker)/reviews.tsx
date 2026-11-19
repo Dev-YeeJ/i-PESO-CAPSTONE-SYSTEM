@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Alert, Linking, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import MaterialIcons from '@expo/vector-icons/MaterialIcons'
 import type { EmployerFeedbackItem, OwnReview, ReviewStatus } from '@/services/seekerService'
@@ -37,6 +38,7 @@ const openGuidelines = () => { Linking.openURL(REVIEW_GUIDELINES_URL).catch(() =
 
 export default function MyReviewsScreen() {
   const router = useRouter()
+  const insets = useSafeAreaInsets()
   const queryClient = useQueryClient()
   const { showToast } = useToast()
   // A notification links here as review=application-12-recruitment (the website's ?review=).
@@ -91,7 +93,7 @@ export default function MyReviewsScreen() {
     <View style={styles.flex}>
       <ScreenHeader title="My Reviews" onBack={() => router.replace(backTargetFor(from) as never)} />
       <ScrollView
-        contentContainerStyle={styles.content}
+        contentContainerStyle={[styles.content, { paddingBottom: spacing.xxxl + insets.bottom }]}
         refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={() => refetch()} tintColor={colors.info} />}
       >
         <Text style={styles.kicker}>Verified reviews</Text>
@@ -119,7 +121,7 @@ export default function MyReviewsScreen() {
               <Card key={action.key} padding="md" style={styles.itemCard}>
                 <View style={styles.actionRow}>
                   <View style={styles.iconBadge}>
-                    <MaterialIcons name="business" size={20} color={colors.blue700} />
+                    <MaterialIcons name="business" size={20} color={colors.iconBlue} />
                   </View>
                   <View style={styles.flexText}>
                     <Text style={styles.employerName} numberOfLines={1}>{action.employerName}</Text>
@@ -276,7 +278,7 @@ function EmployerFeedbackSection({ items }: { items: EmployerFeedbackItem[] }) {
 const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: colors.background },
   content: { padding: spacing.lg, paddingBottom: spacing.xxxl },
-  kicker: { ...textStyles.label, color: colors.secondary, textTransform: 'uppercase', letterSpacing: 1 },
+  kicker: { ...textStyles.label, color: colors.link, textTransform: 'uppercase', letterSpacing: 1 },
   intro: { ...textStyles.small, color: colors.textSecondary, lineHeight: 18, marginTop: spacing.xs, marginBottom: spacing.lg },
   sectionTitle: { ...textStyles.title, color: colors.textPrimary, marginBottom: spacing.md },
   sectionGap: { marginTop: spacing.xl },
@@ -285,7 +287,7 @@ const styles = StyleSheet.create({
   mutedText: { ...textStyles.small, color: colors.textSecondary, lineHeight: 18 },
   itemCard: { marginBottom: spacing.md },
   actionRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md },
-  iconBadge: { width: 40, height: 40, borderRadius: radii.md, backgroundColor: colors.blue50, alignItems: 'center', justifyContent: 'center' },
+  iconBadge: { width: 40, height: 40, borderRadius: radii.md, backgroundColor: colors.tint, alignItems: 'center', justifyContent: 'center' },
   flexText: { flex: 1 },
   employerName: { ...textStyles.bodyBold, color: colors.textPrimary },
   meta: { ...textStyles.small, color: colors.textSecondary, marginTop: 2 },
@@ -307,5 +309,5 @@ const styles = StyleSheet.create({
   lockedBox: { marginTop: spacing.md, backgroundColor: colors.sunken, borderRadius: radii.md, padding: spacing.md },
   feedbackRatings: { marginTop: spacing.md, gap: spacing.sm },
   feedbackRating: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, borderWidth: 1, borderColor: colors.border, borderRadius: radii.md, paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
-  link: { ...textStyles.smallBold, color: colors.secondary, textDecorationLine: 'underline' },
+  link: { ...textStyles.smallBold, color: colors.link, textDecorationLine: 'underline' },
 })

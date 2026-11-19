@@ -27,6 +27,21 @@ const badgeStyles = {
     borderColor: colors.errorBorder,
     textColor: colors.error,
   },
+  /** Solid blue — "New", "Registered", "Booth 12". */
+  brand: {
+    backgroundColor: colors.secondary,
+    borderColor: colors.secondary,
+    textColor: colors.white,
+  },
+  /**
+   * The one amber badge: something the seeker earned (strong match, certificate match).
+   * Navy text on amber — white on amber fails WCAG (see colors.accentText).
+   */
+  earned: {
+    backgroundColor: colors.accent,
+    borderColor: colors.accent,
+    textColor: colors.accentText,
+  },
 }
 
 type BadgeVariant = keyof typeof badgeStyles

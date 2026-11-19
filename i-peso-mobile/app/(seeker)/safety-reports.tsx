@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useInfiniteQuery } from '@tanstack/react-query'
 import MaterialIcons from '@expo/vector-icons/MaterialIcons'
 import { seekerService } from '@/services/seekerService'
@@ -21,11 +22,13 @@ import { colors, radii, spacing, textStyles } from '@/theme'
 // safety-reports is a flat sibling in the Tabs navigator, so router.back() has no real history.
 function backTargetFor(from: string | undefined): string {
   if (from === 'notifications') return '/(seeker)/notifications'
+  if (from === 'home') return '/(seeker)' // Home → Quick actions → Safety Reports
   return '/(seeker)/profile'
 }
 
 export default function MySafetyReportsScreen() {
   const router = useRouter()
+  const insets = useSafeAreaInsets()
   // A notification or the "View my reports" button links here as case=12 (the website's ?case=).
   const { case: caseParam, from } = useLocalSearchParams<{ case?: string; from?: string }>()
   const [openId, setOpenId] = useState<string | null>(null)
@@ -49,7 +52,7 @@ export default function MySafetyReportsScreen() {
     <View style={styles.flex}>
       <ScreenHeader title="My Safety Reports" onBack={() => router.replace(backTargetFor(from) as never)} />
       <ScrollView
-        contentContainerStyle={styles.content}
+        contentContainerStyle={[styles.content, { paddingBottom: spacing.xxxl + insets.bottom }]}
         refreshControl={<RefreshControl refreshing={list.isRefetching && !list.isFetchingNextPage} onRefresh={() => list.refetch()} tintColor={colors.info} />}
       >
         <Text style={styles.kicker}>Report &amp; Safety</Text>
@@ -118,7 +121,7 @@ export default function MySafetyReportsScreen() {
 const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: colors.background },
   content: { padding: spacing.lg, paddingBottom: spacing.xxxl },
-  kicker: { ...textStyles.label, color: colors.secondary, textTransform: 'uppercase', letterSpacing: 1 },
+  kicker: { ...textStyles.label, color: colors.link, textTransform: 'uppercase', letterSpacing: 1 },
   intro: { ...textStyles.small, color: colors.textSecondary, lineHeight: 18, marginTop: spacing.xs },
   infoBox: { marginTop: spacing.md, marginBottom: spacing.lg },
   card: { marginBottom: spacing.md },

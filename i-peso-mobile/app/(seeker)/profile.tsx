@@ -45,7 +45,7 @@ import { Card } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
 import { PressableScale } from '@/components/ui/PressableScale'
 import { SectionHeader } from '@/components/ui/SectionHeader'
-import { MatchRing } from '@/components/ui/MatchRing'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { ScreenSkeleton } from '@/components/ui/ScreenSkeleton'
 import { colors, radii, spacing, typography, shadows } from '@/theme'
 import { openInBrowser, PRIVACY_POLICY_URL, REVIEW_GUIDELINES_URL, TERMS_OF_SERVICE_URL } from '@/utils/links'
@@ -135,6 +135,7 @@ async function prepareProfilePhoto(asset: ImagePicker.ImagePickerAsset): Promise
 }
 
 export default function ProfileScreen() {
+  const insets = useSafeAreaInsets()
   const logout = useAuthStore((state) => state.logout)
   const queryClient = useQueryClient()
   const params = useLocalSearchParams<{ returnSection?: string }>()
@@ -395,15 +396,12 @@ export default function ProfileScreen() {
     <View style={styles.flex}>
       <ScrollView
         ref={scrollViewRef}
-        contentContainerStyle={styles.content}
+        contentContainerStyle={[styles.content, { paddingTop: insets.top + spacing.xs }]}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.secondary} />}
         showsVerticalScrollIndicator={false}
       >
-        <Text style={styles.kicker}>My NSRP Profile</Text>
-        <Text style={styles.title}>Profile</Text>
-        <Text style={styles.subtitle}>
-          Manage your personal information, skills, and experience to get better job matches.
-        </Text>
+        <Text style={styles.kicker}>MY NSRP PROFILE</Text>
+        <Text style={styles.title} accessibilityRole="header">Profile</Text>
 
         {isLoading ? (
           <ScreenSkeleton label="Loading profile" />
@@ -421,85 +419,75 @@ export default function ProfileScreen() {
           </AlertBox>
         ) : null}
 
-        <Card padding="md" style={styles.profileHeaderCard}>
-          <View style={styles.profileHeaderInner}>
-            <PressableScale
-              scaleTo="buttonPress"
-              ripple={null}
-              onPress={pickAndUploadPhoto}
-              disabled={photoBusy}
-              accessibilityRole="button"
-              accessibilityLabel={hasPhoto ? 'Change profile photo' : 'Add profile photo'}
-            >
-              <View style={styles.avatar}>
-                {photoBusy ? (
-                  <ActivityIndicator color={colors.surface} />
-                ) : photoUri ? (
-                  <Image source={{ uri: photoUri }} style={styles.avatarImage} />
-                ) : (
-                  <Text style={styles.avatarText}>{seekerName(profile).charAt(0).toUpperCase()}</Text>
-                )}
-              </View>
-              <Text style={styles.avatarEditLabel}>{hasPhoto ? 'Change' : 'Add photo'}</Text>
-            </PressableScale>
-            <View style={styles.profileHeaderText}>
-              <View style={styles.nameRow}>
-                <Text style={styles.name}>{seekerName(profile)}</Text>
-                <Badge variant={profile?.profile_completed ? 'success' : 'warning'} style={styles.completionBadge}>
-                  {profile?.profile_completed ? 'NSRP Verified' : 'Needs Completion'}
-                </Badge>
-              </View>
-              <Text style={styles.muted}>{textFrom(profile?.email, 'Email not listed')}</Text>
-              <Text style={styles.muted}>{addressLine(profile)}</Text>
+        {/* Profile hero (redesign "22 — Profile"): photo with a camera badge, name, contact. */}
+        <View style={styles.hero}>
+          <PressableScale
+            scaleTo="buttonPress"
+            ripple={null}
+            onPress={pickAndUploadPhoto}
+            disabled={photoBusy}
+            accessibilityRole="button"
+            accessibilityLabel={hasPhoto ? 'Change profile photo' : 'Add profile photo'}
+          >
+            <View style={styles.avatar}>
               {photoBusy ? (
-                <View style={styles.savingRow}>
-                  <ActivityIndicator size="small" color={colors.info} />
-                  <Text style={styles.savingText}>Saving photo...</Text>
-                </View>
-              ) : hasPhoto ? (
-                <PressableScale scaleTo="buttonPress" ripple={null} onPress={deletePhoto} disabled={photoBusy} accessibilityRole="button">
-                  <Text style={styles.removePhotoText}>Remove photo</Text>
-                </PressableScale>
-              ) : null}
+                <ActivityIndicator color={colors.iconBlue} />
+              ) : photoUri ? (
+                <Image source={{ uri: photoUri }} style={styles.avatarImage} />
+              ) : (
+                <Text style={styles.avatarText}>{seekerName(profile).charAt(0).toUpperCase()}</Text>
+              )}
             </View>
-          </View>
-        </Card>
+            <View style={styles.cameraBadge}>
+              <MaterialIcons name="photo-camera" size={18} color={colors.white} />
+            </View>
+          </PressableScale>
+          <Text style={styles.name}>{seekerName(profile)}</Text>
+          <Text style={styles.contact}>{textFrom(profile?.email, 'Email not listed')}</Text>
+          <Text style={styles.contact}>{addressLine(profile)}</Text>
+          <Badge variant={profile?.profile_completed ? 'info' : 'warning'} style={styles.completionBadge}>
+            {profile?.profile_completed ? 'NSRP registered' : 'Needs completion'}
+          </Badge>
+          {photoBusy ? (
+            <View style={styles.savingRow}>
+              <ActivityIndicator size="small" color={colors.info} />
+              <Text style={styles.savingText}>Saving photo…</Text>
+            </View>
+          ) : hasPhoto ? (
+            <PressableScale scaleTo="buttonPress" ripple={null} onPress={deletePhoto} disabled={photoBusy} style={styles.removePhotoBtn} accessibilityRole="button">
+              <Text style={styles.removePhotoText}>Remove photo</Text>
+            </PressableScale>
+          ) : null}
+        </View>
 
         <Card padding="md" style={styles.strengthCard}>
-          <MatchRing percentage={strength} size={76} strokeWidth={6} />
-          <View style={styles.strengthText}>
-            <Text style={styles.strengthTitle}>Profile Strength</Text>
-            <Text style={styles.strengthSub}>
-              {strength < 100 ? 'Complete every section to reach 100%.' : 'Your profile is fully updated!'}
-            </Text>
+          <View style={styles.strengthHead}>
+            <Text style={styles.strengthTitle}>Profile strength</Text>
+            <Text style={styles.strengthFigure}>{strength}%</Text>
           </View>
+          <View style={styles.strengthTrack} accessible accessibilityRole="progressbar" accessibilityValue={{ min: 0, max: 100, now: strength }}>
+            <View style={[styles.strengthFill, { width: `${Math.max(0, Math.min(100, strength))}%` }]} />
+          </View>
+          <Text style={styles.strengthSub}>
+            {strength < 100 ? 'Complete every section to reach 100%.' : 'Your profile is complete.'}
+          </Text>
+          {checklist.length ? (
+            <View style={styles.checklist}>
+              {checklist.map((item) => (
+                <View key={item.key ?? item.label} style={styles.checkRow}>
+                  <MaterialIcons name={item.complete ? 'check-circle' : 'radio-button-unchecked'} size={18} color={item.complete ? colors.link : colors.blue300} />
+                  <Text style={[styles.checkText, item.complete && styles.checkTextDone]}>{item.label}</Text>
+                </View>
+              ))}
+            </View>
+          ) : null}
         </Card>
 
         <View style={styles.heroStatsRow}>
-          <View style={[styles.heroStat, styles.heroStatEmerald]}>
-            <MaterialIcons name="work-outline" size={18} color={colors.success} />
-            <View>
-              <Text style={styles.heroStatValue}>{profile?.dashboard_stats?.active_applications ?? 0}</Text>
-              <Text style={styles.heroStatLabel}>Applications</Text>
-            </View>
-          </View>
-          <View style={[styles.heroStat, styles.heroStatIndigo]}>
-            <MaterialIcons name="auto-awesome" size={18} color={colors.info} />
-            <View>
-              <Text style={styles.heroStatValue}>{profile?.dashboard_stats?.skills ?? hardSkills.length + softSkills.length}</Text>
-              <Text style={styles.heroStatLabel}>Skills</Text>
-            </View>
-          </View>
+          <Stat value={profile?.dashboard_stats?.active_applications ?? 0} label="Applications" />
+          <Stat value={profile?.dashboard_stats?.skills ?? hardSkills.length + softSkills.length} label="Skills" />
+          {analytics ? <Stat value={analytics.search_appearances} label="Search appearances" /> : null}
         </View>
-
-        <Card padding="md" style={styles.checklistCard}>
-          {checklist.map((item) => (
-            <View key={item.key ?? item.label} style={styles.checkRow}>
-              <View style={[styles.checkDot, item.complete && styles.checkDotDone]} />
-              <Text style={[styles.checkText, item.complete && styles.checkTextDone]}>{item.label}</Text>
-            </View>
-          ))}
-        </Card>
 
         <SectionHeader
           title="About"
@@ -721,7 +709,7 @@ export default function ProfileScreen() {
                 ) : null}
 
                 <PressableScale scaleTo="buttonPress" ripple={null} onPress={toggleEditor} style={styles.dutiesToggle} accessibilityRole="button">
-                  <MaterialIcons name="add" size={16} color={colors.secondary} />
+                  <MaterialIcons name="add" size={16} color={colors.link} />
                   <Text style={styles.dutiesToggleText}>{savedResponsibilities ? 'Edit Job Duties / Responsibilities' : 'Add Job Duties / Responsibilities'}</Text>
                 </PressableScale>
 
@@ -834,92 +822,44 @@ export default function ProfileScreen() {
           }) : <Card padding="md"><EmptyLine text="No certificates uploaded yet." /></Card>}
         </View>
 
-        <SectionHeader title="Resume" />
-        <Card padding="md">
-          <Info label="Resume" value={profile?.has_resume ? 'Generated' : 'Not generated'} />
-          <Button
-            variant="outline"
-            fullWidth
-            onPress={() => router.push('/(seeker)/profile/resume-studio' as never)}
-            style={styles.updateBtn}
-          >
-            Open Resume Studio
-          </Button>
-        </Card>
-
-        <SectionHeader title="My Reviews" />
-        <Card padding="md">
-          <Text style={styles.muted}>
-            Rate employers you&apos;ve applied to or worked for, and read employers&apos; feedback about you. Your name is never shown.
-          </Text>
-          <Button
-            variant="outline"
-            fullWidth
-            onPress={() => router.push('/(seeker)/reviews')}
-            style={styles.updateBtn}
-          >
-            Open My Reviews
-          </Button>
-        </Card>
-
-        <SectionHeader title="Safety Reports" />
-        <Card padding="md">
-          <Text style={styles.muted}>
-            Concerns you reported to PESO about employers or job vacancies, and their status. Reports are confidential.
-          </Text>
-          <Button
-            variant="outline"
-            fullWidth
-            onPress={() => router.push('/(seeker)/safety-reports')}
-            style={styles.updateBtn}
-          >
-            Open My Safety Reports
-          </Button>
-        </Card>
-
-        <SectionHeader title="Announcements" />
-        <Card padding="md">
-          <Text style={styles.muted}>
-            Official notices from PESO Urdaneta: office advisories, events, programs and system updates.
-          </Text>
-          <Button
-            variant="outline"
-            fullWidth
-            onPress={() => router.push({ pathname: '/(seeker)/announcements', params: { from: 'profile' } })}
-            style={styles.updateBtn}
-          >
-            Open Announcements
-          </Button>
-        </Card>
-
-        <SectionHeader title="Help & FAQs" />
-        <Card padding="md">
-          <Text style={styles.muted}>
-            Answers from the PESO office to common questions, and the office&apos;s contact details.
-          </Text>
-          <Button
-            variant="outline"
-            fullWidth
-            onPress={() => router.push('/(seeker)/help')}
-            style={styles.updateBtn}
-          >
-            Open Help &amp; FAQs
-          </Button>
-          {/* Versioned on the website, so the app opens them there instead of copying the text. */}
-          <View style={styles.policyLinks}>
-            <Text style={styles.policyLink} onPress={() => openInBrowser(PRIVACY_POLICY_URL)} accessibilityRole="link">Privacy Policy</Text>
-            <Text style={styles.policyLink} onPress={() => openInBrowser(TERMS_OF_SERVICE_URL)} accessibilityRole="link">Terms of Service</Text>
-            <Text style={styles.policyLink} onPress={() => openInBrowser(REVIEW_GUIDELINES_URL)} accessibilityRole="link">Review Guidelines</Text>
-          </View>
-        </Card>
-
-        <Button variant="primary" fullWidth onPress={() => router.push('/(seeker)/profile/edit')} style={styles.editAllBtn}>
+        <Button variant="primary" size="lg" fullWidth icon="edit" onPress={() => router.push('/(seeker)/profile/edit')} style={styles.editAllBtn}>
           Edit profile details
         </Button>
 
-        <Button variant="outline" fullWidth onPress={confirmSignOut} disabled={signingOut} style={styles.signOutBtn}>
-          {signingOut ? 'Signing out...' : 'Sign out'}
-        </Button>
+        <SectionHeader title="Tools" />
+        <View style={styles.listCard}>
+          <LinkRow
+            icon="description"
+            label="Resume Studio"
+            meta={profile?.has_resume ? 'Generated' : 'Not yet made'}
+            onPress={() => router.push('/(seeker)/profile/resume-studio' as never)}
+          />
+          <LinkRow
+            icon="rate-review"
+            label="My reviews"
+            hint="Rate employers and read their feedback about you"
+            onPress={() => router.push('/(seeker)/reviews')}
+          />
+          <LinkRow
+            icon="shield"
+            label="My safety reports"
+            hint="Confidential concerns you sent to PESO"
+            onPress={() => router.push('/(seeker)/safety-reports')}
+            last
+          />
+        </View>
+
+        <SectionHeader title="Settings & help" />
+        <View style={styles.listCard}>
+          <LinkRow icon="notifications-none" label="Notifications" onPress={() => router.push({ pathname: '/(seeker)/notifications', params: { from: 'profile' } })} />
+          <LinkRow icon="campaign" label="Announcements" hint="Notices from PESO Urdaneta" onPress={() => router.push({ pathname: '/(seeker)/announcements', params: { from: 'profile' } })} />
+          <LinkRow icon="help-outline" label="Help & FAQs" onPress={() => router.push({ pathname: '/(seeker)/help', params: { from: 'profile' } })} />
+          {/* Versioned on the website, so the app opens them there instead of copying the text. */}
+          <LinkRow icon="policy" label="Privacy Policy" external onPress={() => openInBrowser(PRIVACY_POLICY_URL)} />
+          <LinkRow icon="gavel" label="Terms of Service" external onPress={() => openInBrowser(TERMS_OF_SERVICE_URL)} />
+          <LinkRow icon="menu-book" label="Review Guidelines" external onPress={() => openInBrowser(REVIEW_GUIDELINES_URL)} />
+          <LinkRow icon="logout" label={signingOut ? 'Signing out…' : 'Sign out'} danger onPress={signingOut ? undefined : confirmSignOut} last />
+        </View>
       </ScrollView>
 
       <CertificateUploadModal
@@ -956,9 +896,10 @@ export default function ProfileScreen() {
                 onPress={handleSignOut}
                 loading={signingOut}
                 disabled={signingOut}
-                style={styles.signOutModalBtn}
+                style={StyleSheet.flatten([styles.signOutModalBtn, styles.signOutConfirm])}
+                textStyle={styles.signOutConfirmText}
               >
-                Sign Out
+                Sign out
               </Button>
             </View>
           </View>
@@ -966,6 +907,58 @@ export default function ProfileScreen() {
       </Modal>
 
     </View>
+  )
+}
+
+function Stat({ value, label }: { value: number; label: string }) {
+  return (
+    <View style={styles.heroStat} accessible accessibilityLabel={`${value} ${label}`}>
+      <Text style={styles.heroStatValue}>{value}</Text>
+      <Text style={styles.heroStatLabel}>{label}</Text>
+    </View>
+  )
+}
+
+/** One row of a grouped settings/tools list (redesign "22 — Profile"). */
+function LinkRow({
+  icon,
+  label,
+  hint,
+  meta,
+  onPress,
+  danger = false,
+  external = false,
+  last = false,
+}: {
+  icon: React.ComponentProps<typeof MaterialIcons>['name']
+  label: string
+  hint?: string
+  meta?: string
+  onPress?: () => void
+  danger?: boolean
+  external?: boolean
+  last?: boolean
+}) {
+  return (
+    <PressableScale
+      scaleTo="buttonPress"
+      ripple={null}
+      onPress={onPress}
+      disabled={!onPress}
+      style={[styles.linkRow, !last && styles.linkRowDivider]}
+      accessibilityRole={external ? 'link' : 'button'}
+      accessibilityLabel={[label, hint, meta].filter(Boolean).join('. ')}
+    >
+      <View style={[styles.linkIcon, danger && styles.linkIconDanger]}>
+        <MaterialIcons name={icon} size={20} color={danger ? colors.error : colors.iconBlue} />
+      </View>
+      <View style={styles.linkText}>
+        <Text style={[styles.linkLabel, danger && styles.linkLabelDanger]}>{label}</Text>
+        {hint ? <Text style={styles.linkHint} numberOfLines={1}>{hint}</Text> : null}
+      </View>
+      {meta ? <Text style={styles.linkMeta}>{meta}</Text> : null}
+      {danger ? null : <MaterialIcons name={external ? 'open-in-new' : 'chevron-right'} size={external ? 18 : 22} color={colors.subtle} />}
+    </PressableScale>
   )
 }
 
@@ -1190,61 +1183,69 @@ function EmptyLine({ text }: { text: string }) {
 const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: colors.background },
   content: { paddingHorizontal: spacing.lg, paddingTop: spacing.xl, paddingBottom: spacing.xxxl },
-  kicker: { color: colors.secondary, fontSize: typography.small, fontFamily: typography.family.bold, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: spacing.xs },
-  title: { color: colors.textPrimary, fontSize: typography.heading, fontFamily: typography.family.medium, marginBottom: spacing.xs },
+  kicker: { color: colors.link, fontSize: typography.small, fontFamily: typography.family.bold, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: spacing.xs },
+  title: { color: colors.textPrimary, fontSize: typography.display, lineHeight: 34, fontFamily: typography.family.bold, marginTop: 2 },
   subtitle: { color: colors.textSecondary, fontSize: typography.body, lineHeight: 20, marginBottom: spacing.lg },
   statusCard: { marginBottom: spacing.lg, alignItems: 'center', justifyContent: 'center', gap: spacing.sm },
   statusMessageCard: { borderColor: colors.border, backgroundColor: colors.surface },
   loadingText: { color: colors.textSecondary, fontSize: typography.small, fontFamily: typography.family.medium, marginTop: spacing.xs },
   alertBox: { marginBottom: spacing.lg },
-  profileHeaderCard: { marginBottom: spacing.lg },
-  profileHeaderInner: { flexDirection: 'row', gap: spacing.md, alignItems: 'center' },
-  profileHeaderText: { flex: 1 },
-  avatar: { width: 72, height: 72, borderRadius: 36, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
-  avatarImage: { width: 72, height: 72, borderRadius: 36 },
-  avatarText: { color: colors.surface, fontSize: typography.heading, fontFamily: typography.family.bold },
-  avatarEditLabel: { textAlign: 'center', marginTop: spacing.xs, color: colors.secondary, fontSize: 10, fontFamily: typography.family.bold },
-  removePhotoText: { marginTop: spacing.xs, color: colors.error, fontSize: typography.small, fontFamily: typography.family.bold },
-  savingRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: spacing.xs },
+  // Profile hero — centred photo with a camera badge (redesign "22 — Profile").
+  hero: { alignItems: 'center', paddingTop: spacing.lg, paddingBottom: spacing.lg },
+  avatar: { width: 96, height: 96, borderRadius: 48, backgroundColor: colors.tint, borderWidth: 3, borderColor: colors.background, alignItems: 'center', justifyContent: 'center', overflow: 'hidden', ...shadows.sm },
+  avatarImage: { width: 96, height: 96, borderRadius: 48 },
+  avatarText: { color: colors.figure, fontSize: 36, fontFamily: typography.family.bold },
+  cameraBadge: { position: 'absolute', right: -2, bottom: -2, width: 36, height: 36, borderRadius: 18, backgroundColor: colors.secondary, borderWidth: 3, borderColor: colors.background, alignItems: 'center', justifyContent: 'center' },
+  removePhotoBtn: { minHeight: 44, justifyContent: 'center' },
+  removePhotoText: { color: colors.error, fontSize: typography.small, fontFamily: typography.family.bold },
+  savingRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, minHeight: 44 },
   savingText: { color: colors.info, fontSize: typography.small, fontFamily: typography.family.bold },
-  nameRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.xs },
-  name: { color: colors.textPrimary, fontSize: typography.title, fontFamily: typography.family.bold },
-  completionBadge: { paddingVertical: 3 },
-  heroStatsRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md },
-  heroStat: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: spacing.xs, borderRadius: radii.md, paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
-  heroStatEmerald: { backgroundColor: colors.successBackground },
-  heroStatIndigo: { backgroundColor: colors.infoBackground },
-  heroStatValue: { color: colors.textPrimary, fontSize: typography.title, fontFamily: typography.family.bold },
-  heroStatLabel: { color: colors.textSecondary, fontSize: 11, fontFamily: typography.family.medium },
+  name: { color: colors.textPrimary, fontSize: typography.heading, lineHeight: 28, fontFamily: typography.family.bold, marginTop: spacing.md, textAlign: 'center' },
+  contact: { color: colors.textSecondary, fontSize: typography.small, lineHeight: 18, marginTop: 2, textAlign: 'center' },
+  completionBadge: { marginTop: spacing.sm },
+  heroStatsRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md, marginBottom: spacing.sm },
+  heroStat: { flex: 1, alignItems: 'center', borderRadius: radii.md, backgroundColor: colors.sunken, paddingHorizontal: spacing.sm, paddingVertical: spacing.md },
+  heroStatValue: { color: colors.textPrimary, fontSize: 20, lineHeight: 24, fontFamily: typography.family.bold },
+  heroStatLabel: { color: colors.textSecondary, fontSize: 11, lineHeight: 14, fontFamily: typography.family.medium, textAlign: 'center', marginTop: 2 },
   metaBadge: { marginTop: spacing.sm },
   muted: { color: colors.textSecondary, fontSize: typography.small, lineHeight: 18 },
-  strengthCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.lg },
-  strengthText: { flex: 1 },
-  strengthTitle: { fontSize: typography.title, fontFamily: typography.family.bold, color: colors.textPrimary, marginBottom: spacing.xs },
-  strengthSub: { fontSize: typography.small, color: colors.textSecondary, lineHeight: 18 },
-  checklistCard: { marginTop: spacing.md, marginBottom: spacing.lg },
+  strengthCard: {},
+  strengthHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  strengthTitle: { fontSize: typography.body, lineHeight: 20, fontFamily: typography.family.bold, color: colors.textPrimary },
+  strengthFigure: { fontSize: 22, lineHeight: 26, fontFamily: typography.family.display, color: colors.figure },
+  strengthTrack: { height: 8, borderRadius: radii.pill, backgroundColor: colors.tintStrong, marginTop: spacing.sm, overflow: 'hidden' },
+  strengthFill: { height: '100%', borderRadius: radii.pill, backgroundColor: colors.secondary },
+  strengthSub: { fontSize: typography.small, color: colors.textSecondary, lineHeight: 18, marginTop: spacing.sm },
+  checklist: { marginTop: spacing.md, paddingTop: spacing.md, borderTopWidth: 1, borderTopColor: colors.border },
+  listCard: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radii.lg, overflow: 'hidden', ...shadows.sm },
+  linkRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 56, paddingHorizontal: spacing.lg, paddingVertical: spacing.sm },
+  linkRowDivider: { borderBottomWidth: 1, borderBottomColor: colors.border },
+  linkIcon: { width: 36, height: 36, borderRadius: radii.md, backgroundColor: colors.tint, alignItems: 'center', justifyContent: 'center' },
+  linkIconDanger: { backgroundColor: colors.errorBackground },
+  linkText: { flex: 1 },
+  linkLabel: { fontSize: 15, lineHeight: 20, fontFamily: typography.family.medium, color: colors.textPrimary },
+  linkLabelDanger: { color: colors.error },
+  linkHint: { fontSize: typography.small, lineHeight: 16, color: colors.subtle, marginTop: 1 },
+  linkMeta: { fontSize: typography.small, color: colors.subtle },
+  signOutConfirm: { borderColor: colors.errorBorder },
+  signOutConfirmText: { color: colors.error },
   summaryGenerateAction: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   summaryText: { color: colors.textPrimary, fontSize: typography.body, lineHeight: 20 },
   summaryEditLink: { marginTop: spacing.md, alignSelf: 'flex-start' },
   analyticsCard: {},
   analyticsStatsRow: { flexDirection: 'row', gap: spacing.lg },
   analyticsStat: { flex: 1, alignItems: 'center', backgroundColor: colors.background, borderRadius: radii.md, paddingVertical: spacing.md },
-  analyticsStatValue: { color: colors.secondary, fontSize: typography.heading, fontFamily: typography.family.bold },
+  analyticsStatValue: { color: colors.link, fontSize: typography.heading, fontFamily: typography.family.bold },
   analyticsStatLabel: { color: colors.textSecondary, fontSize: typography.small, marginTop: spacing.xs, textAlign: 'center' },
   recentViewers: { marginTop: spacing.md, borderTopWidth: 1, borderTopColor: colors.border, paddingTop: spacing.md },
   recentViewersTitle: { color: colors.textPrimary, fontSize: typography.small, fontFamily: typography.family.bold, marginBottom: spacing.xs },
   recentViewerRow: { color: colors.textSecondary, fontSize: typography.small, paddingVertical: spacing.xs },
   checkRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.sm },
-  checkDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.border },
-  checkDotDone: { backgroundColor: colors.success },
   checkText: { color: colors.textSecondary, fontSize: typography.body },
   checkTextDone: { color: colors.textPrimary, fontFamily: typography.family.medium },
   updateBtn: { marginTop: spacing.md },
-  policyLinks: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', columnGap: spacing.lg, rowGap: spacing.sm, marginTop: spacing.md },
-  policyLink: { color: colors.secondary, fontSize: typography.small, fontFamily: typography.family.bold, paddingVertical: spacing.xs },
   editAllBtn: { marginTop: spacing.xl },
-  signOutBtn: { marginTop: spacing.md, marginBottom: spacing.xl },
-  editLinkText: { color: colors.secondary, fontSize: typography.small, fontFamily: typography.family.bold },
+  editLinkText: { color: colors.link, fontSize: typography.small, fontFamily: typography.family.bold },
   infoRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.border },
   infoLabel: { color: colors.textSecondary, fontSize: typography.body },
   infoValue: { color: colors.textPrimary, fontSize: typography.body, fontFamily: typography.family.medium, textAlign: 'right', flex: 1, marginLeft: spacing.md },
@@ -1260,7 +1261,7 @@ const styles = StyleSheet.create({
   bulletDot: { width: 5, height: 5, borderRadius: 3, backgroundColor: colors.secondary, marginTop: 7 },
   bulletText: { flex: 1, color: colors.textPrimary, fontSize: typography.small, lineHeight: 18 },
   dutiesToggle: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: spacing.md, alignSelf: 'flex-start', borderWidth: 1, borderColor: colors.border, borderRadius: radii.md, paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
-  dutiesToggleText: { color: colors.secondary, fontSize: typography.small, fontFamily: typography.family.bold },
+  dutiesToggleText: { color: colors.link, fontSize: typography.small, fontFamily: typography.family.bold },
   dutiesPanel: { marginTop: spacing.md, borderWidth: 1, borderColor: colors.infoBorder, backgroundColor: colors.infoBackground, borderRadius: radii.md, padding: spacing.md },
   dutiesPanelHeader: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: spacing.sm },
   dutiesPanelHeaderText: { flex: 1, minWidth: 160 },
@@ -1275,16 +1276,16 @@ const styles = StyleSheet.create({
   modalBtn: { flex: 1, marginBottom: 0 },
   modalInput: { borderWidth: 1, borderColor: colors.border, borderRadius: radii.md, padding: spacing.md, color: colors.textPrimary, fontSize: typography.body, marginBottom: spacing.md },
   label: { marginBottom: spacing.xs, color: colors.textSecondary, fontSize: typography.small, fontFamily: typography.family.bold },
-  trainingHint: { marginBottom: spacing.md, color: colors.secondary, fontSize: typography.small, fontFamily: typography.family.medium },
+  trainingHint: { marginBottom: spacing.md, color: colors.link, fontSize: typography.small, fontFamily: typography.family.medium },
   modalInputError: { borderColor: colors.errorBorder, backgroundColor: colors.errorBackground, marginBottom: spacing.xs },
   fieldError: { color: colors.error, fontSize: typography.small, fontFamily: typography.family.medium, marginBottom: spacing.md },
   fileErrorInCard: { marginTop: spacing.sm, marginBottom: 0 },
   clearDate: { alignSelf: 'flex-start', marginTop: -spacing.sm, marginBottom: spacing.md, paddingVertical: spacing.xs },
-  clearDateText: { color: colors.secondary, fontSize: typography.small, fontFamily: typography.family.bold },
+  clearDateText: { color: colors.link, fontSize: typography.small, fontFamily: typography.family.bold },
   categoryChip: { borderWidth: 1, borderColor: colors.border, borderRadius: radii.pill, paddingHorizontal: spacing.md, paddingVertical: spacing.xs, marginBottom: spacing.sm },
-  categoryChipActive: { borderColor: colors.blue600, backgroundColor: colors.blue50 },
+  categoryChipActive: { borderColor: colors.blue600, backgroundColor: colors.tint },
   categoryChipText: { fontSize: 11, color: colors.textSecondary, textTransform: 'capitalize' },
-  categoryChipTextActive: { color: colors.secondary, fontFamily: typography.family.bold },
+  categoryChipTextActive: { color: colors.link, fontFamily: typography.family.bold },
   filePreviewCard: { marginTop: spacing.md, marginBottom: spacing.md, borderWidth: 1, borderColor: colors.border, borderRadius: radii.md, padding: spacing.md, backgroundColor: colors.surface },
   filePreviewTitle: { color: colors.textSecondary, fontSize: 11, fontFamily: typography.family.bold, marginBottom: spacing.sm, textTransform: 'uppercase' },
   imagePreview: { width: '100%', height: 200, borderRadius: radii.sm, backgroundColor: colors.background, marginBottom: spacing.sm },
@@ -1297,7 +1298,7 @@ const styles = StyleSheet.create({
   filePreviewBtn: { flex: 1, marginBottom: 0 },
   signOutModalOverlay: { flex: 1, backgroundColor: colors.scrim, justifyContent: 'center', alignItems: 'center', padding: spacing.xl },
   signOutModalContent: { backgroundColor: colors.surface, borderRadius: radii.xl, padding: spacing.xl, width: '100%', maxWidth: 340, alignItems: 'center', ...shadows.elevated },
-  signOutModalIconWrap: { width: 56, height: 56, borderRadius: 28, backgroundColor: 'rgba(239,68,68,0.1)', justifyContent: 'center', alignItems: 'center', marginBottom: spacing.md },
+  signOutModalIconWrap: { width: 56, height: 56, borderRadius: 28, backgroundColor: colors.tint, justifyContent: 'center', alignItems: 'center', marginBottom: spacing.md },
   signOutModalTitle: { color: colors.textPrimary, fontSize: typography.heading, fontFamily: typography.family.bold, marginBottom: spacing.xs, textAlign: 'center' },
   signOutModalDesc: { color: colors.textSecondary, fontSize: typography.body, textAlign: 'center', lineHeight: 22, marginBottom: spacing.xl },
   signOutModalActions: { flexDirection: 'row', gap: spacing.sm, width: '100%' },

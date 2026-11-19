@@ -1,8 +1,8 @@
 import { ReactNode } from 'react'
-import { Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import { Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import MaterialIcons from '@expo/vector-icons/MaterialIcons'
 import { AlertBox } from './AlertBox'
-import { Card } from './Card'
 import { colors, radii, spacing, textStyles, typography } from '@/theme'
 
 interface AuthShellProps {
@@ -15,28 +15,42 @@ interface AuthShellProps {
   footer?: ReactNode
 }
 
+/**
+ * Shared frame for Login, Register, Verify email, Forgot and Reset password (redesign "Auth"
+ * drafts): the real i-PESO logo in a left-aligned brand row, a large left-aligned title, and
+ * the form directly on white — no card, so the fields are the page.
+ */
 export function AuthShell({ title, subtitle, onBack, apiError, headerExtra, children, footer }: AuthShellProps) {
+  const insets = useSafeAreaInsets()
+
   return (
     <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <ScrollView
-        contentContainerStyle={styles.container}
+        contentContainerStyle={[styles.container, { paddingTop: insets.top + spacing.sm, paddingBottom: insets.bottom + spacing.xxl }]}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        {onBack ? (
-          <TouchableOpacity onPress={onBack} style={styles.backBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-            <MaterialIcons name="arrow-back" size={18} color={colors.textSecondary} />
-            <Text style={styles.backText}>Back</Text>
-          </TouchableOpacity>
-        ) : null}
-
-        <View style={styles.logoArea}>
-          <Image source={require('@/assets/images/ipeso-logo.png')} style={styles.logo} />
-          <Text style={styles.wordmark}>i-PESO</Text>
-          <Text style={styles.logoSub}>URDANETA CITY</Text>
+        <View style={styles.topRow}>
+          {onBack ? (
+            <Pressable
+              onPress={onBack}
+              style={({ pressed }) => [styles.backBtn, pressed && styles.backBtnPressed]}
+              accessibilityRole="button"
+              accessibilityLabel="Back"
+            >
+              <MaterialIcons name="arrow-back" size={24} color={colors.textPrimary} />
+            </Pressable>
+          ) : null}
+          <View style={styles.brandRow} accessible accessibilityLabel="i-PESO, Urdaneta City">
+            <Image source={require('@/assets/images/ipeso-logo.png')} style={styles.logo} />
+            <View>
+              <Text style={styles.wordmark}>i-PESO</Text>
+              <Text style={styles.logoSub}>URDANETA CITY</Text>
+            </View>
+          </View>
         </View>
 
-        <Text style={styles.title}>{title}</Text>
+        <Text style={styles.title} accessibilityRole="header">{title}</Text>
         {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
 
         {headerExtra}
@@ -45,9 +59,7 @@ export function AuthShell({ title, subtitle, onBack, apiError, headerExtra, chil
           <AlertBox variant="danger" style={styles.errorBox}>{apiError}</AlertBox>
         ) : null}
 
-        <Card padding="lg" style={styles.card}>
-          {children}
-        </Card>
+        <View style={styles.form}>{children}</View>
 
         {footer}
       </ScrollView>
@@ -62,62 +74,65 @@ const styles = StyleSheet.create({
   },
   container: {
     flexGrow: 1,
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.xxl + spacing.md,
-    paddingBottom: spacing.xxl,
+    paddingHorizontal: spacing.xxl,
   },
-  backBtn: {
+  topRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.xs,
-    alignSelf: 'flex-start',
-    marginBottom: spacing.lg,
+    gap: spacing.md,
+    marginBottom: spacing.xxl,
   },
-  backText: {
-    fontSize: typography.small,
-    fontFamily: typography.family.bold,
-    color: colors.secondaryText,
-  },
-  logoArea: {
+  backBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: colors.sunken,
     alignItems: 'center',
-    marginBottom: spacing.md,
+    justifyContent: 'center',
+    marginLeft: -spacing.xs,
+  },
+  backBtnPressed: {
+    backgroundColor: colors.tint,
+  },
+  brandRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm + 2,
   },
   logo: {
-    width: 56,
-    height: 56,
+    width: 44,
+    height: 44,
     borderRadius: radii.md,
-    marginBottom: spacing.sm,
   },
   wordmark: {
-    fontSize: typography.title,
-    fontFamily: typography.family.medium,
+    fontSize: 16,
+    lineHeight: 20,
+    fontFamily: typography.family.bold,
     color: colors.primary,
   },
   logoSub: {
     fontSize: 10,
+    lineHeight: 12,
     color: colors.subtle,
-    letterSpacing: 3,
-    fontFamily: typography.family.bold,
-    marginTop: 2,
+    letterSpacing: 2,
+    fontFamily: typography.family.medium,
   },
   title: {
-    fontSize: typography.heading,
-    fontFamily: typography.family.medium,
-    color: colors.primary,
-    textAlign: 'center',
-    marginBottom: spacing.sm,
+    ...textStyles.display,
+    color: colors.textPrimary,
   },
   subtitle: {
     ...textStyles.body,
+    fontSize: 15,
+    lineHeight: 22,
     color: colors.textSecondary,
-    textAlign: 'center',
-    marginBottom: spacing.xl,
-    paddingHorizontal: spacing.sm,
+    marginTop: spacing.xs + 2,
   },
   errorBox: {
-    marginBottom: spacing.lg,
+    marginTop: spacing.lg,
   },
-  card: {
-    marginBottom: spacing.xl,
+  form: {
+    marginTop: spacing.xxl,
+    marginBottom: spacing.lg,
   },
 })

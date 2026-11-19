@@ -59,7 +59,7 @@ const styles = StyleSheet.create({
   },
   iconContainer: {
     padding: spacing.xs,
-    backgroundColor: colors.blue50,
+    backgroundColor: colors.tint,
     borderRadius: radii.sm,
   },
   content: {

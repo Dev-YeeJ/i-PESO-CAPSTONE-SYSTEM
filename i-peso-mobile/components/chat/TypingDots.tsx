@@ -1,34 +1,45 @@
 import { StyleSheet, View } from 'react-native'
-import Animated, { useAnimatedStyle, useSharedValue, withDelay, withRepeat, withSequence, withTiming } from 'react-native-reanimated'
+import Animated, { cancelAnimation, useAnimatedStyle, useSharedValue, withDelay, withRepeat, withSequence, withTiming } from 'react-native-reanimated'
 import { useEffect } from 'react'
+import { useMotion } from '@/hooks/useMotion'
 import { colors } from '@/theme'
 
 /**
  * Three-dot "Ace is typing" indicator — each dot bounces in sequence, mirroring the
  * web widget's `.is-typing` bubble (three CSS-animated spans) rather than a plain spinner.
+ *
+ * With the OS "Reduce Motion" setting on, the endless bounce is replaced by three still dots
+ * at stepped opacity: the indicator still reads as "typing", without looping movement.
  */
 export function TypingDots() {
   return (
-    <View style={styles.row}>
-      <Dot delay={0} />
-      <Dot delay={140} />
-      <Dot delay={280} />
+    <View style={styles.row} accessible accessibilityLabel="ACE is typing">
+      <Dot index={0} />
+      <Dot index={1} />
+      <Dot index={2} />
     </View>
   )
 }
 
-function Dot({ delay }: { delay: number }) {
+function Dot({ index }: { index: number }) {
+  const m = useMotion()
   const progress = useSharedValue(0)
 
   useEffect(() => {
+    if (!m.enabled) {
+      cancelAnimation(progress)
+      progress.value = 1 - index * 0.3
+      return
+    }
     progress.value = withDelay(
-      delay,
+      index * 140,
       withRepeat(withSequence(withTiming(1, { duration: 360 }), withTiming(0, { duration: 360 })), -1, false)
     )
-  }, [delay, progress])
+    return () => cancelAnimation(progress)
+  }, [index, progress, m.enabled])
 
   const style = useAnimatedStyle(() => ({
-    transform: [{ translateY: -4 * progress.value }],
+    transform: [{ translateY: m.enabled ? -4 * progress.value : 0 }],
     opacity: 0.4 + 0.6 * progress.value,
   }))
 

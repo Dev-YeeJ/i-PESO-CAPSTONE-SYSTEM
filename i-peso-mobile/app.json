@@ -2,7 +2,7 @@
   "expo": {
     "name": "i-peso-mobile",
     "slug": "i-peso-mobile",
-    "owner": "bryanderps-team",
+    "owner": "brydevapps-team",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -19,7 +19,6 @@
     "android": {
       "package": "com.ipeso.mobile",
       "googleServicesFile": "./google-services.json",
-      "usesCleartextTraffic": true,
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -65,6 +64,13 @@
           "icon": "./assets/images/android-icon-monochrome.png",
           "color": "#2563EB"
         }
+      ],
+      [
+        "expo-speech-recognition",
+        {
+          "microphonePermission": "i-PESO uses the microphone so you can speak your questions to ACE, the job assistant.",
+          "speechRecognitionPermission": "i-PESO turns your speech into text so you can talk to ACE instead of typing."
+        }
       ]
     ],
     "experiments": {
@@ -76,7 +82,7 @@
       "apiBaseUrl": "https://api.ipeso.website/api",
       "router": {},
       "eas": {
-        "projectId": "a6b6c23f-9e48-4765-950d-48521a8b6804"
+        "projectId": "e356b8e6-c423-4668-bbe4-84306dd8e635"
       }
     }
   }

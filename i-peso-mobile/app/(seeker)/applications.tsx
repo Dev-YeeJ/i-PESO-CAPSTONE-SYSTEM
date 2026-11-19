@@ -1,33 +1,28 @@
 import { useCallback, useMemo, useState } from 'react'
-import {
-  Alert,
-  Image,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native'
+import { Alert, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native'
 import { router } from 'expo-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import Animated, { FadeInUp } from 'react-native-reanimated'
+import MaterialIcons from '@expo/vector-icons/MaterialIcons'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import type { SeekerApplication, SeekerApplicationsResponse } from '@/services/seekerService'
 import { seekerService } from '@/services/seekerService'
 import { apiErrorMessage } from '@/utils/apiError'
-import { applicationNextStep, applicationStatusVariant, formatDate, formatInterviewMode, formatInterviewTime, formatSalary, interviewPhase, interviewPhaseText, jobCompany, jobLocation, seekerName, textFrom, titleCase } from '@/utils/seekerView'
+import { applicationNextStep, applicationStatusVariant, formatDate, formatInterviewMode, formatInterviewTime, interviewPhase, interviewPhaseText, jobCompany, jobLocation, textFrom, titleCase } from '@/utils/seekerView'
 import { useMotion } from '@/hooks/useMotion'
 import { useToast } from '@/stores/toastStore'
 import { AlertBox } from '@/components/ui/AlertBox'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
-import { Card } from '@/components/ui/Card'
+import { Chip } from '@/components/ui/Chip'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { PressableScale } from '@/components/ui/PressableScale'
-import { SectionHeader } from '@/components/ui/SectionHeader'
-import { ScreenSkeleton } from '@/components/ui/ScreenSkeleton'
+import { JobCardSkeleton } from '@/components/ui/Skeleton'
+import { CompanyLogo } from '@/components/seeker/CompanyLogo'
 import { ApplicationReviewActions } from '@/components/reviews/ApplicationReviewActions'
-import { colors, radii, spacing, typography } from '@/theme'
+import { colors, radii, shadows, spacing, textStyles, typography } from '@/theme'
+
+// Redesigned Applied tab (Superdesign drafts "14 — Applied", "14b — Applied · Empty").
 
 const STATUS_TABS = [
   { key: '', label: 'All' },
@@ -40,16 +35,27 @@ const STATUS_TABS = [
   { key: 'withdrawn', label: 'Withdrawn' },
 ]
 
+/** Four-step progress per status: Applied → Reviewed → Interview → Decision. */
+const PROGRESS: Record<string, { steps: number; tone: 'blue' | 'ok' | 'closed'; label: string }> = {
+  pending: { steps: 1, tone: 'blue', label: 'Applied · waiting for the employer to review' },
+  reviewed: { steps: 2, tone: 'blue', label: 'Reviewed by the employer' },
+  shortlisted: { steps: 2, tone: 'blue', label: 'Reviewed · you made the shortlist' },
+  interview: { steps: 3, tone: 'blue', label: 'Interview stage' },
+  hired: { steps: 4, tone: 'ok', label: 'Hired' },
+  rejected: { steps: 4, tone: 'closed', label: 'Closed · not selected this time' },
+  withdrawn: { steps: 0, tone: 'closed', label: 'You withdrew this application' },
+}
+
 const EMPTY_APPLICATIONS: SeekerApplication[] = []
 
 export default function ApplicationsScreen() {
+  const insets = useSafeAreaInsets()
   const queryClient = useQueryClient()
   const { showToast } = useToast()
   const [withdrawError, setWithdrawError] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
 
-  const { data: profile } = useQuery({ queryKey: ['seekerProfile'], queryFn: () => seekerService.getProfile() })
   const {
     data: applicationsData,
     isLoading,
@@ -82,25 +88,33 @@ export default function ApplicationsScreen() {
 
   const onRefresh = useCallback(() => { refetch() }, [refetch])
 
+  const patchApplication = (applyId: number | string, patch: (a: SeekerApplication) => SeekerApplication) => {
+    queryClient.setQueryData<SeekerApplicationsResponse>(['applications'], (current) =>
+      current
+        ? { ...current, applications: (current.applications ?? []).map((a) => (a.apply_id === applyId ? patch(a) : a)) }
+        : current
+    )
+  }
+
+  // Optimistic: the card shows "Withdrawn" at once; the server's copy replaces it on success,
+  // and the previous list comes back if the request fails.
   const withdrawMutation = useMutation({
     mutationFn: (id: number | string) => seekerService.withdrawApplication(id),
-    onSuccess: ({ application: withdrawn }) => {
+    onMutate: async (id) => {
       setWithdrawError('')
-      queryClient.setQueryData<SeekerApplicationsResponse>(['applications'], (current) =>
-        current
-          ? {
-              ...current,
-              applications: (current.applications ?? []).map((application) =>
-                application.apply_id === withdrawn.apply_id ? withdrawn : application
-              ),
-            }
-          : current
-      )
+      await queryClient.cancelQueries({ queryKey: ['applications'] })
+      const previous = queryClient.getQueryData<SeekerApplicationsResponse>(['applications'])
+      patchApplication(id, (a) => ({ ...a, status: 'withdrawn', status_label: 'Withdrawn', can_withdraw: false }))
+      return { previous }
+    },
+    onSuccess: ({ application: withdrawn }) => {
+      patchApplication(withdrawn.apply_id, () => withdrawn)
       queryClient.setQueryData(['application', String(withdrawn.apply_id)], withdrawn)
       queryClient.invalidateQueries({ queryKey: ['jobs'] })
       showToast('Application withdrawn.', 'success')
     },
-    onError: (caught: unknown) => {
+    onError: (caught: unknown, _id, context) => {
+      if (context?.previous) queryClient.setQueryData(['applications'], context.previous)
       setWithdrawError(apiErrorMessage(caught, 'Unable to withdraw this application.'))
     },
   })
@@ -117,128 +131,119 @@ export default function ApplicationsScreen() {
   }
 
   const activeApplications = applications.filter((application) => !['hired', 'rejected', 'withdrawn'].includes(application.status)).length
+  const hasApplications = applications.length > 0
 
   return (
     <View style={styles.flex}>
       <ScrollView
-        contentContainerStyle={styles.content}
-        refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={onRefresh} tintColor={colors.info} />}
+        contentContainerStyle={[styles.content, { paddingTop: insets.top + spacing.xs }]}
+        refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={onRefresh} tintColor={colors.secondary} colors={[colors.secondary]} />}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
       >
-        <Text style={styles.kicker}>Application Activity</Text>
-        <Text style={styles.title}>My Applications</Text>
-        <Text style={styles.subtitle}>
-          Track submitted jobs, employer updates, interviews, and placements from i-PESO.
-        </Text>
-
-        {isLoading ? (
-          <ScreenSkeleton label="Loading activity" />
-        ) : null}
-
-        {error ? (
-          <AlertBox variant="danger" style={styles.alertBox}>
-            Unable to load application activity. Check the backend connection.
-          </AlertBox>
-        ) : null}
-
-        {withdrawError ? (
-          <AlertBox variant="danger" style={styles.alertBox}>
-            {withdrawError}
-          </AlertBox>
-        ) : null}
-
-        <Card style={styles.summaryCard} padding="md">
-          <Text style={styles.summaryLabel}>{seekerName(profile)}</Text>
-          <Text style={styles.summaryTitle}>
-            {applications.length
-              ? `${activeApplications} active of ${applications.length} submitted`
-              : 'No applications submitted yet'}
+        <Text style={styles.kicker}>APPLIED</Text>
+        <Text style={styles.title} accessibilityRole="header">My applications</Text>
+        {hasApplications ? (
+          <Text style={styles.subtitle}>
+            <Text style={styles.subtitleStrong}>{activeApplications} active</Text> of {applications.length} sent
           </Text>
-          <Text style={styles.summaryText}>
-            Employers can move your application from pending review to interview, hired, or rejected.
-          </Text>
-        </Card>
+        ) : null}
 
-        {applications.length > 0 ? (
+        {hasApplications ? (
           <>
-            <TextInput
-              style={styles.search}
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-              placeholder="Search by job title, company, or location..."
-              placeholderTextColor={colors.subtle}
-              accessibilityLabel="Search applications"
-            />
-            <View style={styles.chipWrapper}>
-              <ScrollView
-                horizontal
-                nestedScrollEnabled
-                directionalLockEnabled
-                keyboardShouldPersistTaps="handled"
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.chipScrollContent}
-              >
-                {STATUS_TABS.map((tab) => {
-                  const count = tab.key === '' ? applications.length : (statusCounts[tab.key] ?? 0)
-                  if (tab.key && count === 0) return null
-                  const active = statusFilter === tab.key
-                  return (
-                    <PressableScale
-                      key={tab.key || 'all'}
-                      onPress={() => setStatusFilter(tab.key)}
-                      style={[styles.chip, active && styles.chipActive]}
-                      accessibilityRole="button"
-                      accessibilityState={{ selected: active }}
-                    >
-                      <Text style={[styles.chipText, active && styles.chipTextActive]} numberOfLines={1}>
-                        {tab.label} ({count})
-                      </Text>
-                    </PressableScale>
-                  )
-                })}
-              </ScrollView>
+            <View style={styles.search}>
+              <MaterialIcons name="search" size={22} color={colors.subtle} />
+              <TextInput
+                style={styles.searchInput}
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                placeholder="Search by job, company or place"
+                placeholderTextColor={colors.subtle}
+                accessibilityLabel="Search applications"
+              />
+              {searchQuery ? (
+                <PressableScale scaleTo="buttonPress" ripple={null} onPress={() => setSearchQuery('')} style={styles.clearBtn} accessibilityRole="button" accessibilityLabel="Clear search">
+                  <MaterialIcons name="close" size={18} color={colors.subtle} />
+                </PressableScale>
+              ) : null}
             </View>
+            <ScrollView
+              horizontal
+              nestedScrollEnabled
+              keyboardShouldPersistTaps="handled"
+              showsHorizontalScrollIndicator={false}
+              style={styles.chipScroll}
+              contentContainerStyle={styles.chipRow}
+            >
+              {STATUS_TABS.map((tab) => {
+                const count = tab.key === '' ? applications.length : (statusCounts[tab.key] ?? 0)
+                if (tab.key && count === 0) return null
+                return (
+                  <Chip key={tab.key || 'all'} label={`${tab.label} · ${count}`} selected={statusFilter === tab.key} onPress={() => setStatusFilter(tab.key)} />
+                )
+              })}
+            </ScrollView>
           </>
         ) : null}
 
-        <SectionHeader title="Application History" />
+        {withdrawError ? <AlertBox variant="danger" style={styles.alertBox}>{withdrawError}</AlertBox> : null}
 
-        {!isLoading && !applications.length ? (
+        {isLoading ? (
+          <View style={styles.list}>
+            <JobCardSkeleton />
+            <JobCardSkeleton />
+            <JobCardSkeleton />
+          </View>
+        ) : error && !hasApplications ? (
           <EmptyState
-            icon="work-outline"
-            title="Start Applying"
-            message="Open Find Jobs, choose a matching vacancy, and tap Apply now. Your application will appear here and on the employer ATS board."
-            action={
-              <Button variant="outline" fullWidth onPress={() => router.push('/(seeker)/jobs')}>
-                Find jobs
-              </Button>
-            }
+            art="cloud"
+            title="Couldn't load your applications"
+            message="Check your connection, then try again."
+            action={<Button variant="outline" size="sm" icon="refresh" onPress={() => refetch()}>Try again</Button>}
           />
-        ) : null}
-
-        {!isLoading && applications.length > 0 && visibleApplications.length === 0 ? (
+        ) : !hasApplications ? (
           <EmptyState
-            icon="search-off"
-            title="No Matching Applications"
-            message="No applications match your current filter or search criteria."
-            action={
-              <Button variant="outline" fullWidth onPress={() => { setStatusFilter(''); setSearchQuery('') }}>
-                Clear filters
-              </Button>
-            }
+            art="folder"
+            title="Start applying"
+            message="Pick a job that matches you and tap Apply now. You can follow every step from here."
+            action={<Button size="md" icon="search" onPress={() => router.push('/(seeker)/jobs')}>Browse jobs</Button>}
           />
-        ) : null}
-
-        {visibleApplications.map((application, index) => (
-          <ApplicationCard
-            key={String(application.apply_id)}
-            application={application}
-            index={index}
-            onWithdraw={() => confirmWithdraw(application)}
-            withdrawing={withdrawMutation.isPending && withdrawMutation.variables === application.apply_id}
+        ) : visibleApplications.length === 0 ? (
+          <EmptyState
+            art="search"
+            title="No matching applications"
+            message="Nothing matches this search or status."
+            action={<Button variant="outline" size="sm" onPress={() => { setStatusFilter(''); setSearchQuery('') }}>Clear filters</Button>}
           />
-        ))}
+        ) : (
+          <View style={styles.list}>
+            {visibleApplications.map((application, index) => (
+              <ApplicationCard
+                key={String(application.apply_id)}
+                application={application}
+                index={index}
+                onWithdraw={() => confirmWithdraw(application)}
+                withdrawing={withdrawMutation.isPending && withdrawMutation.variables === application.apply_id}
+              />
+            ))}
+          </View>
+        )}
       </ScrollView>
+    </View>
+  )
+}
+
+function Progress({ status }: { status: string }) {
+  const p = PROGRESS[status] ?? { steps: 1, tone: 'blue' as const, label: titleCase(status) }
+  const fill = p.tone === 'ok' ? colors.successBorder : p.tone === 'closed' ? colors.borderStrong : colors.secondary
+  return (
+    <View style={styles.progress} accessible accessibilityLabel={`Progress: ${p.label}`}>
+      <View style={styles.progressBars}>
+        {[0, 1, 2, 3].map((i) => (
+          <View key={i} style={[styles.progressBar, { backgroundColor: i < p.steps ? fill : colors.tintStrong }]} />
+        ))}
+      </View>
+      <Text style={styles.progressLabel}>{p.label}</Text>
     </View>
   )
 }
@@ -256,165 +261,135 @@ function ApplicationCard({
 }) {
   const job = application.job
   const m = useMotion()
+  const interview = application.interview
+  const interviewEnded = interview ? interviewPhase(interview) === 'ended' : false
+  const nextStep = applicationNextStep(application.status, interview)
+  const match = Math.round(Number(application.match_percentage ?? 0))
+  const open = () => router.push(`/(seeker)/applications/${application.apply_id}`)
 
   return (
-    <Animated.View entering={m.enabled ? FadeInUp.delay(m.stagger(index)).duration(240) : undefined}>
+    <Animated.View entering={m.enabled ? FadeInUp.delay(m.stagger(index)).duration(m.duration('normal')) : undefined}>
       <PressableScale
         scaleTo="cardPress"
         ripple={null}
-        onPress={() => router.push(`/(seeker)/applications/${application.apply_id}`)}
+        onPress={open}
+        style={styles.card}
         accessibilityRole="button"
-        accessibilityLabel={`View details for ${textFrom(job?.job_title, 'this application')}`}
+        accessibilityLabel={`${textFrom(job?.job_title, 'Application')}, ${application.status_label ?? titleCase(application.status)}. View details`}
       >
-        <Card style={styles.applicationCard} padding="md">
-          <View style={styles.applicationHeader}>
-            {job?.employer?.company_logo_url ? (
-              <Image source={{ uri: job.employer.company_logo_url }} style={styles.employerLogo} />
-            ) : null}
-            <View style={styles.applicationTitleWrap}>
-              <Text style={styles.jobTitle}>{textFrom(job?.job_title, 'Untitled job')}</Text>
-              <Text style={styles.company}>{job ? jobCompany(job) : 'Employer not listed'}</Text>
+        <View style={styles.cardHead}>
+          <CompanyLogo uri={job?.employer?.company_logo_url} name={job ? jobCompany(job) : null} size={44} />
+          <View style={styles.flexOne}>
+            <Text style={styles.jobTitle} numberOfLines={2}>{textFrom(job?.job_title, 'Untitled job')}</Text>
+            <Text style={styles.company} numberOfLines={1}>{job ? jobCompany(job) : 'Employer not listed'}</Text>
+          </View>
+          <Badge variant={applicationStatusVariant(application.status)}>{application.status_label ?? titleCase(application.status)}</Badge>
+        </View>
+
+        <Progress status={application.status} />
+
+        {interview && application.status === 'interview' && !interviewEnded ? (
+          <View style={styles.interviewBox}>
+            <MaterialIcons name="event-available" size={20} color={colors.link} />
+            <View style={styles.flexOne}>
+              <Text style={styles.interviewWhen}>{formatInterviewTime(interview.schedule)} · {interviewPhaseText(interview)}</Text>
+              <Text style={styles.interviewWhere} numberOfLines={2}>
+                {formatInterviewMode(interview.mode_of_interview)} · {textFrom(interview.venue_or_link, 'Venue or link to follow')}
+              </Text>
             </View>
-            <Badge variant={applicationStatusVariant(application.status)} style={styles.statusBadge}>
-              {application.status_label ?? titleCase(application.status)}
-            </Badge>
           </View>
+        ) : null}
 
-          <View style={styles.jobMetaContainer}>
-            {job ? <Text style={styles.meta}>{jobLocation(job)}</Text> : null}
-            {job ? <Text style={styles.meta}>•</Text> : null}
-            {job ? <Text style={styles.meta}>{formatSalary(job)}</Text> : null}
+        {interview && interviewEnded ? (
+          <AlertBox variant="info" title={interviewPhaseText(interview)} style={styles.inlineAlert}>
+            {`${formatInterviewMode(interview.mode_of_interview)} on ${formatInterviewTime(interview.schedule)}\nThe employer will update this application with their decision.`}
+          </AlertBox>
+        ) : nextStep && application.status !== 'interview' ? (
+          <Text style={styles.nextStep}>{nextStep}</Text>
+        ) : null}
+
+        {application.placement ? (
+          <AlertBox variant="success" title="Placement recorded" style={styles.inlineAlert}>
+            {`Start date: ${formatDate(application.placement.start_date)}\nSalary: ₱${Number(application.placement.salary ?? 0).toLocaleString()}`}
+          </AlertBox>
+        ) : null}
+
+        {application.employer_remarks ? (
+          <View style={styles.remarks}>
+            <Text style={styles.remarksLabel}>EMPLOYER REMARKS</Text>
+            <Text style={styles.remarksText}>{application.employer_remarks}</Text>
           </View>
+        ) : null}
 
-          <View style={styles.detailGrid}>
-            <Detail label="Applied" value={formatDate(application.applied_at)} />
-            <Detail label="Match" value={`${Math.round(Number(application.match_percentage ?? 0))}%`} />
-          </View>
+        <View style={styles.cardFoot}>
+          <Text style={styles.meta}>
+            Applied {formatDate(application.applied_at)} · Match <Text style={styles.matchFigure}>{match}%</Text>
+          </Text>
+          <MaterialIcons name="chevron-right" size={22} color={colors.subtle} />
+        </View>
 
-          {applicationNextStep(application.status, application.interview) ? (
-            <View style={styles.nextStepBox}>
-              <Text style={styles.nextStepTitle}>What&apos;s next</Text>
-              <Text style={styles.nextStepText}>{applicationNextStep(application.status, application.interview)}</Text>
-            </View>
-          ) : null}
-
-          {application.interview && interviewPhase(application.interview) === 'ended' ? (
-            <AlertBox variant="info" title={interviewPhaseText(application.interview)} style={styles.infoAlert}>
-              {`${formatInterviewMode(application.interview.mode_of_interview)} on ${formatInterviewTime(application.interview.schedule)}\nThe employer will update this application with their decision.`}
-            </AlertBox>
-          ) : application.interview && application.status === 'interview' ? (
-            <AlertBox variant="warning" title={`Interview Schedule · ${interviewPhaseText(application.interview)}`} style={styles.infoAlert}>
-              {`${formatInterviewMode(application.interview.mode_of_interview)}\n${formatInterviewTime(application.interview.schedule)}\n${textFrom(application.interview.venue_or_link, 'Venue or link to follow')}`}
-            </AlertBox>
-          ) : null}
-
-          {application.placement ? (
-            <AlertBox variant="success" title="Placement Captured" style={styles.infoAlert}>
-              {`Start date: ${formatDate(application.placement.start_date)}\nSalary: PHP ${Number(application.placement.salary ?? 0).toLocaleString()}`}
-            </AlertBox>
-          ) : null}
-
-          {application.employer_remarks ? (
-            <View style={styles.noteBox}>
-              <Text style={styles.noteTitle}>Employer Remarks</Text>
-              <Text style={styles.noteText}>{application.employer_remarks}</Text>
-            </View>
-          ) : null}
-
-          <View style={styles.cardActions}>
-            <Button variant="outline" size="sm" onPress={() => router.push(`/(seeker)/applications/${application.apply_id}`)} style={styles.cardActionBtn}>
-              View details
-            </Button>
-            {application.can_withdraw ? (
-              <Button variant="danger" size="sm" onPress={onWithdraw} disabled={withdrawing} style={styles.cardActionBtn}>
-                {withdrawing ? 'Withdrawing...' : 'Withdraw'}
-              </Button>
-            ) : null}
-          </View>
-          <ApplicationReviewActions applicationId={application.apply_id} />
-        </Card>
+        {application.can_withdraw ? (
+          <Button variant="outline" size="sm" onPress={onWithdraw} disabled={withdrawing} style={styles.withdrawBtn} textStyle={styles.withdrawText}>
+            {withdrawing ? 'Withdrawing…' : 'Withdraw application'}
+          </Button>
+        ) : null}
+        <ApplicationReviewActions applicationId={application.apply_id} />
       </PressableScale>
     </Animated.View>
   )
 }
 
-function Detail({ label, value }: { label: string; value: string }) {
-  return (
-    <View style={styles.detailItem}>
-      <Text style={styles.detailLabel}>{label}</Text>
-      <Text style={styles.detailValue}>{value}</Text>
-    </View>
-  )
-}
-
 const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: colors.background },
-  content: { paddingHorizontal: spacing.lg, paddingTop: spacing.xl, paddingBottom: spacing.xxxl },
-  kicker: { color: colors.secondary, fontSize: typography.small, fontFamily: typography.family.bold, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: spacing.xs },
-  title: { color: colors.textPrimary, fontSize: typography.heading, fontFamily: typography.family.medium, marginBottom: spacing.xs },
-  subtitle: { color: colors.textSecondary, fontSize: typography.body, lineHeight: 20, marginBottom: spacing.lg },
-  statusCard: { marginBottom: spacing.lg, alignItems: 'center', justifyContent: 'center', gap: spacing.sm },
-  statusMessageCard: { borderColor: colors.border, backgroundColor: colors.surface },
-  loadingText: { color: colors.textSecondary, fontSize: typography.small, fontFamily: typography.family.medium, marginTop: spacing.xs },
-  alertBox: { marginBottom: spacing.lg },
-  summaryCard: { marginBottom: spacing.lg },
-  summaryLabel: { color: colors.secondary, fontSize: typography.small, fontFamily: typography.family.bold, marginBottom: spacing.xs },
-  summaryTitle: { color: colors.textPrimary, fontSize: typography.heading, fontFamily: typography.family.bold, marginBottom: spacing.xs },
-  summaryText: { color: colors.textSecondary, fontSize: typography.body, lineHeight: 20 },
-  applicationCard: { marginBottom: spacing.sm },
-  applicationHeader: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: spacing.sm },
-  employerLogo: { width: 48, height: 48, borderRadius: radii.md, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, resizeMode: 'contain' },
-  applicationTitleWrap: { flex: 1 },
-  jobTitle: { color: colors.textPrimary, fontSize: typography.title, lineHeight: 22, fontFamily: typography.family.bold },
-  company: { color: colors.textSecondary, fontSize: typography.small, fontFamily: typography.family.medium, marginTop: spacing.xs },
-  statusBadge: { alignSelf: 'flex-start', paddingVertical: 0, paddingHorizontal: spacing.sm },
-  jobMetaContainer: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: spacing.sm },
-  meta: { color: colors.textSecondary, fontSize: typography.small, lineHeight: 18 },
-  detailGrid: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md },
-  detailItem: { flex: 1, backgroundColor: colors.background, borderRadius: radii.md, padding: spacing.sm },
-  detailLabel: { color: colors.textSecondary, fontSize: typography.small, fontFamily: typography.family.bold, textTransform: 'uppercase', marginBottom: spacing.xs },
-  detailValue: { color: colors.textPrimary, fontSize: typography.body, fontFamily: typography.family.medium },
-  infoAlert: { marginTop: spacing.md },
-  nextStepBox: { backgroundColor: colors.infoBackground, borderWidth: 1, borderColor: colors.infoBorder, borderRadius: radii.md, padding: spacing.md, marginTop: spacing.md },
-  nextStepTitle: { color: colors.info, fontSize: typography.small, fontFamily: typography.family.bold, textTransform: 'uppercase', letterSpacing: 0.5 },
-  nextStepText: { color: colors.textPrimary, fontSize: typography.small, lineHeight: 20, marginTop: spacing.xs },
-  noteBox: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radii.md, padding: spacing.md, marginTop: spacing.md },
-  noteTitle: { color: colors.textPrimary, fontSize: typography.body, fontFamily: typography.family.bold, marginBottom: spacing.xs },
-  noteText: { color: colors.textSecondary, fontSize: typography.small, lineHeight: 20 },
-  cardActions: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md },
-  cardActionBtn: { flex: 1, marginBottom: 0 },
+  flexOne: { flex: 1 },
+  content: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xxxl },
+  kicker: { ...textStyles.label, color: colors.link },
+  title: { ...textStyles.display, color: colors.textPrimary, marginTop: 2 },
+  subtitle: { ...textStyles.body, color: colors.textSecondary, marginTop: spacing.xs },
+  subtitleStrong: { fontFamily: typography.family.bold, color: colors.textPrimary },
+
   search: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radii.md,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    fontSize: typography.body,
-    color: colors.textPrimary,
-    marginBottom: spacing.sm,
-  },
-  chipWrapper: { marginHorizontal: -spacing.lg, marginBottom: spacing.sm },
-  chipScrollContent: { paddingHorizontal: spacing.lg, paddingVertical: spacing.xs, gap: spacing.xs, flexDirection: 'row', alignItems: 'center' },
-  chip: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
+    height: 52,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
     borderRadius: radii.pill,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
+    backgroundColor: colors.sunken,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingLeft: spacing.lg,
+    paddingRight: spacing.xs,
+    marginTop: spacing.lg,
   },
-  chipActive: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
-  },
-  chipText: {
-    color: colors.textSecondary,
-    fontSize: typography.small,
-    fontFamily: typography.family.medium,
-  },
-  chipTextActive: {
-    color: colors.surface,
-    fontFamily: typography.family.bold,
-  },
+  searchInput: { flex: 1, color: colors.textPrimary, fontSize: 15, fontFamily: typography.family.medium, paddingVertical: 0 },
+  clearBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+  chipScroll: { marginHorizontal: -spacing.lg, marginTop: spacing.md },
+  chipRow: { gap: spacing.sm, paddingHorizontal: spacing.lg },
+  alertBox: { marginTop: spacing.md },
+
+  list: { gap: spacing.md, marginTop: spacing.lg },
+  card: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radii.lg, padding: spacing.lg, ...shadows.sm },
+  cardHead: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md },
+  jobTitle: { ...textStyles.bodyBold, fontSize: 16, lineHeight: 22, color: colors.textPrimary },
+  company: { ...textStyles.small, fontSize: 13, lineHeight: 18, color: colors.textSecondary, marginTop: 2 },
+
+  progress: { marginTop: spacing.md },
+  progressBars: { flexDirection: 'row', gap: spacing.xs },
+  progressBar: { flex: 1, height: 5, borderRadius: radii.pill },
+  progressLabel: { ...textStyles.small, color: colors.textSecondary, marginTop: spacing.xs + 2 },
+
+  interviewBox: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm + 2, marginTop: spacing.md, padding: spacing.md, borderRadius: radii.md, backgroundColor: colors.tint },
+  interviewWhen: { ...textStyles.smallBold, color: colors.textPrimary },
+  interviewWhere: { ...textStyles.small, color: colors.textSecondary, marginTop: 2 },
+  nextStep: { ...textStyles.small, lineHeight: 18, color: colors.textSecondary, marginTop: spacing.sm },
+  inlineAlert: { marginTop: spacing.md },
+  remarks: { marginTop: spacing.md, padding: spacing.md, borderRadius: radii.md, backgroundColor: colors.sunken },
+  remarksLabel: { ...textStyles.label, color: colors.subtle },
+  remarksText: { ...textStyles.small, lineHeight: 18, color: colors.textPrimary, marginTop: spacing.xs },
+
+  cardFoot: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing.md, paddingTop: spacing.md, borderTopWidth: 1, borderTopColor: colors.border },
+  meta: { ...textStyles.small, color: colors.subtle, flexShrink: 1 },
+  matchFigure: { fontFamily: typography.family.display, fontSize: 14, color: colors.figure },
+  withdrawBtn: { marginTop: spacing.md, borderColor: colors.errorBorder },
+  withdrawText: { color: colors.error },
 })

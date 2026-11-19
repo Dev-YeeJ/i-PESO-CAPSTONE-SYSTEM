@@ -40,7 +40,8 @@ export function StarInput({ label, value, onChange, error, disabled = false }: S
                 accessibilityState={{ checked, disabled }}
                 accessibilityLabel={`${star} of 5 stars, ${WORDS[star]}`}
               >
-                <MaterialIcons name="star" size={30} color={star <= value ? colors.accent : colors.border} />
+                {/* Blue, not amber: a rating isn't something the seeker earned. */}
+                <MaterialIcons name="star" size={30} color={star <= value ? colors.blue600 : colors.borderStrong} />
               </Pressable>
             )
           })}
@@ -81,7 +82,7 @@ export function Stars({ value, size = 'sm', label }: StarsProps) {
             <MaterialIcons name="star" size={iconSize} color={colors.border} style={StyleSheet.absoluteFill} />
             {full || half ? (
               <View style={[styles.fillClip, { width: half ? iconSize / 2 : iconSize, height: iconSize }]}>
-                <MaterialIcons name="star" size={iconSize} color={colors.accent} />
+                <MaterialIcons name="star" size={iconSize} color={colors.blue600} />
               </View>
             ) : null}
           </View>

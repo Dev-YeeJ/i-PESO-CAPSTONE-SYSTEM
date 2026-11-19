@@ -274,7 +274,7 @@ const styles = StyleSheet.create({
   },
   footerLink: {
     fontSize: typography.body,
-    color: colors.secondary,
+    color: colors.link,
     fontFamily: typography.family.bold,
   },
   submit: {

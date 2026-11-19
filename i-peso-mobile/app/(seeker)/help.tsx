@@ -2,7 +2,9 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native'
 import Animated, { FadeIn } from 'react-native-reanimated'
 import { useLocalSearchParams, useRouter } from 'expo-router'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useQuery } from '@tanstack/react-query'
+import * as SecureStore from 'expo-secure-store'
 import MaterialIcons from '@expo/vector-icons/MaterialIcons'
 import type { Faq, OfficeInfo } from '@/services/seekerService'
 import { seekerService } from '@/services/seekerService'
@@ -22,6 +24,12 @@ import { colors, radii, spacing, textStyles } from '@/theme'
 
 export const HELP_KEY = ['help', 'seeker'] as const
 
+// "Was this helpful?" is remembered per question on this device, as the website does in
+// localStorage (HelpCenter.jsx's voteKey) — the server keeps one anonymous vote per reader, so
+// the buttons should show the answer already given instead of looking unanswered next visit.
+const faqVoteKey = (id: number) => `ipeso-faq-vote-${id}`
+type FaqVote = 'yes' | 'no'
+
 /** Every word of the search must appear in the question or answer (as on the website). */
 function matches(faq: Faq, term: string) {
   const haystack = `${faq.question} ${faq.answer}`.toLowerCase()
@@ -35,6 +43,7 @@ function backTargetFor(from: string | undefined): string {
 
 export default function HelpScreen() {
   const router = useRouter()
+  const insets = useSafeAreaInsets()
   const m = useMotion()
   // A link can open one question directly as faq=12 (the website's #faq-12).
   const { faq: faqParam, from } = useLocalSearchParams<{ faq?: string; from?: string }>()
@@ -48,7 +57,8 @@ export default function HelpScreen() {
   const [openId, setOpenId] = useState<number | null>(null)
   const [requestedId, setRequestedId] = useState<string | null>(null)
   const [missingNotice, setMissingNotice] = useState(false)
-  const [votes, setVotes] = useState<Record<number, 'yes' | 'no'>>({})
+  const [votes, setVotes] = useState<Record<number, FaqVote>>({})
+  const [votingIds, setVotingIds] = useState<Set<number>>(() => new Set())
 
   const scrollRef = useRef<ScrollView>(null)
   const listY = useRef(0)
@@ -107,9 +117,43 @@ export default function HelpScreen() {
     return () => clearTimeout(timer)
   }, [noResults, trimmed])
 
-  const vote = (faqId: number, helpful: boolean) => {
-    setVotes((current) => ({ ...current, [faqId]: helpful ? 'yes' : 'no' }))
-    seekerService.voteFaq(faqId, helpful).catch(() => undefined) // best-effort, as on the website
+  // Restore the answers already given on this device once the questions are known.
+  useEffect(() => {
+    if (!faqs.length) return undefined
+    let active = true
+    Promise.all(faqs.map(async (faq) => {
+      try {
+        const saved = await SecureStore.getItemAsync(faqVoteKey(faq.id))
+        return saved === 'yes' || saved === 'no' ? ([faq.id, saved] as const) : null
+      } catch {
+        return null // unreadable store: the buttons just start unanswered
+      }
+    })).then((entries) => {
+      if (!active) return
+      const saved = Object.fromEntries(entries.filter((entry) => entry !== null)) as Record<number, FaqVote>
+      // A vote cast while this was loading wins over the stored one.
+      setVotes((current) => ({ ...saved, ...current }))
+    })
+    return () => { active = false }
+  }, [faqs])
+
+  // Mirrors the website's FaqFeedback.send: show the choice at once, remember it, send it
+  // best-effort, and keep the buttons disabled while that one request is in flight.
+  const vote = async (faqId: number, helpful: boolean) => {
+    const value: FaqVote = helpful ? 'yes' : 'no'
+    setVotingIds((current) => new Set(current).add(faqId))
+    setVotes((current) => ({ ...current, [faqId]: value }))
+    SecureStore.setItemAsync(faqVoteKey(faqId), value).catch(() => undefined) // the vote still counts
+    try {
+      await seekerService.voteFaq(faqId, helpful)
+    } catch {
+      // feedback is best-effort, as on the website
+    }
+    setVotingIds((current) => {
+      const next = new Set(current)
+      next.delete(faqId)
+      return next
+    })
   }
 
   return (
@@ -117,7 +161,7 @@ export default function HelpScreen() {
       <ScreenHeader title="Help & FAQs" onBack={() => router.replace(backTargetFor(from) as never)} />
       <ScrollView
         ref={scrollRef}
-        contentContainerStyle={styles.content}
+        contentContainerStyle={[styles.content, { paddingBottom: spacing.xxxl + insets.bottom }]}
         keyboardShouldPersistTaps="handled"
         refreshControl={<RefreshControl refreshing={help.isRefetching} onRefresh={() => help.refetch()} tintColor={colors.info} />}
       >
@@ -233,9 +277,10 @@ export default function HelpScreen() {
                                       <Pressable
                                         key={value}
                                         onPress={() => vote(faq.id, value === 'yes')}
+                                        disabled={votingIds.has(faq.id)}
                                         style={[styles.voteBtn, active && styles.voteBtnActive]}
                                         accessibilityRole="button"
-                                        accessibilityState={{ selected: active }}
+                                        accessibilityState={{ selected: active, disabled: votingIds.has(faq.id) }}
                                       >
                                         <MaterialIcons name={value === 'yes' ? 'thumb-up-off-alt' : 'thumb-down-off-alt'} size={14} color={colors.textSecondary} />
                                         <Text style={styles.voteBtnText}>{value === 'yes' ? 'Yes' : 'No'}</Text>
@@ -314,7 +359,7 @@ function OfficeContactCard({ office }: { office: OfficeInfo | null }) {
 const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: colors.background },
   content: { padding: spacing.lg, paddingBottom: spacing.xxxl },
-  kicker: { ...textStyles.label, color: colors.secondary, textTransform: 'uppercase', letterSpacing: 1 },
+  kicker: { ...textStyles.label, color: colors.link, textTransform: 'uppercase', letterSpacing: 1 },
   intro: { ...textStyles.small, color: colors.textSecondary, lineHeight: 18, marginTop: spacing.xs, marginBottom: spacing.md },
   notice: { marginBottom: spacing.md },
   searchBox: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, borderWidth: 1, borderColor: colors.borderStrong, borderRadius: radii.md, paddingHorizontal: spacing.md, minHeight: 48 },
@@ -345,5 +390,5 @@ const styles = StyleSheet.create({
   contactRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md, paddingVertical: spacing.sm, minHeight: 44 },
   contactLabel: { ...textStyles.label, color: colors.subtle, textTransform: 'uppercase' },
   contactValue: { ...textStyles.small, color: colors.textPrimary, lineHeight: 18 },
-  contactLink: { ...textStyles.smallBold, color: colors.secondary, marginTop: 2 },
+  contactLink: { ...textStyles.smallBold, color: colors.link, marginTop: 2 },
 })

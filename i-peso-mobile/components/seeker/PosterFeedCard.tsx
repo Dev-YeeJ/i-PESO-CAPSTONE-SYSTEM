@@ -12,9 +12,11 @@ import { useToast } from '@/stores/toastStore'
 import { Card } from '@/components/ui/Card'
 import { ImagePreviewModal } from '@/components/ui/ImagePreviewModal'
 import { PressableScale } from '@/components/ui/PressableScale'
+import { STRONG_MATCH } from '@/components/ui/MatchRing'
 import { colors, radii, shadows, spacing, typography } from '@/theme'
 
-const avatarTones = [colors.info, colors.secondary, colors.success, colors.warning, colors.error]
+// Blue shades only (redesign palette) — every one carries white initials at WCAG AA.
+const avatarTones = [colors.blue700, colors.blue600, colors.blue800, colors.blue900, colors.primary]
 const toneFor = (name?: string | null) => {
   const source = name || '?'
   let sum = 0
@@ -99,8 +101,8 @@ export function PosterFeedCard({ poster, index }: { poster: JobFairPoster; index
           <Text style={styles.meta} numberOfLines={1}>{metaLine}</Text>
         </View>
         {poster.match_percentage != null ? (
-          <View style={styles.matchBadge}>
-            <Text style={styles.matchBadgeText}>{Math.round(poster.match_percentage)}% match</Text>
+          <View style={[styles.matchBadge, poster.match_percentage >= STRONG_MATCH && styles.matchBadgeEarned]}>
+            <Text style={[styles.matchBadgeText, poster.match_percentage >= STRONG_MATCH && styles.matchBadgeTextEarned]}>{Math.round(poster.match_percentage)}% match</Text>
           </View>
         ) : null}
       </View>
@@ -233,8 +235,10 @@ const styles = StyleSheet.create({
   card: { marginBottom: spacing.md },
   content: { gap: 0 },
   header: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingBottom: spacing.sm },
-  matchBadge: { backgroundColor: colors.successBackground, borderWidth: 1, borderColor: colors.successBorder, borderRadius: radii.pill, paddingHorizontal: spacing.sm, paddingVertical: 4 },
-  matchBadgeText: { color: colors.success, fontSize: 10, fontFamily: typography.family.bold, textTransform: 'uppercase', letterSpacing: 0.5 },
+  matchBadge: { backgroundColor: colors.tint, borderWidth: 1, borderColor: colors.tintBorder, borderRadius: radii.pill, paddingHorizontal: spacing.sm, paddingVertical: 4 },
+  matchBadgeEarned: { backgroundColor: colors.accent, borderColor: colors.accent },
+  matchBadgeText: { color: colors.iconBlue, fontSize: 10, fontFamily: typography.family.bold, textTransform: 'uppercase', letterSpacing: 0.5 },
+  matchBadgeTextEarned: { color: colors.accentText },
   avatar: { width: 40, height: 40, borderRadius: radii.pill, alignItems: 'center', justifyContent: 'center' },
   avatarText: { color: colors.white, fontSize: typography.small, fontFamily: typography.family.bold },
   employerLogo: { width: 40, height: 40, borderRadius: radii.pill, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, resizeMode: 'contain' },

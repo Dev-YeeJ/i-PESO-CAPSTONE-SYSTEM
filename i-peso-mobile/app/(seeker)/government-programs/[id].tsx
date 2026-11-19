@@ -16,7 +16,7 @@ import { ScreenHeader } from '@/components/ui/ScreenHeader'
 import { ScreenSkeleton } from '@/components/ui/ScreenSkeleton'
 import { SectionHeader } from '@/components/ui/SectionHeader'
 import { apiErrorMessage } from '@/utils/apiError'
-import { colors, spacing, typography } from '@/theme'
+import { colors, radii, spacing, typography } from '@/theme'
 
 const CATEGORY_LABELS: Record<string, string> = {
   job_fair: 'Job Fair',
@@ -163,19 +163,18 @@ export default function ProgramDetailScreen() {
           </Text>
         ) : null}
 
-        <Card padding="md" style={styles.infoCard}>
-          <Detail label="Venue" value={textFrom(program.location_address || program.venue, 'PESO Office, Urdaneta City Hall')} />
-          <Detail label="Application Deadline" value={formatDate(program.application_deadline)} />
-          <Detail label="Slots" value={slotsText} />
-          {program.target_industry ? (
-            <Detail label="Target Industry" value={textFrom(program.target_industry, 'Not listed')} />
-          ) : null}
-        </Card>
+        {/* Facts as a tile grid (redesign "17 — Program details"). */}
+        <View style={styles.factGrid}>
+          <FactTile icon="event-busy" label="Deadline" value={formatDate(program.application_deadline)} />
+          <FactTile icon="group" label="Slots" value={slotsText} />
+          <FactTile icon="place" label="Venue" value={textFrom(program.location_address || program.venue, 'PESO Office, Urdaneta City Hall')} />
+          {program.target_industry ? <FactTile icon="factory" label="Target industry" value={textFrom(program.target_industry, 'Not listed')} /> : null}
+        </View>
 
         {program.eligibility ? (
           <>
-            <SectionHeader title="Eligibility Estimate" />
-            <Card padding="md" style={styles.infoCard}>
+            <SectionHeader title="Eligibility estimate" />
+            <Card padding="md" style={[styles.infoCard, styles.eligCard]}>
               {!program.eligibility.breakdown.length ? (
                 <AlertBox variant="info" style={styles.eligibilityNotice}>
                   No profile-based criteria are configured for this category. Review the listed requirements and confirm eligibility with PESO in person.
@@ -194,7 +193,7 @@ export default function ProgramDetailScreen() {
                   <MaterialIcons
                     name={item.known === false ? 'help-outline' : item.met ? 'check-circle' : 'cancel'}
                     size={18}
-                    color={item.known === false ? colors.warning : item.met ? colors.success : colors.error}
+                    color={item.known === false ? colors.subtle : item.met ? colors.link : colors.error}
                   />
                   <View style={styles.eligBody}>
                     <Text style={styles.eligLabel}>
@@ -222,9 +221,12 @@ export default function ProgramDetailScreen() {
 
 
 
-        <SectionHeader title="How to Apply (In-Person)" />
+        <SectionHeader title="How to apply (in person)" />
         {applicationSteps.map((step, index) => (
-          <BulletRow key={`${step}-${index}`} text={`${index + 1}. ${step}`} />
+          <View key={`${step}-${index}`} style={styles.stepRow}>
+            <View style={styles.stepNum}><Text style={styles.stepNumText}>{index + 1}</Text></View>
+            <Text style={styles.stepText}>{step}</Text>
+          </View>
         ))}
 
         <SectionHeader title="Contact" />
@@ -267,6 +269,18 @@ function Detail({ label, value }: { label: string; value: string }) {
   )
 }
 
+function FactTile({ icon, label, value }: { icon: React.ComponentProps<typeof MaterialIcons>['name']; label: string; value: string }) {
+  return (
+    <View style={styles.factTile}>
+      <View style={styles.factLabelRow}>
+        <MaterialIcons name={icon} size={14} color={colors.subtle} />
+        <Text style={styles.factLabel}>{label.toUpperCase()}</Text>
+      </View>
+      <Text style={styles.factValue}>{value}</Text>
+    </View>
+  )
+}
+
 function BulletRow({ text }: { text: string }) {
   return (
     <View style={styles.bulletRow}>
@@ -279,10 +293,20 @@ function BulletRow({ text }: { text: string }) {
 const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: colors.background },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: spacing.md, padding: spacing.xl },
-  content: { padding: spacing.xl, paddingBottom: spacing.xxxl },
+  content: { padding: spacing.lg, paddingBottom: spacing.xxxl },
   header: { marginBottom: spacing.lg },
-  programTitle: { color: colors.textPrimary, fontSize: typography.heading, lineHeight: 30, fontFamily: typography.family.bold },
-  badgeRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md },
+  programTitle: { color: colors.textPrimary, fontSize: typography.heading, lineHeight: 28, fontFamily: typography.family.bold },
+  badgeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.md },
+  factGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.sm },
+  factTile: { flexBasis: '48%', flexGrow: 1, backgroundColor: colors.sunken, borderRadius: radii.md, padding: spacing.md },
+  factLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  factLabel: { color: colors.subtle, fontSize: typography.label, lineHeight: 14, fontFamily: typography.family.bold, letterSpacing: 0.4 },
+  factValue: { color: colors.textPrimary, fontSize: typography.body, lineHeight: 20, fontFamily: typography.family.bold, marginTop: 4 },
+  eligCard: { backgroundColor: colors.tint, borderColor: colors.tintBorder, shadowOpacity: 0, elevation: 0 },
+  stepRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md, marginBottom: spacing.md },
+  stepNum: { width: 26, height: 26, borderRadius: 13, backgroundColor: colors.tintStrong, alignItems: 'center', justifyContent: 'center' },
+  stepNumText: { color: colors.iconBlue, fontSize: 13, fontFamily: typography.family.bold },
+  stepText: { flex: 1, color: colors.textPrimary, fontSize: typography.body, lineHeight: 20 },
   description: { color: colors.secondaryText, fontSize: typography.body, lineHeight: 22, marginBottom: spacing.lg },
   infoCard: { marginBottom: spacing.lg },
   detailRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: spacing.xs, borderBottomWidth: 1, borderBottomColor: colors.border },

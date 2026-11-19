@@ -10,6 +10,7 @@ import { downloadAndShare } from '@/utils/fileTransfer'
 import { textFrom } from '@/utils/seekerView'
 import { AlertBox } from '@/components/ui/AlertBox'
 import { Badge } from '@/components/ui/Badge'
+import { STRONG_MATCH } from '@/components/ui/MatchRing'
 import { EmployerPreferenceChip } from '@/components/ui/EmployerPreferenceChip'
 import { Card } from '@/components/ui/Card'
 import { ImagePreviewModal } from '@/components/ui/ImagePreviewModal'
@@ -136,9 +137,10 @@ export default function EmployerBoothScreen() {
                     {poster.posted_at ? <Text style={styles.posterMeta}>Posted {timeAgo(poster.posted_at)}</Text> : null}
                   </View>
                   {poster.match_percentage != null ? (
-                    <View style={styles.matchBadge}>
-                      <MaterialIcons name="auto-awesome" size={12} color={colors.success} />
-                      <Text style={styles.matchBadgeText}>Up to {Math.round(poster.match_percentage)}% match</Text>
+                    // Amber only when the match is strong (earned); otherwise quiet blue.
+                    <View style={[styles.matchBadge, poster.match_percentage >= STRONG_MATCH && styles.matchBadgeEarned]}>
+                      <MaterialIcons name="auto-awesome" size={12} color={poster.match_percentage >= STRONG_MATCH ? colors.accentText : colors.iconBlue} />
+                      <Text style={[styles.matchBadgeText, poster.match_percentage >= STRONG_MATCH && styles.matchBadgeTextEarned]}>Up to {Math.round(poster.match_percentage)}% match</Text>
                     </View>
                   ) : null}
                 </View>
@@ -304,7 +306,7 @@ const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: colors.background },
   content: { paddingHorizontal: spacing.lg, paddingTop: spacing.lg, paddingBottom: spacing.xxxl },
   flexShrink: { flexShrink: 1 },
-  kicker: { color: colors.secondary, fontSize: typography.small, fontFamily: typography.family.bold, textTransform: 'uppercase', letterSpacing: 0.5 },
+  kicker: { color: colors.link, fontSize: typography.small, fontFamily: typography.family.bold, textTransform: 'uppercase', letterSpacing: 0.5 },
   subtitle: { color: colors.textSecondary, fontSize: typography.small, marginTop: 2, marginBottom: spacing.lg },
   sectionTitle: { color: colors.textPrimary, fontSize: typography.small, fontFamily: typography.family.bold, textTransform: 'uppercase', letterSpacing: 0.5 },
   sectionHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing.xl, marginBottom: spacing.md },
@@ -321,7 +323,7 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.92)',
+    backgroundColor: colors.surface,
     ...shadows.card,
   },
   posterNavBtnLeft: { left: spacing.sm },
@@ -345,8 +347,10 @@ const styles = StyleSheet.create({
   posterFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm, paddingTop: spacing.sm },
   posterFileName: { color: colors.textPrimary, fontSize: typography.small, fontFamily: typography.family.bold },
   posterMeta: { color: colors.subtle, fontSize: 11, marginTop: 1 },
-  matchBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.successBackground, borderWidth: 1, borderColor: colors.successBorder, borderRadius: radii.pill, paddingHorizontal: spacing.sm, paddingVertical: 4 },
-  matchBadgeText: { color: colors.success, fontSize: 10, fontFamily: typography.family.bold, textTransform: 'uppercase', letterSpacing: 0.4 },
+  matchBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.tint, borderWidth: 1, borderColor: colors.tintBorder, borderRadius: radii.pill, paddingHorizontal: spacing.sm, paddingVertical: 4 },
+  matchBadgeEarned: { backgroundColor: colors.accent, borderColor: colors.accent },
+  matchBadgeText: { color: colors.iconBlue, fontSize: 10, fontFamily: typography.family.bold, textTransform: 'uppercase', letterSpacing: 0.4 },
+  matchBadgeTextEarned: { color: colors.accentText },
 
   emptyCard: { alignItems: 'center' },
   emptyText: { color: colors.textSecondary, fontSize: typography.body, textAlign: 'center' },

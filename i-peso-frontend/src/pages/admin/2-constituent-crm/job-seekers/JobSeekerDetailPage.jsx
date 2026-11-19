@@ -160,7 +160,12 @@ export default function JobSeekerDetailPage() {
         <Button variant="ghost" icon={ArrowLeft} onClick={() => navigate('/admin/job-seekers')}>
           Job Seeker Management
         </Button>
-        <DownloadNSRPButton seekerId={seeker.seeker_id ?? profile.seeker_id} seekerName={name} />
+        <DownloadNSRPButton
+          seekerId={seeker.seeker_id ?? profile.seeker_id}
+          seekerName={name}
+          lastName={seeker.last_name ?? profile.last_name}
+          firstName={seeker.first_name ?? profile.first_name}
+        />
       </div>
 
       {error && (

@@ -62,8 +62,8 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     gap: spacing.sm,
     borderWidth: 1,
-    borderRadius: radii.lg,
-    padding: spacing.lg,
+    borderRadius: radii.md,
+    padding: spacing.md,
   },
   icon: {
     marginTop: 1,
@@ -77,6 +77,8 @@ const styles = StyleSheet.create({
   },
   body: {
     ...textStyles.body,
+    fontSize: 13,
+    lineHeight: 19,
   },
   action: {
     marginTop: spacing.sm,

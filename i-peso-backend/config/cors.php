@@ -28,7 +28,8 @@ return [
 
     'allowed_headers' => ['*'],
 
-    'exposed_headers' => [],
+    // Lets the admin SPA (another origin in production) read download filenames, e.g. the NSRP PDF.
+    'exposed_headers' => ['Content-Disposition'],
 
     'max_age' => (int) env('CORS_MAX_AGE', 3600),
 

@@ -92,7 +92,7 @@ const styles = StyleSheet.create({
   card: { borderWidth: 1, borderColor: colors.border, borderRadius: radii.lg, backgroundColor: colors.surface, padding: spacing.lg },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
   title: { ...textStyles.smallBold, color: colors.textPrimary },
-  link: { ...textStyles.smallBold, color: colors.secondary },
+  link: { ...textStyles.smallBold, color: colors.link },
   loading: { gap: spacing.sm, marginTop: spacing.md },
   rows: { gap: spacing.sm, marginTop: spacing.md },
   row: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'baseline', justifyContent: 'space-between', columnGap: spacing.md, rowGap: 2 },

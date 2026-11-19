@@ -59,7 +59,7 @@ function CompanyLogoInner({ uri, name, size = 48, fallback, style }: CompanyLogo
 const styles = StyleSheet.create({
   frame: { borderRadius: radii.md, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, overflow: 'hidden' },
   image: { width: '100%', height: '100%' },
-  initials: { borderRadius: radii.md, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.blue50 },
-  initialsText: { ...textStyles.smallBold, color: colors.blue700 },
-  initialsLarge: { ...textStyles.title, color: colors.blue700 },
+  initials: { borderRadius: radii.md, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.tint },
+  initialsText: { ...textStyles.smallBold, color: colors.iconBlue },
+  initialsLarge: { ...textStyles.title, color: colors.iconBlue },
 })

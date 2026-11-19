@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Image, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { Linking, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useQueryClient, useQuery } from '@tanstack/react-query'
@@ -29,7 +29,9 @@ import { Card } from '@/components/ui/Card'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { PressableScale } from '@/components/ui/PressableScale'
 import { ScreenHeader } from '@/components/ui/ScreenHeader'
-import { MatchRing } from '@/components/ui/MatchRing'
+import { MatchRing, STRONG_MATCH } from '@/components/ui/MatchRing'
+import { CompanyLogo } from '@/components/seeker/CompanyLogo'
+import { LeafletMap } from '@/components/seeker/LeafletMap'
 import { Skeleton, SkeletonGroup } from '@/components/ui/Skeleton'
 import { SuccessSheet } from '@/components/ui/SuccessSheet'
 import { ReportConcernSheet } from '@/components/safety/ReportConcernSheet'
@@ -142,6 +144,17 @@ export default function JobDetailsScreen() {
   const matched = job.matched_skills ?? []
   const missing = job.missing_skills ?? []
   const breakdown = job.match_breakdown
+  const matchValue = Math.round(Number(job.match_percentage ?? job.match?.percentage ?? 0))
+  const strongMatch = matchValue >= STRONG_MATCH
+  const lat = Number(job.latitude)
+  const lng = Number(job.longitude)
+  const coords = job.latitude != null && job.longitude != null && Number.isFinite(lat) && Number.isFinite(lng) && (lat !== 0 || lng !== 0)
+    ? { latitude: lat, longitude: lng }
+    : null
+  const openDirections = () => {
+    if (!coords) return
+    Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${coords.latitude},${coords.longitude}`).catch(() => undefined)
+  }
 
   const confirmApply = () => {
     if (applied || applying) return
@@ -180,77 +193,73 @@ export default function JobDetailsScreen() {
       <ScreenHeader title="Job Details" onBack={() => router.replace(backTarget as never)} />
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        {/* The identity block. Everything a seeker needs to decide "is this worth reading?"
-            sits above the fold: title, employer, match, and pay. */}
-        <LinearGradient
-          colors={[...gradients.brand]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.hero}
-        >
-          <View style={styles.headerTop}>
-            {job.employer?.company_logo_url ? (
-              <Image source={{ uri: job.employer.company_logo_url }} style={styles.heroLogo} />
-            ) : null}
-            <View style={styles.jobTitleWrap}>
-              <Text style={styles.jobTitle}>{textFrom(job.job_title, 'Untitled job')}</Text>
-              {job.employer?.employer_id ? (
-                <PressableScale
-                  scaleTo="buttonPress"
-                  ripple={null}
-                  onPress={() => router.push({ pathname: '/(seeker)/employers/[id]', params: { id: String(job.employer!.employer_id), from: 'job', fromId: String(id) } })}
-                  accessibilityRole="link"
-                >
-                  <Text style={[styles.company, styles.companyLink]}>{jobCompany(job)}</Text>
-                </PressableScale>
-              ) : (
-                <Text style={styles.company}>{jobCompany(job)}</Text>
-              )}
-            </View>
-            <View style={styles.ringWell}>
-              <MatchRing
-                percentage={job.match_percentage ?? job.match?.percentage ?? 0}
-                size={72}
-                strokeWidth={6}
-                trackColor={colors.blue200}
-              />
-            </View>
+        {/* Identity on white (redesign "11 — Job details"): what the job is and who's hiring. */}
+        <View style={styles.identity}>
+          <CompanyLogo uri={job.employer?.company_logo_url} name={jobCompany(job)} size={60} />
+          <View style={styles.jobTitleWrap}>
+            <Text style={styles.jobTitle} accessibilityRole="header">{textFrom(job.job_title, 'Untitled job')}</Text>
+            {job.employer?.employer_id ? (
+              <PressableScale
+                scaleTo="buttonPress"
+                ripple={null}
+                onPress={() => router.push({ pathname: '/(seeker)/employers/[id]', params: { id: String(job.employer!.employer_id), from: 'job', fromId: String(id) } })}
+                style={styles.companyLinkRow}
+                accessibilityRole="link"
+                accessibilityLabel={`${jobCompany(job)}, open employer profile`}
+              >
+                <Text style={styles.companyLink}>{jobCompany(job)}</Text>
+                <MaterialIcons name="chevron-right" size={18} color={colors.link} />
+              </PressableScale>
+            ) : (
+              <Text style={styles.company}>{jobCompany(job)}</Text>
+            )}
           </View>
-
-          {/* Salary in the serif face — with the match score, the number a seeker actually
-              weighs. It was previously the second row of an eight-row table. */}
-          <View style={styles.salaryBlock}>
-            <Text style={styles.salaryLabel}>SALARY</Text>
-            <Text style={styles.salaryValue} numberOfLines={2}>{formatSalary(job)}</Text>
-          </View>
-
-          <View style={styles.heroFacts}>
-            <HeroFact icon="place" text={jobLocation(job)} />
-            {job.distance_km ? <HeroFact icon="near-me" text={`${job.distance_km} km away`} /> : null}
-            <HeroFact icon="business-center" text={titleCase(job.employment_type, 'Not listed')} />
-          </View>
-        </LinearGradient>
+        </View>
 
         <View style={styles.badgeRow}>
-          {job.job_fair?.is_available_at_job_fair ? <Badge variant="warning">Available at Job Fair</Badge> : null}
+          <Fact icon="place" text={[job.distance_km ? `${Number(job.distance_km).toFixed(1)} km` : '', jobLocation(job)].filter(Boolean).join(' · ')} />
+          <Fact icon="business-center" text={titleCase(job.employment_type, 'Type not listed')} />
+          {job.job_fair?.is_available_at_job_fair ? <Badge variant="info">Available at Job Fair</Badge> : null}
           {job.upskill?.recommended ? <Badge variant="info">Upskill recommended</Badge> : null}
-          {applied ? <Badge variant="info">{titleCase(job.application_status, 'Applied')}</Badge> : null}
+          {applied ? <Badge variant="brand">{titleCase(job.application_status, 'Applied')}</Badge> : null}
         </View>
 
         <EmployerPreferenceChip job={job} style={styles.preferenceChip} />
 
         {applyError ? <AlertBox variant="danger" style={styles.applyErrorBox}>{applyError}</AlertBox> : null}
 
-        {breakdown ? (
-          <>
-            <Text style={styles.sectionTitle}>Why you match</Text>
-            <Card padding="md" style={styles.infoCard}>
-              <FactorBar label="Skills" percentage={breakdown.skills ?? 0} index={0} />
-              <FactorBar label="Occupation" percentage={breakdown.occupation ?? 0} index={1} />
-              <FactorBar label="Experience" percentage={breakdown.experience ?? 0} index={2} />
-              <FactorBar label="Education" percentage={breakdown.education ?? 0} index={3} last />
-            </Card>
-          </>
+        {/* Salary hero — the serif figure is one of the two numbers a seeker actually weighs. */}
+        <LinearGradient colors={[...gradients.brand]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.salaryCard}>
+          <View style={styles.salaryDecor} pointerEvents="none" />
+          <Text style={styles.salaryLabel}>SALARY</Text>
+          <Text style={styles.salaryValue} numberOfLines={2}>{formatSalary(job)}</Text>
+        </LinearGradient>
+
+        {/* Why you match — amber only when the match is strong (earned). */}
+        {!job.match_deferred ? (
+          <Card padding="md" style={styles.matchCard}>
+            <View style={styles.matchHead}>
+              <MatchRing percentage={matchValue} size={72} strokeWidth={6} earned={strongMatch} showPercent />
+              <View style={styles.flexOne}>
+                {strongMatch ? <Badge variant="earned" style={styles.matchBadge}>★ Strong match</Badge> : null}
+                <Text style={styles.matchTitle}>Why you match</Text>
+                {requiredSkills.length ? (
+                  <Text style={styles.matchSub}>You have {requiredSkills.filter((s) => matched.includes(s)).length} of {requiredSkills.length} required skills.</Text>
+                ) : null}
+              </View>
+            </View>
+            {breakdown ? (
+              <View style={styles.factorList}>
+                <FactorBar label="Skills" percentage={breakdown.skills ?? 0} index={0} />
+                <FactorBar label="Occupation" percentage={breakdown.occupation ?? 0} index={1} />
+                <FactorBar label="Experience" percentage={breakdown.experience ?? 0} index={2} />
+                <FactorBar label="Education" percentage={breakdown.education ?? 0} index={3} last />
+              </View>
+            ) : null}
+            {job.certificate_match?.matched ? (
+              <Badge variant="earned" style={styles.certBadge}>Certificate match</Badge>
+            ) : null}
+          </Card>
         ) : null}
 
         <Text style={styles.sectionTitle}>Description</Text>
@@ -263,7 +272,7 @@ export default function JobDetailsScreen() {
               {requiredSkills.map((skill) => (
                 <View key={skill} style={[styles.tag, matched.includes(skill) && styles.tagMatched]}>
                   {matched.includes(skill) ? (
-                    <MaterialIcons name="check" size={13} color={colors.success} />
+                    <MaterialIcons name="check" size={13} color={colors.figure} />
                   ) : null}
                   <Text style={[styles.tagText, matched.includes(skill) && styles.tagTextMatched]}>{skill}</Text>
                 </View>
@@ -287,7 +296,7 @@ export default function JobDetailsScreen() {
                   accessibilityLabel={`See learning resources for ${gap.skill}`}
                 >
                   <Text style={styles.tagMissingText}>{gap.skill}</Text>
-                  <MaterialIcons name="north-east" size={13} color={colors.error} />
+                  <MaterialIcons name="north-east" size={13} color={colors.iconBlue} />
                 </PressableScale>
               ))}
             </View>
@@ -325,6 +334,27 @@ export default function JobDetailsScreen() {
           ) : null}
         </Card>
 
+        {coords ? (
+          <>
+            <Text style={styles.sectionTitle}>Location</Text>
+            <View style={styles.mapCard}>
+              {/* Preview only — touches pass through so the page scroll never gets trapped. */}
+              <View style={styles.mapFrame} pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+                <LeafletMap region={coords} markers={[]} onMarkerPress={() => undefined} />
+              </View>
+              <View style={styles.mapFoot}>
+                <View style={styles.flexOne}>
+                  <Text style={styles.mapPlace} numberOfLines={2}>{jobLocation(job)}</Text>
+                  {job.distance_km ? <Text style={styles.mapMeta}>{Number(job.distance_km).toFixed(1)} km from your address</Text> : null}
+                </View>
+                <Button variant="outline" size="sm" icon="directions" onPress={openDirections} accessibilityLabel="Get directions in Maps">
+                  Directions
+                </Button>
+              </View>
+            </View>
+          </>
+        ) : null}
+
         {job.employer?.employer_id ? (
           <View style={styles.ratingSummary}>
             <CompanyRatingSummary
@@ -356,7 +386,7 @@ export default function JobDetailsScreen() {
           <MaterialIcons
             name={job.is_saved ? 'bookmark' : 'bookmark-border'}
             size={22}
-            color={job.is_saved ? colors.blue700 : colors.textSecondary}
+            color={job.is_saved ? colors.iconBlue : colors.textSecondary}
           />
         </PressableScale>
 
@@ -461,8 +491,8 @@ export default function JobDetailsScreen() {
             Your i-PESO profile will be shared with this employer and PESO staff for review.
           </Text>
           <View style={styles.applyConfirmNote}>
-            <MaterialIcons name="verified-user" size={16} color={colors.success} />
-            <Text style={styles.applyConfirmNoteText}>You can track your application status in Applications.</Text>
+            <MaterialIcons name="verified-user" size={16} color={colors.link} />
+            <Text style={styles.applyConfirmNoteText}>You can follow every step in the Applied tab.</Text>
           </View>
         </View>
       </BottomSheet>
@@ -471,7 +501,7 @@ export default function JobDetailsScreen() {
         visible={applySuccess}
         title="Application submitted"
         message={`${jobCompany(job)} and PESO staff can now see your profile. You'll get a notification when the status changes.`}
-        primaryLabel="Track it"
+        primaryLabel="Go to Applied"
         onPrimary={() => {
           setApplySuccess(false)
           router.push('/(seeker)/applications')
@@ -492,11 +522,12 @@ export default function JobDetailsScreen() {
   )
 }
 
-function HeroFact({ icon, text }: { icon: React.ComponentProps<typeof MaterialIcons>['name']; text: string }) {
+function Fact({ icon, text }: { icon: React.ComponentProps<typeof MaterialIcons>['name']; text: string }) {
+  if (!text) return null
   return (
-    <View style={styles.heroFact}>
-      <MaterialIcons name={icon} size={14} color={colors.blue200} />
-      <Text style={styles.heroFactText} numberOfLines={1}>{text}</Text>
+    <View style={styles.fact}>
+      <MaterialIcons name={icon} size={14} color={colors.textSecondary} />
+      <Text style={styles.factText} numberOfLines={1}>{text}</Text>
     </View>
   )
 }
@@ -540,13 +571,15 @@ function FactorBar({
 
   // Strength is carried by the bar's length and its stated percentage; colour only reinforces
   // it, so the meaning survives for colour-blind users.
-  const color = clamped >= 70 ? colors.success : clamped >= 40 ? colors.blue600 : colors.textSecondary
+  // All-blue per the redesign: depth of blue tracks strength (no green outside status chips).
+  const color = clamped >= 70 ? colors.blue700 : clamped >= 40 ? colors.blue500 : colors.blue300
 
   return (
     <View style={[styles.factorRow, last && styles.factorRowLast]}>
       <View style={styles.factorHeader}>
         <Text style={styles.factorLabel}>{label}</Text>
-        <Text style={[styles.factorValue, { color }]}>{clamped}%</Text>
+        {/* Text stays navy for WCAG AA; only the bar fill carries the blue depth. */}
+        <Text style={[styles.factorValue, { color: colors.textPrimary }]}>{clamped}%</Text>
       </View>
       <View style={styles.factorTrack}>
         <Animated.View style={[styles.factorFill, { backgroundColor: color }, fillStyle]} />
@@ -562,35 +595,40 @@ const styles = StyleSheet.create({
   loadingWrap: { padding: spacing.lg },
   loadingGap: { marginTop: spacing.sm },
   loadingBlock: { marginTop: spacing.lg },
-  hero: {
-    borderRadius: radii.xl,
-    padding: spacing.xl,
-    ...shadows.md,
-  },
-  headerTop: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md },
-  heroLogo: { width: 56, height: 56, borderRadius: radii.md, backgroundColor: colors.surface, resizeMode: 'contain' },
+  flexOne: { flex: 1 },
+  // Identity on white
+  identity: { flexDirection: 'row', alignItems: 'center', gap: spacing.md + 2 },
   jobTitleWrap: { flex: 1 },
-  jobTitle: { ...textStyles.display, fontSize: 26, lineHeight: 32, color: colors.white },
-  company: { ...textStyles.bodyMedium, color: colors.blue200, marginTop: spacing.xs },
-  companyLink: { color: colors.white, textDecorationLine: 'underline' },
-  ringWell: {
-    padding: spacing.xs,
-    borderRadius: radii.pill,
-    backgroundColor: colors.white,
-  },
-  salaryBlock: {
-    marginTop: spacing.xl,
-    paddingTop: spacing.lg,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.18)',
-  },
-  salaryLabel: { ...textStyles.label, fontSize: 9, letterSpacing: 1.4, color: colors.blue200 },
-  salaryValue: { ...textStyles.figure, fontSize: 26, lineHeight: 32, color: colors.white, marginTop: spacing.xs },
-  heroFacts: { marginTop: spacing.lg, gap: spacing.sm },
-  heroFact: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
-  heroFactText: { flex: 1, ...textStyles.small, color: colors.blue200 },
+  jobTitle: { ...textStyles.heading, color: colors.textPrimary },
+  company: { ...textStyles.body, color: colors.textSecondary, marginTop: 2 },
+  companyLinkRow: { flexDirection: 'row', alignItems: 'center', minHeight: 32, alignSelf: 'flex-start' },
+  companyLink: { ...textStyles.bodyBold, color: colors.link },
+  fact: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.sunken, borderRadius: radii.pill, paddingHorizontal: spacing.sm + 1, paddingVertical: 4, maxWidth: '100%' },
+  factText: { ...textStyles.smallBold, fontSize: 11, color: colors.textSecondary, flexShrink: 1 },
 
-  badgeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.lg },
+  // Salary hero
+  salaryCard: { marginTop: spacing.lg, borderRadius: radii.xl - 4, padding: spacing.lg + 2, overflow: 'hidden', ...shadows.lg },
+  salaryDecor: { position: 'absolute', top: -40, right: -30, width: 140, height: 140, borderRadius: 70, backgroundColor: colors.white, opacity: 0.06 },
+  salaryLabel: { ...textStyles.label, color: colors.blue200 },
+  salaryValue: { ...textStyles.figureLarge, fontSize: 30, lineHeight: 36, color: colors.white, marginTop: spacing.xs },
+
+  // Why you match
+  matchCard: { marginTop: spacing.lg },
+  matchHead: { flexDirection: 'row', alignItems: 'center', gap: spacing.lg },
+  matchBadge: { alignSelf: 'flex-start', marginBottom: spacing.xs + 2 },
+  matchTitle: { ...textStyles.title, color: colors.textPrimary },
+  matchSub: { ...textStyles.small, color: colors.textSecondary, marginTop: 2 },
+  factorList: { marginTop: spacing.lg },
+  certBadge: { alignSelf: 'flex-start', marginTop: spacing.md },
+
+  // Location preview
+  mapCard: { borderRadius: radii.lg, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, overflow: 'hidden', ...shadows.sm },
+  mapFrame: { height: 150, backgroundColor: colors.sunken },
+  mapFoot: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.md + 2 },
+  mapPlace: { ...textStyles.bodyBold, color: colors.textPrimary },
+  mapMeta: { ...textStyles.small, color: colors.subtle, marginTop: 2 },
+
+  badgeRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: spacing.sm, marginTop: spacing.md },
   preferenceChip: { marginTop: spacing.md },
   applyErrorBox: { marginTop: spacing.lg },
   infoCard: { marginBottom: spacing.xs },
@@ -614,24 +652,29 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.xs,
-    backgroundColor: colors.blue50,
+    backgroundColor: colors.tint,
     borderRadius: radii.pill,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
   },
-  tagMatched: { backgroundColor: colors.successBackground },
-  tagText: { ...textStyles.smallMedium, color: colors.blue700 },
-  tagTextMatched: { color: colors.success },
+  // Matched skill: solid-tint blue with a check. Missing skill: outlined blue "learn" chip — a
+  // gap to close, not an error, so no red.
+  tagMatched: { backgroundColor: colors.tintStrong },
+  tagText: { ...textStyles.smallMedium, color: colors.iconBlue },
+  tagTextMatched: { color: colors.figure, fontFamily: textStyles.bodyBold.fontFamily },
   tagMissing: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.xs,
-    backgroundColor: colors.errorBackground,
+    minHeight: 36,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.tintBorder,
     borderRadius: radii.pill,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
   },
-  tagMissingText: { ...textStyles.smallMedium, color: colors.error },
+  tagMissingText: { ...textStyles.smallMedium, color: colors.iconBlue },
   tagMuted: {
     backgroundColor: colors.sunken,
     borderRadius: radii.pill,
@@ -664,14 +707,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: colors.surface,
   },
-  saveBtnActive: { backgroundColor: colors.blue50, borderColor: colors.blue200 },
+  saveBtnActive: { backgroundColor: colors.tint, borderColor: colors.tintBorder },
   applyBtn: { flex: 1, marginBottom: 0 },
   applyConfirmBody: { paddingHorizontal: spacing.xl, paddingTop: spacing.lg },
   applyConfirmIcon: { width: 54, height: 54, borderRadius: radii.lg, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.infoBackground, borderWidth: 1, borderColor: colors.infoBorder, marginBottom: spacing.md },
   applyConfirmTitle: { ...textStyles.title, color: colors.textPrimary },
   applyConfirmCompany: { ...textStyles.smallBold, color: colors.info, marginTop: spacing.xs },
   applyConfirmMessage: { ...textStyles.body, color: colors.textSecondary, lineHeight: 21, marginTop: spacing.md },
-  applyConfirmNote: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.lg, padding: spacing.md, borderRadius: radii.md, backgroundColor: colors.successBackground },
+  applyConfirmNote: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.lg, padding: spacing.md, borderRadius: radii.md, backgroundColor: colors.infoBackground },
   applyConfirmNoteText: { flex: 1, ...textStyles.smallMedium, color: colors.success },
   applyConfirmActions: { flexDirection: 'row', gap: spacing.md },
   applyConfirmCancel: { flex: 1, marginBottom: 0 },

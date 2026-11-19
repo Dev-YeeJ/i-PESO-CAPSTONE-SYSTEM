@@ -319,7 +319,7 @@ function ReportConcernForm({ target, onClose }: { target: ReportTarget; onClose:
                   accessibilityRole="checkbox"
                   accessibilityState={{ checked: acknowledge }}
                 >
-                  <MaterialIcons name={acknowledge ? 'check-box' : 'check-box-outline-blank'} size={22} color={acknowledge ? colors.secondary : colors.subtle} />
+                  <MaterialIcons name={acknowledge ? 'check-box' : 'check-box-outline-blank'} size={22} color={acknowledge ? colors.link : colors.subtle} />
                   <Text style={[styles.ackText, styles.flex]}>
                     I confirm this report is truthful to the best of my knowledge. I understand that submitting false or malicious reports violates i-PESO policies and may lead to action on my own account.
                   </Text>
@@ -399,7 +399,7 @@ const styles = StyleSheet.create({
   error: { ...textStyles.small, color: colors.error, marginTop: spacing.xs },
   field: { marginTop: spacing.lg },
   clearDate: { alignSelf: 'flex-start', paddingVertical: spacing.xs },
-  link: { ...textStyles.smallBold, color: colors.secondary },
+  link: { ...textStyles.smallBold, color: colors.link },
   fileList: { gap: spacing.xs, marginTop: spacing.sm },
   fileRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, borderWidth: 1, borderColor: colors.border, borderRadius: radii.md, paddingLeft: spacing.md, minHeight: 44 },
   fileName: { ...textStyles.small, color: colors.textPrimary },

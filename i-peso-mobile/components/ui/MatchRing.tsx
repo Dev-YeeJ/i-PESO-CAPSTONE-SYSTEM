@@ -7,12 +7,26 @@ import { colors, textStyles, typography } from '@/theme'
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle)
 
+/** Match % at or above which a job counts as a strong (earned → amber) match. */
+export const STRONG_MATCH = 80
+
 interface MatchRingProps {
   percentage: number
   size?: number
   strokeWidth?: number
   trackColor?: string
   label?: string
+  /**
+   * Amber arc + navy figure: the seeker *earned* this (a strong job match). Leave off for
+   * scores that aren't an achievement, e.g. profile strength.
+   */
+  earned?: boolean
+  /** White figure and a white-to-blue arc, for use on a brand-gradient surface. */
+  onDark?: boolean
+  /** Append "%" to the figure (job cards); off by default to keep existing screens unchanged. */
+  showPercent?: boolean
+  /** Screen-reader text when the ring isn't a job match (e.g. "Profile strength"). */
+  accessibilityLabel?: string
 }
 
 /**
@@ -26,8 +40,12 @@ export function MatchRing({
   percentage,
   size = 96,
   strokeWidth = 8,
-  trackColor = colors.blue100,
+  trackColor,
   label,
+  earned = false,
+  onDark = false,
+  showPercent = false,
+  accessibilityLabel,
 }: MatchRingProps) {
   const m = useMotion()
   // Gradient ids are global in SVG, so a list of rings would otherwise all reference the
@@ -49,26 +67,36 @@ export function MatchRing({
     strokeDashoffset: circumference - (circumference * progress.value) / 100,
   }))
 
+  const track = trackColor ?? (onDark ? 'rgba(255,255,255,0.18)' : earned ? colors.accentSoft : colors.tintStrong)
+  const stops = onDark ? [colors.blue300, colors.white] : [colors.blue500, colors.blue700]
+  const figureColor = onDark ? colors.white : earned ? colors.accentText : colors.figure
+
   return (
     <View
       style={[styles.wrap, { width: size, height: size }]}
       accessibilityRole="progressbar"
       accessibilityValue={{ min: 0, max: 100, now: clamped }}
-      accessibilityLabel={label ? `${label}: ${clamped} percent` : `${clamped} percent match`}
+      accessibilityLabel={
+        accessibilityLabel
+          ? `${accessibilityLabel}: ${clamped} percent`
+          : label
+          ? `${label}: ${clamped} percent`
+          : `${clamped} percent match${earned ? ', strong match' : ''}`
+      }
     >
       <Svg width={size} height={size}>
         <Defs>
           <LinearGradient id={gradientId} x1="0" y1="0" x2="1" y2="1">
-            <Stop offset="0" stopColor={colors.blue500} />
-            <Stop offset="1" stopColor={colors.blue700} />
+            <Stop offset="0" stopColor={stops[0]} />
+            <Stop offset="1" stopColor={stops[1]} />
           </LinearGradient>
         </Defs>
-        <Circle cx={size / 2} cy={size / 2} r={radius} stroke={trackColor} strokeWidth={strokeWidth} fill="none" />
+        <Circle cx={size / 2} cy={size / 2} r={radius} stroke={track} strokeWidth={strokeWidth} fill="none" />
         <AnimatedCircle
           cx={size / 2}
           cy={size / 2}
           r={radius}
-          stroke={`url(#${gradientId})`}
+          stroke={earned && !onDark ? colors.accent : `url(#${gradientId})`}
           strokeWidth={strokeWidth}
           fill="none"
           strokeDasharray={`${circumference} ${circumference}`}
@@ -79,8 +107,11 @@ export function MatchRing({
         />
       </Svg>
       <View style={styles.center} pointerEvents="none">
-        <Text style={[styles.value, { fontSize: size * 0.3, lineHeight: size * 0.34 }]}>{clamped}</Text>
-        {label ? <Text style={styles.label}>{label}</Text> : null}
+        <Text style={[styles.value, { color: figureColor, fontSize: size * (showPercent ? 0.27 : 0.3), lineHeight: size * 0.34 }]}>
+          {clamped}
+          {showPercent ? <Text style={{ fontSize: size * 0.17 }}>%</Text> : null}
+        </Text>
+        {label ? <Text style={[styles.label, onDark && styles.labelOnDark]}>{label}</Text> : null}
       </View>
     </View>
   )
@@ -98,12 +129,15 @@ const styles = StyleSheet.create({
   },
   value: {
     ...textStyles.figure,
-    color: colors.blue800,
+    color: colors.figure,
   },
   label: {
     fontSize: typography.label,
     fontFamily: typography.family.bold,
     color: colors.textSecondary,
     marginTop: 2,
+  },
+  labelOnDark: {
+    color: colors.blue200,
   },
 })

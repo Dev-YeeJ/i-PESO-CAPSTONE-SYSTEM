@@ -217,11 +217,13 @@ class SeekerProfileFeaturesTest extends TestCase
 
         $response->assertHeader(
             'content-disposition',
-            'attachment; filename=NSRP_Form_'.$seeker->getKey().'_'.$seeker->last_name.'.pdf'
+            'attachment; filename=NSRP_Jobseeker_'.preg_replace('/[^A-Za-z0-9]+/', '_', $seeker->last_name).'_Maria.pdf'
         );
 
         $pdfContent = $response->getContent();
         $this->assertSame(2, preg_match_all('/\/Type\s*\/Page\b/', $pdfContent));
+        // The official form is printed on A4 (595 x 842 pt).
+        $this->assertMatchesRegularExpression('/\/MediaBox\s*\[\s*0(?:\.0+)?\s+0(?:\.0+)?\s+595\.28\d*\s+841\.8\d*\s*\]/', $pdfContent);
     }
 
     public function test_step_three_rejects_unknown_occupation_ids(): void

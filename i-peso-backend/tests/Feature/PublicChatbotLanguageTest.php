@@ -72,6 +72,131 @@ class PublicChatbotLanguageTest extends TestCase
         Http::assertNotSent(fn (Request $request) => str_contains($this->instruction($request), self::THIS_TURN));
     }
 
+    public function test_each_message_is_checked_for_language_without_pinning_one(): void
+    {
+        $this->fakeGemini('Reply text.');
+
+        // Pangasinan (not clearly English or Tagalog): steer away from a Tagalog fallback.
+        $this->postJson('/api/chat/public', ['message' => 'Antoy job vacancies ya saragto ed siyak?'])->assertOk();
+        // Filipino-looking: the latest-message rule only — no guess, since Pangasinan shares these words.
+        $this->postJson('/api/chat/public', ['message' => 'Paano po ba mag-register?'])->assertOk();
+        // Taglish: mirror the mix.
+        $this->postJson('/api/chat/public', ['message' => 'Paano mag-register sa job fair? What are the requirements?'])->assertOk();
+
+        $instructions = collect(Http::recorded())->map(fn (array $pair) => $this->instruction($pair[0]))->values();
+        $this->assertCount(3, $instructions);
+
+        // Every message is judged on its own; none of them pins a language.
+        foreach ($instructions as $instruction) {
+            $this->assertStringContainsString("LANGUAGE CHECK FOR THIS MESSAGE: Decide the reply language from the visitor's LATEST message only", $instruction);
+            $this->assertStringNotContainsString(self::THIS_TURN, $instruction);
+        }
+
+        $this->assertStringContainsString('it may be Pangasinan or Ilocano', $instructions[0]);
+        $this->assertStringContainsString('Do not fall back to Tagalog', $instructions[0]);
+        $this->assertStringContainsString('Never say you can speak a language while replying in a different one', $instructions[0]);
+
+        $this->assertStringNotContainsString('may be Pangasinan or Ilocano', $instructions[1]);
+        $this->assertStringNotContainsString('Mirror the same natural mix', $instructions[1]);
+
+        $this->assertStringContainsString('Mirror the same natural mix', $instructions[2]);
+    }
+
+    public function test_an_earlier_pangasinan_request_ends_when_the_visitor_switches_to_tagalog(): void
+    {
+        $this->fakeGemini('Reply text.');
+
+        // The reported case: Pangasinan asked for earlier, then a short Tagalog question.
+        $this->postJson('/api/chat/public', [
+            'message' => 'May job vacancies ba?',
+            'history' => [
+                ['role' => 'user', 'text' => 'Marunong ka bang magsalita ng Pangasinan?'],
+                ['role' => 'model', 'text' => 'Some earlier reply'],
+                ['role' => 'user', 'text' => 'Antoy job fair natan?'],
+            ],
+        ])->assertOk();
+
+        Http::assertSent(function (Request $request): bool {
+            $instruction = $this->instruction($request);
+
+            return ! str_contains($instruction, self::THIS_TURN)
+                && str_contains($instruction, 'The visitor asked for Pangasinan earlier; if this message is in a different language, that earlier request no longer applies')
+                // A Tagalog question is never steered towards Pangasinan.
+                && ! str_contains($instruction, 'may be Pangasinan or Ilocano');
+        });
+    }
+
+    public function test_borrowed_tagalog_words_in_a_pangasinan_message_keep_the_pangasinan_request(): void
+    {
+        $this->fakeGemini('Reply text.');
+
+        // Pangasinan speakers borrow "pwede" and "po"; that is not a switch to Tagalog.
+        foreach (['Pwede ak onla ed job fair?', 'Anto ray requirements ed TUPAD po?'] as $message) {
+            $this->postJson('/api/chat/public', [
+                'message' => $message,
+                'history' => [['role' => 'user', 'text' => 'Sagutin mo sa Pangasinan']],
+            ])->assertOk();
+        }
+
+        $instructions = collect(Http::recorded())->map(fn (array $pair) => $this->instruction($pair[0]))->values();
+        $this->assertCount(2, $instructions);
+
+        foreach ($instructions as $instruction) {
+            $this->assertStringContainsString(self::THIS_TURN . ': The visitor asked you to use Pangasinan', $instruction);
+            $this->assertStringNotContainsString('that earlier request no longer applies', $instruction);
+        }
+    }
+
+    public function test_a_pangasinan_message_with_borrowed_words_still_gets_the_pangasinan_caution(): void
+    {
+        $this->fakeGemini('Reply text.');
+
+        // No request at all: "wala" and "pwede" must not hide the "may be Pangasinan" hint.
+        $this->postJson('/api/chat/public', ['message' => 'Wala ray bakante ed Urdaneta?'])->assertOk();
+        $this->postJson('/api/chat/public', ['message' => 'Pwede ak onla ed job fair natan?'])->assertOk();
+
+        $instructions = collect(Http::recorded())->map(fn (array $pair) => $this->instruction($pair[0]))->values();
+        $this->assertCount(2, $instructions);
+
+        foreach ($instructions as $instruction) {
+            $this->assertStringContainsString('it may be Pangasinan or Ilocano', $instruction);
+            $this->assertStringContainsString('Do not fall back to Tagalog', $instruction);
+        }
+    }
+
+    public function test_a_language_request_still_carries_over_to_a_neutral_message(): void
+    {
+        $this->fakeGemini('Reply text.');
+
+        // No Tagalog-only or English words: the visitor has not switched, so the request holds.
+        $this->postJson('/api/chat/public', [
+            'message' => 'Production operator Urdaneta',
+            'history' => [['role' => 'user', 'text' => 'Sagutin mo sa Pangasinan']],
+        ])->assertOk();
+
+        Http::assertSent(fn (Request $request) => str_contains($this->instruction($request), self::THIS_TURN . ': The visitor asked you to use Pangasinan'));
+    }
+
+    public function test_bracketed_codes_written_by_the_model_never_reach_the_visitor(): void
+    {
+        $this->fakeGemini("Narito ang mga job fair.\n\n[[LIST_JOB_FAIRS]]\n[[SEARCH_JOB_VACANCIES]]");
+
+        $reply = $this->postJson('/api/chat/public', ['message' => 'Kailan po ang job fair?'])->assertOk()->json('reply');
+
+        $this->assertSame('Narito ang mga job fair.', $reply);
+    }
+
+    public function test_a_reply_made_only_of_codes_becomes_the_no_answer_message(): void
+    {
+        $this->fakeGemini('[[LIST_JOB_FAIRS]] [[SEARCH_JOB_VACANCIES]]');
+
+        $reply = $this->postJson('/api/chat/public', ['message' => 'Kailan po ang job fair?'])->assertOk()->json('reply');
+
+        $this->assertIsString($reply);
+        $this->assertNotSame('', trim($reply));
+        $this->assertStringNotContainsString('[[', $reply);
+    }
+
     public function test_the_latest_language_request_wins(): void
     {
         $this->fakeGemini('Reply text.');

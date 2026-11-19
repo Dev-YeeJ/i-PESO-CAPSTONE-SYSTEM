@@ -19,7 +19,7 @@ import { LinearGradient } from 'expo-linear-gradient'
 import type { EmployerRatingBadge, NearbyJob } from '@/services/seekerService'
 import { Badge } from '@/components/ui/Badge'
 import { EmployerPreferenceChip } from '@/components/ui/EmployerPreferenceChip'
-import { MatchRing } from '@/components/ui/MatchRing'
+import { MatchRing, STRONG_MATCH } from '@/components/ui/MatchRing'
 import { PressableScale } from '@/components/ui/PressableScale'
 import { useMotion } from '@/hooks/useMotion'
 import { colors, gradients, radii, shadows, spacing, textStyles } from '@/theme'
@@ -159,14 +159,15 @@ export function JobFeedCard({ job, index = 0, saving = false, onPress, onToggleS
                       accessible
                       accessibilityLabel={`Rated ${rating.average.toFixed(1)} out of 5 by ${rating.reviewers} verified reviewers`}
                     >
-                      <MaterialIcons name="star" size={14} color={colors.accent} />
+                      {/* Blue, not amber: a rating isn't something the seeker earned. */}
+                      <MaterialIcons name="star" size={14} color={colors.iconBlue} />
                       <Text style={styles.ratingValue}>{rating.average.toFixed(1)}</Text>
                       <Text style={styles.ratingCount}>({rating.reviewers})</Text>
                     </View>
                   ) : null}
                 </View>
               </View>
-              {job.match_deferred ? null : <MatchRing percentage={match} size={52} strokeWidth={5} />}
+              {job.match_deferred ? null : <MatchRing percentage={match} size={52} strokeWidth={5} earned={match >= STRONG_MATCH} showPercent />}
             </View>
 
             <Text style={styles.salary} numberOfLines={1}>{formatSalary(job)}</Text>
@@ -178,9 +179,10 @@ export function JobFeedCard({ job, index = 0, saving = false, onPress, onToggleS
 
             <View style={styles.badgeRow}>
               {job.has_applied ? <Badge variant="info">{titleCase(job.application_status, 'Applied')}</Badge> : null}
-              {job.job_fair?.is_available_at_job_fair ? <Badge variant="warning">Job Fair</Badge> : null}
-              {job.certificate_match?.matched ? <Badge variant="success">Certificate Match</Badge> : null}
-              {!job.match_deferred && match >= 80 ? <Badge variant="success">Strong Match</Badge> : null}
+              {job.job_fair?.is_available_at_job_fair ? <Badge variant="info">Job Fair</Badge> : null}
+              {/* The two amber badges: things the seeker earned. */}
+              {!job.match_deferred && match >= STRONG_MATCH ? <Badge variant="earned">★ Strong Match</Badge> : null}
+              {job.certificate_match?.matched ? <Badge variant="earned">Certificate Match</Badge> : null}
               <EmployerPreferenceChip job={job} />
             </View>
 
@@ -212,7 +214,7 @@ export function JobFeedCard({ job, index = 0, saving = false, onPress, onToggleS
                   <MaterialIcons
                     name={job.is_saved ? 'bookmark' : 'bookmark-border'}
                     size={18}
-                    color={job.is_saved ? colors.blue700 : colors.textSecondary}
+                    color={job.is_saved ? colors.iconBlue : colors.textSecondary}
                   />
                 </Animated.View>
                 <Text style={[styles.saveText, job.is_saved && styles.saveTextActive]}>
@@ -222,7 +224,7 @@ export function JobFeedCard({ job, index = 0, saving = false, onPress, onToggleS
 
               <View style={styles.detailsButton}>
                 <Text style={styles.detailsText}>View details</Text>
-                <MaterialIcons name="arrow-forward" size={16} color={colors.blue700} />
+                <MaterialIcons name="arrow-forward" size={16} color={colors.iconBlue} />
               </View>
             </View>
           </PressableScale>
@@ -312,7 +314,7 @@ const styles = StyleSheet.create({
   salary: {
     marginTop: spacing.md,
     ...textStyles.bodyBold,
-    color: colors.blue800,
+    color: colors.figure,
   },
   metaStack: {
     marginTop: spacing.sm,
@@ -342,8 +344,8 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   skill: {
-    backgroundColor: colors.blue50,
-    color: colors.blue700,
+    backgroundColor: colors.tint,
+    color: colors.iconBlue,
     borderRadius: radii.pill,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.xs,
@@ -377,15 +379,15 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
   },
   saveButtonActive: {
-    backgroundColor: colors.blue50,
-    borderColor: colors.blue200,
+    backgroundColor: colors.tint,
+    borderColor: colors.tintBorder,
   },
   saveText: {
     ...textStyles.smallBold,
     color: colors.textSecondary,
   },
   saveTextActive: {
-    color: colors.blue700,
+    color: colors.iconBlue,
   },
   detailsButton: {
     minHeight: 40,
@@ -396,6 +398,6 @@ const styles = StyleSheet.create({
   },
   detailsText: {
     ...textStyles.smallBold,
-    color: colors.blue700,
+    color: colors.iconBlue,
   },
 })

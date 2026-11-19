@@ -1,7 +1,22 @@
 import { useState } from 'react'
 import apiClient from '@/services/api'
 
-export default function DownloadNSRPButton({ seekerId, seekerName = 'Job Seeker' }) {
+// NSRP_Jobseeker_LastName_FirstName.pdf — the same name the server sends (NsrpFormData::filename).
+const filePart = (value) => String(value ?? '')
+  .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+  .replace(/[^A-Za-z0-9]+/g, '_').replace(/^_+|_+$/g, '')
+
+function fallbackFilename(seekerId, lastName, firstName, seekerName) {
+  const name = [filePart(lastName), filePart(firstName)].filter(Boolean).join('_') || filePart(seekerName)
+  return `NSRP_Jobseeker_${name || seekerId}.pdf`
+}
+
+function filenameFromHeader(disposition) {
+  const match = /filename\*?=(?:UTF-8'')?"?([^";]+)"?/i.exec(disposition ?? '')
+  return match ? decodeURIComponent(match[1].trim()) : null
+}
+
+export default function DownloadNSRPButton({ seekerId, seekerName = 'Job Seeker', lastName, firstName }) {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState(null)
 
@@ -30,7 +45,8 @@ export default function DownloadNSRPButton({ seekerId, seekerName = 'Job Seeker'
       // Create a link element and trigger download
       const link = document.createElement('a')
       link.href = url
-      link.download = `NSRP_Form_${seekerId}_${seekerName.replace(/\s+/g, '_')}.pdf`
+      link.download = filenameFromHeader(response.headers?.['content-disposition'])
+        ?? fallbackFilename(seekerId, lastName, firstName, seekerName)
 
       // Append to DOM, click, and remove
       document.body.appendChild(link)

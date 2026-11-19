@@ -172,7 +172,7 @@ function ReaderAttachment({ announcement }: { announcement: Announcement }) {
       accessibilityRole="button"
       accessibilityLabel={`Open attachment ${name}`}
     >
-      <MaterialIcons name="picture-as-pdf" size={20} color={colors.error} />
+      <MaterialIcons name="picture-as-pdf" size={20} color={colors.iconBlue} />
       <Text style={[styles.fileName, styles.flex]} numberOfLines={1}>{name}</Text>
       {opening ? <ActivityIndicator size="small" color={colors.info} /> : <MaterialIcons name="attach-file" size={18} color={colors.subtle} />}
     </PressableScale>

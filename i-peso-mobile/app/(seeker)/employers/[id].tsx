@@ -19,7 +19,7 @@ import { ReportConcernSheet } from '@/components/safety/ReportConcernSheet'
 import { CompanyReviews } from '@/components/reviews/CompanyReviews'
 import { CompanyLogo } from '@/components/seeker/CompanyLogo'
 import { LinearGradient } from 'expo-linear-gradient'
-import { colors, gradients, radii, spacing, typography } from '@/theme'
+import { colors, gradients, radii, shadows, spacing, typography } from '@/theme'
 
 // Display rules mirror i-peso-frontend's utils/employerProfile.js (shared by the web panel,
 // full page and admin view) so a company reads the same on every surface. Each formatter
@@ -169,31 +169,36 @@ export default function EmployerProfileScreen() {
         {/* Mirrors EmployerProfilePreview's header on the website. The website also shows a
             city chip, but the public profile API doesn't send city_municipality, so it never
             appears for job seekers there either. */}
-        <LinearGradient colors={[...gradients.brand]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.hero}>
-          <CompanyLogo uri={employer.company_logo_url} name={name} size={72} style={styles.heroLogo} />
-          <View style={styles.statusPill}>
-            <MaterialIcons name="verified-user" size={14} color={colors.white} />
-            <Text style={styles.statusPillText}>Verified by PESO</Text>
+        {/* Banner + overlapping logo, identity on white (redesign "13 — Employer profile"). */}
+        <View style={styles.bannerWrap}>
+          <LinearGradient colors={[...gradients.brand]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.banner}>
+            <View style={styles.bannerDecorA} pointerEvents="none" />
+            <View style={styles.bannerDecorB} pointerEvents="none" />
+          </LinearGradient>
+          <View style={styles.logoFrame}>
+            <CompanyLogo uri={employer.company_logo_url} name={name} size={72} />
           </View>
-          <Text style={styles.heroName} accessibilityRole="header">{name}</Text>
-          {registeredName ? <Text style={styles.heroRegistered}>Registered as {registeredName}</Text> : null}
-          {industry || employer.company_size ? (
-            <View style={styles.chipRow} accessibilityLabel="Company highlights">
-              {industry ? (
-                <View style={styles.chip}>
-                  <MaterialIcons name="business" size={14} color={colors.blue50} />
-                  <Text style={styles.chipText}>{industry}</Text>
-                </View>
-              ) : null}
-              {employer.company_size ? (
-                <View style={styles.chip}>
-                  <MaterialIcons name="groups" size={14} color={colors.blue50} />
-                  <Text style={styles.chipText}>{formatCompanySize(employer.company_size)}</Text>
-                </View>
-              ) : null}
+        </View>
+        <Text style={styles.heroName} accessibilityRole="header">{name}</Text>
+        {registeredName ? <Text style={styles.heroRegistered}>Registered as {registeredName}</Text> : null}
+        <View style={styles.chipRow} accessibilityLabel="Company highlights">
+          <View style={[styles.chip, styles.chipVerified]}>
+            <MaterialIcons name="verified" size={14} color={colors.link} />
+            <Text style={[styles.chipText, styles.chipTextVerified]}>Verified by PESO</Text>
+          </View>
+          {industry ? (
+            <View style={styles.chip}>
+              <MaterialIcons name="business" size={14} color={colors.textSecondary} />
+              <Text style={styles.chipText}>{industry}</Text>
             </View>
           ) : null}
-        </LinearGradient>
+          {employer.company_size ? (
+            <View style={styles.chip}>
+              <MaterialIcons name="groups" size={14} color={colors.textSecondary} />
+              <Text style={styles.chipText}>{formatCompanySize(employer.company_size)}</Text>
+            </View>
+          ) : null}
+        </View>
 
         <Card padding="md" style={styles.sectionCard}>
           <Text style={styles.sectionTitle}>About the company</Text>
@@ -301,7 +306,8 @@ export default function EmployerProfileScreen() {
         </Card>
 
         <PressableScale scaleTo="buttonPress" ripple={null} style={styles.reportLink} onPress={() => setReportOpen(true)} accessibilityRole="button">
-          <MaterialIcons name="flag" size={16} color={colors.error} />
+          {/* Quiet, as on Job details: reporting never competes with the page's actions. */}
+          <MaterialIcons name="flag" size={16} color={colors.textSecondary} />
           <Text style={styles.reportLinkText}>Report this employer</Text>
         </PressableScale>
       </ScrollView>
@@ -335,15 +341,19 @@ const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: colors.background },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: spacing.md, padding: spacing.xl },
   content: { padding: spacing.lg, paddingBottom: spacing.xxxl },
-  hero: { borderRadius: radii.xl, padding: spacing.xl, marginBottom: spacing.lg, overflow: 'hidden' },
-  heroLogo: { borderRadius: radii.lg, borderColor: colors.white },
-  statusPill: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, alignSelf: 'flex-start', marginTop: spacing.lg, backgroundColor: colors.heroChip, borderRadius: radii.pill, paddingHorizontal: spacing.md, paddingVertical: spacing.xs },
-  statusPillText: { color: colors.white, fontSize: typography.small, fontFamily: typography.family.bold },
-  heroName: { color: colors.white, fontSize: typography.heading, fontFamily: typography.family.bold, marginTop: spacing.md },
-  heroRegistered: { color: colors.blue100, fontSize: typography.small, marginTop: spacing.xs },
-  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.md },
-  chip: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, backgroundColor: colors.heroChip, borderRadius: radii.pill, paddingHorizontal: spacing.md, paddingVertical: spacing.xs },
-  chipText: { color: colors.blue50, fontSize: typography.small, fontFamily: typography.family.bold },
+  // Banner + overlapping logo
+  bannerWrap: { marginHorizontal: -spacing.lg, marginTop: -spacing.lg, marginBottom: spacing.xl + spacing.lg },
+  banner: { height: 120, overflow: 'hidden' },
+  bannerDecorA: { position: 'absolute', top: -60, right: -30, width: 180, height: 180, borderRadius: 90, backgroundColor: colors.white, opacity: 0.08 },
+  bannerDecorB: { position: 'absolute', bottom: -50, left: 20, width: 110, height: 110, borderRadius: 55, backgroundColor: colors.blue300, opacity: 0.12 },
+  logoFrame: { position: 'absolute', left: spacing.lg, bottom: -36, padding: 4, borderRadius: radii.lg + 4, backgroundColor: colors.surface, ...shadows.md },
+  heroName: { color: colors.textPrimary, fontSize: typography.heading, lineHeight: 28, fontFamily: typography.family.bold },
+  heroRegistered: { color: colors.textSecondary, fontSize: typography.small, marginTop: spacing.xs },
+  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.md, marginBottom: spacing.lg },
+  chip: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, backgroundColor: colors.sunken, borderRadius: radii.pill, paddingHorizontal: spacing.md - 2, paddingVertical: 5 },
+  chipVerified: { backgroundColor: colors.tint },
+  chipText: { color: colors.textSecondary, fontSize: typography.small, fontFamily: typography.family.bold },
+  chipTextVerified: { color: colors.iconBlue },
   sectionCard: { marginBottom: spacing.lg },
   afterJobs: { marginTop: spacing.sm },
   reviewsSubtitle: { color: colors.textSecondary, fontSize: typography.small, marginTop: -spacing.xs, marginBottom: spacing.md },
@@ -372,6 +382,6 @@ const styles = StyleSheet.create({
   factValueMissing: { color: colors.subtle, fontSize: typography.small, marginTop: 2 },
   safetyBox: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, backgroundColor: colors.infoBackground, borderWidth: 1, borderColor: colors.infoBorder, borderRadius: radii.md, padding: spacing.md, marginTop: spacing.md },
   safetyText: { flex: 1, color: colors.info, fontSize: typography.small, lineHeight: 18 },
-  reportLink: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs, marginTop: spacing.sm, paddingVertical: spacing.md },
-  reportLinkText: { color: colors.error, fontSize: typography.small, fontFamily: typography.family.bold },
+  reportLink: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs, marginTop: spacing.sm, minHeight: 44 },
+  reportLinkText: { color: colors.textSecondary, fontSize: typography.small, fontFamily: typography.family.bold },
 })

@@ -110,5 +110,5 @@ const styles = StyleSheet.create({
   chipImprove: { borderColor: colors.infoBorder, backgroundColor: colors.infoBackground },
   chipText: { ...textStyles.smallBold },
   chipTextStrong: { color: colors.success },
-  chipTextImprove: { color: colors.blue700 },
+  chipTextImprove: { color: colors.iconBlue },
 })

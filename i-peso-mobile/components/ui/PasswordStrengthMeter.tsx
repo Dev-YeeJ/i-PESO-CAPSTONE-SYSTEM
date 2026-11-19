@@ -11,10 +11,12 @@ export function getPasswordStrength(password: string) {
   if (/[0-9]/.test(password)) score += 1
   if (/[^A-Za-z0-9]/.test(password)) score += 1
 
+  // Weak stays red (a real problem); the rest climb the blue scale. Amber is reserved for
+  // things the seeker earned, so a "Fair" password no longer borrows it.
   if (score <= 1) return { score, label: 'Weak', color: colors.danger }
-  if (score <= 3) return { score, label: 'Fair', color: colors.accent }
-  if (score === 4) return { score, label: 'Good', color: colors.info }
-  return { score, label: 'Strong', color: colors.success }
+  if (score <= 3) return { score, label: 'Fair', color: colors.blue500 }
+  if (score === 4) return { score, label: 'Good', color: colors.blue600 }
+  return { score, label: 'Strong', color: colors.figure }
 }
 
 interface PasswordStrengthMeterProps {

@@ -78,5 +78,5 @@ const styles = StyleSheet.create({
   buttons: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.sm },
   note: { ...textStyles.smallBold, color: colors.textSecondary, marginTop: spacing.sm },
   noteMuted: { ...textStyles.small, color: colors.textSecondary, marginTop: spacing.sm },
-  link: { ...textStyles.smallBold, color: colors.secondary },
+  link: { ...textStyles.smallBold, color: colors.link },
 })

@@ -1,5 +1,5 @@
-import { ReactNode, useCallback, useEffect } from 'react'
-import { Modal, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native'
+import { ReactNode, useCallback, useEffect, useState } from 'react'
+import { Keyboard, Modal, Platform, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native'
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler'
 import Animated, {
   runOnJS,
@@ -46,6 +46,14 @@ export function BottomSheet({
   const insets = useSafeAreaInsets()
   const { height: screenHeight } = useWindowDimensions()
   const sheetHeight = screenHeight * heightRatio
+
+  // RN 0.81 draws the Modal's window edge-to-edge, where Android's adjustResize no longer
+  // shrinks it for the keyboard — so without this the keyboard covers the sheet's lower half
+  // (inputs, footer). Lift the sheet by the keyboard height and cap its height to what's left.
+  const keyboardHeight = useKeyboardHeight()
+  const liftedHeight = keyboardHeight > 0
+    ? Math.min(sheetHeight, screenHeight - keyboardHeight - insets.top - spacing.sm)
+    : sheetHeight
 
   const translateY = useSharedValue(sheetHeight)
   const backdropOpacity = useSharedValue(0)
@@ -107,7 +115,9 @@ export function BottomSheet({
         <Animated.View
           style={[
             styles.sheet,
-            { height: sheetHeight, paddingBottom: insets.bottom || spacing.lg },
+            keyboardHeight > 0
+              ? { height: liftedHeight, bottom: keyboardHeight, paddingBottom: spacing.sm }
+              : { height: sheetHeight, paddingBottom: insets.bottom || spacing.lg },
             sheetStyle,
           ]}
           accessibilityViewIsModal
@@ -140,6 +150,22 @@ export function BottomSheet({
       </GestureHandlerRootView>
     </Modal>
   )
+}
+
+/** Current keyboard height in px, 0 while it is hidden. */
+function useKeyboardHeight() {
+  const [height, setHeight] = useState(0)
+  useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow'
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide'
+    const show = Keyboard.addListener(showEvent, (event) => setHeight(event.endCoordinates.height))
+    const hide = Keyboard.addListener(hideEvent, () => setHeight(0))
+    return () => {
+      show.remove()
+      hide.remove()
+    }
+  }, [])
+  return height
 }
 
 const styles = StyleSheet.create({

@@ -3,7 +3,7 @@ import QRCode from 'react-native-qrcode-svg'
 import MaterialIcons from '@expo/vector-icons/MaterialIcons'
 import type { JobFairPass } from '@/services/seekerService'
 import { Card } from '@/components/ui/Card'
-import { colors, radii, spacing, typography } from '@/theme'
+import { colors, radii, shadows, spacing, typography } from '@/theme'
 
 export function DigitalQrPass({ pass }: { pass: JobFairPass }) {
   const skills = pass.skills?.slice(0, 5) ?? []
@@ -38,12 +38,13 @@ export function DigitalQrPass({ pass }: { pass: JobFairPass }) {
   )
 }
 
+// Entry-pass card (redesign "20 — Job fair details"): lifted, centred, the QR as the hero.
 const styles = StyleSheet.create({
-  card: { alignItems: 'center' },
-  kicker: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, alignSelf: 'flex-start' },
-  kickerText: { color: colors.info, fontSize: typography.small, fontFamily: typography.family.bold, textTransform: 'uppercase', letterSpacing: 0.5 },
-  eventName: { marginTop: spacing.sm, color: colors.textPrimary, fontSize: typography.title, fontFamily: typography.family.bold, textAlign: 'center' },
-  name: { marginTop: spacing.xs, color: colors.textSecondary, fontSize: typography.body, fontFamily: typography.family.bold },
+  card: { alignItems: 'center', ...shadows.lg },
+  kicker: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, alignSelf: 'center' },
+  kickerText: { color: colors.link, fontSize: typography.label, fontFamily: typography.family.bold, textTransform: 'uppercase', letterSpacing: 0.6 },
+  eventName: { marginTop: spacing.sm, color: colors.textSecondary, fontSize: typography.small, fontFamily: typography.family.medium, textAlign: 'center' },
+  name: { marginTop: spacing.xs, color: colors.textPrimary, fontSize: typography.title, fontFamily: typography.family.bold, textAlign: 'center' },
   meta: { marginTop: spacing.xs, color: colors.textSecondary, fontSize: typography.small },
   qrWrap: { marginTop: spacing.lg, padding: spacing.md, backgroundColor: colors.white, borderRadius: radii.md, borderWidth: 1, borderColor: colors.border },
   skillRow: { marginTop: spacing.lg, flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: spacing.xs },

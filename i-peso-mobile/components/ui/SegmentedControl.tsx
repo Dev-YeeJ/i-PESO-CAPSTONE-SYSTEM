@@ -35,33 +35,34 @@ export function SegmentedControl<T extends string>({ options, value, onChange, s
   )
 }
 
+// Redesign: a sunken track with a white "lifted" segment — reads as a view switch, distinct
+// from the solid-blue filter chips and the gradient primary button.
 const styles = StyleSheet.create({
   track: {
     flexDirection: 'row',
-    backgroundColor: colors.background,
+    backgroundColor: colors.sunken,
     borderRadius: radii.pill,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: 3,
-    gap: 3,
+    padding: spacing.xs,
+    gap: spacing.xs,
   },
   segment: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: spacing.sm,
+    minHeight: 36,
+    paddingHorizontal: spacing.sm,
     borderRadius: radii.pill,
   },
   segmentActive: {
-    backgroundColor: colors.secondary,
-    ...shadows.card,
+    backgroundColor: colors.surface,
+    ...shadows.sm,
   },
   label: {
-    fontSize: typography.small,
+    fontSize: 13,
     fontFamily: typography.family.bold,
     color: colors.textSecondary,
   },
   labelActive: {
-    color: colors.white,
+    color: colors.figure,
   },
 })

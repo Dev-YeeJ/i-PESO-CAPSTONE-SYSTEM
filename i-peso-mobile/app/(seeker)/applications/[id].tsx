@@ -108,52 +108,76 @@ export default function ApplicationDetailScreen() {
       <ScrollView contentContainerStyle={styles.content}>
         {withdrawError ? <AlertBox variant="danger" style={styles.alertBox}>{withdrawError}</AlertBox> : null}
 
-        <View style={styles.titleRow}>
-          <CompanyLogo uri={job?.employer?.company_logo_url} name={job ? jobCompany(job) : null} size={56} fallback="none" style={styles.employerLogo} />
-          <View style={styles.titleTextWrap}>
-            <Text style={styles.jobTitle}>{textFrom(job?.job_title, 'Untitled job')}</Text>
-            {job?.employer?.employer_id ? (
-              <PressableScale
-                scaleTo="buttonPress"
-                ripple={null}
-                onPress={() => router.push({ pathname: '/(seeker)/employers/[id]', params: { id: String(job.employer!.employer_id), from: 'application', fromId: String(id) } })}
-                accessibilityRole="link"
-              >
-                <Text style={[styles.company, styles.companyLink]}>{jobCompany(job)}</Text>
-              </PressableScale>
-            ) : (
-              <Text style={styles.company}>{job ? jobCompany(job) : 'Employer not listed'}</Text>
-            )}
+        {/* Summary (redesign "15 — Application details") */}
+        <Card padding="md">
+          <View style={styles.titleRow}>
+            <CompanyLogo uri={job?.employer?.company_logo_url} name={job ? jobCompany(job) : null} size={48} />
+            <View style={styles.titleTextWrap}>
+              <Text style={styles.jobTitle} accessibilityRole="header">{textFrom(job?.job_title, 'Untitled job')}</Text>
+              {job?.employer?.employer_id ? (
+                <PressableScale
+                  scaleTo="buttonPress"
+                  ripple={null}
+                  onPress={() => router.push({ pathname: '/(seeker)/employers/[id]', params: { id: String(job.employer!.employer_id), from: 'application', fromId: String(id) } })}
+                  style={styles.companyLinkRow}
+                  accessibilityRole="link"
+                  accessibilityLabel={`${jobCompany(job)}, open employer profile`}
+                >
+                  <Text style={styles.companyLink}>{jobCompany(job)}</Text>
+                  <MaterialIcons name="chevron-right" size={18} color={colors.link} />
+                </PressableScale>
+              ) : (
+                <Text style={styles.company}>{job ? jobCompany(job) : 'Employer not listed'}</Text>
+              )}
+            </View>
+            <Badge variant={applicationStatusVariant(application.status)}>
+              {application.status_label ?? titleCase(application.status)}
+            </Badge>
           </View>
-        </View>
-        <Badge variant={applicationStatusVariant(application.status)} style={styles.statusBadge}>
-          {application.status_label ?? titleCase(application.status)}
-        </Badge>
+          <View style={styles.tiles}>
+            <Tile label="Applied" value={formatDate(application.applied_at)} />
+            <Tile label="Match then" value={`${Math.round(Number(application.match_percentage ?? 0))}%`} figure />
+            {job ? <Tile label="Salary" value={formatSalary(job)} figure /> : null}
+          </View>
+          <View style={styles.metaLine}>
+            {job ? (
+              <View style={styles.metaItem}>
+                <MaterialIcons name="place" size={14} color={colors.textSecondary} />
+                <Text style={styles.metaText} numberOfLines={1}>{jobLocation(job)}</Text>
+              </View>
+            ) : null}
+            <Text style={styles.metaText}>Last update {formatDate(application.status_changed_at)}</Text>
+          </View>
+        </Card>
 
         {applicationNextStep(application.status, application.interview) ? (
-          <Card padding="md" style={styles.nextStepCard}>
-            <Text style={styles.nextStepTitle}>What happens next</Text>
-            <Text style={styles.nextStepText}>{applicationNextStep(application.status, application.interview)}</Text>
-          </Card>
+          <View style={styles.nextStepCard}>
+            <MaterialIcons name="info-outline" size={20} color={colors.link} />
+            <View style={styles.titleTextWrap}>
+              <Text style={styles.nextStepTitle}>What happens next</Text>
+              <Text style={styles.nextStepText}>{applicationNextStep(application.status, application.interview)}</Text>
+            </View>
+          </View>
         ) : null}
-
-        <Card padding="md" style={styles.infoCard}>
-          {job ? <Detail label="Location" value={jobLocation(job)} /> : null}
-          {job ? <Detail label="Salary" value={formatSalary(job)} /> : null}
-          <Detail label="Applied" value={formatDate(application.applied_at)} />
-          <Detail label="Match at time of applying" value={`${Math.round(Number(application.match_percentage ?? 0))}%`} />
-          <Detail label="Last update" value={formatDate(application.status_changed_at)} />
-        </Card>
 
         {application.timeline?.length ? (
           <>
-            <Text style={styles.sectionTitle}>Status Timeline</Text>
+            <Text style={styles.sectionTitle}>Status timeline</Text>
             <Card padding="md" style={styles.timelineCard}>
-              {application.timeline.map((entry, index) => (
+              {application.timeline.map((entry, index) => {
+                // Every entry is a step already taken; the newest one is "where you are now".
+                const latest = index === application.timeline!.length - 1
+                return (
                 <View key={index} style={styles.timelineRow}>
                   <View style={styles.timelineDotColumn}>
-                    <View style={styles.timelineDot} />
-                    {index < application.timeline!.length - 1 ? <View style={styles.timelineLine} /> : null}
+                    {latest ? (
+                      <View style={styles.timelineNow} accessibilityLabel="Current step" />
+                    ) : (
+                      <View style={styles.timelineDone}>
+                        <MaterialIcons name="check" size={14} color={colors.white} />
+                      </View>
+                    )}
+                    {!latest ? <View style={styles.timelineLine} /> : null}
                   </View>
                   <View style={styles.timelineTextColumn}>
                     <Text style={styles.timelineTitle}>{entry.title}</Text>
@@ -161,21 +185,24 @@ export default function ApplicationDetailScreen() {
                     {entry.timestamp ? <Text style={styles.timelineTimestamp}>{formatDate(entry.timestamp)}</Text> : null}
                   </View>
                 </View>
-              ))}
+                )
+              })}
             </Card>
           </>
         ) : null}
 
         {application.interview ? (
           <>
-            <Text style={styles.sectionTitle}>Interview Information</Text>
-            <Card padding="md" style={styles.warningCard}>
-              <Detail label="Status" value={interviewPhaseText(application.interview)} />
-              <Detail label="Mode" value={formatInterviewMode(application.interview.mode_of_interview)} />
-              <Detail label="Date and time" value={formatInterviewTime(application.interview.schedule)} />
-              
+            <View style={styles.interviewCard}>
+              <View style={styles.interviewHead}>
+                <MaterialIcons name="event-available" size={22} color={colors.link} />
+                <Text style={styles.interviewTitle}>Interview</Text>
+                <Badge variant="info" style={styles.interviewPhase}>{interviewPhaseText(application.interview)}</Badge>
+              </View>
+              <IconRow icon="schedule" label="Date and time" value={formatInterviewTime(application.interview.schedule)} />
+              <IconRow icon="person-pin-circle" label="Mode" value={formatInterviewMode(application.interview.mode_of_interview)} />
               {application.interview.mode_of_interview !== 'online' ? (
-                <Detail label="Venue" value={textFrom(application.interview.venue_or_link, 'To follow')} />
+                <IconRow icon="place" label="Venue" value={textFrom(application.interview.venue_or_link, 'To follow')} />
               ) : null}
 
               {application.interview.instructions ? (
@@ -201,7 +228,7 @@ export default function ApplicationDetailScreen() {
                   )}
                 </View>
               ) : null}
-            </Card>
+            </View>
           </>
         ) : null}
 
@@ -252,8 +279,17 @@ export default function ApplicationDetailScreen() {
 
       {application.can_withdraw ? (
         <View style={[styles.footer, { paddingBottom: insets.bottom + spacing.md }]}>
-          <Button variant="danger" fullWidth onPress={confirmWithdraw} disabled={withdrawMutation.isPending}>
-            {withdrawMutation.isPending ? 'Withdrawing...' : 'Withdraw Application'}
+          {/* Outlined red, not a solid fill: a destructive option, never the screen's primary action. */}
+          <Button
+            variant="outline"
+            size="lg"
+            fullWidth
+            onPress={confirmWithdraw}
+            disabled={withdrawMutation.isPending}
+            style={styles.withdrawBtn}
+            textStyle={styles.withdrawText}
+          >
+            {withdrawMutation.isPending ? 'Withdrawing…' : 'Withdraw application'}
           </Button>
         </View>
       ) : null}
@@ -270,21 +306,59 @@ function Detail({ label, value }: { label: string; value: string }) {
   )
 }
 
+/** Summary tile; `figure` sets salary / match in the serif (the two figures allowed it). */
+function Tile({ label, value, figure = false }: { label: string; value: string; figure?: boolean }) {
+  return (
+    <View style={styles.tile}>
+      <Text style={styles.tileLabel}>{label.toUpperCase()}</Text>
+      <Text style={figure ? styles.tileFigure : styles.tileValue} numberOfLines={2}>{value}</Text>
+    </View>
+  )
+}
+
+function IconRow({ icon, label, value }: { icon: React.ComponentProps<typeof MaterialIcons>['name']; label: string; value: string }) {
+  return (
+    <View style={styles.iconRow}>
+      <MaterialIcons name={icon} size={20} color={colors.iconBlue} />
+      <View style={styles.titleTextWrap}>
+        <Text style={styles.iconRowLabel}>{label}</Text>
+        <Text style={styles.iconRowValue}>{value}</Text>
+      </View>
+    </View>
+  )
+}
+
 const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: colors.background },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: spacing.md, padding: spacing.xl },
-  content: { padding: spacing.xl, paddingBottom: spacing.xxxl },
+  content: { padding: spacing.lg, paddingBottom: spacing.xxxl },
   alertBox: { marginBottom: spacing.lg },
   titleRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md },
   titleTextWrap: { flex: 1 },
-  employerLogo: { borderRadius: radii.lg },
-  jobTitle: { color: colors.textPrimary, fontSize: typography.heading, lineHeight: 30, fontFamily: typography.family.bold },
-  company: { color: colors.secondaryText, fontSize: typography.title, fontFamily: typography.family.bold, marginTop: spacing.xs },
-  companyLink: { color: colors.info, textDecorationLine: 'underline' },
-  statusBadge: { alignSelf: 'flex-start', marginTop: spacing.md },
-  nextStepCard: { marginTop: spacing.lg, backgroundColor: colors.infoBackground, borderColor: colors.infoBorder },
-  nextStepTitle: { color: colors.info, fontSize: typography.small, fontFamily: typography.family.bold, textTransform: 'uppercase', letterSpacing: 0.5 },
-  nextStepText: { color: colors.textPrimary, fontSize: typography.body, lineHeight: 20, marginTop: spacing.xs },
+  jobTitle: { color: colors.textPrimary, fontSize: typography.title, lineHeight: 24, fontFamily: typography.family.bold },
+  company: { color: colors.secondaryText, fontSize: typography.body, fontFamily: typography.family.medium, marginTop: 2 },
+  companyLinkRow: { flexDirection: 'row', alignItems: 'center', minHeight: 32, alignSelf: 'flex-start' },
+  companyLink: { color: colors.link, fontSize: typography.body, fontFamily: typography.family.bold },
+  tiles: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md },
+  tile: { flex: 1, backgroundColor: colors.sunken, borderRadius: radii.md, padding: spacing.md - 2 },
+  tileLabel: { color: colors.subtle, fontSize: typography.label, lineHeight: 14, fontFamily: typography.family.bold, letterSpacing: 0.4 },
+  tileValue: { color: colors.textPrimary, fontSize: typography.body, lineHeight: 20, fontFamily: typography.family.bold, marginTop: 2 },
+  tileFigure: { color: colors.figure, fontSize: 18, lineHeight: 22, fontFamily: typography.family.display, marginTop: 2 },
+  metaLine: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', gap: spacing.sm, marginTop: spacing.md },
+  metaItem: { flexDirection: 'row', alignItems: 'center', gap: 4, flexShrink: 1 },
+  metaText: { color: colors.subtle, fontSize: typography.small, lineHeight: 16 },
+  nextStepCard: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm + 2, marginTop: spacing.lg, padding: spacing.md, borderRadius: radii.md, borderWidth: 1, backgroundColor: colors.infoBackground, borderColor: colors.infoBorder },
+  nextStepTitle: { color: colors.iconBlue, fontSize: typography.small, fontFamily: typography.family.bold },
+  nextStepText: { color: colors.textPrimary, fontSize: typography.small, lineHeight: 18, marginTop: 2 },
+  interviewCard: { marginTop: spacing.lg, padding: spacing.lg, borderRadius: radii.lg, borderWidth: 1.5, borderColor: colors.tintBorder, backgroundColor: colors.tint, gap: spacing.md - 2 },
+  interviewHead: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  interviewTitle: { flex: 1, color: colors.textPrimary, fontSize: typography.title, fontFamily: typography.family.bold },
+  interviewPhase: { backgroundColor: colors.surface },
+  iconRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm + 2 },
+  iconRowLabel: { color: colors.textSecondary, fontSize: typography.small, lineHeight: 16 },
+  iconRowValue: { color: colors.textPrimary, fontSize: typography.body, lineHeight: 20, fontFamily: typography.family.bold },
+  withdrawBtn: { borderColor: colors.errorBorder },
+  withdrawText: { color: colors.error },
   infoCard: { marginTop: spacing.lg },
   detailRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: spacing.xs, borderBottomWidth: 1, borderBottomColor: colors.border },
   detailLabel: { color: colors.secondaryText, fontSize: typography.small, fontFamily: typography.family.bold },
@@ -292,17 +366,18 @@ const styles = StyleSheet.create({
   sectionTitle: { color: colors.textPrimary, fontSize: typography.title, fontFamily: typography.family.bold, marginTop: spacing.lg, marginBottom: spacing.md },
   timelineCard: {},
   timelineRow: { flexDirection: 'row', gap: spacing.md },
-  timelineDotColumn: { alignItems: 'center', width: 16 },
-  timelineDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.info, marginTop: 4 },
-  timelineLine: { flex: 1, width: 2, backgroundColor: colors.border, marginTop: 2 },
+  timelineDotColumn: { alignItems: 'center', width: 24 },
+  timelineDone: { width: 24, height: 24, borderRadius: 12, backgroundColor: colors.secondary, alignItems: 'center', justifyContent: 'center' },
+  timelineNow: { width: 24, height: 24, borderRadius: 12, backgroundColor: colors.surface, borderWidth: 3, borderColor: colors.secondary },
+  timelineLine: { flex: 1, width: 2, backgroundColor: colors.secondary, marginVertical: 2 },
   timelineTextColumn: { flex: 1, paddingBottom: spacing.lg },
   timelineTitle: { color: colors.textPrimary, fontSize: typography.body, fontFamily: typography.family.bold },
   timelineDescription: { color: colors.secondaryText, fontSize: typography.small, lineHeight: 18, marginTop: spacing.xs },
   timelineTimestamp: { color: colors.subtle, fontSize: 11, marginTop: spacing.xs },
   warningCard: { marginTop: 0, backgroundColor: colors.warningBackground, borderColor: colors.warningBorder },
   successCard: { marginTop: 0, backgroundColor: colors.successBackground, borderColor: colors.successBorder },
-  instructionsText: { marginTop: spacing.sm, color: colors.warning, fontSize: typography.small, lineHeight: 18 },
-  joinActionWrap: { marginTop: spacing.md, paddingTop: spacing.md, borderTopWidth: 1, borderTopColor: colors.warningBorder },
+  instructionsText: { color: colors.figure, fontSize: typography.small, lineHeight: 18, backgroundColor: colors.surface, borderRadius: radii.md, padding: spacing.md },
+  joinActionWrap: { paddingTop: spacing.md, borderTopWidth: 1, borderTopColor: colors.tintBorder },
   noLinkText: { color: colors.secondaryText, fontSize: typography.body, fontFamily: typography.family.medium, textAlign: 'center', marginVertical: spacing.sm },
   remarksText: { color: colors.secondaryText, fontSize: typography.body, lineHeight: 20 },
   footer: { padding: spacing.md, backgroundColor: colors.surface, borderTopWidth: 1, borderTopColor: colors.border },

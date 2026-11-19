@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import {
+  Alert,
   FlatList,
   KeyboardAvoidingView,
   Linking,
   Platform,
+  type ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -16,7 +18,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { LinearGradient } from 'expo-linear-gradient'
 import MaterialIcons from '@expo/vector-icons/MaterialIcons'
 import * as Haptics from 'expo-haptics'
-import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated'
+import Animated, { cancelAnimation, FadeInDown, FadeInUp, useAnimatedKeyboard, useAnimatedStyle, useSharedValue, withRepeat, withTiming } from 'react-native-reanimated'
+import { useVoiceInput, VOICE_LANGUAGE_LABEL, type VoiceLanguage } from '@/hooks/useVoiceInput'
+import { useSpeechPlayback } from '@/hooks/useSpeechPlayback'
 import type { ChatTurn, OfficeLocation } from '@/services/chatbotService'
 import { chatbotService } from '@/services/chatbotService'
 import { useAuthStore } from '@/stores/authStore'
@@ -111,6 +115,55 @@ export default function AssistantScreen() {
   const [aceState, setAceState] = useState<AceState>('greeting')
   const lastUserTextRef = useRef('')
 
+  // Scroll to the true bottom of the chat. Not FlatList.scrollToEnd(): that computes the
+  // target from the last cell's *estimated* size (getCellMetricsApprox) and a new reply isn't
+  // measured yet when its content-size change fires, so long replies stopped short with their
+  // end (and Listen) hidden under the input. The native ScrollView's scrollToEnd uses the real
+  // measured content height.
+  const scrollToBottom = (animated = true) => {
+    const native = listRef.current?.getNativeScrollRef() as unknown as ScrollView | null
+    native?.scrollToEnd({ animated })
+  }
+
+  // Keyboard on Android. The app runs edge-to-edge (app.json edgeToEdgeEnabled), so Android
+  // does NOT resize the window for the keyboard — it draws over the screen and covered the
+  // input (typed text was going in, just hidden). Track the keyboard height and lift the chat
+  // by exactly that much; while it's open the footer drops its nav-bar inset, which the
+  // keyboard already covers. iOS keeps the KeyboardAvoidingView padding below.
+  const keyboard = useAnimatedKeyboard({ isStatusBarTranslucentAndroid: true, isNavigationBarTranslucentAndroid: true })
+  const isAndroid = Platform.OS === 'android'
+  const restingInset = Math.max(insets.bottom, spacing.xs)
+  const keyboardLiftStyle = useAnimatedStyle(() => (isAndroid ? { paddingBottom: keyboard.height.value } : {}))
+  const footerInsetStyle = useAnimatedStyle(() => ({
+    paddingBottom: isAndroid && keyboard.height.value > 0 ? spacing.xs : restingInset,
+  }))
+
+  // Voice features. The mic fills the existing input (the user still reviews and taps Send);
+  // Listen reads one ACE reply at a time. They stop each other so they never overlap.
+  const voice = useVoiceInput(setInput)
+  const playback = useSpeechPlayback()
+  const toggleMic = () => {
+    if (voice.listening) {
+      voice.stop()
+      return
+    }
+    playback.stop()
+    voice.start(input)
+  }
+  const toggleListen = (id: string, text: string) => {
+    if (voice.listening) voice.stop()
+    playback.toggle(id, text)
+  }
+  const chooseVoiceLanguage = () => {
+    const pick = (value: VoiceLanguage) => ({ text: VOICE_LANGUAGE_LABEL[value], onPress: () => voice.setLanguage(value) })
+    Alert.alert(
+      'Voice input language',
+      'Auto listens in Filipino and also follows English (Taglish) where your phone supports it. Phones have no Pangasinan speech recognition yet — speak Pangasinan with Auto or Filipino and check the text before sending.',
+      [pick('auto'), pick('fil-PH'), pick('en-US')],
+      { cancelable: true },
+    )
+  }
+
   useEffect(() => {
     const timer = setTimeout(() => {
       setGreetingVisible(true)
@@ -124,6 +177,7 @@ export default function AssistantScreen() {
   const sendMessage = async (text: string) => {
     const trimmed = text.trim()
     if (!trimmed || sending) return
+    if (voice.listening) voice.stop()
 
     const userMessage: DisplayMessage = { id: `${Date.now()}-user`, role: 'user', text: trimmed }
     const historyForRequest: ChatTurn[] = messages.map(({ role, text: t }) => ({ role, text: t }))
@@ -150,25 +204,33 @@ export default function AssistantScreen() {
 
   const onInputFocus = () => {
     if (!sending) setAceState('listening')
-    setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 100)
+    // After the keyboard has finished rising, so the latest message ends up just above the input.
+    setTimeout(() => scrollToBottom(), 300)
   }
   const onInputBlur = () => { if (!sending) setAceState('idle') }
 
   return (
     <KeyboardAvoidingView
       style={styles.flex}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      // iOS only. On Android the window already resizes for the keyboard (adjustResize under
+      // edge-to-edge); adding behavior="height" on top double-adjusts and left a blank band
+      // under the composer after the keyboard closed.
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       keyboardVerticalOffset={Platform.OS === 'ios' ? headerHeight : 0}
     >
-      <View style={styles.flex}>
+      <Animated.View style={[styles.flex, keyboardLiftStyle]}>
         {/* ── Hero header with Ace ── */}
-        <LinearGradient colors={[...gradients.hero]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.hero}>
+        {/* Top padding includes the status-bar inset so the header (and its back button) start
+            below the clock instead of under it. */}
+        <LinearGradient colors={[...gradients.hero]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.hero, { paddingTop: insets.top + spacing.sm }]}>
           {/* router.replace, not router.back(): assistant is a flat sibling in the Tabs
               navigator (see job-fairs.tsx for the same reasoning) — back() only happens
               to land on Home today because Home is assistant's one entry point. */}
-          <PressableScale scaleTo="buttonPress" ripple={null} onPress={() => router.replace('/(seeker)')} hitSlop={12} style={styles.backBtn} accessibilityRole="button" accessibilityLabel="Back">
-            <MaterialIcons name="arrow-back" size={22} color={colors.white} />
-          </PressableScale>
+          <View style={styles.heroTopRow}>
+            <PressableScale scaleTo="buttonPress" ripple={null} onPress={() => router.replace('/(seeker)')} style={styles.backBtn} accessibilityRole="button" accessibilityLabel="Back">
+              <MaterialIcons name="arrow-back" size={24} color={colors.white} />
+            </PressableScale>
+          </View>
 
           <View style={styles.heroContent}>
             <View style={styles.mascotWrap}>
@@ -194,15 +256,18 @@ export default function AssistantScreen() {
           data={messages}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.messageList}
-          onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: true })}
+          onContentSizeChange={() => scrollToBottom()}
           ListHeaderComponent={
             <View style={styles.bubbleRow}>
               <AceAvatarMark size={26} />
               <View style={styles.bubbleColumn}>
                 {greetingVisible ? (
-                  <Animated.View entering={m.enabled ? FadeInUp.duration(260) : undefined} style={[styles.bubble, styles.modelBubble]}>
-                    <Text style={styles.modelText}>{greetingText}</Text>
-                  </Animated.View>
+                  <>
+                    <Animated.View entering={m.enabled ? FadeInUp.duration(260) : undefined} style={[styles.bubble, styles.modelBubble, playback.speakingId === 'greeting' && styles.bubbleSpeaking]}>
+                      <Text style={styles.modelText}>{greetingText}</Text>
+                    </Animated.View>
+                    <ListenButton active={playback.speakingId === 'greeting'} onPress={() => toggleListen('greeting', greetingText)} />
+                  </>
                 ) : (
                   <View style={[styles.bubble, styles.modelBubble, styles.typingBubble]}>
                     <TypingDots />
@@ -220,7 +285,7 @@ export default function AssistantScreen() {
               >
                 {item.role !== 'user' ? <AceAvatarMark size={26} /> : null}
                 <View style={styles.bubbleColumn}>
-                  <View style={[styles.bubble, item.role === 'user' ? styles.userBubble : styles.modelBubble]}>
+                  <View style={[styles.bubble, item.role === 'user' ? styles.userBubble : styles.modelBubble, playback.speakingId === item.id && styles.bubbleSpeaking]}>
                     <Text style={textStyle}>{renderLinkedText(item.text, textStyle)}</Text>
                     {item.role === 'model' && Boolean(item.toolResults?.search_job_vacancies?.vacancies?.length) && (
                       <View style={{ marginTop: spacing.md, gap: spacing.sm }}>
@@ -260,6 +325,10 @@ export default function AssistantScreen() {
                       </PressableScale>
                     ) : null}
                   </View>
+                  {/* Listen — ACE replies only, never the user's own messages. */}
+                  {item.role === 'model' ? (
+                    <ListenButton active={playback.speakingId === item.id} onPress={() => toggleListen(item.id, item.text)} />
+                  ) : null}
                   {item.officeLocation ? <OfficeLocationCard address={item.officeLocation.address} /> : null}
                 </View>
               </Animated.View>
@@ -290,7 +359,17 @@ export default function AssistantScreen() {
           }
         />
 
-        <View style={[styles.footerContainer, { paddingBottom: Math.max(insets.bottom, spacing.xs) }]}>
+        <Animated.View style={[styles.footerContainer, footerInsetStyle]}>
+          {voice.listening ? (
+            <View style={styles.listeningRow} accessibilityLiveRegion="polite" accessibilityLabel="Listening. Speak now.">
+              <PulseDot />
+              <Text style={styles.listeningText}>Nakikinig… speak now</Text>
+              <Text style={styles.listeningLang} numberOfLines={1}>{VOICE_LANGUAGE_LABEL[voice.language]}</Text>
+              <PressableScale scaleTo="buttonPress" ripple={null} onPress={voice.stop} hitSlop={8} style={styles.listeningStopBtn} accessibilityRole="button" accessibilityLabel="Stop listening">
+                <Text style={styles.listeningStop}>Tapos</Text>
+              </PressableScale>
+            </View>
+          ) : null}
           <View style={styles.inputBar}>
             <TextInput
               style={styles.input}
@@ -300,10 +379,25 @@ export default function AssistantScreen() {
               onBlur={onInputBlur}
               placeholder="Magtanong kay ACE…"
               placeholderTextColor={colors.subtle}
+              selectionColor={colors.secondary}
+              cursorColor={colors.secondary}
               maxLength={500}
               editable={!sending}
               multiline
             />
+            <PressableScale
+              onPress={toggleMic}
+              disabled={sending}
+              scaleTo="buttonPress"
+              ripple={null}
+              haptics
+              style={[styles.micBtn, voice.listening && styles.micBtnActive, sending && styles.sendBtnDisabled]}
+              accessibilityRole="button"
+              accessibilityLabel={voice.listening ? 'Stop voice input' : 'Speak your message'}
+              accessibilityState={{ selected: voice.listening, disabled: sending }}
+            >
+              <MaterialIcons name={voice.listening ? 'stop' : 'mic'} size={22} color={voice.listening ? colors.white : colors.iconBlue} />
+            </PressableScale>
             <PressableScale
               onPress={() => sendMessage(input)}
               disabled={sending || !input.trim()}
@@ -316,12 +410,56 @@ export default function AssistantScreen() {
               <MaterialIcons name="send" size={20} color={colors.white} />
             </PressableScale>
           </View>
-          <Text style={styles.footerBrand}>Powered by iChitech</Text>
+          <View style={styles.footerMetaRow}>
+            <PressableScale scaleTo="buttonPress" ripple={null} onPress={chooseVoiceLanguage} hitSlop={8} style={styles.voiceLangBtn} accessibilityRole="button" accessibilityLabel={`Voice input language: ${VOICE_LANGUAGE_LABEL[voice.language]}. Change`}>
+              <MaterialIcons name="record-voice-over" size={13} color={colors.link} />
+              <Text style={styles.voiceLangText}>Voice: {voice.language === 'auto' ? 'Auto' : VOICE_LANGUAGE_LABEL[voice.language]}</Text>
+              <MaterialIcons name="expand-more" size={14} color={colors.link} />
+            </PressableScale>
+            <Text style={styles.footerBrand}>Powered by iChitech</Text>
+          </View>
           <Text style={styles.disclaimer}>Sagot batay sa impormasyon ng PESO. Huwag pong maglagay ng personal na impormasyon dito.</Text>
-        </View>
-      </View>
+        </Animated.View>
+      </Animated.View>
     </KeyboardAvoidingView>
   )
+}
+
+/** "Listen" under an ACE reply; becomes "Stop · Speaking…" while that reply is being read. */
+function ListenButton({ active, onPress }: { active: boolean; onPress: () => void }) {
+  return (
+    <PressableScale
+      scaleTo="buttonPress"
+      ripple={null}
+      haptics
+      onPress={onPress}
+      hitSlop={6}
+      style={styles.listenBtn}
+      accessibilityRole="button"
+      accessibilityLabel={active ? 'Stop reading this reply' : 'Listen to this reply'}
+      accessibilityState={{ selected: active }}
+    >
+      <MaterialIcons name={active ? 'stop-circle' : 'volume-up'} size={16} color={colors.link} />
+      <Text style={styles.listenText}>{active ? 'Stop' : 'Listen'}</Text>
+      {active ? <Text style={styles.listenSpeaking}>· Speaking…</Text> : null}
+    </PressableScale>
+  )
+}
+
+/** Recording indicator; a steady dot when the OS asks for reduced motion. */
+function PulseDot() {
+  const m = useMotion()
+  const opacity = useSharedValue(1)
+  useEffect(() => {
+    if (!m.enabled) {
+      opacity.value = 1
+      return undefined
+    }
+    opacity.value = withRepeat(withTiming(0.3, { duration: 600 }), -1, true)
+    return () => cancelAnimation(opacity)
+  }, [m.enabled, opacity])
+  const style = useAnimatedStyle(() => ({ opacity: opacity.value }))
+  return <Animated.View style={[styles.pulseDot, style]} />
 }
 
 /**
@@ -352,16 +490,19 @@ function OfficeLocationCard({ address }: { address: string }) {
 const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: colors.background },
 
-  hero: { paddingTop: spacing.xxl, paddingBottom: spacing.lg, paddingHorizontal: spacing.lg, borderBottomLeftRadius: radii.xl, borderBottomRightRadius: radii.xl, ...shadows.md },
-  backBtn: { position: 'absolute', top: spacing.xxl, left: spacing.lg, zIndex: 1, width: 36, height: 36, borderRadius: 18, backgroundColor: colors.heroChip, alignItems: 'center', justifyContent: 'center' },
-  heroContent: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginTop: spacing.xl, paddingLeft: spacing.xxl + spacing.md },
+  // paddingTop is set inline from the safe-area inset (see the header above).
+  hero: { paddingBottom: spacing.lg, paddingHorizontal: spacing.lg, borderBottomLeftRadius: radii.xl, borderBottomRightRadius: radii.xl, ...shadows.md },
+  heroTopRow: { flexDirection: 'row', marginLeft: -spacing.xs },
+  // In normal flow (no longer absolutely positioned over the status bar) and 44pt.
+  backBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.heroChip, alignItems: 'center', justifyContent: 'center' },
+  heroContent: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginTop: spacing.xs },
   mascotWrap: { width: 72, height: 72, alignItems: 'center', justifyContent: 'center' },
   heroText: { flex: 1 },
   heroNameRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   heroName: { color: colors.white, fontSize: typography.heading, fontFamily: typography.family.bold },
   heroRole: { color: colors.blue200, fontSize: typography.small, marginTop: 2 },
   statusRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: spacing.md, alignSelf: 'flex-start', backgroundColor: 'rgba(255,255,255,0.12)', borderRadius: radii.pill, paddingHorizontal: spacing.sm, paddingVertical: 4 },
-  statusDot: { width: 7, height: 7, borderRadius: 3.5, backgroundColor: colors.success },
+  statusDot: { width: 7, height: 7, borderRadius: 3.5, backgroundColor: colors.blue300 },
   statusText: { color: colors.blue100, fontSize: 11, fontFamily: typography.family.medium },
 
   messageList: { padding: spacing.lg, paddingBottom: spacing.md, flexGrow: 1 },
@@ -402,15 +543,34 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingTop: spacing.sm,
     paddingBottom: spacing.sm,
+    // Explicit, not inherited: typed text (textPrimary) always sits on its own surface.
+    backgroundColor: colors.surface,
     color: colors.textPrimary,
     fontSize: typography.body,
     minHeight: 44,
     maxHeight: 120,
     textAlignVertical: 'center',
   },
-  sendBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.secondary, alignItems: 'center', justifyContent: 'center' },
+  sendBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.secondary, alignItems: 'center', justifyContent: 'center' },
   sendBtnDisabled: { backgroundColor: colors.border },
-  footerBrand: { color: colors.subtle, fontSize: 10, textAlign: 'center', paddingTop: 2, fontFamily: typography.family.bold },
+  // Voice input
+  micBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.tint, borderWidth: 1, borderColor: colors.tintBorder, alignItems: 'center', justifyContent: 'center' },
+  micBtnActive: { backgroundColor: colors.secondary, borderColor: colors.secondary },
+  listeningRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginHorizontal: spacing.lg, marginTop: spacing.xs, marginBottom: spacing.sm, paddingLeft: spacing.md, paddingRight: spacing.xs, minHeight: 40, borderRadius: radii.pill, backgroundColor: colors.tint, borderWidth: 1, borderColor: colors.tintBorder },
+  pulseDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.error },
+  listeningText: { color: colors.textPrimary, fontSize: typography.small, fontFamily: typography.family.bold },
+  listeningLang: { flex: 1, color: colors.textSecondary, fontSize: 11 },
+  listeningStopBtn: { minHeight: 32, justifyContent: 'center', paddingHorizontal: spacing.md, borderRadius: radii.pill, backgroundColor: colors.surface },
+  listeningStop: { color: colors.link, fontSize: typography.small, fontFamily: typography.family.bold },
+  footerMetaRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.lg, paddingTop: 2 },
+  voiceLangBtn: { flexDirection: 'row', alignItems: 'center', gap: 3, minHeight: 28 },
+  voiceLangText: { color: colors.link, fontSize: 11, fontFamily: typography.family.bold },
+  // Listen (text-to-speech)
+  listenBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-start', minHeight: 32, paddingHorizontal: spacing.xs, marginTop: 2 },
+  listenText: { color: colors.link, fontSize: typography.small, fontFamily: typography.family.bold },
+  listenSpeaking: { color: colors.textSecondary, fontSize: typography.small },
+  bubbleSpeaking: { borderColor: colors.secondary, borderWidth: 1.5 },
+  footerBrand: { color: colors.subtle, fontSize: 10, textAlign: 'center', fontFamily: typography.family.bold },
   disclaimer: { color: colors.subtle, fontSize: 11, textAlign: 'center', paddingHorizontal: spacing.lg, paddingTop: 2, paddingBottom: 2 },
   fairCard: { flexDirection: 'row', gap: spacing.sm, alignItems: 'center', backgroundColor: colors.infoBackground, padding: spacing.md, borderRadius: radii.md, borderWidth: 1, borderColor: colors.infoBorder },
   fairCardTitle: { color: colors.textPrimary, fontSize: typography.small, fontFamily: typography.family.bold },
