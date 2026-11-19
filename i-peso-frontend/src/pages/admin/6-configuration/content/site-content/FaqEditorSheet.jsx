@@ -1,6 +1,6 @@
 import { createElement, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import toast from 'react-hot-toast'
+import toast from '@/lib/toast'
 import { AlertTriangle, Eye, History, Languages, PenLine, Save, Send, Sparkles, WandSparkles, X } from 'lucide-react'
 import { Button } from '@/components/ui'
 import { Sheet, SheetBody, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from '@/components/ui/sheet'
@@ -168,7 +168,7 @@ function FaqEditorBody({ faq, initialQuestion, allFaqs, canEdit, office, onDone 
                   <p className="flex items-center gap-1.5 font-bold"><AlertTriangle className="h-3.5 w-3.5 text-amber-500" aria-hidden="true" /> Looks like an FAQ you already have</p>
                   <ul className="mt-1 space-y-0.5">
                     {duplicates.map(({ faq: other }) => (
-                      <li key={other.id}>“{other.question}” <span className="text-slate-500">({other.is_published ? 'published' : 'unpublished'} · {other.audience_label ?? other.audience})</span></li>
+                      <li key={other.id}>“{other.question}” <span className="text-slate-500">({other.is_published ? 'published' : 'unpublished'}, {other.audience_label ?? other.audience})</span></li>
                     ))}
                   </ul>
                   <p className="mt-1">Edit that one instead, so the assistant gets one clear answer.</p>
@@ -181,14 +181,14 @@ function FaqEditorBody({ faq, initialQuestion, allFaqs, canEdit, office, onDone 
               max={ANSWER_MAX}
               count={form.answer.length}
               error={errors.answer}
-              hint="Blank line = new paragraph · start a line with “- ” for a bullet · **bold** · links and emails become clickable."
+              hint="Blank line = new paragraph; start a line with “- ” for a bullet ; **bold**, links and emails become clickable."
             >
               <textarea value={form.answer} onChange={(e) => set('answer', e.target.value.slice(0, ANSWER_MAX))} disabled={!canEdit} rows={8} className={inputClass} placeholder="Write a short, direct answer." aria-label="Answer" />
             </Field>
 
             {canEdit && (
               <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-                <p className="text-xs font-extrabold uppercase tracking-wide text-slate-500">AI writing helper</p>
+                <p className="text-xs font-semibold text-slate-500">AI writing helper</p>
                 <div className="mt-2 flex flex-wrap gap-1.5">
                   {Object.entries(AI_TASKS).map(([task, meta]) => (
                     <Button
@@ -260,7 +260,7 @@ function FaqEditorBody({ faq, initialQuestion, allFaqs, canEdit, office, onDone 
                     {(history.data ?? []).map((revision, index) => (
                       <li key={revision.id} className="rounded-xl border border-slate-200 p-3 text-xs">
                         <div className="flex items-center justify-between gap-2">
-                          <span className="font-bold text-slate-800">{formatWhen(revision.created_at)} · {revision.author ?? 'former staff'}{index === 0 ? ' · current' : ''}</span>
+                          <span className="font-bold text-slate-800">{formatWhen(revision.created_at)}, {revision.author ?? 'former staff'}{index === 0 ? ', current' : ''}</span>
                           {canEdit && index > 0 && (
                             <button
                               type="button"

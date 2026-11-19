@@ -1,9 +1,19 @@
 import '@testing-library/jest-dom/vitest'
 import { cleanup } from '@testing-library/react'
-import { afterEach, expect } from 'vitest'
+import { afterEach, expect, vi } from 'vitest'
 import * as axeMatchers from 'vitest-axe/matchers'
 
 expect.extend(axeMatchers)
+
+// Toasts: tests never mount <Toaster/>, so a real toast renders nowhere. Stub the
+// app's toast module once here; a test that asserts on toasts can still import
+// '@/lib/toast' and read these spies, or vi.mock it itself.
+vi.mock('@/lib/toast', () => {
+  const toast = Object.assign(vi.fn(), {
+    success: vi.fn(), error: vi.fn(), warning: vi.fn(), info: vi.fn(), loading: vi.fn(), dismiss: vi.fn(),
+  })
+  return { default: toast, toast }
+})
 
 afterEach(() => {
   cleanup()

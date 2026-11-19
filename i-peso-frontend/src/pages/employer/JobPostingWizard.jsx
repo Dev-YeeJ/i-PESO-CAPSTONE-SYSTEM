@@ -1,4 +1,5 @@
-import { createElement, useEffect, useState } from 'react'
+import { createElement, useEffect, useRef, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import {
   ArrowLeft,
   ArrowRight,
@@ -7,6 +8,8 @@ import {
   Check,
   CheckCircle2,
   CircleDollarSign,
+  Copy,
+  History,
   GraduationCap,
   Loader2,
   MapPin,
@@ -17,11 +20,13 @@ import {
   UsersRound,
   X,
 } from 'lucide-react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Button } from '@/components/ui'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import AIOccupationMapper from '@/components/form/AIOccupationMapper'
-import EducationLevelSelect, { educationRankToBackendValue } from '@/components/form/EducationLevelSelect'
+import EducationLevelSelect, { educationBackendValueToRank, educationRankToBackendValue } from '@/components/form/EducationLevelSelect'
+import { mappingFromVacancy } from '@/components/form/broadFields'
+import { useAuthStore } from '@/stores/authStore'
 import ExperienceTimeFrame from '@/components/form/ExperienceTimeFrame'
 import SkillTaxonomyTags from '@/components/form/SkillTaxonomyTags'
 import SmartSuggestionInput from '@/components/form/SmartSuggestionInput'
@@ -123,14 +128,86 @@ const initialForm = {
 const inputClass = 'mt-2 w-full rounded-xl border border-slate-300 bg-white px-3.5 py-3 text-sm text-slate-900 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-blue-900 focus:ring-2 focus:ring-blue-900/10 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500'
 const selectClass = `${inputClass} appearance-none`
 
+const DRAFT_PREFIX = 'ipeso.jobDraft.'
+
+/** Unfinished posts are kept in this browser only: a convenience, not a record. */
+function readDraft(key) {
+  try {
+    const draft = JSON.parse(window.localStorage.getItem(key) ?? 'null')
+    return draft?.form ? draft : null
+  } catch {
+    return null
+  }
+}
+
+function writeDraft(key, form, step) {
+  try {
+    window.localStorage.setItem(key, JSON.stringify({ form, step, savedAt: new Date().toISOString() }))
+    return true
+  } catch {
+    return false
+  }
+}
+
+function clearDraft(key) {
+  try { window.localStorage.removeItem(key) } catch { /* storage blocked: nothing to clear */ }
+}
+
+const formatTime = (iso) => new Date(iso).toLocaleString('en-PH', { dateStyle: 'medium', timeStyle: 'short' })
+
 export default function JobPostingWizard() {
   const navigate = useNavigate()
-  const [step, setStep] = useState(1)
-  const [form, setForm] = useState(initialForm)
+  const [searchParams] = useSearchParams()
+  const duplicateFrom = searchParams.get('from')
+  const userId = useAuthStore((state) => state.user?.id)
+  const draftKey = `${DRAFT_PREFIX}${userId ?? 'me'}`
+
+  // A copy of another vacancy takes precedence over a saved draft.
+  const [initialDraft] = useState(() => (duplicateFrom ? null : readDraft(draftKey)))
+  const [step, setStep] = useState(initialDraft?.step ?? 1)
+  const [form, setForm] = useState(() => (initialDraft ? { ...initialForm, ...initialDraft.form } : initialForm))
+  const [notice, setNotice] = useState(() => (initialDraft ? { kind: 'draft', savedAt: initialDraft.savedAt } : null))
+  const [draftSavedAt, setDraftSavedAt] = useState(initialDraft?.savedAt ?? null)
+  const published = useRef(false)
   const [errors, setErrors] = useState({})
   const [serverError, setServerError] = useState('')
   const [saving, setSaving] = useState(false)
   const [showPreview, setShowPreview] = useState(false)
+
+  // Duplicate: load the source vacancy once and pre-fill everything but the deadline.
+  useEffect(() => {
+    if (!duplicateFrom) return undefined
+    let cancelled = false
+    employerService.getVacancy(duplicateFrom)
+      .then((vacancy) => {
+        if (cancelled) return
+        setForm(formFromVacancy(vacancy))
+        setStep(1)
+        setNotice({ kind: 'copy', title: vacancy.job_title })
+      })
+      .catch(() => { if (!cancelled) setNotice({ kind: 'copyFailed' }) })
+    return () => { cancelled = true }
+  }, [duplicateFrom])
+
+  // Autosave a moment after the last change. Nothing is stored for an untouched form.
+  useEffect(() => {
+    if (published.current || JSON.stringify(form) === JSON.stringify(initialForm)) return undefined
+    const timer = window.setTimeout(() => {
+      if (!published.current && writeDraft(draftKey, form, step)) setDraftSavedAt(new Date().toISOString())
+    }, 800)
+    return () => window.clearTimeout(timer)
+  }, [form, step, draftKey])
+
+  const startOver = () => {
+    clearDraft(draftKey)
+    setForm(initialForm)
+    setStep(1)
+    setErrors({})
+    setServerError('')
+    setNotice(null)
+    setDraftSavedAt(null)
+    if (duplicateFrom) navigate('/employer/post-job', { replace: true })
+  }
 
   const currentStep = steps[step - 1]
   const progressPercent = ((step - 1) / (steps.length - 1)) * 100
@@ -264,6 +341,8 @@ export default function JobPostingWizard() {
 
     try {
       await employerService.createVacancy(buildPayload(form))
+      published.current = true
+      clearDraft(draftKey)
       navigate('/employer/vacancies')
     } catch (error) {
       const responseErrors = error.response?.data?.errors ?? {}
@@ -276,20 +355,19 @@ export default function JobPostingWizard() {
   }
 
   return (
-    <div className="min-h-full bg-slate-50 px-3 py-4 sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-5xl space-y-5">
+    <div className="min-h-full">
+      <div className="mx-auto max-w-[1100px] space-y-5">
         <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <p className="text-xs font-black uppercase tracking-[0.18em] text-blue-800">Recruitment Management</p>
-            <h1 className="mt-1 text-2xl font-black tracking-tight text-slate-950 sm:text-3xl">Create Job Posting</h1>
-            <p className="mt-1 text-sm leading-6 text-slate-600">
-              Build a DOLE-compliant, match-ready vacancy with structured occupation, location, and skill data.
+            <h1 className="text-2xl font-bold leading-tight tracking-tight text-slate-900 sm:text-[32px] sm:leading-10">Post a job</h1>
+            <p className="mt-1 max-w-[70ch] text-[15px] leading-6 text-slate-600">
+              Five short steps. The occupation, location and skills you pick decide which job seekers see this vacancy first, and you preview it before it goes live.
             </p>
           </div>
           <button
             type="button"
             onClick={() => navigate('/employer/vacancies')}
-            className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 shadow-sm transition hover:border-blue-900 hover:text-blue-900"
+            className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 shadow-sm transition hover:border-blue-900 hover:text-brand-navy"
           >
             <X className="h-4 w-4" />
             Cancel
@@ -300,7 +378,7 @@ export default function JobPostingWizard() {
           <div className="border-b border-slate-200 px-5 py-5 sm:px-7">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <div>
-                <p className="text-sm font-bold text-blue-900">Step {step} of {steps.length}: {currentStep.title}</p>
+                <p className="text-sm font-bold text-brand-navy">Step {step} of {steps.length}: {currentStep.title}</p>
                 <p className="mt-1 text-xs leading-5 text-slate-500">Complete each step to publish a clean, searchable vacancy.</p>
               </div>
               <div className="grid grid-cols-5 gap-2">
@@ -318,24 +396,42 @@ export default function JobPostingWizard() {
                       }}
                       className={`flex min-h-14 min-w-0 flex-col items-center justify-center rounded-xl border px-2 py-2 text-center transition ${
                         active
-                          ? 'border-blue-900 bg-blue-900 text-white shadow-sm'
+                          ? 'border-blue-900 bg-brand-navy text-white shadow-sm'
                           : complete
-                            ? 'border-blue-200 bg-blue-50 text-blue-800'
+                            ? 'border-[#c4d9f7] bg-[#e8f0fc] text-brand-navy'
                             : 'border-slate-200 bg-slate-50 text-slate-400'
                       }`}
                       aria-current={active ? 'step' : undefined}
                     >
                       {complete ? <Check className="h-4 w-4" /> : <Icon className="h-4 w-4" />}
-                      <span className="mt-1 hidden text-[10px] font-black sm:block">{item.shortTitle}</span>
+                      <span className="mt-1 hidden text-[10px] font-bold sm:block">{item.shortTitle}</span>
                     </button>
                   )
                 })}
               </div>
             </div>
             <div className="mt-5 h-2 overflow-hidden rounded-full bg-slate-100">
-              <div className="h-full rounded-full bg-blue-900 transition-all duration-300" style={{ width: `${progressPercent}%` }} />
+              <div className="h-full rounded-full bg-brand-navy transition-all duration-300" style={{ width: `${progressPercent}%` }} />
             </div>
           </div>
+
+          {notice && (
+            <div className="mx-5 mt-5 flex flex-col gap-3 rounded-xl border border-[#c4d9f7] bg-[#e8f0fc] px-4 py-3 text-sm text-brand-navy sm:mx-7 sm:flex-row sm:items-center sm:justify-between" role="status">
+              <p className="flex items-start gap-2">
+                {createElement(notice.kind === 'draft' ? History : Copy, { className: 'mt-0.5 h-4 w-4 shrink-0', 'aria-hidden': true })}
+                <span>
+                  {notice.kind === 'draft' && <>Picked up where you left off. This draft was last saved {formatTime(notice.savedAt)}.</>}
+                  {notice.kind === 'copy' && <>Copied from &ldquo;{notice.title}&rdquo;. Check each step and set a new application deadline before publishing.</>}
+                  {notice.kind === 'copyFailed' && <>That vacancy couldn&apos;t be copied. You can still fill in the post from scratch.</>}
+                </span>
+              </p>
+              {notice.kind !== 'copyFailed' && (
+                <button type="button" onClick={startOver} className="shrink-0 self-start rounded-lg px-3 py-1.5 text-sm font-semibold text-brand-navy underline-offset-2 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-focus sm:self-auto">
+                  Start over
+                </button>
+              )}
+            </div>
+          )}
 
           {serverError && (
             <div className="mx-5 mt-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700 sm:mx-7">
@@ -358,22 +454,28 @@ export default function JobPostingWizard() {
             {step === 5 && <CompensationDetailsStep form={form} errors={errors} change={change} update={update} />}
           </div>
 
-          <footer className="sticky bottom-0 z-10 flex items-center justify-between gap-3 border-t border-slate-200 bg-white/95 px-5 py-4 backdrop-blur sm:px-7">
+          <footer className="sticky bottom-0 z-10 flex items-center justify-between gap-3 border-t border-slate-200 bg-white px-5 py-4  sm:px-7">
             <button
               type="button"
               onClick={goBack}
               disabled={step === 1 || saving}
-              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 shadow-sm transition hover:border-blue-900 hover:text-blue-900 disabled:pointer-events-none disabled:opacity-50"
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 shadow-sm transition hover:border-blue-900 hover:text-brand-navy disabled:pointer-events-none disabled:opacity-50"
             >
               <ArrowLeft className="h-4 w-4" />
               Back
             </button>
 
+            {draftSavedAt && (
+              <p className="hidden flex-1 text-center text-xs text-slate-500 sm:block" aria-live="polite">
+                Draft saved on this device, {formatTime(draftSavedAt)}
+              </p>
+            )}
+
             {step < steps.length ? (
               <button
                 type="button"
                 onClick={goNext}
-                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-blue-900 px-5 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-blue-800"
+                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-brand-navy px-5 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-[#0f2d56]"
               >
                 Next
                 <ArrowRight className="h-4 w-4" />
@@ -383,7 +485,7 @@ export default function JobPostingWizard() {
                 type="button"
                 onClick={openPreview}
                 disabled={saving}
-                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-blue-900 px-5 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-blue-800 disabled:pointer-events-none disabled:opacity-60"
+                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-brand-navy px-5 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-[#0f2d56] disabled:pointer-events-none disabled:opacity-60"
               >
                 <CheckCircle2 className="h-4 w-4" />
                 Review &amp; Publish
@@ -399,6 +501,7 @@ export default function JobPostingWizard() {
               <DialogDescription>Confirm the posting details. Publishing makes this vacancy visible to job seekers and available for matching.</DialogDescription>
             </DialogHeader>
             <PreviewBody form={form} />
+            <MatchEstimate generalTerm={form.general_term} city={form.city_municipality} />
             <DialogFooter>
               <Button variant="ghost" onClick={() => setShowPreview(false)}>Keep editing</Button>
               <Button variant="success" icon={CheckCircle2} onClick={submit} disabled={saving}>
@@ -494,6 +597,7 @@ function AlgorithmAnchorsStep({ form, errors, update, setLocation }) {
             placeholder="e.g. Accounting Staff, Cashier, React Developer, Auto Mechanic"
           />
           {errors.general_term && <p className="mt-1.5 text-xs font-semibold text-red-600">{errors.general_term}</p>}
+          <MatchEstimate generalTerm={form.general_term} city={form.city_municipality} className="mt-3" />
         </div>
 
         <div>
@@ -529,7 +633,7 @@ function AlgorithmAnchorsStep({ form, errors, update, setLocation }) {
               {errors.province || errors.city_municipality || errors.barangay}
             </p>
           )}
-          <div className="mt-3 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800">
+          <div className="mt-3 rounded-lg border border-[#c4d9f7] bg-[#e8f0fc] p-3 text-sm text-brand-navy">
             <strong>Privacy Notice:</strong> This work location will appear to job seekers as the job site and will be used for nearby job matching.
           </div>
         </div>
@@ -771,7 +875,7 @@ function CompensationDetailsStep({ form, errors, change, update }) {
           type="checkbox"
           checked={form.hide_salary}
           onChange={change}
-          className="mt-1 h-4 w-4 rounded border-slate-300 text-blue-900 focus:ring-blue-900/20"
+          className="mt-1 h-4 w-4 rounded border-slate-300 text-brand-navy focus:ring-blue-900/20"
         />
         <span>
           <span className="block text-sm font-bold text-slate-900">Hide exact salary from public posting</span>
@@ -786,7 +890,7 @@ function CompensationDetailsStep({ form, errors, change, update }) {
               type="button"
               onClick={runAiAssist}
               disabled={aiLoading}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-50 px-3 py-2 text-xs font-black text-indigo-600 ring-1 ring-indigo-100 transition hover:bg-indigo-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex items-center gap-1.5 rounded-lg bg-[#e8f0fc] px-3 py-2 text-xs font-bold text-brand-navy ring-1 ring-[#c4d9f7] transition hover:bg-[#e8f0fc] focus:outline-none focus:ring-2 focus:ring-[#2563b8] disabled:cursor-not-allowed disabled:opacity-60"
             >
               {aiLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
               {aiLoading ? 'Drafting…' : 'Smart Draft Responsibilities'}
@@ -817,7 +921,7 @@ function CompensationDetailsStep({ form, errors, change, update }) {
             className={inputClass}
           />
         </Field>
-        <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm leading-6 text-blue-900">
+        <div className="rounded-xl border border-[#c4d9f7] bg-[#e8f0fc] px-4 py-3 text-sm leading-6 text-brand-navy">
           <div className="flex items-start gap-2">
             <CalendarDays className="mt-1 h-4 w-4 shrink-0" />
             <p>The vacancy automatically closes after this date and can be excluded from active matching.</p>
@@ -832,11 +936,11 @@ function StepShell({ icon, title, description, children }) {
   return (
     <div>
       <div className="mb-6 flex items-start gap-3">
-        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-900">
+        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#e8f0fc] text-brand-navy">
           {createElement(icon, { className: 'h-5 w-5' })}
         </span>
         <div>
-          <h2 className="text-lg font-black text-slate-950">{title}</h2>
+          <h2 className="text-lg font-bold text-slate-950">{title}</h2>
           <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-600">{description}</p>
         </div>
       </div>
@@ -858,6 +962,49 @@ function Field({ label, required = true, error, className = '', children }) {
   )
 }
 
+/**
+ * Rough reach of the post while it's being written: seekers with a finished
+ * profile who prefer the same occupation field (and how many live in the
+ * job's city). The real match score is computed when the post goes live.
+ */
+function MatchEstimate({ generalTerm, city, className = '' }) {
+  const estimate = useQuery({
+    queryKey: ['employerMatchEstimate', generalTerm, city || ''],
+    queryFn: () => employerService.getMatchEstimate({ generalTerm, city }),
+    enabled: Boolean(generalTerm),
+    staleTime: 5 * 60_000,
+    retry: false,
+  })
+
+  if (!generalTerm || estimate.isError) return null
+
+  const data = estimate.data
+  return (
+    <div className={`flex items-start gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 ${className}`} aria-live="polite">
+      <span className="mt-0.5 rounded-lg bg-[#e8f0fc] p-1.5 text-brand-navy">
+        <UsersRound className="h-4 w-4" aria-hidden="true" />
+      </span>
+      <div className="text-sm">
+        {estimate.isLoading && <p className="text-slate-500">Counting job seekers in this field…</p>}
+        {data && data.same_field > 0 && (
+          <p className="font-semibold text-slate-800">
+            {data.same_field.toLocaleString()} likely {data.same_field === 1 ? 'match' : 'matches'}
+            {data.same_field_nearby !== null && city ? `, ${data.same_field_nearby.toLocaleString()} in ${city}` : ''}
+          </p>
+        )}
+        {data && data.same_field === 0 && <p className="font-semibold text-slate-800">No likely matches yet</p>}
+        {data && (
+          <p className="mt-0.5 text-xs leading-5 text-slate-500">
+            {data.same_field > 0
+              ? 'Job seekers with a finished profile who prefer this occupation field. Anyone who scores 80% or more against the full post is notified when you publish.'
+              : 'No job seeker with a finished profile has chosen this field yet. Your post still shows to anyone who searches for it.'}
+          </p>
+        )}
+      </div>
+    </div>
+  )
+}
+
 function PreviewBody({ form }) {
   const location = [form.barangay, form.city_municipality, form.province].filter(Boolean).join(', ')
   const salary = form.hide_salary
@@ -872,8 +1019,8 @@ function PreviewBody({ form }) {
 
   return (
     <dl className="grid grid-cols-1 gap-x-6 gap-y-3.5 rounded-xl border border-slate-200 bg-slate-50/60 p-4 sm:grid-cols-2">
-      <PreviewRow label="Position" value={`${form.job_title || '—'} · ${form.vacancies_count} opening${Number(form.vacancies_count) === 1 ? '' : 's'}`} />
-      <PreviewRow label="Employment" value={`${form.employment_type} · ${form.work_setup}`} />
+      <PreviewRow label="Position" value={`${form.job_title || '—'}, ${form.vacancies_count} opening${Number(form.vacancies_count) === 1 ? '' : 's'}`} />
+      <PreviewRow label="Employment" value={`${form.employment_type}, ${form.work_setup}`} />
       <PreviewRow label="Location" value={location || '—'} full />
       {form.specific_address && <PreviewRow label="Specific address" value={form.specific_address} full />}
       <PreviewRow label="Minimum education" value={form.minimum_education || '—'} />
@@ -892,7 +1039,7 @@ function PreviewBody({ form }) {
 function PreviewRow({ label, value, full }) {
   return (
     <div className={full ? 'sm:col-span-2' : ''}>
-      <dt className="text-[11px] font-extrabold uppercase tracking-wide text-slate-400">{label}</dt>
+      <dt className="text-xs font-semibold text-slate-400">{label}</dt>
       <dd className="mt-0.5 whitespace-pre-line text-sm font-semibold text-slate-800">{value}</dd>
     </div>
   )
@@ -907,6 +1054,49 @@ function yearsToExperienceLevel(yearsValue) {
   if (years <= 0) return 'No Experience Required'
   if (years === 1) return '1 Year'
   return `${years} Years`
+}
+
+/** A saved vacancy as a fresh, unpublished form: same role, new deadline. */
+function formFromVacancy(vacancy) {
+  const mapping = mappingFromVacancy(vacancy)
+  const text = (value) => value ?? ''
+  return {
+    ...initialForm,
+    job_title: text(vacancy.job_title),
+    vacancies_count: vacancy.vacancies_count ?? 1,
+    employment_type: vacancy.employment_type || initialForm.employment_type,
+    work_setup: vacancy.work_setup || initialForm.work_setup,
+    occupation_id: vacancy.occupation_id ?? null,
+    occupation_mapping: mapping,
+    general_term: mapping?.anchorCode || text(vacancy.general_term),
+    broad_field_key: mapping?.broadFieldKey ?? '',
+    anchor_code: mapping?.anchorCode ?? '',
+    psoc_code: mapping?.psocCode ?? '',
+    region: text(vacancy.region),
+    province: text(vacancy.province),
+    province_code: text(vacancy.province_code),
+    city_municipality: text(vacancy.city_municipality),
+    city_code: text(vacancy.city_code),
+    barangay: text(vacancy.barangay),
+    barangay_code: text(vacancy.barangay_code),
+    specific_address: text(vacancy.specific_address),
+    latitude: vacancy.latitude ?? null,
+    longitude: vacancy.longitude ?? null,
+    google_place_id: vacancy.google_place_id ?? null,
+    minimum_education_rank: educationBackendValueToRank(vacancy.minimum_education) || initialForm.minimum_education_rank,
+    minimum_education: vacancy.minimum_education || initialForm.minimum_education,
+    required_years_experience: Math.round((vacancy.minimum_experience_months ?? 0) / 12),
+    required_skills: Array.isArray(vacancy.required_skills) ? vacancy.required_skills : [],
+    soft_skills: Array.isArray(vacancy.soft_skills) ? vacancy.soft_skills : [],
+    preferred_gender: vacancy.preferred_gender || 'Any',
+    minimum_age: vacancy.minimum_age ?? '',
+    maximum_age: vacancy.maximum_age ?? '',
+    salary_min: vacancy.salary_min == null ? '' : Number(vacancy.salary_min),
+    salary_max: vacancy.salary_max == null ? '' : Number(vacancy.salary_max),
+    hide_salary: Boolean(vacancy.hide_salary),
+    job_description: text(vacancy.job_description),
+    application_deadline: '',
+  }
 }
 
 function buildPayload(form) {

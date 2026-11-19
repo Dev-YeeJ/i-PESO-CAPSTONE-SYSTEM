@@ -2,7 +2,7 @@ import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } fro
 import { useNavigate, useParams } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { AlertCircle, BriefcaseBusiness, Loader2, LocateFixed, MapPinned, PanelLeftOpen, RefreshCw, Sparkles } from 'lucide-react'
-import toast from 'react-hot-toast'
+import toast from '@/lib/toast'
 import JobMapAssistant from '../../components/maps/JobMapAssistant'
 import JobMapCard from '../../components/maps/JobMapCard'
 import JobMapFilters from '../../components/maps/JobMapFilters'
@@ -11,6 +11,7 @@ import ReportEmployerModal from '../../components/ReportEmployerModal'
 import JobFairInfoModal from '../../components/JobFairInfoModal'
 import EmployerProfileModal from './EmployerProfileModal'
 import { reviewService } from '../../services/reviewService'
+import useMediaQuery from '@/hooks/useMediaQuery'
 import { ALLOWED_RADII, getMapJobDetail, getMapJobs } from '../../services/jobMapService'
 import { applyToJob, toggleSavedJob } from '../../services/seekerService'
 import { listJobFairs } from '../../services/jobFairService'
@@ -60,10 +61,10 @@ function JobSkeleton() {
 function SmartSummary({ summary }) {
   return (
     <div className="border-b border-slate-200 bg-white px-4 py-2.5">
-      <p className="text-[11px] font-semibold leading-5 text-slate-600">
+      <p className="text-sm leading-5 text-slate-600">
         <strong className="text-slate-900">{summary.total_found} jobs</strong> found
-        {' · '}<strong className="text-emerald-700">{summary.high_match_count}</strong> high-match
-        {summary.nearest_distance_km !== null && <>{' · '}nearest <strong className="text-blue-800">{Number(summary.nearest_distance_km).toFixed(1)} km</strong></>}
+        {', '}<strong className="text-emerald-700">{summary.high_match_count}</strong> strong matches
+        {summary.nearest_distance_km !== null && <>{', '}nearest <strong className="text-brand-navy">{Number(summary.nearest_distance_km).toFixed(1)} km</strong></>}
       </p>
     </div>
   )
@@ -89,14 +90,14 @@ function ApplyConfirmation({ job, onCancel, onConfirm, applying }) {
 
   if (!job) return null
   return (
-    <div role="dialog" aria-modal="true" aria-labelledby="apply-confirmation-title" className="fixed inset-0 z-[1000] flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm" onClick={onCancel}>
-      <div className="w-full max-w-sm rounded-3xl bg-white p-5 shadow-2xl ring-1 ring-slate-200" onClick={(event) => event.stopPropagation()}>
+    <div role="dialog" aria-modal="true" aria-labelledby="apply-confirmation-title" className="fixed inset-0 z-[1000] flex items-center justify-center bg-slate-900/40 p-4" onClick={onCancel}>
+      <div className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-2xl ring-1 ring-slate-200" onClick={(event) => event.stopPropagation()}>
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-50 text-blue-900">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#e8f0fc] text-brand-navy">
             <BriefcaseBusiness className="h-5 w-5" />
           </div>
           <div>
-            <h2 id="apply-confirmation-title" className="text-sm font-black text-slate-900">Confirm Application</h2>
+            <h2 id="apply-confirmation-title" className="text-sm font-bold text-slate-900">Confirm application</h2>
             <p className="text-xs font-medium text-slate-500">Apply using your i-PESO profile.</p>
           </div>
         </div>
@@ -105,8 +106,8 @@ function ApplyConfirmation({ job, onCancel, onConfirm, applying }) {
         </div>
         <div className="mt-5 flex gap-2">
           <button type="button" autoFocus onClick={onCancel} className="flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 transition hover:bg-slate-50 hover:border-slate-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700">Cancel</button>
-          <button type="button" disabled={applying} onClick={() => onConfirm(job)} className="flex-1 rounded-xl bg-blue-950 px-3 py-2 text-xs font-bold text-white transition hover:bg-blue-900 disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700">
-            {applying ? 'Applying…' : 'Confirm Apply'}
+          <button type="button" disabled={applying} onClick={() => onConfirm(job)} className="flex-1 rounded-xl bg-brand-navy px-3 py-2 text-xs font-bold text-white transition hover:bg-[#0f2d56] disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700">
+            {applying ? 'Applying…' : 'Confirm and apply'}
           </button>
         </div>
       </div>
@@ -137,6 +138,9 @@ export default function JobMapPage() {
   const [pendingApplyJobId, setPendingApplyJobId] = useState(null)
   const [assistantOpen, setAssistantOpen] = useState(false)
   const [companyId, setCompanyId] = useState(null)
+  // Wide screens get the three-column layout (filters, results, map); smaller
+  // ones keep the floating panel / bottom sheet over a full-bleed map.
+  const wide = useMediaQuery('(min-width: 1280px)')
   const detailAbortRef = useRef(null)
   const detailRequestId = useRef(0)
   const filtersRef = useRef(filters)
@@ -447,105 +451,147 @@ export default function JobMapPage() {
     filters.max_missing_skills !== '' && { key: 'max_missing_skills', label: `≤${filters.max_missing_skills} missing skills` },
   ].filter(Boolean)
 
-  return (
-    <div className="relative -mx-4 -my-6 flex h-[calc(100vh-76px)] flex-col overflow-hidden bg-slate-100 sm:-mx-6 lg:-mx-8 lg:-my-8">
-      {/* Background Map Canvas */}
-      <main className="absolute inset-0 z-0">
-        <Suspense fallback={<div className="h-full w-full animate-pulse bg-slate-200" />}>
-          <JobVacancyMap jobs={mapJobs} jobFairs={jobFairs} onJobFairSelect={handleJobFairPin} seekerLocation={seekerLocation} selectedJobId={selectedJobId} popupJobId={popupJobId} onMarkerSelect={previewMarkerJob} onPopupClose={closePopup} onViewJob={openDetails} detailsOpen={Boolean(detailsJob)} onListToggle={togglePanel} onReset={resetFilters} highOnly={Number(filters.min_match) >= 80} onHighToggle={toggleHighMatch} />
-        </Suspense>
-        <div role="status" aria-live="polite" className={`pointer-events-none absolute left-1/2 top-4 z-10 -translate-x-1/2 transition-all duration-300 ${isFetching ? 'translate-y-0 opacity-100' : '-translate-y-2 opacity-0'}`}>
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white/95 px-3 py-1.5 text-[11px] font-bold text-blue-950 shadow-lg backdrop-blur">
-            <Loader2 className="h-3.5 w-3.5 animate-spin" /> {isLoading ? 'Loading map…' : 'Updating map…'}
+  const panelHeader = (
+    <header className="z-20 flex items-center justify-between gap-2 border-b border-slate-200/50 bg-transparent px-4 py-3">
+      <div className="flex min-w-0 items-center gap-2.5">
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-brand-navy text-amber-400 shadow-inner"><MapPinned className="h-4 w-4" aria-hidden="true" /></span>
+        <div className="min-w-0">
+          <h1 className="text-sm font-bold text-slate-900">Job map</h1>
+          <p className="text-[11px] leading-4 text-slate-500">Vacancies near you, ranked by how well you match.</p>
+        </div>
+      </div>
+      <div className="flex shrink-0 items-center gap-1.5">
+        <button type="button" onClick={() => setAssistantOpen((open) => !open)} aria-expanded={assistantOpen} className={`flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-[11px] font-bold shadow-sm transition ${assistantOpen ? 'border-brand-navy bg-brand-navy text-white' : 'border-slate-200 bg-white text-brand-navy hover:bg-slate-50'}`} title="Describe the job you want in your own words"><Sparkles className="h-3.5 w-3.5" aria-hidden="true" /> Smart search</button>
+        <button type="button" onClick={useCurrentLocation} disabled={isLocating} className="flex h-8 w-8 items-center justify-center rounded-md border border-slate-200 bg-white text-brand-navy shadow-sm transition hover:bg-slate-50 disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700" aria-label={isLocating ? 'Locating…' : 'Use current location'} title="Use current location">{isLocating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <LocateFixed className="h-3.5 w-3.5" />}</button>
+      </div>
+    </header>
+  )
+
+  const filterBlock = (
+    <>
+      {assistantOpen && <JobMapAssistant onFiltersParsed={updateFilters} />}
+      <JobMapFilters filters={filters} onFilterChange={updateFilters} onReset={resetFilters} />
+    </>
+  )
+
+  const locationBlock = (locationNotice || !hasLocation) && (
+    <div className={`mx-3 mt-2 rounded-lg border px-3 py-2 text-[11px] leading-4 ${hasLocation ? 'border-[#c4d9f7] bg-[#e8f0fc] text-brand-navy' : 'border-amber-200 bg-amber-50/70 text-amber-800'}`}>
+      {locationNotice || 'Update your address to view nearby jobs on the map. You can still browse the available job list.'}
+    </div>
+  )
+
+  const chipsBlock = activeFilters.length > 0 && (
+    <div className="border-b border-slate-200 bg-slate-50 px-4 py-2">
+      <div className="flex flex-wrap gap-1.5">
+        {activeFilters.map((filter) => (
+          <span key={filter.key} className="inline-flex items-center gap-1 rounded-md bg-[#e8f0fc] px-2 py-1 text-[10px] font-bold text-brand-navy">
+            {filter.label}
+            <button type="button" aria-label={`Remove ${filter.label} filter`} onClick={() => updateFilters({ [filter.key]: typeof filters[filter.key] === 'boolean' ? false : '' })} className="text-brand-navy hover:text-brand-navy">&times;</button>
           </span>
+        ))}
+      </div>
+    </div>
+  )
+
+  const listBlock = (
+    <div className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain bg-slate-50/70 p-3 [scrollbar-gutter:stable]">
+      {isLoading ? <><JobSkeleton /><JobSkeleton /><JobSkeleton /></> : error ? (
+        <div className="rounded-2xl border border-red-200 bg-white p-5 text-center shadow-sm"><AlertCircle className="mx-auto h-7 w-7 text-red-500" /><h2 className="mt-2 text-sm font-bold text-slate-800">Unable to load jobs</h2><p className="mt-1 text-xs leading-5 text-slate-500">{error}</p><button type="button" onClick={() => jobsQuery.refetch()} className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-brand-navy px-3 py-2 text-xs font-bold text-white shadow transition hover:bg-[#0f2d56]"><RefreshCw className="h-3.5 w-3.5" /> Try again</button></div>
+      ) : locationRequired ? (
+        <div className="rounded-2xl border border-amber-200 bg-white p-6 text-center shadow-sm"><LocateFixed className="mx-auto h-8 w-8 text-amber-500" /><h2 className="mt-3 text-sm font-bold text-slate-800">Location needed for nearby jobs</h2><p className="mt-1 text-xs leading-5 text-slate-500">Update your profile address or allow your current location for this search.</p><button type="button" onClick={useCurrentLocation} disabled={isLocating} className="mt-4 inline-flex items-center gap-1.5 rounded-lg bg-brand-navy px-3 py-2 text-xs font-bold text-white shadow transition hover:bg-[#0f2d56] disabled:opacity-50">{isLocating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <LocateFixed className="h-3.5 w-3.5" />} Use current location</button></div>
+      ) : jobs.length === 0 ? (
+        <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-6 text-center shadow-sm">
+          <BriefcaseBusiness className="mx-auto h-8 w-8 text-slate-300" />
+          <h2 className="mt-3 text-sm font-bold text-slate-800">{highMatchEmpty ? 'No high-match jobs found nearby' : `No jobs found within ${filters.radius_km} km`}</h2>
+          <p className="mt-1 text-xs leading-5 text-slate-500">{highMatchEmpty ? 'Try widening the radius or lowering the match filter.' : 'Try widening the radius or clearing your search filters.'}</p>
+          <div className="mt-4 flex flex-wrap justify-center gap-2">
+            <button type="button" onClick={() => updateFilters({ radius_km: Math.max(...ALLOWED_RADII) })} className="rounded-lg bg-brand-navy px-3 py-2 text-xs font-bold text-white shadow transition hover:bg-[#0f2d56]">Search a wider area</button>
+            {highMatchEmpty && <button type="button" onClick={() => updateFilters({ min_match: 0 })} className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-bold text-slate-700 transition hover:border-[#c4d9f7] hover:text-brand-navy">Lower match filter</button>}
+            <button type="button" onClick={() => navigate('/seeker/government-programs')} className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-bold text-slate-700 transition hover:border-[#c4d9f7] hover:text-brand-navy">Explore government programs</button>
+          </div>
         </div>
-        {!hasLocation && !isFetching && (
-          <div className="pointer-events-none absolute inset-x-4 top-16 z-10 mx-auto max-w-md rounded-xl border border-amber-200 bg-white/95 p-3 text-center text-xs font-semibold leading-5 text-amber-800 shadow-lg backdrop-blur">Update your address or use your current location to view nearby job pins.</div>
-        )}
-      </main>
-
-      {/* Floating Left Panel */}
-      <aside className={`absolute z-10 flex min-h-0 flex-col overflow-hidden bg-white/95 shadow-2xl ring-1 ring-slate-200/80 backdrop-blur-md transition-all duration-300 ease-in-out ${panelOpen ? 'inset-x-0 bottom-0 h-[72%] rounded-t-3xl md:inset-auto md:left-4 md:top-4 md:bottom-4 md:h-auto md:w-[380px] md:rounded-2xl md:translate-x-0 xl:w-[420px]' : 'inset-x-0 bottom-0 h-[72%] translate-y-full rounded-t-3xl md:inset-auto md:left-4 md:top-4 md:bottom-4 md:h-auto md:w-[380px] md:rounded-2xl md:-translate-x-[110%] xl:w-[420px]'}`}>
-        <header className="z-20 flex items-center justify-between border-b border-slate-200/50 bg-transparent px-4 py-3">
-          <div className="flex items-center gap-2.5">
-            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-950 text-amber-400 shadow-inner"><MapPinned className="h-4 w-4" /></span>
-            <div><h1 className="text-sm font-black tracking-wide text-slate-900">Smart Job Map</h1><p className="max-w-[250px] text-[10px] font-medium leading-4 text-slate-500">Discover jobs near you.</p></div>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <button type="button" onClick={() => setAssistantOpen((open) => !open)} aria-expanded={assistantOpen} className={`flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-[10px] font-bold shadow-sm transition ${assistantOpen ? 'border-blue-900 bg-blue-950 text-white' : 'border-slate-200 bg-white text-blue-950 hover:bg-slate-50'}`} title="Smart-assisted search"><Sparkles className="h-3.5 w-3.5" /> Smart Search</button>
-            <button type="button" onClick={useCurrentLocation} disabled={isLocating} className="flex h-8 w-8 items-center justify-center rounded-md border border-slate-200 bg-white text-blue-950 shadow-sm transition hover:bg-slate-50 hover:text-blue-700 disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700" aria-label={isLocating ? 'Locating…' : 'Use current location'} title="Use current location">{isLocating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <LocateFixed className="h-3.5 w-3.5" />}</button>
-          </div>
-        </header>
-
-        {assistantOpen && <JobMapAssistant onFiltersParsed={updateFilters} />}
-        <JobMapFilters filters={filters} onFilterChange={updateFilters} onReset={resetFilters} />
-        <SmartSummary summary={liveSummary} />
-
-        {activeFilters.length > 0 && (
-          <div className="border-b border-slate-200 bg-slate-50 px-4 py-2">
-            <div className="flex flex-wrap gap-1.5">
-              {activeFilters.map((filter) => (
-                <span key={filter.key} className="inline-flex items-center gap-1 rounded-md bg-blue-100 px-2 py-1 text-[9px] font-bold text-blue-800">
-                  {filter.label}
-                  <button type="button" onClick={() => updateFilters({ [filter.key]: typeof filters[filter.key] === 'boolean' ? false : '' })} className="text-blue-900 hover:text-blue-950">&times;</button>
-                </span>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {(locationNotice || !hasLocation) && (
-          <div className={`mx-3 mt-2 rounded-lg border px-3 py-2 text-[11px] leading-4 ${hasLocation ? 'border-blue-100 bg-blue-50/70 text-blue-800' : 'border-amber-200 bg-amber-50/70 text-amber-800'}`}>
-            {locationNotice || 'Update your address to view nearby jobs on the map. You can still browse the available job list.'}
-          </div>
-        )}
-
-        <div className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain bg-slate-50/70 p-3 [scrollbar-gutter:stable]">
-          {isLoading ? <><JobSkeleton /><JobSkeleton /><JobSkeleton /></> : error ? (
-            <div className="rounded-2xl border border-red-200 bg-white p-5 text-center shadow-sm"><AlertCircle className="mx-auto h-7 w-7 text-red-500" /><h2 className="mt-2 text-sm font-black text-slate-800">Unable to load jobs</h2><p className="mt-1 text-xs leading-5 text-slate-500">{error}</p><button type="button" onClick={() => jobsQuery.refetch()} className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-blue-950 px-3 py-2 text-xs font-bold text-white shadow transition hover:bg-blue-900"><RefreshCw className="h-3.5 w-3.5" /> Try again</button></div>
-          ) : locationRequired ? (
-            <div className="rounded-2xl border border-amber-200 bg-white p-6 text-center shadow-sm"><LocateFixed className="mx-auto h-8 w-8 text-amber-500" /><h2 className="mt-3 text-sm font-black text-slate-800">Location needed for nearby jobs</h2><p className="mt-1 text-xs leading-5 text-slate-500">Update your profile address or allow your current location for this search.</p><button type="button" onClick={useCurrentLocation} disabled={isLocating} className="mt-4 inline-flex items-center gap-1.5 rounded-lg bg-blue-950 px-3 py-2 text-xs font-bold text-white shadow transition hover:bg-blue-900 disabled:opacity-50">{isLocating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <LocateFixed className="h-3.5 w-3.5" />} Use current location</button></div>
-          ) : jobs.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-6 text-center shadow-sm">
-              <BriefcaseBusiness className="mx-auto h-8 w-8 text-slate-300" />
-              <h2 className="mt-3 text-sm font-black text-slate-800">{highMatchEmpty ? 'No high-match jobs found nearby' : `No jobs found within ${filters.radius_km} km`}</h2>
-              <p className="mt-1 text-xs leading-5 text-slate-500">{highMatchEmpty ? 'Try widening the radius or lowering the match filter.' : 'Try widening the radius or clearing your search filters.'}</p>
-              {/* One consistent visual language for every secondary action here — solid
-                  for the single recommended next step, matching outline treatment for
-                  the rest, regardless of where each one navigates to. */}
-              <div className="mt-4 flex flex-wrap justify-center gap-2">
-                <button type="button" onClick={() => updateFilters({ radius_km: Math.max(...ALLOWED_RADII) })} className="rounded-lg bg-blue-950 px-3 py-2 text-xs font-bold text-white shadow transition hover:bg-blue-900">Search a wider area</button>
-                {highMatchEmpty && <button type="button" onClick={() => updateFilters({ min_match: 0 })} className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-bold text-slate-700 transition hover:border-blue-300 hover:text-blue-900">Lower match filter</button>}
-                <button type="button" onClick={() => navigate('/seeker/government-programs')} className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-bold text-slate-700 transition hover:border-blue-300 hover:text-blue-900">Explore Government Programs</button>
-              </div>
-            </div>
-          ) : jobs.map((job) => (
-            <div id={`map-job-${job.post_id}`} key={job.post_id}>
-              <JobMapCard job={job} rating={employerRatings[job.employer_id || job.employer?.employer_id]} isActive={selectedJobId === job.post_id} isApplying={applyingIds.includes(job.post_id)} isSaving={savingIds.includes(job.post_id)} onClick={() => openDetails(job)} onView={openDetails} onApply={requestApply} onSave={handleSave} onTraining={viewTraining} onJobFair={handleJobFair} />
-            </div>
-          ))}
-          {!isFetching && !error && jobs.length >= Number(filters.limit) && Number(filters.limit) < 100 && (
-            <button
-              type="button"
-              onClick={() => updateFilters({ limit: Math.min(100, Number(filters.limit) + 20) })}
-              className="w-full rounded-xl border border-blue-200 bg-white px-4 py-3 text-xs font-black text-blue-900 shadow-sm transition hover:bg-blue-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700"
-            >
-              Load more vacancies
-            </button>
-          )}
+      ) : jobs.map((job) => (
+        <div id={`map-job-${job.post_id}`} key={job.post_id}>
+          <JobMapCard job={job} rating={employerRatings[job.employer_id || job.employer?.employer_id]} isActive={selectedJobId === job.post_id} isApplying={applyingIds.includes(job.post_id)} isSaving={savingIds.includes(job.post_id)} onClick={() => openDetails(job)} onView={openDetails} onApply={requestApply} onSave={handleSave} onTraining={viewTraining} onJobFair={handleJobFair} />
         </div>
-      </aside>
-
-      {!panelOpen && (
-        <button type="button" onClick={() => setPanelOpen(true)} className="absolute left-4 top-4 z-20 flex items-center gap-2 rounded-xl border border-slate-200 bg-white/95 px-4 py-2.5 text-xs font-bold text-blue-950 shadow-lg backdrop-blur hover:bg-white md:left-6 md:top-6">
-          <PanelLeftOpen className="h-4 w-4" /> Show {jobs.length} jobs
+      ))}
+      {!isFetching && !error && jobs.length >= Number(filters.limit) && Number(filters.limit) < 100 && (
+        <button
+          type="button"
+          onClick={() => updateFilters({ limit: Math.min(100, Number(filters.limit) + 20) })}
+          className="w-full rounded-xl border border-[#c4d9f7] bg-white px-4 py-3 text-xs font-bold text-brand-navy shadow-sm transition hover:bg-[#e8f0fc] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700"
+        >
+          Load more vacancies
         </button>
       )}
+    </div>
+  )
 
-      {/* Floating Details Panel */}
-      <div className="absolute inset-0 z-20 pointer-events-none">
-        <JobMapDetailsPanel job={detailsJob} onViewCompanyReviews={(employerId) => setCompanyId(employerId)} isLoading={detailLoadingId === selectedJobId} loadError={detailError} onClose={() => { detailAbortRef.current?.abort(); setSelectedJobId(null); setDetailError('') }} onApply={requestApply} onSave={handleSave} onTraining={viewTraining} onJobFair={handleJobFair} onApplicationStatus={() => navigate('/seeker/applications')} onReport={(job) => setReportTarget({ employer: { employer_id: job.employer_id || job.employer?.employer_id, employer_name: job.employer_name }, vacancy: { post_id: job.post_id, job_title: job.job_title } })} isApplying={detailsJob ? applyingIds.includes(detailsJob.post_id) : false} isSaving={detailsJob ? savingIds.includes(detailsJob.post_id) : false} />
+  const mapBlock = (
+    <>
+      <Suspense fallback={<div className="h-full w-full animate-pulse bg-slate-200" />}>
+        <JobVacancyMap jobs={mapJobs} jobFairs={jobFairs} onJobFairSelect={handleJobFairPin} seekerLocation={seekerLocation} selectedJobId={selectedJobId} popupJobId={popupJobId} onMarkerSelect={previewMarkerJob} onPopupClose={closePopup} onViewJob={openDetails} detailsOpen={Boolean(detailsJob)} onListToggle={togglePanel} onReset={resetFilters} highOnly={Number(filters.min_match) >= 80} onHighToggle={toggleHighMatch} />
+      </Suspense>
+      <div role="status" aria-live="polite" className={`pointer-events-none absolute left-1/2 top-4 z-10 -translate-x-1/2 transition-all duration-300 ${isFetching ? 'translate-y-0 opacity-100' : '-translate-y-2 opacity-0'}`}>
+        <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-bold text-brand-navy shadow-lg">
+          <Loader2 className="h-3.5 w-3.5 animate-spin" /> {isLoading ? 'Loading map…' : 'Updating map…'}
+        </span>
       </div>
+      {!hasLocation && !isFetching && (
+        <div className="pointer-events-none absolute inset-x-4 top-16 z-10 mx-auto max-w-md rounded-xl border border-amber-200 bg-white p-3 text-center text-xs font-semibold leading-5 text-amber-800 shadow-lg">Update your address or use your current location to view nearby job pins.</div>
+      )}
+    </>
+  )
+
+  const detailsBlock = (
+    <div className="pointer-events-none absolute inset-0 z-20">
+      <JobMapDetailsPanel job={detailsJob} onViewCompanyReviews={(employerId) => setCompanyId(employerId)} isLoading={detailLoadingId === selectedJobId} loadError={detailError} onClose={() => { detailAbortRef.current?.abort(); setSelectedJobId(null); setDetailError('') }} onApply={requestApply} onSave={handleSave} onTraining={viewTraining} onJobFair={handleJobFair} onApplicationStatus={() => navigate('/seeker/applications')} onReport={(job) => setReportTarget({ employer: { employer_id: job.employer_id || job.employer?.employer_id, employer_name: job.employer_name }, vacancy: { post_id: job.post_id, job_title: job.job_title } })} isApplying={detailsJob ? applyingIds.includes(detailsJob.post_id) : false} isSaving={detailsJob ? savingIds.includes(detailsJob.post_id) : false} />
+    </div>
+  )
+
+  return (
+    <div className="relative -mx-4 -my-6 flex h-[calc(100vh-76px)] flex-col overflow-hidden bg-slate-100 sm:-mx-6 lg:-mx-8 lg:-my-8">
+      {wide ? (
+        <div className={`grid min-h-0 flex-1 ${panelOpen ? 'grid-cols-[300px_380px_minmax(0,1fr)]' : 'grid-cols-[300px_minmax(0,1fr)]'}`}>
+          <aside aria-label="Filters" className="flex min-h-0 flex-col overflow-y-auto border-r border-slate-200 bg-white">
+            {panelHeader}
+            {filterBlock}
+            {locationBlock}
+          </aside>
+          {panelOpen && (
+            <section aria-label="Results" className="flex min-h-0 flex-col border-r border-slate-200 bg-white">
+              <SmartSummary summary={liveSummary} />
+              {chipsBlock}
+              {listBlock}
+            </section>
+          )}
+          <section aria-label="Map" className="relative min-h-0">
+            {mapBlock}
+            {detailsBlock}
+          </section>
+        </div>
+      ) : (
+        <>
+          <main className="absolute inset-0 z-0">{mapBlock}</main>
+
+          <aside className={`absolute z-10 flex min-h-0 flex-col overflow-hidden bg-white shadow-elevated ring-1 ring-slate-200 transition-all duration-300 ease-in-out ${panelOpen ? 'inset-x-0 bottom-0 h-[72%] rounded-t-3xl md:inset-auto md:left-4 md:top-4 md:bottom-4 md:h-auto md:w-[380px] md:rounded-2xl md:translate-x-0' : 'inset-x-0 bottom-0 h-[72%] translate-y-full rounded-t-3xl md:inset-auto md:left-4 md:top-4 md:bottom-4 md:h-auto md:w-[380px] md:rounded-2xl md:-translate-x-[110%]'}`}>
+            {panelHeader}
+            {filterBlock}
+            <SmartSummary summary={liveSummary} />
+            {chipsBlock}
+            {locationBlock}
+            {listBlock}
+          </aside>
+
+          {!panelOpen && (
+            <button type="button" onClick={() => setPanelOpen(true)} className="absolute left-4 top-4 z-20 flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-bold text-brand-navy shadow-lg hover:bg-white md:left-6 md:top-6">
+              <PanelLeftOpen className="h-4 w-4" /> Show {jobs.length} jobs
+            </button>
+          )}
+
+          {detailsBlock}
+        </>
+      )}
 
       <ApplyConfirmation job={pendingApplyJob} onCancel={() => setPendingApplyJobId(null)} onConfirm={submitApplication} applying={pendingApplyJob ? applyingIds.includes(pendingApplyJob.post_id) : false} />
       <ReportEmployerModal open={Boolean(reportTarget)} employer={reportTarget?.employer} vacancy={reportTarget?.vacancy} onClose={() => setReportTarget(null)} />

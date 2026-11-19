@@ -127,7 +127,7 @@ export default function EmployerRegistration() {
       title="Complete your employer profile"
       subtitle="Provide the company information and legal requirements PESO needs to review your organization."
       progress={(step / STEPS.length) * 100}
-      progressLabel={`Step ${step} of ${STEPS.length} · ${STEPS[step - 1].title}`}
+      progressLabel={`Step ${step} of ${STEPS.length}: ${STEPS[step - 1].title}`}
       maxWidth="max-w-4xl"
       role="employer"
       steps={employerRegistrationSteps}
@@ -151,7 +151,7 @@ export default function EmployerRegistration() {
             )}
 
             <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-4">
-              <p className="text-sm font-extrabold text-amber-950">Step {step} of 5: {STEPS[step - 1].title}</p>
+              <p className="text-sm font-semibold text-amber-950">Step {step} of 5: {STEPS[step - 1].title}</p>
               <p className="mt-1 text-xs leading-5 text-amber-800">{STEPS[step - 1].subtitle}</p>
             </div>
 

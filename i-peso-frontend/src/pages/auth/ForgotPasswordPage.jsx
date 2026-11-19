@@ -1,8 +1,8 @@
 import { useState } from 'react'
-import { ArrowLeft, KeyRound, Mail } from 'lucide-react'
+import { ArrowLeft, Mail } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 import AuthShell from '@/components/auth/AuthShell'
-import { AlertBox, Button, Card } from '@/components/ui'
+import { AlertBox, Button } from '@/components/ui'
 import { authService } from '@/services/authService'
 
 export default function ForgotPasswordPage() {
@@ -33,12 +33,11 @@ export default function ForgotPasswordPage() {
   }
 
   return (
-    <AuthShell title="Reset your password" subtitle="Enter your registered email address and we will send a six-digit reset code." sideTitle="Recover access securely." sideText="Password recovery uses a time-limited verification code sent to the email address attached to your i-PESO account.">
-      <Link to="/login" className="mb-5 inline-flex items-center gap-2 text-sm font-bold text-slate-500 hover:text-brand-navy"><ArrowLeft className="h-4 w-4" />Back to sign in</Link>
+    <AuthShell title="Reset your password" subtitle="Enter the email on your account and we'll send a six-digit code. It expires in 10 minutes." sideTitle="Locked out? You'll be back in a minute." sideText="We send a time-limited code to the email on your account. Nobody at PESO can see your password.">
+      <Link to="/login" className="mb-5 inline-flex items-center gap-2 text-sm font-semibold text-slate-600 hover:text-brand-navy"><ArrowLeft className="h-4 w-4" />Back to sign in</Link>
       {apiError && <AlertBox variant="danger" title="Reset code could not be sent" className="mb-5">{apiError}</AlertBox>}
-      <Card>
-        <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-50 text-blue-700"><KeyRound className="h-6 w-6" /></span>
-        <form onSubmit={submit} noValidate className="mt-6 space-y-5">
+      <>
+        <form onSubmit={submit} noValidate className="space-y-5">
           <label className="portal-label">
             Email address
             <div className="relative">
@@ -47,10 +46,10 @@ export default function ForgotPasswordPage() {
             </div>
             {emailError && <span className="mt-1.5 block text-xs font-medium text-red-600">{emailError}</span>}
           </label>
-          <Button type="submit" disabled={loading} icon={Mail} className="w-full">{loading ? 'Sending reset code...' : 'Send Reset Code'}</Button>
+          <Button type="submit" disabled={loading} icon={Mail} className="w-full">{loading ? 'Sending code…' : 'Send reset code'}</Button>
         </form>
-        <p className="mt-6 border-t border-slate-200 pt-5 text-center text-sm text-slate-600">Remembered your password? <Link to="/login" className="font-extrabold text-blue-700 hover:underline">Sign in</Link></p>
-      </Card>
+        <p className="mt-6 text-sm text-slate-600">Remembered it? <Link to="/login" className="font-semibold text-brand-navy hover:underline">Sign in</Link></p>
+      </>
     </AuthShell>
   )
 }

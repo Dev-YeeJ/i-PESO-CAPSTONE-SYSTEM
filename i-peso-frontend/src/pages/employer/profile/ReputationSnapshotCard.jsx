@@ -23,9 +23,9 @@ export default function ReputationSnapshotCard() {
   const waiting = (data?.counts?.recruitment?.needs_reply ?? 0) + (data?.counts?.employment?.needs_reply ?? 0)
 
   return (
-    <section aria-labelledby="reputation-snapshot" className="overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04),0_12px_32px_-16px_rgba(15,23,42,0.18)]">
+    <section aria-labelledby="reputation-snapshot" className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04),0_12px_32px_-16px_rgba(15,23,42,0.18)]">
       <div className="p-6">
-        <h2 id="reputation-snapshot" className="text-base font-black text-slate-900">Your reputation</h2>
+        <h2 id="reputation-snapshot" className="text-base font-bold text-slate-900">Your reputation</h2>
         <p className="mt-0.5 text-sm text-slate-600">From verified applicants and employees.</p>
 
         {isLoading ? (
@@ -43,11 +43,11 @@ export default function ReputationSnapshotCard() {
                   <dd className="mt-1">
                     {section?.enough ? (
                       <>
-                        <span className="flex items-center gap-1 text-2xl font-black text-slate-950">
+                        <span className="flex items-center gap-1 text-2xl font-bold text-slate-950">
                           {section.average?.toFixed(1)}
                           <Star className="h-4 w-4 fill-amber-400 text-amber-400" aria-hidden />
                         </span>
-                        <span className="text-xs text-slate-500">{section.reviewers} reviewers · {section.recommend_percent}% recommend</span>
+                        <span className="text-xs text-slate-500">{section.reviewers} reviewers, {section.recommend_percent}% recommend</span>
                       </>
                     ) : (
                       <>

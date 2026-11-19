@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import toast from 'react-hot-toast'
+import toast from '@/lib/toast'
 import { AlertTriangle, Archive, ArrowLeft, BellRing, ChevronDown, Eye, FileText, Megaphone, Paperclip, RotateCcw, Save, Send, SlidersHorizontal, Trash2, Undo2 } from 'lucide-react'
 import { Badge, Button, Card, ConfirmDialog, ErrorState, LoadingSkeleton } from '@/components/ui'
 import { adminAnnouncementService, isoToLocalInput, localInputToIso } from '@/services/announcementService'
@@ -12,7 +12,7 @@ import { AUDIENCE_SHORT, CATEGORY_META, PRIORITY_META, STATE_BADGE, formatDateTi
 
 const TITLE_MAX = 150
 const BODY_MAX = 5000
-const labelClass = 'text-xs font-extrabold uppercase tracking-wide text-slate-600'
+const labelClass = 'text-xs font-semibold text-slate-600'
 const inputClass = 'mt-1.5 w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 focus:border-brand-navy focus:outline-none focus:ring-2 focus:ring-brand-navy/10 disabled:bg-slate-50 disabled:text-slate-500'
 
 const EMPTY = {
@@ -69,6 +69,8 @@ export default function AnnouncementFormPage() {
     queryKey: ['admin', 'announcement', id],
     queryFn: () => adminAnnouncementService.get(id),
     enabled: !isNew,
+    // While notifications are still going out (sent after the publish response), check back for progress.
+    refetchInterval: (query) => (query.state.data?.delivery?.in_progress ? 4000 : false),
   })
   const announcement = detailQuery.data
   const state = announcement?.state ?? 'draft'
@@ -245,12 +247,11 @@ export default function AnnouncementFormPage() {
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="portal-eyebrow">Configuration · Announcements</p>
-          <h1 className="portal-title mt-1">{isNew ? 'New announcement' : readOnly ? 'Announcement' : 'Edit announcement'}</h1>
+          <h1 className="portal-title">{isNew ? 'New announcement' : readOnly ? 'Announcement' : 'Edit announcement'}</h1>
           {!isNew && (
             <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-slate-500">
               <Badge status={STATE_BADGE[state] ?? 'neutral'}>{announcement.state_label}</Badge>
-              {announcement.updated_by && <span>Last edited by {announcement.updated_by} · {formatDateTime(announcement.updated_at)}</span>}
+              {announcement.updated_by && <span>Last edited by {announcement.updated_by}, {formatDateTime(announcement.updated_at)}</span>}
             </div>
           )}
         </div>
@@ -286,7 +287,7 @@ export default function AnnouncementFormPage() {
                 onChange={(value) => set('audience', value)}
                 disabled={readOnly}
                 options={Object.entries(AUDIENCE_SHORT).map(([value, label]) => ({ value, label }))}
-                hint={`${AUDIENCE_HELP[form.audience]}${optionsQuery.data ? ` · ${audienceSize.toLocaleString()} accounts` : ''}`}
+                hint={`${AUDIENCE_HELP[form.audience]}${optionsQuery.data ? `, ${audienceSize.toLocaleString()} accounts` : ''}`}
               />
 
               <Segmented
@@ -325,7 +326,7 @@ export default function AnnouncementFormPage() {
               <div className="flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3.5">
                 <BellRing className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" aria-hidden="true" />
                 <p className="text-sm">
-                  <span className="block font-extrabold text-slate-950">How readers get it</span>
+                  <span className="block font-semibold text-slate-950">How readers get it</span>
                   <span className="mt-0.5 block text-xs text-slate-600">
                     {alreadyNotified
                       ? `Notified ${announcement.notified_count.toLocaleString()} users on ${formatDateTime(announcement.notified_at)} — notifications are only sent once.`
@@ -343,7 +344,7 @@ export default function AnnouncementFormPage() {
                 type="button"
                 onClick={() => setShowMore((open) => !open)}
                 aria-expanded={showMore}
-                className="flex w-full items-center justify-between text-left text-sm font-extrabold text-slate-700 hover:text-brand-navy"
+                className="flex w-full items-center justify-between text-left text-sm font-semibold text-slate-700 hover:text-brand-navy"
               >
                 <span className="flex items-center gap-2">
                   <SlidersHorizontal className="h-4 w-4 text-slate-400" />
@@ -534,7 +535,7 @@ function Preview({ form, existing }) {
 
   return (
     <Card padding="sm">
-      <h2 className="flex items-center gap-2 text-sm font-extrabold uppercase tracking-wide text-slate-500"><Eye className="h-4 w-4" /> Reader preview</h2>
+      <h2 className="flex items-center gap-2 text-sm font-semibold text-slate-500"><Eye className="h-4 w-4" /> Reader preview</h2>
 
       {form.priority !== 'normal' && (
         <div className="mt-3">
@@ -543,8 +544,8 @@ function Preview({ form, existing }) {
             <span className={`absolute inset-y-0 left-0 w-1.5 ${meta.bannerAccent}`} aria-hidden="true" />
             <Megaphone className={`mt-0.5 h-4 w-4 shrink-0 ${meta.bannerText}`} aria-hidden="true" />
             <div className="min-w-0">
-              <p className={`text-[10px] font-black uppercase tracking-wider ${meta.bannerText}`}>{form.priority === 'urgent' ? 'Urgent PESO announcement' : 'PESO announcement'}</p>
-              <p className="text-sm font-extrabold text-slate-950">{title}</p>
+              <p className={`text-xs font-bold ${meta.bannerText}`}>{form.priority === 'urgent' ? 'Urgent PESO announcement' : 'PESO announcement'}</p>
+              <p className="text-sm font-semibold text-slate-950">{title}</p>
               <p className="line-clamp-2 text-xs text-slate-700">{excerpt}</p>
             </div>
           </div>
@@ -558,7 +559,7 @@ function Preview({ form, existing }) {
           <PriorityPill priority={form.priority} />
           {form.is_pinned && <PinnedMark />}
         </div>
-        <p className="mt-2 font-black text-slate-950">{title}</p>
+        <p className="mt-2 font-bold text-slate-950">{title}</p>
         <AnnouncementBody text={body} className="mt-1 max-h-60 overflow-y-auto text-[13px]" />
         {hasAttachment && (
           <p className="mt-2 flex items-center gap-1.5 text-xs font-semibold text-slate-500">
@@ -582,29 +583,34 @@ function StatusPanel({ announcement }) {
 
   return (
     <Card padding="sm">
-      <h2 className="text-sm font-extrabold uppercase tracking-wide text-slate-500">Status &amp; reach</h2>
+      <h2 className="text-sm font-semibold text-slate-500">Status &amp; reach</h2>
       <dl className="mt-3 space-y-2 text-sm">
         <Row label="Status"><Badge status={STATE_BADGE[announcement.state] ?? 'neutral'}>{announcement.state_label}</Badge></Row>
-        <Row label="Created">{announcement.created_by ?? '—'} · {formatDateTime(announcement.created_at)}</Row>
+        <Row label="Created">{announcement.created_by ?? '—'}, {formatDateTime(announcement.created_at)}</Row>
         {announcement.published_by && <Row label="Published by">{announcement.published_by}</Row>}
         <Row label="Visible from">{announcement.publish_at ? formatDateTime(announcement.publish_at) : '—'}</Row>
         <Row label="Until">{announcement.expires_at ? formatDateTime(announcement.expires_at) : 'No end date'}</Row>
         <Row label="Notifications">
-          {announcement.notified_at
-            ? `Sent to ${announcement.notified_count.toLocaleString()} · ${formatDateTime(announcement.notified_at)}`
+          {announcement.delivery?.in_progress ? (
+            <span className="inline-flex items-center gap-2" role="status">
+              <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-brand-navy border-t-transparent motion-reduce:animate-none" aria-hidden="true" />
+              Sending in the background: {(announcement.notified_count ?? 0).toLocaleString()} of {(announcement.delivery.total ?? 0).toLocaleString()} notified. You can leave this page.
+            </span>
+          ) : announcement.notified_at
+            ? `Sent to ${(announcement.notified_count ?? 0).toLocaleString()}, ${formatDateTime(announcement.notified_at)}`
             : announcement.notify_users ? (announcement.state === 'scheduled' ? 'Will send when it goes live' : 'Sending…') : 'Not sent (published before notifications were automatic)'}
         </Row>
       </dl>
 
       {published ? (
         <div className="mt-4 rounded-xl bg-slate-50 p-3">
-          <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Reach</p>
-          <p className="mt-1 text-2xl font-black text-brand-navy">{reach.rate ?? 0}%</p>
+          <p className="text-xs font-bold text-slate-500">Reach</p>
+          <p className="mt-1 text-2xl font-bold text-brand-navy">{reach.rate ?? 0}%</p>
           <p className="text-xs text-slate-600">Seen by {(reach.seen ?? 0).toLocaleString()} of {(reach.targeted ?? 0).toLocaleString()} accounts in the audience</p>
           <div className="mt-2 h-2 overflow-hidden rounded-full bg-white" role="progressbar" aria-valuenow={reach.rate ?? 0} aria-valuemin={0} aria-valuemax={100} aria-label="Reach">
             <div className="h-full rounded-full bg-slate-500" style={{ width: `${Math.max(reach.rate ?? 0, 2)}%` }} />
           </div>
-          <p className="mt-2 text-xs text-slate-500">{(reach.seen_seekers ?? 0).toLocaleString()} job seekers · {(reach.seen_employers ?? 0).toLocaleString()} employers · {(reach.dismissed ?? 0).toLocaleString()} dismissed the banner</p>
+          <p className="mt-2 text-xs text-slate-500">{(reach.seen_seekers ?? 0).toLocaleString()} job seekers, {(reach.seen_employers ?? 0).toLocaleString()} employers, {(reach.dismissed ?? 0).toLocaleString()} dismissed the banner</p>
         </div>
       ) : (
         <p className="mt-4 flex items-start gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
@@ -648,7 +654,7 @@ function Segmented({ label, value, options, onChange, disabled, hint }) {
 function Row({ label, children }) {
   return (
     <div className="flex items-start justify-between gap-3">
-      <dt className="shrink-0 text-xs font-bold uppercase tracking-wide text-slate-500">{label}</dt>
+      <dt className="shrink-0 text-xs font-bold text-slate-500">{label}</dt>
       <dd className="text-right text-slate-800">{children}</dd>
     </div>
   )

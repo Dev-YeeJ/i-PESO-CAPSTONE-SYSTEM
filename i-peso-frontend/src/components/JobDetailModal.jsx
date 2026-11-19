@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import toast from 'react-hot-toast'
+import toast from '@/lib/toast'
 import { Award, Banknote, Bookmark, BriefcaseBusiness, CalendarDays, Check, ExternalLink, Flag, GraduationCap, Loader2, MapPin, Navigation, Sparkles } from 'lucide-react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import EmployerPreferenceChip from '@/components/jobs/EmployerPreferenceChip'

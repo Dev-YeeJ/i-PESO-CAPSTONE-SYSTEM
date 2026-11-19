@@ -96,7 +96,7 @@ export default function Step4Representative({ onComplete }) {
     <form onSubmit={handleSubmit} noValidate className="space-y-4">
       <FormError message={apiError} />
 
-      <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-sm text-blue-800">
+      <div className="bg-[#e8f0fc] border border-[#c4d9f7] rounded-xl p-4 text-sm text-brand-navy">
         <p className="font-medium mb-1">Authorized Representative Details</p>
         <p>Please provide information about the person authorized to represent this company.</p>
       </div>
@@ -129,7 +129,7 @@ export default function Step4Representative({ onComplete }) {
               name="suffix"
               value={form.suffix ?? ''}
               onChange={handleChange}
-              className="w-full px-2 py-2.5 text-sm rounded-xl border border-slate-300 bg-white transition-all focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+              className="w-full px-2 py-2.5 text-sm rounded-xl border border-slate-300 bg-white transition-all focus:outline-none focus:ring-2 focus:ring-[#2563b8]"
             >
               <option value=""></option>
               {['Jr.', 'Sr.', 'II', 'III', 'IV', 'V'].map(s => <option key={s} value={s}>{s}</option>)}
@@ -159,7 +159,7 @@ export default function Step4Representative({ onComplete }) {
           onChange={handleChange}
           onBlur={handleBlur}
           className={`w-full px-3.5 py-2.5 text-sm rounded-xl border bg-white transition-all focus:outline-none focus:ring-2 focus:ring-blue-500/20 ${
-            getError('designation') ? 'border-red-400 focus:border-red-400' : 'border-slate-300 focus:border-blue-400'
+            getError('designation') ? 'border-red-400 focus:border-red-400' : 'border-slate-300 focus:border-brand-navy'
           }`}
         />
         <datalist id="designation-options">
@@ -187,7 +187,7 @@ export default function Step4Representative({ onComplete }) {
         <label className="block text-sm font-medium text-slate-700 mb-1.5">
           Company ID / Valid Government ID (Photo)
         </label>
-        <div className="border-2 border-dashed border-slate-300 rounded-xl p-6 text-center hover:border-blue-400 transition-colors">
+        <div className="border-2 border-dashed border-slate-300 rounded-xl p-6 text-center hover:border-brand-navy transition-colors">
           {form.government_id_preview ? (
             <div className="space-y-2">
               <img
@@ -225,7 +225,7 @@ export default function Step4Representative({ onComplete }) {
               />
               <label
                 htmlFor="gov-id-input"
-                className="inline-block px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 cursor-pointer transition-colors text-sm font-medium"
+                className="inline-block px-4 py-2 bg-brand-navy text-white rounded-xl hover:bg-[#0f2d56] cursor-pointer transition-colors text-sm font-medium"
               >
                 Choose File
               </label>

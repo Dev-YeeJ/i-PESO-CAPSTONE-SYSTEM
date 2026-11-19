@@ -8,8 +8,8 @@ const COLORS = ['#1e293b', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'
 const CustomTooltip = ({ active, payload, label }) => {
   if (active && payload && payload.length) {
     return (
-      <div className="rounded-xl border border-slate-200 bg-white/95 p-3 font-semibold text-slate-700 shadow-xl backdrop-blur-sm">
-        {label ? <p className="mb-2 text-xs font-extrabold uppercase tracking-wide text-slate-500">{label}</p> : null}
+      <div className="rounded-xl border border-slate-200 bg-white p-3 font-semibold text-slate-700 shadow-xl">
+        {label ? <p className="mb-2 text-xs font-semibold text-slate-500">{label}</p> : null}
         <div className="space-y-1">
           {payload.map((p, i) => (
             <div key={i} className="flex items-center gap-2 text-sm">
@@ -28,7 +28,7 @@ const CustomTooltip = ({ active, payload, label }) => {
 export default function JobFairReportsChart({ metrics, reports, fairTitle }) {
   const participationRef = useRef(null)
   const outcomesRef = useRef(null)
-  const footnote = fairTitle ? `I-PESO Job Fair · ${fairTitle}` : 'I-PESO Job Fair'
+  const footnote = fairTitle ? `I-PESO Job Fair, ${fairTitle}` : 'I-PESO Job Fair'
   // Aggregate data for Pie Chart
   const pieData = [
     { name: 'Approved Employers', value: metrics?.approved ?? 0 },

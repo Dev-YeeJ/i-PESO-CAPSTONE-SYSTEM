@@ -1,11 +1,12 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import MyApplications from '../MyApplications'
 import { reviewService } from '@/services/reviewService'
 import {
+  getSeekerApplicationDetail,
   getSeekerApplications,
   withdrawSeekerApplication,
 } from '@/services/seekerService'
@@ -113,5 +114,36 @@ describe('MyApplications (seeker application tracking)', () => {
     renderPage()
 
     expect(await screen.findByRole('button', { name: /rate this employer/i })).toBeInTheDocument()
+  })
+
+  describe('on a wide screen', () => {
+    const originalMatchMedia = window.matchMedia
+    beforeEach(() => {
+      window.matchMedia = (query) => ({
+        matches: query.includes('min-width'), media: query, onchange: null,
+        addListener() {}, removeListener() {}, addEventListener() {}, removeEventListener() {}, dispatchEvent() { return false },
+      })
+    })
+    afterEach(() => { window.matchMedia = originalMatchMedia })
+
+    it('lists applications beside a details panel that follows the selection', async () => {
+      const second = { ...application, apply_id: 2, status: 'interview', status_label: 'Interview', job: { ...application.job, job_title: 'Cashier', employer: { company_name: 'Puregold' } } }
+      getSeekerApplications.mockResolvedValue({ applications: [application, second] })
+      getSeekerApplicationDetail.mockImplementation(async (id) => ({
+        application: { ...(id === 1 ? application : second), timeline: [{ title: id === 1 ? 'Shortlisted' : 'Interview scheduled', description: 'Step', timestamp: null }] },
+      }))
+
+      renderPage()
+
+      const panel = await screen.findByRole('complementary', { name: 'Application details' })
+      // The first application is shown without a click, and no dialog is used.
+      await waitFor(() => expect(getSeekerApplicationDetail).toHaveBeenCalledWith(1))
+      expect(within(panel).getByRole('heading', { name: 'Data Encoder' })).toBeInTheDocument()
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+
+      await userEvent.click(screen.getByRole('button', { name: /Cashier/ }))
+      expect(await within(panel).findByRole('heading', { name: 'Cashier' })).toBeInTheDocument()
+      expect(await within(panel).findByText('Interview scheduled')).toBeInTheDocument()
+    })
   })
 })

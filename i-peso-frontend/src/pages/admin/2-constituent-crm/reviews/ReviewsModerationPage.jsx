@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import toast from 'react-hot-toast'
+import toast from '@/lib/toast'
 import { AlertTriangle, CheckCircle2, EyeOff, Flag, Gavel, MessageSquareWarning, Search, ShieldAlert } from 'lucide-react'
 import { Badge, Button, Card } from '@/components/ui'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -79,7 +79,7 @@ export default function ReviewsModerationPage() {
             className="text-left font-bold text-slate-900 hover:text-brand-navy hover:underline focus-visible:rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-navy/40">
             {review.employer?.name}
           </button>
-          <p className="text-xs text-slate-500">{review.type === 'employment' ? 'Employment' : 'Recruitment'} · by {review.reviewer?.name}</p>
+          <p className="text-xs text-slate-500">{review.type === 'employment' ? 'Employment' : 'Recruitment'}, by {review.reviewer?.name}</p>
           {review.comment && <p className="mt-1 line-clamp-2 text-sm text-slate-600">{review.comment}</p>}
         </div>
       ),
@@ -109,7 +109,7 @@ export default function ReviewsModerationPage() {
       />
 
       {!canAct && (
-        <p className="mt-4 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">You can view reviews here. Publishing, hiding and escalating need full Constituent CRM access.</p>
+        <p className="mt-4 rounded-lg border border-[#c4d9f7] bg-[#e8f0fc] px-4 py-3 text-sm text-brand-navy">You can view reviews here. Publishing, hiding and escalating need full Constituent CRM access.</p>
       )}
 
       <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -210,7 +210,7 @@ function ReviewDetailDialog({ id, canAct, onClose }) {
         <DialogHeader>
           <DialogTitle>{review ? `Review of ${review.employer?.name}` : 'Review'}</DialogTitle>
           <DialogDescription>
-            {review ? `${review.type === 'employment' ? 'Employment' : 'Recruitment'} experience · submitted ${new Date(review.created_at).toLocaleDateString('en-PH', { dateStyle: 'medium' })}${review.edited_at ? ' · edited' : ''}` : 'Loading…'}
+            {review ? `${review.type === 'employment' ? 'Employment' : 'Recruitment'} experience, submitted ${new Date(review.created_at).toLocaleDateString('en-PH', { dateStyle: 'medium' })}${review.edited_at ? ', edited' : ''}` : 'Loading…'}
           </DialogDescription>
         </DialogHeader>
 
@@ -223,9 +223,9 @@ function ReviewDetailDialog({ id, canAct, onClose }) {
             </div>
 
             <dl className="grid gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm sm:grid-cols-2">
-              <div><dt className="text-xs font-bold uppercase tracking-wide text-slate-500">Reviewer (visible to PESO only)</dt><dd className="font-semibold text-slate-900">{review.reviewer?.name}</dd><dd className="text-xs text-slate-500">{review.reviewer?.email}</dd></div>
-              <div><dt className="text-xs font-bold uppercase tracking-wide text-slate-500">Verified interaction</dt><dd className="font-semibold text-slate-900">{review.interaction?.source}{review.interaction?.job_title ? ` · ${review.interaction.job_title}` : ''}</dd>
-                <dd className="text-xs text-slate-500">{review.interaction?.application_status ? `Application: ${review.interaction.application_status}` : ''}{review.interaction?.start_date ? ` · started ${review.interaction.start_date}` : ''}</dd></div>
+              <div><dt className="text-xs font-bold text-slate-500">Reviewer (visible to PESO only)</dt><dd className="font-semibold text-slate-900">{review.reviewer?.name}</dd><dd className="text-xs text-slate-500">{review.reviewer?.email}</dd></div>
+              <div><dt className="text-xs font-bold text-slate-500">Verified interaction</dt><dd className="font-semibold text-slate-900">{review.interaction?.source}{review.interaction?.job_title ? `, ${review.interaction.job_title}` : ''}</dd>
+                <dd className="text-xs text-slate-500">{review.interaction?.application_status ? `Application: ${review.interaction.application_status}` : ''}{review.interaction?.start_date ? `, started ${review.interaction.start_date}` : ''}</dd></div>
             </dl>
 
             <div className="rounded-xl border border-slate-200 p-4">
@@ -250,7 +250,7 @@ function ReviewDetailDialog({ id, canAct, onClose }) {
                   {review.flags.map((flag) => (
                     <li key={flag.id} className="rounded-lg border border-slate-200 p-3 text-sm">
                       <div className="flex flex-wrap items-center justify-between gap-2">
-                        <span className="flex items-center gap-1.5 font-semibold text-slate-800"><Flag className="h-3.5 w-3.5" /> {flag.from} · {flag.reason}</span>
+                        <span className="flex items-center gap-1.5 font-semibold text-slate-800"><Flag className="h-3.5 w-3.5" /> {flag.from}, {flag.reason}</span>
                         <Badge variant={flag.status === 'open' ? 'pending' : 'neutral'} icon={false}>{flag.status}</Badge>
                       </div>
                       {flag.details && <p className="mt-1 text-slate-600">{flag.details}</p>}
@@ -262,8 +262,8 @@ function ReviewDetailDialog({ id, canAct, onClose }) {
             )}
 
             {review.reply && (
-              <div className="rounded-lg border-l-4 border-blue-200 bg-blue-50/60 px-3 py-2 text-sm">
-                <p className="flex items-center justify-between gap-2 text-xs font-bold text-blue-900">
+              <div className="rounded-lg border-l-4 border-[#c4d9f7] bg-[#e8f0fc] px-3 py-2 text-sm">
+                <p className="flex items-center justify-between gap-2 text-xs font-bold text-brand-navy">
                   <span className="flex items-center gap-1.5"><MessageSquareWarning className="h-3.5 w-3.5" /> Employer's reply {review.reply.status === 'hidden' ? '(hidden)' : ''}</span>
                   {canAct && (
                     <button type="button" className="font-semibold underline-offset-2 hover:underline" disabled={replyVisibility.isPending} onClick={() => replyVisibility.mutate(review.reply.status === 'hidden')}>

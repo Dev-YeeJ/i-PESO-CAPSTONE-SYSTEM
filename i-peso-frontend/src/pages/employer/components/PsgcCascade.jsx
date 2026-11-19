@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { getBarangaysByCity, getCitiesByProvince, getProvinces } from '@/services/psgcServices'
 
-const selectClass = 'w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:cursor-not-allowed disabled:bg-slate-100'
+const selectClass = 'w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm focus:border-brand-navy focus:outline-none focus:ring-2 focus:ring-[#2563b8] disabled:cursor-not-allowed disabled:bg-slate-100'
 
 export default function PsgcCascade({
   province,

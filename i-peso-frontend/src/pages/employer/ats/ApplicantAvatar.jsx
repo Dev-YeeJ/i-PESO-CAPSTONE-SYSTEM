@@ -40,7 +40,7 @@ export default function ApplicantAvatar({ applicationId, hasPhoto, name, size = 
   }
 
   return (
-    <div className={`flex ${sizeClass} shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 font-bold text-white shadow-sm`}>
+    <div className={`flex ${sizeClass} shrink-0 items-center justify-center rounded-full bg-[#e8f0fc] font-bold text-brand-navy shadow-sm`}>
       {getInitials(name)}
     </div>
   )

@@ -31,8 +31,6 @@ export default function RegistrationJourneyShell({
 
   return (
     <div className="registration-journey-shell pre-dashboard-shell min-h-screen">
-      <div className="registration-journey-grid" />
-
       <div className="registration-journey-layout mx-auto grid min-h-screen w-full max-w-[1720px]">
         <aside className="registration-journey-aside">
           <BrandMark light compact />
@@ -41,7 +39,7 @@ export default function RegistrationJourneyShell({
             {showPitch && (
               <div className="mb-7">
                 <p className="registration-rail-label mb-2">{copy.eyebrow}</p>
-                <h1 className="text-[1.6rem] font-bold leading-[1.15] tracking-tight text-white" style={{ fontFamily: 'var(--rj-display)' }}>
+                <h1 className="font-display text-[2rem] leading-[1.15] text-white">
                   {copy.heading}
                 </h1>
               </div>
@@ -65,7 +63,7 @@ export default function RegistrationJourneyShell({
                     </span>
                     <span className="min-w-0 truncate">{step.label}</span>
                     <span className="sr-only">
-                      {complete ? '— saved' : isActive ? '— current step' : '— not started'}
+                      {complete ? ', saved' : isActive ? ', current step' : ', not started'}
                     </span>
                   </div>
                 )
@@ -89,7 +87,7 @@ export default function RegistrationJourneyShell({
             <Lock className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
             <span>
               <Link to="/privacy-policy" className="registration-rail-foot-link">Privacy Policy</Link>
-              {' · '}
+              <span className="mx-2 opacity-50" aria-hidden="true">|</span>
               <Link to="/terms-of-service" className="registration-rail-foot-link">Terms of Service</Link>
             </span>
           </div>
@@ -119,7 +117,7 @@ export default function RegistrationJourneyShell({
                   <span key={step.label} className={index < currentStep ? 'is-done' : ''} />
                 ))}
               </div>
-              <p className="mt-2 truncate text-xs font-semibold text-white/75">{active?.label}</p>
+              <p className="mt-2 truncate text-sm font-semibold text-white/80">{active?.label}</p>
             </div>
 
             <section className="registration-form-panel">
@@ -137,13 +135,13 @@ export default function RegistrationJourneyShell({
                     <div className="registration-meter-fill" style={{ width: `${progress}%` }} />
                   </div>
                   <span className="registration-meter-caption">
-                    {currentStep} / {steps.length} · {active?.shortLabel ?? active?.label}
+                    Step {currentStep} of {steps.length}: {active?.shortLabel ?? active?.label}
                   </span>
                 </div>
 
                 <h2>{title}</h2>
                 {subtitle && <p className="rj-sub">{subtitle}</p>}
-                <p className="rj-ref">{copy.portal} · Urdaneta City PESO</p>
+                <p className="rj-ref">{copy.portal}, Urdaneta City PESO</p>
               </div>
 
               <div className="registration-form-content">{children}</div>

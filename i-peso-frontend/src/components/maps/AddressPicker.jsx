@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { LocateFixed, Loader2, MapPin } from 'lucide-react'
 import PsgcCascade from '@/pages/employer/components/PsgcCascade'
-import toast from 'react-hot-toast'
+import toast from '@/lib/toast'
 import { detectAddress, resolveCoordinatesAddress } from '@/services/geoService'
 import { MapContainer, Marker as LeafletMarker, TileLayer, useMap, useMapEvents } from 'react-leaflet'
 import L from 'leaflet'

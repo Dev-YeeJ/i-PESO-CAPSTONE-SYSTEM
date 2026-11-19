@@ -1,7 +1,8 @@
 import { useEffect, useRef } from 'react'
 import { Outlet, useLocation } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
-import { Toaster, toast } from 'react-hot-toast'
+import { Toaster } from 'sonner'
+import toast from '@/lib/toast'
 import { useAuthStore } from '@/stores/authStore'
 import Echo from 'laravel-echo'
 import Pusher from 'pusher-js'
@@ -71,16 +72,7 @@ export default function App() {
   return (
     <>
       {underMaintenance ? <MaintenanceScreen message={systemStatus.maintenance.message} /> : <Outlet />}
-      <Toaster
-        position="top-right"
-        toastOptions={{
-          duration: 4000,
-          style: {
-            borderRadius: '12px',
-            color: '#0f172a',
-          },
-        }}
-      />
+      <Toaster position="top-right" duration={4000} richColors closeButton toastOptions={{ style: { borderRadius: '12px' } }} />
       {!isStaffArea && !underMaintenance && systemStatus.chatbot_enabled && <UnifiedChatWidget />}
       <CookieConsent />
     </>

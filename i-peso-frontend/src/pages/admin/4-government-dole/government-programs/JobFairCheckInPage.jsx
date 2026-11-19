@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Html5Qrcode } from 'html5-qrcode'
 import { useNavigate, useParams } from 'react-router-dom'
 import { CheckCircle2, Clock3, Search, XCircle, FileText, FileSpreadsheet, SwitchCamera, UserPlus, RefreshCw, Users } from 'lucide-react'
-import toast from 'react-hot-toast'
+import toast from '@/lib/toast'
 import { AlertBox, Badge, Button, Card } from '@/components/ui'
 import PageHeader from '@/pages/admin/_components/PageHeader'
 import { adminService } from '@/services/adminService'
@@ -28,14 +28,14 @@ function AttendeeCard({ attendee }) {
   return (
     <div className="space-y-3">
       <div>
-        <p className="text-lg font-black text-slate-950">{attendee.name || 'Unnamed seeker'}</p>
+        <p className="text-lg font-bold text-slate-950">{attendee.name || 'Unnamed seeker'}</p>
         <p className="text-sm text-slate-600">{attendee.mobile_number || 'No mobile number on file'} {attendee.email ? `· ${attendee.email}` : ''}</p>
       </div>
       <div className="flex flex-wrap gap-2 text-xs font-semibold text-slate-600">
         {attendee.educ_attainment && <span className="rounded-full bg-slate-100 px-2.5 py-1">{attendee.educ_attainment}</span>}
         {attendee.employment_status && <span className="rounded-full bg-slate-100 px-2.5 py-1">{attendee.employment_status}</span>}
         {attendee.preferred_job && <span className="rounded-full bg-slate-100 px-2.5 py-1">Prefers: {attendee.preferred_job}</span>}
-        {attendee.is_guest && <span className="rounded-full bg-blue-100 px-2.5 py-1 text-blue-700">Walk-in</span>}
+        {attendee.is_guest && <span className="rounded-full bg-[#e8f0fc] px-2.5 py-1 text-brand-navy">Walk-in</span>}
       </div>
       {attendee.skills?.length > 0 && (
         <div className="flex flex-wrap gap-1.5">
@@ -240,16 +240,16 @@ export default function JobFairCheckInPage() {
 
       <section className="grid grid-cols-2 gap-3">
         <Card padding="sm">
-          <p className="text-2xl font-black text-slate-950">{counts.attendance}</p>
+          <p className="text-2xl font-bold text-slate-950">{counts.attendance}</p>
           <p className="text-xs font-bold text-slate-500">Registered</p>
         </Card>
         <Card padding="sm">
-          <p className="text-2xl font-black text-slate-950">{counts.rsvps}</p>
+          <p className="text-2xl font-bold text-slate-950">{counts.rsvps}</p>
           <p className="text-xs font-bold text-slate-500">Pre-registered</p>
         </Card>
       </section>
 
-      <Card className="border-blue-100 bg-blue-50/50">
+      <Card className="border-[#c4d9f7] bg-[#e8f0fc]">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
             <span className="rounded-xl bg-white p-2.5 text-brand-navy shadow-sm"><Users className="h-5 w-5" /></span>
@@ -263,7 +263,7 @@ export default function JobFairCheckInPage() {
           </Button>
         </div>
         {showManualRecord && (
-          <form onSubmit={encodeWalkIn} className="mt-4 grid gap-2 border-t border-blue-100 pt-4 sm:grid-cols-2">
+          <form onSubmit={encodeWalkIn} className="mt-4 grid gap-2 border-t border-[#c4d9f7] pt-4 sm:grid-cols-2">
             <input required value={walkIn.guest_name} onChange={(e) => setWalkIn((w) => ({ ...w, guest_name: e.target.value }))} placeholder="Full name *" className="rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm focus:border-brand-navy focus:outline-none focus:ring-2 focus:ring-brand-navy/10" />
             <input value={walkIn.guest_mobile_number} onChange={(e) => setWalkIn((w) => ({ ...w, guest_mobile_number: e.target.value }))} placeholder="Mobile number" className="rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm focus:border-brand-navy focus:outline-none focus:ring-2 focus:ring-brand-navy/10" />
             <input value={walkIn.guest_email} onChange={(e) => setWalkIn((w) => ({ ...w, guest_email: e.target.value }))} placeholder="Email address" className="rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm focus:border-brand-navy focus:outline-none focus:ring-2 focus:ring-brand-navy/10" />
@@ -285,7 +285,7 @@ export default function JobFairCheckInPage() {
             exit={{ opacity: 0, scale: 0.95 }}
             transition={{ duration: 0.3 }}
           >
-            <Card padding="none" className="relative overflow-hidden border-2 border-blue-500/30 shadow-lg shadow-blue-900/5">
+            <Card padding="none" className="relative overflow-hidden border-2 border-brand-navy/30 shadow-lg shadow-blue-900/5">
               {!cameraError && (
                 <MotionDiv
                   animate={{ opacity: [0.2, 0.6, 0.2], boxShadow: ['inset 0 0 0 2px rgba(96,165,250,0)', 'inset 0 0 0 4px rgba(96,165,250,0.5)', 'inset 0 0 0 2px rgba(96,165,250,0)'] }}
@@ -388,7 +388,7 @@ export default function JobFairCheckInPage() {
           </Card>
 
           <Card>
-            <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Still can't find them? Encode a walk-in</p>
+            <p className="text-xs font-bold text-slate-400">Still can't find them? Encode a walk-in</p>
             <p className="mt-1 text-sm text-slate-500">For a seeker with no i-peso account — only the physical/Google Form pre-registration.</p>
             <form onSubmit={encodeWalkIn} className="mt-3 space-y-2">
               <input
@@ -429,7 +429,7 @@ export default function JobFairCheckInPage() {
         <div className="border-b border-slate-100 p-4">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <h2 className="text-lg font-black text-slate-950">Registration roster</h2>
+              <h2 className="text-lg font-bold text-slate-950">Registration roster</h2>
               <p className="text-sm text-slate-500">Select a pre-registered person here when a QR code is unavailable.</p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
@@ -460,7 +460,7 @@ export default function JobFairCheckInPage() {
                     <Badge variant={attendee.is_attended ? 'approved' : 'pending'}>{attendee.is_attended ? 'Registered' : 'Pre-registered'}</Badge>
                     {attendee.is_guest && <Badge variant="info">Walk-in</Badge>}
                   </div>
-                  <p className="mt-1 text-sm text-slate-500">{attendee.mobile_number || 'No mobile number'}{attendee.email ? ` · ${attendee.email}` : ''}</p>
+                  <p className="mt-1 text-sm text-slate-500">{attendee.mobile_number || 'No mobile number'}{attendee.email ? `, ${attendee.email}` : ''}</p>
                   <p className="mt-1 text-xs text-slate-400">{attendee.is_attended ? `Registered ${formatDateTime(attendee.scanned_at)}` : 'Waiting at registration'}</p>
                 </div>
                 {!attendee.is_attended && <Button size="sm" onClick={() => checkIn({ attendee_id: attendee.id })}>Register</Button>}

@@ -5,7 +5,7 @@ import { CheckCircle2, ClipboardEdit, Download, Eye, FileText, Flame, Mail, Refr
 import { useNavigate, useParams } from 'react-router-dom'
 import { Badge, Button, Card, CardHeader, LoadingSkeleton, StatCard } from '@/components/ui'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
-import toast from 'react-hot-toast'
+import toast from '@/lib/toast'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import PageHeader from '@/pages/admin/_components/PageHeader'
@@ -38,7 +38,7 @@ const inputClass = 'mt-1.5 w-full rounded-lg border border-slate-300 bg-white px
 function StepLabel({ step, children }) {
   return (
     <span className="flex items-center gap-2.5">
-      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand-navy text-xs font-black text-white">{step}</span>
+      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand-navy text-xs font-bold text-white">{step}</span>
       {children}
     </span>
   )
@@ -46,7 +46,7 @@ function StepLabel({ step, children }) {
 
 function Field({ label, value, onChange, type = 'text', textarea = false, className = '' }) {
   return (
-    <label className={`text-xs font-bold uppercase tracking-wide text-slate-500 ${className}`}>
+    <label className={`text-xs font-bold text-slate-500 ${className}`}>
       {label}
       {textarea ? (
         <textarea value={value} onChange={(e) => onChange(e.target.value)} rows={2} className={`resize-none normal-case ${inputClass}`} />
@@ -374,7 +374,7 @@ export default function JobFairDetailPage() {
 
           <Card padding="sm" className="mb-6 flex flex-wrap items-center justify-between gap-4 border-emerald-100 bg-emerald-50/30">
             <div>
-              <p className="font-black text-emerald-950">Job Seeker Attendance Report</p>
+              <p className="font-bold text-emerald-950">Job Seeker Attendance Report</p>
               <p className="text-xs font-semibold text-emerald-700/80">List of seekers who registered at the info desk</p>
             </div>
             <div className="flex gap-2">
@@ -440,7 +440,7 @@ export default function JobFairDetailPage() {
                         {r.status || 'pending'}
                       </Badge>
                     </div>
-                    <p className="text-xs font-semibold text-slate-500">{r.total_applicants} applicants · {r.total_hots} HOTS</p>
+                    <p className="text-xs font-semibold text-slate-500">{r.total_applicants} applicants, {r.total_hots} HOTS</p>
                     {r.review_remarks && <p className="text-xs text-rose-600 font-semibold mt-1">PESO note: {r.review_remarks}</p>}
                   </div>
                   <div className="flex gap-2">
@@ -531,7 +531,7 @@ export default function JobFairDetailPage() {
                       )}
                       
                       {hasFiles && (
-                        <button type="button" onClick={() => { setActiveFileIndex(0); setReviewingGallery({ req, submissions, viewableFiles, pendingSubmissions, displayStatus }) }} className="mt-2 flex items-center gap-1.5 text-sm font-semibold text-blue-700 hover:underline">
+                        <button type="button" onClick={() => { setActiveFileIndex(0); setReviewingGallery({ req, submissions, viewableFiles, pendingSubmissions, displayStatus }) }} className="mt-2 flex items-center gap-1.5 text-sm font-semibold text-brand-navy hover:underline">
                           <Eye className="h-4 w-4 shrink-0" /> View {viewableFiles.length} {viewableFiles.length === 1 ? 'File' : 'Files'} & Review
                         </button>
                       )}

@@ -4,7 +4,7 @@ import { Building2, FileText, ImageOff, ArrowRight } from 'lucide-react'
 import { EmptyState, LoadingSkeleton } from '@/components/ui'
 import { listJobFairPosters, viewJobFairPoster } from '@/services/jobFairService'
 
-const avatarTones = ['bg-blue-600', 'bg-indigo-600', 'bg-emerald-600', 'bg-amber-600', 'bg-rose-600', 'bg-cyan-600']
+const avatarTones = ['bg-brand-navy', 'bg-brand-navy', 'bg-emerald-600', 'bg-amber-600', 'bg-rose-600', 'bg-cyan-600']
 const toneFor = (name) => avatarTones[[...(name || '')].reduce((sum, ch) => sum + ch.charCodeAt(0), 0) % avatarTones.length]
 const initialsFor = (name) => (name || '?').trim().split(/\s+/).slice(0, 2).map((w) => w[0]).join('').toUpperCase()
 
@@ -35,7 +35,7 @@ export default function PosterFeedTab() {
   if (error) return <div className="rounded-2xl border border-red-200 bg-red-50 p-5 text-sm font-semibold text-red-700">{error}</div>
   if (!posters.length) {
     return (
-      <div className="max-w-2xl mx-auto rounded-3xl border border-slate-200 bg-white p-12 shadow-sm">
+      <div className="max-w-2xl mx-auto rounded-2xl border border-slate-200 bg-white p-12 shadow-sm">
         <EmptyState icon={ImageOff} title="No employer posters yet" description="PESO-approved job vacancy posters from participating employers will appear here." />
       </div>
     )
@@ -98,13 +98,13 @@ function PosterCard({ poster }) {
   return (
     <article className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition-shadow hover:shadow-md">
       <div className="flex items-center gap-3 p-4">
-        <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-sm font-black text-white ${toneFor(poster.company_name)}`}>
+        <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white ${toneFor(poster.company_name)}`}>
           {initialsFor(poster.company_name)}
         </span>
         <div className="min-w-0 flex-1">
-          <p className="truncate font-black text-slate-950">{poster.company_name || 'Employer'}</p>
+          <p className="truncate font-bold text-slate-950">{poster.company_name || 'Employer'}</p>
           <p className="truncate text-xs font-semibold text-slate-500">
-            {poster.job_fair_title}{poster.venue ? ` · ${poster.venue}` : ''}{poster.posted_at ? ` · ${timeAgo(poster.posted_at)}` : ''}
+            {[poster.job_fair_title, poster.venue, poster.posted_at ? timeAgo(poster.posted_at) : null].filter(Boolean).join(', ')}
           </p>
         </div>
       </div>
@@ -124,7 +124,7 @@ function PosterCard({ poster }) {
             </div>
           ) : (
             <div className="flex items-center justify-center p-10">
-              <div className="h-6 w-6 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
+              <div className="h-6 w-6 animate-spin rounded-full border-2 border-brand-navy border-t-transparent" />
             </div>
           )
         ) : (
@@ -136,7 +136,7 @@ function PosterCard({ poster }) {
               <p className="font-semibold text-slate-900">Document Uploaded</p>
               <p className="mt-1 text-sm">{currentFile.original_filename}</p>
             </div>
-            <button type="button" onClick={() => openPoster(currentFile)} className="inline-flex items-center gap-2 rounded-full bg-blue-50 px-4 py-2 text-sm font-bold text-blue-700 transition-colors hover:bg-blue-100">
+            <button type="button" onClick={() => openPoster(currentFile)} className="inline-flex items-center gap-2 rounded-full bg-[#e8f0fc] px-4 py-2 text-sm font-bold text-brand-navy transition-colors hover:bg-[#e8f0fc]">
               View Document <ArrowRight className="h-4 w-4" />
             </button>
           </div>
@@ -186,7 +186,7 @@ function PosterCard({ poster }) {
             <Building2 className="h-3.5 w-3.5" />PESO-approved employer posting
           </div>
           {poster.match_percentage !== undefined && poster.match_percentage !== null && (
-            <div className="flex items-center gap-1.5 rounded-full bg-emerald-50 px-2 py-1 text-[10px] font-black uppercase tracking-widest text-emerald-700 shadow-sm">
+            <div className="flex items-center gap-1.5 rounded-full bg-emerald-50 px-2 py-1 text-xs font-bold text-emerald-700 shadow-sm">
               {Math.round(poster.match_percentage)}% match
             </div>
           )}
@@ -195,7 +195,7 @@ function PosterCard({ poster }) {
         {poster.job_fair_id && poster.employer_id && (
           <Link 
             to={`/seeker/job-fairs/${poster.job_fair_id}/employers/${poster.employer_id}`}
-            className="flex items-center gap-1.5 rounded-lg bg-blue-50 px-3 py-1.5 text-xs font-bold text-blue-700 hover:bg-blue-100 transition"
+            className="flex items-center gap-1.5 rounded-lg bg-[#e8f0fc] px-3 py-1.5 text-xs font-bold text-brand-navy hover:bg-[#e8f0fc] transition"
           >
             View Booth <ArrowRight className="h-3.5 w-3.5" />
           </Link>

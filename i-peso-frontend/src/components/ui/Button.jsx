@@ -3,9 +3,10 @@ import { Link } from 'react-router-dom'
 import { Loader2 } from 'lucide-react'
 
 const variants = {
-  primary: 'border border-amber-500 bg-brand-gold text-brand-navy shadow-sm hover:border-amber-400 hover:bg-amber-400',
+  // Navy carries action; gold is reserved for highlights / "earned" states (accent).
+  primary: 'border border-brand-navy bg-brand-navy text-white shadow-sm hover:border-[#0f2d56] hover:bg-[#0f2d56]',
   accent: 'border border-amber-500 bg-brand-gold text-brand-navy shadow-sm hover:border-amber-400 hover:bg-amber-400',
-  navy: 'border border-blue-900 bg-blue-900 text-white shadow-sm hover:border-blue-800 hover:bg-blue-800',
+  navy: 'border border-brand-navy bg-brand-navy text-white shadow-sm hover:border-[#0f2d56] hover:bg-[#0f2d56]',
   secondary: 'border border-brand-navy bg-white text-brand-navy hover:bg-brand-navy hover:text-white',
   outline: 'border border-slate-300 bg-white text-slate-700 hover:border-brand-navy hover:text-brand-navy',
   danger: 'bg-red-600 text-white hover:bg-red-700',

@@ -1,6 +1,6 @@
 import { createElement, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { AnimatePresence, motion } from 'framer-motion'
+import { AnimatePresence, motion as Motion } from 'framer-motion'
 import { useQuery } from '@tanstack/react-query'
 import { companyLogoUrl } from '@/utils/companyLogoUrl'
 import {
@@ -9,40 +9,40 @@ import {
   BookmarkCheck,
   BriefcaseBusiness,
   Building2,
+  CalendarCheck,
   CalendarDays,
+  CheckCircle2,
   ChevronRight,
-  Filter,
+  Clock3,
   Layers3,
   MapPin,
+  QrCode,
   Search,
+  Send,
   ShieldCheck,
   SlidersHorizontal,
   Sparkles,
   Star,
-  Target,
-  UserRound,
   WalletCards,
   X,
   Zap,
 } from 'lucide-react'
-import toast from 'react-hot-toast'
+import toast from '@/lib/toast'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { StatCard } from '@/components/ui'
 import EmployerPreferenceChip from '@/components/jobs/EmployerPreferenceChip'
 import EmployerProfileModal from './EmployerProfileModal'
 import { applyToJob, getProfileImage, toggleSavedJob as toggleSavedJobApi } from '@/services/seekerService'
 import { reviewService } from '@/services/reviewService'
-
-const feedTabs = [
-  { key: 'smart', label: 'Jobs', icon: Star },
-  { key: 'saved', label: 'Saved Jobs', icon: BookmarkCheck },
-]
+import { formatInterviewTime, interviewPhase } from '@/utils/interview'
 
 const sortOptions = [
-  { value: 'match', label: 'Highest Match Score (Merit)' },
-  { value: 'distance', label: 'Closest Distance (GPS)' },
+  { value: 'match', label: 'Best match' },
+  { value: 'distance', label: 'Nearest' },
   { value: 'newest', label: 'Newest' },
 ]
+
+// Application statuses grouped the way the summary card reads them.
+const IN_PROGRESS_STATUSES = ['pending', 'reviewed', 'shortlisted']
 
 const JOBS_PER_BATCH = 6
 
@@ -57,6 +57,8 @@ export default function JobSeekerHome({
   error = '',
   jobsError = '',
   jobsLoading = false,
+  jobFairs = [],
+  applications = null,
 }) {
   const [draftQuery, setDraftQuery] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
@@ -276,74 +278,81 @@ export default function JobSeekerHome({
     }
   }
 
+  const firstName = profile?.first_name || String(seeker.name || '').split(' ')[0] || 'there'
+  const recommendedCount = feedJobs.recommended.length
+
   return (
     <div className="min-h-full">
-      <div className="portal-page mx-auto max-w-[1440px] space-y-4 sm:space-y-6">
+      <div className="portal-page mx-auto max-w-[1440px] space-y-5 sm:space-y-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h1 className="text-2xl font-bold leading-tight tracking-tight text-slate-900 sm:text-[32px] sm:leading-10">{greeting()}, {firstName}</h1>
+            <p className="mt-1 text-[15px] text-slate-600">
+              {activeApplications > 0
+                ? <>You have <span className="font-semibold text-slate-900">{activeApplications} active application{activeApplications === 1 ? '' : 's'}</span>{recommendedCount > 0 && <> and <span className="font-semibold text-slate-900">{recommendedCount} recommended job{recommendedCount === 1 ? '' : 's'}</span></>}.</>
+                : recommendedCount > 0
+                  ? <><span className="font-semibold text-slate-900">{recommendedCount} job{recommendedCount === 1 ? '' : 's'}</span> match your profile right now.</>
+                  : 'Search open vacancies below, or complete your profile to get matched.'}
+            </p>
+          </div>
+          <Link to="/seeker/job-map" className="inline-flex items-center justify-center gap-2 self-start rounded-xl bg-brand-navy px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#0f2d56] sm:self-auto">
+            <MapPin className="h-4 w-4" aria-hidden="true" /> Find jobs near me
+          </Link>
+        </div>
+
         {(error || jobsError) && (
           <div className="grid gap-3">
             {error && <Notice tone="danger" message={error} />}
-            {jobsError && (
-              <Notice
-                tone="warning"
-                message={jobsError}
-              />
-            )}
+            {jobsError && <Notice tone="warning" message={jobsError} />}
           </div>
         )}
 
-        <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <StatCard label="Profile Readiness" value={`${Math.min(seeker.nsrpCompletion, 100)}%`} icon={UserRound} color="blue" />
-          <StatCard label="Active Applications" value={activeApplications} icon={BriefcaseBusiness} color="blue" />
-          <StatCard label="Saved Jobs" value={savedJobIds.length} icon={BookmarkCheck} color="amber" />
-          <StatCard label="Profile Views (30d)" value={analyticsData?.total_views_30_days ?? '—'} icon={Target} color="green" />
-        </section>
-
-        <div className="grid gap-4 lg:grid-cols-[minmax(280px,0.8fr)_minmax(0,2fr)] lg:gap-6 lg:items-start">
-          <aside className="grid auto-cols-[minmax(260px,1fr)] grid-flow-col gap-3 overflow-x-auto pb-1 sm:gap-5 lg:sticky lg:top-24 lg:block lg:space-y-5 lg:overflow-visible lg:pb-0">
-            <ProfileSnapshot seeker={seeker} activeApplications={activeApplications} />
-            <NextBestAction profile={profile} seeker={seeker} />
+        <div className="grid gap-5 lg:grid-cols-[340px_minmax(0,1fr)] lg:items-start lg:gap-6">
+          <aside className="grid gap-4 sm:grid-cols-2 lg:sticky lg:top-24 lg:block lg:space-y-5">
+            <ProfileStrengthCard profile={profile} seeker={seeker} />
+            <ApplicationsSummaryCard applications={applications} />
+            <JobFairCard fairs={jobFairs} />
             <ProfileInsightsCard analytics={analyticsData} />
           </aside>
 
-          <main className="space-y-5">
+          <main className="min-w-0 space-y-4">
             <SearchPanel
               usingFallbackJobs={usingFallbackJobs}
               radiusKm={Number(nearbyJobsData?.radius_km ?? 20)}
               hasLocation={hasLocation}
               noNearbyJobs={hasLocation && feedJobs.nearby.length === 0}
               draftQuery={draftQuery}
+              searchQuery={searchQuery}
               onQueryChange={setDraftQuery}
               onClear={clearSearch}
               onSubmit={submitSearch}
             />
 
-            <JobFeedSelector
+            <FeedSwitcher
               activeFeed={jobFeedMode}
+              activeTab={activeTab}
               hasLocation={hasLocation}
               counts={{
                 recommended: feedJobs.recommended.length,
                 nearby: feedJobs.nearby.length,
                 latest: feedJobs.latest.length,
+                saved: savedJobIds.length,
               }}
-              onChange={(feed) => {
+              resultCount={visibleJobs.length}
+              sortMode={sortMode}
+              onFeedChange={(feed) => {
                 setJobFeedMode(feed)
                 setActiveTab('smart')
               }}
-            />
-
-            <FeedControls
-              activeTab={activeTab}
-              savedCount={savedJobIds.length}
-              resultCount={visibleJobs.length}
-              sortMode={sortMode}
-              onTabChange={setActiveTab}
+              onSavedSelect={() => setActiveTab('saved')}
               onSortChange={setSortMode}
             />
 
-            <motion.section
+            <Motion.section
               layout
               className="space-y-3 sm:space-y-4"
               aria-busy={jobsLoading}
+              aria-label="Job vacancies"
               initial="hidden"
               animate="show"
               variants={{
@@ -377,11 +386,11 @@ export default function JobSeekerHome({
                 <EmptyFeedState
                   title={activeTab === 'saved' ? 'No saved jobs yet' : 'No matching vacancies found'}
                   text={activeTab === 'saved'
-                    ? 'Save promising vacancies so you can compare them later.'
-                    : 'Try another keyword or switch to Latest Active Vacancies.'}
+                    ? 'Tap the bookmark on any vacancy to keep it here and compare later.'
+                    : 'Try another keyword, or switch to Latest to see every open vacancy.'}
                 />
               )}
-            </motion.section>
+            </Motion.section>
           </main>
         </div>
 
@@ -419,299 +428,235 @@ function SearchPanel({
   hasLocation,
   noNearbyJobs,
   draftQuery,
+  searchQuery,
   onQueryChange,
   onClear,
   onSubmit,
 }) {
   return (
-    <section className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm shadow-slate-900/[0.03]">
-      <div className="p-3 sm:p-5">
-        <form onSubmit={onSubmit} className="flex gap-2 sm:gap-3">
-          <div className="relative flex-1">
-            <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
-            <input
-              value={draftQuery}
-              onChange={(event) => onQueryChange(event.target.value)}
-              className="h-12 w-full rounded-lg border border-slate-300 bg-slate-50 pl-12 pr-4 text-sm font-semibold text-slate-900 shadow-sm outline-none transition placeholder:text-slate-500 hover:bg-white focus:border-blue-600 focus:bg-white focus:ring-4 focus:ring-blue-100"
-              placeholder="Search jobs, skills, or employers"
-            />
-          </div>
-          <div className="flex gap-2 shrink-0">
-            <button
-              type="submit"
-              className="inline-flex h-12 items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 text-sm font-black text-white shadow-sm transition hover:bg-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-200 sm:px-6"
-            >
-              <Search className="h-4 w-4 sm:hidden" />
-              <span className="hidden sm:inline">Search</span>
+    <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-card">
+      <form onSubmit={onSubmit} className="flex gap-2 p-3 sm:gap-3 sm:p-4" role="search">
+        <label className="flex flex-1 items-center gap-3 rounded-xl border border-slate-200 px-4 transition focus-within:border-[#2563b8] focus-within:ring-2 focus-within:ring-[#c4d9f7]">
+          <Search className="h-[18px] w-[18px] shrink-0 text-slate-400" aria-hidden="true" />
+          <span className="sr-only">Search jobs</span>
+          <input
+            value={draftQuery}
+            onChange={(event) => onQueryChange(event.target.value)}
+            className="h-11 w-full bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-400"
+            placeholder="Job title, skill or company"
+          />
+          {draftQuery && (
+            <button type="button" onClick={onClear} className="rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700" aria-label="Clear search">
+              <X className="h-4 w-4" />
             </button>
-            {draftQuery && (
-              <button
-                type="button"
-                onClick={onClear}
-                className="inline-flex h-12 w-12 items-center justify-center rounded-lg border border-slate-300 bg-white text-slate-500 transition hover:bg-slate-50 hover:text-slate-800"
-                aria-label="Clear search"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            )}
-          </div>
-        </form>
-
-      </div>
+          )}
+        </label>
+        <button
+          type="submit"
+          className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-xl bg-brand-navy px-4 text-sm font-semibold text-white transition hover:bg-[#0f2d56] focus:outline-none focus-visible:ring-2 focus-visible:ring-focus sm:px-5"
+        >
+          <Search className="h-4 w-4 sm:hidden" aria-hidden="true" />
+          <span className="hidden sm:inline">Search</span>
+        </button>
+      </form>
+      {searchQuery && (
+        <div className="flex flex-wrap items-center gap-2 border-t border-slate-100 px-4 py-2.5">
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-[#e8f0fc] px-3 py-1 text-xs font-semibold text-brand-navy">
+            “{searchQuery}”
+            <button type="button" onClick={onClear} aria-label={`Remove search ${searchQuery}`}><X className="h-3 w-3" /></button>
+          </span>
+        </div>
+      )}
 
       {!hasLocation && (
-        <div className="border-t border-amber-200 bg-amber-50 px-5 py-3 text-xs font-semibold leading-5 text-amber-800">
-          Your saved profile has no GPS coordinates. Latest active vacancies remain available; add your location to enable nearby matching.
+        <div className="flex items-start gap-2 border-t border-amber-200 bg-[#fffbeb] px-4 py-3 text-xs font-medium leading-5 text-amber-900">
+          <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+          <span>Your profile has no saved location yet, so Nearby is off. <Link to="/seeker/profile" className="font-semibold underline">Add your location</Link> to see jobs close to home.</span>
         </div>
       )}
       {noNearbyJobs && (
-        <div className="border-t border-slate-200 bg-slate-50 px-5 py-3 text-xs font-semibold leading-5 text-slate-600">
-          Your location is saved, but no active vacancies were found within {radiusKm} km. This does not mean your location is missing.
+        <div className="border-t border-slate-200 bg-brand-canvas px-4 py-3 text-xs font-medium leading-5 text-slate-600">
+          Your location is saved, but no open vacancies were found within {radiusKm} km.
         </div>
       )}
       {usingFallbackJobs && hasLocation && (
-        <div className="border-t border-blue-100 bg-blue-50 px-5 py-3 text-xs font-semibold leading-5 text-blue-800">
-          Showing the latest active vacancies as a broader fallback feed.
+        <div className="border-t border-[#c4d9f7] bg-[#e8f0fc] px-4 py-3 text-xs font-medium leading-5 text-brand-navy">
+          Showing every open vacancy, newest first.
         </div>
       )}
     </section>
   )
 }
 
-function JobFeedSelector({ activeFeed, hasLocation, counts, onChange }) {
-  const feeds = [
-    {
-      key: 'recommended',
-      title: 'Recommended Jobs',
-      description: counts.recommended ? 'Ranked by your profile and skills' : 'No recommended jobs yet',
-    },
-    ...(hasLocation ? [{
-      key: 'nearby',
-      title: 'Nearby Jobs',
-      description: counts.nearby ? 'Based on your saved GPS location' : 'No nearby jobs in the current radius',
-    }] : []),
-    {
-      key: 'latest',
-      title: 'Latest Active Vacancies',
-      description: 'Broader fallback across active postings',
-    },
+function FeedSwitcher({ activeFeed, activeTab, hasLocation, counts, resultCount, sortMode, onFeedChange, onSavedSelect, onSortChange }) {
+  const options = [
+    { key: 'recommended', label: 'Recommended', icon: Sparkles, count: counts.recommended },
+    ...(hasLocation ? [{ key: 'nearby', label: 'Nearby', icon: MapPin, count: counts.nearby }] : []),
+    { key: 'latest', label: 'Latest', icon: Clock3, count: counts.latest },
+    { key: 'saved', label: 'Saved', icon: Bookmark, count: counts.saved },
   ]
 
   return (
-    <section className="flex snap-x gap-2 overflow-x-auto rounded-lg border border-slate-200 bg-white p-2 shadow-sm shadow-slate-900/[0.03]" aria-label="Dashboard job feeds">
-      {feeds.map((feed) => {
-        const active = activeFeed === feed.key
-        return (
-          <button
-            key={feed.key}
-            type="button"
-            onClick={() => onChange(feed.key)}
-            className={`min-w-[210px] flex-1 snap-start rounded-md px-3 py-2.5 text-left transition focus:outline-none focus:ring-4 focus:ring-blue-100 sm:min-w-max ${
-              active
-                ? 'bg-blue-700 text-white shadow-sm'
-                : 'bg-white text-slate-700 hover:bg-slate-50'
-            }`}
-          >
-            <span className="flex items-center justify-between gap-3">
-              <span className="text-xs font-black sm:text-sm">{feed.title}</span>
-              <span className={`rounded-full px-2 py-0.5 text-[11px] font-black ${active ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'}`}>{counts[feed.key]}</span>
-            </span>
-            <span className={`mt-1 block text-[11px] font-semibold ${active ? 'text-blue-100' : 'text-slate-500'}`}>{feed.description}</span>
-          </button>
-        )
-      })}
-    </section>
-  )
-}
-
-function FeedControls({
-  activeTab,
-  savedCount,
-  resultCount,
-  sortMode,
-  onTabChange,
-  onSortChange,
-}) {
-  return (
-    <section className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm shadow-slate-900/[0.03] sm:p-4">
-      <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-        <div className="flex gap-2 overflow-x-auto pb-1">
-          {feedTabs.map((tab) => {
-            const Icon = tab.icon
-            const active = activeTab === tab.key
-
-            return (
-              <button
-                key={tab.key}
-                type="button"
-                onClick={() => onTabChange(tab.key)}
-                className={`inline-flex min-h-10 shrink-0 items-center gap-2 rounded-lg border px-4 py-2 text-sm font-black transition ${
-                  active
-                    ? 'border-blue-600 bg-blue-600 text-white shadow-sm'
-                    : 'border-slate-200 bg-white text-slate-600 hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700'
-                }`}
-              >
-                <Icon className="h-4 w-4" />
-                {tab.label}
-                {tab.key === 'saved' && savedCount > 0 && (
-                  <span className={`rounded-full px-2 py-0.5 text-[11px] ${active ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'}`}>
-                    {savedCount}
-                  </span>
-                )}
-              </button>
-            )
-          })}
-        </div>
-
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-          <span className="inline-flex items-center gap-2 rounded-full bg-slate-50 px-3 py-2 text-xs font-bold text-slate-500">
-            <Filter className="h-3.5 w-3.5" />
-            {resultCount} result{resultCount === 1 ? '' : 's'}
-          </span>
-
-          <label className="flex items-center gap-2 text-sm font-bold text-slate-600">
-            Sort
-            <select
-              value={sortMode}
-              onChange={(event) => onSortChange(event.target.value)}
-              className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-bold text-slate-900 shadow-sm outline-none focus:border-blue-600 focus:ring-4 focus:ring-blue-100"
+    <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+      <div className="flex gap-1 overflow-x-auto rounded-xl border border-slate-200 bg-white p-1 shadow-card" role="tablist" aria-label="Job lists">
+        {options.map((option) => {
+          const active = option.key === 'saved' ? activeTab === 'saved' : activeTab !== 'saved' && activeFeed === option.key
+          return (
+            <button
+              key={option.key}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              onClick={() => (option.key === 'saved' ? onSavedSelect() : onFeedChange(option.key))}
+              className={`inline-flex shrink-0 items-center gap-2 rounded-lg px-3.5 py-2 text-sm font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-focus ${
+                active ? 'bg-brand-navy text-white' : 'text-slate-600 hover:text-brand-navy'
+              }`}
             >
-              {sortOptions.map((option) => (
-                <option key={option.value} value={option.value}>{option.label}</option>
-              ))}
-            </select>
-          </label>
-        </div>
+              {createElement(option.icon, { className: 'h-4 w-4', 'aria-hidden': true })}
+              {option.label}
+              <span className={`rounded-full px-1.5 text-xs ${active ? 'bg-white/20' : 'bg-slate-100'}`}>{option.count}</span>
+            </button>
+          )
+        })}
       </div>
-    </section>
+
+      <div className="flex items-center justify-between gap-3 lg:justify-end">
+        <span className="text-sm text-slate-500">{resultCount} result{resultCount === 1 ? '' : 's'}</span>
+        <label className="flex items-center gap-2 text-sm text-slate-600">
+          Sort by
+          <select
+            value={sortMode}
+            onChange={(event) => onSortChange(event.target.value)}
+            className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-800 outline-none focus:border-[#2563b8] focus:ring-2 focus:ring-[#c4d9f7]"
+          >
+            {sortOptions.map((option) => (
+              <option key={option.value} value={option.value}>{option.label}</option>
+            ))}
+          </select>
+        </label>
+      </div>
+    </div>
   )
 }
 
 function JobCard({ job, rating, saved = false, applying = false, onSave, onDetails, onQuickApply, onViewEmployer }) {
-  const matchMeta = matchMetaFor(job.matchScore)
+  const strong = !job.matchDeferred && job.matchScore >= 80
   const openFromKeyboard = (event) => {
+    if (event.target !== event.currentTarget) return
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault()
       onDetails()
     }
   }
+  const stop = (handler) => (event) => { event.stopPropagation(); handler() }
 
   return (
-    <motion.article
+    <Motion.article
       layout
       variants={{
         hidden: { opacity: 0, y: 18 },
         show: { opacity: 1, y: 0 },
       }}
       exit={{ opacity: 0, scale: 0.98 }}
-      whileHover={{ y: -2 }}
       transition={{ duration: 0.22, ease: 'easeOut' }}
       tabIndex={0}
-      role="button"
       onClick={onDetails}
       onKeyDown={openFromKeyboard}
-      className="group cursor-pointer rounded-lg border border-slate-200 bg-white p-4 shadow-sm shadow-slate-900/[0.03] outline-none transition-colors hover:border-blue-300 hover:shadow-md focus-visible:border-blue-500 focus-visible:ring-4 focus-visible:ring-blue-100 sm:p-5"
+      aria-label={`${job.title} at ${job.company}. Press Enter for details.`}
+      className="group cursor-pointer rounded-2xl border border-slate-200 bg-white p-4 shadow-card outline-none transition hover:border-[#c4d9f7] hover:shadow-elevated focus-visible:ring-2 focus-visible:ring-focus sm:p-5"
     >
-      <div className="flex flex-col gap-4">
-        <div className="flex items-start gap-3 sm:gap-4">
-          <button 
-            type="button"
-            className="shrink-0 transition-transform hover:scale-105 focus:outline-none"
-            onClick={(e) => { e.stopPropagation(); onViewEmployer(); }}
-            title={`View ${job.company} profile`}
-          >
-            <CompanyMark company={job.company} logoPath={job.companyLogoPath} />
-          </button>
-          <div className="min-w-0 flex-1">
-            <h2 className="text-base font-black leading-snug text-blue-700 group-hover:underline sm:text-lg">{job.title}</h2>
-            <button 
-              type="button"
-              className="mt-0.5 text-sm font-semibold text-slate-900 hover:text-blue-700 hover:underline focus:outline-none focus:text-blue-700 focus:underline"
-              onClick={(e) => { e.stopPropagation(); onViewEmployer(); }}
-            >
-              {job.company}
-            </button>
-            {rating && (
-              <span
-                className="ml-2 inline-flex items-center gap-1 align-middle text-xs font-bold text-slate-700"
-                aria-label={`Rated ${rating.average.toFixed(1)} out of 5 by ${rating.reviewers} verified reviewers`}
-              >
-                <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" aria-hidden="true" />
-                {rating.average.toFixed(1)}
-                <span className="font-normal text-slate-500">({rating.reviewers})</span>
-              </span>
+      <div className="flex items-start gap-3 sm:gap-4">
+        <button type="button" className="shrink-0 rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-focus" onClick={stop(onViewEmployer)} title={`View ${job.company} profile`}>
+          <CompanyMark company={job.company} logoPath={job.companyLogoPath} sizeClass="h-12 w-12" />
+        </button>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <h2 className="text-[17px] font-semibold leading-snug text-slate-900 group-hover:text-brand-navy">{job.title}</h2>
+              <p className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-sm text-slate-600">
+                <button type="button" className="font-medium hover:text-brand-navy hover:underline focus:outline-none focus-visible:underline" onClick={stop(onViewEmployer)}>{job.company}</button>
+                {rating ? (
+                  <span className="inline-flex items-center gap-1" aria-label={`Rated ${rating.average.toFixed(1)} out of 5 by ${rating.reviewers} verified reviewers`}>
+                    <span className="text-slate-300" aria-hidden="true">·</span>
+                    <Star className="h-3.5 w-3.5 fill-brand-gold text-brand-gold" aria-hidden="true" />
+                    {rating.average.toFixed(1)} <span className="text-slate-400">({rating.reviewers})</span>
+                  </span>
+                ) : null}
+              </p>
+            </div>
+            {!job.matchDeferred && (
+              <div className="shrink-0 text-right">
+                <p className="font-display text-[30px] leading-none text-brand-navy sm:text-[34px]">{job.matchScore}<span className="text-lg">%</span></p>
+                <span className={`mt-1 inline-block rounded-full px-2 py-0.5 text-[11px] font-bold ${strong ? 'bg-brand-gold text-brand-navy' : 'bg-[#e8f0fc] text-brand-navy'}`}>
+                  {strong ? 'Strong match' : job.matchScore >= 60 ? 'Good match' : 'Partial match'}
+                </span>
+              </div>
             )}
-            <p className="mt-0.5 text-sm text-slate-500 flex items-center gap-1.5 flex-wrap">
-              <span>{job.location}</span>
-              {job.distanceKm != null && (
-                <>
-                  <span className="text-slate-300">&bull;</span>
-                  <span className="flex items-center gap-1"><MapPin className="h-3.5 w-3.5"/> {formatDistance(job.distanceKm)}</span>
-                </>
-              )}
-            </p>
-            <p className="mt-1 text-xs font-bold text-slate-500 flex items-center gap-2 flex-wrap">
-              <span className="flex items-center gap-1"><WalletCards className="h-3.5 w-3.5"/> {job.salaryRange}</span>
-              <span className="text-slate-300">&bull;</span>
-              <span className="flex items-center gap-1"><BriefcaseBusiness className="h-3.5 w-3.5"/> {job.workSetup || 'Not specified'}</span>
-            </p>
           </div>
-          <button 
-            type="button" 
-            onClick={(e) => { e.stopPropagation(); onSave(); }} 
-            className="rounded-full p-2 text-slate-400 transition hover:bg-blue-50 hover:text-blue-600 focus:outline-none focus:ring-4 focus:ring-blue-100"
-            aria-label={saved ? `Remove ${job.title} from saved jobs` : `Save ${job.title}`}
-          >
-            {saved ? <BookmarkCheck className="h-6 w-6 text-blue-600" /> : <Bookmark className="h-6 w-6" />}
-          </button>
-        </div>
 
-        <div className="flex flex-wrap items-center gap-2 mt-2">
-          {!job.matchDeferred && <ScoreBadge icon={Star} label={`${job.matchScore}% Match`} className={matchMeta.className} />}
-          {job.requiredSkills.slice(0, 3).map((skill) => (
-            <span key={skill} className="rounded-md bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">
-              {skill}
-            </span>
-          ))}
-          {job.requiredSkills.length > 3 && (
-            <span className="text-xs font-semibold text-slate-400">+{job.requiredSkills.length - 3} more</span>
-          )}
-          <EmployerPreferenceChip job={job} />
-        </div>
+          <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1.5 text-sm text-slate-600">
+            <span className="flex items-center gap-1.5"><MapPin className="h-4 w-4 text-slate-400" aria-hidden="true" />{job.location}{job.distanceKm != null && ` (${formatDistance(job.distanceKm)})`}</span>
+            <span className="flex items-center gap-1.5"><WalletCards className="h-4 w-4 text-slate-400" aria-hidden="true" /><span className="font-semibold text-slate-900 tabular-nums">{job.salaryRange}</span></span>
+            <span className="flex items-center gap-1.5"><BriefcaseBusiness className="h-4 w-4 text-slate-400" aria-hidden="true" />{job.workSetup || 'Not specified'}</span>
+            <span className="flex items-center gap-1.5"><Clock3 className="h-4 w-4 text-slate-400" aria-hidden="true" />{formatDate(job.postedAt) || 'Recently'}</span>
+          </div>
 
-        <div className="flex flex-col gap-3 border-t border-slate-100 pt-3 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-xs font-semibold text-emerald-700 flex items-center gap-1">
-            {job.matchDeferred ? (
-              <span className="text-slate-500">Open the details to check requirements</span>
-            ) : job.missingCriticalSkills.length ? (
-              <span className="text-amber-600 flex items-center gap-1">
-                <AlertTriangle className="h-3.5 w-3.5"/> Missing {job.missingCriticalSkills.length} skill{job.missingCriticalSkills.length > 1 ? 's' : ''}
-              </span>
-            ) : (
-              <><ShieldCheck className="h-3.5 w-3.5"/> Strong Match</>
-            )}
-          </p>
-          
-          <div className="flex items-center justify-between gap-2 sm:justify-end">
-            <span className="mr-2 self-center text-xs text-slate-500">{formatDate(job.postedAt) || 'recently'}</span>
-            <button
-              type="button"
-              onClick={(e) => { e.stopPropagation(); onDetails(); }}
-              className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-full bg-slate-100 px-4 py-2 text-xs font-black text-slate-700 shadow-sm transition hover:bg-slate-200 focus:outline-none focus:ring-4 focus:ring-slate-100"
-            >
-              <ChevronRight className="h-3.5 w-3.5" />
-              View all details
-            </button>
+          <div className="mt-3 flex flex-wrap items-center gap-1.5">
+            {job.requiredSkills.slice(0, 3).map((skill) => (
+              <span key={skill} className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">{skill}</span>
+            ))}
+            {job.requiredSkills.length > 3 && <span className="text-xs font-medium text-slate-400">+{job.requiredSkills.length - 3} more</span>}
+            <EmployerPreferenceChip job={job} />
           </div>
         </div>
       </div>
-    </motion.article>
+
+      <div className="mt-4 flex flex-col gap-3 border-t border-slate-100 pt-4 sm:flex-row sm:items-center sm:justify-between">
+        <p className="flex items-center gap-1.5 text-xs font-semibold">
+          {job.hasApplied ? (
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-[#fffbeb] px-3 py-1 text-[#b45309]"><CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />Applied: {titleCase(job.applicationStatus || 'pending')}</span>
+          ) : job.matchDeferred ? (
+            <span className="font-medium text-slate-500">Open the details to check requirements</span>
+          ) : job.missingCriticalSkills.length ? (
+            <span className="flex items-center gap-1 text-amber-700"><AlertTriangle className="h-3.5 w-3.5" aria-hidden="true" />Missing {job.missingCriticalSkills.length} skill{job.missingCriticalSkills.length > 1 ? 's' : ''}</span>
+          ) : (
+            <span className="flex items-center gap-1 text-emerald-700"><ShieldCheck className="h-3.5 w-3.5" aria-hidden="true" />Meets the listed skills</span>
+          )}
+        </p>
+        <div className="flex items-center justify-end gap-2">
+          <button
+            type="button"
+            onClick={stop(onSave)}
+            className={`flex h-10 w-10 items-center justify-center rounded-xl border transition focus:outline-none focus-visible:ring-2 focus-visible:ring-focus ${saved ? 'border-brand-navy bg-[#e8f0fc] text-brand-navy' : 'border-slate-200 text-slate-500 hover:border-brand-navy hover:text-brand-navy'}`}
+            aria-label={saved ? `Remove ${job.title} from saved jobs` : `Save ${job.title}`}
+            aria-pressed={saved}
+          >
+            {saved ? <BookmarkCheck className="h-[18px] w-[18px]" /> : <Bookmark className="h-[18px] w-[18px]" />}
+          </button>
+          {job.hasApplied ? (
+            <Link to="/seeker/applications" onClick={(event) => event.stopPropagation()} className="rounded-xl border border-brand-navy px-4 py-2.5 text-sm font-semibold text-brand-navy transition hover:bg-[#e8f0fc]">View application</Link>
+          ) : (
+            <>
+              <button type="button" onClick={stop(onDetails)} className="rounded-xl border border-brand-navy px-4 py-2.5 text-sm font-semibold text-brand-navy transition hover:bg-[#e8f0fc]">Details</button>
+              <button
+                type="button"
+                onClick={stop(onQuickApply)}
+                disabled={applying}
+                className="inline-flex items-center gap-2 rounded-xl bg-brand-navy px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#0f2d56] disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <Zap className="h-4 w-4" aria-hidden="true" />{applying ? 'Applying…' : 'Quick apply'}
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+    </Motion.article>
   )
 }
 
 function DashboardJobSkeleton({ compact = false }) {
   return (
-    <div className="animate-pulse rounded-lg border border-slate-200 bg-white p-4 shadow-sm shadow-slate-900/[0.03] sm:p-5">
+    <div className="animate-pulse rounded-2xl border border-slate-200 bg-white p-4 shadow-card sm:p-5" aria-hidden="true">
       <div className="flex gap-3 sm:gap-4">
         <div className="h-12 w-12 shrink-0 rounded-md bg-slate-200" />
         <div className="flex-1">
@@ -738,110 +683,140 @@ function DashboardJobSkeleton({ compact = false }) {
   )
 }
 
-function ProfileSnapshot({ seeker, activeApplications }) {
+function ProfileStrengthCard({ profile, seeker }) {
+  const completion = Math.max(0, Math.min(100, Number(seeker.nsrpCompletion) || 0))
+  const action = nextBestAction(profile, seeker)
+  const circumference = 2 * Math.PI * 15.5
+  const verdict = completion >= 90 ? 'Excellent — your profile is complete.' : completion >= 60 ? 'Good — employers can find you.' : 'Needs work — employers may skip you.'
+
   return (
-    <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-      <div className="relative h-20 bg-gradient-to-r from-blue-700 to-indigo-800">
-        <div className="absolute -bottom-8 left-1/2 -translate-x-1/2">
-          <img src={seeker.profilePhoto} alt={seeker.name} className="h-16 w-16 rounded-full border-4 border-white object-cover shadow-md" />
+    <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-card">
+      <div className="flex items-center gap-5">
+        <div className="relative h-[88px] w-[88px] shrink-0" role="img" aria-label={`Profile ${completion}% complete`}>
+          <svg viewBox="0 0 36 36" className="h-full w-full -rotate-90" aria-hidden="true">
+            <circle cx="18" cy="18" r="15.5" fill="none" stroke="#e8f0fc" strokeWidth="3.5" />
+            <circle cx="18" cy="18" r="15.5" fill="none" stroke="#123563" strokeWidth="3.5" strokeLinecap="round" strokeDasharray={`${(completion / 100) * circumference} ${circumference}`} />
+          </svg>
+          <span className="absolute inset-0 flex items-center justify-center font-display text-2xl text-brand-navy">{completion}%</span>
+        </div>
+        <div className="min-w-0">
+          <p className="text-sm font-semibold text-slate-500">Profile strength</p>
+          <p className="mt-1 font-semibold leading-6 text-slate-900">{verdict}</p>
+          <Link to="/seeker/profile" className="text-sm font-medium text-brand-navy hover:underline">View my profile</Link>
         </div>
       </div>
-      
-      <div className="pt-10 px-5 pb-4 text-center">
-        <h2 className="text-lg font-black text-slate-950 truncate hover:underline cursor-pointer">
-          <Link to="/seeker/profile">{seeker.name}</Link>
-        </h2>
-        <p className="mt-1 text-xs text-slate-600 line-clamp-2">{seeker.headline}</p>
+      <div className="mt-5 rounded-xl border border-brand-gold/40 bg-[#fffbeb] p-4">
+        <p className="flex items-center gap-2 text-sm font-semibold text-slate-900"><Sparkles className="h-4 w-4 text-[#d97706]" aria-hidden="true" />Next best step</p>
+        <p className="mt-1 text-sm font-semibold text-slate-900">{action.title}</p>
+        <p className="mt-1 text-sm leading-6 text-slate-600">{action.description}</p>
+        <Link to={action.href} className="mt-3 inline-flex items-center gap-2 rounded-lg bg-brand-navy px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-[#0f2d56]">
+          {action.cta} <ChevronRight className="h-4 w-4" aria-hidden="true" />
+        </Link>
       </div>
-
-      <div className="border-t border-slate-100 py-3">
-        <div className="px-5 py-2 hover:bg-slate-50 cursor-pointer flex justify-between items-center transition">
-          <span className="text-xs font-semibold text-slate-500">Profile Readiness</span>
-          <span className="text-xs font-black text-blue-700">{seeker.nsrpCompletion}%</span>
-        </div>
-        <div className="px-5 pb-2">
-          <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-200">
-            <div className="h-full rounded-full bg-gradient-to-r from-blue-600 to-emerald-500" style={{ width: `${Math.min(seeker.nsrpCompletion, 100)}%` }} />
-          </div>
-        </div>
-        <div className="px-5 py-2 hover:bg-slate-50 cursor-pointer flex justify-between items-center transition">
-          <span className="text-xs font-semibold text-slate-500">Active Applications</span>
-          <span className="text-xs font-black text-blue-700">{activeApplications}</span>
-        </div>
-      </div>
-
     </section>
   )
 }
 
-function NextBestAction({ profile, seeker }) {
-  const action = nextBestAction(profile, seeker)
+function ApplicationsSummaryCard({ applications }) {
+  const list = applications ?? []
+  const inProgress = list.filter((application) => IN_PROGRESS_STATUSES.includes(application.status)).length
+  const interviews = list.filter((application) => application.status === 'interview').length
+  const hired = list.filter((application) => application.status === 'hired').length
+  const nextInterview = list
+    .filter((application) => application.status === 'interview' && application.interview?.schedule && interviewPhase(application.interview) === 'upcoming')
+    .sort((a, b) => new Date(a.interview.schedule) - new Date(b.interview.schedule))[0]
+
+  const rows = [
+    { label: 'In progress', value: inProgress, icon: Send, tone: 'text-[#2563b8]' },
+    { label: 'Interview', value: interviews, icon: CalendarCheck, tone: 'text-[#d97706]' },
+    { label: 'Hired', value: hired, icon: CheckCircle2, tone: 'text-emerald-600' },
+  ]
 
   return (
-    <section className="rounded-xl border border-indigo-100 bg-gradient-to-br from-indigo-50 via-white to-blue-50 p-5 shadow-sm">
-      <div className="flex items-start gap-3">
-        <span className="rounded-xl bg-white p-2 text-indigo-600 shadow-sm">
-          <Sparkles className="h-5 w-5" />
-        </span>
-        <div>
-          <p className="text-xs font-black uppercase tracking-[0.16em] text-indigo-600">Next Best Action</p>
-          <h2 className="mt-1 text-lg font-black text-slate-950">{action.title}</h2>
-          <p className="mt-2 text-sm leading-6 text-slate-600">{action.description}</p>
+    <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-card">
+      <div className="flex items-center justify-between">
+        <h2 className="font-semibold text-slate-900">My applications</h2>
+        <Link to="/seeker/applications" className="text-sm font-semibold text-brand-navy hover:underline">View all</Link>
+      </div>
+      {applications === null ? (
+        <div className="mt-4 space-y-2.5" aria-busy="true">
+          {[0, 1, 2].map((key) => <div key={key} className="h-10 animate-pulse rounded-xl bg-slate-100" />)}
+        </div>
+      ) : list.length === 0 ? (
+        <p className="mt-3 text-sm leading-6 text-slate-600">You haven&apos;t applied yet. Use <span className="font-semibold text-slate-900">Quick apply</span> on any vacancy — you&apos;ll track it here.</p>
+      ) : (
+        <>
+          <ul className="mt-4 space-y-2 text-sm">
+            {rows.map((row) => (
+              <li key={row.label} className="flex items-center justify-between rounded-xl bg-brand-canvas px-3 py-2.5">
+                <span className="flex items-center gap-2.5 text-slate-700">{createElement(row.icon, { className: `h-4 w-4 ${row.tone}`, 'aria-hidden': true })}{row.label}</span>
+                <span className="font-semibold tabular-nums text-slate-900">{row.value}</span>
+              </li>
+            ))}
+          </ul>
+          {nextInterview && (
+            <div className="mt-4 rounded-xl border border-slate-200 p-3.5">
+              <p className="text-sm font-semibold text-slate-500">Up next</p>
+              <p className="mt-1 text-sm font-semibold text-slate-900">Interview for {nextInterview.job?.job_title || 'a vacancy'}{nextInterview.job?.employer?.company_name ? ` at ${nextInterview.job.employer.company_name}` : ''}</p>
+              <p className="text-sm text-slate-500">{formatInterviewTime(nextInterview.interview.schedule)}</p>
+            </div>
+          )}
+        </>
+      )}
+    </section>
+  )
+}
+
+function JobFairCard({ fairs }) {
+  const fair = fairs[0]
+  if (!fair) return null
+  const date = fair.start_date ? new Date(`${String(fair.start_date).slice(0, 10)}T00:00:00`) : null
+  const valid = date && !Number.isNaN(date.getTime())
+
+  return (
+    <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-card">
+      <h2 className="font-semibold text-slate-900">Upcoming job fair</h2>
+      <div className="mt-4 flex items-center gap-4">
+        <div className="w-14 shrink-0 rounded-xl bg-brand-navy py-2 text-center text-white">
+          <p className="text-[10px] font-semibold text-white/70">{valid ? date.toLocaleDateString('en-PH', { month: 'short' }) : '—'}</p>
+          <p className="font-display text-2xl leading-none">{valid ? String(date.getDate()).padStart(2, '0') : '—'}</p>
+        </div>
+        <div className="min-w-0">
+          <p className="text-sm font-semibold text-slate-900">{fair.title}</p>
+          <p className="truncate text-sm text-slate-500">{[fair.venue, fair.start_time?.slice(0, 5)].filter(Boolean).join(', ')}</p>
         </div>
       </div>
-      <Link
-        to={action.href}
-        className="mt-5 inline-flex w-full min-h-11 items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-black text-white shadow-sm transition hover:bg-indigo-700"
-      >
-        <Sparkles className="h-4 w-4" />
-        {action.cta}
+      <Link to="/seeker/job-fairs" className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl border border-brand-navy px-4 py-2.5 text-sm font-semibold text-brand-navy transition hover:bg-[#e8f0fc]">
+        <QrCode className="h-4 w-4" aria-hidden="true" />Register &amp; get my QR pass
       </Link>
     </section>
   )
 }
 
-// Merges what used to be two separate always-informational sidebar cards
-// (profile view analytics + a static explainer of the ranking engine) into
-// one, so the sticky sidebar doesn't stack four cards deep. The ranking
-// explainer always shows; the profile-views section appears once analytics
-// data has loaded.
+// Profile visibility plus a short note on how the feed is ranked. The
+// visibility half appears once analytics has loaded.
 function ProfileInsightsCard({ analytics }) {
   return (
-    <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-      <div className="flex items-start gap-3">
-        <span className="rounded-xl bg-blue-50 p-2 text-blue-700">
-          <Layers3 className="h-5 w-5" />
-        </span>
-        <div>
-          <h2 className="text-sm font-black text-slate-950">How your feed is ranked</h2>
-          <p className="mt-1 text-sm leading-6 text-slate-600">
-            i-PESO separates merit score from GPS distance so qualified applicants are not hidden just because another job is closer.
-          </p>
-        </div>
-      </div>
-      <div className="mt-4 grid gap-3">
-        <EngineRow icon={Star} title="Merit Score" text="Occupation, skills, experience, and education." />
-        <EngineRow icon={MapPin} title="GPS Distance" text="Nearby jobs can still be sorted by commute distance." />
-      </div>
+    <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-card">
+      <h2 className="font-semibold text-slate-900">How your feed is ranked</h2>
+      <p className="mt-1 text-sm leading-6 text-slate-600">
+        Your match % (occupation, skills, experience, education) is kept separate from distance, so a closer job never hides a better fit. Sort by <span className="font-semibold text-slate-900">Nearest</span> when commute matters most.
+      </p>
 
       {analytics && (
-        <div className="mt-5 border-t border-slate-100 pt-4">
-          <div className="flex items-center gap-2">
-            <UserRound className="h-4 w-4 text-blue-700" />
-            <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">Profile Visibility (30d)</p>
-          </div>
+        <div className="mt-4 border-t border-slate-100 pt-4">
+          <p className="text-sm font-semibold text-slate-900">Profile visibility in the last 30 days</p>
           <div className="mt-3 grid grid-cols-2 gap-3">
-            <SidebarStat label="Profile Views" value={analytics.total_views_30_days} />
-            <SidebarStat label="Search Appearances" value={analytics.search_appearances} />
+            <SidebarStat label="Profile views" value={analytics.total_views_30_days} />
+            <SidebarStat label="Search appearances" value={analytics.search_appearances} />
           </div>
-
           {analytics.recent_viewers?.length > 0 && (
             <div className="mt-4">
-              <p className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-400">Recent Viewers</p>
-              <ul className="mt-3 space-y-3 text-sm font-semibold text-slate-700">
+              <p className="text-xs font-semibold text-slate-500">Recently viewed by</p>
+              <ul className="mt-2 space-y-2 text-sm text-slate-700">
                 {analytics.recent_viewers.map((viewer, i) => (
                   <li key={i} className="flex items-center gap-2">
-                    <Building2 className="h-4 w-4 text-slate-400 shrink-0" />
+                    <Building2 className="h-4 w-4 shrink-0 text-slate-400" aria-hidden="true" />
                     <span className="truncate">{viewer.company_name}</span>
                   </li>
                 ))}
@@ -859,7 +834,7 @@ function JobDetailModal({ job, saved, applying = false, onClose, onSave, onQuick
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-h-[90vh] max-w-3xl overflow-y-auto">
         <DialogHeader>
-          <span className="inline-flex w-fit items-center gap-2 rounded-full border border-blue-100 bg-blue-50 px-3 py-1 text-xs font-black text-blue-700">
+          <span className="inline-flex w-fit items-center gap-2 rounded-full bg-[#e8f0fc] px-3 py-1 text-xs font-semibold text-brand-navy">
             <Layers3 className="h-3.5 w-3.5" />
             Match explanation
           </span>
@@ -882,7 +857,7 @@ function JobDetailModal({ job, saved, applying = false, onClose, onSave, onQuick
                 >
                   {job.company}
                 </button>
-                {' · '}{job.location}
+                {', '}{job.location}
               </DialogDescription>
             </div>
           </div>
@@ -921,7 +896,7 @@ function JobDetailModal({ job, saved, applying = false, onClose, onSave, onQuick
               <h3 className="font-black text-slate-950">Required skills</h3>
               <div className="mt-3 flex flex-wrap gap-2">
                 {job.requiredSkills.map((skill) => (
-                  <span key={skill} className="rounded-full bg-blue-50 px-3 py-1.5 text-xs font-bold text-blue-700">
+                  <span key={skill} className="rounded-full bg-[#e8f0fc] px-3 py-1.5 text-xs font-semibold text-brand-navy">
                     {skill}
                   </span>
                 ))}
@@ -955,7 +930,7 @@ function JobDetailModal({ job, saved, applying = false, onClose, onSave, onQuick
           <button
             type="button"
             onClick={onSave}
-            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-black text-slate-700 transition hover:bg-slate-50"
+            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-brand-navy bg-white px-4 py-2.5 text-sm font-semibold text-brand-navy transition hover:bg-[#e8f0fc]"
           >
             {saved ? <BookmarkCheck className="h-4 w-4" /> : <Bookmark className="h-4 w-4" />}
             {saved ? 'Saved' : 'Save Job'}
@@ -964,7 +939,7 @@ function JobDetailModal({ job, saved, applying = false, onClose, onSave, onQuick
             type="button"
             onClick={onQuickApply}
             disabled={job.hasApplied || applying}
-            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-black text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-brand-navy px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#0f2d56] disabled:cursor-not-allowed disabled:opacity-60"
           >
             <Zap className="h-4 w-4" />
             {job.hasApplied ? `Applied: ${titleCase(job.applicationStatus || 'pending')}` : applying ? 'Submitting...' : 'Apply'}
@@ -977,13 +952,11 @@ function JobDetailModal({ job, saved, applying = false, onClose, onSave, onQuick
 
 function EmptyFeedState({ title, text }) {
   return (
-    <div className="overflow-hidden rounded-xl border border-dashed border-slate-300 bg-white px-6 py-12 text-center shadow-sm">
-      <div className="mx-auto flex h-24 w-24 items-center justify-center rounded-full bg-blue-50">
-        <div className="flex h-16 w-16 items-center justify-center rounded-full bg-white shadow-sm">
-          <SlidersHorizontal className="h-8 w-8 text-blue-600" />
-        </div>
+    <div className="rounded-2xl border border-dashed border-slate-300 bg-white px-6 py-12 text-center">
+      <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-[#e8f0fc]">
+        <SlidersHorizontal className="h-7 w-7 text-brand-navy" aria-hidden="true" />
       </div>
-      <h3 className="mt-5 text-lg font-black text-slate-950">{title}</h3>
+      <h3 className="mt-5 text-lg font-semibold text-slate-900">{title}</h3>
       <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-500">{text}</p>
     </div>
   )
@@ -995,7 +968,7 @@ function MetricCard({ icon: Icon, label, value }) {
       <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-50 text-blue-700">
         {createElement(Icon, { className: 'h-4 w-4' })}
       </span>
-      <p className="mt-3 text-xs font-black uppercase tracking-[0.16em] text-slate-500">{label}</p>
+      <p className="mt-3 text-xs font-semibold text-slate-500">{label}</p>
       <p className="mt-1 text-xl font-black text-slate-950">{value}</p>
     </div>
   )
@@ -1004,7 +977,7 @@ function MetricCard({ icon: Icon, label, value }) {
 function MiniFact({ icon: Icon, label, value }) {
   return (
     <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
-      <p className="flex items-center gap-1.5 text-[11px] font-black uppercase tracking-[0.14em] text-slate-500">
+      <p className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-500">
         {createElement(Icon, { className: 'h-3.5 w-3.5' })}
         {label}
       </p>
@@ -1016,7 +989,7 @@ function MiniFact({ icon: Icon, label, value }) {
 function Fact({ icon: Icon, label, value }) {
   return (
     <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
-      <p className="flex items-center gap-1.5 text-[11px] font-black uppercase tracking-[0.14em] text-slate-500">
+      <p className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-500">
         {createElement(Icon, { className: 'h-3.5 w-3.5' })}
         {label}
       </p>
@@ -1042,7 +1015,7 @@ function ScorePill({ label, value }) {
         <span className="text-xs font-black text-slate-900">{Math.round(value)}%</span>
       </div>
       <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-200">
-        <div className="h-full rounded-full bg-blue-600" style={{ width: `${Math.max(0, Math.min(100, value))}%` }} />
+        <div className="h-full rounded-full bg-brand-navy" style={{ width: `${Math.max(0, Math.min(100, value))}%` }} />
       </div>
     </div>
   )
@@ -1056,7 +1029,7 @@ function ScoreRow({ label, value }) {
         <span className="text-sm font-black text-slate-950">{Math.round(value)}%</span>
       </div>
       <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-100">
-        <div className="h-full rounded-full bg-blue-600" style={{ width: `${Math.max(0, Math.min(100, value))}%` }} />
+        <div className="h-full rounded-full bg-brand-navy" style={{ width: `${Math.max(0, Math.min(100, value))}%` }} />
       </div>
     </div>
   )
@@ -1086,9 +1059,9 @@ function CompanyMark({ company, logoPath, sizeClass = 'h-14 w-14' }) {
 
 function SidebarStat({ label, value }) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-white px-3 py-3">
-      <p className="text-[11px] font-black uppercase tracking-wide text-slate-400">{label}</p>
-      <p className="mt-1 text-sm font-black text-slate-900">{value}</p>
+    <div className="rounded-xl bg-brand-canvas px-3 py-3">
+      <p className="text-xs text-slate-500">{label}</p>
+      <p className="mt-1 font-display text-2xl leading-none text-slate-900 tabular-nums">{value ?? '—'}</p>
     </div>
   )
 }
@@ -1116,6 +1089,13 @@ function Notice({ message, tone }) {
       <p>{message}</p>
     </div>
   )
+}
+
+function greeting(now = new Date()) {
+  const hour = now.getHours()
+  if (hour < 12) return 'Good morning'
+  if (hour < 18) return 'Good afternoon'
+  return 'Good evening'
 }
 
 function buildSeekerView(profile, user, photoUrl = null) {
@@ -1359,22 +1339,6 @@ function companyMonogram(company) {
     .slice(0, 2)
     .map((word) => word[0]?.toUpperCase() ?? '')
     .join('') || 'PE'
-}
-
-function matchMetaFor(score) {
-  if (score >= 90) {
-    return { className: 'border-emerald-200 bg-emerald-50 text-emerald-700' }
-  }
-
-  if (score >= 80) {
-    return { className: 'border-blue-200 bg-blue-50 text-blue-700' }
-  }
-
-  if (score >= 60) {
-    return { className: 'border-amber-200 bg-amber-50 text-amber-700' }
-  }
-
-  return { className: 'border-slate-200 bg-slate-100 text-slate-600' }
 }
 
 function titleCase(value) {

@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Eye, EyeOff, LogIn } from 'lucide-react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import AuthShell from '@/components/auth/AuthShell'
-import { AlertBox, Button, Card } from '@/components/ui'
+import { AlertBox, Button } from '@/components/ui'
 import { authService } from '@/services/authService'
 import { useAuthStore } from '@/stores/authStore'
 
@@ -82,13 +82,12 @@ export default function LoginPage() {
 
   return (
     <AuthShell
-      title="Welcome back"
-      subtitle="Sign in to continue to your i-PESO employment workspace."
-      sideTitle="Pick up where you left off."
-      sideText="One account for your profile, activity, and PESO notifications."
+      title="Sign in"
+      subtitle="Job seekers and employers use the same sign-in."
+      sideTitle="Your next job starts at the PESO office, even online."
     >
-      {apiError && <AlertBox variant="danger" title="Sign-in failed" className="mb-5">{apiError}</AlertBox>}
-      <Card>
+      {apiError && <AlertBox variant="danger" title="That didn't work" className="mb-5">{apiError}</AlertBox>}
+      <>
         <form onSubmit={submit} noValidate className="space-y-5">
           <AuthField
             label="Email address"
@@ -101,8 +100,8 @@ export default function LoginPage() {
           />
           <div>
             <div className="mb-1.5 flex items-center justify-between">
-              <label className="text-sm font-bold text-slate-700">Password</label>
-              <Link to="/forgot-password" className="text-xs font-bold text-blue-700 hover:underline">Forgot password?</Link>
+              <label className="text-sm font-semibold text-slate-800">Password</label>
+              <Link to="/forgot-password" className="text-sm font-semibold text-brand-navy hover:underline">Forgot password?</Link>
             </div>
             <div className="relative">
               <input
@@ -119,12 +118,14 @@ export default function LoginPage() {
             </div>
             {fieldError('password') && <p className="mt-1.5 text-xs font-medium text-red-600">{fieldError('password')}</p>}
           </div>
-          <Button type="submit" disabled={loading} icon={LogIn} className="w-full">{loading ? 'Signing in...' : 'Sign In'}</Button>
+          <Button type="submit" disabled={loading} icon={LogIn} className="w-full">{loading ? 'Signing in…' : 'Sign in'}</Button>
         </form>
-        <div className="mt-6 border-t border-slate-200 pt-5 text-center text-sm text-slate-600">
-          New to i-PESO? <Link to="/register" className="font-extrabold text-blue-700 hover:underline">Create an account</Link>
+        <div className="mt-8 rounded-2xl border border-slate-200 bg-brand-canvas p-5">
+          <p className="text-sm font-semibold text-slate-900">New to i-PESO?</p>
+          <p className="mt-1 text-sm text-slate-600">Registration is free for job seekers and employers.</p>
+          <Button to="/register" variant="secondary" size="sm" className="mt-3">Create an account</Button>
         </div>
-      </Card>
+      </>
     </AuthShell>
   )
 }

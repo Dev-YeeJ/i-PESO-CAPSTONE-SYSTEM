@@ -1,6 +1,6 @@
 import { createElement, useCallback, useEffect, useMemo, useState } from 'react'
 import { Download, FileDown, FileText, Filter, RefreshCw, UsersRound } from 'lucide-react'
-import toast from 'react-hot-toast'
+import toast from '@/lib/toast'
 import { EmptyState, LoadingSkeleton } from '@/components/ui'
 import { downloadReportBlob, exportHiringActivityReport, previewHiringActivityReport } from '@/services/hiringActivityReportService'
 

@@ -71,8 +71,8 @@ export default function LocationDataQualityPage() {
       </header>
 
       <div className="grid gap-6 md:grid-cols-3">
-        <MetricCard title="Job Seekers" data={metrics?.job_seekers} icon={Users} colorClass="bg-blue-50 text-blue-600" />
-        <MetricCard title="Employers" data={metrics?.employers} icon={Building2} colorClass="bg-indigo-50 text-indigo-600" />
+        <MetricCard title="Job Seekers" data={metrics?.job_seekers} icon={Users} colorClass="bg-[#e8f0fc] text-brand-navy" />
+        <MetricCard title="Employers" data={metrics?.employers} icon={Building2} colorClass="bg-[#e8f0fc] text-brand-navy" />
         <MetricCard title="Job Vacancies" data={metrics?.job_vacancies} icon={BriefcaseBusiness} colorClass="bg-emerald-50 text-emerald-600" />
       </div>
 

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import toast from 'react-hot-toast'
+import toast from '@/lib/toast'
 import { CheckCheck, ChevronDown, Megaphone, Paperclip } from 'lucide-react'
 import { announcementService } from '@/services/announcementService'
 import AnnouncementBanner from './AnnouncementBanner'

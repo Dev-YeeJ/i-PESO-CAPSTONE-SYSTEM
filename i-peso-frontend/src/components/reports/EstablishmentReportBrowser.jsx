@@ -1,7 +1,7 @@
 import { createElement, useCallback, useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Download, Filter, RefreshCw, FileText, Users, ClipboardCheck, Handshake, Award } from 'lucide-react'
-import toast from 'react-hot-toast'
+import toast from '@/lib/toast'
 import { AlertBox, Button, Card, CardHeader, EmptyState, LoadingSkeleton } from '@/components/ui'
 import PageHeader from '@/pages/admin/_components/PageHeader'
 import EstablishmentReportPreview from './EstablishmentReportPreview'

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useMutation, useQuery } from '@tanstack/react-query'
-import toast from 'react-hot-toast'
+import toast from '@/lib/toast'
 import { KeyRound, Pencil, Trash2, UserCheck, UserX } from 'lucide-react'
 import { Badge, Button, ConfirmDialog } from '@/components/ui'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -74,7 +74,7 @@ export default function StaffDetailDialog({ staff, canManageAccounts, canViewAct
         <DialogContent className="max-h-[92vh] max-w-xl overflow-y-auto">
           <DialogHeader>
             <div className="flex items-center gap-4">
-              <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-brand-navy text-lg font-black text-white">
+              <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-brand-navy text-lg font-bold text-white">
                 {initialsOf(staff.name)}
               </span>
               <div className="min-w-0">
@@ -102,15 +102,15 @@ export default function StaffDetailDialog({ staff, canManageAccounts, canViewAct
           </dl>
 
           {staff.internship && (
-            <div className="rounded-xl border border-blue-200 bg-blue-50/50 p-4">
-              <h3 className="text-sm font-bold text-blue-900">Internship</h3>
+            <div className="rounded-xl border border-[#c4d9f7] bg-[#e8f0fc] p-4">
+              <h3 className="text-sm font-bold text-brand-navy">Internship</h3>
               <dl className="mt-3 grid gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
                 <Detail label="School" value={staff.internship.school} />
                 <Detail label="Course" value={staff.internship.course} />
                 <Detail label="Required hours" value={staff.internship.required_hours ? `${staff.internship.required_hours} hours` : null} />
                 <Detail label="Dates" value={staff.internship.start_date ? `${formatDate(staff.internship.start_date)} – ${formatDate(staff.internship.end_date)}` : null} />
               </dl>
-              <p className="mt-3 text-xs text-blue-800">Their hours and daily time record are in the OJT / Interns tab.</p>
+              <p className="mt-3 text-xs text-brand-navy">Their hours and daily time record are in the OJT / Interns tab.</p>
             </div>
           )}
 
@@ -123,7 +123,7 @@ export default function StaffDetailDialog({ staff, canManageAccounts, canViewAct
                 {access.map(([module, level]) => (
                   <li key={module} className="flex items-center justify-between rounded-lg border border-slate-200 px-3 py-2 text-sm">
                     <span className="font-medium text-slate-700">{MODULE_LABELS[module] ?? module}</span>
-                    <span className={`text-xs font-bold ${level === 'manage' ? 'text-emerald-700' : 'text-blue-700'}`}>{ACCESS_LABELS[level]}</span>
+                    <span className={`text-xs font-bold ${level === 'manage' ? 'text-emerald-700' : 'text-brand-navy'}`}>{ACCESS_LABELS[level]}</span>
                   </li>
                 ))}
               </ul>
@@ -232,7 +232,7 @@ function RecentActivity({ staff }) {
 function Detail({ label, value }) {
   return (
     <div className="min-w-0">
-      <dt className="text-xs font-bold uppercase tracking-wide text-slate-500">{label}</dt>
+      <dt className="text-xs font-bold text-slate-500">{label}</dt>
       <dd className="mt-0.5 break-words font-medium text-slate-900">{value || <span className="text-slate-400">—</span>}</dd>
     </div>
   )

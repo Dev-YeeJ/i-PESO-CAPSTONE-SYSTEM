@@ -74,7 +74,7 @@ export function DataTable({
                   <th
                     key={header.id}
                     scope="col"
-                    className="px-5 py-3.5 text-left text-[11px] font-bold uppercase tracking-[0.12em] text-slate-300"
+                    className="px-5 py-3.5 text-left text-xs font-bold text-slate-300"
                   >
                     {flexRender(header.column.columnDef.header, header.getContext())}
                   </th>

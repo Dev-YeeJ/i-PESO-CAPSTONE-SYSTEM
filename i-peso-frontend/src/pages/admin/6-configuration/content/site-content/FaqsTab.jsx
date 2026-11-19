@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import toast from 'react-hot-toast'
+import toast from '@/lib/toast'
 import { ArrowDown, ArrowUp, Bot, Eye, EyeOff, Pencil, Plus, Search, Sparkles, Trash2 } from 'lucide-react'
 import { Badge, Button, Card, ConfirmDialog, ErrorState, LoadingSkeleton } from '@/components/ui'
 import { adminFaqService } from '@/services/siteContentService'
@@ -82,7 +82,7 @@ export default function FaqsTab({ canEdit, office }) {
       <Card>
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h2 className="text-lg font-black text-slate-950">Assistant answers (FAQs)</h2>
+            <h2 className="text-lg font-bold text-slate-950">Assistant answers (FAQs)</h2>
             <p className="mt-1 max-w-2xl text-sm text-slate-600">
               What the i-PESO assistant answers from. Once published, an FAQ is used by the chat assistant for the audience you pick —
               there is no separate Help page, so write each answer the way you would want the assistant to say it.
@@ -132,7 +132,7 @@ export default function FaqsTab({ canEdit, office }) {
           {query.data?.can_add_starter_pack ? (
             <div className="py-6">
               <Sparkles className="mx-auto h-8 w-8 text-amber-500" aria-hidden="true" />
-              <h3 className="mt-3 text-lg font-black text-slate-950">No FAQs yet</h3>
+              <h3 className="mt-3 text-lg font-bold text-slate-950">No FAQs yet</h3>
               <p className="mx-auto mt-1 max-w-lg text-sm text-slate-600">
                 Start from about a dozen suggested questions written from how i-PESO works — registration steps, employer documents,
                 passwords, reports. They are added <strong>unpublished</strong> so you can check and adjust each one first.
@@ -151,7 +151,7 @@ export default function FaqsTab({ canEdit, office }) {
       ) : (
         groups.map((group) => (
           <Card key={group.value} padding="none">
-            <h3 className="border-b border-slate-100 px-5 py-3 text-xs font-black uppercase tracking-wide text-slate-500">{group.label} · {group.items.length}</h3>
+            <h3 className="border-b border-slate-100 px-5 py-3 text-xs font-bold text-slate-500">{group.label}, {group.items.length}</h3>
             <ul className="divide-y divide-slate-100">
               {group.items.map((faq, index) => (
                 <li key={faq.id} className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-start">

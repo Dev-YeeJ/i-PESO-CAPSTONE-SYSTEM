@@ -76,8 +76,8 @@ function PositionBox({ position, onSelect, highlight = false, muted = false }) {
   return (
     <section className={`w-full max-w-sm rounded-xl border-2 shadow-sm ${tone}`} aria-label={position.label}>
       <header className="px-4 pb-2 pt-3 text-center">
-        <p className={`text-sm font-extrabold leading-snug ${highlight ? 'text-white' : 'text-slate-950'}`}>{position.title}</p>
-        <p className={`mt-0.5 text-xs ${highlight ? 'text-blue-100' : 'text-slate-500'}`}>
+        <p className={`text-sm font-semibold leading-snug ${highlight ? 'text-white' : 'text-slate-950'}`}>{position.title}</p>
+        <p className={`mt-0.5 text-xs ${highlight ? 'text-white/80' : 'text-slate-500'}`}>
           {position.members.length === 0 ? 'Vacant' : `${position.members.length} ${position.members.length === 1 ? 'person' : 'people'}`}
         </p>
       </header>
@@ -100,7 +100,7 @@ function MemberList({ members, onSelect, inverted = false }) {
             onClick={() => onSelect?.(member)}
             className={`flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left text-sm transition ${inverted ? 'hover:bg-white/15' : 'hover:bg-slate-100'}`}
           >
-            <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[11px] font-black ${inverted ? 'bg-brand-gold text-brand-navy' : 'bg-slate-200 text-slate-700'}`}>
+            <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[11px] font-bold ${inverted ? 'bg-brand-gold text-brand-navy' : 'bg-slate-200 text-slate-700'}`}>
               {initialsOf(member.name)}
             </span>
             <span className={`truncate font-semibold ${inverted ? 'text-white' : 'text-slate-800'}`}>{member.name}</span>

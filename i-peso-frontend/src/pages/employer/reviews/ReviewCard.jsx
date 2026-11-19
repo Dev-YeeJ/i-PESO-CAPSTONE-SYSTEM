@@ -1,7 +1,7 @@
 import { forwardRef, useId, useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { AnimatePresence, motion as Motion } from 'framer-motion'
-import toast from 'react-hot-toast'
+import toast from '@/lib/toast'
 import { ChevronDown, Clock3, CornerDownRight, EyeOff, Flag, MessageSquareReply, Pencil, ShieldCheck, ThumbsDown, ThumbsUp, Trash2 } from 'lucide-react'
 import { Button, ConfirmDialog } from '@/components/ui'
 import { Stars } from '@/components/reviews/StarRating'
@@ -57,19 +57,19 @@ const ReviewCard = forwardRef(function ReviewCard({ review, onDispute }, ref) {
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -8 }}
       transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-      className="rounded-3xl border border-slate-200/80 bg-white p-5 shadow-[0_1px_2px_rgba(15,23,42,0.04),0_10px_28px_-18px_rgba(15,23,42,0.22)] sm:p-6"
+      className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_1px_2px_rgba(15,23,42,0.04),0_10px_28px_-18px_rgba(15,23,42,0.22)] sm:p-6"
     >
       {/* Who and when */}
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-3">
           <span className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100"><ShieldCheck className="h-5 w-5" aria-hidden /></span>
           <div>
-            <p className="text-sm font-black text-slate-900">{review.reviewer}</p>
-            <p className="text-xs text-slate-500">{review.month}{review.edited ? ' · edited' : ''}</p>
+            <p className="text-sm font-bold text-slate-900">{review.reviewer}</p>
+            <p className="text-xs text-slate-500">{review.month}{review.edited ? ' (edited)' : ''}</p>
           </div>
         </div>
         <div className="flex flex-col items-end gap-1.5">
-          <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-sm font-black tabular-nums ring-1 ${scoreTone(review.average)}`}>
+          <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-sm font-bold tabular-nums ring-1 ${scoreTone(review.average)}`}>
             {review.average?.toFixed(1)}<span className="sr-only"> out of 5</span>
           </span>
           {!reply && !editing && (
@@ -146,7 +146,7 @@ const ReviewCard = forwardRef(function ReviewCard({ review, onDispute }, ref) {
         {editing ? (
           <Motion.div key="composer" initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
             <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
-              <label htmlFor={replyId} className="text-sm font-black text-slate-900">{reply ? 'Edit your public reply' : 'Write a public reply'}</label>
+              <label htmlFor={replyId} className="text-sm font-bold text-slate-900">{reply ? 'Edit your public reply' : 'Write a public reply'}</label>
               <ul className="mt-2 flex flex-wrap gap-1.5" aria-label="Tips for a good reply">
                 {TIPS.map((tip) => <li key={tip} className="rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-600 ring-1 ring-slate-200">{tip}</li>)}
               </ul>
@@ -180,7 +180,7 @@ const ReviewCard = forwardRef(function ReviewCard({ review, onDispute }, ref) {
               <div className="mt-5 flex gap-3 rounded-2xl bg-brand-navy/[0.04] p-4 ring-1 ring-brand-navy/10">
                 <CornerDownRight className="mt-0.5 h-4 w-4 shrink-0 text-brand-navy/60" aria-hidden />
                 <div className="min-w-0">
-                  <p className="flex flex-wrap items-center gap-2 text-xs font-black text-brand-navy">
+                  <p className="flex flex-wrap items-center gap-2 text-xs font-bold text-brand-navy">
                     Your public reply{reply.edited ? <span className="font-semibold text-slate-500">· edited</span> : null}
                     {reply.status === 'hidden' && <span className="inline-flex items-center gap-1 rounded-full bg-red-50 px-2 py-0.5 font-bold text-red-700"><EyeOff className="h-3 w-3" aria-hidden />Hidden by PESO</span>}
                   </p>

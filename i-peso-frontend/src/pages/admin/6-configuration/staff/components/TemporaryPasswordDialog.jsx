@@ -36,9 +36,9 @@ export default function TemporaryPasswordDialog({ result, onClose }) {
         </DialogHeader>
 
         <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-          <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Email</p>
+          <p className="text-xs font-bold text-slate-500">Email</p>
           <p className="mt-0.5 text-sm font-semibold text-slate-900">{result?.staff?.email}</p>
-          <p className="mt-3 text-xs font-bold uppercase tracking-wide text-slate-500">Temporary password</p>
+          <p className="mt-3 text-xs font-bold text-slate-500">Temporary password</p>
           <div className="mt-1 flex items-center justify-between gap-3">
             <code className="select-all break-all font-mono text-lg font-bold tracking-wide text-slate-950">{result?.temporary_password}</code>
             <Button variant="outline" size="sm" icon={copied ? Check : Copy} onClick={copy}>{copied ? 'Copied' : 'Copy'}</Button>

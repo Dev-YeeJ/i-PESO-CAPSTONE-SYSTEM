@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import toast from 'react-hot-toast'
+import toast from '@/lib/toast'
 import { Check, CheckCheck, Pencil, Plus, X } from 'lucide-react'
 import { Badge, Button, ErrorState, LoadingSkeleton } from '@/components/ui'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -38,7 +38,7 @@ export default function InternLogsDialog({ internId, canReview, onClose }) {
           <DialogHeader>
             <DialogTitle>{intern?.name ?? 'Intern'}</DialogTitle>
             <DialogDescription>
-              {intern ? `${intern.progress.school ?? 'School not set'} · ${daysLeftLabel(intern.progress)}` : 'Loading…'}
+              {intern ? `${intern.progress.school ?? 'School not set'}, ${daysLeftLabel(intern.progress)}` : 'Loading…'}
             </DialogDescription>
           </DialogHeader>
 
@@ -73,7 +73,7 @@ export default function InternLogsDialog({ internId, canReview, onClose }) {
                 <div className="overflow-x-auto rounded-xl border border-slate-200">
                   <table className="w-full min-w-[640px] text-sm">
                     <caption className="sr-only">Daily time record for {intern.name}</caption>
-                    <thead className="bg-slate-50 text-left text-xs font-bold uppercase tracking-wide text-slate-500">
+                    <thead className="bg-slate-50 text-left text-xs font-bold text-slate-500">
                       <tr>
                         <th scope="col" className="px-3 py-2">Date</th>
                         <th scope="col" className="px-3 py-2">In</th>

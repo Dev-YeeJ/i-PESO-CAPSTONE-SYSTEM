@@ -149,7 +149,7 @@ export default function Step1AccountSetup({ onComplete }) {
           {COMPANY_TYPES.map((type) => (
             <label
               key={type.value}
-              className="flex items-center space-x-3 cursor-pointer p-3 border border-slate-300 rounded-xl hover:bg-blue-50 transition-colors"
+              className="flex items-center space-x-3 cursor-pointer p-3 border border-slate-300 rounded-xl hover:bg-[#e8f0fc] transition-colors"
             >
               <input
                 type="radio"
@@ -184,7 +184,7 @@ export default function Step1AccountSetup({ onComplete }) {
       <button
         type="submit"
         disabled={isLoading}
-        className="w-full py-3 mt-2 bg-blue-700 hover:bg-blue-800 disabled:opacity-60 text-white font-semibold rounded-xl flex items-center justify-center gap-2 transition-colors"
+        className="w-full py-3 mt-2 bg-brand-navy hover:bg-[#0f2d56] disabled:opacity-60 text-white font-semibold rounded-xl flex items-center justify-center gap-2 transition-colors"
       >
         {isLoading ? 'Processing...' : 'Continue to Step 2'}
       </button>

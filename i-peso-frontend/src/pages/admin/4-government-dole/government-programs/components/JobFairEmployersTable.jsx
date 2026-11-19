@@ -18,14 +18,14 @@ export default function JobFairEmployersTable({ participants, onReviewRequiremen
           {row.original.company_logo ? (
             <img src={row.original.company_logo} alt={row.original.company_name} className="h-10 w-10 shrink-0 rounded-lg object-cover" />
           ) : (
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-100 text-blue-700 font-bold">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[#e8f0fc] text-brand-navy font-bold">
               {row.original.company_name.substring(0, 1).toUpperCase()}
             </div>
           )}
           <div className="min-w-0">
             <p className="truncate text-sm font-bold text-slate-900">{row.original.company_name}</p>
             {row.original.representative_name && (
-              <p className="mt-0.5 truncate text-[11px] font-semibold text-slate-500 uppercase tracking-wide">
+              <p className="mt-0.5 truncate text-xs font-semibold text-slate-500">
                 Rep: {row.original.representative_name}
               </p>
             )}
@@ -71,7 +71,7 @@ export default function JobFairEmployersTable({ participants, onReviewRequiremen
           <button
             type="button"
             onClick={() => onReviewRequirements(p.id)}
-            className="flex items-center gap-1.5 rounded-lg bg-blue-50 px-3 py-1.5 text-xs font-bold text-blue-700 transition hover:bg-blue-100"
+            className="flex items-center gap-1.5 rounded-lg bg-[#e8f0fc] px-3 py-1.5 text-xs font-bold text-brand-navy transition hover:bg-[#e8f0fc]"
           >
             <FileText className="h-3.5 w-3.5 shrink-0" />
             <span className="truncate">{totalReqs ? `${approvedReqs}/${totalReqs} approved` : 'View'}</span>
@@ -120,7 +120,7 @@ export default function JobFairEmployersTable({ participants, onReviewRequiremen
                 {row.original.company_logo ? (
                   <img src={row.original.company_logo} alt={row.original.company_name} className="h-12 w-12 shrink-0 rounded-xl object-cover border border-slate-100" />
                 ) : (
-                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-blue-100 to-blue-200 text-blue-700 font-bold text-lg shadow-inner">
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[#e8f0fc] text-brand-navy font-bold text-lg">
                     {row.original.company_name.substring(0, 1).toUpperCase()}
                   </div>
                 )}
@@ -133,7 +133,7 @@ export default function JobFairEmployersTable({ participants, onReviewRequiremen
                   ) : (
                     <div className="h-4 mb-2"></div>
                   )}
-                  <Badge variant={statusTones[row.original.status] ?? 'neutral'} icon={false} className="text-[10px] uppercase tracking-wide">
+                  <Badge variant={statusTones[row.original.status] ?? 'neutral'} icon={false} className="text-xs">
                     {row.original.status.replaceAll('_', ' ')}
                   </Badge>
                 </div>
@@ -142,7 +142,7 @@ export default function JobFairEmployersTable({ participants, onReviewRequiremen
                 <button
                   type="button"
                   onClick={() => onReviewRequirements(row.original.id)}
-                  className="flex items-center gap-1.5 rounded-lg bg-blue-50 px-4 py-2 text-xs font-bold text-blue-700 transition hover:bg-blue-600 hover:text-white group w-full justify-center"
+                  className="flex items-center gap-1.5 rounded-lg bg-[#e8f0fc] px-4 py-2 text-xs font-bold text-brand-navy transition hover:bg-[#0f2d56] hover:text-white group w-full justify-center"
                 >
                   <FileText className="h-4 w-4 shrink-0" />
                   <span className="truncate">

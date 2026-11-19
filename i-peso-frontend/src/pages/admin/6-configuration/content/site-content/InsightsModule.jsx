@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import toast from 'react-hot-toast'
+import toast from '@/lib/toast'
 import { Bot, Check, PenLine, ShieldAlert } from 'lucide-react'
 import { Button, Card, ErrorState, LoadingSkeleton } from '@/components/ui'
 import { adminContentInsightService } from '@/services/siteContentService'
@@ -60,7 +60,7 @@ export default function InsightsModule({ onGo, canEdit, allowed }) {
               <div className="min-w-0 flex-1">
                 <p className="break-words font-semibold text-slate-950">“{item.text}”</p>
                 <p className="mt-0.5 text-xs text-slate-500">
-                  {item.count}× · last {formatWhen(item.last_at)} · {item.sources.map((s) => SOURCE_LABEL[s] ?? s).join(', ')}
+                  {item.count}×, last {formatWhen(item.last_at)}, {item.sources.map((s) => SOURCE_LABEL[s] ?? s).join(', ')}
                 </p>
                 {item.closest_faq && (
                   <p className="mt-1 text-xs text-slate-600">
@@ -92,7 +92,7 @@ export default function InsightsModule({ onGo, canEdit, allowed }) {
       <Card>
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h2 className="text-lg font-black text-slate-950">Assistant insights</h2>
+            <h2 className="text-lg font-bold text-slate-950">Assistant insights</h2>
             <p className="mt-1 max-w-3xl text-sm text-slate-600">
               What people asked the assistant that it couldn’t answer — each one is an FAQ worth writing.
               Nothing here identifies anyone: emails and numbers are removed, and reports are deleted after {retention} days.
@@ -110,7 +110,7 @@ export default function InsightsModule({ onGo, canEdit, allowed }) {
       </Card>
 
       <Card>
-        <h3 className="flex items-center gap-2 font-black text-slate-950"><Bot className="h-4 w-4 text-slate-400" aria-hidden="true" /> Questions the assistant couldn’t answer</h3>
+        <h3 className="flex items-center gap-2 font-bold text-slate-950"><Bot className="h-4 w-4 text-slate-400" aria-hidden="true" /> Questions the assistant couldn’t answer</h3>
         {gapLogging ? (
           <>
             <p className="mt-1 text-xs text-slate-500">The assistant told these people to contact the office. An FAQ or a filled-in Office info field lets it answer next time.</p>

@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { FileSpreadsheet, ArrowLeft, CheckCircle2, Trash2, CalendarX, PencilLine, Save } from 'lucide-react'
 import { Card, CardHeader, Button, Badge, AlertBox, ConfirmDialog, LoadingSkeleton } from '@/components/ui'
 import PageHeader from '@/pages/admin/_components/PageHeader'
-import toast from 'react-hot-toast'
+import toast from '@/lib/toast'
 import PlacementRecordEditor, { blankPlacementRecord, stripBlankPlacementRecords } from '@/components/reports/PlacementRecordEditor'
 import {
   listEmployerPlacementReports,
@@ -217,9 +217,9 @@ export default function EmployerPlacementReportPage() {
                   <div>
                     <p className="text-sm font-semibold text-slate-800">{r.original_filename}</p>
                     <p className="text-xs text-slate-500">
-                      {r.coverage_month ? `${MONTHS[r.coverage_month - 1]} ${r.coverage_year} · ` : ''}
+                      {r.coverage_month ? `${MONTHS[r.coverage_month - 1]} ${r.coverage_year}, ` : ''}
                       {r.is_nil_report ? 'No hires declared' : `${r.record_count} record(s)`}
-                      {r.selected_sheet && ` · sheet “${r.selected_sheet}”`}
+                      {r.selected_sheet && `, sheet “${r.selected_sheet}”`}
                     </p>
                   </div>
                 </div>

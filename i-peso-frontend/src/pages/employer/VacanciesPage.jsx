@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
-import { BriefcaseBusiness, MapPin, Plus, Trash2, UsersRound, Calendar, Banknote, GraduationCap, Clock } from 'lucide-react'
+import { BriefcaseBusiness, Copy, MapPin, Plus, Trash2, UsersRound, Calendar, Banknote, GraduationCap, Clock } from 'lucide-react'
 import { AlertBox, Badge, Button, Card, CardHeader, EmptyState, LoadingSkeleton } from '@/components/ui'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import * as employerService from '@/services/employerService'
+import PortalPageHeader from '@/components/shell/PortalPageHeader'
 
 export default function VacanciesPage() {
   const [vacancies, setVacancies] = useState([])
@@ -42,20 +43,18 @@ export default function VacanciesPage() {
 
   return (
     <div className="portal-page">
-      <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
-        <div>
-          <p className="portal-eyebrow">Recruitment Management</p>
-          <h1 className="portal-title mt-1">My Vacancies</h1>
-          <p className="portal-subtitle">Manage opportunities published under your PESO-accredited employer account.</p>
-        </div>
-        <Button to="/employer/post-job" icon={Plus}>Create Job Post</Button>
-      </div>
+      <PortalPageHeader
+        title="Vacancies"
+        subtitle="Everything you've posted under your PESO-accredited account. Open one to see its applicants."
+      >
+        <Button to="/employer/post-job" icon={Plus}>Post a job</Button>
+      </PortalPageHeader>
 
       {error && <AlertBox variant="danger" title="Vacancy action failed">{error}</AlertBox>}
 
       <Card padding="none">
         <div className="p-5 sm:p-6">
-          <CardHeader title="Published Opportunities" subtitle={`${vacancies.length} vacancy record${vacancies.length === 1 ? '' : 's'} in your account`} />
+          <CardHeader title="Your vacancies" subtitle={`${vacancies.length} vacancy record${vacancies.length === 1 ? '' : 's'} in your account`} />
         </div>
         {loading ? (
           <div className="border-t border-slate-200 p-5 sm:p-6"><LoadingSkeleton variant="card" rows={3} /></div>
@@ -73,12 +72,12 @@ export default function VacanciesPage() {
             {vacancies.map((vacancy) => (
               <div key={vacancy.post_id} className="flex flex-col gap-4 px-5 py-6 transition hover:bg-slate-50 sm:px-6 lg:flex-row lg:items-start lg:justify-between">
                 <div className="flex min-w-0 gap-4 w-full">
-                  <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-700 shadow-sm border border-blue-100"><BriefcaseBusiness className="h-6 w-6" /></span>
+                  <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[#e8f0fc] text-brand-navy shadow-sm border border-[#c4d9f7]"><BriefcaseBusiness className="h-6 w-6" /></span>
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
-                      <h2 className="text-lg font-extrabold text-slate-900 truncate">{vacancy.job_title}</h2>
-                      <Badge variant={vacancy.status} className="uppercase text-[10px] tracking-wider">{vacancy.status}</Badge>
-                      {vacancy.admin_hold_at && <Badge variant="rejected" className="uppercase text-[10px] tracking-wider">On hold by PESO</Badge>}
+                      <h2 className="text-lg font-semibold text-slate-900 truncate">{vacancy.job_title}</h2>
+                      <Badge variant={vacancy.status} className=" text-xs">{vacancy.status}</Badge>
+                      {vacancy.admin_hold_at && <Badge variant="rejected" className=" text-xs">On hold by PESO</Badge>}
                     </div>
                     {vacancy.admin_hold_at && (
                       <p className="mt-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs leading-5 text-red-800">
@@ -108,13 +107,15 @@ export default function VacanciesPage() {
                     </div>
                   </div>
                   <div className="flex flex-col gap-2 shrink-0 ml-4 hidden lg:flex">
-                    <Button to={`/employer/ats/${vacancy.post_id}`} variant="outline" size="sm" icon={UsersRound}>View Applicants</Button>
+                    <Button to={`/employer/ats/${vacancy.post_id}`} variant="outline" size="sm" icon={UsersRound}>View applicants</Button>
+                    <Button to={`/employer/post-job?from=${vacancy.post_id}`} variant="ghost" size="sm" icon={Copy} aria-label={`Duplicate ${vacancy.job_title}`}>Duplicate</Button>
                     <Button onClick={() => setPendingDelete(vacancy)} variant="ghost" size="sm" icon={Trash2} className="text-red-600 hover:bg-red-50 hover:text-red-700">Delete</Button>
                   </div>
                 </div>
                 {/* Mobile action buttons */}
                 <div className="flex flex-row gap-2 w-full lg:hidden mt-2 pt-4 border-t border-slate-100">
                   <Button to={`/employer/ats/${vacancy.post_id}`} variant="outline" size="sm" icon={UsersRound} className="flex-1 justify-center">Applicants</Button>
+                  <Button to={`/employer/post-job?from=${vacancy.post_id}`} variant="ghost" size="sm" icon={Copy} className="flex-1 justify-center" aria-label={`Duplicate ${vacancy.job_title}`}>Duplicate</Button>
                   <Button onClick={() => setPendingDelete(vacancy)} variant="ghost" size="sm" icon={Trash2} className="flex-1 justify-center text-red-600 hover:bg-red-50 hover:text-red-700">Delete</Button>
                 </div>
               </div>

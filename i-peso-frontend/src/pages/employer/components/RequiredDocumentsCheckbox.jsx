@@ -28,7 +28,7 @@ export default function RequiredDocumentsCheckbox({ requiredDocuments, uploadedD
     <div className="bg-slate-50 rounded-lg p-4">
       <div className="flex justify-between items-center mb-4">
         <h3 className="font-semibold text-slate-900">Required Documents</h3>
-        <span className="text-sm font-medium text-blue-600">
+        <span className="text-sm font-medium text-brand-navy">
           {uploadedCount} of {totalCount} uploaded
         </span>
       </div>

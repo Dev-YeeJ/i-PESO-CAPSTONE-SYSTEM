@@ -24,7 +24,7 @@ export default function HoursProgress({ progress, compact = false }) {
       <p className={`mt-1.5 text-slate-600 ${compact ? 'text-xs' : 'text-sm'}`}>
         <strong className="text-slate-900">{formatHours(approved)}</strong>
         {required ? ` of ${formatHours(required)}` : ''}
-        {pending > 0 && <span className="text-amber-700"> · {formatHours(pending)} waiting</span>}
+        {pending > 0 && <span className="text-amber-700">, {formatHours(pending)} waiting</span>}
       </p>
     </div>
   )

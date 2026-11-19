@@ -1,12 +1,13 @@
 import { useState } from 'react'
 import { ArrowDown, ArrowUp, ExternalLink, History, Link2, Plus, Save, Undo2, X } from 'lucide-react'
 import { Button, Card } from '@/components/ui'
-import { ABOUT_LIMITS, SERVICE_AUDIENCES } from '@/components/site-content/siteContentDefaults'
+import { ABOUT_LIMITS, ORG_LEVELS, SERVICE_AUDIENCES } from '@/components/site-content/siteContentDefaults'
 import { Field, MoreSection, ReadOnlyNote, SectionHistoryDialog } from './SiteContentBits'
 import { formatWhen, inputClass } from './formStyles'
 import useSectionEditor from './useSectionEditor'
 
 const blankService = { title: '', description: '', audience: 'everyone', link_label: '', link_url: '' }
+const blankPerson = { name: '', position: '', level: 'staff', unit: '' }
 const trimOrNull = (value) => (typeof value === 'string' && value.trim() ? value.trim() : null)
 
 const normalize = (form) => ({
@@ -19,7 +20,22 @@ const normalize = (form) => ({
     link_label: trimOrNull(s.link_label),
     link_url: trimOrNull(s.link_url),
   })),
+  org_chart: (form.org_chart ?? []).map((p) => ({
+    name: p.name?.trim() ?? '',
+    position: p.position?.trim() ?? '',
+    level: p.level || 'staff',
+    unit: trimOrNull(p.unit),
+  })),
 })
+
+/** Move item `index` of `list` by `delta`, or return the list unchanged at either end. */
+const moved = (list, index, delta) => {
+  const target = index + delta
+  if (target < 0 || target >= list.length) return list
+  const next = [...list]
+  ;[next[index], next[target]] = [next[target], next[index]]
+  return next
+}
 
 export default function AboutTab({ section, canEdit }) {
   return <AboutForm key={section.version} section={section} canEdit={canEdit} />
@@ -29,17 +45,15 @@ function AboutForm({ section, canEdit }) {
   const editor = useSectionEditor('about', section, { normalize })
   const { form, set, err, dirty } = editor
   const services = form.services ?? []
+  const people = form.org_chart ?? []
+  const setPerson = (index, patch) => set('org_chart', people.map((p, i) => (i === index ? { ...p, ...patch } : p)))
+  // Unit names already typed, offered as suggestions so a unit is spelled the same everywhere.
+  const units = [...new Set(people.map((p) => p.unit?.trim()).filter(Boolean))]
   // Services whose link fields are open (already have a link, or "Add a link" was pressed).
   const [linkOpen, setLinkOpen] = useState(() => new Set(services.map((s, i) => (s.link_url ? i : null)).filter((i) => i !== null)))
 
   const setService = (index, patch) => set('services', services.map((s, i) => (i === index ? { ...s, ...patch } : s)))
-  const moveService = (index, delta) => {
-    const next = [...services]
-    const target = index + delta
-    if (target < 0 || target >= next.length) return
-    ;[next[index], next[target]] = [next[target], next[index]]
-    set('services', next)
-  }
+  const moveService = (index, delta) => set('services', moved(services, index, delta))
 
   const textArea = (key, { rows = 3, placeholder, hint } = {}) => (
     <Field label={section.labels[key]} max={ABOUT_LIMITS[key]} count={(form[key] ?? '').length} error={err(key)} hint={hint}>
@@ -51,7 +65,7 @@ function AboutForm({ section, canEdit }) {
     <Card>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-lg font-black text-slate-950">About PESO</h2>
+          <h2 className="text-lg font-bold text-slate-950">About PESO</h2>
           <p className="mt-1 max-w-2xl text-sm text-slate-600">The public <strong>/about</strong> page. Contact details come from Office info.</p>
         </div>
         <div className="flex gap-1">
@@ -69,7 +83,7 @@ function AboutForm({ section, canEdit }) {
         </div>
 
         <fieldset>
-          <legend className="text-xs font-extrabold uppercase tracking-wide text-slate-600">PESO services ({services.length}/{ABOUT_LIMITS.max_services})</legend>
+          <legend className="text-xs font-semibold text-slate-600">PESO services ({services.length}/{ABOUT_LIMITS.max_services})</legend>
           {err('services') && <p className="mt-1 text-xs font-semibold text-red-600">{err('services')}</p>}
           <ol className="mt-2 divide-y divide-slate-100 rounded-xl border border-slate-200">
             {services.map((service, index) => {
@@ -109,6 +123,48 @@ function AboutForm({ section, canEdit }) {
           {canEdit && (
             <Button size="sm" variant="outline" icon={Plus} className="mt-3" disabled={services.length >= ABOUT_LIMITS.max_services} onClick={() => set('services', [...services, { ...blankService }])}>
               Add a service
+            </Button>
+          )}
+        </fieldset>
+
+        <fieldset>
+          <legend className="text-xs font-semibold text-slate-600">Organization chart ({people.length}/{ABOUT_LIMITS.max_org})</legend>
+          <p className="mt-1 text-xs text-slate-500">
+            The office&apos;s real staff, shown on the About page as office head, then each unit head with their staff. Hidden on the page while empty.
+            Staff are grouped under the unit head with the same unit name.
+          </p>
+          {err('org_chart') && <p className="mt-1 text-xs font-semibold text-red-600">{err('org_chart')}</p>}
+          {people.length > 0 && (
+            <ol className="mt-2 divide-y divide-slate-100 rounded-xl border border-slate-200">
+              {people.map((person, index) => {
+                const rowError = err(`org_chart.${index}.name`) ?? err(`org_chart.${index}.position`) ?? err(`org_chart.${index}.level`) ?? err(`org_chart.${index}.unit`)
+                return (
+                  <li key={index} className="space-y-2 p-3">
+                    <div className="grid gap-2 md:grid-cols-[1.2fr_1.2fr_9rem_1fr_auto]">
+                      <input value={person.name ?? ''} onChange={(e) => setPerson(index, { name: e.target.value.slice(0, ABOUT_LIMITS.org_name) })} disabled={!canEdit} placeholder="Full name" aria-label={`Person ${index + 1} name`} className={`${inputClass} !mt-0`} />
+                      <input value={person.position ?? ''} onChange={(e) => setPerson(index, { position: e.target.value.slice(0, ABOUT_LIMITS.org_position) })} disabled={!canEdit} placeholder="Position" aria-label={`Person ${index + 1} position`} className={`${inputClass} !mt-0`} />
+                      <select value={person.level || 'staff'} onChange={(e) => setPerson(index, { level: e.target.value })} disabled={!canEdit} aria-label={`Person ${index + 1} level`} className="rounded-xl border border-slate-300 bg-white px-2.5 py-2.5 text-sm">
+                        {ORG_LEVELS.map((level) => <option key={level.value} value={level.value}>{level.label}</option>)}
+                      </select>
+                      <input value={person.unit ?? ''} list="org-units" onChange={(e) => setPerson(index, { unit: e.target.value.slice(0, ABOUT_LIMITS.org_unit) })} disabled={!canEdit || person.level === 'head'} placeholder={person.level === 'head' ? 'Not needed' : 'Unit (optional)'} aria-label={`Person ${index + 1} unit`} className={`${inputClass} !mt-0`} />
+                      {canEdit && (
+                        <span className="flex items-center">
+                          <button type="button" onClick={() => set('org_chart', moved(people, index, -1))} disabled={index === 0} aria-label={`Move person ${index + 1} up`} className="rounded-md p-1.5 text-slate-400 hover:bg-slate-100 disabled:opacity-30"><ArrowUp className="h-4 w-4" /></button>
+                          <button type="button" onClick={() => set('org_chart', moved(people, index, 1))} disabled={index === people.length - 1} aria-label={`Move person ${index + 1} down`} className="rounded-md p-1.5 text-slate-400 hover:bg-slate-100 disabled:opacity-30"><ArrowDown className="h-4 w-4" /></button>
+                          <button type="button" onClick={() => set('org_chart', people.filter((_, i) => i !== index))} aria-label={`Remove person ${index + 1}`} className="rounded-md p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"><X className="h-4 w-4" /></button>
+                        </span>
+                      )}
+                    </div>
+                    {rowError && <p className="text-xs font-semibold text-red-600">{rowError}</p>}
+                  </li>
+                )
+              })}
+            </ol>
+          )}
+          <datalist id="org-units">{units.map((unit) => <option key={unit} value={unit} />)}</datalist>
+          {canEdit && (
+            <Button size="sm" variant="outline" icon={Plus} className="mt-3" disabled={people.length >= ABOUT_LIMITS.max_org} onClick={() => set('org_chart', [...people, { ...blankPerson, level: people.length === 0 ? 'head' : 'staff' }])}>
+              Add a person
             </Button>
           )}
         </fieldset>

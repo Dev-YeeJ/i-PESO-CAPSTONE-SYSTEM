@@ -116,7 +116,7 @@ export default function ContentModulesPage() {
           <div className="flex gap-2 overflow-x-auto pb-1 lg:flex-col lg:gap-5 lg:overflow-visible lg:pb-0">
             {groups.map((group) => (
               <div key={group.name} className="flex shrink-0 gap-2 lg:flex-col lg:gap-1">
-                <p className="hidden px-3 text-[11px] font-black uppercase tracking-wider text-slate-400 lg:block">{group.name}</p>
+                <p className="hidden px-3 text-xs font-bold text-slate-400 lg:block">{group.name}</p>
                 {group.items.map((item) => {
                   const selected = item.value === active
                   const badge = badgeFor(item.value)
@@ -133,7 +133,7 @@ export default function ContentModulesPage() {
                       {createElement(item.icon, { className: 'h-4 w-4 shrink-0', 'aria-hidden': true })}
                       <span className="flex-1 whitespace-nowrap">{item.label}</span>
                       {badge ? (
-                        <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-black bg-slate-200 text-slate-700`} aria-label={`${badge} to look at`}>
+                        <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold bg-slate-200 text-slate-700`} aria-label={`${badge} to look at`}>
                           {badge}
                         </span>
                       ) : null}

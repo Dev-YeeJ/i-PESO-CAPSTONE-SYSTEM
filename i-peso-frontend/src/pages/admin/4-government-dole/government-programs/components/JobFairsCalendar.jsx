@@ -24,7 +24,7 @@ export default function JobFairsCalendar({ fairs }) {
   }
 
   return (
-    <Card className="p-4 sm:p-6 overflow-hidden bg-white shadow-sm border border-slate-200 rounded-3xl">
+    <Card className="p-4 sm:p-6 overflow-hidden bg-white shadow-sm border border-slate-200 rounded-2xl">
       <div className="calendar-container w-full h-[600px]">
         <FullCalendar
           plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}

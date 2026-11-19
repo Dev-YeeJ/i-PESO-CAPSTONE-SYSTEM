@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import toast from 'react-hot-toast'
+import toast from '@/lib/toast'
 import {
   ArrowLeft,
   ArrowRight,
@@ -180,10 +180,10 @@ export default function GovernmentProgramFormPage() {
     return (
       <div className="space-y-6">
         <PageHeader title={id ? 'Edit Government Program' : 'Post a Government Program'} eyebrow="Government & DOLE" />
-        <div className="rounded-2xl border border-blue-200 bg-blue-50 p-5">
-          <p className="text-sm font-bold text-blue-950">Full access is required to create or edit programs.</p>
-          <p className="mt-1 text-sm text-blue-800">Your role can view Government &amp; DOLE information but cannot change it.</p>
-          <button type="button" className="mt-4 rounded-lg border border-blue-300 bg-white px-3 py-2 text-sm font-bold text-blue-900" onClick={() => navigate('/admin/government-programs')}>Back to programs</button>
+        <div className="rounded-2xl border border-[#c4d9f7] bg-[#e8f0fc] p-5">
+          <p className="text-sm font-bold text-brand-navy">Full access is required to create or edit programs.</p>
+          <p className="mt-1 text-sm text-brand-navy">Your role can view Government &amp; DOLE information but cannot change it.</p>
+          <button type="button" className="mt-4 rounded-lg border border-[#c4d9f7] bg-white px-3 py-2 text-sm font-bold text-brand-navy" onClick={() => navigate('/admin/government-programs')}>Back to programs</button>
         </div>
       </div>
     )
@@ -201,7 +201,7 @@ export default function GovernmentProgramFormPage() {
           <div className="border-b border-slate-200 px-5 py-5 sm:px-7">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <p className="text-sm font-bold text-blue-900">Step {step} of {steps.length}: {currentStep.title}</p>
+                <p className="text-sm font-bold text-brand-navy">Step {step} of {steps.length}: {currentStep.title}</p>
                 <p className="mt-1 text-xs leading-5 text-slate-500">All posted programs are public announcements. Job seekers review eligibility and apply in person at PESO.</p>
               </div>
               <div className="grid grid-cols-3 gap-2">
@@ -211,7 +211,7 @@ export default function GovernmentProgramFormPage() {
                     type="button"
                     onClick={() => (s.number < step || validate(s.number)) && setStep(s.number)}
                     className={`flex flex-col items-center gap-1 rounded-xl px-2 py-1.5 text-[10px] font-bold transition ${
-                      s.number === step ? 'bg-blue-50 text-blue-900' : s.number < step ? 'text-emerald-600' : 'text-slate-400'
+                      s.number === step ? 'bg-[#e8f0fc] text-brand-navy' : s.number < step ? 'text-emerald-600' : 'text-slate-400'
                     }`}
                   >
                     {s.number < step ? <Check className="h-4 w-4" /> : <s.icon className="h-4 w-4" />}
@@ -221,7 +221,7 @@ export default function GovernmentProgramFormPage() {
               </div>
             </div>
             <div className="mt-4 h-2 overflow-hidden rounded-full bg-slate-100">
-              <div className="h-full rounded-full bg-blue-900 transition-all" style={{ width: `${progressPercent}%` }} />
+              <div className="h-full rounded-full bg-brand-navy transition-all" style={{ width: `${progressPercent}%` }} />
             </div>
           </div>
 
@@ -310,17 +310,17 @@ export default function GovernmentProgramFormPage() {
             <button
               type="button"
               onClick={step === 1 ? () => navigate('/admin/government-programs') : back}
-              className="inline-flex items-center gap-2 rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-bold text-slate-700 hover:border-blue-900 hover:text-blue-900"
+              className="inline-flex items-center gap-2 rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-bold text-slate-700 hover:border-blue-900 hover:text-brand-navy"
             >
               <ArrowLeft className="h-4 w-4" /> {step === 1 ? 'Cancel' : 'Back'}
             </button>
 
             {step < steps.length ? (
-              <button type="button" onClick={next} className="inline-flex items-center gap-2 rounded-xl bg-blue-900 px-6 py-2.5 text-sm font-black text-white hover:bg-blue-800">
+              <button type="button" onClick={next} className="inline-flex items-center gap-2 rounded-xl bg-brand-navy px-6 py-2.5 text-sm font-bold text-white hover:bg-[#0f2d56]">
                 Next <ArrowRight className="h-4 w-4" />
               </button>
             ) : (
-              <button type="submit" disabled={submitting} className="inline-flex items-center gap-2 rounded-xl bg-blue-900 px-6 py-2.5 text-sm font-black text-white disabled:bg-slate-300">
+              <button type="submit" disabled={submitting} className="inline-flex items-center gap-2 rounded-xl bg-brand-navy px-6 py-2.5 text-sm font-bold text-white disabled:bg-slate-300">
                 {submitting ? 'Saving…' : id ? 'Update program' : 'Publish program'}
               </button>
             )}
@@ -331,7 +331,7 @@ export default function GovernmentProgramFormPage() {
   )
 }
 
-const inputCls = 'w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500'
+const inputCls = 'w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:ring-2 focus:ring-[#2563b8]'
 
 function localDateString() {
   const now = new Date()
@@ -372,7 +372,7 @@ function validateEligibilityRules(rules) {
 function Group({ title, subtitle, children }) {
   return (
     <section>
-      <h3 className="text-sm font-black text-slate-950">{title}</h3>
+      <h3 className="text-sm font-bold text-slate-950">{title}</h3>
       {subtitle && <p className="mt-0.5 text-xs text-slate-500">{subtitle}</p>}
       <div className="mt-3">{children}</div>
     </section>
@@ -405,7 +405,7 @@ function StringList({ items = [], onChange, placeholder, addLabel }) {
           </button>
         </div>
       ))}
-      <button type="button" onClick={() => onChange([...items, ''])} className="inline-flex items-center gap-1.5 text-sm font-bold text-blue-700">
+      <button type="button" onClick={() => onChange([...items, ''])} className="inline-flex items-center gap-1.5 text-sm font-bold text-brand-navy">
         <Plus className="h-4 w-4" /> {addLabel}
       </button>
     </div>

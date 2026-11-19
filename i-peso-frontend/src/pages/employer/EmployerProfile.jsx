@@ -6,7 +6,7 @@ import {
   BadgeCheck, Building2, Camera, Clock3, Factory, FileCheck2, Hash, Mail, MapPin, Pencil,
   Phone, ShieldAlert, Smartphone, UserRound, UsersRound,
 } from 'lucide-react'
-import toast from 'react-hot-toast'
+import toast from '@/lib/toast'
 import * as employerService from '@/services/employerService'
 import * as employerProfileService from '@/services/employerProfileService'
 import { useAuthStore } from '@/stores/authStore'
@@ -22,7 +22,7 @@ const PROFILE_KEY = ['employer', 'profile']
 
 const humanize = (value) => (value ? value.replace(/_/g, ' ').replace(/\b\w/g, (letter) => letter.toUpperCase()) : null)
 
-const card = 'rounded-3xl border border-slate-200/80 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04),0_12px_32px_-16px_rgba(15,23,42,0.18)]'
+const card = 'rounded-2xl border border-slate-200/80 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04),0_12px_32px_-16px_rgba(15,23,42,0.18)]'
 
 const rise = {
   hidden: { opacity: 0, y: 14 },
@@ -39,7 +39,7 @@ function SectionCard({ index, title, icon, action, children, className = '' }) {
   return (
     <Motion.section variants={rise} initial="hidden" animate="show" custom={index} aria-label={title} className={`${card} p-6 sm:p-7 ${className}`}>
       <div className="mb-5 flex items-center justify-between gap-3">
-        <h2 className="flex items-center gap-2.5 text-base font-black text-slate-900">
+        <h2 className="flex items-center gap-2.5 text-base font-bold text-slate-900">
           <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-navy/5 text-brand-navy">{createElement(icon, { className: 'h-[18px] w-[18px]', 'aria-hidden': true })}</span>
           {title}
         </h2>
@@ -125,8 +125,6 @@ export default function EmployerProfile() {
           className="relative isolate overflow-hidden rounded-[28px] bg-brand-navy text-white shadow-[0_24px_60px_-28px_rgba(18,53,99,0.75)]"
         >
           <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10">
-            <div className="absolute -right-24 -top-32 h-80 w-80 rounded-full bg-brand-gold/25 blur-3xl" />
-            <div className="absolute -bottom-40 left-1/3 h-80 w-[28rem] rounded-full bg-sky-400/15 blur-3xl" />
             <div className="absolute inset-0 opacity-[0.07] [background-image:radial-gradient(white_1px,transparent_1px)] [background-size:18px_18px]" />
           </div>
 
@@ -134,11 +132,11 @@ export default function EmployerProfile() {
             <button
               type="button"
               onClick={() => setLogoOpen(true)}
-              className="group relative shrink-0 self-start rounded-3xl focus:outline-none focus-visible:ring-4 focus-visible:ring-brand-gold/60"
+              className="group relative shrink-0 self-start rounded-2xl focus:outline-none focus-visible:ring-4 focus-visible:ring-brand-gold/60"
               aria-label={profile.company_logo_url ? 'Change company logo' : 'Add a company logo'}
             >
-              <CompanyLogo src={profile.company_logo_url} name={profile.company_name} size="xl" className="rounded-3xl border-white/90 shadow-xl sm:h-32 sm:w-32" />
-              <span className="absolute inset-0 flex flex-col items-center justify-center gap-1 rounded-3xl bg-slate-950/60 text-xs font-bold opacity-0 transition group-hover:opacity-100 group-focus-visible:opacity-100">
+              <CompanyLogo src={profile.company_logo_url} name={profile.company_name} size="xl" className="rounded-2xl border-white/90 shadow-xl sm:h-32 sm:w-32" />
+              <span className="absolute inset-0 flex flex-col items-center justify-center gap-1 rounded-2xl bg-slate-950/60 text-xs font-bold opacity-0 transition group-hover:opacity-100 group-focus-visible:opacity-100">
                 <Camera className="h-6 w-6" aria-hidden /> {profile.company_logo_url ? 'Change' : 'Add logo'}
               </span>
             </button>
@@ -147,8 +145,8 @@ export default function EmployerProfile() {
               <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold ring-1 ${status.className}`}>
                 <status.icon className="h-3.5 w-3.5" aria-hidden /> {status.label}
               </span>
-              <h1 className="mt-3 text-3xl font-black tracking-tight sm:text-[2.6rem] sm:leading-[1.1]">{profile.company_name}</h1>
-              <p className="mt-1.5 text-sm text-blue-100/80 sm:text-base">
+              <h1 className="mt-3 text-3xl font-bold tracking-tight sm:text-[2.6rem] sm:leading-[1.1]">{profile.company_name}</h1>
+              <p className="mt-1.5 text-sm text-white/80 sm:text-base">
                 {profile.trade_name ? `Doing business as ${profile.trade_name}` : humanize(profile.company_type)}
               </p>
               <ul className="mt-4 flex flex-wrap gap-2 text-xs font-semibold text-blue-50" aria-label="Company highlights">
@@ -220,11 +218,11 @@ export default function EmployerProfile() {
               action={<Button size="sm" variant="ghost" icon={Pencil} onClick={() => setEditing({ focus: 'representative_name' })}>Edit</Button>}
             >
               <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
-                <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-navy to-sky-700 text-lg font-black text-white shadow-md" aria-hidden="true">
+                <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-brand-navy text-lg font-bold text-white shadow-md" aria-hidden="true">
                   {(profile.representative_name || '?').split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join('').toUpperCase()}
                 </span>
                 <div className="min-w-0 flex-1">
-                  <p className="text-lg font-black text-slate-900">{profile.representative_name || 'Not set'}</p>
+                  <p className="text-lg font-bold text-slate-900">{profile.representative_name || 'Not set'}</p>
                   <p className="text-sm text-slate-500">{profile.representative_designation || 'Position not set'}</p>
                 </div>
                 <dl className="grid gap-3 text-sm sm:text-right">
@@ -257,7 +255,7 @@ export default function EmployerProfile() {
             )}
 
             <Motion.section variants={rise} initial="hidden" animate="show" custom={3} aria-labelledby="verification-card" className={`${card} p-6`}>
-              <h2 id="verification-card" className="text-base font-black text-slate-900">Verification</h2>
+              <h2 id="verification-card" className="text-base font-bold text-slate-900">Verification</h2>
               <p className="mt-0.5 text-sm text-slate-600">
                 {profile.verification_status === 'verified'
                   ? `Verified${profile.verified_at ? ` on ${new Date(profile.verified_at).toLocaleDateString('en-PH', { dateStyle: 'medium' })}` : ''}. You can post jobs.`

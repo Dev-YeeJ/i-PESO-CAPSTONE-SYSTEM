@@ -71,14 +71,14 @@ export default function JobPostingDetailPage() {
       <div className="mt-6 grid gap-4 lg:grid-cols-3">
         <div className="lg:col-span-2 space-y-4">
           <Card padding="sm">
-            <h2 className="text-lg font-black text-slate-950 mb-4">Job Description</h2>
+            <h2 className="text-lg font-bold text-slate-950 mb-4">Job Description</h2>
             <div className="prose prose-sm max-w-none text-slate-700 whitespace-pre-wrap">
               {vacancy.job_description}
             </div>
           </Card>
           
           <Card padding="sm">
-            <h2 className="text-lg font-black text-slate-950 mb-4">Candidate Requirements</h2>
+            <h2 className="text-lg font-bold text-slate-950 mb-4">Candidate Requirements</h2>
             <div className="divide-y divide-slate-100">
               <InfoRow label="Education" value={vacancy.minimum_education} />
               <InfoRow label="Experience" value={vacancy.experience_level} />
@@ -98,7 +98,7 @@ export default function JobPostingDetailPage() {
           </Card>
 
           <Card padding="sm">
-            <h2 className="text-lg font-black text-slate-950 mb-4">Inclusivity & Preferences</h2>
+            <h2 className="text-lg font-bold text-slate-950 mb-4">Inclusivity & Preferences</h2>
             <div className="divide-y divide-slate-100">
               <InfoRow label="Preferred Gender" value={vacancy.preferred_gender} />
               <InfoRow label="Age Requirement" value={vacancy.minimum_age || vacancy.maximum_age ? `${vacancy.minimum_age || 'Any'} to ${vacancy.maximum_age || 'Any'} years old` : 'Any'} />
@@ -111,7 +111,7 @@ export default function JobPostingDetailPage() {
 
         <div className="space-y-4">
           <Card padding="sm">
-            <h2 className="text-lg font-black text-slate-950 mb-4">Job Overview</h2>
+            <h2 className="text-lg font-bold text-slate-950 mb-4">Job Overview</h2>
             <div className="space-y-3">
               <div className="flex items-start gap-3">
                 <Building2 className="h-5 w-5 shrink-0 text-slate-400 mt-0.5" />
@@ -161,7 +161,7 @@ export default function JobPostingDetailPage() {
           </Card>
           
           <Card padding="sm">
-             <h2 className="text-lg font-black text-slate-950 mb-4">Benefits</h2>
+             <h2 className="text-lg font-bold text-slate-950 mb-4">Benefits</h2>
              {vacancy.benefits && vacancy.benefits.length > 0 ? (
                <ul className="list-disc pl-5 text-sm text-slate-700 space-y-1">
                  {vacancy.benefits.map((b, i) => <li key={i}>{b}</li>)}

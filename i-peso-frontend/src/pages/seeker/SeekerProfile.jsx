@@ -25,7 +25,7 @@ import {
   X,
 } from 'lucide-react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import toast from 'react-hot-toast'
+import toast from '@/lib/toast'
 import CertificateUploadModal from './components/CertificateUploadModal'
 import ProfilePhotoUploadModal from './components/ProfilePhotoUploadModal'
 import {
@@ -42,7 +42,7 @@ import { Button, LoadingSkeleton } from '@/components/ui'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 
 const skillGroups = [
-  ['dole_skills', 'DOLE Skills', 'bg-blue-50 text-blue-700 border-blue-200'],
+  ['dole_skills', 'DOLE Skills', 'bg-[#e8f0fc] text-brand-navy border-[#c4d9f7]'],
   ['technical_skills', 'Technical Skills', 'bg-violet-50 text-violet-700 border-violet-200'],
   ['soft_skills', 'Soft Skills', 'bg-emerald-50 text-emerald-700 border-emerald-200'],
 ]
@@ -369,12 +369,10 @@ export default function SeekerProfile() {
   const profileStrengthPercent = strength.percentage ?? 0
 
   return (
-    <div className="-mx-4 -mt-8 bg-slate-50 pb-12 sm:-mx-6">
-      <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
-        <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-          <div className="relative h-28 bg-[radial-gradient(circle_at_top_left,_rgba(96,165,250,0.35),_transparent_32%),linear-gradient(135deg,_#0f172a,_#1d4ed8_58%,_#38bdf8)] sm:h-32">
-            <div className="absolute inset-0 bg-[linear-gradient(120deg,_rgba(255,255,255,0.16)_0,_rgba(255,255,255,0)_45%)]" />
-          </div>
+    <div className="pb-12">
+      <div className="mx-auto max-w-[1440px]">
+        <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-card">
+          <div className="h-16 bg-[#e8f0fc] sm:h-20" aria-hidden="true" />
 
           <div className="px-5 pb-6 sm:px-7">
             <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
@@ -383,10 +381,10 @@ export default function SeekerProfile() {
                   <LazyImage
                     src={photoUrl}
                     alt={fullName(profile)}
-                    wrapperClassName="h-32 w-32 rounded-3xl border-4 border-white shadow-xl"
+                    wrapperClassName="h-32 w-32 rounded-2xl border-4 border-white shadow-card"
                     className="h-full w-full object-cover"
                     fallback={
-                      <div className="flex h-32 w-32 items-center justify-center rounded-3xl border-4 border-white bg-blue-100 text-3xl font-black text-blue-800 shadow-xl">
+                      <div className="flex h-32 w-32 items-center justify-center rounded-2xl border-4 border-white bg-[#e8f0fc] text-3xl font-bold text-brand-navy shadow-xl">
                         {initials(profile)}
                       </div>
                     }
@@ -395,7 +393,7 @@ export default function SeekerProfile() {
                     type="button"
                     onClick={() => setPhotoUploadOpen(true)}
                     title={profile.has_profile_image ? 'Change 2x2 photo' : 'Upload 2x2 photo'}
-                    className="absolute -bottom-2 -right-2 rounded-full border-4 border-white bg-blue-700 p-2.5 text-white shadow-md transition hover:bg-blue-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="absolute -bottom-2 -right-2 rounded-full border-4 border-white bg-brand-navy p-2.5 text-white shadow-md transition hover:bg-[#0f2d56] focus:outline-none focus:ring-2 focus:ring-[#2563b8]"
                   >
                     <Camera className="h-4 w-4" />
                   </button>
@@ -403,12 +401,12 @@ export default function SeekerProfile() {
 
                 <div className="min-w-0 pb-1">
                   <div className="flex flex-wrap items-center gap-3">
-                    <h1 className="text-3xl font-black tracking-tight text-slate-950">{fullName(profile)}</h1>
+                    <h1 className="text-[28px] font-bold leading-9 tracking-tight text-slate-900">{fullName(profile)}</h1>
                     <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold ${
                       profileComplete ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
                     }`}>
                       {profileComplete ? <ShieldCheck className="h-4 w-4" /> : <Target className="h-4 w-4" />}
-                      {profileComplete ? 'NSRP Verified Profile' : 'Profile Needs Completion'}
+                      {profileComplete ? 'NSRP registered' : 'Profile needs completion'}
                     </span>
                   </div>
                   <p className="mt-2 text-base font-semibold text-slate-700">{preferredTitle}</p>
@@ -421,18 +419,18 @@ export default function SeekerProfile() {
               </div>
 
               <div className="flex flex-wrap gap-2">
-                <button onClick={() => openProfileEditor('identity')} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-blue-200 bg-white px-4 py-2.5 text-sm font-bold text-blue-700 shadow-sm transition hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                  <UserCheck className="h-4 w-4" /> Update Profile Data
+                <button onClick={() => openProfileEditor('identity')} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-[#c4d9f7] bg-white px-4 py-2.5 text-sm font-bold text-brand-navy shadow-sm transition hover:bg-[#e8f0fc] focus:outline-none focus:ring-2 focus:ring-[#2563b8]">
+                  <UserCheck className="h-4 w-4" aria-hidden="true" /> Edit profile
                 </button>
-                <button onClick={openResumePreview} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-blue-700 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-blue-800 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                  <Eye className="h-4 w-4" /> Preview Resume
+                <button onClick={openResumePreview} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-brand-navy px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-[#0f2d56] focus:outline-none focus:ring-2 focus:ring-[#2563b8]">
+                  <Eye className="h-4 w-4" aria-hidden="true" /> Preview resume
                 </button>
               </div>
             </div>
 
             <div className="mt-6 grid gap-3 sm:grid-cols-3">
-              <HeroStat icon={Target} label="Profile Strength" value={`${profileStrengthPercent}%`} tone="blue" />
-              <HeroStat icon={BriefcaseBusiness} label="Applications" value={activeApplications} tone="emerald" />
+              <HeroStat icon={Target} label="Profile strength" value={`${profileStrengthPercent}%`} tone="blue" />
+              <HeroStat icon={BriefcaseBusiness} label="Active applications" value={activeApplications} tone="emerald" />
               <HeroStat icon={Sparkles} label="Skills" value={verifiedSkillCount} tone="indigo" />
             </div>
           </div>
@@ -448,7 +446,7 @@ export default function SeekerProfile() {
                   type="button"
                   onClick={generateProfessionalSummary}
                   disabled={summaryGenerating}
-                  className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-50 px-3 py-2 text-sm font-bold text-indigo-600 ring-1 ring-indigo-100 transition hover:bg-indigo-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-[#e8f0fc] px-3 py-2 text-sm font-bold text-brand-navy ring-1 ring-[#c4d9f7] transition hover:bg-[#e8f0fc] focus:outline-none focus:ring-2 focus:ring-[#2563b8]"
                 >
                   {summaryGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
                   {summaryGenerating ? 'Generating...' : professionalSummary || summaryDraft ? 'Regenerate Smart Summary' : 'Generate Smart Summary'}
@@ -464,7 +462,7 @@ export default function SeekerProfile() {
                     onChange={(event) => setSummaryDraft(event.target.value)}
                     rows={5}
                     placeholder="Write a short summary of your career goals, top skills, and preferred work."
-                    className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm leading-6 text-slate-700 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+                    className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm leading-6 text-slate-700 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-brand-navy focus:ring-4 focus:ring-[#c4d9f7]"
                   />
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <p className="text-xs text-slate-500">Use this space for the resume version of your profile, not government form data.</p>
@@ -472,7 +470,7 @@ export default function SeekerProfile() {
                       type="button"
                       onClick={saveProfessionalSummary}
                       disabled={!summaryDraft.trim() || summarySaving}
-                      className="inline-flex items-center gap-1.5 rounded-xl bg-blue-700 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-50"
+                      className="inline-flex items-center gap-1.5 rounded-xl bg-brand-navy px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-[#0f2d56] disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       {summarySaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
                       {summarySaving ? 'Saving...' : 'Save Summary'}
@@ -480,7 +478,7 @@ export default function SeekerProfile() {
                   </div>
                 </div>
               ) : professionalSummary ? (
-                <div className="rounded-xl border border-blue-100 bg-blue-50/60 p-4">
+                <div className="rounded-xl border border-[#c4d9f7] bg-[#e8f0fc] p-4">
                   <p className="text-sm leading-7 text-slate-700">{professionalSummary}</p>
                   <button
                     type="button"
@@ -488,7 +486,7 @@ export default function SeekerProfile() {
                       setSummaryDraft(professionalSummary)
                       setSummaryEditing(true)
                     }}
-                    className="mt-4 text-sm font-bold text-blue-700 hover:text-blue-800"
+                    className="mt-4 text-sm font-bold text-brand-navy hover:text-brand-navy"
                   >
                     Edit summary
                   </button>
@@ -507,12 +505,12 @@ export default function SeekerProfile() {
                   {profile.educations.map((education) => (
                     <div key={education.id} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
                       <p className="font-bold text-slate-900">{education.institution_name || 'School not specified'}</p>
-                      <p className="mt-1 text-sm font-semibold text-blue-700">{educationLabel(education.level)}</p>
+                      <p className="mt-1 text-sm font-semibold text-brand-navy">{educationLabel(education.level)}</p>
                       {education.course_strand && <p className="mt-1 text-sm text-slate-600">{education.course_strand}</p>}
                       <div className="mt-3 flex flex-wrap gap-2 text-xs">
                         <span className="rounded-full bg-white px-2.5 py-1 font-semibold text-slate-600">{educationStatusLabel(education)}</span>
                         {educationYearRange(education) && (
-                          <span className="rounded-full bg-blue-50 px-2.5 py-1 font-semibold text-blue-700">{educationYearRange(education)}</span>
+                          <span className="rounded-full bg-[#e8f0fc] px-2.5 py-1 font-semibold text-brand-navy">{educationYearRange(education)}</span>
                         )}
                         {education.undergrad_level_reached && (
                           <span className="rounded-full bg-amber-50 px-2.5 py-1 font-semibold text-amber-700">{education.undergrad_level_reached}</span>
@@ -536,10 +534,10 @@ export default function SeekerProfile() {
                     <div key={group.label} className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
                       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                         <div>
-                          <p className="text-sm font-black text-slate-900">{group.label}</p>
+                          <p className="text-sm font-bold text-slate-900">{group.label}</p>
                           <p className="mt-0.5 text-xs text-slate-500">{group.helper}</p>
                         </div>
-                        <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${group.tone === 'blue' ? 'bg-blue-100 text-blue-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                        <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${group.tone === 'blue' ? 'bg-[#e8f0fc] text-brand-navy' : 'bg-emerald-100 text-emerald-700'}`}>
                           {group.skills.length} verified
                         </span>
                       </div>
@@ -567,12 +565,12 @@ export default function SeekerProfile() {
 
                     return (
                       <div key={key} className="relative pb-6 last:pb-0">
-                        <span className="absolute -left-[1.82rem] top-2 flex h-5 w-5 items-center justify-center rounded-full border-4 border-white bg-blue-700 shadow-sm" />
-                        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-blue-200 hover:shadow-md">
+                        <span className="absolute -left-[1.82rem] top-2 flex h-5 w-5 items-center justify-center rounded-full border-4 border-white bg-brand-navy shadow-sm" />
+                        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-[#c4d9f7] hover:shadow-md">
                           <div className="flex flex-wrap items-start justify-between gap-3">
                             <div>
-                              <p className="text-base font-black text-slate-950">{experience.position}</p>
-                              <p className="mt-1 text-sm font-bold text-blue-700">{experience.company_name}</p>
+                              <p className="text-base font-bold text-slate-950">{experience.position}</p>
+                              <p className="mt-1 text-sm font-bold text-brand-navy">{experience.company_name}</p>
                               <p className="mt-1 text-sm text-slate-500">{experience.company_address || 'Address not specified'}{experience.employment_status ? ` | ${experience.employment_status.replaceAll('_', ' ')}` : ''}</p>
                             </div>
                             {experience.number_of_months && <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-bold text-slate-600">{experience.number_of_months} months</span>}
@@ -582,7 +580,7 @@ export default function SeekerProfile() {
                             <ul className="mt-4 space-y-2 rounded-xl bg-slate-50 p-3 text-sm text-slate-700">
                               {responsibilityLines(savedResponsibilities).map((line) => (
                                 <li key={line} className="flex gap-2">
-                                  <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-blue-600" />
+                                  <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-brand-navy" />
                                   <span>{line}</span>
                                 </li>
                               ))}
@@ -595,13 +593,13 @@ export default function SeekerProfile() {
                               setOpenExperienceEditors((current) => ({ ...current, [key]: !current[key] }))
                               setExperienceDrafts((current) => ({ ...current, [key]: current[key] ?? savedResponsibilities }))
                             }}
-                            className="mt-4 inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-sm font-bold text-blue-700 transition hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            className="mt-4 inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-sm font-bold text-brand-navy transition hover:bg-[#e8f0fc] focus:outline-none focus:ring-2 focus:ring-[#2563b8]"
                           >
                             <Plus className="h-4 w-4" /> {savedResponsibilities ? 'Edit Job Duties / Responsibilities' : 'Add Job Duties / Responsibilities'}
                           </button>
 
                           {isOpen && (
-                            <div className="mt-4 rounded-xl border border-indigo-100 bg-indigo-50/40 p-4">
+                            <div className="mt-4 rounded-xl border border-[#c4d9f7] bg-[#e8f0fc] p-4">
                               <div className="flex flex-wrap items-center justify-between gap-3">
                                 <div>
                                   <p className="text-sm font-bold text-slate-900">Resume bullet points</p>
@@ -610,7 +608,7 @@ export default function SeekerProfile() {
                                 <button
                                   type="button"
                                   onClick={() => enhanceResponsibilities(key, experience)}
-                                  className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-50 px-3 py-2 text-sm font-bold text-indigo-600 ring-1 ring-indigo-100 transition hover:bg-indigo-100 hover:shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                  className="inline-flex items-center gap-1.5 rounded-lg bg-[#e8f0fc] px-3 py-2 text-sm font-bold text-brand-navy ring-1 ring-[#c4d9f7] transition hover:bg-[#e8f0fc] hover:shadow-sm focus:outline-none focus:ring-2 focus:ring-[#2563b8]"
                                 >
                                   <Sparkles className="h-4 w-4" /> Smart Enhance Bullets
                                 </button>
@@ -622,7 +620,7 @@ export default function SeekerProfile() {
                                 onChange={(event) => setExperienceDrafts((current) => ({ ...current, [key]: event.target.value }))}
                                 rows={4}
                                 placeholder="Example: encoded files"
-                                className="mt-3 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm leading-6 text-slate-700 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
+                                className="mt-3 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm leading-6 text-slate-700 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-brand-navy focus:ring-4 focus:ring-[#c4d9f7]"
                               />
                               <div className="mt-3 flex flex-wrap justify-end gap-2">
                                 <button
@@ -635,7 +633,7 @@ export default function SeekerProfile() {
                                 <button
                                   type="button"
                                   onClick={() => saveResponsibilities(key)}
-                                  className="inline-flex items-center gap-1.5 rounded-xl bg-blue-700 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-blue-800"
+                                  className="inline-flex items-center gap-1.5 rounded-xl bg-brand-navy px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-[#0f2d56]"
                                 >
                                   <Save className="h-4 w-4" /> Save Bullets
                                 </button>
@@ -656,13 +654,13 @@ export default function SeekerProfile() {
               subtitle="Maintain complete certificate records with privately stored supporting proof."
               action={(
                 <div className="flex flex-wrap gap-2">
-                  <button onClick={() => openProfileEditor('training')} className="inline-flex items-center gap-1.5 rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-700">
+                  <button onClick={() => openProfileEditor('training')} className="inline-flex items-center gap-1.5 rounded-xl border border-[#c4d9f7] bg-[#e8f0fc] px-3 py-2 text-sm font-semibold text-brand-navy">
                     <FileText className="h-4 w-4" /> Update Records
                   </button>
                   <button
                     type="button"
                     onClick={() => setUploadOpen(true)}
-                    className="inline-flex items-center gap-1.5 rounded-xl bg-blue-700 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-800"
+                    className="inline-flex items-center gap-1.5 rounded-xl bg-brand-navy px-3 py-2 text-sm font-semibold text-white hover:bg-[#0f2d56]"
                   >
                     <Plus className="h-4 w-4" /> Add Certificate
                   </button>
@@ -681,7 +679,7 @@ export default function SeekerProfile() {
 
               {certificates.length > 0 && (
                 <div className="mt-5 border-t border-slate-100 pt-5">
-                  <p className="mb-3 text-xs font-bold uppercase tracking-wide text-slate-400">Certificate records</p>
+                  <p className="mb-3 text-xs font-bold text-slate-400">Certificate records</p>
                   <div className="grid gap-3 sm:grid-cols-2">
                     {certificates.map((certificate) => (
                       <div key={certificate.certificate_id} className="rounded-2xl border border-slate-200 p-4">
@@ -691,7 +689,7 @@ export default function SeekerProfile() {
                             <p className="font-bold text-slate-900">{certificate.title}</p>
                             <p className="mt-0.5 text-sm text-slate-500">{certificate.issuing_body}</p>
                             <div className="mt-2 flex flex-wrap gap-1.5 text-[11px] font-bold">
-                              <span className="rounded-full bg-blue-50 px-2.5 py-1 text-blue-700">{certificateCategory(certificate.category)}</span>
+                              <span className="rounded-full bg-[#e8f0fc] px-2.5 py-1 text-brand-navy">{certificateCategory(certificate.category)}</span>
                               <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-emerald-700">Verified by Upload</span>
                               <span className={`rounded-full px-2.5 py-1 ${isExpiredCertificate(certificate) ? 'bg-red-50 text-red-700' : 'bg-slate-100 text-slate-600'}`}>
                                 {isExpiredCertificate(certificate) ? 'Expired' : certificate.expires_at ? `Expires ${formatCertificateDate(certificate.expires_at)}` : 'No expiration'}
@@ -729,11 +727,10 @@ export default function SeekerProfile() {
 
             <ResumePolishCard items={resumePolishItems} completed={completedPolishItems} />
 
-            <section className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-slate-950 via-blue-950 to-blue-800 p-6 text-white shadow-lg">
-              <div className="absolute right-0 top-0 h-24 w-24 rounded-full bg-cyan-300/20 blur-2xl" />
+            <section className="relative overflow-hidden rounded-2xl bg-brand-navy p-6 text-white">
               <span className="relative inline-flex rounded-xl bg-white/10 p-2.5"><FileText className="h-6 w-6" /></span>
-              <h2 className="relative mt-4 text-xl font-black">Resume Studio</h2>
-              <p className="relative mt-2 text-sm leading-6 text-blue-100">Transform this profile into a DOLE-compliant, ATS-friendly PDF resume in one click.</p>
+              <h2 className="relative mt-4 text-xl font-bold">Resume Studio</h2>
+              <p className="relative mt-2 text-sm leading-6 text-white/80">Transform this profile into a DOLE-compliant, ATS-friendly PDF resume in one click.</p>
               {!profile.has_profile_image && (
                 <button type="button" onClick={() => setPhotoUploadOpen(true)} className="relative mt-4 flex w-full items-center gap-3 rounded-xl border border-amber-300/40 bg-amber-300/15 p-3 text-left text-xs text-amber-50">
                   <Camera className="h-5 w-5 shrink-0" />
@@ -742,12 +739,12 @@ export default function SeekerProfile() {
               )}
               <button
                 onClick={openResumePreview}
-                className="relative mt-5 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-white px-4 py-3 text-sm font-black text-blue-900 shadow-sm transition hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-white/70"
+                className="relative mt-5 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-white px-4 py-3 text-sm font-bold text-brand-navy shadow-sm transition hover:bg-[#e8f0fc] focus:outline-none focus:ring-2 focus:ring-white/70"
               >
                 <Eye className="h-4 w-4" />
                 Open Resume Studio
               </button>
-              {profile.has_resume && <p className="relative mt-3 flex items-center gap-1.5 text-xs text-blue-100"><CheckCircle2 className="h-4 w-4" /> A resume has already been generated. Preview again to refresh it.</p>}
+              {profile.has_resume && <p className="relative mt-3 flex items-center gap-1.5 text-xs text-white/80"><CheckCircle2 className="h-4 w-4" /> A resume has already been generated. Preview again to refresh it.</p>}
             </section>
           </aside>
         </div>
@@ -870,13 +867,13 @@ function ResumeStudioModal({
       <div className="mx-auto max-w-6xl overflow-hidden rounded-2xl bg-slate-50 shadow-2xl">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-white px-5 py-4">
           <div>
-            <p className="text-xs font-black uppercase tracking-[0.18em] text-indigo-600">Resume Studio</p>
-            <h2 id="resume-studio-title" className="mt-1 text-xl font-black text-slate-950">Customize & Preview Resume</h2>
+            <p className="text-xs font-bold text-brand-navy">Resume Studio</p>
+            <h2 id="resume-studio-title" className="mt-1 text-xl font-bold text-slate-950">Customize & Preview Resume</h2>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-xl border border-slate-200 bg-white p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="rounded-xl border border-slate-200 bg-white p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#2563b8]"
             aria-label="Close Resume Studio"
           >
             <X className="h-5 w-5" />
@@ -889,13 +886,13 @@ function ResumeStudioModal({
               <header className="border-b-2 border-slate-900 pb-4">
                 <div className="flex flex-col-reverse gap-4 sm:flex-row sm:items-start sm:justify-between">
                   <div className="min-w-0 flex-1">
-                    <h3 className="text-2xl font-black uppercase tracking-[0.08em] text-slate-950">{fullName(profile)}</h3>
-                    <p className="mt-1 text-sm font-bold uppercase tracking-wide text-slate-700">{preferredOccupationLabel(profile)}</p>
+                    <h3 className="text-2xl font-bold text-slate-950">{fullName(profile)}</h3>
+                    <p className="mt-1 text-sm font-bold text-slate-700">{preferredOccupationLabel(profile)}</p>
                     <p className="mt-3 text-xs leading-5 text-slate-600">
                       {[location, profile.mobile_number, profile.email].filter(Boolean).join(' | ')}
                     </p>
                   </div>
-                  <div className="flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden border border-slate-300 bg-slate-50 text-xl font-black text-slate-500">
+                  <div className="flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden border border-slate-300 bg-slate-50 text-xl font-bold text-slate-500">
                     {photoUrl
                       ? <img src={photoUrl} alt={fullName(profile)} className="h-full w-full object-cover" />
                       : initials(profile)}
@@ -929,10 +926,10 @@ function ResumeStudioModal({
                         <article key={experienceKey(experience, index)}>
                           <div className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between">
                             <div>
-                              <p className="font-black text-slate-950">{experience.position || 'Position not specified'}</p>
+                              <p className="font-bold text-slate-950">{experience.position || 'Position not specified'}</p>
                               <p className="text-sm font-bold text-slate-700">{experience.company_name || 'Company not specified'}</p>
                             </div>
-                            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{resumeDateRange(experience)}</p>
+                            <p className="text-xs font-semibold text-slate-500">{resumeDateRange(experience)}</p>
                           </div>
                           {duties.length > 0 ? (
                             <ul className="mt-2 list-disc space-y-1 pl-5 text-sm leading-6 text-slate-700">
@@ -956,10 +953,10 @@ function ResumeStudioModal({
                     {profile.educations.map((education) => (
                       <article key={education.id} className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between">
                         <div>
-                          <p className="font-black text-slate-950">{education.course_strand || educationLabel(education.level)}</p>
+                          <p className="font-bold text-slate-950">{education.course_strand || educationLabel(education.level)}</p>
                           <p className="text-sm font-semibold text-slate-700">{education.institution_name || educationLabel(education.level)}</p>
                         </div>
-                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{educationYearRange(education) || educationStatusLabel(education)}</p>
+                        <p className="text-xs font-semibold text-slate-500">{educationYearRange(education) || educationStatusLabel(education)}</p>
                       </article>
                     ))}
                   </div>
@@ -973,13 +970,13 @@ function ResumeStudioModal({
                   <div className="space-y-3">
                     {(profile.trainings ?? []).map((training) => (
                       <article key={`${training.course}-${training.training_institution}`} className="text-sm leading-6 text-slate-700">
-                        <p className="font-black text-slate-950">{training.course}</p>
+                        <p className="font-bold text-slate-950">{training.course}</p>
                         <p>{[training.training_institution, training.hours_of_training ? `${training.hours_of_training} hours` : null, training.certificates_received].filter(Boolean).join(' | ')}</p>
                       </article>
                     ))}
                     {(profile.certificates ?? []).map((certificate) => (
                       <article key={certificate.certificate_id} className="text-sm leading-6 text-slate-700">
-                        <p className="font-black text-slate-950">{certificate.title}</p>
+                        <p className="font-bold text-slate-950">{certificate.title}</p>
                         <p>{[certificate.issuing_body, certificate.issued_at ? `Issued ${formatMonthYear(certificate.issued_at)}` : null].filter(Boolean).join(' | ')}</p>
                       </article>
                     ))}
@@ -1011,7 +1008,7 @@ function ResumeStudioModal({
 
           <aside className="space-y-4">
             <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-              <p className="text-sm font-black text-slate-950">Resume readiness</p>
+              <p className="text-sm font-bold text-slate-950">Resume readiness</p>
               <p className="mt-1 text-xs leading-5 text-slate-500">{completedChecks} of {resumeChecks.length} items ready for your PDF.</p>
               <div className="mt-4 space-y-2">
                 {resumeChecks.map((item) => (
@@ -1040,7 +1037,7 @@ function ResumeStudioModal({
               type="button"
               onClick={onDownload}
               disabled={generating || (!String(professionalSummary || '').trim() && !hasResumeSourceData(profile, allSkills))}
-              className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-blue-700 px-4 py-3 text-sm font-black text-white shadow-sm transition hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-brand-navy px-4 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-[#0f2d56] disabled:cursor-not-allowed disabled:opacity-60"
             >
               {generating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
               {generating ? 'Generating PDF...' : 'Download PDF Resume'}
@@ -1056,7 +1053,7 @@ function ResumeStudioModal({
 function ResumePreviewSection({ title, children }) {
   return (
     <section>
-      <h4 className="border-b border-slate-300 pb-1.5 text-xs font-black uppercase tracking-[0.18em] text-slate-950">{title}</h4>
+      <h4 className="border-b border-slate-300 pb-1.5 text-xs font-bold text-slate-950">{title}</h4>
       <div className="mt-3">{children}</div>
     </section>
   )
@@ -1064,18 +1061,18 @@ function ResumePreviewSection({ title, children }) {
 
 function TrainingRecordCard({ training }) {
   return (
-    <div className="rounded-2xl border border-blue-100 bg-blue-50/50 p-4">
+    <div className="rounded-2xl border border-[#c4d9f7] bg-[#e8f0fc] p-4">
       <div className="flex items-start gap-3">
-        <span className="rounded-xl bg-white p-2 text-blue-700 shadow-sm">
+        <span className="rounded-xl bg-white p-2 text-brand-navy shadow-sm">
           <Award className="h-5 w-5" />
         </span>
         <div className="min-w-0 flex-1">
-          <p className="font-black text-slate-900">{training.course}</p>
+          <p className="font-bold text-slate-900">{training.course}</p>
           <p className="mt-1 text-sm text-slate-600">
             {[training.training_institution || 'Institution not specified', training.hours_of_training ? `${training.hours_of_training} hours` : null].filter(Boolean).join(' | ')}
           </p>
           {training.certificates_received && (
-            <span className="mt-3 inline-flex rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-black text-emerald-700">
+            <span className="mt-3 inline-flex rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700">
               {training.certificates_received}
             </span>
           )}
@@ -1102,31 +1099,31 @@ function Card({ title, subtitle, action, children }) {
 }
 
 function ProfileFact({ icon, value }) {
-  return <span className="flex min-w-0 items-center gap-2">{createElement(icon, { className: 'h-4 w-4 shrink-0 text-blue-600' })}<span className="truncate">{value}</span></span>
+  return <span className="flex min-w-0 items-center gap-2">{createElement(icon, { className: 'h-4 w-4 shrink-0 text-brand-navy' })}<span className="truncate">{value}</span></span>
 }
 
 function Stat({ icon, label, value }) {
   return (
     <div className="flex items-center gap-3 border-b border-slate-200 px-6 py-4 last:border-0 sm:border-b-0 sm:border-r sm:last:border-r-0">
-      <span className="rounded-xl bg-white p-2 text-blue-700 shadow-sm">{createElement(icon, { className: 'h-5 w-5' })}</span>
-      <div><p className="text-xl font-black text-slate-900">{value}</p><p className="text-xs font-medium text-slate-500">{label}</p></div>
+      <span className="rounded-xl bg-white p-2 text-brand-navy shadow-sm">{createElement(icon, { className: 'h-5 w-5' })}</span>
+      <div><p className="text-xl font-bold text-slate-900">{value}</p><p className="text-xs font-medium text-slate-500">{label}</p></div>
     </div>
   )
 }
 
 function HeroStat({ icon, label, value, tone }) {
   const tones = {
-    blue: 'bg-blue-50 text-blue-800 ring-blue-100',
+    blue: 'bg-[#e8f0fc] text-brand-navy ring-[#c4d9f7]',
     emerald: 'bg-emerald-50 text-emerald-800 ring-emerald-100',
-    indigo: 'bg-indigo-50 text-indigo-800 ring-indigo-100',
+    indigo: 'bg-[#e8f0fc] text-brand-navy ring-[#c4d9f7]',
   }
 
   return (
     <div className={`flex items-center gap-3 rounded-2xl px-4 py-3 ring-1 ${tones[tone] ?? tones.blue}`}>
       <span className="rounded-xl bg-white/80 p-2 shadow-sm">{createElement(icon, { className: 'h-5 w-5' })}</span>
       <div>
-        <p className="text-lg font-black leading-none">{value}</p>
-        <p className="mt-1 text-xs font-bold uppercase tracking-wide opacity-75">{label}</p>
+        <p className="text-lg font-bold leading-none">{value}</p>
+        <p className="mt-1 text-xs font-bold opacity-75">{label}</p>
       </div>
     </div>
   )
@@ -1136,11 +1133,11 @@ function PremiumSkillChip({ skill, tone }) {
   const name = skillName(skill)
   const classes = tone === 'emerald'
     ? 'border-emerald-200 bg-white text-emerald-800 shadow-emerald-900/5'
-    : 'border-blue-200 bg-white text-blue-800 shadow-blue-900/5'
+    : 'border-[#c4d9f7] bg-white text-brand-navy shadow-blue-900/5'
 
   return (
     <span className={`inline-flex items-center gap-2 rounded-full border px-3.5 py-2 text-sm font-bold shadow-sm ${classes}`}>
-      <span className={`h-2 w-2 rounded-full ${tone === 'emerald' ? 'bg-emerald-500' : 'bg-blue-600'}`} />
+      <span className={`h-2 w-2 rounded-full ${tone === 'emerald' ? 'bg-emerald-500' : 'bg-brand-navy'}`} />
       {name}
     </span>
   )
@@ -1155,7 +1152,7 @@ function ProfileStrengthCard({ insights, percentage, onItemAction }) {
     <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <p className="text-xs font-bold uppercase tracking-[0.18em] text-blue-600">Profile Strength</p>
+          <p className="text-xs font-bold text-brand-navy">Profile Strength</p>
           <h2 className="mt-1 text-lg font-bold text-slate-950">Employer readiness</h2>
           <p className="mt-1 text-sm text-slate-500">{insights.message}</p>
         </div>
@@ -1166,7 +1163,7 @@ function ProfileStrengthCard({ insights, percentage, onItemAction }) {
         <div className="flex items-center gap-4">
           <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-full p-2" style={ringStyle}>
             <div className="flex h-full w-full items-center justify-center rounded-full bg-white shadow-inner">
-              <span className="text-2xl font-black text-blue-800">{percentage}%</span>
+              <span className="text-2xl font-bold text-brand-navy">{percentage}%</span>
             </div>
           </div>
           <div className="min-w-0">
@@ -1177,9 +1174,9 @@ function ProfileStrengthCard({ insights, percentage, onItemAction }) {
       </div>
 
       {insights.nextItems.length > 0 && (
-        <div className="mt-5 rounded-xl border border-blue-100 bg-blue-50/70 p-4">
+        <div className="mt-5 rounded-xl border border-[#c4d9f7] bg-[#e8f0fc] p-4">
           <div className="mb-3 flex items-center gap-2">
-            <Target className="h-4 w-4 text-blue-700" />
+            <Target className="h-4 w-4 text-brand-navy" />
             <h3 className="text-sm font-bold text-slate-900">Next best actions</h3>
           </div>
           <div className="space-y-2.5">
@@ -1188,13 +1185,13 @@ function ProfileStrengthCard({ insights, percentage, onItemAction }) {
                 key={item.key}
                 type="button"
                 onClick={() => onItemAction(item)}
-                className="group flex w-full items-center justify-between gap-3 rounded-lg border border-blue-100 bg-white px-3 py-2.5 text-left text-sm shadow-sm transition hover:border-blue-200 hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="group flex w-full items-center justify-between gap-3 rounded-lg border border-[#c4d9f7] bg-white px-3 py-2.5 text-left text-sm shadow-sm transition hover:border-[#c4d9f7] hover:bg-[#e8f0fc] focus:outline-none focus:ring-2 focus:ring-[#2563b8]"
               >
                 <span>
                   <span className="block font-bold text-slate-800">{item.label}</span>
                   <span className="text-xs text-slate-500">{profileStrengthHelper(item.key)}</span>
                 </span>
-                <ArrowRight className="h-4 w-4 shrink-0 text-blue-600 transition group-hover:translate-x-0.5" />
+                <ArrowRight className="h-4 w-4 shrink-0 text-brand-navy transition group-hover:translate-x-0.5" />
               </button>
             ))}
           </div>
@@ -1214,8 +1211,8 @@ function StrengthChecklistGroup({ group }) {
   return (
     <div>
       <div className="mb-2.5 flex items-center justify-between gap-3">
-        <h3 className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-slate-600">
-          {createElement(group.icon, { className: 'h-4 w-4 text-blue-600' })}
+        <h3 className="flex items-center gap-2 text-xs font-bold text-slate-600">
+          {createElement(group.icon, { className: 'h-4 w-4 text-brand-navy' })}
           {group.title}
         </h3>
         <span className="text-xs font-bold text-slate-400">{group.completed}/{group.items.length}</span>
@@ -1245,11 +1242,11 @@ function ResumePolishCard({ items, completed }) {
     <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <p className="text-xs font-bold uppercase tracking-[0.18em] text-indigo-600">Resume Polish</p>
+          <p className="text-xs font-bold text-brand-navy">Resume Polish</p>
           <h2 className="mt-1 text-lg font-bold text-slate-950">Ready for employers</h2>
           <p className="mt-1 text-sm text-slate-500">Turn clinical NSRP data into a stronger resume presentation.</p>
         </div>
-        <span className="rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-bold text-indigo-700">{completed}/{items.length}</span>
+        <span className="rounded-full bg-[#e8f0fc] px-2.5 py-1 text-xs font-bold text-brand-navy">{completed}/{items.length}</span>
       </div>
 
       <div className="mt-5 h-2 overflow-hidden rounded-full bg-slate-100">
@@ -1262,11 +1259,11 @@ function ResumePolishCard({ items, completed }) {
             key={item.key}
             type="button"
             onClick={item.onClick}
-            className="group flex w-full items-start gap-3 rounded-xl border border-slate-200 bg-white p-3 text-left transition hover:border-indigo-200 hover:bg-indigo-50/50 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            className="group flex w-full items-start gap-3 rounded-xl border border-slate-200 bg-white p-3 text-left transition hover:border-[#c4d9f7] hover:bg-[#e8f0fc] focus:outline-none focus:ring-2 focus:ring-[#2563b8]"
           >
             <span
               className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${
-                item.complete ? 'bg-emerald-100 text-emerald-700' : 'bg-indigo-50 text-indigo-600'
+                item.complete ? 'bg-emerald-100 text-emerald-700' : 'bg-[#e8f0fc] text-brand-navy'
               }`}
             >
               {item.complete ? <Check className="h-3.5 w-3.5" /> : <ClipboardCheck className="h-3.5 w-3.5" />}
@@ -1274,7 +1271,7 @@ function ResumePolishCard({ items, completed }) {
             <span className="min-w-0 flex-1">
               <span className="flex items-center justify-between gap-2">
                 <span className="font-bold text-slate-800">{item.label}</span>
-                <span className="text-xs font-bold text-indigo-600">{item.complete ? 'Done' : item.action}</span>
+                <span className="text-xs font-bold text-brand-navy">{item.complete ? 'Done' : item.action}</span>
               </span>
               <span className="mt-0.5 block text-xs leading-5 text-slate-500">{item.helper}</span>
             </span>
@@ -1290,7 +1287,7 @@ function EmptyState({ icon, text, action, onClick }) {
     <div className="rounded-2xl border-2 border-dashed border-slate-200 px-4 py-8 text-center">
       {createElement(icon, { className: 'mx-auto h-8 w-8 text-slate-300' })}
       <p className="mt-3 text-sm text-slate-500">{text}</p>
-      <button onClick={onClick} className="mt-3 inline-flex items-center gap-1 text-sm font-bold text-blue-700"><Plus className="h-4 w-4" /> {action}</button>
+      <button onClick={onClick} className="mt-3 inline-flex items-center gap-1 text-sm font-bold text-brand-navy"><Plus className="h-4 w-4" /> {action}</button>
     </div>
   )
 }
@@ -1482,7 +1479,7 @@ function profileStrengthInsights(strength) {
       groups,
       nextItems,
       label: 'Strong',
-      badgeClass: 'bg-blue-100 text-blue-700',
+      badgeClass: 'bg-[#e8f0fc] text-brand-navy',
       message: 'A few final details can make your profile more convincing.',
     }
   }

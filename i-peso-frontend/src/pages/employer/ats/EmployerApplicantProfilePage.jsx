@@ -9,12 +9,12 @@ import { TERMINAL_STATUSES } from './atsConstants'
 import { formatDate, formatDateTime } from './atsFormatters'
 import InterviewSummary from './InterviewSummary'
 import ReportApplicantButton from '@/components/safety/ReportApplicantButton'
-import toast from 'react-hot-toast'
+import toast from '@/lib/toast'
 
 function InfoTile({ label, value }) {
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
-      <p className="text-xs font-black uppercase tracking-wide text-slate-400">{label}</p>
+      <p className="text-xs font-bold text-slate-400">{label}</p>
       <p className="mt-1 font-semibold text-slate-900">{value || 'Not specified'}</p>
     </div>
   )
@@ -22,8 +22,8 @@ function InfoTile({ label, value }) {
 
 function SectionHeading({ icon: Icon, title }) {
   return (
-    <h3 className="mb-4 flex items-center gap-2 text-sm font-bold uppercase tracking-widest text-slate-800">
-      <Icon className="h-4 w-4 text-blue-600" /> {title}
+    <h3 className="mb-4 flex items-center gap-2 text-sm font-bold text-slate-800">
+      <Icon className="h-4 w-4 text-brand-navy" /> {title}
     </h3>
   )
 }
@@ -60,7 +60,7 @@ export default function EmployerApplicantProfilePage() {
     return (
       <div className="mx-auto max-w-4xl p-6 text-center">
         <h2 className="text-xl font-bold text-slate-800">Application not found</h2>
-        <Link to="/employer/ats" className="mt-4 inline-flex items-center text-blue-600 hover:underline">
+        <Link to="/employer/ats" className="mt-4 inline-flex items-center text-brand-navy hover:underline">
           <ChevronLeft className="mr-1 h-4 w-4" /> Back to ATS
         </Link>
       </div>
@@ -103,12 +103,12 @@ export default function EmployerApplicantProfilePage() {
             <div className="flex items-center gap-5">
               <ApplicantAvatar applicationId={data?.apply_id} hasPhoto={seeker.has_profile_image} name={seeker.name} size="lg" />
               <div>
-                <h1 className="text-2xl font-black text-slate-900">{seeker.name || 'Applicant'}</h1>
+                <h1 className="text-2xl font-bold text-slate-900">{seeker.name || 'Applicant'}</h1>
                 <p className="mt-1 text-sm font-medium text-slate-500">
-                  Applying for: <span className="font-bold text-blue-700">{data?.job?.job_title}</span>
+                  Applying for: <span className="font-bold text-brand-navy">{data?.job?.job_title}</span>
                 </p>
                 <div className="mt-3 flex flex-wrap items-center gap-3">
-                  <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${status === 'hired' ? 'bg-emerald-100 text-emerald-800' : status === 'rejected' ? 'bg-red-100 text-red-800' : 'bg-blue-100 text-blue-800'}`}>
+                  <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${status === 'hired' ? 'bg-emerald-100 text-emerald-800' : status === 'rejected' ? 'bg-red-100 text-red-800' : 'bg-[#e8f0fc] text-brand-navy'}`}>
                     {data?.status_label}
                   </span>
                   <span className="text-sm font-semibold text-amber-600">{data?.match_percentage}% Match</span>
@@ -121,7 +121,7 @@ export default function EmployerApplicantProfilePage() {
               <Button 
                 variant="secondary" 
                 size="sm" 
-                className="bg-blue-50 text-blue-700 hover:bg-blue-100 disabled:opacity-50" 
+                className="bg-[#e8f0fc] text-brand-navy hover:bg-[#e8f0fc] disabled:opacity-50" 
                 onClick={handleDownloadResume}
                 disabled={!seeker.has_resume}
                 title={seeker.has_resume ? "Download Resume" : "No resume generated"}
@@ -194,7 +194,7 @@ export default function EmployerApplicantProfilePage() {
 
           <div className="space-y-8">
             <div className="rounded-2xl border border-slate-200 bg-slate-50 p-6">
-              <h3 className="mb-4 text-sm font-bold uppercase tracking-widest text-slate-800">Contact & Summary</h3>
+              <h3 className="mb-4 text-sm font-bold text-slate-800">Contact & Summary</h3>
               <div className="space-y-4">
                 <div className="flex items-center gap-3 text-sm text-slate-700">
                   <Mail className="h-4 w-4 text-slate-400" /> {seeker.email || 'Not provided'}
@@ -215,7 +215,7 @@ export default function EmployerApplicantProfilePage() {
               <SectionHeading icon={Sparkles} title="Matched Skills" />
               <div className="flex flex-wrap gap-2">
                 {skills.map((skill, index) => (
-                  <span key={`${skill}-${index}`} className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-bold text-blue-700">
+                  <span key={`${skill}-${index}`} className="rounded-lg border border-[#c4d9f7] bg-[#e8f0fc] px-3 py-1.5 text-xs font-bold text-brand-navy">
                     {skill}
                   </span>
                 ))}
@@ -228,11 +228,11 @@ export default function EmployerApplicantProfilePage() {
               <div className="space-y-4">
                 {timeline.length ? timeline.map((item, index) => (
                   <div key={`${item.title}-${index}`} className="flex gap-3">
-                    <div className={`mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ${item.status === status ? 'bg-blue-600 ring-4 ring-blue-50' : 'bg-slate-300'}`} />
+                    <div className={`mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ${item.status === status ? 'bg-brand-navy ring-4 ring-blue-50' : 'bg-slate-300'}`} />
                     <div className="min-w-0">
                       <p className="text-sm font-bold text-slate-900">{item.title}</p>
                       <p className="mt-0.5 text-xs text-slate-500">{item.description}</p>
-                      <p className="mt-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                      <p className="mt-1 text-xs font-bold text-slate-400">
                         {item.timestamp ? formatDateTime(item.timestamp) : 'Pending'}
                       </p>
                     </div>

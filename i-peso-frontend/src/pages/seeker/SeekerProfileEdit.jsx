@@ -1,6 +1,6 @@
 import { createElement, useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import toast from 'react-hot-toast'
+import { useBlocker, useNavigate } from 'react-router-dom'
+import toast from '@/lib/toast'
 import {
   ArrowLeft,
   Award,
@@ -38,6 +38,7 @@ import {
 import { useAuthStore } from '@/stores/authStore'
 import { Button, LoadingSkeleton } from '@/components/ui'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import PortalPageHeader from '@/components/shell/PortalPageHeader'
 import { serializeOccupationPreferences } from '@/utils/seekerProfilePayloads'
 import { ISO_COUNTRIES } from '@/data/jobPreferenceVocabularies'
 import {
@@ -50,9 +51,9 @@ import {
 } from '@/data/seekerProfileVocabularies'
 import { resolveAddressSuggestion } from '@/services/geoService'
 
-const inputClass = 'mt-1.5 w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm font-semibold text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-700 focus:ring-2 focus:ring-blue-700/10 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500'
+const inputClass = 'mt-1.5 w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm font-semibold text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-brand-navy focus:ring-2 focus:ring-blue-700/10 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500'
 const selectClass = inputClass
-const labelClass = 'block text-xs font-black uppercase tracking-wide text-slate-500'
+const labelClass = 'block text-xs font-bold text-slate-500'
 const cardClass = 'rounded-2xl border border-slate-200 bg-white p-5 shadow-sm'
 
 const SECTION_TABS = [
@@ -67,6 +68,20 @@ const SECTION_TABS = [
   { id: 'languages', label: 'Languages', icon: Languages },
   { id: 'work', label: 'Work Experience', icon: BriefcaseBusiness },
 ]
+
+// Which slice of the form each section edits (some sections share one API step).
+// Certificates upload immediately, so they never hold unsaved changes.
+const SECTION_FORM_KEY = {
+  identity: 'identity',
+  address: 'identity',
+  employment: 'employment',
+  preferences: 'preferences',
+  education: 'education',
+  skills: 'education',
+  training: 'training',
+  languages: 'languages',
+  work: 'work',
+}
 
 const RELIGION_OPTIONS = [
   { value: 'roman_catholic', label: 'Roman Catholic' },
@@ -155,6 +170,7 @@ export default function SeekerProfileEdit() {
   const [openingCertificate, setOpeningCertificate] = useState(null)
   const [activeSection, setActiveSection] = useState(() => sectionFromHash())
   const [justSaved, setJustSaved] = useState({})
+  const [savedForm, setSavedForm] = useState(null)
 
   useEffect(() => {
     let active = true
@@ -162,7 +178,9 @@ export default function SeekerProfileEdit() {
       .then((result) => {
         if (!active) return
         setProfile(result)
-        setForm(buildProfileEditForm(result))
+        const initial = buildProfileEditForm(result)
+        setForm(initial)
+        setSavedForm(initial)
         updateUser({ name: fullName(result) })
       })
       .catch((error) => toast.error(error.response?.data?.message ?? 'Unable to load your profile.'))
@@ -259,7 +277,9 @@ export default function SeekerProfileEdit() {
       await saveSeekerProfileStep(step, payload)
       const refreshed = await getSeekerProfile()
       setProfile(refreshed)
-      setForm(buildProfileEditForm(refreshed))
+      const next = buildProfileEditForm(refreshed)
+      setForm(next)
+      setSavedForm(next)
       updateUser({ name: fullName(refreshed), profile_completed: refreshed.profile_completed })
       setJustSaved((current) => ({ ...current, [section]: Date.now() }))
       toast.success('Profile section updated.')
@@ -287,6 +307,43 @@ export default function SeekerProfileEdit() {
   }
 
   const [pendingDeleteCert, setPendingDeleteCert] = useState(null)
+
+  const dirtyKeys = useMemo(() => {
+    if (!form || !savedForm) return new Set()
+    return new Set(Object.keys(form).filter((key) => JSON.stringify(form[key]) !== JSON.stringify(savedForm[key])))
+  }, [form, savedForm])
+  const isDirty = dirtyKeys.size > 0
+  const activeKey = SECTION_FORM_KEY[activeSection]
+  const activeDirty = Boolean(activeKey && dirtyKeys.has(activeKey))
+  const activeLabel = SECTION_TABS.find((tab) => tab.id === activeSection)?.label ?? 'this section'
+
+  useEffect(() => {
+    if (!isDirty) return undefined
+    const warn = (event) => { event.preventDefault(); event.returnValue = '' }
+    window.addEventListener('beforeunload', warn)
+    return () => window.removeEventListener('beforeunload', warn)
+  }, [isDirty])
+
+  // Leaving the page inside the app (sidebar, back link) with unsaved edits asks first.
+  const blocker = useBlocker(({ currentLocation, nextLocation }) => isDirty && currentLocation.pathname !== nextLocation.pathname)
+
+  const savers = form ? {
+    identity: () => save('identity', 1, () => buildStep1Payload(form.identity), validateIdentity),
+    address: () => save('address', 1, () => buildStep1Payload(form.identity), validateIdentity),
+    employment: () => save('employment', 2, () => buildStep2Payload(form.employment), validateEmployment),
+    preferences: () => save('preferences', 3, () => buildStep3Payload(form.preferences), validatePreferences),
+    education: () => save('education', 5, () => buildStep5Payload(form.education), validateEducationAndSkills),
+    skills: () => save('skills', 5, () => buildStep5Payload(form.education), validateEducationAndSkills),
+    training: () => save('training', 6, () => buildStep6Payload(form.training), validateTraining),
+    languages: () => save('languages', 4, () => buildStep4Payload(form.languages), validateLanguages),
+    work: () => save('work', 7, () => buildStep7Payload(form.work), validateWorkExperience),
+  } : {}
+
+  const discardActive = () => {
+    if (!activeKey || !savedForm) return
+    setForm((current) => ({ ...current, [activeKey]: savedForm[activeKey] }))
+    setErrors({})
+  }
 
   const confirmDeleteCert = async () => {
     const certificate = pendingDeleteCert
@@ -332,48 +389,49 @@ export default function SeekerProfileEdit() {
   }
 
   return (
-    <div className="min-h-[calc(100vh-5rem)] bg-slate-50 pb-12">
-      <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
-        <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <button
-              type="button"
-              onClick={() => navigate('/seeker/profile')}
-              className="mb-3 inline-flex items-center gap-2 text-sm font-bold text-blue-700 hover:text-blue-900"
-            >
-              <ArrowLeft className="h-4 w-4" /> Back to profile
-            </button>
-            <p className="text-xs font-black uppercase tracking-[0.18em] text-blue-700">Profile Maintenance</p>
-            <h1 className="mt-1 text-2xl font-black text-slate-950">Update your NSRP profile data</h1>
-            <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-600">
-              This screen is for maintaining your completed profile. It saves directly to your NSRP profile records without restarting the first-time job seeker registration flow.
-            </p>
-          </div>
-          <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
-            <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Profile readiness</p>
-            <p className="mt-1 text-2xl font-black text-blue-800">{completionItems.filter((item) => item.done).length}/{completionItems.length}</p>
-          </div>
+    <div className={activeDirty ? 'pb-28' : 'pb-12'}>
+      <div className="mx-auto max-w-[1440px]">
+        <button
+          type="button"
+          onClick={() => navigate('/seeker/profile')}
+          className="mb-4 inline-flex items-center gap-2 text-sm font-semibold text-slate-600 hover:text-brand-navy"
+        >
+          <ArrowLeft className="h-4 w-4" aria-hidden="true" /> Back to profile
+        </button>
+        <div className="mb-6">
+          <PortalPageHeader
+            title="Update profile"
+            subtitle="Changes here update your NSRP record and your job matches. Save each section when you're done."
+          >
+            <div className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 shadow-card">
+              <p className="text-xs text-slate-500">Sections complete</p>
+              <p className="font-display text-2xl leading-none text-brand-navy tabular-nums">{completionItems.filter((item) => item.done).length}/{completionItems.length}</p>
+            </div>
+          </PortalPageHeader>
         </div>
 
         <div className="grid gap-5 lg:grid-cols-[240px_minmax(0,1fr)]">
           <aside className="space-y-4">
-            <nav className="sticky top-24 rounded-2xl border border-slate-200 bg-white p-2 shadow-sm">
+            <nav className="sticky top-24 rounded-2xl border border-slate-200 bg-white p-2 shadow-card" aria-label="Profile sections">
               {SECTION_TABS.map(({ id, label, icon }) => (
                 <button
                   key={id}
                   type="button"
                   onClick={() => setSection(id)}
-                  className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-bold transition focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                  aria-current={activeSection === id ? 'true' : undefined}
+                  className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition focus:outline-none focus-visible:ring-2 focus-visible:ring-focus ${
                     activeSection === id
-                      ? 'bg-blue-700 text-white shadow-sm'
-                      : 'text-slate-600 hover:bg-blue-50 hover:text-blue-800'
+                      ? 'bg-[#e8f0fc] font-semibold text-brand-navy'
+                      : 'font-medium text-slate-600 hover:bg-slate-100 hover:text-brand-navy'
                   }`}
                 >
                   {createElement(icon, { className: 'h-4 w-4' })}
                   <span className="flex-1">{label}</span>
-                  {justSaved[id] && (
-                    <CheckCircle2 className={`h-4 w-4 shrink-0 ${activeSection === id ? 'text-white' : 'text-emerald-600'}`} aria-label="Saved this session" />
-                  )}
+                  {SECTION_FORM_KEY[id] && dirtyKeys.has(SECTION_FORM_KEY[id]) ? (
+                    <span className="h-2 w-2 shrink-0 rounded-full bg-brand-gold" aria-label="Unsaved changes" />
+                  ) : justSaved[id] ? (
+                    <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" aria-label="Saved this session" />
+                  ) : null}
                 </button>
               ))}
             </nav>
@@ -386,7 +444,7 @@ export default function SeekerProfileEdit() {
                 icon={UserCheck}
                 title="Identity"
                 subtitle="Keep core NSRP identity data consistent with job seeker onboarding."
-                onSave={() => save('identity', 1, () => buildStep1Payload(form.identity), validateIdentity)}
+                onSave={savers.identity}
                 saving={saving === 'identity'}
                 justSaved={Boolean(justSaved.identity)}
               >
@@ -418,7 +476,7 @@ export default function SeekerProfileEdit() {
                 </div>
 
                 <div className="mt-5 rounded-2xl border border-slate-200 bg-white p-4">
-                  <p className="text-sm font-black text-slate-900">Disability status</p>
+                  <p className="text-sm font-bold text-slate-900">Disability status</p>
                   <div className="mt-3 flex flex-wrap gap-2">
                     {DISABILITY_OPTIONS.map((option) => {
                       const checked = form.identity.disabilities.includes(option.value)
@@ -428,7 +486,7 @@ export default function SeekerProfileEdit() {
                           type="button"
                           onClick={() => updateSection('identity', { disabilities: toggleDisability(form.identity.disabilities, option.value) })}
                           className={`rounded-full border px-3 py-2 text-sm font-bold transition focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                            checked ? 'border-blue-600 bg-blue-50 text-blue-800' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                            checked ? 'border-brand-navy bg-[#e8f0fc] text-brand-navy' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
                           }`}
                         >
                           {checked ? 'Checked ' : ''}{option.label}
@@ -450,7 +508,7 @@ export default function SeekerProfileEdit() {
                 icon={ShieldCheck}
                 title="Employment Status"
                 subtitle="This preserves the government NSRP employment classification while keeping the UI simple."
-                onSave={() => save('employment', 2, () => buildStep2Payload(form.employment), validateEmployment)}
+                onSave={savers.employment}
                 saving={saving === 'employment'}
                 justSaved={Boolean(justSaved.employment)}
               >
@@ -521,7 +579,7 @@ export default function SeekerProfileEdit() {
                 icon={Sparkles}
                 title="Job Preferences"
                 subtitle="Update preferred roles and locations without going back to registration."
-                onSave={() => save('preferences', 3, () => buildStep3Payload(form.preferences), validatePreferences)}
+                onSave={savers.preferences}
                 saving={saving === 'preferences'}
                 justSaved={Boolean(justSaved.preferences)}
               >
@@ -567,7 +625,7 @@ export default function SeekerProfileEdit() {
                 icon={GraduationCap}
                 title="Education"
                 subtitle="Keep the same education records and completion logic used during onboarding."
-                onSave={() => save('education', 5, () => buildStep5Payload(form.education), validateEducationAndSkills)}
+                onSave={savers.education}
                 saving={saving === 'education'}
                 justSaved={Boolean(justSaved.education)}
               >
@@ -588,7 +646,7 @@ export default function SeekerProfileEdit() {
                 icon={MapPin}
                 title="Address & GPS"
                 subtitle="Maintain the present address and map coordinates used for nearby job matching."
-                onSave={() => save('address', 1, () => buildStep1Payload(form.identity), validateIdentity)}
+                onSave={savers.address}
                 saving={saving === 'address'}
                 justSaved={Boolean(justSaved.address)}
               >
@@ -651,7 +709,7 @@ export default function SeekerProfileEdit() {
                 icon={Sparkles}
                 title="Skills"
                 subtitle="Maintain hard and soft skills without mixing them into education records."
-                onSave={() => save('skills', 5, () => buildStep5Payload(form.education), validateEducationAndSkills)}
+                onSave={savers.skills}
                 saving={saving === 'skills'}
                 justSaved={Boolean(justSaved.skills)}
               >
@@ -671,7 +729,7 @@ export default function SeekerProfileEdit() {
                 icon={Award}
                 title="Trainings, Eligibility & E-Certificates"
                 subtitle="Training records come from the NSRP registration inputs. Certificate files are optional proof attachments."
-                onSave={() => save('training', 6, () => buildStep6Payload(form.training), validateTraining)}
+                onSave={savers.training}
                 saving={saving === 'training'}
                 justSaved={Boolean(justSaved.training)}
               >
@@ -684,7 +742,7 @@ export default function SeekerProfileEdit() {
                         <SearchableTextInput label="Training institution" value={training.training_institution} options={TRAINING_INSTITUTION_OPTIONS} placeholder="Type or select an institution" onChange={(value) => updateListItem('training', 'trainings', index, { training_institution: value })} />
                         <div>
                           <label className={labelClass}>Hours of training</label>
-                          <div className="mt-1.5 flex items-center rounded-xl border border-slate-300 bg-white focus-within:border-blue-700 focus-within:ring-2 focus-within:ring-blue-700/10 overflow-hidden">
+                          <div className="mt-1.5 flex items-center rounded-xl border border-slate-300 bg-white focus-within:border-brand-navy focus-within:ring-2 focus-within:ring-blue-700/10 overflow-hidden">
                             <button
                               type="button"
                               onClick={() => {
@@ -765,13 +823,13 @@ export default function SeekerProfileEdit() {
                 title="Certificates"
                 subtitle="Create complete credential records with privately stored proof files."
               >
-                <div className="rounded-2xl border border-blue-100 bg-blue-50/60 p-4">
+                <div className="rounded-2xl border border-[#c4d9f7] bg-[#e8f0fc] p-4">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
-                      <p className="text-sm font-black text-slate-900">Private certificate vault</p>
+                      <p className="text-sm font-bold text-slate-900">Private certificate vault</p>
                       <p className="mt-1 text-sm text-slate-600">Certificates may stand alone or be linked to one of your saved training records.</p>
                     </div>
-                    <button type="button" onClick={() => setUploadOpen(true)} className="inline-flex items-center gap-1.5 rounded-xl bg-blue-700 px-3 py-2 text-sm font-bold text-white hover:bg-blue-800">
+                    <button type="button" onClick={() => setUploadOpen(true)} className="inline-flex items-center gap-1.5 rounded-xl bg-brand-navy px-3 py-2 text-sm font-bold text-white hover:bg-[#0f2d56]">
                       <Plus className="h-4 w-4" /> Add Certificate
                     </button>
                   </div>
@@ -797,7 +855,7 @@ export default function SeekerProfileEdit() {
                 icon={Languages}
                 title="Languages & Dialects"
                 subtitle="Record what the seeker can read, write, speak, or understand."
-                onSave={() => save('languages', 4, () => buildStep4Payload(form.languages), validateLanguages)}
+                onSave={savers.languages}
                 saving={saving === 'languages'}
                 justSaved={Boolean(justSaved.languages)}
               >
@@ -819,7 +877,7 @@ export default function SeekerProfileEdit() {
                               type="checkbox"
                               checked={Boolean(language[ability])}
                               onChange={(event) => updateListItem('languages', 'languages', index, { [ability]: event.target.checked })}
-                              className="h-4 w-4 rounded border-slate-300 text-blue-700 focus:ring-blue-700"
+                              className="h-4 w-4 rounded border-slate-300 text-brand-navy focus:ring-blue-700"
                             />
                             {ability.replace('can_', '').replace('understand', 'understand')}
                           </label>
@@ -837,7 +895,7 @@ export default function SeekerProfileEdit() {
                 icon={BriefcaseBusiness}
                 title="Work Experience"
                 subtitle="Maintain work history and resume-ready responsibilities in one place."
-                onSave={() => save('work', 7, () => buildStep7Payload(form.work), validateWorkExperience)}
+                onSave={savers.work}
                 saving={saving === 'work'}
                 justSaved={Boolean(justSaved.work)}
               >
@@ -903,6 +961,33 @@ export default function SeekerProfileEdit() {
           </DialogContent>
         </Dialog>
       )}
+      {activeDirty && (
+        <div className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white px-4 py-3 shadow-elevated md:left-[280px] sm:px-8" role="region" aria-label="Unsaved changes">
+          <div className="mx-auto flex max-w-[1440px] flex-wrap items-center justify-between gap-3">
+            <p className="flex items-center gap-2 text-sm text-slate-700">
+              <span className="h-2 w-2 rounded-full bg-brand-gold" aria-hidden="true" />
+              You have unsaved changes in {activeLabel}.
+            </p>
+            <div className="flex gap-2">
+              <Button variant="ghost" size="sm" onClick={discardActive} disabled={Boolean(saving)}>Discard</Button>
+              <Button size="sm" icon={Save} loading={saving === activeSection} onClick={() => savers[activeSection]?.()}>Save {activeLabel.toLowerCase()}</Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <Dialog open={blocker.state === 'blocked'} onOpenChange={(open) => { if (!open) blocker.reset?.() }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Leave without saving?</DialogTitle>
+            <DialogDescription>You have unsaved changes in your profile. If you leave now, they'll be lost.</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => blocker.reset?.()}>Stay and keep editing</Button>
+            <Button variant="danger" onClick={() => blocker.proceed?.()}>Leave without saving</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
@@ -911,15 +996,15 @@ function SectionCard({ icon, title, subtitle, children, onSave, saving, justSave
   return (
     <section className={cardClass}>
       <div className="mb-5 flex items-start gap-3 border-b border-slate-100 pb-5">
-        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-blue-50 text-blue-700">
+        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#e8f0fc] text-brand-navy">
           {createElement(icon, { className: 'h-5 w-5' })}
         </span>
         <div className="flex-1">
-          <h2 className="text-lg font-black text-slate-950">{title}</h2>
+          <h2 className="text-lg font-semibold text-slate-900">{title}</h2>
           <p className="mt-1 text-sm leading-6 text-slate-500">{subtitle}</p>
         </div>
         {justSaved && !saving && (
-          <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-black text-emerald-700">
+          <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700">
             <CheckCircle2 className="h-4 w-4" />
             Saved
           </span>
@@ -932,10 +1017,10 @@ function SectionCard({ icon, title, subtitle, children, onSave, saving, justSave
             type="button"
             onClick={onSave}
             disabled={Boolean(saving)}
-            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-blue-700 px-4 py-2.5 text-sm font-black text-white shadow-sm transition hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-brand-navy px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-[#0f2d56] disabled:cursor-not-allowed disabled:opacity-60"
           >
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-            {saving ? 'Saving...' : 'Save Section'}
+            {saving ? 'Saving…' : 'Save section'}
           </button>
         </div>
       )}
@@ -984,7 +1069,7 @@ function TextArea({ label, value, onChange, rows = 3, error }) {
 function ToggleInput({ label, checked, onChange }) {
   return (
     <label className="mt-7 inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-bold text-slate-700">
-      <input type="checkbox" checked={Boolean(checked)} onChange={(event) => onChange(event.target.checked)} className="h-4 w-4 rounded border-slate-300 text-blue-700 focus:ring-blue-700" />
+      <input type="checkbox" checked={Boolean(checked)} onChange={(event) => onChange(event.target.checked)} className="h-4 w-4 rounded border-slate-300 text-brand-navy focus:ring-blue-700" />
       {label}
     </label>
   )
@@ -993,8 +1078,8 @@ function ToggleInput({ label, checked, onChange }) {
 function ArrayHeader({ title, onAdd, addLabel }) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-3">
-      <h3 className="text-sm font-black text-slate-950">{title}</h3>
-      <button type="button" onClick={onAdd} className="inline-flex items-center gap-1.5 rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-bold text-blue-700 hover:bg-blue-100">
+      <h3 className="text-sm font-bold text-slate-950">{title}</h3>
+      <button type="button" onClick={onAdd} className="inline-flex items-center gap-1.5 rounded-xl border border-[#c4d9f7] bg-[#e8f0fc] px-3 py-2 text-sm font-bold text-brand-navy hover:bg-[#e8f0fc]">
         <Plus className="h-4 w-4" /> {addLabel}
       </button>
     </div>
@@ -1379,14 +1464,14 @@ function CertificateRecordCard({ certificate, opening, onView, onDelete }) {
   const expired = certificate.expires_at && certificate.expires_at < new Date().toISOString().slice(0, 10)
 
   return (
-    <article className="rounded-xl border border-blue-100 bg-white p-4 shadow-sm">
+    <article className="rounded-xl border border-[#c4d9f7] bg-white p-4 shadow-sm">
       <div className="flex items-start gap-3">
         <span className="rounded-xl bg-amber-100 p-2 text-amber-700"><Award className="h-5 w-5" /></span>
         <div className="min-w-0 flex-1">
-          <p className="font-black text-slate-900">{certificate.title}</p>
+          <p className="font-bold text-slate-900">{certificate.title}</p>
           <p className="mt-0.5 text-sm text-slate-500">{certificate.issuing_body}</p>
           <div className="mt-2 flex flex-wrap gap-1.5 text-[11px] font-bold">
-            <span className="rounded-full bg-blue-50 px-2.5 py-1 text-blue-700">{certificateCategory(certificate.category)}</span>
+            <span className="rounded-full bg-[#e8f0fc] px-2.5 py-1 text-brand-navy">{certificateCategory(certificate.category)}</span>
             <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-emerald-700">Verified by Upload</span>
             <span className={`rounded-full px-2.5 py-1 ${expired ? 'bg-red-50 text-red-700' : 'bg-slate-100 text-slate-600'}`}>
               {expired ? 'Expired' : certificate.expires_at ? `Expires ${formatCertificateDate(certificate.expires_at)}` : 'No expiration'}

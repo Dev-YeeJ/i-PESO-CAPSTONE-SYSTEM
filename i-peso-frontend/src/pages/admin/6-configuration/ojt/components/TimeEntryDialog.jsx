@@ -50,7 +50,7 @@ export default function TimeEntryDialog({ intern, log, onClose, onSaved }) {
           <DialogDescription>
             {isAdd
               ? `For a day ${intern.name} worked but has no entry. It is saved as approved.`
-              : `${intern.name} · ${formatWorkDate(log.work_date)}. The corrected entry is saved as approved.`}
+              : `${intern.name}, ${formatWorkDate(log.work_date)}. The corrected entry is saved as approved.`}
           </DialogDescription>
         </DialogHeader>
 

@@ -1,5 +1,5 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
-import toast from 'react-hot-toast'
+import toast from '@/lib/toast'
 import { Loader2, Plus, Search, X } from 'lucide-react'
 import {
   SOFT_SKILL_SUGGESTIONS,

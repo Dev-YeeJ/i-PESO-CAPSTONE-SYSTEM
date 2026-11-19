@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { AnimatePresence, motion as Motion } from 'framer-motion'
-import toast from 'react-hot-toast'
+import toast from '@/lib/toast'
 import { CalendarClock, Check, Lock, Pencil, Star, UsersRound } from 'lucide-react'
 import { Button, EmptyState, ErrorState } from '@/components/ui'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -40,7 +40,7 @@ export default function HiresTab() {
 
       {isLoading ? (
         <div className="grid gap-4 md:grid-cols-2" aria-hidden="true">
-          {[0, 1, 2, 3].map((key) => <div key={key} className="h-32 animate-pulse rounded-3xl bg-slate-100" />)}
+          {[0, 1, 2, 3].map((key) => <div key={key} className="h-32 animate-pulse rounded-2xl bg-slate-100" />)}
         </div>
       ) : error ? (
         <ErrorState description="Your hires could not be loaded." onRetry={refetch} error={error} />
@@ -48,9 +48,9 @@ export default function HiresTab() {
         <EmptyState icon={UsersRound} title="No hires yet" description="People you mark as Hired, or that PESO links from your placement reports, will appear here." />
       ) : (
         <>
-          <div className="flex flex-col gap-4 rounded-3xl border border-slate-200/80 bg-white p-5 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-4 rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm sm:flex-row sm:items-center sm:justify-between">
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-black text-slate-900">Feedback given for {given} of {hires.length} {hires.length === 1 ? 'hire' : 'hires'}</p>
+              <p className="text-sm font-bold text-slate-900">Feedback given for {given} of {hires.length} {hires.length === 1 ? 'hire' : 'hires'}</p>
               <div className="mt-2 h-2 max-w-sm overflow-hidden rounded-full bg-slate-100" aria-hidden="true">
                 <Motion.div className="h-full rounded-full bg-emerald-500" initial={{ width: 0 }} animate={{ width: `${(given / hires.length) * 100}%` }} transition={{ duration: 0.9, ease: [0.16, 1, 0.3, 1] }} />
               </div>
@@ -69,7 +69,7 @@ export default function HiresTab() {
           </div>
 
           {visible.length === 0 ? (
-            <p className="rounded-3xl border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500">
+            <p className="rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500">
               {show === 'waiting' ? "You're all caught up. Every hire has feedback." : 'No feedback given yet.'}
             </p>
           ) : (
@@ -84,14 +84,14 @@ export default function HiresTab() {
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0, transition: { delay: Math.min(index, 8) * 0.04 } }}
                       exit={{ opacity: 0, scale: 0.97 }}
-                      className="flex flex-col gap-4 rounded-3xl border border-slate-200/80 bg-white p-5 shadow-[0_1px_2px_rgba(15,23,42,0.04),0_10px_28px_-18px_rgba(15,23,42,0.22)]"
+                      className="flex flex-col gap-4 rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_1px_2px_rgba(15,23,42,0.04),0_10px_28px_-18px_rgba(15,23,42,0.22)]"
                     >
                       <div className="flex items-start gap-3.5">
-                        <span className={cn('flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br text-base font-black text-white shadow-md', GRADIENTS[(hire.seeker_id ?? index) % GRADIENTS.length])} aria-hidden="true">
+                        <span className={cn('flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br text-base font-bold text-white shadow-md', GRADIENTS[(hire.seeker_id ?? index) % GRADIENTS.length])} aria-hidden="true">
                           {initials(hire.name)}
                         </span>
                         <div className="min-w-0 flex-1">
-                          <p className="truncate text-base font-black text-slate-900">{hire.name}</p>
+                          <p className="truncate text-base font-bold text-slate-900">{hire.name}</p>
                           <p className="truncate text-sm text-slate-500">{hire.job_title ?? 'Position not set'}</p>
                           {hire.start_date && <p className="mt-0.5 text-xs text-slate-400">Started {startedOn(hire.start_date)}</p>}
                         </div>
@@ -190,7 +190,7 @@ function WorkerFeedbackDialog({ hire, aspects, rehireOptions, onClose }) {
         </div>
 
         <fieldset>
-          <legend className="text-sm font-black text-slate-900">Would you hire {firstName} again?</legend>
+          <legend className="text-sm font-bold text-slate-900">Would you hire {firstName} again?</legend>
           <div className="mt-2 grid grid-cols-3 gap-2">
             {Object.entries(rehireOptions).map(([value, label]) => (
               <label key={value} className={cn(
@@ -206,7 +206,7 @@ function WorkerFeedbackDialog({ hire, aspects, rehireOptions, onClose }) {
         </fieldset>
 
         <div>
-          <label htmlFor="worker-comment" className="text-sm font-black text-slate-900">Comment <span className="font-normal text-slate-500">(optional, private)</span></label>
+          <label htmlFor="worker-comment" className="text-sm font-bold text-slate-900">Comment <span className="font-normal text-slate-500">(optional, private)</span></label>
           <textarea id="worker-comment" rows={3} maxLength={2000} value={comment} onChange={(event) => setComment(event.target.value)}
             placeholder="Specific, job-related observations. No contact details."
             className="mt-1.5 w-full rounded-xl border border-slate-300 px-3.5 py-3 text-sm leading-6 focus:border-brand-navy focus:outline-none focus:ring-4 focus:ring-brand-navy/10" />

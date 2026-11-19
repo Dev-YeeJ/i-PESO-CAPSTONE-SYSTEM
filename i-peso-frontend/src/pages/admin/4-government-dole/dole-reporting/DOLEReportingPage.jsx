@@ -1,12 +1,13 @@
 import { createElement, useEffect, useState } from 'react'
-import { FileText, FileBarChart, CalendarDays, CheckCircle2, Printer, Save, X, Loader2, Edit, FileDown } from 'lucide-react'
+import { FileText, AlertTriangle, CalendarDays, CheckCircle2, Printer, Save, X, Loader2, Edit, FileDown } from 'lucide-react'
+import PlacementComplianceGrid from './components/PlacementComplianceGrid'
+import { summarizeCompliance, usePlacementComplianceGrid } from './components/complianceGrid'
 import { Card, Button } from '@/components/ui'
 import PageHeader from '@/pages/admin/_components/PageHeader'
 import DataTable from '@/pages/admin/_components/DataTable'
 import { adminService } from '@/services/adminService'
-import toast from 'react-hot-toast'
+import toast from '@/lib/toast'
 import { useNavigate } from 'react-router-dom'
-import api from '@/services/api'
 
 const SIGNATORY_ROLES = [
   ['prepared_by', 'Prepared by', 'SLEO/PESO Coordinator'],
@@ -55,6 +56,10 @@ export default function DOLEReportingPage() {
   const [previewIssuesConcerns, setPreviewIssuesConcerns] = useState('')
   const [previewSignatories, setPreviewSignatories] = useState(emptySignatories())
   const [isSaving, setIsSaving] = useState(false)
+
+  const [complianceYear, setComplianceYear] = useState(new Date().getFullYear())
+  const complianceQuery = usePlacementComplianceGrid(complianceYear)
+  const compliance = summarizeCompliance(complianceQuery.data)
 
   const fetchReports = async () => {
     try {
@@ -249,16 +254,29 @@ export default function DOLEReportingPage() {
         />
 
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <SummaryCard icon={FileText} label="Total Reports" value={reports.length} detail="Generated SPRS" tone="navy" />
-          <SummaryCard icon={CalendarDays} label="Recent Submissions" value={reports.filter(r => r.status === 'submitted').length} detail="Officially filed" tone="green" />
-          <SummaryCard icon={FileBarChart} label="Placements YTD" value={0} detail="Year to date" tone="blue" />
-          <SummaryCard icon={CheckCircle2} label="Compliance" value="100%" detail="On-time submission rate" tone="amber" />
+          <SummaryCard icon={FileText} label="SPRS reports" value={reports.length} detail="Generated so far" tone="navy" />
+          <SummaryCard icon={CalendarDays} label="Submitted to DOLE" value={reports.filter(r => r.status === 'submitted').length} detail="Officially filed" tone="green" />
+          <SummaryCard
+            icon={CheckCircle2}
+            label="Employer on-time rate"
+            value={complianceQuery.isLoading ? '…' : compliance.rate === null ? '–' : `${compliance.rate}%`}
+            detail={compliance.required ? `${compliance.onTime} of ${compliance.required} placement reports on time, ${complianceYear}` : `No placement reports due yet in ${complianceYear}`}
+            tone="blue"
+          />
+          <SummaryCard
+            icon={AlertTriangle}
+            label="Overdue placement reports"
+            value={complianceQuery.isLoading ? '…' : compliance.overdue}
+            detail="Past the deadline with nothing submitted"
+            tone="amber"
+          />
         </div>
 
+        <PlacementComplianceGrid year={complianceYear} onYearChange={setComplianceYear} />
         <Card padding="none" className="mt-6">
           <div className="p-5 sm:p-6 flex items-center justify-between border-b border-slate-100">
             <div>
-              <h2 className="text-lg font-bold text-slate-950">SPRS History</h2>
+              <h2 className="text-lg font-bold text-slate-950">SPRS history</h2>
               <p className="text-sm text-slate-500">View and track past statistical reports.</p>
             </div>
           </div>
@@ -274,7 +292,7 @@ export default function DOLEReportingPage() {
 
       {/* GENERATE MODAL */}
       {showGenerateModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm print:hidden p-4 sm:p-0">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 print:hidden p-4 sm:p-0">
           <div className="w-full max-w-lg rounded-xl bg-white shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
             <div className="flex items-center justify-between p-6 border-b border-slate-100 shrink-0">
               <div>
@@ -409,9 +427,9 @@ export default function DOLEReportingPage() {
 
               <div className="text-center mb-4 border-b-2 border-black pb-3">
                 <p className="text-right text-xs font-bold">SPRS Form 2018</p>
-                <h1 className="text-lg font-bold uppercase">Department of Labor and Employment</h1>
+                <h1 className="text-lg font-bold">Department of Labor and Employment</h1>
                 <p className="text-sm">Regional Office No. 1 &middot; San Fernando City, La Union</p>
-                <h2 className="text-base font-bold uppercase mt-2">Statistical Performance Reporting System (SPRS)</h2>
+                <h2 className="text-base font-bold mt-2">Statistical Performance Reporting System (SPRS)</h2>
                 <p className="text-sm font-semibold">PESO Monthly Operations Statistical Report (PESO OpS)</p>
               </div>
 
@@ -470,7 +488,7 @@ export default function DOLEReportingPage() {
                       if (row.section) {
                         return (
                           <tr key={row.key} className="bg-slate-200">
-                            <td colSpan={8} className="border border-black p-1.5 font-bold uppercase">{row.label}</td>
+                            <td colSpan={8} className="border border-black p-1.5 font-bold">{row.label}</td>
                           </tr>
                         )
                       }
@@ -496,7 +514,7 @@ export default function DOLEReportingPage() {
               </div>
 
               <div className="mb-6">
-                <p className="font-bold border-b border-black text-sm mb-2 uppercase">Other Accomplishments</p>
+                <p className="font-bold border-b border-black text-sm mb-2">Other Accomplishments</p>
                 <table className="w-full text-sm border-collapse border border-black">
                   <tbody>
                     <tr>
@@ -511,7 +529,7 @@ export default function DOLEReportingPage() {
                           min="0"
                           onChange={(e) => setPreviewOther((o) => ({ ...o, ftja_total: Math.max(0, e.target.value) }))}
                           placeholder="—"
-                          className="w-full bg-blue-50 px-1.5 py-1 text-center text-sm outline-none"
+                          className="w-full bg-[#e8f0fc] px-1.5 py-1 text-center text-sm outline-none"
                         />
                       </td>
                       <td className="border border-black p-1.5 text-center w-1/6">
@@ -522,7 +540,7 @@ export default function DOLEReportingPage() {
                           min="0"
                           onChange={(e) => setPreviewOther((o) => ({ ...o, ftja_with_attachment: Math.max(0, e.target.value) }))}
                           placeholder="—"
-                          className="w-full bg-blue-50 px-1.5 py-1 text-center text-sm outline-none"
+                          className="w-full bg-[#e8f0fc] px-1.5 py-1 text-center text-sm outline-none"
                         />
                       </td>
                     </tr>
@@ -531,7 +549,7 @@ export default function DOLEReportingPage() {
               </div>
 
               <div className="mb-6">
-                <p className="font-bold border-b border-black text-sm mb-2 uppercase">Issues / Concerns</p>
+                <p className="font-bold border-b border-black text-sm mb-2">Issues / Concerns</p>
                 <textarea
                   className="w-full border border-black p-2 text-sm"
                   rows={3}
@@ -580,7 +598,7 @@ function NumCell({ value, onChange, auto = false, min = 0 }) {
   }
 
   return (
-    <td className={`border border-black p-0 text-center ${auto ? 'bg-blue-50' : 'bg-white'}`}>
+    <td className={`border border-black p-0 text-center ${auto ? 'bg-[#e8f0fc]' : 'bg-white'}`}>
       <input
         type="number"
         value={value ?? 0}
@@ -598,15 +616,15 @@ function SummaryCard({ icon, label, value, detail, tone }) {
     navy: 'bg-slate-100 text-brand-navy',
     green: 'bg-emerald-50 text-emerald-700',
     amber: 'bg-amber-50 text-amber-700',
-    blue: 'bg-blue-50 text-blue-700',
+    blue: 'bg-[#e8f0fc] text-brand-navy',
   }
 
   return (
     <Card padding="sm">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <p className="text-xs font-extrabold uppercase tracking-wide text-slate-500">{label}</p>
-          <p className="mt-2 text-3xl font-black text-slate-950">{value}</p>
+          <p className="text-xs font-semibold text-slate-500">{label}</p>
+          <p className="mt-2 text-3xl font-bold text-slate-950">{value}</p>
           <p className="mt-1 text-xs text-slate-500">{detail}</p>
         </div>
         <span className={`rounded-xl p-2.5 ${tones[tone]}`}>

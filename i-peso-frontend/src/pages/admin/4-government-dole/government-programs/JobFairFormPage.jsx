@@ -13,7 +13,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import * as z from 'zod'
 import { isBefore, parseISO } from 'date-fns'
 import { useDropzone } from 'react-dropzone'
-import toast from 'react-hot-toast'
+import toast from '@/lib/toast'
 
 const MotionDiv = motion.div
 
@@ -279,18 +279,18 @@ export default function JobFairFormPage() {
                 <div className="space-y-5">
                   <div>
                     <label className="block text-sm font-bold text-slate-700">Title</label>
-                    <input {...register('title')} className={`mt-2 w-full rounded-lg border ${errors.title ? 'border-red-400 focus:ring-red-100' : 'border-slate-300 focus:ring-blue-100 focus:border-blue-500'} px-4 py-2.5 text-sm focus:outline-none focus:ring-2`} />
+                    <input {...register('title')} className={`mt-2 w-full rounded-lg border ${errors.title ? 'border-red-400 focus:ring-red-100' : 'border-slate-300 focus:ring-[#c4d9f7] focus:border-brand-navy'} px-4 py-2.5 text-sm focus:outline-none focus:ring-2`} />
                     {errors.title && <p className="mt-1 text-xs font-semibold text-red-600">{errors.title.message}</p>}
                   </div>
                   <div>
                     <label className="block text-sm font-bold text-slate-700">Description</label>
-                    <textarea {...register('description')} rows={4} className={`mt-2 w-full rounded-lg border ${errors.description ? 'border-red-400 focus:ring-red-100' : 'border-slate-300 focus:ring-blue-100 focus:border-blue-500'} px-4 py-2.5 text-sm focus:outline-none focus:ring-2`} />
+                    <textarea {...register('description')} rows={4} className={`mt-2 w-full rounded-lg border ${errors.description ? 'border-red-400 focus:ring-red-100' : 'border-slate-300 focus:ring-[#c4d9f7] focus:border-brand-navy'} px-4 py-2.5 text-sm focus:outline-none focus:ring-2`} />
                     {errors.description && <p className="mt-1 text-xs font-semibold text-red-600">{errors.description.message}</p>}
                   </div>
                   {/* Dropzone Integration */}
                   <div>
                     <label className="block text-sm font-bold text-slate-700 mb-2">Event Flyer / Banner (Optional)</label>
-                    <div {...getRootProps()} className={`flex flex-col items-center justify-center rounded-xl border-2 border-dashed p-6 transition-colors cursor-pointer ${isDragActive ? 'border-blue-500 bg-blue-50' : 'border-slate-300 bg-slate-50 hover:bg-slate-100'}`}>
+                    <div {...getRootProps()} className={`flex flex-col items-center justify-center rounded-xl border-2 border-dashed p-6 transition-colors cursor-pointer ${isDragActive ? 'border-brand-navy bg-[#e8f0fc]' : 'border-slate-300 bg-slate-50 hover:bg-slate-100'}`}>
                       <input {...getInputProps()} />
                       {flyerFile ? (
                         <div className="flex items-center gap-3">
@@ -315,7 +315,7 @@ export default function JobFairFormPage() {
                 <div className="space-y-5">
                   <div>
                     <label className="block text-sm font-bold text-slate-700">Venue</label>
-                    <input {...register('venue')} placeholder="e.g. SM City Urdaneta - Events Center, 2nd Floor" className={`mt-2 w-full rounded-lg border ${errors.venue ? 'border-red-400' : 'border-slate-300'} px-4 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100`} />
+                    <input {...register('venue')} placeholder="e.g. SM City Urdaneta - Events Center, 2nd Floor" className={`mt-2 w-full rounded-lg border ${errors.venue ? 'border-red-400' : 'border-slate-300'} px-4 py-2.5 text-sm focus:border-brand-navy focus:outline-none focus:ring-2 focus:ring-[#c4d9f7]`} />
                     {errors.venue && <p className="mt-1 text-xs font-semibold text-red-600">{errors.venue.message}</p>}
                   </div>
                   <AddressPicker
@@ -350,7 +350,7 @@ export default function JobFairFormPage() {
                   <div className={`grid gap-4 md:grid-cols-2 ${multiDay ? 'lg:grid-cols-2' : 'lg:grid-cols-3'}`}>
                     <div>
                       <label className="block text-sm font-bold text-slate-700">Start Date</label>
-                      <input type="date" {...register('start_date')} min={id ? undefined : todayDate} className={`mt-2 w-full rounded-lg border ${errors.start_date ? 'border-red-400' : 'border-slate-300'} px-4 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100`} />
+                      <input type="date" {...register('start_date')} min={id ? undefined : todayDate} className={`mt-2 w-full rounded-lg border ${errors.start_date ? 'border-red-400' : 'border-slate-300'} px-4 py-2.5 text-sm focus:border-brand-navy focus:outline-none focus:ring-2 focus:ring-[#c4d9f7]`} />
                       {errors.start_date && <p className="mt-1 text-xs font-semibold text-red-600">{errors.start_date.message}</p>}
                     </div>
                     <AnimatePresence>
@@ -362,31 +362,31 @@ export default function JobFairFormPage() {
                           transition={{ duration: 0.3 }}
                         >
                           <label className="block text-sm font-bold text-slate-700">End Date</label>
-                          <input type="date" {...register('end_date')} min={formValues.start_date || undefined} className={`mt-2 w-full rounded-lg border ${errors.end_date ? 'border-red-400' : 'border-slate-300'} px-4 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100`} />
+                          <input type="date" {...register('end_date')} min={formValues.start_date || undefined} className={`mt-2 w-full rounded-lg border ${errors.end_date ? 'border-red-400' : 'border-slate-300'} px-4 py-2.5 text-sm focus:border-brand-navy focus:outline-none focus:ring-2 focus:ring-[#c4d9f7]`} />
                           {errors.end_date && <p className="mt-1 text-xs font-semibold text-red-600">{errors.end_date.message}</p>}
                         </motion.div>
                       )}
                     </AnimatePresence>
                     <div>
                       <label className="block text-sm font-bold text-slate-700">Start Time</label>
-                      <input type="time" {...register('start_time')} className={`mt-2 w-full rounded-lg border ${errors.start_time ? 'border-red-400' : 'border-slate-300'} px-4 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100`} />
+                      <input type="time" {...register('start_time')} className={`mt-2 w-full rounded-lg border ${errors.start_time ? 'border-red-400' : 'border-slate-300'} px-4 py-2.5 text-sm focus:border-brand-navy focus:outline-none focus:ring-2 focus:ring-[#c4d9f7]`} />
                     </div>
                     <div>
                       <label className="block text-sm font-bold text-slate-700">End Time</label>
-                      <input type="time" {...register('end_time')} className={`mt-2 w-full rounded-lg border ${errors.end_time ? 'border-red-400' : 'border-slate-300'} px-4 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100`} />
+                      <input type="time" {...register('end_time')} className={`mt-2 w-full rounded-lg border ${errors.end_time ? 'border-red-400' : 'border-slate-300'} px-4 py-2.5 text-sm focus:border-brand-navy focus:outline-none focus:ring-2 focus:ring-[#c4d9f7]`} />
                     </div>
                   </div>
 
                   <div className="grid gap-4 md:grid-cols-2">
                     <div>
                       <label className="block text-sm font-bold text-slate-700">Submission Deadline</label>
-                      <input type="date" {...register('submission_deadline')} max={formValues.start_date || undefined} className={`mt-2 w-full rounded-lg border ${errors.submission_deadline ? 'border-red-400' : 'border-slate-300'} px-4 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100`} />
+                      <input type="date" {...register('submission_deadline')} max={formValues.start_date || undefined} className={`mt-2 w-full rounded-lg border ${errors.submission_deadline ? 'border-red-400' : 'border-slate-300'} px-4 py-2.5 text-sm focus:border-brand-navy focus:outline-none focus:ring-2 focus:ring-[#c4d9f7]`} />
                       {errors.submission_deadline && <p className="mt-1 text-xs font-semibold text-red-600">{errors.submission_deadline.message}</p>}
                       <p className="mt-1 text-xs text-slate-500">Employers must submit their documentary requirements by this date.</p>
                     </div>
                     <div>
                       <label className="block text-sm font-bold text-slate-700">Maximum Representatives</label>
-                      <input type="number" {...register('maximum_representatives')} className={`mt-2 w-full rounded-lg border ${errors.maximum_representatives ? 'border-red-400' : 'border-slate-300'} px-4 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100`} />
+                      <input type="number" {...register('maximum_representatives')} className={`mt-2 w-full rounded-lg border ${errors.maximum_representatives ? 'border-red-400' : 'border-slate-300'} px-4 py-2.5 text-sm focus:border-brand-navy focus:outline-none focus:ring-2 focus:ring-[#c4d9f7]`} />
                       {errors.maximum_representatives && <p className="mt-1 text-xs font-semibold text-red-600">{errors.maximum_representatives.message}</p>}
                     </div>
                   </div>
@@ -399,9 +399,9 @@ export default function JobFairFormPage() {
                 <CardHeader title="Partner Agencies" subtitle="Optional — co-organizers shown on the official bulletin." />
                 <div className="flex flex-wrap gap-2">
                   {formValues.partner_agencies.map((agency, index) => (
-                    <span key={agency + index} className="inline-flex items-center gap-1.5 rounded-full border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-bold text-blue-800">
+                    <span key={agency + index} className="inline-flex items-center gap-1.5 rounded-full border border-[#c4d9f7] bg-[#e8f0fc] px-3 py-1.5 text-xs font-bold text-brand-navy">
                       {agency}
-                      <button type="button" onClick={() => removePartnerAgency(index)} aria-label={`Remove ${agency}`} className="text-blue-500 hover:text-blue-800">
+                      <button type="button" onClick={() => removePartnerAgency(index)} aria-label={`Remove ${agency}`} className="text-blue-500 hover:text-brand-navy">
                         <X className="h-3 w-3" />
                       </button>
                     </span>
@@ -412,7 +412,7 @@ export default function JobFairFormPage() {
                     value={partnerAgencyInput}
                     onChange={(event) => setPartnerAgencyInput(event.target.value)}
                     onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); addPartnerAgency() } }}
-                    className="flex-1 rounded-lg border border-slate-300 px-4 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                    className="flex-1 rounded-lg border border-slate-300 px-4 py-2.5 text-sm focus:border-brand-navy focus:outline-none focus:ring-2 focus:ring-[#c4d9f7]"
                   />
                   <Button type="button" variant="outline" icon={Plus} onClick={addPartnerAgency}>Add</Button>
                 </div>
@@ -459,8 +459,8 @@ export default function JobFairFormPage() {
                     ['HOTS', metrics?.total_hots ?? 0],
                   ].map(([label, value]) => (
                     <div key={label} className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-                      <p className="text-xl font-black text-slate-950">{value}</p>
-                      <p className="text-[11px] font-extrabold uppercase text-slate-500">{label}</p>
+                      <p className="text-xl font-bold text-slate-950">{value}</p>
+                      <p className="text-xs font-semibold text-slate-500">{label}</p>
                     </div>
                   ))}
                 </div>

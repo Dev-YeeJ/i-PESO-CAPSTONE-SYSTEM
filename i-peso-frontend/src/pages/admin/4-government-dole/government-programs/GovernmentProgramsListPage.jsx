@@ -2,7 +2,7 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
-import toast from 'react-hot-toast'
+import toast from '@/lib/toast'
 import { Pencil, Trash2 } from 'lucide-react'
 import { Button, Card } from '@/components/ui'
 import { ConfirmModal, PageHeader, StatusBadge } from '@/pages/admin/_components'

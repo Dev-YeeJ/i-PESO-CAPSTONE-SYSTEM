@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import toast from 'react-hot-toast'
+import toast from '@/lib/toast'
 import {
   ArrowLeft, BriefcaseBusiness, Building2, ClipboardList, Eye, FileText, Flag, Gavel, History,
   Lock, MessageSquareText, ShieldAlert, ShieldCheck, UserRound,
@@ -14,7 +14,7 @@ const formatDateTime = (value) => (value ? new Date(value).toLocaleString('en-PH
 const formatDate = (value) => (value ? new Date(value).toLocaleDateString('en-PH', { dateStyle: 'medium' }) : '—')
 const titleCase = (value = '') => value.replace(/_/g, ' ').replace(/\b\w/g, (letter) => letter.toUpperCase())
 const fieldClass = 'mt-1.5 w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm font-normal focus:border-brand-navy focus:outline-none focus:ring-2 focus:ring-brand-navy/15'
-const labelClass = 'block text-xs font-extrabold uppercase tracking-wide text-slate-500'
+const labelClass = 'block text-xs font-semibold text-slate-500'
 const errorText = (error, fallback) => Object.values(error?.response?.data?.errors ?? {}).flat()[0] ?? error?.response?.data?.message ?? fallback
 
 export default function SafetyReportDetailPage() {
@@ -37,7 +37,7 @@ export default function SafetyReportDetailPage() {
   if (isError || !report) {
     return (
       <div className="portal-page">
-        <PageHeader title="Safety report" eyebrow="Constituent CRM · Reports & Safety" />
+        <PageHeader title="Safety report" eyebrow="Constituent CRM, Reports & Safety" />
         <div className="rounded-xl border border-red-200 bg-red-50 p-6 text-sm text-red-700">{error?.response?.data?.message ?? 'This report could not be loaded.'}</div>
         <Button variant="outline" icon={ArrowLeft} className="mt-4" onClick={() => navigate('/admin/safety-reports')}>Back to reports</Button>
       </div>
@@ -59,8 +59,8 @@ export default function SafetyReportDetailPage() {
 
       <PageHeader
         title={`Case ${report.case_number}`}
-        subtitle={`${report.category_label} · filed ${formatDateTime(report.created_at)} by a ${report.reporter.type_label.toLowerCase()}`}
-        eyebrow="Constituent CRM · Reports & Safety"
+        subtitle={`${report.category_label}, filed ${formatDateTime(report.created_at)} by a ${report.reporter.type_label.toLowerCase()}`}
+        eyebrow="Constituent CRM, Reports & Safety"
       />
 
       <div className="mb-6 flex flex-wrap items-center gap-2">
@@ -70,25 +70,25 @@ export default function SafetyReportDetailPage() {
           {report.subject_type === 'employer' ? <Building2 className="h-3.5 w-3.5" /> : <UserRound className="h-3.5 w-3.5" />}
           Report about a{report.subject_type === 'employer' ? 'n employer' : ' job seeker'}
         </span>
-        {report.assigned_to && <span className="rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-800">Assigned to {report.assigned_to}</span>}
+        {report.assigned_to && <span className="rounded-full border border-[#c4d9f7] bg-[#e8f0fc] px-2.5 py-1 text-xs font-bold text-brand-navy">Assigned to {report.assigned_to}</span>}
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[1.55fr_1fr]">
         <div className="space-y-6">
           <Card>
-            <h2 className="flex items-center gap-2 font-black text-slate-950"><Flag className="h-5 w-5 text-red-600" />What was reported</h2>
+            <h2 className="flex items-center gap-2 font-bold text-slate-950"><Flag className="h-5 w-5 text-red-600" />What was reported</h2>
             <p className="mt-1 text-xs text-slate-500">An allegation to be reviewed — not proof of wrongdoing.</p>
             <dl className="mt-4 space-y-3 text-sm">
               <Field label="Category">{report.category_label}</Field>
               {report.incident_date && <Field label="Date of incident">{formatDate(report.incident_date)}</Field>}
               <Field label="Description"><span className="block whitespace-pre-wrap rounded-lg bg-slate-50 p-4 leading-6 text-slate-700">{report.description}</span></Field>
-              {report.review_id && <Field label="Source">Opened by PESO from employer review #{report.review_id} · <Link to="/admin/reviews" className="font-semibold text-blue-700 hover:underline">Reviews &amp; Feedback</Link></Field>}
+              {report.review_id && <Field label="Source">Opened by PESO from employer review #{report.review_id}, <Link to="/admin/reviews" className="font-semibold text-brand-navy hover:underline">Reviews &amp; Feedback</Link></Field>}
             </dl>
           </Card>
 
           <div className="grid gap-4 md:grid-cols-2">
             <Card>
-              <h3 className="flex items-center gap-2 font-black text-slate-950">
+              <h3 className="flex items-center gap-2 font-bold text-slate-950">
                 {report.subject_type === 'employer' ? <Building2 className="h-4 w-4 text-slate-500" /> : <UserRound className="h-4 w-4 text-slate-500" />}
                 Reported party
               </h3>
@@ -96,7 +96,7 @@ export default function SafetyReportDetailPage() {
                 <Row label="Name">{report.subject.name}</Row>
                 <Row label="Email">{report.subject.email}</Row>
                 {report.subject.verification_status && <Row label="Verification">{titleCase(report.subject.verification_status)}</Row>}
-                <Row label="Reports about them">{report.subject.reports_about} total · {report.subject.open_reports_about} open</Row>
+                <Row label="Reports about them">{report.subject.reports_about} total, {report.subject.open_reports_about} open</Row>
               </dl>
               {report.subject.restriction && (
                 <p className="mt-3 rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-800">
@@ -109,11 +109,11 @@ export default function SafetyReportDetailPage() {
               {subjectPath && <Button variant="outline" size="sm" className="mt-4" to={subjectPath}>Open profile</Button>}
               {report.subject.other_cases?.length > 0 && (
                 <div className="mt-4 border-t border-slate-100 pt-3">
-                  <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Other cases about them</p>
+                  <p className="text-xs font-bold text-slate-400">Other cases about them</p>
                   <ul className="mt-2 space-y-1.5">
                     {report.subject.other_cases.map((other) => (
                       <li key={other.id} className="flex items-center justify-between gap-2 text-xs">
-                        <Link to={`/admin/safety-reports/${other.id}`} className="font-mono font-semibold text-blue-700 hover:underline">{other.case_number}</Link>
+                        <Link to={`/admin/safety-reports/${other.id}`} className="font-mono font-semibold text-brand-navy hover:underline">{other.case_number}</Link>
                         <span className="truncate text-slate-500">{other.category_label}</span>
                         <Badge status={safetyStatusBadge(other.status)} icon={false}>{other.status_label}</Badge>
                       </li>
@@ -124,7 +124,7 @@ export default function SafetyReportDetailPage() {
             </Card>
 
             <Card>
-              <h3 className="flex items-center gap-2 font-black text-slate-950"><ShieldCheck className="h-4 w-4 text-slate-500" />Reported by</h3>
+              <h3 className="flex items-center gap-2 font-bold text-slate-950"><ShieldCheck className="h-4 w-4 text-slate-500" />Reported by</h3>
               <p className="mt-1 text-xs text-slate-500">Confidential. Never shown to the reported party.</p>
               <dl className="mt-3 space-y-2 text-sm">
                 <Row label="Type">{report.reporter.type_label}</Row>
@@ -152,10 +152,10 @@ export default function SafetyReportDetailPage() {
             <div className="grid gap-4 md:grid-cols-2">
               {report.vacancy && (
                 <Card>
-                  <h3 className="flex items-center gap-2 font-black text-slate-950"><BriefcaseBusiness className="h-4 w-4 text-slate-500" />Job vacancy</h3>
+                  <h3 className="flex items-center gap-2 font-bold text-slate-950"><BriefcaseBusiness className="h-4 w-4 text-slate-500" />Job vacancy</h3>
                   <dl className="mt-3 space-y-2 text-sm">
                     <Row label="Title">{report.vacancy.job_title}</Row>
-                    <Row label="Status">{titleCase(report.vacancy.status)}{report.vacancy.on_hold ? ' · on hold by PESO' : ''}</Row>
+                    <Row label="Status">{titleCase(report.vacancy.status)}{report.vacancy.on_hold ? ', on hold by PESO' : ''}</Row>
                     {report.vacancy.location && <Row label="Location">{report.vacancy.location}</Row>}
                     <Row label="Posted">{formatDate(report.vacancy.created_at)}</Row>
                   </dl>
@@ -164,7 +164,7 @@ export default function SafetyReportDetailPage() {
               )}
               {report.application && (
                 <Card>
-                  <h3 className="flex items-center gap-2 font-black text-slate-950"><ClipboardList className="h-4 w-4 text-slate-500" />Application</h3>
+                  <h3 className="flex items-center gap-2 font-bold text-slate-950"><ClipboardList className="h-4 w-4 text-slate-500" />Application</h3>
                   <dl className="mt-3 space-y-2 text-sm">
                     <Row label="For">{report.application.job_title}</Row>
                     <Row label="Status">{titleCase(report.application.status)}</Row>
@@ -177,7 +177,7 @@ export default function SafetyReportDetailPage() {
           )}
 
           <Card>
-            <h3 className="flex items-center gap-2 font-black text-slate-950"><FileText className="h-4 w-4 text-slate-500" />Evidence</h3>
+            <h3 className="flex items-center gap-2 font-bold text-slate-950"><FileText className="h-4 w-4 text-slate-500" />Evidence</h3>
             {report.attachments.length === 0 ? (
               <p className="mt-2 text-sm text-slate-500">No files were attached.</p>
             ) : (
@@ -203,7 +203,7 @@ export default function SafetyReportDetailPage() {
           </Card>
 
           <Card>
-            <h3 className="flex items-center gap-2 font-black text-slate-950"><History className="h-4 w-4 text-slate-500" />Case history</h3>
+            <h3 className="flex items-center gap-2 font-bold text-slate-950"><History className="h-4 w-4 text-slate-500" />Case history</h3>
             <p className="mt-1 text-xs text-slate-500">Internal — visible to authorized PESO personnel only.</p>
             <ol className="mt-4 space-y-4">
               {report.timeline.map((entry) => (
@@ -211,7 +211,7 @@ export default function SafetyReportDetailPage() {
                   <span className={`mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ${entry.kind === 'action' ? 'bg-red-500' : entry.kind === 'note' ? 'bg-amber-500' : entry.kind === 'reporter_update' ? 'bg-blue-500' : 'bg-slate-300'}`} />
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-bold text-slate-900">{entry.title}</p>
-                    <p className="text-xs text-slate-500">{entry.actor} · {formatDateTime(entry.created_at)}</p>
+                    <p className="text-xs text-slate-500">{entry.actor}, {formatDateTime(entry.created_at)}</p>
                     {entry.body && <p className="mt-1 whitespace-pre-wrap text-sm text-slate-700">{entry.body}</p>}
                     {entry.notice && <p className="mt-1 rounded-lg border border-slate-200 bg-slate-50 p-2 text-xs text-slate-600"><span className="font-bold">Notice sent:</span> {entry.notice}</p>}
                     {entry.meta?.ends_at && <p className="mt-1 text-xs text-slate-500">Until {formatDate(entry.meta.ends_at)}</p>}
@@ -241,10 +241,10 @@ export default function SafetyReportDetailPage() {
           )}
           {report.closed_at && (
             <Card>
-              <p className="text-xs font-extrabold uppercase tracking-wide text-slate-500">Closing record</p>
+              <p className="text-xs font-semibold text-slate-500">Closing record</p>
               <p className="mt-2 text-sm text-slate-700">
                 {report.status_label} by <strong>{report.closed_by ?? 'PESO'}</strong> on {formatDateTime(report.closed_at)}
-                {report.dismissal_reason_label ? ` · ${report.dismissal_reason_label}` : ''}
+                {report.dismissal_reason_label ? `, ${report.dismissal_reason_label}` : ''}
               </p>
               {report.resolution_summary && <p className="mt-2 whitespace-pre-wrap rounded-lg bg-slate-50 p-3 text-sm text-slate-700">{report.resolution_summary}</p>}
             </Card>
@@ -297,7 +297,7 @@ function ReviewCard({ report, options, onSaved }) {
 
   return (
     <Card>
-      <h2 className="flex items-center gap-2 font-black text-slate-950"><ShieldAlert className="h-5 w-5 text-brand-navy" />Review</h2>
+      <h2 className="flex items-center gap-2 font-bold text-slate-950"><ShieldAlert className="h-5 w-5 text-brand-navy" />Review</h2>
       <div className="mt-4 space-y-4">
         <label className="block">
           <span className={labelClass}>Status</span>
@@ -403,7 +403,7 @@ function ActionCard({ report, onSaved }) {
 
   return (
     <Card>
-      <h2 className="flex items-center gap-2 font-black text-slate-950"><Gavel className="h-5 w-5 text-brand-navy" />Record an action</h2>
+      <h2 className="flex items-center gap-2 font-bold text-slate-950"><Gavel className="h-5 w-5 text-brand-navy" />Record an action</h2>
       <p className="mt-1 text-xs leading-5 text-slate-500">Nothing happens to the reported party until you record it here. Choose the least severe action that addresses the findings.</p>
       {restriction && (
         <p className="mt-3 rounded-lg border border-red-200 bg-red-50 p-2 text-xs text-red-800">
@@ -490,7 +490,7 @@ function NoteCard({ report, onSaved }) {
 
   return (
     <Card>
-      <h2 className="flex items-center gap-2 font-black text-slate-950"><MessageSquareText className="h-5 w-5 text-brand-navy" />Internal note</h2>
+      <h2 className="flex items-center gap-2 font-bold text-slate-950"><MessageSquareText className="h-5 w-5 text-brand-navy" />Internal note</h2>
       <textarea rows={3} maxLength={5000} value={note} onChange={(event) => setNote(event.target.value)} className={fieldClass}
         placeholder="Calls made, documents checked, what each party said… Visible to PESO only." />
       <Button variant="outline" className="mt-3 w-full" disabled={note.trim().length < 3} loading={add.isPending} onClick={() => add.mutate()}>Add note</Button>
@@ -501,7 +501,7 @@ function NoteCard({ report, onSaved }) {
 function Field({ label, children }) {
   return (
     <div>
-      <dt className="text-xs font-bold uppercase tracking-wide text-slate-400">{label}</dt>
+      <dt className="text-xs font-bold text-slate-400">{label}</dt>
       <dd className="mt-1 text-slate-800">{children}</dd>
     </div>
   )

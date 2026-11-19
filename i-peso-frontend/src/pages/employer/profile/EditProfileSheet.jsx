@@ -103,7 +103,7 @@ function Field({ id, label, hint, error, optional, children }) {
 function Group({ title, children }) {
   return (
     <fieldset className="space-y-5">
-      <legend className="mb-4 text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">{title}</legend>
+      <legend className="mb-4 text-xs font-bold text-slate-400">{title}</legend>
       {children}
     </fieldset>
   )

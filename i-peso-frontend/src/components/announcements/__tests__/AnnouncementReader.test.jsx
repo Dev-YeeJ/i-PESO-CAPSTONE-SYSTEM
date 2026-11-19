@@ -23,7 +23,7 @@ vi.mock('@/services/announcementService', async (importOriginal) => {
     },
   }
 })
-vi.mock('react-hot-toast', () => ({ default: { success: vi.fn(), error: vi.fn() } }))
+vi.mock('@/lib/toast', () => { const toast = Object.assign(vi.fn(), { success: vi.fn(), error: vi.fn(), warning: vi.fn(), loading: vi.fn(), dismiss: vi.fn() }); return { default: toast, toast } })
 
 const item = (overrides = {}) => ({
   id: 1,

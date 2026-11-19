@@ -23,7 +23,7 @@ vi.mock('@/services/announcementService', async (importOriginal) => {
     },
   }
 })
-vi.mock('react-hot-toast', () => ({ default: { success: vi.fn(), error: vi.fn() } }))
+vi.mock('@/lib/toast', () => { const toast = Object.assign(vi.fn(), { success: vi.fn(), error: vi.fn(), warning: vi.fn(), loading: vi.fn(), dismiss: vi.fn() }); return { default: toast, toast } })
 
 const options = {
   audiences: [
@@ -58,7 +58,7 @@ describe('Admin announcement form', () => {
     await userEvent.type(screen.getByPlaceholderText(/PESO office closed/i), 'Office closed Friday')
     await userEvent.type(screen.getByPlaceholderText(/Write the full announcement/i), 'Holiday closure.')
     await userEvent.click(screen.getByRole('radio', { name: /job seekers/i }))
-    expect(await screen.findByText(/Job seekers only .* · 1,000 accounts/)).toBeInTheDocument()
+    expect(await screen.findByText(/Job seekers only .*, 1,000 accounts/)).toBeInTheDocument()
     // Every announcement notifies its audience; publishing always confirms first.
     await userEvent.click(screen.getByRole('button', { name: /publish now/i }))
 

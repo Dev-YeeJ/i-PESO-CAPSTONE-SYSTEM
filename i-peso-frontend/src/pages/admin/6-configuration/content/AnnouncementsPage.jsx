@@ -13,7 +13,7 @@ import { CategoryChip, PinnedMark, PriorityPill } from '@/components/announcemen
 import { AUDIENCE_SHORT, STATE_BADGE, formatDateTime } from '@/components/announcements/announcementMeta'
 
 const PER_PAGE = 15
-const labelClass = 'text-xs font-extrabold uppercase tracking-wide text-slate-500'
+const labelClass = 'text-xs font-semibold text-slate-500'
 const selectClass = 'mt-2 w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm'
 
 const TABS = [
@@ -63,7 +63,7 @@ export default function AnnouncementsPage() {
             <PriorityPill priority={row.priority} />
             {row.is_pinned && <PinnedMark />}
           </div>
-          <p className="mt-1 font-extrabold text-slate-950">{value}</p>
+          <p className="mt-1 font-semibold text-slate-950">{value}</p>
           <p className="line-clamp-1 text-xs text-slate-500">{row.excerpt}</p>
         </div>
       ),
@@ -114,7 +114,7 @@ export default function AnnouncementsPage() {
         <StatCard icon={Radio} color="slate" label="Live now" value={num(summary.live)} subtitle="Visible to readers" />
         <StatCard icon={CalendarClock} color="slate" label="Scheduled" value={num(summary.scheduled)} subtitle="Will go live automatically" />
         <StatCard icon={FilePen} color="slate" label="Drafts" value={num(summary.draft)} subtitle="Not visible to anyone yet" />
-        <StatCard icon={Megaphone} color="slate" label="Ended & archived" value={num((summary.expired ?? 0) + (summary.archived ?? 0))} subtitle={`${num(summary.expired)} ended · ${num(summary.archived)} archived`} />
+        <StatCard icon={Megaphone} color="slate" label="Ended & archived" value={num((summary.expired ?? 0) + (summary.archived ?? 0))} subtitle={`${num(summary.expired)} ended, ${num(summary.archived)} archived`} />
       </div>
 
       <Card padding="sm" className="mt-6">
@@ -130,7 +130,7 @@ export default function AnnouncementsPage() {
                 state === tab.value ? 'border-slate-300 bg-slate-100 text-slate-900' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-400'
               }`}
             >
-              {tab.label} <span className={state === tab.value ? 'text-blue-100' : 'text-slate-400'}>{num(tab.count(summary))}</span>
+              {tab.label} <span className={state === tab.value ? 'text-white/80' : 'text-slate-400'}>{num(tab.count(summary))}</span>
             </button>
           ))}
         </div>
@@ -160,7 +160,7 @@ export default function AnnouncementsPage() {
       {error && (
         <div className="mt-6 flex items-center justify-between gap-4 rounded-xl border border-slate-200 bg-slate-50 text-slate-700 p-4 text-sm">
           <span className="flex items-center gap-2"><AlertTriangle className="h-4 w-4" />{error}</span>
-          <button type="button" onClick={() => listQuery.refetch()} className="font-extrabold hover:underline">Try again</button>
+          <button type="button" onClick={() => listQuery.refetch()} className="font-semibold hover:underline">Try again</button>
         </div>
       )}
 
@@ -184,7 +184,7 @@ export default function AnnouncementsPage() {
           </p>
           <div className="flex items-center gap-2">
             <Button variant="outline" size="sm" icon={ArrowLeft} disabled={page <= 1} onClick={() => setPage((current) => current - 1)}>Previous</Button>
-            <span className="px-2 text-xs font-extrabold text-slate-600">Page {page} of {listQuery.data.last_page}</span>
+            <span className="px-2 text-xs font-semibold text-slate-600">Page {page} of {listQuery.data.last_page}</span>
             <Button variant="outline" size="sm" icon={ArrowRight} disabled={page >= listQuery.data.last_page} onClick={() => setPage((current) => current + 1)}>Next</Button>
           </div>
         </div>

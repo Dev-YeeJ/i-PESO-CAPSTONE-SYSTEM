@@ -1,7 +1,7 @@
 import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import toast from 'react-hot-toast'
+import toast from '@/lib/toast'
 import ContentModulesPage from '../ContentModulesPage'
 import { renderWithProviders } from '@/test/utils'
 import { adminContentInsightService, adminFaqService, adminPolicyService, adminSiteContentService } from '@/services/siteContentService'
@@ -15,7 +15,7 @@ vi.mock('@/services/siteContentService', async (importOriginal) => ({
   adminPolicyService: { list: vi.fn(), get: vi.fn(), version: vi.fn(), startDraft: vi.fn(), saveDraft: vi.fn(), publish: vi.fn(), discard: vi.fn() },
   adminContentInsightService: { health: vi.fn(), insights: vi.fn(), resolve: vi.fn(), assist: vi.fn() },
 }))
-vi.mock('react-hot-toast', () => ({ default: Object.assign(vi.fn(), { success: vi.fn(), error: vi.fn() }) }))
+vi.mock('@/lib/toast', () => { const toast = Object.assign(vi.fn(), { success: vi.fn(), error: vi.fn(), warning: vi.fn(), loading: vi.fn(), dismiss: vi.fn() }); return { default: toast, toast } })
 
 const labels = {
   office: { office_name: 'Office name', address: 'Address', map_url: 'Map link', hours: 'Office hours', phone: 'Phone', email: 'Email', facebook: 'Facebook page', fees_policy: 'Fees policy', employer_approval_time: 'Employer approval time' },

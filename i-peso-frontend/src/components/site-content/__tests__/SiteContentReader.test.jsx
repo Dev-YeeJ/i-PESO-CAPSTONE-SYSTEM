@@ -67,7 +67,8 @@ describe('Landing page content', () => {
     expect(screen.getByRole('heading', { name: 'Everything in one place.' })).toBeInTheDocument()
     // Fields not saved keep the original wording.
     expect(screen.getByText('Find Your', { exact: false })).toBeInTheDocument()
-    expect(screen.getByText('Mon–Fri, 8 AM – 5 PM')).toBeInTheDocument()
+    // Office hours show in the contact card and again in the footer.
+    expect(screen.getAllByText('Mon–Fri, 8 AM – 5 PM').length).toBeGreaterThan(0)
     // Help & FAQs was removed — the assistant answers questions instead.
     expect(screen.queryByText('Is i-PESO free?')).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: /help & faqs/i })).not.toBeInTheDocument()
@@ -154,6 +155,37 @@ describe('About page and landing sections', () => {
     // Questions go to the assistant now, not a Help page.
     expect(screen.getByText(/ask the/i)).toHaveTextContent('Ask the i-PESO assistant')
     expect(screen.queryByRole('link', { name: /help & faqs/i })).not.toBeInTheDocument()
+  })
+
+  it('shows the organization chart PESO entered, staff under their unit head, and hides it while empty', async () => {
+    publicSiteContentService.get.mockResolvedValue({
+      office,
+      landing: {},
+      about: {
+        headline: 'About PESO Urdaneta City',
+        intro: 'We connect people with work.',
+        org_chart: [
+          { name: 'Ana Cruz', position: 'PESO Manager', level: 'head', unit: null },
+          { name: 'Ben Reyes', position: 'Unit Head', level: 'unit_head', unit: 'Employment facilitation' },
+          { name: 'Carla Diaz', position: 'Job Placement Officer', level: 'staff', unit: 'employment facilitation' },
+          { name: 'Dan Lim', position: 'Clerk', level: 'staff', unit: null },
+        ],
+      },
+    })
+
+    const { unmount } = renderWithProviders(<AboutPage />, { route: '/about' })
+
+    expect(await screen.findByRole('heading', { name: 'Our team' })).toBeInTheDocument()
+    expect(screen.getByText('Ana Cruz')).toBeInTheDocument()
+    const unitCard = screen.getByText('Employment facilitation').closest('li')
+    expect(unitCard).toHaveTextContent('Carla Diaz')
+    expect(screen.getByRole('heading', { name: 'Other staff' }).parentElement).toHaveTextContent('Dan Lim')
+    unmount()
+
+    publicSiteContentService.get.mockResolvedValue({ office, landing: {}, about: { headline: 'About', intro: 'Hi.', org_chart: [] } })
+    renderWithProviders(<AboutPage />, { route: '/about' })
+    expect(await screen.findByText('Hi.')).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Our team' })).not.toBeInTheDocument()
   })
 
   it('does not point to the assistant on the About page when it is switched off', async () => {

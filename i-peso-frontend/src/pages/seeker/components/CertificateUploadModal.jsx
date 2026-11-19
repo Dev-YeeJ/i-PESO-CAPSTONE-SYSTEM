@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Award, FileCheck2, FileUp, Loader2, ShieldCheck, X } from 'lucide-react'
-import toast from 'react-hot-toast'
+import toast from '@/lib/toast'
 import { uploadCertificate } from '@/services/seekerService'
 
 const categories = [
@@ -30,7 +30,7 @@ const initialForm = {
   file: null,
 }
 
-const inputClass = 'mt-1.5 w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm font-semibold text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-800 focus:ring-4 focus:ring-blue-100'
+const inputClass = 'mt-1.5 w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm font-semibold text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-800 focus:ring-4 focus:ring-[#c4d9f7]'
 const today = new Date().toISOString().slice(0, 10)
 
 export default function CertificateUploadModal({ open, trainings = [], onClose, onUploaded }) {
@@ -131,14 +131,14 @@ export default function CertificateUploadModal({ open, trainings = [], onClose, 
           <div className="absolute -right-10 -top-16 h-40 w-40 rounded-full bg-amber-400/15 blur-2xl" />
           <div className="relative flex items-start justify-between gap-4">
             <div className="flex items-start gap-3">
-              <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-amber-400 text-blue-950 shadow-lg"><Award className="h-5 w-5" /></span>
+              <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-amber-400 text-brand-navy shadow-lg"><Award className="h-5 w-5" /></span>
               <div>
-                <p className="text-[11px] font-black uppercase tracking-[0.18em] text-amber-300">Private credential vault</p>
-                <h2 id="certificate-modal-title" className="mt-1 text-xl font-black sm:text-2xl">Add Certificate</h2>
-                <p className="mt-1 max-w-xl text-sm leading-5 text-blue-100">Create the credential record and attach its proof in one secure submission.</p>
+                <p className="text-xs font-bold text-amber-300">Private credential vault</p>
+                <h2 id="certificate-modal-title" className="mt-1 text-xl font-bold sm:text-2xl">Add Certificate</h2>
+                <p className="mt-1 max-w-xl text-sm leading-5 text-white/80">Create the credential record and attach its proof in one secure submission.</p>
               </div>
             </div>
-            <button type="button" onClick={close} disabled={saving} className="rounded-lg p-2 text-blue-100 hover:bg-white/10 hover:text-white disabled:opacity-50" aria-label="Close certificate form"><X className="h-5 w-5" /></button>
+            <button type="button" onClick={close} disabled={saving} className="rounded-lg p-2 text-white/80 hover:bg-white/10 hover:text-white disabled:opacity-50" aria-label="Close certificate form"><X className="h-5 w-5" /></button>
           </div>
         </header>
 
@@ -147,7 +147,7 @@ export default function CertificateUploadModal({ open, trainings = [], onClose, 
 
           <section>
             <div className="mb-4">
-              <h3 className="font-black text-slate-950">Certificate details</h3>
+              <h3 className="font-bold text-slate-950">Certificate details</h3>
               <p className="mt-1 text-xs leading-5 text-slate-500">Fields marked with an asterisk are required before the proof can be saved.</p>
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
@@ -196,9 +196,9 @@ export default function CertificateUploadModal({ open, trainings = [], onClose, 
 
           <section className="mt-6 border-t border-slate-200 pt-6">
             <Field label="Proof File" required error={fieldErrors.file}>
-              <label className="mt-1.5 flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-300 bg-slate-50 px-5 py-6 text-center transition hover:border-blue-500 hover:bg-blue-50/50">
-                {form.file ? <FileCheck2 className="h-8 w-8 text-emerald-600" /> : <FileUp className="h-8 w-8 text-blue-800" />}
-                <span className="mt-2 max-w-full truncate text-sm font-black text-slate-900">{form.file?.name ?? 'Choose a PDF or image'}</span>
+              <label className="mt-1.5 flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-300 bg-slate-50 px-5 py-6 text-center transition hover:border-brand-navy hover:bg-[#e8f0fc]">
+                {form.file ? <FileCheck2 className="h-8 w-8 text-emerald-600" /> : <FileUp className="h-8 w-8 text-brand-navy" />}
+                <span className="mt-2 max-w-full truncate text-sm font-bold text-slate-900">{form.file?.name ?? 'Choose a PDF or image'}</span>
                 <span className="mt-1 text-xs text-slate-500">{form.file ? formatBytes(form.file.size) : 'PDF, JPG, JPEG, or PNG — maximum 5 MB'}</span>
                 <input type="file" accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png" disabled={saving} onChange={(event) => update('file', event.target.files?.[0] ?? null)} className="sr-only" />
               </label>
@@ -210,20 +210,20 @@ export default function CertificateUploadModal({ open, trainings = [], onClose, 
             {blockedByNoTrainings && (
               <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs font-semibold text-amber-800">This category needs a training record on file. Add one under the Trainings section first, then come back to link it here.</p>
             )}
-            {selectedTraining && <p className="mt-3 text-xs font-semibold text-blue-800">This proof will be linked to: {selectedTraining.course}.</p>}
+            {selectedTraining && <p className="mt-3 text-xs font-semibold text-brand-navy">This proof will be linked to: {selectedTraining.course}.</p>}
             {saving && (
               <div className="mt-4" aria-live="polite">
                 <div className="flex justify-between text-xs font-bold text-slate-600"><span>Securely uploading</span><span>{progress}%</span></div>
                 <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-200"><div className="h-full rounded-full bg-gradient-to-r from-blue-800 to-amber-400 transition-all" style={{ width: `${progress}%` }} /></div>
               </div>
             )}
-            <p className="mt-4 flex items-start gap-2 text-xs leading-5 text-slate-500"><ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-blue-800" />Proof files remain private and are available only through authenticated, owner-protected access.</p>
+            <p className="mt-4 flex items-start gap-2 text-xs leading-5 text-slate-500"><ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-brand-navy" />Proof files remain private and are available only through authenticated, owner-protected access.</p>
           </section>
         </div>
 
         <footer className="flex flex-col-reverse gap-3 border-t border-slate-200 bg-slate-50 px-5 py-4 sm:flex-row sm:justify-end sm:px-7">
           <button type="button" disabled={saving} onClick={close} className="min-h-11 rounded-xl border border-slate-300 bg-white px-5 text-sm font-bold text-slate-700 hover:bg-slate-100 disabled:opacity-50">Cancel</button>
-          <button type="submit" disabled={saving || blockedByNoTrainings} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-blue-950 px-6 text-sm font-black text-white shadow-sm hover:bg-blue-900 disabled:cursor-not-allowed disabled:opacity-60">
+          <button type="submit" disabled={saving || blockedByNoTrainings} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-blue-950 px-6 text-sm font-bold text-white shadow-sm hover:bg-[#0f2d56] disabled:cursor-not-allowed disabled:opacity-60">
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Award className="h-4 w-4 text-amber-300" />}
             {saving ? 'Saving Certificate…' : 'Save Certificate'}
           </button>
@@ -236,7 +236,7 @@ export default function CertificateUploadModal({ open, trainings = [], onClose, 
 function Field({ label, required = false, hint = '', error, children }) {
   return (
     <label className="block">
-      <span className="flex items-center gap-1 text-xs font-black uppercase tracking-wide text-slate-600">
+      <span className="flex items-center gap-1 text-xs font-bold text-slate-600">
         {label}{required && <span className="text-red-600">*</span>}{hint && <span className="ml-auto normal-case tracking-normal text-slate-400">{hint}</span>}
       </span>
       {children}

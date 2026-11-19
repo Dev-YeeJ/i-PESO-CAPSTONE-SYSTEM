@@ -14,31 +14,31 @@
 .registration-journey-shell {
   /* ── Ink: deep civic navy. Darker and cooler than the old #17378f end stop,
         so white type sits at 14:1 rather than 6:1. ── */
-  --rj-ink:        #0B1E3D;
-  --rj-ink-deep:   #06152C;
+  --rj-ink:        #123563;
+  --rj-ink-deep:   #0f2d56;
   --rj-ink-raise:  rgba(255, 255, 255, 0.045);
   --rj-ink-line:   rgba(255, 255, 255, 0.10);
   --rj-on-ink:     #FFFFFF;                      /* 18.9:1 on --rj-ink-deep */
-  --rj-on-ink-2:   rgba(198, 214, 239, 0.72);    /*  6.9:1 */
-  --rj-on-ink-3:   rgba(168, 189, 222, 0.68);    /*  5.0:1 — carries the step
+  --rj-on-ink-2:   rgba(255, 255, 255, 0.78);    /*  6.9:1 */
+  --rj-on-ink-3:   rgba(255, 255, 255, 0.62);    /*  5.0:1 — carries the step
                                                         labels, so it has to
                                                         clear 4.5:1 blended */
 
   /* ── Seal gold. Two values, deliberately: the bright one is for FILLS on
         navy, the ink one is for TEXT on paper. The old #F59E0B scored 2.1:1
         on white and failed WCAG everywhere it was used as a label. ── */
-  --rj-seal:       #F2A93B;                      /*  fills on navy only */
-  --rj-seal-ink:   #A0611A;                      /*  5.0:1 on white */
-  --rj-seal-wash:  #FDF6E9;
+  --rj-seal:       #F59E0B;                      /*  fills on navy only */
+  --rj-seal-ink:   #b45309;                      /*  5.0:1 on white */
+  --rj-seal-wash:  #fffbeb;
 
   /* ── Paper: the form surface. ── */
   --rj-paper:      #FFFFFF;
-  --rj-paper-sunk: #FAFAF8;
-  --rj-rule:       #E5E2DB;
-  --rj-rule-firm:  #CFCBC2;
-  --rj-text:       #10233F;                      /* 14.9:1 on paper */
-  --rj-text-2:     #55627A;                      /*  6.2:1 */
-  --rj-text-3:     #6B7484;                      /*  4.7:1 — hint and help
+  --rj-paper-sunk: #F8FAFC;
+  --rj-rule:       #E2E8F0;
+  --rj-rule-firm:  #CBD5E1;
+  --rj-text:       #0F172A;                      /* 14.9:1 on paper */
+  --rj-text-2:     #475569;                      /*  6.2:1 */
+  --rj-text-3:     #64748B;                      /*  4.7:1 — hint and help
                                                         text is content, so it
                                                         does not get to sit at
                                                         the old 3.1:1 grey */
@@ -48,16 +48,18 @@
   --rj-alert:       #B42318;
   --rj-alert-bg:    #FEF4F2;
 
-  --rj-display: 'Bricolage Grotesque', 'DM Sans', system-ui, sans-serif;
-  --rj-body:    'Public Sans', 'DM Sans', system-ui, sans-serif;
-  --rj-mono:    'DM Mono', ui-monospace, 'SFMono-Regular', monospace;
+  --rj-display: 'DM Sans', system-ui, sans-serif;
+  --rj-body:    'DM Sans', system-ui, sans-serif;
+  /* Was a monospace face; numbers now use DM Sans tabular figures. */
+  --rj-mono:    'DM Sans', system-ui, sans-serif;
 
-  --rj-rail: 19rem;
+  --rj-rail: 22rem;
+  font-variant-numeric: tabular-nums;
 
   position: relative;
   overflow-x: hidden;
-  background: var(--rj-ink);
-  color: var(--rj-on-ink);
+  background: var(--rj-paper-sunk);
+  color: var(--rj-text);
   font-family: var(--rj-body);
 }
 
@@ -105,11 +107,8 @@
 .registration-rail-label {
   margin-bottom: 0.85rem;
   color: var(--rj-on-ink-3);
-  font-family: var(--rj-mono);
-  font-size: 0.66rem;
-  font-weight: 500;
-  letter-spacing: 0.13em;
-  text-transform: uppercase;
+  font-size: 0.8rem;
+  font-weight: 600;
 }
 
 /* ── Step list ── */
@@ -126,32 +125,31 @@
   border-radius: 0.55rem;
   padding: 0.5rem 0.6rem;
   color: var(--rj-on-ink-3);
-  font-size: 0.8rem;
+  font-size: 0.9rem;
   font-weight: 500;
   transition: color 0.2s ease, background 0.2s ease;
 }
 
 .registration-step-number {
   display: flex;
-  width: 1.5rem;
-  height: 1.5rem;
+  width: 1.75rem;
+  height: 1.75rem;
   flex: 0 0 auto;
   align-items: center;
   justify-content: center;
   border: 1px solid var(--rj-ink-line);
   border-radius: 9999px;
   background: var(--rj-ink-raise);
-  font-family: var(--rj-mono);
-  font-size: 0.66rem;
-  font-weight: 500;
+  font-size: 0.78rem;
+  font-weight: 600;
 }
 
 .registration-step.is-complete { color: var(--rj-on-ink-2); }
 
 .registration-step.is-complete .registration-step-number {
   border-color: transparent;
-  background: rgba(52, 211, 153, 0.17);
-  color: #6EE7B7;
+  background: var(--rj-seal);
+  color: var(--rj-ink-deep);
 }
 
 /* The active step is the only lit thing in the rail. */
@@ -162,10 +160,10 @@
 }
 
 .registration-step.is-active .registration-step-number {
-  border-color: transparent;
-  background: var(--rj-seal);
-  color: var(--rj-ink-deep);
-  font-weight: 500;
+  border: 2px solid var(--rj-seal);
+  background: transparent;
+  color: var(--rj-on-ink);
+  font-weight: 700;
 }
 
 /* ── "Have this ready" — the signature.
@@ -190,8 +188,8 @@
   display: flex;
   gap: 0.55rem;
   color: var(--rj-on-ink-2);
-  font-size: 0.78rem;
-  line-height: 1.45;
+  font-size: 0.88rem;
+  line-height: 1.5;
 }
 
 .registration-ready-list li::before {
@@ -207,8 +205,8 @@
 .registration-ready-note {
   margin-top: 0.9rem;
   color: var(--rj-on-ink-3);
-  font-size: 0.72rem;
-  line-height: 1.5;
+  font-size: 0.8rem;
+  line-height: 1.55;
 }
 
 .registration-rail-foot {
@@ -246,13 +244,13 @@
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
-  color: var(--rj-on-ink-3);
+  color: var(--rj-text-2);
   font-size: 0.78rem;
   font-weight: 600;
   transition: color 0.2s ease;
 }
 
-.registration-home-link:hover { color: var(--rj-on-ink); }
+.registration-home-link:hover { color: var(--rj-ink); }
 
 .registration-main-bar {
   display: flex;
@@ -266,8 +264,8 @@
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
-  color: var(--rj-on-ink-3);
-  font-size: 0.72rem;
+  color: var(--rj-text-2);
+  font-size: 0.8rem;
   font-weight: 500;
 }
 
@@ -300,10 +298,11 @@
 
 .registration-form-panel {
   overflow: hidden;
+  border: 1px solid var(--rj-rule);
   border-radius: 1rem;
   color: var(--rj-text);
   background: var(--rj-paper);
-  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.30);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
 }
 
 .registration-form-heading {
@@ -339,17 +338,16 @@
 .registration-meter-caption {
   flex: 0 0 auto;
   color: var(--rj-text-2);
-  font-family: var(--rj-mono);
-  font-size: 0.68rem;
-  letter-spacing: 0.04em;
+  font-size: 0.8rem;
+  font-weight: 600;
   white-space: nowrap;
 }
 
 .registration-form-heading h2 {
   font-family: var(--rj-display);
-  font-size: 1.65rem;
+  font-size: 1.75rem;
   font-weight: 700;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.015em;
   line-height: 1.15;
   color: var(--rj-text);
 }
@@ -357,8 +355,8 @@
 .registration-form-heading .rj-sub {
   margin-top: 0.4rem;
   color: var(--rj-text-2);
-  font-size: 0.85rem;
-  line-height: 1.5;
+  font-size: 0.95rem;
+  line-height: 1.55;
 }
 
 /* The document reference reads as a citation, not a link. It was blue and
@@ -366,9 +364,7 @@
 .registration-form-heading .rj-ref {
   margin-top: 0.65rem;
   color: var(--rj-text-3);
-  font-family: var(--rj-mono);
-  font-size: 0.68rem;
-  letter-spacing: 0.03em;
+  font-size: 0.78rem;
 }
 
 .registration-form-content {
@@ -406,9 +402,9 @@
 .rj-section-numeral {
   flex: 0 0 auto;
   min-width: 1.6rem;
-  color: var(--rj-seal-ink);
-  font-family: var(--rj-mono);
-  font-size: 1.3rem;
+  color: var(--rj-ink);
+  font-family: 'DM Serif Display', Georgia, serif;
+  font-size: 1.5rem;
   font-weight: 500;
   line-height: 1;
 }

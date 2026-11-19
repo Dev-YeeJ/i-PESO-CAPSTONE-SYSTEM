@@ -52,7 +52,7 @@ export const LANDING_DEFAULTS = {
 export const LANDING_SECTIONS = [
   { key: 'announcements', label: 'PESO announcements', help: 'Live announcements for the Public audience.' },
   { key: 'features', label: '“What you get” feature cards', help: 'The four cards edited above.' },
-  { key: 'jobs', label: 'Job discovery', help: 'The seeker/employer preview.' },
+  { key: 'jobs', label: 'Job search & featured vacancies', help: 'The hero search bar and the newest open vacancies from verified employers.' },
   { key: 'programs', label: 'Government programs', help: 'Open programs from Government & DOLE.' },
 ]
 
@@ -70,9 +70,21 @@ export const ABOUT_DEFAULTS = {
     { title: 'Employer accreditation and job posting', description: 'Verified employers can post vacancies, screen ranked applicants and join PESO job fairs.', audience: 'employers', link_label: 'Register your company', link_url: '/register/employer' },
     { title: 'Placement reporting', description: 'Employers file a simple monthly placement report so PESO can track local employment.', audience: 'employers', link_label: null, link_url: null },
   ],
+  // Real people only: empty (and hidden) until PESO enters its own staff list.
+  org_chart: [],
 }
 
-export const ABOUT_LIMITS = { headline: 80, intro: 600, mission: 600, vision: 600, mandate: 600, service_title: 80, service_description: 300, max_services: 12 }
+export const ABOUT_LIMITS = {
+  headline: 80, intro: 600, mission: 600, vision: 600, mandate: 600, service_title: 80, service_description: 300, max_services: 12,
+  org_name: 100, org_position: 100, org_unit: 80, max_org: 40,
+}
+
+/** Tiers of the About page organization chart, top to bottom. */
+export const ORG_LEVELS = [
+  { value: 'head', label: 'Office head' },
+  { value: 'unit_head', label: 'Unit head' },
+  { value: 'staff', label: 'Staff' },
+]
 
 export const SERVICE_AUDIENCES = [
   { value: 'everyone', label: 'Everyone' },

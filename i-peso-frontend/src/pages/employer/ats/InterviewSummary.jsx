@@ -39,13 +39,13 @@ export default function InterviewSummary({ interview, applicationStatus }) {
   const canJoin = !muted && isJoinableLink(interview)
 
   return (
-    <div className={`rounded-xl border p-4 shadow-sm ${muted ? 'border-slate-200 bg-slate-50 text-slate-800' : 'border-blue-100 bg-blue-50 text-blue-900'}`}>
+    <div className={`rounded-xl border p-4 shadow-sm ${muted ? 'border-slate-200 bg-slate-50 text-slate-800' : 'border-[#c4d9f7] bg-[#e8f0fc] text-brand-navy'}`}>
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-base font-black">{ended ? label : HEADINGS[phase]}</p>
+        <p className="text-base font-bold">{ended ? label : HEADINGS[phase]}</p>
         <span className={`rounded-full border px-2.5 py-0.5 text-xs font-bold ${tone}`}>{label}</span>
       </div>
       <p className="mt-1 font-medium">
-        {formatInterviewTime(interview.schedule)} · {formatInterviewMode(interview.mode_of_interview)}
+        {formatInterviewTime(interview.schedule)}, {formatInterviewMode(interview.mode_of_interview)}
       </p>
 
       {canJoin ? (
@@ -53,12 +53,12 @@ export default function InterviewSummary({ interview, applicationStatus }) {
           href={interview.venue_or_link}
           target="_blank"
           rel="noopener noreferrer"
-          className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-blue-700 px-3 py-1.5 text-sm font-semibold text-white hover:bg-blue-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700"
+          className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-brand-navy px-3 py-1.5 text-sm font-semibold text-white hover:bg-[#0f2d56] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700"
         >
           Join call <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
         </a>
       ) : !isJoinableLink(interview) ? (
-        <p className={`mt-2 ${muted ? 'text-slate-600' : 'text-blue-800'}`}>{interview.venue_or_link || 'Venue to follow'}</p>
+        <p className={`mt-2 ${muted ? 'text-slate-600' : 'text-brand-navy'}`}>{interview.venue_or_link || 'Venue to follow'}</p>
       ) : null}
 
       {ended && applicationStatus === 'interview' && (

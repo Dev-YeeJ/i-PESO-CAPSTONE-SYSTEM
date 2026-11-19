@@ -1,13 +1,14 @@
 import { useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import toast from 'react-hot-toast'
+import toast from '@/lib/toast'
 import { Building2, Lock, MessageSquareReply, Pencil, Star, Trash2 } from 'lucide-react'
 import { Badge, Button, ConfirmDialog, EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui'
 import ReviewFormDialog from '@/components/reviews/ReviewFormDialog'
 import { Stars } from '@/components/reviews/StarRating'
 import { reviewService } from '@/services/reviewService'
 import { MY_REVIEWS_KEY, openActions } from '@/utils/reviews'
+import PortalPageHeader from '@/components/shell/PortalPageHeader'
 
 const STATUS = {
   published: { label: 'Published', variant: 'approved' },
@@ -63,37 +64,37 @@ export default function MyReviewsPage() {
   }
 
   return (
-    <div className="mx-auto max-w-5xl">
-      <header>
-        <p className="text-xs font-black uppercase tracking-widest text-blue-700">Verified reviews</p>
-        <h1 className="mt-1 text-3xl font-black text-slate-950">My Reviews</h1>
-        <p className="mt-2 max-w-2xl text-sm text-slate-600">
-          Help other job seekers by rating employers you've applied to or worked for. Only people with a real application or job through i-PESO can review, and your name is never shown.
-        </p>
-      </header>
+    <div className="mx-auto max-w-[1100px] space-y-6 pb-12">
+      <PortalPageHeader
+        title="Reviews"
+        subtitle="Rate employers you applied to or worked for. Only people with a real application or job through i-PESO can review, and your name is never shown."
+      >
+        <Button to="/review-guidelines" variant="secondary" size="sm">Review guidelines</Button>
+      </PortalPageHeader>
 
       {isLoading ? (
-        <div className="mt-8"><LoadingSkeleton variant="card" rows={3} /></div>
+        <LoadingSkeleton variant="card" rows={3} />
       ) : error ? (
-        <div className="mt-8"><ErrorState description="Your reviews could not be loaded." onRetry={refetch} error={error} /></div>
+        <ErrorState description="Your reviews could not be loaded." onRetry={refetch} error={error} />
       ) : (
         <>
-          <section className="mt-8" aria-labelledby="ready-heading">
-            <h2 id="ready-heading" className="text-lg font-black text-slate-900">Ready to review <span className="text-slate-400">({actions.length})</span></h2>
+          <section className="rounded-2xl border border-brand-gold/40 bg-[#fffbeb] p-5" aria-labelledby="ready-heading">
+            <h2 id="ready-heading" className="text-lg font-semibold text-slate-900">Ready to review <span className="font-normal text-slate-500">({actions.length})</span></h2>
+            <p className="mt-1 text-sm text-slate-700">PESO confirmed you applied to or worked for these employers.</p>
             {actions.length === 0 ? (
-              <p className="mt-3 rounded-2xl border border-dashed border-slate-300 bg-white p-6 text-sm text-slate-500">
+              <p className="mt-3 rounded-xl border border-dashed border-slate-300 bg-white p-5 text-sm text-slate-600">
                 Nothing to review right now. You can rate an employer once they respond to your application, or once you start a job you got through i-PESO.
               </p>
             ) : (
               <ul className="mt-3 grid gap-3 md:grid-cols-2">
                 {actions.map((action) => (
-                  <li key={action.key} className="flex items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                  <li key={action.key} className="flex items-center justify-between gap-4 rounded-xl border border-slate-200 bg-white p-4">
                     <div className="flex min-w-0 items-start gap-3">
-                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-700"><Building2 className="h-5 w-5" /></span>
+                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#e8f0fc] text-brand-navy"><Building2 className="h-5 w-5" /></span>
                       <div className="min-w-0">
                         <p className="truncate font-bold text-slate-900">{action.employerName}</p>
                         <p className="truncate text-xs text-slate-500">
-                          {action.jobTitle} · {action.type === 'employment' ? 'Employment experience' : action.limited ? 'No response from employer' : 'Recruitment experience'}
+                          {action.jobTitle}, {action.type === 'employment' ? 'employment experience' : action.limited ? 'no response from employer' : 'recruitment experience'}
                         </p>
                       </div>
                     </div>
@@ -108,8 +109,8 @@ export default function MyReviewsPage() {
 
           <EmployerFeedbackSection items={data?.employer_feedback ?? []} />
 
-          <section className="mt-10" aria-labelledby="mine-heading">
-            <h2 id="mine-heading" className="text-lg font-black text-slate-900">Your reviews <span className="text-slate-400">({reviews.length})</span></h2>
+          <section aria-labelledby="mine-heading">
+            <h2 id="mine-heading" className="text-lg font-semibold text-slate-900">Your reviews <span className="font-normal text-slate-500">({reviews.length})</span></h2>
             {reviews.length === 0 ? (
               <div className="mt-3"><EmptyState icon={Star} title="No reviews yet" description="Reviews you write will appear here. You can edit or take them back anytime." /></div>
             ) : (
@@ -117,12 +118,12 @@ export default function MyReviewsPage() {
                 {reviews.map((review) => {
                   const status = STATUS[review.status] ?? STATUS.published
                   return (
-                    <li key={review.id} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                    <li key={review.id} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-card">
                       <div className="flex flex-wrap items-start justify-between gap-3">
                         <div className="min-w-0">
-                          <p className="font-bold text-slate-900">{review.employer?.name}</p>
+                          <p className="font-semibold text-slate-900">{review.employer?.name}</p>
                           <p className="text-xs text-slate-500">
-                            {review.job_title ? `${review.job_title} · ` : ''}{review.type === 'employment' ? 'Employment experience' : 'Recruitment experience'} · {review.month}{review.edited ? ' · edited' : ''}
+                            {[review.job_title, review.type === 'employment' ? 'employment experience' : 'recruitment experience', review.month].filter(Boolean).join(', ')}{review.edited ? ' (edited)' : ''}
                           </p>
                         </div>
                         <Badge status={status.variant}>{status.label}</Badge>
@@ -187,13 +188,13 @@ function EmployerFeedbackSection({ items }) {
   if (!items.length) return null
 
   return (
-    <section className="mt-10" aria-labelledby="employer-feedback-heading">
-      <h2 id="employer-feedback-heading" className="text-lg font-black text-slate-900">Feedback from employers</h2>
+    <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-card" aria-labelledby="employer-feedback-heading">
+      <h2 id="employer-feedback-heading" className="text-lg font-semibold text-slate-900">Feedback from employers</h2>
       <p className="mt-1 flex items-center gap-1.5 text-sm text-slate-600"><Lock className="h-4 w-4" aria-hidden /> Only you and PESO can read the comments. Employers you apply to see only your average rating and how many would hire you again.</p>
       <ul className="mt-3 space-y-3">
         {items.map((item) => (
-          <li key={item.id} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-            <p className="font-bold text-slate-900">{item.employer?.name}</p>
+          <li key={item.id} className="rounded-xl bg-brand-canvas p-4">
+            <p className="font-semibold text-slate-900">{item.employer?.name}</p>
             {item.job_title && <p className="text-xs text-slate-500">{item.job_title}</p>}
             {item.locked ? (
               <p className="mt-3 rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-600">
@@ -214,7 +215,7 @@ function EmployerFeedbackSection({ items }) {
                 {item.comment && <p className="mt-2 whitespace-pre-line text-sm text-slate-700">{item.comment}</p>}
                 <p className="mt-3 text-xs text-slate-500">
                   Think something here is unfair or not about your work? Tell PESO at the office; staff can remove feedback that breaks the{' '}
-                  <a href="/review-guidelines" target="_blank" rel="noreferrer" className="font-semibold text-blue-700 underline-offset-2 hover:underline">guidelines</a>.
+                  <a href="/review-guidelines" target="_blank" rel="noreferrer" className="font-semibold text-brand-navy underline-offset-2 hover:underline">guidelines</a>.
                 </p>
               </>
             )}

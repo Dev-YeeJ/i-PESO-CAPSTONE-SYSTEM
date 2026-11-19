@@ -88,7 +88,7 @@ export default function ProfilePhotoUploadModal({ open, onClose, onUploaded }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm">
-      <form onSubmit={submit} className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl">
+      <form onSubmit={submit} className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
         <div className="flex items-start justify-between gap-4">
           <div>
             <h2 className="text-xl font-bold text-slate-950">Upload 2x2 Photo</h2>
@@ -97,13 +97,13 @@ export default function ProfilePhotoUploadModal({ open, onClose, onUploaded }) {
           <button type="button" onClick={onClose} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100"><X className="h-5 w-5" /></button>
         </div>
 
-        <label className="mt-6 block cursor-pointer rounded-2xl border-2 border-dashed border-blue-200 bg-blue-50/50 p-5 text-center hover:bg-blue-50">
+        <label className="mt-6 block cursor-pointer rounded-2xl border-2 border-dashed border-[#c4d9f7] bg-[#e8f0fc] p-5 text-center hover:bg-[#e8f0fc]">
           <div className="mx-auto flex h-36 w-36 items-center justify-center overflow-hidden rounded-xl border-4 border-white bg-slate-200 shadow-md">
             {preview
               ? <img src={preview} alt="Selected 2x2 preview" className="h-full w-full object-cover" />
               : <Camera className="h-12 w-12 text-slate-400" />}
           </div>
-          <span className="mt-4 inline-flex items-center gap-2 rounded-xl bg-blue-700 px-4 py-2 text-sm font-bold text-white">
+          <span className="mt-4 inline-flex items-center gap-2 rounded-xl bg-brand-navy px-4 py-2 text-sm font-bold text-white">
             <Upload className="h-4 w-4" /> Choose Photo
           </span>
           <input type="file" accept="image/jpeg,image/png" onChange={selectFile} className="sr-only" />
@@ -116,7 +116,7 @@ export default function ProfilePhotoUploadModal({ open, onClose, onUploaded }) {
 
         <div className="mt-5 flex gap-3">
           <button type="button" onClick={onClose} className="flex-1 rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-bold text-slate-700">Cancel</button>
-          <button type="submit" disabled={saving || !file} className="flex-1 rounded-xl bg-blue-700 px-4 py-2.5 text-sm font-bold text-white disabled:opacity-50">
+          <button type="submit" disabled={saving || !file} className="flex-1 rounded-xl bg-brand-navy px-4 py-2.5 text-sm font-bold text-white disabled:opacity-50">
             {saving ? 'Uploading...' : 'Use This Photo'}
           </button>
         </div>

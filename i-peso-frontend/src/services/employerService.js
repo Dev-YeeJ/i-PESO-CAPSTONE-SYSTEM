@@ -50,6 +50,14 @@ export const getVacancy = async (id) => {
   return response.data
 }
 
+/** Rough "likely matches" for a post still being written: counts only. */
+export const getMatchEstimate = async ({ generalTerm, city }) => {
+  const response = await apiClient.get('/employer/vacancies/match-estimate', {
+    params: { general_term: generalTerm, city_municipality: city || undefined },
+  })
+  return response.data
+}
+
 export const createVacancy = async (vacancy) => {
   const response = await apiClient.post('/employer/vacancies', vacancy)
   return response.data

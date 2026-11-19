@@ -1,11 +1,12 @@
 import { useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import toast from 'react-hot-toast'
+import toast from '@/lib/toast'
 import { Building2, ChevronRight, FileText, Lock, Paperclip, ShieldCheck, UserRound, X } from 'lucide-react'
 import { Badge, Button, EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { safetyReportService, safetyStatusBadge } from '@/services/safetyReportService'
+import PortalPageHeader from '@/components/shell/PortalPageHeader'
 
 const formatDate = (value) => (value ? new Date(value).toLocaleDateString('en-PH', { dateStyle: 'medium' }) : '—')
 const formatDateTime = (value) => (value ? new Date(value).toLocaleString('en-PH', { dateStyle: 'medium', timeStyle: 'short' }) : '—')
@@ -31,17 +32,13 @@ export default function MySafetyReportsPage({ role }) {
   const reportingEmployers = role === 'seeker'
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6">
-      <header>
-        <p className="text-xs font-extrabold uppercase tracking-wider text-blue-700">Report &amp; Safety</p>
-        <h1 className="mt-1 text-2xl font-black text-slate-950">My safety reports</h1>
-        <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
-          Concerns you reported to PESO about {reportingEmployers ? 'employers, companies or job vacancies' : 'applicants'}.
-          Reports are confidential — {reportingEmployers ? 'the employer' : 'the applicant'} is never told who filed them.
-        </p>
-      </header>
+    <div className="mx-auto max-w-[1100px] space-y-6 pb-12">
+      <PortalPageHeader
+        title="Safety Reports"
+        subtitle={`Concerns you reported to PESO about ${reportingEmployers ? 'employers, companies or job vacancies' : 'applicants'}. Reports are confidential: ${reportingEmployers ? 'the employer' : 'the applicant'} is never told who filed them.`}
+      />
 
-      <div className="mt-4 flex gap-2 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
+      <div className="flex gap-3 rounded-2xl border border-[#c4d9f7] bg-[#e8f0fc] p-4 text-sm leading-6 text-brand-navy">
         <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" />
         <span>
           {reportingEmployers
@@ -51,7 +48,7 @@ export default function MySafetyReportsPage({ role }) {
         </span>
       </div>
 
-      <section className="mt-6">
+      <section>
         {listQuery.isLoading ? (
           <LoadingSkeleton variant="card" rows={3} />
         ) : listQuery.isError ? (
@@ -65,18 +62,18 @@ export default function MySafetyReportsPage({ role }) {
                 <button
                   type="button"
                   onClick={() => openCase(report.id)}
-                  className="flex w-full items-center gap-4 rounded-xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:border-blue-300 hover:shadow focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-700"
+                  className="flex w-full items-center gap-4 rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-card transition hover:border-brand-navy focus:outline-none focus-visible:ring-2 focus-visible:ring-focus"
                 >
                   <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-500">
                     {report.subject_type === 'employer' ? <Building2 className="h-5 w-5" /> : <UserRound className="h-5 w-5" />}
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="flex flex-wrap items-center gap-2">
-                      <span className="font-black text-slate-950">{report.subject_name}</span>
-                      <span className="font-mono text-xs text-slate-400">{report.case_number}</span>
+                      <span className="font-semibold text-slate-900">{report.subject_name}</span>
+                      <span className="text-xs text-slate-500 tabular-nums">{report.case_number}</span>
                     </span>
                     <span className="mt-0.5 block truncate text-sm text-slate-600">
-                      {report.category_label}{report.vacancy_title ? ` · ${report.vacancy_title}` : ''}
+                      {report.category_label}{report.vacancy_title ? `, ${report.vacancy_title}` : ''}
                     </span>
                     <span className="mt-0.5 block text-xs text-slate-400">Filed {formatDate(report.created_at)}</span>
                   </span>
@@ -164,38 +161,38 @@ function ReportDetailDialog({ role, id, onClose }) {
                 <Badge status={safetyStatusBadge(report.status)}>{report.status_label}</Badge>
               </DialogTitle>
               <DialogDescription>
-                Case <span className="font-mono font-semibold text-slate-700">{report.case_number}</span> · filed {formatDateTime(report.created_at)}
+                Case <span className="tabular-nums font-semibold text-slate-700">{report.case_number}</span>, filed {formatDateTime(report.created_at)}
               </DialogDescription>
             </DialogHeader>
 
-            <p className={`rounded-lg border px-3 py-2 text-sm ${report.is_open ? 'border-blue-200 bg-blue-50 text-blue-900' : 'border-slate-200 bg-slate-50 text-slate-700'}`}>
+            <p className={`rounded-lg border px-3 py-2 text-sm ${report.is_open ? 'border-[#c4d9f7] bg-[#e8f0fc] text-brand-navy' : 'border-slate-200 bg-slate-50 text-slate-700'}`}>
               {report.outcome_message}
             </p>
 
             <dl className="space-y-3 text-sm">
               <div>
-                <dt className="text-xs font-bold uppercase tracking-wide text-slate-400">Reason</dt>
+                <dt className="text-xs font-bold text-slate-400">Reason</dt>
                 <dd className="mt-0.5 font-semibold text-slate-900">{report.category_label}</dd>
               </div>
               {report.vacancy_title && (
                 <div>
-                  <dt className="text-xs font-bold uppercase tracking-wide text-slate-400">Job vacancy</dt>
+                  <dt className="text-xs font-bold text-slate-400">Job vacancy</dt>
                   <dd className="mt-0.5 text-slate-700">{report.vacancy_title}</dd>
                 </div>
               )}
               {report.incident_date && (
                 <div>
-                  <dt className="text-xs font-bold uppercase tracking-wide text-slate-400">Date of incident</dt>
+                  <dt className="text-xs font-bold text-slate-400">Date of incident</dt>
                   <dd className="mt-0.5 text-slate-700">{formatDate(report.incident_date)}</dd>
                 </div>
               )}
               <div>
-                <dt className="text-xs font-bold uppercase tracking-wide text-slate-400">What you reported</dt>
+                <dt className="text-xs font-bold text-slate-400">What you reported</dt>
                 <dd className="mt-1 whitespace-pre-wrap rounded-lg bg-slate-50 p-3 leading-6 text-slate-700">{report.description}</dd>
               </div>
               {report.attachments?.length > 0 && (
                 <div>
-                  <dt className="text-xs font-bold uppercase tracking-wide text-slate-400">Evidence sent</dt>
+                  <dt className="text-xs font-bold text-slate-400">Evidence sent</dt>
                   <dd className="mt-1 space-y-1">
                     {report.attachments.map((file) => (
                       <p key={file.id} className="flex items-center gap-2 text-slate-700"><FileText className="h-4 w-4 text-slate-400" />{file.name}</p>
@@ -205,11 +202,11 @@ function ReportDetailDialog({ role, id, onClose }) {
               )}
               {report.updates?.length > 0 && (
                 <div>
-                  <dt className="text-xs font-bold uppercase tracking-wide text-slate-400">Information you added</dt>
+                  <dt className="text-xs font-bold text-slate-400">Information you added</dt>
                   <dd className="mt-1 space-y-2">
                     {report.updates.map((update, index) => (
                       <div key={index} className="rounded-lg border border-slate-200 p-3">
-                        <p className="text-xs text-slate-400">{formatDateTime(update.created_at)}{update.attachments ? ` · ${update.attachments} file(s)` : ''}</p>
+                        <p className="text-xs text-slate-400">{formatDateTime(update.created_at)}{update.attachments ? `, ${update.attachments} file(s)` : ''}</p>
                         {update.body && <p className="mt-1 whitespace-pre-wrap text-slate-700">{update.body}</p>}
                       </div>
                     ))}
@@ -227,7 +224,7 @@ function ReportDetailDialog({ role, id, onClose }) {
                   value={details}
                   onChange={(event) => { setDetails(event.target.value); setError('') }}
                   placeholder="Something new happened, or you remembered a detail? Add it here."
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-700/20"
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-brand-navy focus:outline-none focus:ring-2 focus:ring-blue-700/20"
                 />
                 {files.length > 0 && (
                   <ul className="space-y-1">
@@ -255,7 +252,7 @@ function ReportDetailDialog({ role, id, onClose }) {
                           if (fileInput.current) fileInput.current.value = ''
                         }}
                       />
-                      <label htmlFor="report-more-evidence" className="inline-flex cursor-pointer items-center gap-2 text-sm font-semibold text-blue-700 hover:underline">
+                      <label htmlFor="report-more-evidence" className="inline-flex cursor-pointer items-center gap-2 text-sm font-semibold text-brand-navy hover:underline">
                         <Paperclip className="h-4 w-4" />Attach evidence
                       </label>
                     </>

@@ -31,7 +31,7 @@ import StatCard from '@/pages/admin/_components/StatCard'
 import { adminService } from '@/services/adminService'
 import { downloadBlob } from '@/services/placementReportService'
 import SeekerAvatar from './SeekerAvatar'
-import toast from 'react-hot-toast'
+import toast from '@/lib/toast'
 
 const PER_PAGE = 15
 
@@ -172,7 +172,7 @@ export default function JobSeekersListPage() {
           <div className="flex min-w-64 items-start gap-3">
             <SeekerAvatar seekerId={row.seeker_id} hasPhoto={row.has_profile_image} initials={initials} />
             <div className="min-w-0">
-              <p className="truncate font-extrabold text-slate-950">{name || 'Unnamed seeker'}</p>
+              <p className="truncate font-semibold text-slate-950">{name || 'Unnamed seeker'}</p>
               <p className="truncate text-xs text-slate-500">{row.email || 'No email on file'}</p>
               <div className="mt-2 flex flex-wrap gap-1.5">
                 <Badge status={row.profile_completed ? 'verified' : 'pending'}>{row.profile_completed ? 'Complete' : 'Incomplete'}</Badge>
@@ -259,7 +259,7 @@ export default function JobSeekersListPage() {
       <Card padding="sm" className="mt-6">
         <div className="flex flex-wrap items-end gap-3">
           <label className="min-w-[260px] flex-1">
-            <span className="text-xs font-extrabold uppercase tracking-wide text-slate-500">Search directory</span>
+            <span className="text-xs font-semibold text-slate-500">Search directory</span>
             <div className="relative mt-2">
               <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
               <input
@@ -272,7 +272,7 @@ export default function JobSeekersListPage() {
           </label>
 
           <label className="w-full sm:w-48">
-            <span className="text-xs font-extrabold uppercase tracking-wide text-slate-500">Profile status</span>
+            <span className="text-xs font-semibold text-slate-500">Profile status</span>
             <select
               value={filters.profileStatus}
               onChange={(event) => updateFilter('profileStatus', event.target.value)}
@@ -285,7 +285,7 @@ export default function JobSeekersListPage() {
           </label>
 
           <label className="w-full sm:w-48">
-            <span className="text-xs font-extrabold uppercase tracking-wide text-slate-500">Employment status</span>
+            <span className="text-xs font-semibold text-slate-500">Employment status</span>
             <select
               value={filters.employmentStatus}
               onChange={(event) => updateFilter('employmentStatus', event.target.value)}
@@ -306,31 +306,31 @@ export default function JobSeekersListPage() {
         {showAdvancedFilters && (
           <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
             <label>
-              <span className="text-xs font-extrabold uppercase tracking-wide text-slate-500">Broad field</span>
+              <span className="text-xs font-semibold text-slate-500">Broad field</span>
               <input value={filters.broadField} onChange={(event) => updateFilter('broadField', event.target.value)} placeholder="e.g. IT" className="mt-2 w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm" />
             </label>
             <label>
-              <span className="text-xs font-extrabold uppercase tracking-wide text-slate-500">Preferred occupation</span>
+              <span className="text-xs font-semibold text-slate-500">Preferred occupation</span>
               <input value={filters.preferredOccupation} onChange={(event) => updateFilter('preferredOccupation', event.target.value)} placeholder="Occupation" className="mt-2 w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm" />
             </label>
             <label>
-              <span className="text-xs font-extrabold uppercase tracking-wide text-slate-500">Skill</span>
+              <span className="text-xs font-semibold text-slate-500">Skill</span>
               <input value={filters.skill} onChange={(event) => updateFilter('skill', event.target.value)} placeholder="Skill" className="mt-2 w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm" />
             </label>
             <label>
-              <span className="text-xs font-extrabold uppercase tracking-wide text-slate-500">Province</span>
+              <span className="text-xs font-semibold text-slate-500">Province</span>
               <input value={filters.province} onChange={(event) => updateFilter('province', event.target.value)} placeholder="Province" className="mt-2 w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm" />
             </label>
             <label>
-              <span className="text-xs font-extrabold uppercase tracking-wide text-slate-500">City / municipality</span>
+              <span className="text-xs font-semibold text-slate-500">City / municipality</span>
               <input value={filters.city} onChange={(event) => updateFilter('city', event.target.value)} placeholder="City" className="mt-2 w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm" />
             </label>
             <label>
-              <span className="text-xs font-extrabold uppercase tracking-wide text-slate-500">Barangay</span>
+              <span className="text-xs font-semibold text-slate-500">Barangay</span>
               <input value={filters.barangay} onChange={(event) => updateFilter('barangay', event.target.value)} placeholder="Barangay" className="mt-2 w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm" />
             </label>
             <label>
-              <span className="text-xs font-extrabold uppercase tracking-wide text-slate-500">Has certificates</span>
+              <span className="text-xs font-semibold text-slate-500">Has certificates</span>
               <select value={filters.hasCertificates} onChange={(event) => updateFilter('hasCertificates', event.target.value)} className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm">
                 <option value="all">All</option>
                 <option value="yes">Yes</option>
@@ -338,7 +338,7 @@ export default function JobSeekersListPage() {
               </select>
             </label>
             <label>
-              <span className="text-xs font-extrabold uppercase tracking-wide text-slate-500">Has applications</span>
+              <span className="text-xs font-semibold text-slate-500">Has applications</span>
               <select value={filters.hasApplications} onChange={(event) => updateFilter('hasApplications', event.target.value)} className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm">
                 <option value="all">All</option>
                 <option value="yes">Yes</option>
@@ -346,7 +346,7 @@ export default function JobSeekersListPage() {
               </select>
             </label>
             <label>
-              <span className="text-xs font-extrabold uppercase tracking-wide text-slate-500">Hired status</span>
+              <span className="text-xs font-semibold text-slate-500">Hired status</span>
               <select value={filters.hiredStatus} onChange={(event) => updateFilter('hiredStatus', event.target.value)} className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm">
                 <option value="all">All</option>
                 <option value="hired">Hired</option>
@@ -354,7 +354,7 @@ export default function JobSeekersListPage() {
               </select>
             </label>
             <label>
-              <span className="text-xs font-extrabold uppercase tracking-wide text-slate-500">Missing GPS</span>
+              <span className="text-xs font-semibold text-slate-500">Missing GPS</span>
               <select value={filters.missingGps} onChange={(event) => updateFilter('missingGps', event.target.value)} className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm">
                 <option value="all">All</option>
                 <option value="yes">Missing</option>
@@ -362,7 +362,7 @@ export default function JobSeekersListPage() {
               </select>
             </label>
             <label>
-              <span className="text-xs font-extrabold uppercase tracking-wide text-slate-500">Sort</span>
+              <span className="text-xs font-semibold text-slate-500">Sort</span>
               <select value={filters.sort} onChange={(event) => updateFilter('sort', event.target.value)} className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm">
                 <option value="latest">Latest registered</option>
                 <option value="name">Name A-Z</option>
@@ -372,11 +372,11 @@ export default function JobSeekersListPage() {
               </select>
             </label>
             <label>
-              <span className="text-xs font-extrabold uppercase tracking-wide text-slate-500">Registered from</span>
+              <span className="text-xs font-semibold text-slate-500">Registered from</span>
               <input type="date" value={filters.dateFrom} onChange={(event) => updateFilter('dateFrom', event.target.value)} className="mt-2 w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm" />
             </label>
             <label>
-              <span className="text-xs font-extrabold uppercase tracking-wide text-slate-500">Registered to</span>
+              <span className="text-xs font-semibold text-slate-500">Registered to</span>
               <input type="date" value={filters.dateTo} onChange={(event) => updateFilter('dateTo', event.target.value)} className="mt-2 w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm" />
             </label>
           </div>
@@ -397,7 +397,7 @@ export default function JobSeekersListPage() {
       {error && (
         <div className="mt-6 flex items-center justify-between gap-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
           <span>{error}</span>
-          <button type="button" onClick={() => seekersQuery.refetch()} className="font-extrabold hover:underline">Try again</button>
+          <button type="button" onClick={() => seekersQuery.refetch()} className="font-semibold hover:underline">Try again</button>
         </div>
       )}
 
@@ -420,7 +420,7 @@ export default function JobSeekersListPage() {
           </p>
           <div className="flex items-center gap-2">
             <Button variant="outline" size="sm" icon={ArrowLeft} disabled={page <= 1} onClick={() => setPage((current) => current - 1)}>Previous</Button>
-            <span className="px-2 text-xs font-extrabold text-slate-600">Page {page} of {pagination.lastPage}</span>
+            <span className="px-2 text-xs font-semibold text-slate-600">Page {page} of {pagination.lastPage}</span>
             <Button variant="outline" size="sm" icon={ArrowRight} disabled={page >= pagination.lastPage} onClick={() => setPage((current) => current + 1)}>Next</Button>
           </div>
         </div>
