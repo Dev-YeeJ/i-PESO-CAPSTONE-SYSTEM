@@ -127,6 +127,7 @@ class BootstrapOccupationCatalogTest extends TestCase
         if (! Schema::hasTable('job_vacancies')) {
             Schema::create('job_vacancies', function (Blueprint $table) {
                 $table->id('post_id');
+                $table->timestamp('seekers_notified_at')->nullable();
                 $table->unsignedBigInteger('occupation_id')->nullable();
                 $table->string('job_title');
                 $table->string('status')->default('active');

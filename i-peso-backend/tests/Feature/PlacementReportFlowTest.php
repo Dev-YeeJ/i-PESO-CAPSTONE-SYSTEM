@@ -753,6 +753,73 @@ class PlacementReportFlowTest extends TestCase
         }
     }
 
+    public function test_compliance_grid_reports_each_employer_month_by_month(): void
+    {
+        Carbon::setTestNow('2026-01-05 09:00:00');
+
+        try {
+            $steady = $this->employer('steady@example.test', 'Steady Corp');
+            $quiet = $this->employer('quiet@example.test', 'Quiet Corp');
+            $admin = $this->admin();
+
+            $this->submittedReport($steady, month: 1, year: 2026)->forceFill(['status' => PlacementReportUpload::STATUS_APPROVED])->save();
+            $this->nilReport($steady, month: 2, year: 2026);
+            $this->submittedReport($quiet, month: 1, year: 2026)->forceFill(['status' => PlacementReportUpload::STATUS_REJECTED])->save();
+
+            // 5 April: January and February are past their deadlines; March is due 10 April.
+            Carbon::setTestNow('2026-04-05 09:00:00');
+            Sanctum::actingAs($admin);
+
+            $response = $this->getJson('/api/admin/placement-reports/compliance/grid?year=2026')
+                ->assertOk()
+                ->assertJsonPath('year', 2026)
+                ->assertJsonCount(3, 'months')
+                ->assertJsonPath('months.0.due_date', '2026-02-10')
+                ->assertJsonPath('months.2.due_date', '2026-04-10');
+
+            $rows = collect($response->json('rows'))->keyBy('company_name');
+            $this->assertSame(['approved', 'nil', 'due'], collect($rows['Steady Corp']['cells'])->pluck('state')->all());
+            $this->assertSame(0, $rows['Steady Corp']['missing']);
+            $this->assertSame(['needs_revision', 'overdue', 'due'], collect($rows['Quiet Corp']['cells'])->pluck('state')->all());
+            $this->assertSame(2, $rows['Quiet Corp']['missing']);
+        } finally {
+            Carbon::setTestNow();
+        }
+    }
+
+    public function test_send_reminder_notifies_one_employer_and_refuses_a_settled_month(): void
+    {
+        Notification::fake();
+        Carbon::setTestNow('2026-03-01 09:00:00');
+
+        try {
+            $reported = $this->employer('sent@example.test', 'Sent It Inc');
+            $silent = $this->employer('late@example.test', 'Late Again Inc');
+            $admin = $this->admin();
+            $this->nilReport($reported, month: 2, year: 2026);
+
+            Carbon::setTestNow('2026-03-12 09:00:00');
+            Sanctum::actingAs($admin);
+
+            $this->postJson('/api/admin/placement-reports/compliance/remind', [
+                'employer_id' => $silent->employer_id, 'coverage_month' => 2, 'coverage_year' => 2026,
+            ])->assertOk();
+
+            Notification::assertSentTo($silent, PlacementReportDue::class, function (PlacementReportDue $notification) {
+                return $notification->coverageLabel === 'February 2026'
+                    && $notification->dueDate === '2026-03-10'
+                    && $notification->daysLeft === -2;
+            });
+
+            $this->postJson('/api/admin/placement-reports/compliance/remind', [
+                'employer_id' => $reported->employer_id, 'coverage_month' => 2, 'coverage_year' => 2026,
+            ])->assertStatus(422);
+            Notification::assertNotSentTo($reported, PlacementReportDue::class);
+        } finally {
+            Carbon::setTestNow();
+        }
+    }
+
     // ── Fixtures ─────────────────────────────────────────────────────────
 
     private function employer(string $email = 'employer@example.test', string $company = 'OneSource General Solutions'): Employer
@@ -792,6 +859,21 @@ class PlacementReportFlowTest extends TestCase
             'date_of_birth' => $birthDate,
             'created_at' => now(),
             'updated_at' => now(),
+        ]);
+    }
+
+    private function nilReport(Employer $employer, int $month, int $year): PlacementReportUpload
+    {
+        return PlacementReportUpload::create([
+            'employer_id' => $employer->employer_id,
+            'original_filename' => 'No hires declared',
+            'stored_path' => null,
+            'row_count' => 0,
+            'status' => PlacementReportUpload::STATUS_PENDING_REVIEW,
+            'is_nil_report' => true,
+            'coverage_month' => $month,
+            'coverage_year' => $year,
+            'submitted_at' => now(),
         ]);
     }
 
@@ -909,6 +991,7 @@ class PlacementReportFlowTest extends TestCase
 
         Schema::create('job_vacancies', function (Blueprint $table) {
             $table->id('post_id');
+            $table->timestamp('seekers_notified_at')->nullable();
             $table->unsignedBigInteger('employer_id');
             $table->string('job_title');
             $table->timestamps();

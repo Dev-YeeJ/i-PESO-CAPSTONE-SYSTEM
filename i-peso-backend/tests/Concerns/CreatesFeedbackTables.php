@@ -90,6 +90,7 @@ trait CreatesFeedbackTables
 
         Schema::create('job_vacancies', function (Blueprint $table) {
             $table->id('post_id');
+            $table->timestamp('seekers_notified_at')->nullable();
             $table->unsignedBigInteger('employer_id');
             $table->string('job_title');
             $table->string('status');

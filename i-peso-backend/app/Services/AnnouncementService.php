@@ -9,6 +9,7 @@ use App\Models\JobSeeker;
 use App\Notifications\AnnouncementPublished;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -24,6 +25,24 @@ use Illuminate\Support\Facades\Log;
 class AnnouncementService
 {
     private const CHUNK = 200;
+
+    /** Cache key holding {total, done} while an announcement's notifications are going out. */
+    public static function deliveryKey(int $announcementId): string
+    {
+        return "announcement-delivery:{$announcementId}";
+    }
+
+    /**
+     * Progress of the send for the admin page: null when nothing is in flight.
+     *
+     * @return array{in_progress: bool, total: int}|null
+     */
+    public function deliveryProgress(Announcement $announcement): ?array
+    {
+        $state = Cache::get(self::deliveryKey($announcement->id));
+
+        return $state ? ['in_progress' => ! ($state['done'] ?? false), 'total' => (int) ($state['total'] ?? 0)] : null;
+    }
 
     /** @return array<string, int> head-count per audience value */
     public function audienceCounts(): array
@@ -152,6 +171,13 @@ class AnnouncementService
         $announcement->refresh();
         $notification = new AnnouncementPublished($announcement);
         $notified = 0;
+        $progressKey = self::deliveryKey($announcement->id);
+        Cache::put($progressKey, ['total' => $this->audienceCounts()[$announcement->audience] ?? 0, 'done' => false], now()->addHours(2));
+        $announcement->forceFill(['notified_count' => 0])->saveQuietly();
+        // After each batch, publish the running count so the admin page can show progress.
+        $checkpoint = function () use ($announcement, &$notified) {
+            $announcement->forceFill(['notified_count' => $notified])->saveQuietly();
+        };
 
         $send = function (Model $user) use ($notification, &$notified) {
             try {
@@ -168,14 +194,15 @@ class AnnouncementService
         };
 
         if ($this->reachesSeekers($announcement->audience)) {
-            JobSeeker::query()->chunkById(self::CHUNK, fn ($seekers) => $seekers->each($send), 'seeker_id');
+            JobSeeker::query()->chunkById(self::CHUNK, function ($seekers) use ($send, $checkpoint) { $seekers->each($send); $checkpoint(); }, 'seeker_id');
         }
 
         if ($this->reachesEmployers($announcement->audience)) {
-            Employer::query()->chunkById(self::CHUNK, fn ($employers) => $employers->each($send), 'employer_id');
+            Employer::query()->chunkById(self::CHUNK, function ($employers) use ($send, $checkpoint) { $employers->each($send); $checkpoint(); }, 'employer_id');
         }
 
         $announcement->forceFill(['notified_count' => $notified])->save();
+        Cache::put($progressKey, ['total' => $notified, 'done' => true], now()->addMinutes(10));
 
         return $notified;
     }

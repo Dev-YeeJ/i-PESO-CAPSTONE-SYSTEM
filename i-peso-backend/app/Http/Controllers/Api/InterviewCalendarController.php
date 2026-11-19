@@ -45,7 +45,11 @@ class InterviewCalendarController extends Controller
 
             return [
                 'id' => (string) $interview->interview_id,
-                'title' => $seekerName !== '' ? "{$seekerName} — {$jobTitle}" : $jobTitle,
+                'title' => $seekerName !== '' ? "{$seekerName}, {$jobTitle}" : $jobTitle,
+                'seeker_name' => $seekerName !== '' ? $seekerName : null,
+                'job_title' => $jobTitle,
+                // Lets the calendar open the applicant's page from an event.
+                'application_id' => $interview->application?->apply_id,
                 'start' => $interview->schedule->toIso8601String(),
                 'end' => $interview->endsAt()->toIso8601String(),
                 // No join link once the call is over; the event is history now.

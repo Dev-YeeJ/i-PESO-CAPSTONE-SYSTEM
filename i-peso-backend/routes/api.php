@@ -69,6 +69,12 @@ Route::get('/public/government-programs', [\App\Http\Controllers\Api\PublicGover
 // Landing page: live announcements addressed to the Public audience.
 Route::get('/public/announcements', [\App\Http\Controllers\Api\PublicAnnouncementController::class, 'index'])->middleware('throttle:60,1');
 Route::get('/public/announcements/{announcement}/attachment', [\App\Http\Controllers\Api\PublicAnnouncementController::class, 'attachment'])->middleware('throttle:60,1');
+// Landing page: a few open vacancies (keyword/location filter), the next public job fairs, headline counts.
+Route::controller(\App\Http\Controllers\Api\PublicLandingController::class)->middleware('throttle:60,1')->group(function () {
+    Route::get('/public/featured-jobs', 'featuredJobs');
+    Route::get('/public/job-fairs', 'jobFairs');
+    Route::get('/public/stats', 'stats');
+});
 // Site Content: landing text + office details, and the versioned policy pages.
 // (There is no Help & FAQs page any more — FAQs only feed the assistant.)
 Route::controller(\App\Http\Controllers\Api\PublicSiteContentController::class)->middleware('throttle:60,1')->group(function () {
@@ -145,6 +151,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
         Route::middleware('verified.employer')->group(function () {
             Route::get('/dashboard-stats', [\App\Http\Controllers\Api\EmployerDashboardController::class, 'stats']);
+            Route::get('/search', [\App\Http\Controllers\Api\GlobalSearchController::class, 'employer'])->middleware('throttle:60,1');
 
             // Reviews of the company (read, reply once, dispute) and private feedback about hires.
             Route::get('/reviews', [EmployerFeedbackController::class, 'reviews']);
@@ -188,6 +195,8 @@ Route::middleware('auth:sanctum')->group(function () {
 
             Route::post('/vacancies/ai-suggest', [EmployerAiSuggestionController::class, 'suggestJobPosting'])
                 ->middleware('throttle:10,1');
+            // Before apiResource so it isn't read as a {vacancy} id.
+            Route::get('/vacancies/match-estimate', \App\Http\Controllers\Api\EmployerMatchEstimateController::class)->middleware('throttle:60,1');
             Route::apiResource('vacancies', EmployerJobVacancyController::class);
             Route::get('/applications', [EmployerApplicationController::class, 'index']);
             // Sidebar "Applicants" badge (before {application} so it isn't read as an id).
@@ -205,6 +214,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // Seeker profile endpoints (step-by-step completion)
     Route::prefix('seeker')->group(function () {
         Route::get('/dashboard-summary', [SeekerController::class, 'dashboardSummary']);
+        Route::get('/search', [\App\Http\Controllers\Api\GlobalSearchController::class, 'seeker'])->middleware('throttle:60,1');
         Route::get('/profile', [SeekerController::class, 'getProfile']);
         Route::put('/professional-summary', [SeekerController::class, 'saveProfessionalSummary']);
         Route::get('/government-programs', [SeekerGovernmentProgramController::class, 'index']);
@@ -297,6 +307,8 @@ Route::middleware('auth:sanctum')->group(function () {
 
         // Dashboard — visible to every signed-in admin/staff account, no module gate
         Route::get('/dashboard/stats', [AdminDashboardController::class, 'stats']);
+        // ⌘K record search; each group is filtered by the account's modules inside.
+        Route::get('/search', [\App\Http\Controllers\Api\GlobalSearchController::class, 'admin'])->middleware('throttle:60,1');
 
         Route::middleware('admin.permission:employment_hub')->group(function () {
             Route::get('/applications', [AdminApplicationController::class, 'index']);
@@ -445,6 +457,8 @@ Route::middleware('auth:sanctum')->group(function () {
 
             // Placement Report review + approval (employer-submitted spreadsheet imports)
             Route::get('/placement-reports/compliance', [AdminPlacementReportController::class, 'compliance']);
+            Route::get('/placement-reports/compliance/grid', [AdminPlacementReportController::class, 'complianceGrid']);
+            Route::post('/placement-reports/compliance/remind', [AdminPlacementReportController::class, 'remind'])->middleware('throttle:30,1');
             Route::get('/placement-reports', [AdminPlacementReportController::class, 'index']);
             Route::get('/placement-reports/{placementReport}', [AdminPlacementReportController::class, 'show']);
             Route::get('/placement-reports/{placementReport}/export', [AdminPlacementReportController::class, 'exportCsv']);

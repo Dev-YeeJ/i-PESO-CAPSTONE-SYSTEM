@@ -94,6 +94,35 @@ class ContentModulesSmartTest extends TestCase
         ]])->assertStatus(422)->assertJsonValidationErrors(['values.show_sections']);
     }
 
+    public function test_the_about_org_chart_starts_empty_and_saves_validated_entries(): void
+    {
+        $this->getJson('/api/public/site-content')->assertOk()->assertJsonPath('about.org_chart', []);
+
+        Sanctum::actingAs($this->admin());
+        $about = $this->getJson('/api/admin/site-content')->json('sections.about.values');
+
+        $bad = [...$about, 'org_chart' => [['name' => '', 'position' => 'Clerk', 'level' => 'chief', 'unit' => null]]];
+        $this->putJson('/api/admin/site-content/about', ['version' => 0, 'values' => $bad])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['values.org_chart.0.name', 'values.org_chart.0.level']);
+
+        $about['org_chart'] = [
+            ['name' => '  Ana Cruz ', 'position' => 'PESO Manager', 'level' => 'head', 'unit' => ''],
+            ['name' => 'Ben Reyes', 'position' => 'Labor Market Information Officer', 'level' => 'unit_head', 'unit' => 'Labor market information', 'extra' => 'dropped'],
+        ];
+        $this->putJson('/api/admin/site-content/about', ['version' => 0, 'values' => $about])->assertOk();
+
+        // An editor that doesn't send the chart keeps the saved one.
+        unset($about['org_chart']);
+        $this->putJson('/api/admin/site-content/about', ['version' => 1, 'values' => $about])->assertOk();
+
+        $this->app['auth']->forgetGuards();
+        $this->getJson('/api/public/site-content')
+            ->assertJsonCount(2, 'about.org_chart')
+            ->assertJsonPath('about.org_chart.0', ['name' => 'Ana Cruz', 'position' => 'PESO Manager', 'level' => 'head', 'unit' => null])
+            ->assertJsonMissingPath('about.org_chart.1.extra');
+    }
+
     public function test_new_sections_are_validated(): void
     {
         Sanctum::actingAs($this->admin());

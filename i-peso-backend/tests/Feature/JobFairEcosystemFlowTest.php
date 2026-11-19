@@ -9,6 +9,7 @@ use App\Models\JobVacancy;
 use App\Services\EnhancedJobMatchingService;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Support\Carbon;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
@@ -25,6 +26,9 @@ class JobFairEcosystemFlowTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        // The fixtures use fixed calendar dates and the job fair rules only accept
+        // today or later, so pin "today" before the earliest of them.
+        Carbon::setTestNow('2026-09-01 09:00:00');
         // This test verifies the safe *fallback* to log-only when live UniSMS
         // credentials aren't configured — so those credentials must be cleared
         // here rather than left to whatever happens to be in the environment.
@@ -39,6 +43,12 @@ class JobFairEcosystemFlowTest extends TestCase
             'services.sms.sender_id' => null,
         ]);
         $this->createTables();
+    }
+
+    protected function tearDown(): void
+    {
+        Carbon::setTestNow();
+        parent::tearDown();
     }
 
     public function test_omnichannel_job_fair_flow_with_seeker_qr_registration(): void

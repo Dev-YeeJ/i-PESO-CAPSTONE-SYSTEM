@@ -123,7 +123,8 @@ class AdminAnalyticsDashboardTest extends TestCase
         });
         Schema::create('occupations', function (Blueprint $table) { $table->id(); $table->string('title'); $table->timestamps(); });
         Schema::create('job_vacancies', function (Blueprint $table) {
-            $table->id('post_id'); $table->unsignedBigInteger('employer_id'); $table->unsignedBigInteger('occupation_id')->nullable(); $table->string('general_term')->nullable();
+            $table->id('post_id');
+            $table->timestamp('seekers_notified_at')->nullable(); $table->unsignedBigInteger('employer_id'); $table->unsignedBigInteger('occupation_id')->nullable(); $table->string('general_term')->nullable();
             $table->string('job_title'); $table->string('status'); $table->string('province')->nullable(); $table->string('city_municipality')->nullable(); $table->string('barangay')->nullable(); $table->timestamps();
         });
         Schema::create('applications', function (Blueprint $table) {

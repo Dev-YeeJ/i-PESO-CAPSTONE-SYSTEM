@@ -116,6 +116,80 @@ class PlacementComplianceService
     }
 
     /**
+     * Every reporting employer against every month of a year, up to the month
+     * whose report is currently coming due. Two queries regardless of size.
+     *
+     * Cell states: approved, pending_review, nil (an approved/pending "no hires"
+     * report), needs_revision, overdue, due (deadline not reached yet),
+     * not_required (the employer wasn't verified yet that month).
+     *
+     * @return array{year: int, months: list<array{month: int, label: string, due_date: string}>, rows: list<array<string, mixed>>}
+     */
+    public function yearGrid(int $year, ?Carbon $asOf = null): array
+    {
+        $asOf ??= Carbon::now('Asia/Manila');
+        $lastMonth = $year < $asOf->year ? 12 : max(0, $asOf->month - 1);
+        $months = [];
+        for ($month = 1; $month <= $lastMonth; $month++) {
+            $months[] = [
+                'month' => $month,
+                'label' => Carbon::create($year, $month, 1)->format('M'),
+                'due_date' => $this->dueDate($year, $month)->toDateString(),
+            ];
+        }
+
+        $employers = Employer::query()
+            ->whereIn('verification_status', config('placement_reports.reporting_statuses', ['verified']))
+            ->whereRaw('COALESCE(verified_at, created_at) <= ?', [Carbon::create($year, max(1, $lastMonth), 1)->endOfMonth()])
+            ->select('employer_id', 'company_name', 'trade_name', 'verified_at', 'created_at')
+            ->orderBy('company_name')
+            ->get();
+
+        $uploads = PlacementReportUpload::query()
+            ->where('coverage_year', $year)
+            ->whereIn('employer_id', $employers->pluck('employer_id'))
+            ->get(['id', 'employer_id', 'coverage_month', 'status', 'is_nil_report', 'submitted_at'])
+            ->groupBy(fn (PlacementReportUpload $upload) => $upload->employer_id.'-'.$upload->coverage_month);
+
+        $rows = $employers->map(function (Employer $employer) use ($months, $uploads, $year, $asOf) {
+            $since = Carbon::parse($employer->verified_at ?? $employer->created_at);
+            $cells = [];
+            foreach ($months as $info) {
+                $forMonth = $uploads->get($employer->employer_id.'-'.$info['month'], collect());
+                $settled = $forMonth->first(fn ($u) => in_array($u->status, self::SETTLED_STATUSES, true));
+                $rejected = $forMonth->first(fn ($u) => $u->status === PlacementReportUpload::STATUS_REJECTED);
+                $due = $this->dueDate($year, $info['month']);
+                $late = $settled && $settled->submitted_at && Carbon::parse($settled->submitted_at)->greaterThan($due);
+
+                $state = match (true) {
+                    $since->greaterThan(Carbon::create($year, $info['month'], 1)->endOfMonth()) => 'not_required',
+                    $settled !== null && $settled->is_nil_report => 'nil',
+                    $settled !== null => $settled->status,
+                    $rejected !== null => 'needs_revision',
+                    $asOf->greaterThan($due) => 'overdue',
+                    default => 'due',
+                };
+
+                $cells[] = [
+                    'month' => $info['month'],
+                    'state' => $state,
+                    'late' => (bool) $late,
+                    'upload_id' => ($settled ?? $rejected)?->id,
+                ];
+            }
+
+            return [
+                'employer_id' => $employer->employer_id,
+                'company_name' => $employer->company_name ?: $employer->trade_name,
+                'cells' => $cells,
+                'missing' => collect($cells)->whereIn('state', ['overdue', 'needs_revision'])->count(),
+            ];
+        })->values()->all();
+
+        return ['year' => $year, 'months' => $months, 'rows' => $rows];
+    }
+
+    /**
      * Employers with nothing settled for the period — the chase list.
      *
      * @return Collection<int, Employer>
