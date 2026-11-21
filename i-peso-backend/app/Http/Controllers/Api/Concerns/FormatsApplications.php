@@ -15,6 +15,7 @@ trait FormatsApplications
             'jobSeeker.workExperiences',
             'jobSeeker.occupations',
             'interviewSchedule',
+            'interviewSchedules',
         ]);
 
         $vacancy = $application->jobVacancy;
@@ -162,24 +163,41 @@ trait FormatsApplications
             ];
         }
 
-        if ($status === 'interview' && $application->interviewSchedule) {
+        $current = $application->interviewSchedule;
+
+        if ($status === 'interview' && $current && $current->status === 'scheduled') {
             $timeline[] = [
                 'title' => 'Interview details shared',
                 'description' => 'The interview date, venue, and instructions were shared.',
-                'timestamp' => $application->interviewSchedule->created_at?->toISOString(),
+                'timestamp' => $current->created_at?->toISOString(),
                 'status' => 'interview_details',
             ];
-
-            if ($application->interviewSchedule->phase() === 'ended') {
-                $timeline[] = [
-                    'title' => $application->interviewSchedule->mode_of_interview === 'face_to_face' ? 'Interview ended' : 'Call ended',
-                    'description' => 'The interview time has passed. The employer will update this application with their decision.',
-                    'timestamp' => $application->interviewSchedule->endsAt()?->toISOString(),
-                    'status' => 'interview_ended',
-                ];
-            }
         }
 
-        return $timeline;
+        // A "Call ended" / "Interview ended" entry for every interview that took place:
+        // earlier rounds too, and after the application was hired or rejected.
+        foreach ($application->interviewSchedules as $interview) {
+            if ($interview->phase() !== 'ended') {
+                continue;
+            }
+
+            $awaitingDecision = $status === 'interview' && $current && $interview->is($current);
+            $timeline[] = [
+                'title' => $interview->mode_of_interview === 'face_to_face' ? 'Interview ended' : 'Call ended',
+                'description' => $awaitingDecision
+                    ? 'The interview time has passed. The employer will update this application with their decision.'
+                    : 'This interview took place.',
+                'timestamp' => $interview->endsAt()?->toISOString(),
+                'status' => 'interview_ended',
+            ];
+        }
+
+        // "Application submitted" first, then oldest first (ISO times in UTC sort as text);
+        // undated entries last. The sort is stable, so equal times keep the order above.
+        $submitted = array_shift($timeline);
+        usort($timeline, fn (array $a, array $b) => [$a['timestamp'] === null, (string) $a['timestamp']]
+            <=> [$b['timestamp'] === null, (string) $b['timestamp']]);
+
+        return [$submitted, ...$timeline];
     }
 }

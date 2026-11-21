@@ -1515,7 +1515,7 @@ class EmployerVerificationJobPostingTest extends TestCase
         if (! Schema::hasTable('interview_schedules')) {
             Schema::create('interview_schedules', function (Blueprint $table) {
                 $table->id('interview_id');
-                $table->unsignedBigInteger('apply_id')->unique();
+                $table->unsignedBigInteger('apply_id')->index(); // several interviews per application (rounds, moved slots)
                 $table->string('mode_of_interview');
                 $table->dateTime('schedule');
                 $table->string('venue_or_link', 500)->nullable();

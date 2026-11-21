@@ -155,7 +155,7 @@ class PublicChatTools
         }
 
         $applications = $seeker->applications()
-            ->with(['jobVacancy:post_id,job_title', 'interviewSchedule:apply_id,schedule,mode_of_interview,venue_or_link,status'])
+            ->with(['jobVacancy:post_id,job_title', 'interviewSchedule:interview_id,apply_id,schedule,mode_of_interview,venue_or_link,status'])
             ->latest()
             ->limit(self::MAX_ROWS)
             ->get()

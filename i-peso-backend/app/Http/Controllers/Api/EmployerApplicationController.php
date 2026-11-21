@@ -432,30 +432,39 @@ class EmployerApplicationController extends Controller
 
         if ($validated['status'] === 'interview') {
             $interview = $validated['interview'] ?? [];
-            $interviewSchedule = $application->interviewSchedule()->updateOrCreate(
-                ['apply_id' => $application->apply_id],
-                [
-                    'mode_of_interview' => $interview['mode_of_interview'],
-                    'schedule' => self::interviewTime($interview['schedule']),
-                    'venue_or_link' => $interview['venue_or_link'] ?? null,
-                    'instructions' => $interview['instructions'] ?? null,
-                    'status' => 'scheduled',
-                    'interview_reminder_24h_sent_at' => null,
-                    'interview_reminder_1h_sent_at' => null,
-                    'interview_reminder_15m_sent_at' => null,
-                ]
-            );
+            $details = [
+                'mode_of_interview' => $interview['mode_of_interview'],
+                'schedule' => self::interviewTime($interview['schedule']),
+                'venue_or_link' => $interview['venue_or_link'] ?? null,
+                'instructions' => $interview['instructions'] ?? null,
+            ];
 
-            $isReschedule = $originalInterviewSchedule
-                && $originalInterviewSchedule->schedule
-                && $originalInterviewSchedule->schedule->ne($interviewSchedule->schedule);
+            // Every interview is kept as its own row so the calendar keeps its history
+            // (and its "Call ended" label). The current one is the only "scheduled" row.
+            $current = $originalInterviewSchedule?->status === 'scheduled' ? $originalInterviewSchedule : null;
+            $notification = null;
 
-            if ($interviewSchedule->wasRecentlyCreated) {
-                Notification::send($application->jobSeeker, new InterviewScheduledNotification($application));
-                Notification::send($application->jobVacancy?->employer, new InterviewScheduledNotification($application));
-            } elseif ($isReschedule) {
-                Notification::send($application->jobSeeker, new InterviewUpdatedNotification($application));
-                Notification::send($application->jobVacancy?->employer, new InterviewUpdatedNotification($application));
+            if ($current && $current->phase() !== 'ended' && $current->schedule?->eq($details['schedule'])) {
+                // Same slot, details edited (link, venue, instructions): update it in place.
+                $current->update($details);
+            } else {
+                if ($current) {
+                    // Already held → it took place; still upcoming → it was moved.
+                    $current->update(['status' => $current->phase() === 'ended' ? 'completed' : 'rescheduled']);
+                }
+                $application->interviewSchedules()->create($details + ['status' => 'scheduled']);
+                $application->unsetRelation('interviewSchedule')->unsetRelation('interviewSchedules');
+
+                // A moved slot is an update to the seeker; anything else (first interview,
+                // a further round, re-inviting after a cancellation) is a new interview.
+                $notification = $current && $current->status === 'rescheduled'
+                    ? InterviewUpdatedNotification::class
+                    : InterviewScheduledNotification::class;
+            }
+
+            if ($notification) {
+                Notification::send($application->jobSeeker, new $notification($application));
+                Notification::send($application->jobVacancy?->employer, new $notification($application));
             }
         }
 
@@ -465,8 +474,11 @@ class EmployerApplicationController extends Controller
             // inconsistent state regardless of why the transition happened.
             // If the interview time already passed, it took place: record it as
             // completed so it isn't reported (or shown to the seeker) as cancelled.
+            // Only the current (scheduled) interview is closed; earlier rounds keep their status.
             $closingStatus = $originalInterviewSchedule?->closingStatus() ?? 'cancelled';
-            $application->interviewSchedule()->update(['status' => $closingStatus]);
+            if ($originalInterviewSchedule?->status === 'scheduled') {
+                $originalInterviewSchedule->update(['status' => $closingStatus]);
+            }
 
             // Only send the "Interview Cancelled" notification when the employer
             // explicitly cancels the interview by moving the application to a

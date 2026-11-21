@@ -260,6 +260,10 @@ class HiringApplicationFlowTest extends TestCase
             ->assertOk()
             ->assertJsonPath('application.interview.status', 'completed')
             ->assertJsonPath('application.interview.phase', 'ended');
+
+        // "Call ended" stays in the timeline after the hiring decision, in order.
+        $titles = collect($this->getJson("/api/employer/applications/{$application->apply_id}")->json('application.timeline'))->pluck('title')->all();
+        $this->assertSame(['Application submitted', 'Call ended', 'Hired'], $titles);
     }
 
     public function test_pulling_back_before_the_interview_still_cancels_it(): void
@@ -274,6 +278,116 @@ class HiringApplicationFlowTest extends TestCase
             ->assertJsonPath('application.interview.phase', 'cancelled');
 
         Notification::assertSentTo($seeker, \App\Notifications\InterviewCancelledNotification::class);
+    }
+
+    public function test_a_second_round_keeps_the_held_interview_on_the_calendar(): void
+    {
+        Notification::fake();
+        $first = now()->addDay()->setTime(10, 0);
+        [$employer, $seeker, $application] = $this->scheduleOnlineInterview($first);
+
+        // The first interview takes place, then the employer books a second round.
+        $this->travelTo($first->copy()->addHours(2));
+        $second = $first->copy()->addDays(2);
+        $this->rescheduleInterview($employer, $application, $second)
+            ->assertJsonPath('application.interview.phase', 'upcoming');
+
+        $this->assertSame(['completed', 'scheduled'], $application->interviewSchedules()->pluck('status')->all());
+        Notification::assertSentToTimes($seeker, \App\Notifications\InterviewScheduledNotification::class, 2);
+
+        $events = $this->calendarEvents($employer, $first->copy()->subDay(), $second->copy()->addDay());
+        $this->assertSame(['ended', 'upcoming'], array_column($events, 'phase'));
+
+        // The seeker's timeline still says the first call ended, before the new round.
+        Sanctum::actingAs($seeker);
+        $titles = collect($this->getJson("/api/seeker/applications/{$application->apply_id}")->json('application.timeline'))->pluck('title')->all();
+        $this->assertSame('Application submitted', $titles[0]);
+        $this->assertContains('Call ended', $titles);
+        $this->assertLessThan(array_search('Interview details shared', $titles, true), array_search('Call ended', $titles, true));
+    }
+
+    public function test_moving_an_upcoming_interview_keeps_one_slot_on_the_calendar(): void
+    {
+        Notification::fake();
+        $original = now()->addDays(3)->setTime(10, 0);
+        [$employer, $seeker, $application] = $this->scheduleOnlineInterview($original);
+
+        $moved = $original->copy()->subDay();
+        $this->rescheduleInterview($employer, $application, $moved);
+
+        // The old slot is kept on record as "rescheduled" but not drawn; one live interview.
+        $this->assertSame(['rescheduled', 'scheduled'], $application->interviewSchedules()->pluck('status')->all());
+        Notification::assertSentTo($seeker, \App\Notifications\InterviewUpdatedNotification::class);
+
+        $events = $this->calendarEvents($employer, now(), $original->copy()->addDay());
+        $this->assertCount(1, $events);
+        $this->assertSame($moved->copy()->timezone('Asia/Manila')->format('Y-m-d H:i'), \Carbon\Carbon::parse($events[0]['start'])->timezone('Asia/Manila')->format('Y-m-d H:i'));
+    }
+
+    public function test_editing_the_link_of_the_same_slot_updates_it_in_place(): void
+    {
+        Notification::fake();
+        $slot = now()->addDays(2)->setTime(14, 0);
+        [$employer, $seeker, $application] = $this->scheduleOnlineInterview($slot);
+
+        $this->rescheduleInterview($employer, $application, $slot, 'https://meet.example.org/new-room');
+
+        $this->assertSame(1, $application->interviewSchedules()->count());
+        $this->assertSame('https://meet.example.org/new-room', $application->interviewSchedule()->first()->venue_or_link);
+        Notification::assertNotSentTo($seeker, \App\Notifications\InterviewUpdatedNotification::class);
+    }
+
+    public function test_the_calendar_shows_older_interviews_that_were_closed_as_cancelled_after_they_took_place(): void
+    {
+        Notification::fake();
+        $held = now()->subDays(3)->setTime(9, 0);
+        $neverHeld = now()->subDays(2)->setTime(9, 0);
+        $employer = $this->createEmployer();
+        $vacancy = $this->createVacancy($employer);
+
+        // Before 9 Nov 2026, hiring after the interview stored it as "cancelled".
+        foreach ([[$held, $held->copy()->addHours(5)], [$neverHeld, $neverHeld->copy()->subDay()]] as [$time, $closedAt]) {
+            $seeker = $this->createSeeker();
+            Sanctum::actingAs($seeker);
+            $this->postJson("/api/seeker/jobs/{$vacancy->post_id}/apply")->assertCreated();
+            $application = Application::where('seeker_id', $seeker->getKey())->firstOrFail();
+            DB::table('interview_schedules')->insert([
+                'apply_id' => $application->apply_id,
+                'mode_of_interview' => 'online',
+                'schedule' => $time,
+                'status' => 'cancelled',
+                'created_at' => $time->copy()->subWeek(),
+                'updated_at' => $closedAt,
+            ]);
+        }
+
+        $events = $this->calendarEvents($employer, now()->subWeek(), now());
+        $this->assertCount(1, $events, 'Only the interview that took place is history; the one cancelled beforehand stays hidden.');
+        $this->assertSame('ended', $events[0]['phase']);
+    }
+
+    private function rescheduleInterview(Employer $employer, Application $application, \Carbon\CarbonInterface $schedule, ?string $link = 'https://meet.example.org/room')
+    {
+        Sanctum::actingAs($employer);
+
+        return $this->patchJson("/api/employer/applications/{$application->apply_id}/status", [
+            'status' => 'interview',
+            'interview' => [
+                'mode_of_interview' => 'online',
+                'schedule' => $schedule->copy()->timezone('Asia/Manila')->format('Y-m-d H:i:s'),
+                'venue_or_link' => $link,
+            ],
+        ])->assertOk();
+    }
+
+    private function calendarEvents(Employer $employer, \Carbon\CarbonInterface $from, \Carbon\CarbonInterface $to): array
+    {
+        Sanctum::actingAs($employer);
+
+        return $this->getJson('/api/employer/calendar/events?'.http_build_query([
+            'start' => $from->toDateString(),
+            'end' => $to->copy()->addDay()->toDateString(),
+        ]))->assertOk()->json('events');
     }
 
     public function test_withdrawing_cancels_the_interview_and_tells_the_employer(): void
@@ -862,7 +976,7 @@ class HiringApplicationFlowTest extends TestCase
         if (! Schema::hasTable('interview_schedules')) {
             Schema::create('interview_schedules', function (Blueprint $table) {
                 $table->id('interview_id');
-                $table->unsignedBigInteger('apply_id')->unique();
+                $table->unsignedBigInteger('apply_id')->index(); // several interviews per application (rounds, moved slots)
                 $table->string('mode_of_interview');
                 $table->dateTime('schedule');
                 $table->string('venue_or_link', 500)->nullable();

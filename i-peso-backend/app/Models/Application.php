@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -97,8 +98,18 @@ class Application extends Model
         return $this->belongsTo(JobFair::class, 'job_fair_id', 'job_fair_id');
     }
 
+    /**
+     * The current interview: the latest one. Earlier rounds and moved slots stay on
+     * record as their own rows (see interviewSchedules()), so the calendar keeps them.
+     */
     public function interviewSchedule(): HasOne
     {
-        return $this->hasOne(InterviewSchedule::class, 'apply_id', 'apply_id');
+        return $this->hasOne(InterviewSchedule::class, 'apply_id', 'apply_id')->latestOfMany('interview_id');
+    }
+
+    /** Every interview for this application, oldest first. */
+    public function interviewSchedules(): HasMany
+    {
+        return $this->hasMany(InterviewSchedule::class, 'apply_id', 'apply_id')->orderBy('interview_id');
     }
 }

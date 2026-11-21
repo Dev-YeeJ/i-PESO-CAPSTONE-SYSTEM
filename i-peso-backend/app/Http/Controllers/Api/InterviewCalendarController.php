@@ -29,11 +29,15 @@ class InterviewCalendarController extends Controller
         $interviews = InterviewSchedule::query()
             ->with(['application.jobVacancy', 'application.jobSeeker'])
             ->whereHas('application.jobVacancy', fn ($vacancy) => $vacancy->where('employer_id', $employer->employer_id))
-            // Completed interviews stay on the calendar as a record of what was held.
-            ->whereIn('status', ['scheduled', 'completed'])
+            // Held interviews stay on the calendar as a record (with their "Call ended" label).
+            // Before 9 Nov 2026 a held interview was stored as "cancelled" when the employer
+            // later hired or rejected, so those are fetched too and kept when phase() shows
+            // they took place. Moved ("rescheduled") and truly cancelled slots stay hidden.
+            ->whereIn('status', ['scheduled', 'completed', 'cancelled'])
             ->whereBetween('schedule', [$validated['start'], $validated['end']])
             ->orderBy('schedule')
-            ->get();
+            ->get()
+            ->reject(fn (InterviewSchedule $interview) => $interview->phase() === 'cancelled');
 
         $events = $interviews->map(function (InterviewSchedule $interview) {
             $jobTitle = $interview->application?->jobVacancy?->job_title ?? 'Interview';
