@@ -83,7 +83,8 @@ export default function EmployerLayout() {
     .map((group) => ({ ...group, items: group.items.filter((item) => !item.protected || approved) }))
     .filter((group) => group.items.length > 0)
 
-  // "Applicants" badge: applicants nobody has reviewed yet. Polled like the bell.
+  // "Applicants" badge: the total number of applicants to this employer's vacancies,
+  // gold while some are still waiting for review. Polled like the bell.
   const applicantCounts = useQuery({
     queryKey: ['employer', 'applicantCounts'],
     queryFn: getApplicantCounts,
@@ -99,10 +100,15 @@ export default function EmployerLayout() {
     return () => window.removeEventListener(APPLICANTS_CHANGED_EVENT, refresh)
   }, [approved, refetchApplicantCounts])
   const newApplicants = applicantCounts.data?.new ?? 0
-  const badgeFor = (to) => (to === '/employer/ats' && newApplicants > 0 ? newApplicants : 0)
+  const totalApplicants = applicantCounts.data?.total ?? 0
+  const badgeFor = (to) => (to === '/employer/ats' && totalApplicants > 0 ? totalApplicants : 0)
+  const plural = (count, word) => `${count} ${word}${count === 1 ? '' : 's'}`
   const badgeTitle = applicantCounts.data
-    ? `${newApplicants} new applicant${newApplicants === 1 ? '' : 's'} waiting for review · ${applicantCounts.data.total} in total`
+    ? `${plural(totalApplicants, 'applicant')} in total${newApplicants ? ` · ${newApplicants} waiting for review` : ''}`
     : undefined
+  const badgeLabel = `${plural(totalApplicants, 'applicant')}${newApplicants ? `, ${newApplicants} new` : ''}`
+  // Gold = something needs attention; otherwise a quieter count.
+  const badgeTone = newApplicants > 0 ? 'bg-brand-gold text-brand-navy' : 'bg-white/15 text-white'
   
   const logoUrl = user?.employer?.logo_url
   const companyName = user?.employer?.company_name || user?.name
@@ -159,7 +165,7 @@ export default function EmployerLayout() {
               to={to}
               end={to.endsWith('dashboard')}
               title={badge ? `${label} — ${badgeTitle}` : collapsed ? label : undefined}
-              aria-label={badge ? `${label}, ${badge} new` : undefined}
+              aria-label={badge ? `${label}, ${badgeLabel}` : undefined}
               onClick={() => setMobileOpen(false)}
               className={({ isActive }) => `min-h-10 py-2.5 ${
                 collapsed ? 'justify-center px-2' : 'gap-3 px-3'
@@ -171,14 +177,14 @@ export default function EmployerLayout() {
               <span className="relative shrink-0">
                 {createElement(icon, { className: 'h-[18px] w-[18px]', 'aria-hidden': true })}
                 {badge > 0 && collapsed && (
-                  <span className="absolute -right-2 -top-2 flex h-4 min-w-4 items-center justify-center rounded-full bg-brand-gold px-1 text-[10px] font-bold leading-none text-brand-navy ring-2 ring-brand-navy">
+                  <span className={`absolute -right-2 -top-2 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-bold leading-none ring-2 ring-brand-navy ${badgeTone}`}>
                     {badge > 99 ? '99+' : badge}
                   </span>
                 )}
               </span>
               {!collapsed && label}
               {badge > 0 && !collapsed && (
-                <span className="portal-sidebar-badge">
+                <span className={`portal-sidebar-badge ${badgeTone}`}>
                   {badge > 99 ? '99+' : badge}
                 </span>
               )}
