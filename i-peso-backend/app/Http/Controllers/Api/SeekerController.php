@@ -644,6 +644,21 @@ class SeekerController extends Controller
                 'string',
                 'max:255',
             ],
+            // A short description when Physical is ticked (e.g. "left leg amputation,
+            // uses crutches"). Kept apart from the Others text so both can be saved.
+            // Sensitive personal information: PESO staff and the NSRP form only, never employers.
+            // Required only from screens that ask for it (the website always sends the key).
+            // The mobile app doesn't ask yet: it omits the key, and the saved description is kept.
+            'physical_disability_details' => [
+                'nullable',
+                Rule::requiredIf(fn () => $request->exists('physical_disability_details')
+                    && in_array('physical', $request->input('disabilities', []), true)),
+                'string',
+                'max:255',
+            ],
+        ], [
+            'physical_disability_details.required' => 'Please describe your physical disability.',
+            'physical_disability_details.max' => 'Keep the description to 255 characters or fewer.',
         ]);
 
         if (in_array('none', $validated['disabilities'], true) && count($validated['disabilities']) > 1) {
@@ -697,6 +712,12 @@ class SeekerController extends Controller
         $seeker->save();
 
         // ── Save disability records ──
+        // A screen that doesn't ask for the physical description (the mobile app) must not
+        // erase one entered on the website, so keep the saved one when the key is absent.
+        $physicalDetails = $request->exists('physical_disability_details')
+            ? ($validated['physical_disability_details'] ?? null)
+            : $seeker->disabilities()->where('disability_type', 'physical')->value('disability_specification');
+
         $seeker->disabilities()->delete();
 
         $selected = $validated['disabilities'] ?? [];
@@ -706,9 +727,13 @@ class SeekerController extends Controller
                 SeekerDisability::create([
                     'seeker_id' => $seeker->getKey(),
                     'disability_type' => $type,
-                    'disability_specification' => ($type === 'others')
-                        ? ($validated['disability_specification'] ?? null)
-                        : null,
+                    // Each row keeps its own description: Others → what it is,
+                    // Physical → the seeker's short description. Other types have none.
+                    'disability_specification' => match ($type) {
+                        'others' => $validated['disability_specification'] ?? null,
+                        'physical' => $physicalDetails,
+                        default => null,
+                    },
                 ]);
             }
         }

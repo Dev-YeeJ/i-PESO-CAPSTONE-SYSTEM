@@ -29,6 +29,7 @@ import {
   resolveAddressSuggestion,
 } from '@/services/geoService'
 import { serializeOccupationPreferences } from '@/utils/seekerProfilePayloads'
+import { physicalDetailsPayload } from '@/utils/disabilityDetails'
 import {
   COMPANY_SUGGESTIONS as SHARED_COMPANY_SUGGESTIONS,
   ELIGIBILITY_NAME_OPTIONS as SHARED_ELIGIBILITY_NAME_OPTIONS,
@@ -713,6 +714,9 @@ const Step1 = ({ form, errors, onChange, user, onGpsDetect, onAddressSelect, gps
                     if (opt.value === 'others' && !e.target.checked) {
                       onChange({ target: { name: 'disability_specification', value: '' } })
                     }
+                    if (opt.value === 'physical' && !e.target.checked) {
+                      onChange({ target: { name: 'physical_disability_details', value: '' } })
+                    }
                   }}
                   style={{ accentColor: '#1d4ed8' }}
                 />
@@ -722,6 +726,24 @@ const Step1 = ({ form, errors, onChange, user, onGpsDetect, onAddressSelect, gps
           })}
         </div>
       </FormField>
+
+      {(form.disabilities ?? []).includes('physical') && (
+        <FormField
+          label="Describe your physical disability"
+          error={errors.physical_disability_details}
+          help="Only PESO staff see this, to help with referrals and workplace support. Employers never see it."
+        >
+          <input
+            style={inputStyle(!!errors.physical_disability_details)}
+            name="physical_disability_details"
+            value={form.physical_disability_details ?? ''}
+            onChange={onChange}
+            maxLength={255}
+            placeholder="e.g. Left leg amputation, uses crutches"
+            aria-label="Describe your physical disability"
+          />
+        </FormField>
+      )}
 
       {(form.disabilities ?? []).includes('others') && (
         <FormField label="Please specify disability" error={errors.disability_specification}>
@@ -2514,6 +2536,7 @@ export default function SeekerOnboarding() {
     google_place_id: null,
     disabilities : [],
     disability_specification: '',
+    physical_disability_details: '',
     // Step 2
     employment_status: '',
     employment_type  : '',
@@ -2837,6 +2860,8 @@ export default function SeekerOnboarding() {
       if (!form.disabilities?.length)          e.disabilities    = 'Please make a selection.'
       if (form.disabilities?.includes('others') && !form.disability_specification?.trim())
         e.disability_specification = 'Please specify the disability type.'
+      if (form.disabilities?.includes('physical') && !form.physical_disability_details?.trim())
+        e.physical_disability_details = 'Please describe your physical disability.'
     }
 
     if (s === 2) {
@@ -3057,6 +3082,7 @@ export default function SeekerOnboarding() {
     google_place_id          : form.google_place_id,
     disabilities             : form.disabilities,
     disability_specification : form.disability_specification || null,
+    physical_disability_details: physicalDetailsPayload(form.disabilities, form.physical_disability_details),
   })
 
   const buildStep2Payload = () => ({

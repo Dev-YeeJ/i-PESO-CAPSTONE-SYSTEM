@@ -3,6 +3,7 @@
 namespace Tests\Unit;
 
 use App\Models\JobSeeker;
+use App\Models\SeekerDisability;
 use App\Models\SeekerEducation;
 use App\Models\SeekerLanguage;
 use App\Models\SeekerSkill;
@@ -121,6 +122,58 @@ class NsrpFormDataTest extends TestCase
         $this->assertSame('NSRP_Jobseeker_Pena_Nino.pdf', NsrpFormData::filename($this->seeker(['last_name' => 'Peña', 'first_name' => 'Niño'])));
     }
 
+    public function test_the_please_specify_blank_labels_a_physical_description(): void
+    {
+        $onlyOther = NsrpFormData::for($this->seeker(disabilities: [
+            ['disability_type' => 'others', 'disability_specification' => 'Autism'],
+        ]))['disability'];
+        $this->assertSame('Autism', $onlyOther['specify']); // reads exactly as before
+
+        $both = NsrpFormData::for($this->seeker(disabilities: [
+            ['disability_type' => 'physical', 'disability_specification' => 'Left leg amputation'],
+            ['disability_type' => 'others', 'disability_specification' => 'Autism'],
+        ]))['disability'];
+        $this->assertSame(['physical', 'others'], $both['types']);
+        $this->assertSame('Physical: Left leg amputation; Others: Autism', $both['specify']);
+
+        $physicalOnly = NsrpFormData::for($this->seeker(disabilities: [
+            ['disability_type' => 'physical', 'disability_specification' => 'Uses a wheelchair'],
+        ]))['disability'];
+        $this->assertSame('Physical: Uses a wheelchair', $physicalOnly['specify']);
+
+        // Both at their 255-character maximum: cut so it still fits the space on paper.
+        $longest = NsrpFormData::for($this->seeker(disabilities: [
+            ['disability_type' => 'physical', 'disability_specification' => str_repeat('a', 255)],
+            ['disability_type' => 'others', 'disability_specification' => str_repeat('b', 255)],
+        ]))['disability'];
+        $this->assertLessThanOrEqual(121, mb_strlen($longest['specify']));
+        $this->assertStringEndsWith('…', $longest['specify']);
+
+        $noDetails = NsrpFormData::for($this->seeker(disabilities: [
+            ['disability_type' => 'physical', 'disability_specification' => null],
+        ]))['disability'];
+        $this->assertSame('', $noDetails['specify']);
+    }
+
+    public function test_a_long_specify_answer_moves_above_the_short_blank_and_stays_in_its_cell(): void
+    {
+        $render = fn (array $disabilities) => view('pdf.nsrp-form', ['form' => NsrpFormData::for($this->seeker(disabilities: $disabilities))])->render();
+
+        // Short: written on the blank itself (x 351pt = blank start + 1.5).
+        $short = $render([['disability_type' => 'others', 'disability_specification' => 'Autism']]);
+        $this->assertMatchesRegularExpression('/left:351pt;[^"]*">Autism<\/div>/', $short);
+
+        // Long: in the empty part of the disability cell above the blank (x 284.5pt, 116pt wide,
+        // so it ends before the divider at 404.4pt), wrapped instead of shrunk to nothing.
+        $long = $render([['disability_type' => 'physical', 'disability_specification' => 'Left leg amputation below the knee, uses crutches']]);
+        $this->assertMatchesRegularExpression(
+            '/left:284\.5pt;[^"]*width:116pt;[^"]*">Physical: Left leg amputation below the knee, uses crutches<\/div>/',
+            $long,
+        );
+        preg_match('/font-size:([\d.]+)pt;[^"]*">Physical: Left leg/', $long, $size);
+        $this->assertGreaterThanOrEqual(4.2, (float) $size[1]);
+    }
+
     public function test_the_form_renders_the_official_wording_and_both_page_numbers(): void
     {
         $html = view('pdf.nsrp-form', ['form' => NsrpFormData::for($this->seeker(['civil_status' => 'separated']))])->render();
@@ -149,7 +202,7 @@ class NsrpFormDataTest extends TestCase
         $this->assertStringContainsString('>Separated</div>', $html);
     }
 
-    private function seeker(array $attributes = [], array $workExperiences = [], array $educations = [], array $skills = [], array $languages = []): JobSeeker
+    private function seeker(array $attributes = [], array $workExperiences = [], array $educations = [], array $skills = [], array $languages = [], array $disabilities = []): JobSeeker
     {
         $seeker = (new JobSeeker)->forceFill($attributes + [
             'seeker_id' => 7,
@@ -161,7 +214,8 @@ class NsrpFormDataTest extends TestCase
         $seeker->setRelation('educations', collect($educations)->map(fn ($row) => (new SeekerEducation)->forceFill($row)));
         $seeker->setRelation('seekerSkills', collect($skills)->map(fn ($row) => (new SeekerSkill)->forceFill($row)));
         $seeker->setRelation('languages', collect($languages)->map(fn ($row) => (new SeekerLanguage)->forceFill($row)));
-        foreach (['disabilities', 'occupations', 'workLocations', 'trainings', 'eligibilities'] as $relation) {
+        $seeker->setRelation('disabilities', collect($disabilities)->map(fn ($row) => (new SeekerDisability)->forceFill($row)));
+        foreach (['occupations', 'workLocations', 'trainings', 'eligibilities'] as $relation) {
             $seeker->setRelation($relation, collect());
         }
 

@@ -261,7 +261,24 @@ class SeekerController extends Controller
             $jobFairParticipation = $seeker->jobFairAttendances()->select(['id', 'job_fair_id', 'created_at'])->get()->toArray();
         }
 
+        // Disability status as declared in the NSRP profile, with the Others / Physical
+        // descriptions. Sensitive personal information (RA 10173): PESO staff only. Employer
+        // endpoints never load it (RA 7277 bars disability-based hiring decisions).
+        $disabilities = [];
+        if (Schema::hasTable('seeker_disabilities')) {
+            $disabilities = $seeker->disabilities()
+                ->whereNot('disability_type', 'none')
+                ->get(['disability_type', 'disability_specification'])
+                ->map(fn ($row) => [
+                    'type' => $row->disability_type,
+                    'details' => filled($row->disability_specification) ? $row->disability_specification : null,
+                ])
+                ->values()
+                ->all();
+        }
+
         $payload = $seeker->toArray();
+        $payload['disabilities'] = $disabilities;
         $payload['profile'] = [
             'seeker_id' => $seeker->seeker_id,
             'first_name' => $seeker->first_name,

@@ -85,6 +85,107 @@ class SeekerProfileFeaturesTest extends TestCase
             ->assertJsonValidationErrors('disability_specification');
     }
 
+    public function test_step_one_saves_a_physical_description_alongside_an_other_one(): void
+    {
+        $seeker = $this->createSeeker();
+        Sanctum::actingAs($seeker);
+
+        $this->postJson('/api/seeker/step-1', $this->stepOnePayload([
+            'disabilities' => ['physical', 'others'],
+            'disability_specification' => 'Autism spectrum disorder',
+            'physical_disability_details' => 'Left leg amputation, uses crutches',
+        ]))->assertOk();
+
+        $this->assertDatabaseHas('seeker_disabilities', [
+            'seeker_id' => $seeker->getKey(),
+            'disability_type' => 'physical',
+            'disability_specification' => 'Left leg amputation, uses crutches',
+        ]);
+        $this->assertDatabaseHas('seeker_disabilities', [
+            'seeker_id' => $seeker->getKey(),
+            'disability_type' => 'others',
+            'disability_specification' => 'Autism spectrum disorder',
+        ]);
+    }
+
+    public function test_step_one_from_the_website_requires_a_physical_description(): void
+    {
+        $seeker = $this->createSeeker();
+        Sanctum::actingAs($seeker);
+
+        $this->postJson('/api/seeker/step-1', $this->stepOnePayload([
+            'disabilities' => ['physical'],
+            'physical_disability_details' => '',
+        ]))
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['physical_disability_details' => 'Please describe your physical disability.']);
+
+        $this->postJson('/api/seeker/step-1', $this->stepOnePayload([
+            'disabilities' => ['physical'],
+            'physical_disability_details' => str_repeat('a', 256),
+        ]))
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('physical_disability_details');
+    }
+
+    public function test_step_one_from_the_mobile_app_keeps_the_saved_physical_description(): void
+    {
+        $seeker = $this->createSeeker();
+        Sanctum::actingAs($seeker);
+
+        $this->postJson('/api/seeker/step-1', $this->stepOnePayload([
+            'disabilities' => ['physical'],
+            'physical_disability_details' => 'Uses a wheelchair',
+        ]))->assertOk();
+
+        // The app doesn't ask for the description yet, so it never sends the key:
+        // not required, and the description entered on the website survives.
+        $this->postJson('/api/seeker/step-1', $this->stepOnePayload([
+            'disabilities' => ['physical', 'visual'],
+        ]))->assertOk();
+
+        $this->assertDatabaseHas('seeker_disabilities', [
+            'seeker_id' => $seeker->getKey(),
+            'disability_type' => 'physical',
+            'disability_specification' => 'Uses a wheelchair',
+        ]);
+    }
+
+    public function test_unticking_physical_drops_its_description(): void
+    {
+        $seeker = $this->createSeeker();
+        Sanctum::actingAs($seeker);
+
+        $this->postJson('/api/seeker/step-1', $this->stepOnePayload([
+            'disabilities' => ['physical'],
+            'physical_disability_details' => 'Uses a wheelchair',
+        ]))->assertOk();
+
+        $this->postJson('/api/seeker/step-1', $this->stepOnePayload([
+            'disabilities' => ['none'],
+            'physical_disability_details' => null,
+        ]))->assertOk();
+
+        $this->assertDatabaseMissing('seeker_disabilities', ['seeker_id' => $seeker->getKey()]);
+    }
+
+    public function test_peso_staff_see_disability_status_with_descriptions_on_the_seeker_profile(): void
+    {
+        $seeker = $this->createSeeker();
+        Sanctum::actingAs($seeker);
+        $this->postJson('/api/seeker/step-1', $this->stepOnePayload([
+            'disabilities' => ['physical', 'visual'],
+            'physical_disability_details' => 'Left leg amputation, uses crutches',
+        ]))->assertOk();
+
+        Sanctum::actingAs($this->createAdministrator());
+
+        $disabilities = collect($this->getJson("/api/admin/seekers/{$seeker->getKey()}")->assertOk()->json('disabilities'))
+            ->keyBy('type');
+        $this->assertSame('Left leg amputation, uses crutches', $disabilities['physical']['details']);
+        $this->assertNull($disabilities['visual']['details']);
+    }
+
     public function test_step_one_requires_the_seeker_to_be_at_least_fifteen(): void
     {
         $seeker = $this->createSeeker();
@@ -1472,6 +1573,38 @@ class SeekerProfileFeaturesTest extends TestCase
                 $table->timestamps();
             });
         }
+    }
+
+    private function stepOnePayload(array $overrides = []): array
+    {
+        return array_merge([
+            'first_name' => 'Juan',
+            'last_name' => 'Dela Cruz',
+            'date_of_birth' => '2000-01-01',
+            'sex' => 'male',
+            'civil_status' => 'single',
+            'religion' => 'roman_catholic',
+            'height_ft' => 5.5,
+            'address_province' => 'Pangasinan',
+            'address_municipality_city' => 'Urdaneta City',
+            'address_barangay' => 'Poblacion',
+            'address_house_street' => '123 Rizal Street',
+            'disabilities' => ['none'],
+        ], $overrides);
+    }
+
+    private function createAdministrator(): Administrator
+    {
+        return Administrator::create([
+            'first_name' => 'PESO',
+            'last_name' => 'Administrator',
+            'email' => fake()->unique()->safeEmail(),
+            'mobile_number' => '09170000001',
+            'password' => 'password123',
+            'role' => 'administrator',
+            'status' => 'active',
+            'email_verified_at' => now(),
+        ]);
     }
 
     private function createSimpleRelationTable(string $name, callable $columns): void

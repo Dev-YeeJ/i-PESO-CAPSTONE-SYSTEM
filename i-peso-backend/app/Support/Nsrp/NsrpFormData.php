@@ -129,10 +129,25 @@ final class NsrpFormData
     private static function disabilities(JobSeeker $seeker): array
     {
         $types = $seeker->disabilities->pluck('disability_type')->map(fn ($t) => strtolower((string) $t));
+        $detail = fn (string $type) => self::text(optional($seeker->disabilities->firstWhere('disability_type', $type))->disability_specification);
+        $physical = $detail('physical');
+        $other = $detail('others');
+
+        // The form has one "Please specify" blank. With only an Others description it reads as
+        // before; once a physical description is involved each part is labelled so the reader
+        // can tell them apart.
+        $specify = $physical === ''
+            ? $other
+            : implode('; ', array_filter(['Physical: '.$physical, $other !== '' ? 'Others: '.$other : null]));
+        // The space on paper holds about 120 characters at the smallest legible size;
+        // anything longer is cut on the printed copy (staff see the full text in i-PESO).
+        $specify = Str::limit($specify, 120, '…');
 
         return [
             'types' => $types->reject(fn ($t) => $t === 'none')->values()->all(),
-            'other' => self::text(optional($seeker->disabilities->firstWhere('disability_type', 'others'))->disability_specification),
+            'other' => $other,
+            'physical' => $physical,
+            'specify' => $specify,
         ];
     }
 

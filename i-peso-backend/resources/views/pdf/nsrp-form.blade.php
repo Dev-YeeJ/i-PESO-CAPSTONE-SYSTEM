@@ -201,7 +201,17 @@
     foreach ([['visual', 'Visual', 98.7, 295.0], ['speech', 'Speech', 158.6, 295.0], ['mental', 'Mental', 225.4, 295.0], ['hearing', 'Hearing', 98.7, 310.6], ['physical', 'Physical', 158.6, 310.6], ['others', 'Others', 225.4, 310.6]] as [$key, $label, $x, $yc]) {
         $p1 .= $cb($x, $yc, in_array($key, $disability, true), 7.8).$t($x + 18, $yc, $label, 9);
     }
-    $p1 .= $t(284.5, 311.4, 'Please specify:', 9).$blank(349.5, 391.4, 314.6, $f['disability']['other'], 6.5);
+    // "Please specify" blank: a short answer (an Others description like "Autism") sits on the
+    // blank as the form intends. The blank is only ~40pt wide, so a longer one (always the case
+    // once a physical description is included) goes in the empty part of this same cell just
+    // above it, right of the checkbox columns, wrapped onto up to 3 lines — never past the divider.
+    $specify = $f['disability']['specify'];
+    if (mb_strlen($specify) <= 10) {
+        $p1 .= $t(284.5, 311.4, 'Please specify:', 9).$blank(349.5, 391.4, 314.6, $specify, 6.5);
+    } else {
+        $p1 .= $t(284.5, 311.4, 'Please specify:', 9).$blank(349.5, 391.4, 314.6)
+            .$val(284.5, 295.2, 116, $specify, 6.5, 'left', 3, 4.2, 19);
+    }
     $p1 .= $t(408, 295.7, 'CONTACT<br>NUMBER/S', 8.6, 'b').$val(478.5, 295.7, 81, $f['contact'], 7.5, 'left', 2, 4.2, 26);
     $p1 .= $t(408, 316.2, 'E-MAIL', 8.6, 'b').$val(478.5, 316.2, 81, $f['email'], 7, 'left', 1, 3.2); // no spaces to wrap at
 

@@ -8,6 +8,7 @@ use App\Models\Employer;
 use App\Models\JobSeeker;
 use App\Models\JobVacancy;
 use App\Models\Occupation;
+use App\Models\SeekerDisability;
 use App\Notifications\ApplicationWithdrawnNotification;
 use App\Notifications\InterviewReminderNotification;
 use App\Notifications\NewApplicationReceivedNotification;
@@ -142,6 +143,46 @@ class HiringApplicationFlowTest extends TestCase
 
         Sanctum::actingAs($otherEmployer);
         $this->getJson("/api/employer/applications/{$application->apply_id}/seeker-profile-image")->assertNotFound();
+    }
+
+    public function test_employers_never_receive_an_applicants_disability_details(): void
+    {
+        if (! Schema::hasTable('seeker_disabilities')) {
+            Schema::create('seeker_disabilities', function (Blueprint $table) {
+                $table->id();
+                $table->unsignedBigInteger('seeker_id');
+                $table->string('disability_type');
+                $table->string('disability_specification')->nullable();
+                $table->timestamps();
+            });
+        }
+
+        $employer = $this->createEmployer();
+        $seeker = $this->createSeeker();
+        $vacancy = $this->createVacancy($employer);
+        SeekerDisability::create([
+            'seeker_id' => $seeker->getKey(),
+            'disability_type' => 'physical',
+            'disability_specification' => 'Left leg amputation, uses crutches',
+        ]);
+
+        Sanctum::actingAs($seeker);
+        $this->postJson("/api/seeker/jobs/{$vacancy->post_id}/apply")->assertCreated();
+        $application = Application::firstOrFail();
+
+        // Sensitive personal information (RA 10173), and RA 7277 bars disability-based
+        // hiring decisions: neither the description nor the disability status reaches employers.
+        Sanctum::actingAs($employer);
+        $this->getJson("/api/employer/applications/{$application->apply_id}")
+            ->assertOk()
+            ->assertSee($seeker->last_name) // the applicant's profile is there...
+            ->assertDontSee('Left leg amputation') // ...without the disability
+            ->assertDontSee('disabilit');
+        $this->getJson('/api/employer/applications')
+            ->assertOk()
+            ->assertSee($seeker->last_name)
+            ->assertDontSee('Left leg amputation')
+            ->assertDontSee('disabilit');
     }
 
     public function test_employer_scheduling_interview_sends_immediate_notifications_to_both_parties(): void

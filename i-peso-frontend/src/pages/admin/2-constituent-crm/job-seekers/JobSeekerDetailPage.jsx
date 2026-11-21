@@ -237,6 +237,7 @@ export default function JobSeekerDetailPage() {
               <InfoItem label="Barangay" value={seeker.address_barangay} />
               <InfoItem label="City / Municipality" value={seeker.address_municipality_city} />
               <InfoItem label="Province" value={seeker.address_province} />
+              <DisabilityItem disabilities={seeker.disabilities ?? []} />
             </div>
           </Card>
 
@@ -361,6 +362,40 @@ function InfoItem({ label, value }) {
     <div>
       <p className="text-xs font-bold text-slate-400">{label}</p>
       <p className="mt-1 text-sm font-semibold capitalize text-slate-800">{formatValue(value)}</p>
+    </div>
+  )
+}
+
+const DISABILITY_LABELS = {
+  visual: 'Visual',
+  hearing: 'Hearing',
+  speech: 'Speech',
+  mental: 'Mental/Intellectual',
+  physical: 'Physical',
+  others: 'Others',
+}
+
+/**
+ * Disability status from the NSRP profile, with the seeker's own description for
+ * Physical and Others. Sensitive personal information: PESO staff only, never
+ * employers. Free text, so (unlike InfoItem) no capitalisation is applied.
+ */
+function DisabilityItem({ disabilities }) {
+  return (
+    <div className="sm:col-span-2 lg:col-span-3">
+      <p className="text-xs font-bold text-slate-400">Disability</p>
+      {disabilities.length === 0 ? (
+        <p className="mt-1 text-sm font-semibold text-slate-800">None declared</p>
+      ) : (
+        <ul className="mt-1 space-y-1">
+          {disabilities.map((item) => (
+            <li key={item.type} className="text-sm text-slate-800">
+              <span className="font-semibold">{DISABILITY_LABELS[item.type] ?? item.type}</span>
+              {item.details && <span className="text-slate-600">: {item.details}</span>}
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   )
 }

@@ -40,6 +40,7 @@ import { Button, LoadingSkeleton } from '@/components/ui'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import PortalPageHeader from '@/components/shell/PortalPageHeader'
 import { serializeOccupationPreferences } from '@/utils/seekerProfilePayloads'
+import { disabilityDetailFor, physicalDetailsPayload } from '@/utils/disabilityDetails'
 import { ISO_COUNTRIES } from '@/data/jobPreferenceVocabularies'
 import {
   COMPANY_SUGGESTIONS,
@@ -494,6 +495,21 @@ export default function SeekerProfileEdit() {
                       )
                     })}
                   </div>
+                  {form.identity.disabilities.includes('physical') && (
+                    <div className="mt-3">
+                      <TextInput
+                        label="Describe your physical disability"
+                        value={form.identity.physical_disability_details}
+                        error={errors.physical_disability_details}
+                        onChange={(value) => updateSection('identity', { physical_disability_details: value })}
+                        maxLength={255}
+                        placeholder="e.g. Left leg amputation, uses crutches"
+                      />
+                      {!errors.physical_disability_details && (
+                        <p className="mt-1.5 text-xs text-slate-500">Only PESO staff see this, to help with referrals and workplace support. Employers never see it.</p>
+                      )}
+                    </div>
+                  )}
                   {form.identity.disabilities.includes('others') && (
                     <div className="mt-3">
                       <TextInput label="Disability specification" value={form.identity.disability_specification} error={errors.disability_specification} onChange={(value) => updateSection('identity', { disability_specification: value })} />
@@ -1164,7 +1180,8 @@ function buildIdentity(profile) {
     location_accuracy: profile.location_accuracy ?? null,
     google_place_id: profile.google_place_id ?? null,
     disabilities: disabilities.length ? disabilities : ['none'],
-    disability_specification: (profile.disabilities ?? []).find((item) => item.disability_specification)?.disability_specification ?? '',
+    disability_specification: disabilityDetailFor(profile.disabilities, 'others'),
+    physical_disability_details: disabilityDetailFor(profile.disabilities, 'physical'),
   }
 }
 
@@ -1174,6 +1191,7 @@ function buildStep1Payload(identity) {
     religion_other: identity.religion === 'other' ? identity.religion_other : null,
     disabilities: identity.disabilities.length ? identity.disabilities : ['none'],
     disability_specification: identity.disabilities.includes('others') ? identity.disability_specification : null,
+    physical_disability_details: physicalDetailsPayload(identity.disabilities, identity.physical_disability_details),
     height_ft: identity.height_ft === '' ? '' : Number(identity.height_ft),
     location_accuracy: identity.location_accuracy,
     google_place_id: identity.google_place_id,
@@ -1212,6 +1230,9 @@ function validateIdentity(identity) {
   }
   if (identity.disabilities?.includes('others') && !String(identity.disability_specification ?? '').trim()) {
     errors.disability_specification = 'Please specify the disability.'
+  }
+  if (identity.disabilities?.includes('physical') && !String(identity.physical_disability_details ?? '').trim()) {
+    errors.physical_disability_details = 'Please describe your physical disability.'
   }
 
   return errors

@@ -3,5 +3,8 @@
     "allow": [
       "Bash(npm test *)"
     ]
+  },
+  "enabledPlugins": {
+    "superdesign@claude-plugins-official": true
   }
 }
