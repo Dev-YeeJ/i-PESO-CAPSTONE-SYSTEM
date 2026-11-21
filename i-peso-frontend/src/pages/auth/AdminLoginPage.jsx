@@ -1,8 +1,6 @@
 import { useState } from 'react'
-import { Eye, EyeOff, KeyRound, LifeBuoy, LogIn, XCircle } from 'lucide-react'
-import { useLocation, useNavigate } from 'react-router-dom'
-import AuthShell from '@/components/auth/AuthShell'
-import Button from '@/components/ui/Button'
+import { Eye, EyeOff, ShieldCheck, XCircle } from 'lucide-react'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { authService } from '@/services/authService'
 import { useAuthStore } from '@/stores/authStore'
 import { adminLandingPath } from '@/utils/adminAccess'
@@ -77,67 +75,88 @@ export default function AdminLoginPage() {
   }
 
   return (
-    <AuthShell
-      variant="staff"
-      title="Staff sign in"
-      subtitle="Use the work email your PESO Office Manager registered for you."
-      sideTitle="PESO staff workspace"
-      sideText="For PESO Urdaneta City personnel and OJT interns. Job seekers and employers sign in on the public site."
-    >
-      {apiError && (
-        <div className="mb-5 flex items-start gap-2.5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800" role="alert">
-          <XCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-          <span>{apiError}</span>
-        </div>
-      )}
-
-      <form onSubmit={submit} noValidate className="space-y-4">
-        <ConsoleField
-          label="Work email address"
-          type="email"
-          value={email}
-          onChange={(event) => { setEmail(event.target.value); setApiError('') }}
-          onBlur={() => setTouched((current) => ({ ...current, email: true }))}
-          placeholder="you@urdanetacity.gov.ph"
-          autoComplete="username"
-          error={fieldError('email')}
-        />
-        <div>
-          <label htmlFor="admin-password" className="portal-label">Password</label>
-          <div className="relative">
-            <input
-              id="admin-password"
-              type={showPassword ? 'text' : 'password'}
-              value={password}
-              onChange={(event) => { setPassword(event.target.value); setApiError('') }}
-              onBlur={() => setTouched((current) => ({ ...current, password: true }))}
-              placeholder="Enter your password"
-              autoComplete="current-password"
-              className={`portal-input pr-11 ${fieldError('password') ? 'border-red-400' : ''}`}
-            />
-            <button type="button" onClick={() => setShowPassword((current) => !current)} className="absolute right-3 top-1/2 mt-0.5 -translate-y-1/2 text-slate-400 hover:text-slate-700" aria-label={showPassword ? 'Hide password' : 'Show password'}>
-              {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-            </button>
+    <div className="flex min-h-screen items-center justify-center bg-slate-950 px-4 py-10">
+      <div className="w-full max-w-sm">
+        <div className="mb-8 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+            <span className="font-mono text-[11px] font-medium uppercase tracking-[0.2em] text-slate-500">
+              i-PESO &middot; Administrator Console
+            </span>
           </div>
-          {fieldError('password') && <p className="mt-1.5 text-xs font-medium text-red-700">{fieldError('password')}</p>}
+          <Link to="/" className="text-[11px] font-medium text-slate-600 hover:text-slate-400">
+            Public site &rarr;
+          </Link>
         </div>
-        <Button type="submit" loading={loading} icon={LogIn} className="w-full">{loading ? 'Signing in…' : 'Sign in to workspace'}</Button>
-      </form>
 
-      <div className="mt-6 space-y-3 text-sm text-slate-600">
-        <p className="flex gap-2"><KeyRound className="mt-0.5 h-4 w-4 shrink-0 text-brand-navy" aria-hidden="true" />First time? Sign in with the temporary password from your email. You&apos;ll choose your own next.</p>
-        <p className="flex gap-2"><LifeBuoy className="mt-0.5 h-4 w-4 shrink-0 text-brand-navy" aria-hidden="true" />No account or locked out? Staff accounts are managed by the PESO Office Manager.</p>
+        {apiError && (
+          <div className="mb-5 flex items-start gap-2.5 rounded-md border border-red-900/60 bg-red-950/50 px-4 py-3 text-sm text-red-300">
+            <XCircle className="mt-0.5 h-4 w-4 shrink-0 text-red-500" />
+            <span>{apiError}</span>
+          </div>
+        )}
+
+        <div className="rounded-lg border border-slate-800 bg-slate-900 p-7">
+          <ShieldCheck className="h-7 w-7 text-sky-500" strokeWidth={1.75} />
+          <h1 className="mt-4 text-xl font-bold text-white">Administrator sign-in</h1>
+          <p className="mt-1.5 text-sm leading-5 text-slate-400">
+            Restricted to Urdaneta City PESO administrators and staff.
+          </p>
+
+          <form onSubmit={submit} noValidate className="mt-6 space-y-4">
+            <ConsoleField
+              label="Work email address"
+              type="email"
+              value={email}
+              onChange={(event) => { setEmail(event.target.value); setApiError('') }}
+              onBlur={() => setTouched((current) => ({ ...current, email: true }))}
+              placeholder="you@urdanetacity.gov.ph"
+              error={fieldError('email')}
+            />
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wide text-slate-400">Password</label>
+              <div className="relative mt-1.5">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={(event) => { setPassword(event.target.value); setApiError('') }}
+                  onBlur={() => setTouched((current) => ({ ...current, password: true }))}
+                  placeholder="Enter your password"
+                  className={`w-full rounded-md border bg-slate-950 px-3.5 py-2.5 pr-11 text-sm text-white placeholder:text-slate-600 transition focus:outline-none focus:ring-2 focus:ring-sky-500/40 ${fieldError('password') ? 'border-red-500' : 'border-slate-700 focus:border-sky-500'}`}
+                />
+                <button type="button" onClick={() => setShowPassword((current) => !current)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300" aria-label={showPassword ? 'Hide password' : 'Show password'}>
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+              {fieldError('password') && <p className="mt-1.5 text-xs font-medium text-red-400">{fieldError('password')}</p>}
+            </div>
+            <button
+              type="submit"
+              disabled={loading}
+              className="flex w-full items-center justify-center gap-2 rounded-md bg-sky-600 py-2.5 text-sm font-semibold text-white transition hover:bg-sky-500 disabled:pointer-events-none disabled:opacity-50"
+            >
+              {loading ? 'Signing in…' : 'Sign in'}
+            </button>
+          </form>
+
+          <p className="mt-6 border-t border-slate-800 pt-4 text-xs text-slate-500">
+            Staff accounts are created by a PESO system administrator. Contact your office if you need access.
+          </p>
+        </div>
       </div>
-    </AuthShell>
+    </div>
   )
 }
 
 function ConsoleField({ label, error, ...props }) {
   return (
-    <label className="portal-label">
+    <label className="block text-xs font-semibold uppercase tracking-wide text-slate-400">
       {label}
-      <input {...props} className={`portal-input ${error ? 'border-red-400' : ''}`} />
-      {error && <span className="mt-1.5 block text-xs font-medium text-red-700">{error}</span>}
+      <input
+        {...props}
+        className={`mt-1.5 w-full rounded-md border bg-slate-950 px-3.5 py-2.5 text-sm text-white placeholder:text-slate-600 transition focus:outline-none focus:ring-2 focus:ring-sky-500/40 ${error ? 'border-red-500' : 'border-slate-700 focus:border-sky-500'}`}
+      />
+      {error && <span className="mt-1.5 block text-xs font-medium normal-case tracking-normal text-red-400">{error}</span>}
     </label>
   )
 }

@@ -99,7 +99,7 @@ export default function EmployerRegistration() {
           <DoleCertificationCheckbox isChecked={hasAgreed} onChange={(e) => { setHasAgreed(e.target.checked); setErrors(current => ({ ...current, agreement: undefined })); }} />
           {errors.agreement && <p className="text-red-500 text-sm mt-1">{errors.agreement}</p>}
 
-          <Button type="submit" disabled={loading || !hasAgreed} icon={Building2} className="w-full">{loading ? 'Creating account...' : 'Continue to Email Verification'}</Button>
+          <Button variant="accent" type="submit" disabled={loading || !hasAgreed} icon={Building2} className="w-full">{loading ? 'Creating account...' : 'Continue to Email Verification'}</Button>
         </form>
         <p className="registration-secondary-action">Already registered? <Link to="/login">Sign in</Link></p>
       </Card>

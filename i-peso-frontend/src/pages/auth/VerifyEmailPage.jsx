@@ -1,11 +1,11 @@
 import { useRef, useState } from 'react'
-import { Inbox, RefreshCw, ShieldCheck } from 'lucide-react'
+import { MailCheck, RefreshCw, ShieldCheck } from 'lucide-react'
 import AuthShell from '@/components/auth/AuthShell'
 import { employerRegistrationSteps, seekerRegistrationSteps } from '@/components/auth/registrationJourneys'
-import { AlertBox, Button } from '@/components/ui'
+import { AlertBox, Button, Card } from '@/components/ui'
 import { authService } from '@/services/authService'
 import { useAuthStore } from '@/stores/authStore'
-import { Link, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 
 export default function VerifyEmailPage() {
   const navigate = useNavigate()
@@ -65,36 +65,37 @@ export default function VerifyEmailPage() {
 
   return (
     <AuthShell
-      title="Check your email"
-      subtitle={<>We sent a six-digit code to <span className="font-semibold text-slate-900 break-all">{email || 'your registered email'}</span>. It expires in 10 minutes.</>}
+      title="Verify your email"
+      subtitle="Enter the six-digit code sent to your registered email address."
       sideTitle="Secure account activation."
       sideText="Email verification confirms account ownership before personal or company information is collected."
       sideItems={['Six-digit one-time code', 'Protected account activation', 'Guided onboarding after verification']}
       maxWidth="max-w-xl"
       journey={{ role: pendingRole, steps: journeySteps, currentStep: 2 }}
     >
-      <>
+      <Card>
+        <div className="mb-6 text-center">
+          <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-xl bg-blue-50 text-blue-700"><MailCheck className="h-7 w-7" /></span>
+          <p className="mt-4 text-sm text-slate-600">Code sent to</p>
+          <p className="mt-1 break-all font-extrabold text-brand-navy">{email || 'your registered email'}</p>
+        </div>
         {apiError && <AlertBox variant="danger" title="Verification failed" className="mb-5">{apiError}</AlertBox>}
         {resendSuccess && <AlertBox variant="success" title="New code sent" className="mb-5">Check your email inbox for the latest verification code.</AlertBox>}
         <form onSubmit={submit} className="space-y-5">
-          <label className="portal-label">
-            Six-digit code
-            <input ref={inputRef} type="text" value={otp} onChange={change} placeholder="000000" maxLength="6" inputMode="numeric" autoComplete="one-time-code" className={`portal-input mt-2 h-14 text-center font-display text-3xl tracking-[0.5em] ${error ? 'border-red-400' : ''}`} />
-            {error && <span className="mt-2 block text-left text-xs font-medium text-red-700">{error}</span>}
+          <label className="portal-label text-center">
+            Verification code
+            <input ref={inputRef} type="text" value={otp} onChange={change} placeholder="000000" maxLength="6" inputMode="numeric" autoComplete="one-time-code" className={`portal-input mt-2 py-3 text-center text-2xl font-black tracking-[0.45em] ${error ? 'border-red-400' : ''}`} />
+            {error && <span className="mt-2 block text-left text-xs font-medium text-red-600">{error}</span>}
           </label>
-          <Button type="submit" disabled={loading || otp.length !== 6} icon={ShieldCheck} className="w-full">{loading ? 'Verifying…' : 'Verify and continue'}</Button>
+          <Button variant="accent" type="submit" disabled={loading || otp.length !== 6} icon={ShieldCheck} className="w-full">{loading ? 'Verifying...' : 'Verify and Continue'}</Button>
         </form>
-        <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 pt-5 text-sm">
-          <button type="button" onClick={resend} disabled={resending} className="inline-flex items-center gap-2 font-semibold text-brand-navy hover:underline disabled:opacity-50">
-            <RefreshCw className={`h-4 w-4 ${resending ? 'animate-spin' : ''}`} aria-hidden="true" />{resending ? 'Sending…' : 'Send a new code'}
+        <div className="mt-6 border-t border-slate-200 pt-5 text-center">
+          <p className="text-sm text-slate-600">Did not receive the email?</p>
+          <button type="button" onClick={resend} disabled={resending} className="mt-2 inline-flex items-center gap-2 text-sm font-extrabold text-blue-700 disabled:opacity-50">
+            <RefreshCw className={`h-4 w-4 ${resending ? 'animate-spin' : ''}`} />{resending ? 'Sending...' : 'Resend verification code'}
           </button>
-          <Link to={pendingRole === 'employer' ? '/register/employer' : '/register/seeker'} className="font-semibold text-slate-600 hover:text-brand-navy">Use a different email</Link>
         </div>
-        <p className="mt-5 flex gap-2 rounded-xl bg-brand-canvas p-3.5 text-sm text-slate-600">
-          <Inbox className="mt-0.5 h-4 w-4 shrink-0 text-brand-navy" aria-hidden="true" />
-          Can&apos;t find it? Check your Spam or Promotions folder for an email from i-PESO Urdaneta.
-        </p>
-      </>
+      </Card>
     </AuthShell>
   )
 }

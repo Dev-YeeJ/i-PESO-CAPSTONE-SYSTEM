@@ -626,23 +626,24 @@ select:focus-visible {
   background-color: #0f2d56;
 }
 
-/* Public and onboarding screens share the navy primary action language. */
+/* Public and onboarding screens keep the original gold primary action language
+   (the landing and auth pages were kept on their pre-redesign look). */
 .pre-dashboard-shell button.bg-blue-600,
 .pre-dashboard-shell button.bg-blue-700,
 .pre-dashboard-shell button.from-blue-600,
 .guest-shell button.bg-blue-600,
 .guest-shell button.bg-blue-700,
 .guest-shell button.from-blue-600 {
-  background-color: #123563 !important;
+  background-color: #f59e0b !important;
   background-image: none !important;
-  color: #ffffff !important;
+  color: #0f172a !important;
 }
 
 .pre-dashboard-shell button.bg-blue-600:hover,
 .pre-dashboard-shell button.bg-blue-700:hover,
 .guest-shell button.bg-blue-600:hover,
 .guest-shell button.bg-blue-700:hover {
-  background-color: #0f2d56 !important;
+  background-color: #fbbf24 !important;
 }
 
 /* ============================================================

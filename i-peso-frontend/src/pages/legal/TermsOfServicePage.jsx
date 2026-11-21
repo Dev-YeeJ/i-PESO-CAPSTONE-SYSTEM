@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom';
 import { Scale } from 'lucide-react';
 import LegalPageLayout, { PolicySection } from './LegalPageLayout';
 
-const inlineLinkClass = 'font-semibold text-brand-navy underline decoration-brand-gold/50 decoration-2 underline-offset-2 hover:decoration-brand-gold';
+const inlineLinkClass = 'font-semibold text-[#0A192F] underline decoration-[#B45309]/50 decoration-2 underline-offset-2 hover:decoration-[#B45309]';
 
 // Effective date of this policy text. Bump this whenever the content below
 // changes materially — it is the only date on the page that is not a

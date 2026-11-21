@@ -25,13 +25,16 @@ export default function PublicAnnouncementsSection() {
   if (!items.length) return null
 
   return (
-    <section id="announcements" className="scroll-mt-24 px-4 pt-20 sm:px-8">
-      <div className="mx-auto max-w-[1280px]">
+    <section id="announcements" className="relative z-10 border-t border-white/5 bg-[#0D1F38] px-6 py-16">
+      <div className="mx-auto max-w-6xl">
         <div className="mb-8 flex items-center gap-3">
-          <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#e8f0fc] text-brand-navy">
+          <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-yellow-400/15 text-yellow-400">
             <Megaphone className="h-5 w-5" aria-hidden="true" />
           </span>
-          <h2 className="text-[28px] font-bold tracking-tight text-slate-900">Latest from the PESO office</h2>
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[0.2em] text-yellow-400">PESO Announcements</p>
+            <h2 className="mt-1 text-2xl font-extrabold tracking-tight text-white md:text-3xl">Latest from the PESO office</h2>
+          </div>
         </div>
 
         <div className="grid gap-4 md:grid-cols-3">
@@ -40,17 +43,17 @@ export default function PublicAnnouncementsSection() {
               key={item.id}
               type="button"
               onClick={() => setOpen(item)}
-              className={`flex flex-col rounded-2xl border bg-white p-5 text-left text-slate-900 shadow-card transition hover:border-[#c4d9f7] hover:shadow-elevated focus:outline-none focus-visible:ring-2 focus-visible:ring-focus ${
-                item.priority === 'urgent' ? 'border-red-300 ring-2 ring-red-200' : 'border-slate-200'
+              className={`flex flex-col rounded-xl border bg-white p-5 text-left text-[#0A192F] shadow-lg transition hover:-translate-y-0.5 hover:shadow-xl ${
+                item.priority === 'urgent' ? 'border-red-400 ring-2 ring-red-400/40' : 'border-white/10'
               }`}
             >
               <div className="flex flex-wrap items-center gap-1.5">
                 <CategoryChip category={item.category} label={item.category_label} />
                 <PriorityPill priority={item.priority} />
               </div>
-              <h3 className="mt-3 text-base font-semibold leading-snug">{item.title}</h3>
+              <h3 className="mt-3 text-base font-extrabold leading-snug">{item.title}</h3>
               <p className="mt-2 line-clamp-3 flex-1 text-sm leading-6 text-slate-600">{item.excerpt}</p>
-              <p className="mt-3 text-xs font-semibold text-slate-500"><span>{formatDate(item.publish_at)}</span><span className="ml-3 text-brand-navy">Read more</span></p>
+              <p className="mt-3 text-xs font-semibold text-slate-500">{formatDate(item.publish_at)} · <span className="text-[#B45309]">Read more</span></p>
             </button>
           ))}
         </div>
@@ -67,7 +70,7 @@ export default function PublicAnnouncementsSection() {
                 </div>
                 <DialogTitle className="pt-2 text-xl leading-tight">{open.title}</DialogTitle>
                 <DialogDescription className="flex flex-wrap gap-x-3 text-xs">
-                  <span>PESO Urdaneta, {formatDateTime(open.publish_at)}</span>
+                  <span>PESO Urdaneta · {formatDateTime(open.publish_at)}</span>
                   {open.expires_at && <span className="inline-flex items-center gap-1"><CalendarClock className="h-3.5 w-3.5" /> Until {formatDateTime(open.expires_at)}</span>}
                 </DialogDescription>
               </DialogHeader>

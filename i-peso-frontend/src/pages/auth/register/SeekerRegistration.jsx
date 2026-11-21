@@ -174,7 +174,7 @@ export default function SeekerRegistration() {
             </div>
             <Field label="Confirm password" name="password_confirmation" type={showConfirmation ? 'text' : 'password'} placeholder="Re-enter your password" value={form.password_confirmation ?? ''} onChange={change} onBlur={blur} error={fieldError('password_confirmation')} autoComplete="new-password" rightElement={<VisibilityButton shown={showConfirmation} onClick={() => setShowConfirmation((current) => !current)} />} />
           </div>
-          <Button type="submit" disabled={loading} icon={UserPlus} className="w-full">{loading ? 'Creating account...' : 'Create Job Seeker Account'}</Button>
+          <Button variant="accent" type="submit" disabled={loading} icon={UserPlus} className="w-full">{loading ? 'Creating account...' : 'Create Job Seeker Account'}</Button>
         </form>
         <p className="registration-secondary-action">Already registered? <Link to="/login">Sign in</Link></p>
       </Card>

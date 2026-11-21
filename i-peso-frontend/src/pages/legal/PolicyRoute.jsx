@@ -7,7 +7,7 @@ import RichText from '@/components/site-content/RichText'
 import LegalPageLayout, { PolicySection } from './LegalPageLayout'
 import { POLICY_META, formatPolicyDate } from './policyMeta'
 
-const linkClass = 'font-semibold text-brand-navy underline decoration-brand-gold/50 decoration-2 underline-offset-2 hover:decoration-brand-gold'
+const linkClass = 'font-semibold text-[#0A192F] underline decoration-[#B45309]/50 decoration-2 underline-offset-2 hover:decoration-[#B45309]'
 
 /**
  * /privacy-policy, /terms-of-service, /review-guidelines.
@@ -82,7 +82,7 @@ function PolicyNotice({ slug, data, shown, requested }) {
   if (requested && shown.version !== current.version) {
     const isUpcoming = upcoming && shown.version === upcoming.version
     return (
-      <div role="note" className="mb-6 flex items-start gap-3 rounded-xl border border-[#c4d9f7] bg-[#e8f0fc] px-4 py-3 text-sm leading-6 text-brand-navy">
+      <div role="note" className="mb-6 flex items-start gap-3 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm leading-6 text-blue-950">
         <History className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
         <p>
           {isUpcoming
@@ -96,11 +96,11 @@ function PolicyNotice({ slug, data, shown, requested }) {
 
   if (!requested && upcoming) {
     return (
-      <div role="note" className="mb-6 flex items-start gap-3 rounded-xl border border-amber-300 bg-[#fffbeb] px-4 py-3 text-sm leading-6 text-amber-950">
+      <div role="note" className="mb-6 flex items-start gap-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-950">
         <CalendarClock className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
         <p>
           An updated version takes effect on <strong>{formatPolicyDate(upcoming.effective_at)}</strong>
-          {upcoming.change_note ? <>: {upcoming.change_note}</> : null}.{' '}
+          {upcoming.change_note ? <> — {upcoming.change_note}</> : null}.{' '}
           <Link to={`/${slug}?version=${upcoming.version}`} className={linkClass}>Read it now</Link>.
         </p>
       </div>
@@ -114,22 +114,23 @@ function VersionList({ slug, versions = [], shownVersion }) {
   if (versions.length < 2) return null
 
   return (
-    <section aria-labelledby="policy-versions" className="rounded-2xl border border-slate-200 bg-white p-5 shadow-card">
-      <h2 id="policy-versions" className="font-semibold text-slate-900">Version history</h2>
-      <ol className="mt-3 space-y-3 border-l border-slate-200 pl-4 text-sm">
+    <section aria-labelledby="policy-versions" className="mt-10 rounded-2xl border border-[#0A192F]/10 bg-white p-5">
+      <h2 id="policy-versions" className="text-xs font-black uppercase tracking-wide text-slate-400">All versions</h2>
+      <ol className="mt-3 divide-y divide-slate-100">
         {versions.map((version) => (
-          <li key={version.version} className="relative">
-            <span className={`absolute -left-[21px] top-1.5 h-2.5 w-2.5 rounded-full ${version.version === shownVersion ? 'bg-brand-navy' : 'bg-slate-300'}`} aria-hidden="true" />
-            {version.version === shownVersion ? (
-              <p className="font-semibold text-slate-900">Version {version.version} <span className="font-normal text-slate-500">(shown)</span></p>
-            ) : (
-              <Link to={version.is_current ? `/${slug}` : `/${slug}?version=${version.version}`} className="font-semibold text-brand-navy hover:underline">Version {version.version}</Link>
-            )}
-            <p className="text-slate-500">
+          <li key={version.version} className="flex flex-col gap-1 py-3 text-sm sm:flex-row sm:items-baseline sm:gap-4">
+            <span className="w-44 shrink-0 font-semibold text-[#0A192F]">
+              {version.version === shownVersion ? (
+                <>Version {version.version} <span className="text-xs font-bold text-[#B45309]">(shown)</span></>
+              ) : (
+                <Link to={version.is_current ? `/${slug}` : `/${slug}?version=${version.version}`} className={linkClass}>Version {version.version}</Link>
+              )}
+            </span>
+            <span className="w-40 shrink-0 text-slate-500">
               {version.is_upcoming ? 'Takes effect ' : 'Effective '}{formatPolicyDate(version.effective_at)}
-              {version.is_current && <span className="ml-1 font-semibold text-emerald-700">(current)</span>}
-            </p>
-            {version.change_note && <p className="text-slate-600">{version.change_note}</p>}
+              {version.is_current && <span className="ml-1 text-xs font-bold text-emerald-700">· current</span>}
+            </span>
+            <span className="text-slate-600">{version.change_note}</span>
           </li>
         ))}
       </ol>

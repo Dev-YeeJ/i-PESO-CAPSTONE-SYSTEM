@@ -1,8 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useNavigate, useLocation, Link } from 'react-router-dom'
 import { authService } from '@/services/authService'
-import AuthShell from '@/components/auth/AuthShell'
-import Button from '@/components/ui/Button'
+import IPesoLogo from '@/components/branding/IPesoLogo'
 
 const OTP_EXPIRY_SECONDS   = 600  // 10 minutes — matches Laravel cache TTL
 const RESEND_COOLDOWN      = 60   // 60 seconds before resend is allowed
@@ -204,24 +203,74 @@ const ResetPasswordPage = () => {
   // ── Success screen ───────────────────────────────────────
   if (success) {
     return (
-      <AuthShell title="Password updated" subtitle="Sign in with your new password." sideTitle="Locked out? You'll be back in a minute." sideText="We send a time-limited code to the email on your account. Nobody at PESO can see your password.">
-        <div className="flex items-start gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-5 text-emerald-900" role="status">
-          <svg className="mt-0.5 h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
-          <p className="text-sm leading-6">Your password has been changed. Use it the next time you sign in.</p>
+      <div className="pre-dashboard-shell reset-auth-shell flex min-h-screen items-center justify-center bg-[#0A192F] p-4">
+        <div className="w-full max-w-md">
+          <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-10 text-center">
+            <div className="w-20 h-20 bg-green-50 border-2 border-green-200 rounded-3xl flex items-center justify-center mx-auto mb-6">
+              <svg className="w-10 h-10 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
+              </svg>
+            </div>
+            <h2 className="text-2xl font-bold text-slate-900 mb-2">Password reset!</h2>
+            <p className="text-slate-500 text-sm leading-relaxed mb-8">
+              Your password has been updated successfully.<br />
+              You can now sign in with your new password.
+            </p>
+            <button
+              onClick={() => navigate('/login')}
+              className="w-full py-3 bg-blue-700 hover:bg-blue-800 text-white text-sm font-semibold rounded-xl transition-colors shadow-sm shadow-blue-200"
+            >
+              Back to Sign In
+            </button>
+          </div>
         </div>
-        <Button onClick={() => navigate('/login')} className="mt-6 w-full">Go to sign in</Button>
-      </AuthShell>
+      </div>
     )
   }
 
   // ── Main page ────────────────────────────────────────────
   return (
-    <AuthShell title="Choose a new password" subtitle={<>Enter the code we sent to <span className="font-semibold text-slate-900">{maskedEmail}</span>, then pick a new password.</>} sideTitle="Locked out? You'll be back in a minute." sideText="We send a time-limited code to the email on your account. Nobody at PESO can see your password.">
-        <ol className="mb-6 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm" aria-label="Reset steps">
-          <li className="flex items-center gap-2 text-slate-500"><span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#e8f0fc] text-xs font-bold text-brand-navy" aria-hidden="true">1</span>Email</li>
-          <li className="flex items-center gap-2 font-semibold text-slate-900" aria-current="step"><span className="flex h-6 w-6 items-center justify-center rounded-full bg-brand-navy text-xs font-bold text-white" aria-hidden="true">2</span>Code and new password</li>
-        </ol>
-        <Link to="/forgot-password" className="mb-5 inline-flex items-center gap-1.5 text-sm font-semibold text-slate-600 hover:text-brand-navy">Use a different email</Link>
+    <div className="pre-dashboard-shell reset-auth-shell flex min-h-screen items-center justify-center bg-[#0A192F] p-4 py-10">
+
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute -top-40 -right-40 w-96 h-96 bg-blue-100 rounded-full opacity-30 blur-3xl" />
+        <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-indigo-100 rounded-full opacity-30 blur-3xl" />
+      </div>
+
+      <div className="w-full max-w-md relative">
+
+        <Link
+          to="/forgot-password"
+          className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700 mb-8 transition-colors group"
+        >
+          <svg className="w-4 h-4 group-hover:-translate-x-0.5 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
+          </svg>
+          Back
+        </Link>
+
+        {/* Header */}
+        <div className="text-center mb-8">
+          <div className="inline-flex items-center gap-2.5 mb-5">
+            <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl bg-white shadow-lg shadow-blue-200"><IPesoLogo className="h-full w-full" /></div>
+            <div className="text-left">
+              <p className="text-base font-bold text-blue-900 leading-none">i-PESO</p>
+              <p className="text-[10px] text-slate-500 leading-none mt-0.5 uppercase tracking-wide">Urdaneta City</p>
+            </div>
+          </div>
+
+          <div className="w-16 h-16 bg-blue-50 border border-blue-200 rounded-2xl flex items-center justify-center mx-auto mb-5">
+            <svg className="w-8 h-8 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+            </svg>
+          </div>
+
+          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Reset your password</h1>
+          <p className="text-sm text-slate-500 mt-2">
+            Enter the code sent to{' '}
+            <span className="font-semibold text-slate-700">{maskedEmail}</span>
+          </p>
+        </div>
 
         {/* OTP Expiry Banner */}
         <div className={['flex items-center justify-between px-4 py-2.5 rounded-xl border mb-4 transition-all', expiryBg].join(' ')}>
@@ -243,7 +292,8 @@ const ResetPasswordPage = () => {
           )}
         </div>
 
-        <div>
+        {/* Card */}
+        <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-8">
 
           {apiError && (
             <div className="mb-5 flex items-start gap-3 p-3.5 bg-red-50 border border-red-200 rounded-xl">
@@ -258,10 +308,10 @@ const ResetPasswordPage = () => {
 
             {/* 6-Box OTP */}
             <div>
-              <label className="mb-3 block text-sm font-semibold text-slate-800">
-                Six-digit code
+              <label className="block text-sm font-medium text-slate-700 mb-3 text-center">
+                6-Digit Reset Code
               </label>
-              <div className="flex justify-between gap-2" onPaste={handlePaste}>
+              <div className="flex gap-2.5 justify-center" onPaste={handlePaste}>
                 {digits.map((digit, index) => (
                   <input
                     key={index}
@@ -274,15 +324,15 @@ const ResetPasswordPage = () => {
                     onChange={(e) => handleDigitChange(index, e.target.value)}
                     onKeyDown={(e) => handleKeyDown(index, e)}
                     className={[
-                      'h-14 w-12 rounded-xl border text-center',
-                      'font-display text-2xl transition-all focus:outline-none focus:ring-2 focus:ring-[#c4d9f7]',
+                      'w-11 h-12 text-center text-lg font-bold rounded-xl border-2',
+                      'transition-all focus:outline-none focus:ring-2 focus:ring-blue-500/30',
                       expired
                         ? 'border-slate-200 bg-slate-50 text-slate-400 cursor-not-allowed'
                         : errors.otp
                         ? 'border-red-300 bg-red-50'
                         : digit
-                        ? 'border-slate-400 bg-white text-slate-900'
-                        : 'border-slate-300 bg-white text-slate-900 focus:border-brand-navy',
+                        ? 'border-blue-500 bg-blue-50 text-blue-800'
+                        : 'border-slate-300 bg-white text-slate-900 focus:border-blue-400',
                     ].join(' ')}
                   />
                 ))}
@@ -299,7 +349,7 @@ const ResetPasswordPage = () => {
                   type="button"
                   onClick={handleResend}
                   disabled={isResending}
-                  className="flex items-center gap-1.5 text-sm font-semibold text-brand-navy hover:text-blue-800 disabled:opacity-60 transition-colors"
+                  className="flex items-center gap-1.5 text-sm font-semibold text-blue-700 hover:text-blue-800 disabled:opacity-60 transition-colors"
                 >
                   {isResending ? (
                     <>
@@ -379,7 +429,7 @@ const ResetPasswordPage = () => {
                       'text-xs font-medium',
                       strength.score <= 1 ? 'text-red-500' :
                       strength.score <= 3 ? 'text-amber-500' :
-                      strength.score === 4 ? 'text-brand-navy' : 'text-green-600',
+                      strength.score === 4 ? 'text-blue-600' : 'text-green-600',
                     ].join(' ')}>
                       {strength.label} password
                       {strength.score < 3 && ' — add uppercase, numbers, or symbols'}
@@ -455,7 +505,7 @@ const ResetPasswordPage = () => {
             <button
               type="submit"
               disabled={isLoading || expired}
-              className="flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-brand-navy text-[15px] font-semibold text-white transition hover:bg-[#0f2d56] disabled:cursor-not-allowed disabled:opacity-60"
+              className="w-full py-3 bg-blue-700 hover:bg-blue-800 active:scale-[0.99] disabled:opacity-60 disabled:cursor-not-allowed text-white text-sm font-semibold rounded-xl transition-all flex items-center justify-center gap-2 shadow-sm shadow-blue-200"
             >
               {isLoading ? (
                 <>
@@ -465,12 +515,13 @@ const ResetPasswordPage = () => {
                   </svg>
                   Resetting password…
                 </>
-              ) : expired ? 'Code expired. Send a new one to continue' : 'Save new password'}
+              ) : expired ? 'Code expired — resend to continue' : 'Reset Password'}
             </button>
 
           </form>
         </div>
-    </AuthShell>
+      </div>
+    </div>
   )
 }
 

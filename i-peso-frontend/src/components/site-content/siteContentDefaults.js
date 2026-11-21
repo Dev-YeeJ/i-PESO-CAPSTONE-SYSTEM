@@ -52,7 +52,7 @@ export const LANDING_DEFAULTS = {
 export const LANDING_SECTIONS = [
   { key: 'announcements', label: 'PESO announcements', help: 'Live announcements for the Public audience.' },
   { key: 'features', label: '“What you get” feature cards', help: 'The four cards edited above.' },
-  { key: 'jobs', label: 'Job search & featured vacancies', help: 'The hero search bar and the newest open vacancies from verified employers.' },
+  { key: 'jobs', label: 'Job discovery', help: 'The seeker/employer preview.' },
   { key: 'programs', label: 'Government programs', help: 'Open programs from Government & DOLE.' },
 ]
 

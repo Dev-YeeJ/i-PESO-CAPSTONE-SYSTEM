@@ -7,7 +7,7 @@ import { useOfficeInfo } from '@/components/site-content/useSiteContent';
 // [PESO TO CONFIRM] placeholder.
 const EFFECTIVE_DATE = 'September 9, 2026';
 
-const inlineLinkClass = 'font-semibold text-brand-navy underline decoration-brand-gold/50 decoration-2 underline-offset-2 hover:decoration-brand-gold';
+const inlineLinkClass = 'font-semibold text-[#0A192F] underline decoration-[#B45309]/50 decoration-2 underline-offset-2 hover:decoration-[#B45309]';
 
 const SECTIONS = [
   { id: 'introduction', label: 'Introduction & Scope' },

@@ -5,7 +5,7 @@ import LegalPageLayout, { PolicySection } from './LegalPageLayout'
 // Bump when the rules below change materially.
 const EFFECTIVE_DATE = 'November 12, 2026'
 
-const inlineLinkClass = 'font-semibold text-brand-navy underline decoration-brand-gold/50 decoration-2 underline-offset-2 hover:decoration-brand-gold'
+const inlineLinkClass = 'font-semibold text-[#0A192F] underline decoration-[#B45309]/50 decoration-2 underline-offset-2 hover:decoration-[#B45309]'
 
 const SECTIONS = [
   { id: 'purpose', label: 'Why reviews exist' },

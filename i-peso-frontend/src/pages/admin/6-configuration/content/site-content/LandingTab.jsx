@@ -206,35 +206,35 @@ function LandingForm({ section, canEdit }) {
 function LandingPreview({ landing, device }) {
   const phone = device === 'phone'
   return (
-    <div className={`mx-auto overflow-hidden rounded-2xl border border-slate-300 bg-white text-slate-900 shadow-lg ${phone ? 'max-w-[375px]' : 'w-full'}`} aria-label="Landing page preview">
-      <div className={`bg-gradient-to-br from-brand-navy to-[#0f2d56] px-5 text-white ${phone ? 'py-10' : 'py-12'}`}>
-        <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-[11px] font-medium text-white/90">
-          <HeroBadgeIcon className="h-3.5 w-3.5 text-brand-gold" /> {landing.hero_badge}
+    <div className={`mx-auto overflow-hidden rounded-2xl border border-slate-300 bg-[#0A192F] text-white shadow-lg ${phone ? 'max-w-[375px]' : 'w-full'}`} aria-label="Landing page preview">
+      <div className={`flex flex-col items-center px-5 text-center ${phone ? 'py-10' : 'py-12'}`}>
+        <span className="inline-flex items-center gap-2 rounded-full border border-slate-700/50 bg-slate-800/30 px-4 py-2 text-[11px] font-medium text-slate-300">
+          <HeroBadgeIcon className="h-3.5 w-3.5 text-yellow-500" /> {landing.hero_badge}
         </span>
-        <h3 className={`mt-5 font-display leading-tight tracking-tight ${phone ? 'text-3xl' : 'text-4xl'}`}>
+        <h3 className={`mt-6 font-extrabold leading-tight tracking-tight ${phone ? 'text-3xl' : 'text-4xl'}`}>
           <HeroHeadlineContent landing={landing} />
         </h3>
-        <p className={`mt-4 max-w-xl leading-relaxed text-white/75 ${phone ? 'text-sm' : 'text-base'}`}>
+        <p className={`mt-4 max-w-xl leading-relaxed text-slate-400 ${phone ? 'text-sm' : 'text-base'}`}>
           <HeroSubheadlineContent landing={landing} />
         </p>
-        <div className={`mt-5 flex rounded-xl bg-white p-1.5 ${phone ? 'flex-col gap-1.5' : 'max-w-lg items-center'}`} aria-hidden="true">
-          <span className="flex-1 px-3 py-2 text-sm text-slate-400">Job title, skill or company</span>
-          <span className="rounded-lg bg-brand-navy px-4 py-2 text-center text-sm font-semibold text-white">Search jobs</span>
+        <div className={`mt-6 flex gap-3 ${phone ? 'w-full flex-col' : ''}`} aria-hidden="true">
+          <span className="rounded-xl bg-white px-5 py-2.5 text-sm font-bold text-slate-900">Find Jobs</span>
+          <span className="rounded-xl bg-yellow-400 px-5 py-2.5 text-sm font-bold text-slate-900">Post Jobs</span>
         </div>
-        <HeroHighlights landing={landing} className={`mt-5 flex flex-wrap text-xs font-medium text-white/75 ${phone ? 'gap-3' : 'gap-6'}`} />
+        <HeroHighlights landing={landing} className={`mt-6 flex flex-wrap justify-center text-xs font-medium text-slate-400 ${phone ? 'gap-3' : 'gap-6'}`} />
       </div>
-      <div className="px-5 py-8">
-        <p className="text-xs font-semibold text-[#2563b8]">{landing.features_eyebrow}</p>
-        <p className="mt-2 text-xl font-bold tracking-tight">{landing.features_heading}</p>
+      <div className="border-t border-white/5 bg-[#0D1F38] px-5 py-8">
+        <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-yellow-400">{landing.features_eyebrow}</p>
+        <p className="mt-2 text-xl font-extrabold tracking-tight">{landing.features_heading}</p>
         <div className={`mt-5 grid gap-3 ${phone ? 'grid-cols-1' : 'grid-cols-2'}`}>
           {landing.features.map((feature, index) => (
-            <div key={index} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-card">
+            <div key={index} className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
               <FeatureCardContent feature={feature} />
             </div>
           ))}
         </div>
       </div>
-      <div className="bg-[#071122] px-5 py-4 text-[11px] text-slate-500">{landing.footer_tagline}, Pangasinan, Philippines</div>
+      <div className="border-t border-white/5 bg-[#071122] px-5 py-4 text-[11px] text-slate-500">{landing.footer_tagline} · Pangasinan, Philippines</div>
     </div>
   )
 }

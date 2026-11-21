@@ -21,20 +21,20 @@ export default function OfficeContactCard({ office, role = null, className = '' 
   ].filter(Boolean)
 
   return (
-    <section aria-labelledby="office-contact-heading" className={`rounded-2xl border border-slate-200 bg-white p-5 shadow-card sm:p-6 ${className}`}>
-      <p className="text-sm font-semibold text-slate-500">Still need help?</p>
-      <h2 id="office-contact-heading" className="mt-1 text-lg font-bold tracking-tight text-slate-900">{office.office_name || 'PESO Urdaneta City'}</h2>
+    <section aria-labelledby="office-contact-heading" className={`rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6 ${className}`}>
+      <p className="text-xs font-extrabold uppercase tracking-wide text-slate-500">Still need help?</p>
+      <h2 id="office-contact-heading" className="mt-1 text-lg font-black tracking-tight text-slate-950">{office.office_name || 'PESO Urdaneta City'}</h2>
       {rows.length === 0 ? (
         <p className="mt-3 text-sm text-slate-600">Visit the PESO office of Urdaneta City.</p>
       ) : (
         <dl className="mt-4 grid gap-4 sm:grid-cols-2">
           {rows.map(({ icon, label, value, href, linkLabel, external }) => (
             <div key={label} className="flex gap-3">
-              <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#e8f0fc] text-brand-navy">
+              <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-brand-navy/5 text-brand-navy">
                 {createElement(icon, { className: 'h-4 w-4', 'aria-hidden': true })}
               </span>
               <div className="min-w-0">
-                <dt className="text-sm text-slate-500">{label}</dt>
+                <dt className="text-xs font-bold uppercase tracking-wide text-slate-500">{label}</dt>
                 <dd className="mt-0.5 break-words text-sm font-semibold text-slate-900">
                   {href && !linkLabel ? (
                     <a href={href} target={external ? '_blank' : undefined} rel={external ? 'noreferrer' : undefined} className="text-brand-navy underline-offset-2 hover:underline">
