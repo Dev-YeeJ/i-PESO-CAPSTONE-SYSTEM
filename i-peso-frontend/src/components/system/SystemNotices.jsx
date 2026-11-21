@@ -1,6 +1,6 @@
 import { createElement } from 'react'
 import { Link } from 'react-router-dom'
-import { LifeBuoy, LogIn, Wrench } from 'lucide-react'
+import { LogIn, Wrench } from 'lucide-react'
 import IPesoLogo from '@/components/branding/IPesoLogo'
 import { useSystemStatus } from './useSystemStatus'
 
@@ -55,9 +55,7 @@ export function RegistrationGate({ role, children }) {
     <NoticeShell icon={LogIn} title="Registration is paused" message={message}>
       <div className="mt-8 flex flex-wrap justify-center gap-3">
         <Link to="/login" className="rounded-xl bg-white px-5 py-2.5 text-sm font-bold text-slate-900 hover:bg-slate-100">Sign in to an existing account</Link>
-        <Link to="/help" className="inline-flex items-center gap-2 rounded-xl border border-white/20 px-5 py-2.5 text-sm font-bold text-white hover:bg-white/10">
-          <LifeBuoy className="h-4 w-4" aria-hidden="true" /> Help &amp; FAQs
-        </Link>
+        <Link to="/" className="rounded-xl border border-white/20 px-5 py-2.5 text-sm font-bold text-white hover:bg-white/10">Back to home</Link>
       </div>
       {role === 'any' ? null : (
         <p className="mt-6 text-sm text-slate-400">

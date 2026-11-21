@@ -72,7 +72,7 @@ class SafetyReport extends Model
 
     public function filedByAdmin(): BelongsTo
     {
-        return $this->belongsTo(Administrator::class, 'filed_by_admin_id', 'admin_id');
+        return $this->belongsTo(Administrator::class, 'filed_by_admin_id', 'admin_id')->withTrashed();
     }
 
     public function subjectEmployer(): BelongsTo
@@ -97,12 +97,12 @@ class SafetyReport extends Model
 
     public function assignedAdmin(): BelongsTo
     {
-        return $this->belongsTo(Administrator::class, 'assigned_admin_id', 'admin_id');
+        return $this->belongsTo(Administrator::class, 'assigned_admin_id', 'admin_id')->withTrashed();
     }
 
     public function closedByAdmin(): BelongsTo
     {
-        return $this->belongsTo(Administrator::class, 'closed_by_admin_id', 'admin_id');
+        return $this->belongsTo(Administrator::class, 'closed_by_admin_id', 'admin_id')->withTrashed();
     }
 
     public function events(): HasMany

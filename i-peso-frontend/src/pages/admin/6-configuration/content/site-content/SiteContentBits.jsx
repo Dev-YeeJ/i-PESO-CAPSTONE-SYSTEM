@@ -105,7 +105,7 @@ export function MoreSection({ summary, forceOpen = false, children, defaultOpen 
         type="button"
         onClick={() => setOpen((value) => !value)}
         aria-expanded={shown}
-        className="flex w-full items-center justify-between text-left text-sm font-extrabold text-slate-700 hover:text-slate-950"
+        className="flex w-full items-center justify-between text-left text-sm font-semibold text-slate-700 hover:text-slate-950"
       >
         <span className="flex items-center gap-2">
           <SlidersHorizontal className="h-4 w-4 text-slate-400" aria-hidden="true" />

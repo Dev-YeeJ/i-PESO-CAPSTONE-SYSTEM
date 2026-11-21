@@ -10,7 +10,7 @@ import { adminSafetyReportService, safetyPriorityClass, safetyStatusBadge } from
 
 const PER_PAGE = 15
 const selectClass = 'mt-2 w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm'
-const labelClass = 'text-xs font-extrabold uppercase tracking-wide text-slate-500'
+const labelClass = 'text-xs font-semibold text-slate-500'
 
 export default function SafetyReportsListPage() {
   const navigate = useNavigate()
@@ -72,11 +72,11 @@ export default function SafetyReportsListPage() {
       label: 'Reported party',
       render: (value, row) => (
         <div className="min-w-44">
-          <p className="flex items-center gap-1.5 font-extrabold text-slate-950">
+          <p className="flex items-center gap-1.5 font-semibold text-slate-950">
             {row.subject_type === 'employer' ? <Building2 className="h-3.5 w-3.5 text-slate-400" /> : <UserRound className="h-3.5 w-3.5 text-slate-400" />}
             {value}
           </p>
-          <p className="text-xs text-slate-500">{row.subject_type === 'employer' ? 'Employer / company' : 'Job seeker'}{row.vacancy_title ? ` · ${row.vacancy_title}` : ''}</p>
+          <p className="text-xs text-slate-500">{row.subject_type === 'employer' ? 'Employer / company' : 'Job seeker'}{row.vacancy_title ? `, ${row.vacancy_title}` : ''}</p>
         </div>
       ),
     },
@@ -113,9 +113,9 @@ export default function SafetyReportsListPage() {
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard icon={Inbox} color="amber" label="New" value={num(summary.submitted)} subtitle="Submitted, not yet reviewed" />
-        <StatCard icon={ShieldAlert} color="blue" label="Open cases" value={num(summary.open)} subtitle={`${num(summary.open_about_employers)} about employers · ${num(summary.open_about_seekers)} about job seekers`} />
+        <StatCard icon={ShieldAlert} color="blue" label="Open cases" value={num(summary.open)} subtitle={`${num(summary.open_about_employers)} about employers, ${num(summary.open_about_seekers)} about job seekers`} />
         <StatCard icon={Flag} color="red" label="High priority open" value={num(summary.open_high_priority)} subtitle="Fraud, fees, harassment, identity" />
-        <StatCard icon={CheckCircle2} color="green" label="Closed" value={num((summary.resolved ?? 0) + (summary.dismissed ?? 0))} subtitle={`${num(summary.resolved)} resolved · ${num(summary.dismissed)} dismissed`} />
+        <StatCard icon={CheckCircle2} color="green" label="Closed" value={num((summary.resolved ?? 0) + (summary.dismissed ?? 0))} subtitle={`${num(summary.resolved)} resolved, ${num(summary.dismissed)} dismissed`} />
       </div>
 
       <Card padding="sm" className="mt-6">
@@ -190,7 +190,7 @@ export default function SafetyReportsListPage() {
       {error && (
         <div className="mt-6 flex items-center justify-between gap-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
           <span className="flex items-center gap-2"><AlertTriangle className="h-4 w-4" />{error}</span>
-          <button type="button" onClick={() => reportsQuery.refetch()} className="font-extrabold hover:underline">Try again</button>
+          <button type="button" onClick={() => reportsQuery.refetch()} className="font-semibold hover:underline">Try again</button>
         </div>
       )}
 
@@ -213,7 +213,7 @@ export default function SafetyReportsListPage() {
           </p>
           <div className="flex items-center gap-2">
             <Button variant="outline" size="sm" icon={ArrowLeft} disabled={page <= 1} onClick={() => setPage((current) => current - 1)}>Previous</Button>
-            <span className="px-2 text-xs font-extrabold text-slate-600">Page {page} of {pagination.lastPage}</span>
+            <span className="px-2 text-xs font-semibold text-slate-600">Page {page} of {pagination.lastPage}</span>
             <Button variant="outline" size="sm" icon={ArrowRight} disabled={page >= pagination.lastPage} onClick={() => setPage((current) => current + 1)}>Next</Button>
           </div>
         </div>

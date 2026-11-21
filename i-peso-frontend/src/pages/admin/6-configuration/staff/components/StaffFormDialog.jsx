@@ -141,7 +141,7 @@ export default function StaffFormDialog({ open, onOpenChange, staff, positions, 
 
         <form id="staff-form" onSubmit={submit} noValidate className="space-y-5">
           <fieldset className="grid gap-4 sm:grid-cols-2">
-            <legend className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500">Personal details</legend>
+            <legend className="mb-2 text-xs font-bold text-slate-500">Personal details</legend>
             <Field label="First name" required error={errors.first_name}>
               <input value={form.first_name} onChange={set('first_name')} className={inputClass(errors.first_name)} autoComplete="off" />
             </Field>
@@ -166,7 +166,7 @@ export default function StaffFormDialog({ open, onOpenChange, staff, positions, 
           </fieldset>
 
           <fieldset className="grid gap-4 sm:grid-cols-2">
-            <legend className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500">Position</legend>
+            <legend className="mb-2 text-xs font-bold text-slate-500">Position</legend>
             <Field
               label="Position"
               required
@@ -183,8 +183,8 @@ export default function StaffFormDialog({ open, onOpenChange, staff, positions, 
           </fieldset>
 
           {isIntern && (
-            <fieldset className="grid gap-4 rounded-xl border border-blue-200 bg-blue-50/50 p-4 sm:grid-cols-2">
-              <legend className="px-1 text-xs font-bold uppercase tracking-wide text-blue-800">Internship</legend>
+            <fieldset className="grid gap-4 rounded-xl border border-[#c4d9f7] bg-[#e8f0fc] p-4 sm:grid-cols-2">
+              <legend className="px-1 text-xs font-bold text-brand-navy">Internship</legend>
               <Field label="School" required error={errors.ojt_school}>
                 <input value={form.ojt_school} onChange={set('ojt_school')} placeholder="e.g. Pangasinan State University" className={inputClass(errors.ojt_school)} autoComplete="off" />
               </Field>

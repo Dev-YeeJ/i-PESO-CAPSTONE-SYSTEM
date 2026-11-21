@@ -16,8 +16,9 @@ use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 /**
- * Site Content → FAQs. Managed by Configuration or Constituent CRM (front
- * desk) staff: admin.permission:configuration|constituent_crm.
+ * Content Modules → FAQs: the assistant's answer bank (there is no reader-facing
+ * Help page). Managed by Configuration or Constituent CRM (front desk) staff:
+ * admin.permission:configuration|constituent_crm.
  */
 class FaqController extends Controller
 {
@@ -52,24 +53,17 @@ class FaqController extends Controller
             $query->where(fn ($q) => $q->where('question', 'like', $term)->orWhere('answer', 'like', $term));
         }
 
-        $all = Faq::query()->get(['id', 'is_published', 'is_featured', 'audience']);
+        $all = Faq::query()->get(['id', 'is_published', 'audience']);
         $chatbotLimit = SiteContentService::CHATBOT_FAQ_LIMIT;
-        $votes = $this->votes();
 
         return response()->json([
-            'data' => Faq::sortForDisplay($query->get())->map(fn (Faq $faq) => [
-                ...$this->present($faq),
-                'helpful_votes' => (int) ($votes[$faq->id]->helpful ?? 0),
-                'unhelpful_votes' => (int) ($votes[$faq->id]->not_helpful ?? 0),
-            ])->values(),
+            'data' => Faq::sortForDisplay($query->get())->map(fn (Faq $faq) => $this->present($faq))->values(),
             'summary' => [
                 'total' => $all->count(),
                 'published' => $all->where('is_published', true)->count(),
                 'unpublished' => $all->where('is_published', false)->count(),
-                'featured' => $all->where('is_featured', true)->count(),
                 'in_assistant' => min($all->where('is_published', true)->count(), $chatbotLimit),
                 'assistant_limit' => $chatbotLimit,
-                'max_featured' => Faq::MAX_FEATURED,
             ],
             'topics' => $this->content->topics(),
             'audiences' => collect(Faq::AUDIENCES)->map(fn ($label, $value) => ['value' => $value, 'label' => $label])->values(),
@@ -112,10 +106,6 @@ class FaqController extends Controller
         if ($topicChanged) {
             $faq->sort_order = (int) Faq::query()->where('topic', $data['topic'])->max('sort_order') + 1;
         }
-        // Only Everyone FAQs can be featured on the (public) landing page.
-        if ($faq->audience !== Faq::AUDIENCE_EVERYONE) {
-            $faq->is_featured = false;
-        }
         $faq->save();
 
         $changed = array_keys(array_diff_assoc(array_map('strval', $faq->snapshot()), array_map('strval', $before)));
@@ -136,35 +126,6 @@ class FaqController extends Controller
     public function unpublish(Request $request, Faq $faq): JsonResponse
     {
         return $this->setPublished($request, $faq, false);
-    }
-
-    public function feature(Request $request, Faq $faq): JsonResponse
-    {
-        $admin = $this->admin($request);
-        $featured = (bool) $request->validate(['featured' => ['required', 'boolean']])['featured'];
-
-        if ($featured) {
-            if ($faq->audience !== Faq::AUDIENCE_EVERYONE) {
-                throw ValidationException::withMessages(['featured' => 'Only FAQs for Everyone can be shown on the landing page.']);
-            }
-            $current = Faq::query()->where('is_featured', true)->whereKeyNot($faq->id)->get(['id', 'question']);
-            if ($current->count() >= Faq::MAX_FEATURED) {
-                throw ValidationException::withMessages(['featured' => sprintf(
-                    'The landing page already shows %d questions: %s. Remove one first.',
-                    Faq::MAX_FEATURED,
-                    $current->pluck('question')->map(fn ($q) => '"'.$q.'"')->implode(', ')
-                )]);
-            }
-        }
-
-        $faq->forceFill(['is_featured' => $featured, 'updated_by' => $admin->admin_id])->save();
-        $this->content->flush();
-        ActivityLogger::logAs($admin, 'faq_featured', sprintf('%s FAQ #%d "%s" %s the landing page.', $featured ? 'Showed' : 'Removed', $faq->id, $faq->question, $featured ? 'on' : 'from'));
-
-        return response()->json([
-            'message' => $featured ? ($faq->is_published ? 'Shown on the landing page.' : 'Will show on the landing page once published.') : 'Removed from the landing page.',
-            'faq' => $this->present($faq->fresh('editor')),
-        ]);
     }
 
     public function reorder(Request $request): JsonResponse
@@ -261,7 +222,7 @@ class FaqController extends Controller
         ));
 
         return response()->json([
-            'message' => $published ? 'Published. It is on the Help pages now.' : 'Unpublished. It is hidden from readers.',
+            'message' => $published ? 'Published. The assistant can use it now.' : 'Unpublished. The assistant no longer uses it.',
             'faq' => $this->present($faq->fresh('editor')),
         ]);
     }
@@ -285,20 +246,6 @@ class FaqController extends Controller
         $data['link_url'] ??= null;
 
         return $data;
-    }
-
-    /** "Was this helpful?" totals per FAQ (empty if the insight tables are not migrated yet). */
-    private function votes(): \Illuminate\Support\Collection
-    {
-        try {
-            return DB::table('faq_feedback')
-                ->select('faq_id', DB::raw('SUM(CASE WHEN helpful THEN 1 ELSE 0 END) as helpful'), DB::raw('SUM(CASE WHEN helpful THEN 0 ELSE 1 END) as not_helpful'))
-                ->groupBy('faq_id')
-                ->get()
-                ->keyBy('faq_id');
-        } catch (\Illuminate\Database\QueryException) {
-            return collect();
-        }
     }
 
     private function present(Faq $faq): array

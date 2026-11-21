@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import toast from 'react-hot-toast'
+import toast from '@/lib/toast'
 import { Lock, ShieldCheck, Trash2 } from 'lucide-react'
 import { Badge, Button, Card, ConfirmDialog, ErrorState, LoadingSkeleton } from '@/components/ui'
 import PageHeader from '@/pages/admin/_components/PageHeader'
@@ -44,7 +44,7 @@ export default function RolePermissionsPage() {
       />
 
       {!canEdit && (
-        <p className="mt-4 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+        <p className="mt-4 rounded-lg border border-[#c4d9f7] bg-[#e8f0fc] px-4 py-3 text-sm text-brand-navy">
           You can view roles here. Only the system administrator can change them.
         </p>
       )}
@@ -99,7 +99,7 @@ function RoleCard({ role, modules, canEdit }) {
           </h2>
           <p className="mt-1 text-xs text-slate-500">
             {role.administrators_count ?? 0} {role.administrators_count === 1 ? 'account' : 'accounts'}
-            {locked && ' · The PESO Office Manager. Always has full access, including staff accounts and roles'}
+            {locked && '. The PESO Office Manager. Always has full access, including staff accounts and roles'}
           </p>
         </div>
         <Badge variant={role.is_system ? 'neutral' : 'review'} icon={false}>{role.is_system ? 'Built-in' : 'Custom'}</Badge>
@@ -159,7 +159,7 @@ function RoleCard({ role, modules, canEdit }) {
 function LevelPicker({ label, value, onChange, disabled }) {
   const tone = {
     none: 'bg-slate-700 text-white',
-    view: 'bg-blue-700 text-white',
+    view: 'bg-brand-navy text-white',
     manage: 'bg-emerald-700 text-white',
   }
 

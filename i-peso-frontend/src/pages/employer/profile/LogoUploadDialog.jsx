@@ -76,11 +76,11 @@ export default function LogoUploadDialog({ open, onOpenChange, currentUrl, compa
                 <div className="flex items-end gap-5">
                   <figure className="flex flex-col items-center gap-1.5">
                     <img src={preview} alt="New logo preview" className="h-28 w-28 rounded-2xl border-4 border-white bg-white object-contain p-1.5 shadow-lg" />
-                    <figcaption className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Profile</figcaption>
+                    <figcaption className="text-xs font-bold text-slate-500">Profile</figcaption>
                   </figure>
                   <figure className="flex flex-col items-center gap-1.5">
                     <img src={preview} alt="" className="h-12 w-12 rounded-xl border-2 border-white bg-white object-contain p-1 shadow" />
-                    <figcaption className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Job card</figcaption>
+                    <figcaption className="text-xs font-bold text-slate-500">Job card</figcaption>
                   </figure>
                 </div>
                 <p className="max-w-xs truncate text-sm font-semibold text-slate-700">{file?.name}</p>
@@ -94,7 +94,7 @@ export default function LogoUploadDialog({ open, onOpenChange, currentUrl, compa
                   ? <CompanyLogo src={currentUrl} name={companyName} size="lg" />
                   : <span className="flex h-16 w-16 items-center justify-center rounded-2xl bg-white text-brand-navy shadow"><ImageUp className="h-7 w-7" aria-hidden /></span>}
                 <p className="text-sm font-bold text-slate-800">{isDragActive ? 'Drop the image here' : 'Drag an image here, or click to choose'}</p>
-                <p className="text-xs text-slate-500">JPG, PNG or WebP · up to 5 MB</p>
+                <p className="text-xs text-slate-500">JPG, PNG or WebP, up to 5 MB</p>
               </Motion.div>
             )}
           </AnimatePresence>

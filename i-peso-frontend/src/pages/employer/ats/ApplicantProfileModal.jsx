@@ -8,12 +8,12 @@ import { formatDate, formatDateTime } from './atsFormatters'
 import InterviewSummary from './InterviewSummary'
 import ReportApplicantButton from '@/components/safety/ReportApplicantButton'
 import { getApplicantResume } from '@/services/employerApplicationService'
-import toast from 'react-hot-toast'
+import toast from '@/lib/toast'
 
 function InfoTile({ label, value }) {
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
-      <p className="text-xs font-black uppercase tracking-wide text-slate-400">{label}</p>
+      <p className="text-xs font-bold text-slate-400">{label}</p>
       <p className="mt-1 font-semibold text-slate-900">{value || 'Not specified'}</p>
     </div>
   )
@@ -21,8 +21,8 @@ function InfoTile({ label, value }) {
 
 function SectionHeading({ icon: Icon, title }) {
   return (
-    <h3 className="mb-4 flex items-center gap-2 text-sm font-bold uppercase tracking-widest text-slate-800">
-      <Icon className="h-4 w-4 text-blue-600" /> {title}
+    <h3 className="mb-4 flex items-center gap-2 text-sm font-bold text-slate-800">
+      <Icon className="h-4 w-4 text-brand-navy" /> {title}
     </h3>
   )
 }
@@ -70,8 +70,8 @@ export default function ApplicantProfileModal({
             <div className="flex items-center gap-4">
               <ApplicantAvatar applicationId={data?.apply_id} hasPhoto={seeker.has_profile_image} name={seeker.name} size="md" />
               <div>
-                <DialogTitle className="text-xl font-black text-slate-900">{seeker.name || 'Applicant'}</DialogTitle>
-                <p className="text-sm font-medium text-slate-500">Applying for: <span className="text-blue-700">{jobTitle || data?.job?.job_title}</span></p>
+                <DialogTitle className="text-xl font-bold text-slate-900">{seeker.name || 'Applicant'}</DialogTitle>
+                <p className="text-sm font-medium text-slate-500">Applying for: <span className="text-brand-navy">{jobTitle || data?.job?.job_title}</span></p>
               </div>
             </div>
             
@@ -94,7 +94,7 @@ export default function ApplicantProfileModal({
                 <Button 
                   variant="secondary" 
                   size="sm" 
-                  className="bg-blue-50 text-blue-700 hover:bg-blue-100 disabled:opacity-50" 
+                  className="bg-[#e8f0fc] text-brand-navy hover:bg-[#e8f0fc] disabled:opacity-50" 
                   onClick={handleDownloadResume}
                   disabled={!seeker.has_resume}
                   title={seeker.has_resume ? "Download Resume" : "No resume generated"}
@@ -103,7 +103,7 @@ export default function ApplicantProfileModal({
                 </Button>
               </div>
 
-              <button onClick={onClose} className="rounded-full p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500"><X className="h-5 w-5" /></button>
+              <button onClick={onClose} className="rounded-full p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600 focus:outline-none focus:ring-2 focus:ring-[#2563b8]"><X className="h-5 w-5" /></button>
             </div>
           </div>
         </div>
@@ -147,7 +147,7 @@ export default function ApplicantProfileModal({
                     <SectionHeading icon={Sparkles} title="Matched Skills" />
                     <div className="flex flex-wrap gap-2">
                       {skills.map((skill, index) => (
-                        <span key={`${skill}-${index}`} className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-bold text-blue-700">{skill}</span>
+                        <span key={`${skill}-${index}`} className="rounded-lg border border-[#c4d9f7] bg-[#e8f0fc] px-3 py-1.5 text-xs font-bold text-brand-navy">{skill}</span>
                       ))}
                       {!skills.length && <span className="text-sm text-slate-500">No declared skills yet.</span>}
                     </div>
@@ -220,11 +220,11 @@ export default function ApplicantProfileModal({
                     <div className="space-y-4">
                       {timeline.length ? timeline.map((item, index) => (
                         <div key={`${item.title}-${index}`} className="flex gap-3">
-                          <div className={`mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ${item.status === status ? 'bg-blue-600 ring-4 ring-blue-50' : 'bg-slate-300'}`} />
+                          <div className={`mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ${item.status === status ? 'bg-brand-navy ring-4 ring-blue-50' : 'bg-slate-300'}`} />
                           <div className="min-w-0">
                             <p className="text-sm font-bold text-slate-900">{item.title}</p>
                             <p className="mt-0.5 text-xs text-slate-500">{item.description}</p>
-                            <p className="mt-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">{item.timestamp ? formatDateTime(item.timestamp) : 'Pending'}</p>
+                            <p className="mt-1 text-xs font-bold text-slate-400">{item.timestamp ? formatDateTime(item.timestamp) : 'Pending'}</p>
                           </div>
                         </div>
                       )) : (

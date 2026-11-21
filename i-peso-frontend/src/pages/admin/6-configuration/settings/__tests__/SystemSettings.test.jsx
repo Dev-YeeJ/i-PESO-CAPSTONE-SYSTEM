@@ -1,7 +1,7 @@
 import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import toast from 'react-hot-toast'
+import toast from '@/lib/toast'
 import SystemSettingsPage from '../SystemSettingsPage'
 import { renderWithProviders } from '@/test/utils'
 import { adminSystemSettingsService, publicSystemStatusService } from '@/services/systemSettingsService'
@@ -11,7 +11,7 @@ vi.mock('@/services/systemSettingsService', () => ({
   adminSystemSettingsService: { list: vi.fn(), save: vi.fn(), status: vi.fn(), testEmail: vi.fn(), testSms: vi.fn(), testAi: vi.fn() },
   publicSystemStatusService: { get: vi.fn() },
 }))
-vi.mock('react-hot-toast', () => ({ default: Object.assign(vi.fn(), { success: vi.fn(), error: vi.fn() }) }))
+vi.mock('@/lib/toast', () => { const toast = Object.assign(vi.fn(), { success: vi.fn(), error: vi.fn(), warning: vi.fn(), loading: vi.fn(), dismiss: vi.fn() }); return { default: toast, toast } })
 
 const setting = (key, group, type, value, extra = {}) => ({ key, group, type, value, default: value, label: extra.label ?? key, help: `${key} help`, changed: false, updated_at: null, updated_by: null, ...extra })
 

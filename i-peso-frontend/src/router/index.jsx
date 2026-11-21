@@ -18,12 +18,13 @@ import AdminLayout    from '@/layouts/AdminLayout'
 import App            from '@/App'
 import RouteErrorBoundary from './RouteErrorBoundary'
 import { RegistrationGate } from '@/components/system/SystemNotices'
+// Announcements live on the dashboard now; the old pages only redirect there.
+import AnnouncementsRedirect from '@/components/announcements/AnnouncementsRedirect'
 
 // --- LAZY LOADED PAGES ---
 const LandingPage        = lazy(() => import('@/pages/landing/LandingPage'))
 // Policy pages: the published version from Site Content → Policy pages, or the original text.
 const PolicyRoute = lazy(() => import('@/pages/legal/PolicyRoute'))
-const PublicHelpPage = lazy(() => import('@/pages/help/PublicHelpPage'))
 const AboutPage = lazy(() => import('@/pages/about/AboutPage'))
 const LoginPage          = lazy(() => import('@/pages/auth/LoginPage'))
 const AdminLoginPage     = lazy(() => import('@/pages/auth/AdminLoginPage'))
@@ -63,8 +64,6 @@ const SeekerProgramDetails = lazy(() => import('@/pages/seeker/ProgramDetailsPag
 const SeekerApplications = lazy(() => import('@/pages/seeker/MyApplications'))
 const SeekerReviews = lazy(() => import('@/pages/seeker/MyReviewsPage'))
 const MySafetyReports = lazy(() => import('@/pages/shared/MySafetyReportsPage'))
-const AnnouncementsFeed = lazy(() => import('@/pages/shared/AnnouncementsFeedPage'))
-const HelpPage = lazy(() => import('@/pages/shared/HelpPage'))
 const SeekerOnboarding  = lazy(() => import('@/pages/auth/onboarding/SeekerOnboarding'))
 
 // Admin Pages - CATEGORY 1: OVERVIEW
@@ -134,7 +133,8 @@ export const router = createBrowserRouter([
           { path: '/privacy-policy', element: S(PolicyRoute, { slug: 'privacy-policy' }) },
           { path: '/review-guidelines', element: S(PolicyRoute, { slug: 'review-guidelines' }) },
           { path: '/terms-of-service', element: S(PolicyRoute, { slug: 'terms-of-service' }) },
-          { path: '/help', element: S(PublicHelpPage) },
+          // Help & FAQs was removed (the assistant answers instead); old links land on the home page.
+          { path: '/help', element: <Navigate to="/" replace /> },
           { path: '/about', element: S(AboutPage) },
           {
             element: <GuestOnly />,
@@ -178,8 +178,8 @@ export const router = createBrowserRouter([
                     children: [
                       { index: true, element: <Navigate to="dashboard" replace /> },
                       { path: 'dashboard', element: S(EmployerDashboard) },
-                      { path: 'announcements', element: S(AnnouncementsFeed, { role: 'employer' }) },
-                      { path: 'help', element: S(HelpPage, { role: 'employer' }) },
+                      { path: 'announcements', element: <AnnouncementsRedirect to="/employer/dashboard" /> },
+                      { path: 'help', element: <Navigate to="/employer/dashboard" replace /> },
                       {
                         element: <RequireApprovedEmployer />,
                         children: [
@@ -289,8 +289,8 @@ export const router = createBrowserRouter([
                           { path: 'applications', element: S(SeekerApplications) },
                           { path: 'reviews', element: S(SeekerReviews) },
                           { path: 'safety-reports', element: S(MySafetyReports, { role: 'seeker' }) },
-                          { path: 'announcements', element: S(AnnouncementsFeed, { role: 'seeker' }) },
-                          { path: 'help', element: S(HelpPage, { role: 'seeker' }) },
+                          { path: 'announcements', element: <AnnouncementsRedirect to="/seeker/dashboard" /> },
+                          { path: 'help', element: <Navigate to="/seeker/dashboard" replace /> },
                           { path: 'profile', element: S(SeekerProfile) },
                           { path: 'profile/edit', element: S(SeekerProfileEdit) },
                           { path: 'employers/:id', element: S(SeekerEmployerProfile) },

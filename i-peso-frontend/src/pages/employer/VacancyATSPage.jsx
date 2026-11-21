@@ -1,12 +1,12 @@
-import { useState } from 'react'
+import { createElement, useState } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   Search, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight,
   CheckSquare, Square, MapPin, GraduationCap, Calendar as CalendarIcon,
-  Briefcase, Users, ArrowUpDown, Eye, ArrowLeft, RefreshCw,
+  Briefcase, Users, ArrowUpDown, Eye, ArrowLeft, RefreshCw, Columns3, List,
 } from 'lucide-react'
-import toast from 'react-hot-toast'
+import toast from '@/lib/toast'
 import {
   getVacancyApplications,
   getEmployerApplicationDetail,
@@ -22,6 +22,16 @@ import InterviewModal from './ats/InterviewModal'
 import { InterviewPhaseChip } from './ats/InterviewSummary'
 import HireModal from './ats/HireModal'
 import RejectModal from './ats/RejectModal'
+import ApplicantBoard from './ats/ApplicantBoard'
+
+const VIEW_KEY = 'ipeso.ats.view'
+const VIEW_OPTIONS = [
+  { id: 'board', label: 'Board', icon: Columns3 },
+  { id: 'table', label: 'Table', icon: List },
+]
+const readView = () => {
+  try { return window.localStorage.getItem(VIEW_KEY) === 'board' ? 'board' : 'table' } catch { return 'table' }
+}
 
 export default function VacancyATSPage() {
   const { vacancyId } = useParams()
@@ -40,6 +50,13 @@ export default function VacancyATSPage() {
   const [modalTargets, setModalTargets] = useState([])
   const [detailApplication, setDetailApplication] = useState(null)
   const [detailLoading, setDetailLoading] = useState(false)
+  const [view, setView] = useState(readView)
+
+  const changeView = (next) => {
+    setView(next)
+    setSelectedIds(new Set())
+    try { window.localStorage.setItem(VIEW_KEY, next) } catch { /* private window: just don't remember */ }
+  }
 
   const { isSubmitting, runStatusChange } = useApplicationStatusActions({
     invalidateKeys: [['vacancyApplications'], ['vacancyATSCounts']],
@@ -65,7 +82,7 @@ export default function VacancyATSPage() {
     }),
     staleTime: 1000 * 30,
     refetchInterval: 30000,
-    enabled: !!vacancyId,
+    enabled: !!vacancyId && view === 'table',
   })
 
   const applications = applicationsQuery.data?.data || []
@@ -144,6 +161,16 @@ export default function VacancyATSPage() {
     else runStatusChange(status, targets).then(({ success }) => success && setSelectedIds(new Set()))
   }
 
+  /** One applicant moved on the board: the final and interview stages need their dialog first. */
+  const moveApplicant = (app, status) => {
+    if (status === 'interview' || status === 'hired' || status === 'rejected') {
+      setModalTargets([app])
+      setActiveModal(status === 'interview' ? 'interview' : status === 'hired' ? 'hire' : 'reject')
+      return
+    }
+    runStatusChange(status, [app])
+  }
+
   const handleModalSubmit = async (extraPayload) => {
     const { success } = await runStatusChange(activeModal === 'interview' ? 'interview' : activeModal === 'hire' ? 'hired' : 'rejected', modalTargets, extraPayload)
     if (success) {
@@ -161,7 +188,7 @@ export default function VacancyATSPage() {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
         <div className="text-center">
-          <div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-blue-600 border-t-transparent" />
+          <div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-brand-navy border-t-transparent" />
           <p className="mt-4 text-sm font-medium text-slate-500">Loading vacancy details...</p>
         </div>
       </div>
@@ -201,8 +228,8 @@ export default function VacancyATSPage() {
 
         <div className="px-6 py-5">
           <div className="mb-2 flex flex-wrap items-center gap-3">
-            <h1 className="text-2xl font-extrabold tracking-tight text-slate-900">{vacancy?.job_title}</h1>
-            <Badge status={vacancy?.status} icon={false} className="uppercase tracking-wider">{vacancy?.status}</Badge>
+            <h1 className="text-2xl font-semibold tracking-tight text-slate-900">{vacancy?.job_title}</h1>
+            <Badge status={vacancy?.status} icon={false} className="">{vacancy?.status}</Badge>
           </div>
           <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-slate-500">
             {vacancy?.location && <span className="flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5" />{vacancy.location}</span>}
@@ -213,8 +240,8 @@ export default function VacancyATSPage() {
 
           <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-7">
             <div className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-3">
-              <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Total</p>
-              <p className="mt-1 text-2xl font-extrabold text-slate-900">{totalApplicants}</p>
+              <p className="text-xs font-bold text-slate-400">Total</p>
+              <p className="mt-1 text-2xl font-semibold text-slate-900">{totalApplicants}</p>
             </div>
             {PIPELINE_TABS.map((tab) => {
               const count = tabCounts[tab.id] || 0
@@ -224,10 +251,10 @@ export default function VacancyATSPage() {
                   key={tab.id}
                   onClick={() => { setActiveTab(tab.id); setCurrentPage(1); setSelectedIds(new Set()) }}
                   aria-pressed={activeTab === tab.id}
-                  className={`rounded-xl border px-4 py-3 text-left transition-all hover:shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700 ${activeTab === tab.id ? 'border-blue-200 bg-blue-50 ring-1 ring-blue-200' : 'border-slate-100 bg-white hover:border-slate-200'}`}
+                  className={`rounded-xl border px-4 py-3 text-left transition-all hover:shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700 ${activeTab === tab.id ? 'border-[#c4d9f7] bg-[#e8f0fc] ring-1 ring-[#c4d9f7]' : 'border-slate-100 bg-white hover:border-slate-200'}`}
                 >
-                  <p className="flex items-center gap-1 text-xs font-bold uppercase tracking-wider text-slate-400"><TabIcon className="h-3 w-3" />{tab.label}</p>
-                  <p className={`mt-1 text-2xl font-extrabold ${activeTab === tab.id ? 'text-blue-700' : 'text-slate-900'}`}>{count}</p>
+                  <p className="flex items-center gap-1 text-xs font-bold text-slate-400"><TabIcon className="h-3 w-3" />{tab.label}</p>
+                  <p className={`mt-1 text-2xl font-semibold ${activeTab === tab.id ? 'text-brand-navy' : 'text-slate-900'}`}>{count}</p>
                 </button>
               )
             })}
@@ -236,7 +263,7 @@ export default function VacancyATSPage() {
       </div>
 
       <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-        <div className="no-scrollbar flex overflow-x-auto border-b border-slate-200">
+        {view === 'table' && <div className="no-scrollbar flex overflow-x-auto border-b border-slate-200">
           {PIPELINE_TABS.map((tab) => {
             const TabIcon = tab.icon
             return (
@@ -244,15 +271,15 @@ export default function VacancyATSPage() {
                 key={tab.id}
                 onClick={() => { setActiveTab(tab.id); setCurrentPage(1); setSelectedIds(new Set()) }}
                 aria-pressed={activeTab === tab.id}
-                className={`flex items-center gap-2 whitespace-nowrap border-b-2 px-5 py-3.5 text-sm font-semibold transition-all focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-blue-700 ${activeTab === tab.id ? 'border-blue-600 bg-blue-50/40 text-blue-700' : 'border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-700'}`}
+                className={`flex items-center gap-2 whitespace-nowrap border-b-2 px-5 py-3.5 text-sm font-semibold transition-all focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-blue-700 ${activeTab === tab.id ? 'border-brand-navy bg-[#e8f0fc] text-brand-navy' : 'border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-700'}`}
               >
                 <TabIcon className="h-4 w-4" />
                 {tab.label}
-                <span className={`ml-1 rounded-full px-2 py-0.5 text-xs font-bold ${activeTab === tab.id ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-500'}`}>{tabCounts[tab.id] || 0}</span>
+                <span className={`ml-1 rounded-full px-2 py-0.5 text-xs font-bold ${activeTab === tab.id ? 'bg-[#e8f0fc] text-brand-navy' : 'bg-slate-100 text-slate-500'}`}>{tabCounts[tab.id] || 0}</span>
               </button>
             )
           })}
-        </div>
+        </div>}
 
         <div className="flex flex-col items-stretch justify-between gap-3 border-b border-slate-100 px-5 py-3 sm:flex-row sm:items-center">
           <div className="relative max-w-md flex-1">
@@ -263,7 +290,7 @@ export default function VacancyATSPage() {
               aria-label="Search applicants"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-10 pr-4 text-sm placeholder:text-slate-400 focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-500"
+              className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-10 pr-4 text-sm placeholder:text-slate-400 focus:border-brand-navy focus:bg-white focus:ring-2 focus:ring-[#2563b8]"
             />
           </div>
 
@@ -276,28 +303,55 @@ export default function VacancyATSPage() {
                   const opt = SORT_OPTIONS.find((o) => o.value === e.target.value)
                   setSortBy(opt.value); setSortDir(opt.dir); setCurrentPage(1)
                 }}
-                className="cursor-pointer rounded-lg border border-slate-200 bg-white py-2 pl-3 pr-8 text-sm focus:ring-2 focus:ring-blue-500"
+                className="cursor-pointer rounded-lg border border-slate-200 bg-white py-2 pl-3 pr-8 text-sm focus:ring-2 focus:ring-[#2563b8]"
               >
                 {SORT_OPTIONS.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
               </select>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-0.5" role="group" aria-label="Applicant view">
+              {VIEW_OPTIONS.map(({ id, label, icon }) => (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => changeView(id)}
+                  aria-pressed={view === id}
+                  className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-focus ${view === id ? 'bg-white text-brand-navy shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                >
+                  {createElement(icon, { className: 'h-4 w-4', 'aria-hidden': true })}
+                  {label}
+                </button>
+              ))}
+            </div>
+            {view === 'table' && <div className="flex items-center gap-2">
               <span className="text-xs font-medium text-slate-400">Show</span>
               <select
                 value={pageSize}
                 onChange={(e) => { setPageSize(Number(e.target.value)); setCurrentPage(1) }}
-                className="cursor-pointer rounded-lg border border-slate-200 bg-white py-2 pl-3 pr-8 text-sm focus:ring-2 focus:ring-blue-500"
+                className="cursor-pointer rounded-lg border border-slate-200 bg-white py-2 pl-3 pr-8 text-sm focus:ring-2 focus:ring-[#2563b8]"
               >
                 {PAGE_SIZE_OPTIONS.map((size) => <option key={size} value={size}>{size}</option>)}
               </select>
-            </div>
+            </div>}
             <Button to="/employer/calendar" variant="outline" size="sm" icon={CalendarIcon}>
               <span className="hidden sm:inline">Calendar</span>
             </Button>
           </div>
         </div>
 
-        <div className="overflow-x-auto">
+        {view === 'board' && (
+          <ApplicantBoard
+            vacancyId={vacancyId}
+            search={debouncedSearch}
+            sortBy={sortBy}
+            sortDir={sortDir}
+            counts={debouncedSearch ? {} : tabCounts}
+            onMove={moveApplicant}
+            onOpen={openProfileModal}
+            disabled={isSubmitting}
+          />
+        )}
+
+        {view === 'table' && <div className="overflow-x-auto">
           <table className="w-full min-w-[800px] border-collapse text-left">
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50/80">
@@ -309,17 +363,17 @@ export default function VacancyATSPage() {
                       aria-pressed={selectedIds.size === applications.length && applications.length > 0}
                       className="text-slate-400 transition-colors hover:text-slate-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700"
                     >
-                      {selectedIds.size === applications.length && applications.length > 0 ? <CheckSquare className="h-4.5 w-4.5 text-blue-600" /> : <Square className="h-4.5 w-4.5" />}
+                      {selectedIds.size === applications.length && applications.length > 0 ? <CheckSquare className="h-4.5 w-4.5 text-brand-navy" /> : <Square className="h-4.5 w-4.5" />}
                     </button>
                   )}
                 </th>
-                <th className="px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Candidate</th>
-                <th className="w-28 px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Match</th>
-                <th className="px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Skills</th>
-                <th className="hidden px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500 lg:table-cell">Education</th>
-                <th className="hidden px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500 md:table-cell">Location</th>
-                <th className="w-28 px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Applied</th>
-                <th className="w-20 px-4 py-3 text-center text-xs font-bold uppercase tracking-wider text-slate-500">Actions</th>
+                <th className="px-4 py-3 text-xs font-bold text-slate-500">Candidate</th>
+                <th className="w-28 px-4 py-3 text-xs font-bold text-slate-500">Match</th>
+                <th className="px-4 py-3 text-xs font-bold text-slate-500">Skills</th>
+                <th className="hidden px-4 py-3 text-xs font-bold text-slate-500 lg:table-cell">Education</th>
+                <th className="hidden px-4 py-3 text-xs font-bold text-slate-500 md:table-cell">Location</th>
+                <th className="w-28 px-4 py-3 text-xs font-bold text-slate-500">Applied</th>
+                <th className="w-20 px-4 py-3 text-center text-xs font-bold text-slate-500">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -355,26 +409,26 @@ export default function VacancyATSPage() {
                   const topSkills = skills.slice(0, 3)
 
                   return (
-                    <tr key={app.apply_id} className={`group transition-colors ${isSelected ? 'bg-blue-50/50' : 'hover:bg-slate-50/80'}`}>
+                    <tr key={app.apply_id} className={`group transition-colors ${isSelected ? 'bg-[#e8f0fc]' : 'hover:bg-slate-50/80'}`}>
                       <td className="px-4 py-3.5 text-center">
                         {!isTerminalTab && (
                           <button
                             onClick={() => toggleSelect(app.apply_id)}
                             aria-label={`${isSelected ? 'Deselect' : 'Select'} ${seeker.name || 'this applicant'}`}
                             aria-pressed={isSelected}
-                            className="text-slate-400 transition-colors hover:text-blue-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700"
+                            className="text-slate-400 transition-colors hover:text-brand-navy focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700"
                           >
-                            {isSelected ? <CheckSquare className="h-4.5 w-4.5 text-blue-600" /> : <Square className="h-4.5 w-4.5" />}
+                            {isSelected ? <CheckSquare className="h-4.5 w-4.5 text-brand-navy" /> : <Square className="h-4.5 w-4.5" />}
                           </button>
                         )}
                       </td>
                       <td className="px-4 py-3.5">
                         <div className="flex items-center gap-3">
-                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-xs font-bold text-white shadow-sm">
+                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#e8f0fc] text-brand-navy text-xs font-bold text-white shadow-sm">
                             {getInitials(seeker.name)}
                           </div>
                           <div className="min-w-0">
-                            <button onClick={() => openProfileModal(app)} className="block max-w-[200px] truncate text-left text-sm font-bold text-slate-900 transition-colors hover:text-blue-600">
+                            <button onClick={() => openProfileModal(app)} className="block max-w-[200px] truncate text-left text-sm font-bold text-slate-900 transition-colors hover:text-brand-navy">
                               {seeker.name}
                             </button>
                             <p className="max-w-[200px] truncate text-xs text-slate-500">{seeker.email}</p>
@@ -414,7 +468,7 @@ export default function VacancyATSPage() {
                       </td>
                       <td className="px-4 py-3.5 text-center">
                         <div className="flex items-center justify-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-                          <button onClick={() => openProfileModal(app)} className="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-blue-50 hover:text-blue-600" title="View profile">
+                          <button onClick={() => openProfileModal(app)} className="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-[#e8f0fc] hover:text-brand-navy" title="View profile">
                             <Eye className="h-4 w-4" />
                           </button>
                           {activeTab === 'interview' && (
@@ -430,9 +484,9 @@ export default function VacancyATSPage() {
               )}
             </tbody>
           </table>
-        </div>
+        </div>}
 
-        {totalPages > 0 && applications.length > 0 && (
+        {view === 'table' && totalPages > 0 && applications.length > 0 && (
           <div className="flex flex-col items-center justify-between gap-3 border-t border-slate-200 bg-slate-50/50 px-5 py-3 sm:flex-row">
             <p className="text-sm text-slate-500">
               Showing <span className="font-semibold text-slate-700">{fromItem}</span> – <span className="font-semibold text-slate-700">{toItem}</span> of <span className="font-semibold text-slate-700">{totalItems}</span> applicants
@@ -451,7 +505,7 @@ export default function VacancyATSPage() {
                       onClick={() => goToPage(i)}
                       aria-label={`Page ${i}`}
                       aria-current={i === currentPage ? 'page' : undefined}
-                      className={`h-9 min-w-[36px] rounded-lg text-sm font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700 ${i === currentPage ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-200'}`}
+                      className={`h-9 min-w-[36px] rounded-lg text-sm font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700 ${i === currentPage ? 'bg-brand-navy text-white shadow-sm' : 'text-slate-600 hover:bg-slate-200'}`}
                     >
                       {i}
                     </button>,
@@ -466,10 +520,10 @@ export default function VacancyATSPage() {
         )}
       </div>
 
-      {selectedIds.size > 0 && (
+      {view === 'table' && selectedIds.size > 0 && (
         <div className="fixed bottom-6 left-1/2 z-40 flex -translate-x-1/2 animate-in fade-in slide-in-from-bottom-5 items-center gap-6 rounded-2xl border border-slate-700/50 bg-slate-900 px-6 py-4 text-white shadow-2xl">
           <div className="flex items-center gap-3">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-600 text-sm font-bold text-white">{selectedIds.size}</div>
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-brand-navy text-sm font-bold text-white">{selectedIds.size}</div>
             <span className="whitespace-nowrap text-sm font-semibold">Selected</span>
           </div>
           <div className="h-8 w-px bg-slate-700" />
@@ -477,7 +531,7 @@ export default function VacancyATSPage() {
             <span className="mr-1 text-xs text-slate-400">Move to:</span>
             {activeTab !== 'reviewed' && <button onClick={() => openBulkModal('reviewed')} className="rounded-lg px-3 py-1.5 text-sm font-medium text-slate-300 transition-colors hover:bg-slate-800">Reviewed</button>}
             {activeTab !== 'shortlisted' && <button onClick={() => openBulkModal('shortlisted')} className="rounded-lg px-3 py-1.5 text-sm font-medium text-slate-300 transition-colors hover:bg-slate-800">Shortlist</button>}
-            <button onClick={() => openBulkModal('interview')} className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-blue-500">Interview</button>
+            <button onClick={() => openBulkModal('interview')} className="rounded-lg bg-brand-navy px-3 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-blue-500">Interview</button>
             <button onClick={() => openBulkModal('hired')} className="ml-1 rounded-lg bg-emerald-600 px-3 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-emerald-500">Hire</button>
             <button onClick={() => openBulkModal('rejected')} className="ml-1 rounded-lg px-3 py-1.5 text-sm font-medium text-red-400 transition-colors hover:bg-red-950/30">Reject</button>
           </div>

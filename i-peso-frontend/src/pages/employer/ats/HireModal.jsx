@@ -38,7 +38,7 @@ export default function HireModal({ open, onClose, targets = [], isSubmitting, o
           <div>
             <DialogTitle className="text-emerald-900">Official placement capture</DialogTitle>
             <p className="mt-1 text-xs font-medium text-emerald-700">
-              Mandatory DOLE SPRS reporting requirement · hiring {targets.length} candidate{targets.length > 1 ? 's' : ''}.
+              Required for DOLE SPRS reporting. Hiring {targets.length} candidate{targets.length > 1 ? 's' : ''}.
             </p>
           </div>
         </div>

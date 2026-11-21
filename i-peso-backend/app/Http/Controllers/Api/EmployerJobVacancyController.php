@@ -105,10 +105,12 @@ class EmployerJobVacancyController extends Controller
      * the first time it's active (guarded by seekers_notified_at, mirroring
      * JobFairController::publish()'s published_at guard so a later edit never re-notifies).
      * Scored against every seeker with a completed profile; an incomplete profile can't produce
-     * a meaningful match score anyway. Synchronous like every other broadcast notification in
-     * this app (see JobFairController::broadcastToSeekers) — this deployment has no queue
-     * worker, so set_time_limit(0) guards against PHP's default execution-time limit cutting a
-     * large seeker base off partway through.
+     * a meaningful match score anyway.
+     *
+     * Scoring every seeker can take minutes, longer than the browser waits, so the work runs
+     * after the response (defer(), like announcements) — this deployment has no queue worker.
+     * seekers_notified_at is claimed atomically first, so a quick second save never sends
+     * the same vacancy twice.
      */
     private function notifyMatchingSeekersIfNewlyActive(JobVacancy $vacancy, EnhancedJobMatchingService $matching): void
     {
@@ -116,26 +118,38 @@ class EmployerJobVacancyController extends Controller
             return;
         }
 
-        set_time_limit(0);
+        $claimed = JobVacancy::query()
+            ->whereKey($vacancy->post_id)
+            ->where('status', 'active')
+            ->whereNull('seekers_notified_at')
+            ->update(['seekers_notified_at' => now()]);
+        if ($claimed !== 1) {
+            return;
+        }
 
-        JobSeeker::query()
-            ->where('profile_completed', true)
-            ->chunkById(100, function ($seekers) use ($vacancy, $matching) {
-                foreach ($seekers as $seeker) {
-                    try {
-                        $result = $matching->calculateMatch($vacancy, $seeker);
-                    } catch (\Throwable $e) {
-                        report($e);
-                        continue;
+        $vacancyId = $vacancy->post_id;
+        defer(function () use ($vacancyId, $matching) {
+            set_time_limit(0);
+            $vacancy = JobVacancy::find($vacancyId);
+            if (! $vacancy) {
+                return;
+            }
+
+            JobSeeker::query()
+                ->where('profile_completed', true)
+                ->chunkById(100, function ($seekers) use ($vacancy, $matching) {
+                    foreach ($seekers as $seeker) {
+                        try {
+                            $result = $matching->calculateMatch($vacancy, $seeker);
+                            if ((float) ($result['percentage'] ?? 0) >= 80) {
+                                $seeker->notify(new NewJobVacancyPosted($vacancy));
+                            }
+                        } catch (\Throwable $e) {
+                            report($e);
+                        }
                     }
-
-                    if ((float) ($result['percentage'] ?? 0) >= 80) {
-                        $seeker->notify(new NewJobVacancyPosted($vacancy));
-                    }
-                }
-            }, 'seeker_id');
-
-        $vacancy->update(['seekers_notified_at' => now()]);
+                }, 'seeker_id');
+        });
     }
 
     public function destroy(Request $request, JobVacancy $vacancy): JsonResponse

@@ -80,8 +80,8 @@ export default function EmployerProfileModal({ open, employerId, onClose }) {
                   <div className="flex items-center gap-4">
                     <CompanyLogo src={employer.company_logo_url} name={name} size="lg" />
                     <div className="min-w-0">
-                      <h2 className="break-words text-xl font-black leading-tight sm:text-2xl">{name}</h2>
-                      {registeredName && <p className="mt-0.5 text-sm text-blue-100">Registered as {registeredName}</p>}
+                      <h2 className="break-words text-xl font-bold leading-tight sm:text-2xl">{name}</h2>
+                      {registeredName && <p className="mt-0.5 text-sm text-white/80">Registered as {registeredName}</p>}
                       <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-white/10 px-2.5 py-1 text-xs font-semibold text-white ring-1 ring-white/20">
                         <ShieldCheck className="h-3.5 w-3.5" aria-hidden="true" />
                         Verified by PESO

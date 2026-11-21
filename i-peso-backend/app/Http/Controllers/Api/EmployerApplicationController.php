@@ -99,6 +99,30 @@ class EmployerApplicationController extends Controller
         return response()->json($applications);
     }
 
+    /**
+     * Applicant counts for the sidebar badge: `new` = still "pending" (nobody
+     * on the employer's side has moved them yet), `active` = still in the
+     * pipeline, `total` = every application to this employer's vacancies.
+     * Cheap on purpose: the employer portal polls it.
+     */
+    public function counts(Request $request): JsonResponse
+    {
+        $employer = $this->employer($request);
+
+        $byStatus = Application::query()
+            ->whereHas('jobVacancy', fn ($vacancy) => $vacancy->where('employer_id', $employer->employer_id))
+            ->selectRaw('status, COUNT(*) as total')
+            ->groupBy('status')
+            ->pluck('total', 'status')
+            ->map(fn ($count) => (int) $count);
+
+        return response()->json([
+            'new' => $byStatus->get('pending', 0),
+            'active' => collect(['pending', 'reviewed', 'shortlisted', 'interview'])->sum(fn ($status) => $byStatus->get($status, 0)),
+            'total' => $byStatus->sum(),
+        ]);
+    }
+
     public function show(Request $request, Application $application): JsonResponse
     {
         $this->ensureOwnership($request, $application);

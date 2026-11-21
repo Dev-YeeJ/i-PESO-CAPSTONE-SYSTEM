@@ -1,11 +1,13 @@
 import Button from '@/components/ui/Button'
 
-export function PageHeader({ title, subtitle, actions = [], eyebrow = 'PESO Operations' }) {
+// `eyebrow` is accepted for compatibility but no longer shown: the top bar's
+// breadcrumb already names the section, so a label above the title repeats it.
+// eslint-disable-next-line no-unused-vars
+export function PageHeader({ title, subtitle, actions = [], eyebrow }) {
   return (
     <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
       <div>
-        <p className="portal-eyebrow">{eyebrow}</p>
-        <h1 className="portal-title mt-1">{title}</h1>
+        <h1 className="portal-title">{title}</h1>
         {subtitle && <p className="portal-subtitle">{subtitle}</p>}
       </div>
       {actions.length > 0 && (

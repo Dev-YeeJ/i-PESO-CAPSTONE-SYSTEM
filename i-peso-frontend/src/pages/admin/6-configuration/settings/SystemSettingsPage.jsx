@@ -1,7 +1,7 @@
 import { createElement, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import toast from 'react-hot-toast'
+import toast from '@/lib/toast'
 import {
   Activity, AlertTriangle, Building2, CheckCircle2, KeyRound, MessageSquareText, Plus, RefreshCw, Save, Send, ShieldCheck, Undo2, X, XCircle,
 } from 'lucide-react'
@@ -73,7 +73,7 @@ export default function SystemSettingsPage() {
                   {createElement(section.icon, { className: 'h-4 w-4 shrink-0', 'aria-hidden': true })}
                   <span className="flex-1 whitespace-nowrap">{section.label}</span>
                   {section.value === 'status' && problems > 0 && (
-                    <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-black bg-slate-200 text-slate-700`} aria-label={`${problems} to check`}>{problems}</span>
+                    <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold bg-slate-200 text-slate-700`} aria-label={`${problems} to check`}>{problems}</span>
                   )}
                 </button>
               )
@@ -151,7 +151,7 @@ function StatusPanel({ status, canEdit }) {
           <div className="flex items-center gap-3">
             {createElement(STATUS_META[overall].icon, { className: `h-8 w-8 ${STATUS_META[overall].className}`, 'aria-hidden': true })}
             <div>
-              <p className="text-lg font-black text-slate-950">{overallText}</p>
+              <p className="text-lg font-bold text-slate-950">{overallText}</p>
               <p className="text-xs text-slate-500">Checked {formatWhen(checkedAt)}</p>
             </div>
           </div>
@@ -293,7 +293,7 @@ function SettingsGroup({ group, title, settings, canEdit, smsUsage }) {
 
   return (
     <Card>
-      <h2 className="text-lg font-black text-slate-950">{title}</h2>
+      <h2 className="text-lg font-bold text-slate-950">{title}</h2>
       {canEdit && <p className="mt-1 text-xs text-slate-500">Switches apply as soon as you flip them.</p>}
       <div className="mt-2 divide-y divide-slate-100">
         {group === 'sms' ? (

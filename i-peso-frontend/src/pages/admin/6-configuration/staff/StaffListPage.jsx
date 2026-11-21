@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import toast from 'react-hot-toast'
+import toast from '@/lib/toast'
 import { GraduationCap, MailCheck, Search, UserPlus, UserX, UsersRound } from 'lucide-react'
 import { Badge, Card } from '@/components/ui'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -85,7 +85,7 @@ export default function StaffListPage() {
       label: 'Name',
       render: (_, member) => (
         <div className="flex items-center gap-3">
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-black text-slate-700">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-bold text-slate-700">
             {initialsOf(member.name)}
           </span>
           <div className="min-w-0">
@@ -131,7 +131,7 @@ export default function StaffListPage() {
       />
 
       {!canManageAccounts && (
-        <p className="mt-4 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+        <p className="mt-4 rounded-lg border border-[#c4d9f7] bg-[#e8f0fc] px-4 py-3 text-sm text-brand-navy">
           You can view staff here. Only the system administrator can add staff or change accounts.
         </p>
       )}
@@ -216,6 +216,11 @@ export default function StaffListPage() {
         onOpenChange={(open) => !open && setSelectedId(null)}
         onEdit={() => { setForm({ staff: selected }); setSelectedId(null) }}
         onChanged={handleChanged}
+        onDeleted={() => {
+          setSelectedId(null)
+          refresh() // includes the org chart (['admin', 'staff', …])
+          queryClient.invalidateQueries({ queryKey: ['admin', 'ojt'] })
+        }}
       />
 
       {form && (

@@ -122,7 +122,7 @@ export default function DocumentUploadZone({
     <div className={`border-2 rounded-xl overflow-hidden transition-all h-full flex flex-col bg-white shadow-xs ${
       isUploaded
         ? 'border-emerald-300 ring-1 ring-emerald-200'
-        : 'border-dashed border-slate-300 hover:border-blue-400'
+        : 'border-dashed border-slate-300 hover:border-brand-navy'
     }`}>
       <input
         ref={fileInputRef}
@@ -138,7 +138,7 @@ export default function DocumentUploadZone({
       }`}>
         <div className="flex items-center gap-2.5 min-w-0">
           <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
-            isUploaded ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'
+            isUploaded ? 'bg-emerald-100 text-emerald-700' : 'bg-[#e8f0fc] text-brand-navy'
           }`}>
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -162,7 +162,7 @@ export default function DocumentUploadZone({
             Uploaded
           </span>
         ) : (
-          <span className="shrink-0 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+          <span className="shrink-0 text-xs font-semibold text-slate-400">
             {optional ? 'Optional' : 'Required'}
           </span>
         )}
@@ -180,7 +180,7 @@ export default function DocumentUploadZone({
 
             {/* Display File Name */}
             <div className="mt-2 flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 border border-slate-200 rounded-lg max-w-full">
-              <svg className="w-4 h-4 text-blue-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg className="w-4 h-4 text-brand-navy shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
               </svg>
               <span className="text-xs sm:text-sm font-semibold text-slate-800 truncate max-w-[220px]" title={displayFileName}>
@@ -235,7 +235,7 @@ export default function DocumentUploadZone({
                   min={todayLocalDate()}
                   onClick={(e) => e.stopPropagation()}
                   onChange={(e) => setExpirationDate(e.target.value)}
-                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-brand-navy focus:ring-2 focus:ring-[#2563b8]"
                 />
               </label>
             )}
@@ -244,7 +244,7 @@ export default function DocumentUploadZone({
               onDragLeave={handleDragLeave}
               onDrop={handleDrop}
               className={`cursor-pointer transition-all flex flex-col items-center justify-center p-3 rounded-lg ${
-                isDragging ? 'bg-blue-50 border-2 border-blue-400' : ''
+                isDragging ? 'bg-[#e8f0fc] border-2 border-brand-navy' : ''
               }`}
             >
               <svg className="w-7 h-7 mb-2 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">

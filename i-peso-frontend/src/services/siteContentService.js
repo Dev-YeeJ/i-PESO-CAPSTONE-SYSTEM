@@ -7,21 +7,11 @@ import api from './api'
 const clean = (params = {}) =>
   Object.fromEntries(Object.entries(params).filter(([, value]) => value !== undefined && value !== null && value !== ''))
 
-/** No sign-in: landing page, footer, /help, /privacy-policy and friends. */
+/** No sign-in: landing page, footer, About, /privacy-policy and friends. */
 export const publicSiteContentService = {
   get: async () => (await api.get('/public/site-content')).data,
-  faqs: async () => (await api.get('/public/faqs')).data,
   policy: async (slug) => (await api.get(`/public/policies/${slug}`)).data,
   policyVersion: async (slug, version) => (await api.get(`/public/policies/${slug}/versions/${version}`)).data,
-  /** "Was this helpful?" — one vote per reader; voting again changes it. */
-  voteFaq: async (faqId, helpful) => (await api.post(`/public/faqs/${faqId}/feedback`, { helpful })).data,
-  /** A Help search that found nothing — tells PESO which FAQ to write next. */
-  reportSearchMiss: async (term) => (await api.post('/public/help/search-misses', { term })).data,
-}
-
-/** Signed-in job seeker or employer: the Help page inside their portal. */
-export const helpService = {
-  get: async () => (await api.get('/help')).data,
 }
 
 export const adminSiteContentService = {
@@ -36,7 +26,7 @@ export const adminSiteContentService = {
 export const adminContentInsightService = {
   health: async () => (await api.get('/admin/content-modules/health')).data,
   insights: async (days = 30) => (await api.get('/admin/content-modules/insights', { params: { days } })).data,
-  resolve: async (kind, normalized) => (await api.post('/admin/content-modules/insights/resolve', { kind, normalized })).data,
+  resolve: async (normalized) => (await api.post('/admin/content-modules/insights/resolve', { kind: 'gap', normalized })).data,
   /** task: draft_answer | simplify | translate_filipino | suggest_question */
   assist: async (payload) => (await api.post('/admin/content-modules/ai-assist', payload)).data,
 }
@@ -47,7 +37,6 @@ export const adminFaqService = {
   update: async (id, values) => (await api.put(`/admin/faqs/${id}`, values)).data,
   publish: async (id) => (await api.post(`/admin/faqs/${id}/publish`)).data,
   unpublish: async (id) => (await api.post(`/admin/faqs/${id}/unpublish`)).data,
-  feature: async (id, featured) => (await api.post(`/admin/faqs/${id}/feature`, { featured })).data,
   reorder: async (ids) => (await api.put('/admin/faqs/reorder', { ids })).data,
   revisions: async (id) => (await api.get(`/admin/faqs/${id}/revisions`)).data.revisions,
   remove: async (id) => (await api.delete(`/admin/faqs/${id}`)).data,

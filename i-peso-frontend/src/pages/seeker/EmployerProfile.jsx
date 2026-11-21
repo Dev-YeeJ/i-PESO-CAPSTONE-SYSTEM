@@ -140,9 +140,9 @@ export default function EmployerProfile() {
             <p className="text-sm leading-6 text-slate-600">
               Open a job above and apply from its details. Your application goes straight to this employer through i-PESO.
             </p>
-            <div className="mt-4 flex gap-3 rounded-xl border border-blue-100 bg-blue-50 p-4">
-              <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-blue-700" aria-hidden="true" />
-              <p className="text-xs leading-5 text-blue-900">
+            <div className="mt-4 flex gap-3 rounded-xl border border-[#c4d9f7] bg-[#e8f0fc] p-4">
+              <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-brand-navy" aria-hidden="true" />
+              <p className="text-xs leading-5 text-brand-navy">
                 PESO checked this employer's business documents before letting them post jobs. If anyone asks you to pay to apply, report them.
               </p>
             </div>

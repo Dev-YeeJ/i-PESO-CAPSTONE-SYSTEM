@@ -12,8 +12,8 @@ const itemTarget = (check, item) => (['faqs', 'insights'].includes(check.module)
 
 /**
  * The content health check: a score and an automatic checklist of what to
- * fix — blank office details, stale or duplicate FAQs, broken links, what
- * readers can't find, what the assistant can't answer.
+ * fix — blank office details, stale or duplicate FAQs, what the assistant
+ * can't answer.
  */
 export default function OverviewModule({ health, onGo, allowed }) {
   if (health.isLoading) return <LoadingSkeleton variant="card" rows={4} />
@@ -28,27 +28,26 @@ export default function OverviewModule({ health, onGo, allowed }) {
     <div className="space-y-5">
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,2fr)]">
         <Card>
-          <p className="text-xs font-extrabold uppercase tracking-wide text-slate-500">Content health</p>
+          <p className="text-xs font-semibold text-slate-500">Content health</p>
           <div className="mt-2 flex items-end gap-3">
-            <p className={`text-5xl font-black tabular-nums ${tone}`}>{score}<span className="text-2xl">%</span></p>
+            <p className={`text-5xl font-bold tabular-nums ${tone}`}>{score}<span className="text-2xl">%</span></p>
             <Button size="sm" variant="ghost" icon={RefreshCw} loading={health.isFetching} onClick={() => health.refetch()} className="mb-1">Check again</Button>
           </div>
           <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-slate-100" role="progressbar" aria-label="Content health score" aria-valuenow={score} aria-valuemin={0} aria-valuemax={100}>
             <div className={`h-full rounded-full ${bar}`} style={{ width: `${score}%` }} />
           </div>
           <p className="mt-3 text-sm text-slate-600">
-            {warnings.length === 0 ? 'Nothing needs attention. Readers and the assistant have what they need.' : `${warnings.length} thing${warnings.length === 1 ? '' : 's'} to fix — most important first.`}
+            {warnings.length === 0 ? 'Nothing needs attention. The assistant has what it needs.' : `${warnings.length} thing${warnings.length === 1 ? '' : 's'} to fix — most important first.`}
           </p>
         </Card>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="grid grid-cols-3 gap-3">
           {[
             ['FAQs published', counts.faqs_published],
             ['Unpublished drafts', counts.faqs_unpublished],
-            ['Empty searches (30 days)', counts.missed_searches],
             ['Unanswered in chat (30 days)', counts.chatbot_gaps],
           ].map(([label, value]) => (
             <Card key={label} padding="sm">
-              <p className="text-2xl font-black tabular-nums text-slate-950">{value}</p>
+              <p className="text-2xl font-bold tabular-nums text-slate-950">{value}</p>
               <p className="mt-1 text-xs font-semibold text-slate-500">{label}</p>
             </Card>
           ))}

@@ -24,7 +24,7 @@ const GROUPS = [
     name: 'Overview',
     items: [
       { value: 'overview', label: 'Health check', icon: Activity, module: BOTH },
-      { value: 'insights', label: 'Reader insights', icon: Lightbulb, module: BOTH },
+      { value: 'insights', label: 'Assistant insights', icon: Lightbulb, module: BOTH },
     ],
   },
   {
@@ -34,7 +34,7 @@ const GROUPS = [
       { value: 'about', label: 'About PESO', icon: Landmark, module: 'configuration' },
     ],
   },
-  { name: 'Help', items: [{ value: 'faqs', label: 'FAQs', icon: MessageCircleQuestion, module: BOTH }] },
+  { name: 'Assistant', items: [{ value: 'faqs', label: 'FAQs', icon: MessageCircleQuestion, module: BOTH }] },
   {
     name: 'Pages',
     items: [
@@ -46,9 +46,9 @@ const GROUPS = [
 
 /**
  * Configuration → Content Modules: the portal's standing information and
- * the tools that keep it good — a health check, what readers search for and
- * vote on, and what the assistant could not answer. Full width, with a
- * module sidebar; `?tab=` picks the module.
+ * the tools that keep it good — a health check and what the assistant could
+ * not answer (FAQs are the assistant's answer bank; there is no Help page).
+ * Full width, with a module sidebar; `?tab=` picks the module.
  */
 export default function ContentModulesPage() {
   const user = useAuthStore((s) => s.user)
@@ -80,7 +80,7 @@ export default function ContentModulesPage() {
     const data = health.data
     if (!data) return null
     if (value === 'overview') return data.checks.filter((check) => check.status === 'warn').length || null
-    if (value === 'insights') return (data.counts.missed_searches + data.counts.chatbot_gaps) || null
+    if (value === 'insights') return data.counts.chatbot_gaps || null
     if (value === 'faqs') return data.counts.faqs_unpublished || null
     return null
   }
@@ -107,7 +107,7 @@ export default function ContentModulesPage() {
       <PageHeader
         eyebrow="Configuration"
         title="Content Modules"
-        subtitle="Everything people read on i-PESO that isn’t a record — office details, FAQs and pages — plus what readers and the assistant tell you is missing. Time-bound news belongs in Announcements."
+        subtitle="Everything people read on i-PESO that isn’t a record — office details, the assistant’s FAQs and pages — plus what the assistant tells you is missing. Time-bound news belongs in Announcements."
       />
 
       <div className="grid gap-6 lg:grid-cols-[15rem_minmax(0,1fr)]">
@@ -116,7 +116,7 @@ export default function ContentModulesPage() {
           <div className="flex gap-2 overflow-x-auto pb-1 lg:flex-col lg:gap-5 lg:overflow-visible lg:pb-0">
             {groups.map((group) => (
               <div key={group.name} className="flex shrink-0 gap-2 lg:flex-col lg:gap-1">
-                <p className="hidden px-3 text-[11px] font-black uppercase tracking-wider text-slate-400 lg:block">{group.name}</p>
+                <p className="hidden px-3 text-xs font-bold text-slate-400 lg:block">{group.name}</p>
                 {group.items.map((item) => {
                   const selected = item.value === active
                   const badge = badgeFor(item.value)
@@ -133,7 +133,7 @@ export default function ContentModulesPage() {
                       {createElement(item.icon, { className: 'h-4 w-4 shrink-0', 'aria-hidden': true })}
                       <span className="flex-1 whitespace-nowrap">{item.label}</span>
                       {badge ? (
-                        <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-black bg-slate-200 text-slate-700`} aria-label={`${badge} to look at`}>
+                        <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold bg-slate-200 text-slate-700`} aria-label={`${badge} to look at`}>
                           {badge}
                         </span>
                       ) : null}

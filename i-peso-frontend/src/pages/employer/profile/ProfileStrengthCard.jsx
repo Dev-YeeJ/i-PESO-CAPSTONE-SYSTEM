@@ -11,7 +11,7 @@ export default function ProfileStrengthCard({ strength, onFix }) {
   const complete = done === total
 
   return (
-    <section aria-labelledby="profile-strength" className="rounded-3xl border border-slate-200/80 bg-white p-6 shadow-[0_1px_2px_rgba(15,23,42,0.04),0_12px_32px_-16px_rgba(15,23,42,0.18)]">
+    <section aria-labelledby="profile-strength" className="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-[0_1px_2px_rgba(15,23,42,0.04),0_12px_32px_-16px_rgba(15,23,42,0.18)]">
       <div className="flex items-center gap-5">
         <div className="relative h-20 w-20 shrink-0">
           <svg viewBox="0 0 80 80" className="h-20 w-20 -rotate-90" aria-hidden="true">
@@ -25,12 +25,12 @@ export default function ProfileStrengthCard({ strength, onFix }) {
               transition={{ duration: 1.2, ease: [0.16, 1, 0.3, 1] }}
             />
           </svg>
-          <span className="absolute inset-0 flex items-center justify-center text-lg font-black text-slate-900">
+          <span className="absolute inset-0 flex items-center justify-center text-lg font-bold text-slate-900">
             <CountUp value={percent} suffix="%" />
           </span>
         </div>
         <div>
-          <h2 id="profile-strength" className="text-base font-black text-slate-900">Profile strength</h2>
+          <h2 id="profile-strength" className="text-base font-bold text-slate-900">Profile strength</h2>
           <p className="mt-0.5 text-sm text-slate-600">
             {complete ? 'Complete. Job seekers see everything they need.' : `${done} of ${total} done. Complete profiles get more applicants.`}
           </p>

@@ -299,6 +299,55 @@
 
 .ipeso-chat-voice-action:hover { background: #DBEAFE; }
 .ipeso-chat-voice-action:focus-visible { outline: 2px solid var(--ace-blue); outline-offset: 1px; }
+.ipeso-chat-voice-action:disabled { cursor: progress; opacity: 0.7; background: transparent; }
+
+/* ── Listen + Translate row under ACE's messages ── */
+
+.ipeso-chat-message-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0.15rem; }
+
+.ipeso-chat-translate { position: relative; display: inline-flex; }
+
+.ipeso-chat-translate-menu {
+  position: absolute;
+  bottom: calc(100% + 0.3rem);
+  left: 0;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  min-width: 8.5rem;
+  border: 1px solid #DBEAFE;
+  border-radius: 0.6rem;
+  padding: 0.25rem;
+  background: #FFFFFF;
+  box-shadow: 0 10px 24px -12px rgba(15, 23, 42, 0.35);
+}
+
+.ipeso-chat-translate-menu button {
+  border: 0;
+  border-radius: 0.4rem;
+  padding: 0.4rem 0.6rem;
+  background: transparent;
+  color: #0F172A;
+  font: inherit;
+  font-size: 0.75rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.ipeso-chat-translate-menu button:hover:not(:disabled) { background: #EFF6FF; color: var(--ace-blue); }
+.ipeso-chat-translate-menu button:focus-visible { outline: 2px solid var(--ace-blue); outline-offset: -2px; }
+.ipeso-chat-translate-menu button:disabled { color: #94A3B8; cursor: default; }
+.ipeso-chat-translate-menu button[aria-checked="true"]::after { content: ' ✓'; }
+
+.ipeso-chat-translated-note { margin: 0.15rem 0 0; font-size: 0.66rem; color: #64748B; }
+.ipeso-chat-translated-note button {
+  border: 0; padding: 0; background: none; font: inherit; color: var(--ace-blue); font-weight: 700; cursor: pointer; text-decoration: underline;
+}
+.ipeso-chat-translated-note.is-error { color: #B91C1C; }
+
+.ipeso-chat-spin { animation: aceSpin 0.8s linear infinite; }
+@keyframes aceSpin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .ipeso-chat-spin { animation: none; } }
 
 /* ── Bubbles ── */
 

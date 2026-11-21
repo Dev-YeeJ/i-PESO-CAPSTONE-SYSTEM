@@ -289,7 +289,12 @@ class AnnouncementController extends Controller
             'priority' => $validated['priority'],
             'audience' => $validated['audience'],
             'is_pinned' => (bool) ($validated['is_pinned'] ?? false),
-            'notify_users' => (bool) ($validated['notify_users'] ?? false),
+            // Every announcement reaches its readers' notification bell (there is
+            // no separate Announcements page for seekers/employers any more). The
+            // one exception: something already live from before this rule, which
+            // was published without notifying — editing it must not suddenly
+            // notify everyone about an old announcement.
+            'notify_users' => $existing && $existing->isLive() && ! $existing->notify_users ? false : true,
             'publish_at' => $publishAt,
             'expires_at' => $expiresAt,
             'link_label' => filled($validated['link_url'] ?? null) ? trim((string) $validated['link_label']) : null,

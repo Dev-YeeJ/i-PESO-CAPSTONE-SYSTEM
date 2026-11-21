@@ -25,6 +25,6 @@ class SiteContentRevision extends Model
 
     public function author(): BelongsTo
     {
-        return $this->belongsTo(Administrator::class, 'changed_by', 'admin_id');
+        return $this->belongsTo(Administrator::class, 'changed_by', 'admin_id')->withTrashed();
     }
 }

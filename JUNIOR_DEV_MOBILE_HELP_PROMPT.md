@@ -1,5 +1,7 @@
 # Master prompt: Help & FAQs in the i-PESO mobile app (job seeker)
 
+> **CANCELLED (2026-11-14): do not build this.** The Help & FAQs module was removed from the whole system because the i-PESO assistant (chatbot) already answers these questions. `GET /api/help` and the public FAQ endpoints no longer exist, and the website's Help pages are gone. FAQs still exist, but only as the assistant's answer bank, managed by PESO staff in Content Modules. No mobile Help screen is needed. The original prompt is kept below for reference only.
+
 Paste everything below the line into your AI coding assistant, opened in the `i-PESO-CAPSTONE-SYSTEM` repository. Pull the latest `main` first.
 
 ---

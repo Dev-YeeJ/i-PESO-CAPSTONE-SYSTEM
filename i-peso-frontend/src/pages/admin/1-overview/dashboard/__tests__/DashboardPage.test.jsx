@@ -5,7 +5,7 @@ import { renderWithProviders } from '@/test/utils'
 import { adminService } from '@/services/adminService'
 
 vi.mock('@/services/adminService', () => ({
-  adminService: { getDashboardStats: vi.fn() },
+  adminService: { getDashboardStats: vi.fn(), getJobFairsList: vi.fn().mockResolvedValue({ data: [] }) },
 }))
 
 const stats = {
@@ -31,11 +31,11 @@ describe('admin DashboardPage', () => {
 
     renderWithProviders(<DashboardPage />)
 
-    expect(await screen.findByText('Operations Dashboard')).toBeInTheDocument()
-    expect(screen.getByText('Registered Seekers')).toBeInTheDocument()
+    expect(await screen.findByText('Operations dashboard')).toBeInTheDocument()
+    expect(screen.getByText('Registered job seekers')).toBeInTheDocument()
     // 1,240 also appears in the Platform Composition bar, so allow multiple.
     expect(screen.getAllByText('1,240').length).toBeGreaterThan(0)
-    expect(screen.getByText('Active Vacancies')).toBeInTheDocument()
+    expect(screen.getByText('Active vacancies')).toBeInTheDocument()
     expect(screen.getAllByText('42').length).toBeGreaterThan(0)
     // hired / rejected breakdown on the applications KPI
     expect(screen.getByText(/24 hired/i)).toBeInTheDocument()
@@ -46,8 +46,8 @@ describe('admin DashboardPage', () => {
 
     renderWithProviders(<DashboardPage />)
 
-    await screen.findByText('Registered Seekers')
-    expect(screen.getByRole('button', { name: /how registered seekers is calculated/i })).toBeInTheDocument()
+    await screen.findByText('Registered job seekers')
+    expect(screen.getByRole('button', { name: /how registered job seekers is calculated/i })).toBeInTheDocument()
   })
 
   it('shows an error state with retry when stats fail to load', async () => {

@@ -7,7 +7,7 @@ import { adminService } from '@/services/adminService'
 import { useForm, FormProvider, Controller, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import toast from 'react-hot-toast'
+import toast from '@/lib/toast'
 import { blankResultEntry } from '@/components/reports/jobFairResultVocab'
 
 const inputClass = 'mt-2 w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm shadow-sm transition-colors focus:border-brand-navy focus:outline-none focus:ring-2 focus:ring-brand-navy/20'
@@ -15,7 +15,7 @@ const inputClass = 'mt-2 w-full rounded-xl border border-slate-300 bg-white px-4
 function StepLabel({ step, children }) {
   return (
     <span className="flex items-center gap-2.5">
-      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand-navy text-xs font-black text-white">{step}</span>
+      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand-navy text-xs font-bold text-white">{step}</span>
       {children}
     </span>
   )
@@ -23,7 +23,7 @@ function StepLabel({ step, children }) {
 
 function FormField({ label, value, onChange, type = 'text', textarea = false, className = '' }) {
   return (
-    <label className={`text-[11px] font-extrabold uppercase tracking-wider text-slate-500 ${className}`}>
+    <label className={`text-xs font-semibold text-slate-500 ${className}`}>
       {label}
       {textarea ? (
         <textarea value={value} onChange={(e) => onChange(e.target.value)} rows={2} className={`resize-none normal-case ${inputClass}`} />
@@ -108,11 +108,11 @@ function ProxyReportForm({ fairId, onSuccess }) {
       <FormProvider {...methods}>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
           <div className="rounded-xl border border-slate-200 p-5">
-            <p className="mb-4 text-xs font-extrabold uppercase tracking-wide text-slate-600">Employer Details</p>
+            <p className="mb-4 text-xs font-semibold text-slate-600">Employer Details</p>
             <div className="grid gap-5 sm:grid-cols-2">
               <Controller name="company_name" control={control} render={({ field }) => <FormField label="Company name" {...field} />} />
               <Controller name="employer_type" control={control} render={({ field }) => (
-                <label className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500">
+                <label className="text-xs font-semibold text-slate-500">
                   Employer type
                   <select {...field} className={inputClass}>
                     <option value="paper_only_employer">Paper-only</option>
@@ -129,7 +129,7 @@ function ProxyReportForm({ fairId, onSuccess }) {
           </div>
 
           <div className="rounded-xl border border-slate-200 p-5">
-            <p className="mb-4 text-xs font-extrabold uppercase tracking-wide text-slate-600">Aggregate Totals</p>
+            <p className="mb-4 text-xs font-semibold text-slate-600">Aggregate Totals</p>
             <div className="grid gap-5 sm:grid-cols-3">
               <Controller name="total_male" control={control} render={({ field }) => <FormField label="Male applicants" type="number" {...field} />} />
               <Controller name="total_female" control={control} render={({ field }) => <FormField label="Female applicants" type="number" {...field} />} />
@@ -145,7 +145,7 @@ function ProxyReportForm({ fairId, onSuccess }) {
           </div>
 
           <div className="rounded-xl border border-slate-200 p-5">
-            <p className="mb-4 text-xs font-extrabold uppercase tracking-wide text-slate-600">
+            <p className="mb-4 text-xs font-semibold text-slate-600">
               Per-applicant register <span className="font-medium normal-case text-slate-400">(optional — leave empty to save aggregate totals only)</span>
             </p>
             <JobFairResultEntryEditor control={control} name="entries" searchApplicants={adminService.searchApplicantSuggestions} />
@@ -194,7 +194,7 @@ function ProxyConfirmationForm({ fairId, onSuccess }) {
       <FormProvider {...methods}>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
           <div className="rounded-xl border border-slate-200 p-5">
-            <p className="mb-4 text-xs font-extrabold uppercase tracking-wide text-slate-600">Company & Representative</p>
+            <p className="mb-4 text-xs font-semibold text-slate-600">Company & Representative</p>
             <div className="grid gap-5 sm:grid-cols-2">
               <Controller name="company_name" control={control} render={({ field }) => <FormField label="Company name" {...field} />} />
               <Controller name="representative_1_name" control={control} render={({ field }) => <FormField label="Representative name" {...field} />} />
@@ -204,7 +204,7 @@ function ProxyConfirmationForm({ fairId, onSuccess }) {
           </div>
 
           <div className="rounded-xl border border-slate-200 p-5">
-            <p className="mb-4 text-xs font-extrabold uppercase tracking-wide text-slate-600">List of Vacancies / Orders</p>
+            <p className="mb-4 text-xs font-semibold text-slate-600">List of Vacancies / Orders</p>
             <Controller name="vacancies" control={control} render={({ field }) => (
               <ConfirmationVacancyEditor vacancies={field.value} onChange={field.onChange} />
             )} />

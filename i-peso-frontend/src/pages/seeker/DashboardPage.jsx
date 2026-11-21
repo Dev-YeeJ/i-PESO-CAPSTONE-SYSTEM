@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react'
 import JobSeekerHome from './JobSeekerHome'
-import JobFairBulletin from './components/JobFairBulletin'
-import AnnouncementBanner from '@/components/announcements/AnnouncementBanner'
-import { getNearbyJobs, getSeekerAnalytics, getSeekerDashboardSummary } from '@/services/seekerService'
+import DashboardAnnouncements from '@/components/announcements/DashboardAnnouncements'
+import { getNearbyJobs, getSeekerAnalytics, getSeekerApplications, getSeekerDashboardSummary } from '@/services/seekerService'
 import { useAuthStore } from '@/stores/authStore'
 import { listJobFairs } from '@/services/jobFairService'
 
@@ -16,6 +15,8 @@ export default function SeekerDashboard() {
   const [error, setError] = useState('')
   const [jobsError, setJobsError] = useState('')
   const [jobFairs, setJobFairs] = useState([])
+  // null = still loading; [] = loaded, none yet (the summary card tells those apart).
+  const [applications, setApplications] = useState(null)
 
   useEffect(() => {
     let active = true
@@ -36,7 +37,10 @@ export default function SeekerDashboard() {
 
     listJobFairs()
       .then((items) => {
-        if (active) setJobFairs(items.slice(0, 2))
+        // The bulletin keeps past fairs as a record; the dashboard only wants what's next.
+        const today = new Date().toISOString().slice(0, 10)
+        const upcoming = items.filter((fair) => String(fair.end_date ?? fair.start_date ?? fair.event_date ?? '').slice(0, 10) >= today)
+        if (active) setJobFairs(upcoming.slice(0, 2))
       })
       .catch(() => {
         // Job fair cards are supplementary; the vacancy feed should stay usable.
@@ -77,6 +81,15 @@ export default function SeekerDashboard() {
           })
       })
 
+    getSeekerApplications()
+      .then((data) => {
+        if (active) setApplications(data?.applications ?? [])
+      })
+      .catch(() => {
+        // Supplementary: the card falls back to its empty state.
+        if (active) setApplications([])
+      })
+
     analyticsTimer = window.setTimeout(() => {
       getSeekerAnalytics()
         .then((analytics) => {
@@ -95,8 +108,7 @@ export default function SeekerDashboard() {
 
   return (
     <>
-      <AnnouncementBanner />
-      <JobFairBulletin fairs={jobFairs} />
+      <DashboardAnnouncements />
       <JobSeekerHome
         profile={profile}
         user={user}
@@ -108,6 +120,8 @@ export default function SeekerDashboard() {
         error={error}
         jobsError={jobsError}
         jobsLoading={jobsLoading}
+        jobFairs={jobFairs}
+        applications={applications}
       />
     </>
   )

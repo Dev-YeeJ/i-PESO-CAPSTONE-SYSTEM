@@ -136,7 +136,7 @@ export default function EmployerOTPVerification({ email, employerId, onComplete 
             className={`w-full px-3.5 py-2.5 text-center text-2xl tracking-widest font-mono rounded-xl border bg-white transition-all focus:outline-none focus:ring-2 focus:ring-blue-500/20 ${
               getError('otp')
                 ? 'border-red-400 focus:border-red-400'
-                : 'border-slate-300 focus:border-blue-400'
+                : 'border-slate-300 focus:border-brand-navy'
             }`}
           />
           {getError('otp') && (
@@ -156,7 +156,7 @@ export default function EmployerOTPVerification({ email, employerId, onComplete 
         <button
           type="submit"
           disabled={isLoading || otp.length < 6}
-          className="w-full py-3 bg-blue-700 hover:bg-blue-800 disabled:opacity-60 text-white font-semibold rounded-xl transition-colors"
+          className="w-full py-3 bg-brand-navy hover:bg-[#0f2d56] disabled:opacity-60 text-white font-semibold rounded-xl transition-colors"
         >
           {isLoading ? 'Verifying...' : 'Verify Email & Continue'}
         </button>
@@ -170,7 +170,7 @@ export default function EmployerOTPVerification({ email, employerId, onComplete 
             type="button"
             onClick={handleResend}
             disabled={resendLoading || resendCountdown > 0}
-            className="text-sm font-medium text-blue-700 hover:text-blue-800 disabled:text-slate-400 disabled:cursor-not-allowed transition-colors"
+            className="text-sm font-medium text-brand-navy hover:text-brand-navy disabled:text-slate-400 disabled:cursor-not-allowed transition-colors"
           >
             {resendCountdown > 0 ? `Resend in ${resendCountdown}s` : 'Resend Code'}
           </button>

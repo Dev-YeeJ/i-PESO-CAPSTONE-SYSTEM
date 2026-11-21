@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import toast from 'react-hot-toast'
+import toast from '@/lib/toast'
 import { Check, Info } from 'lucide-react'
 import { Button } from '@/components/ui'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -50,7 +50,7 @@ export default function DisputeDialog({ review, reasons, onClose }) {
         )}
 
         <fieldset>
-          <legend className="text-sm font-black text-slate-900">Why should PESO look at it?</legend>
+          <legend className="text-sm font-bold text-slate-900">Why should PESO look at it?</legend>
           <div className="mt-2 grid gap-2">
             {Object.entries(reasons).map(([value, label]) => {
               const on = reason === value
@@ -71,7 +71,7 @@ export default function DisputeDialog({ review, reasons, onClose }) {
         </fieldset>
 
         <div>
-          <label htmlFor="dispute-details" className="text-sm font-black text-slate-900">What's wrong with it?</label>
+          <label htmlFor="dispute-details" className="text-sm font-bold text-slate-900">What's wrong with it?</label>
           <textarea
             id="dispute-details"
             rows={4}

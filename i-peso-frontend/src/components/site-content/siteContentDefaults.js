@@ -46,15 +46,14 @@ export const LANDING_DEFAULTS = {
     { icon: 'users', title: 'Centralized Screening', body: 'Review applications, schedule interviews, and hire directly from your dashboard.' },
   ],
   footer_tagline: 'Urdaneta City PESO Employment Portal',
-  show_sections: { announcements: true, features: true, jobs: true, programs: true, faq: true },
+  show_sections: { announcements: true, features: true, jobs: true, programs: true },
 }
 
 export const LANDING_SECTIONS = [
   { key: 'announcements', label: 'PESO announcements', help: 'Live announcements for the Public audience.' },
   { key: 'features', label: '“What you get” feature cards', help: 'The four cards edited above.' },
-  { key: 'jobs', label: 'Job discovery', help: 'The seeker/employer preview.' },
+  { key: 'jobs', label: 'Job search & featured vacancies', help: 'The hero search bar and the newest open vacancies from verified employers.' },
   { key: 'programs', label: 'Government programs', help: 'Open programs from Government & DOLE.' },
-  { key: 'faq', label: 'Common questions', help: 'Up to 5 FAQs marked “Show on home”.' },
 ]
 
 // Mission and vision stay blank until PESO Urdaneta supplies its own wording.
@@ -71,9 +70,21 @@ export const ABOUT_DEFAULTS = {
     { title: 'Employer accreditation and job posting', description: 'Verified employers can post vacancies, screen ranked applicants and join PESO job fairs.', audience: 'employers', link_label: 'Register your company', link_url: '/register/employer' },
     { title: 'Placement reporting', description: 'Employers file a simple monthly placement report so PESO can track local employment.', audience: 'employers', link_label: null, link_url: null },
   ],
+  // Real people only: empty (and hidden) until PESO enters its own staff list.
+  org_chart: [],
 }
 
-export const ABOUT_LIMITS = { headline: 80, intro: 600, mission: 600, vision: 600, mandate: 600, service_title: 80, service_description: 300, max_services: 12 }
+export const ABOUT_LIMITS = {
+  headline: 80, intro: 600, mission: 600, vision: 600, mandate: 600, service_title: 80, service_description: 300, max_services: 12,
+  org_name: 100, org_position: 100, org_unit: 80, max_org: 40,
+}
+
+/** Tiers of the About page organization chart, top to bottom. */
+export const ORG_LEVELS = [
+  { value: 'head', label: 'Office head' },
+  { value: 'unit_head', label: 'Unit head' },
+  { value: 'staff', label: 'Staff' },
+]
 
 export const SERVICE_AUDIENCES = [
   { value: 'everyone', label: 'Everyone' },
@@ -137,9 +148,9 @@ export const FAQ_TOPICS = [
 ]
 
 export const FAQ_AUDIENCES = [
-  { value: 'everyone', label: 'Everyone', help: 'Public Help page, the landing page (if featured), and both portals.' },
-  { value: 'seekers', label: 'Job seekers', help: 'Only signed-in job seekers (web and mobile app).' },
-  { value: 'employers', label: 'Employers', help: 'Only signed-in employers, including those still being verified.' },
+  { value: 'everyone', label: 'Everyone', help: 'The assistant uses it for visitors, job seekers and employers.' },
+  { value: 'seekers', label: 'Job seekers', help: 'The assistant uses it only for signed-in job seekers.' },
+  { value: 'employers', label: 'Employers', help: 'The assistant uses it only for signed-in employers, including those still being verified.' },
 ]
 
 /** Merge an API payload over defaults; keeps a saved null (blank = not on record). */

@@ -30,7 +30,7 @@ export default function PoliciesTab({ canEdit, office }) {
   return (
     <div className="space-y-4">
       <Card>
-        <h2 className="text-lg font-black text-slate-950">Policy pages</h2>
+        <h2 className="text-lg font-bold text-slate-950">Policy pages</h2>
         <p className="mt-1 max-w-3xl text-sm text-slate-600">
           Legal text is never edited in place. Each change becomes a new <strong>version</strong> with its own effective date;
           earlier versions stay readable so anyone can see exactly what they agreed to. Readers see nothing new until you publish.
@@ -43,10 +43,10 @@ export default function PoliciesTab({ canEdit, office }) {
             <div className="flex items-start gap-3">
               <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-navy/5 text-brand-navy"><ScrollText className="h-5 w-5" aria-hidden="true" /></span>
               <div className="min-w-0">
-                <h3 className="font-black text-slate-950">{policy.title}</h3>
+                <h3 className="font-bold text-slate-950">{policy.title}</h3>
                 <p className="mt-0.5 text-xs text-slate-500">
-                  Version {policy.current.version} · effective {formatPolicyDate(policy.current.effective_at)}
-                  {policy.current.is_builtin ? ' · original text' : ''}
+                  Version {policy.current.version}, effective {formatPolicyDate(policy.current.effective_at)}
+                  {policy.current.is_builtin ? ', original text' : ''}
                 </p>
               </div>
             </div>
@@ -54,7 +54,7 @@ export default function PoliciesTab({ canEdit, office }) {
               {policy.upcoming && (
                 <Badge variant="review"><CalendarClock className="h-3 w-3" aria-hidden="true" /> Version {policy.upcoming.version} from {formatPolicyDate(policy.upcoming.effective_at)}</Badge>
               )}
-              {policy.draft && <Badge variant="pending">Draft v{policy.draft.version} · edited {formatWhen(policy.draft.updated_at)}{policy.draft.updated_by ? ` by ${policy.draft.updated_by}` : ''}</Badge>}
+              {policy.draft && <Badge variant="pending">Draft v{policy.draft.version}, edited {formatWhen(policy.draft.updated_at)}{policy.draft.updated_by ? ` by ${policy.draft.updated_by}` : ''}</Badge>}
               <Badge variant="neutral">{policy.version_count} version{policy.version_count === 1 ? '' : 's'}</Badge>
             </div>
             <div className="mt-auto flex flex-wrap gap-2 pt-4">

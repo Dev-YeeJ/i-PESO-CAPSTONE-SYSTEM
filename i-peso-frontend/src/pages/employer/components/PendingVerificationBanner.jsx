@@ -90,7 +90,7 @@ function DocumentStatusRow({ doc, accountStatus, onReupload, reuploadingType }) 
         </span>
         <div className="flex items-center gap-2">
           {doc.verification_status === 'pending' && (doc.viewed_at || doc.staff_viewed_at) ? (
-            <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 border border-blue-200 px-2 py-0.5 text-xs font-bold text-blue-700">
+            <span className="inline-flex items-center gap-1 rounded-full bg-[#e8f0fc] border border-[#c4d9f7] px-2 py-0.5 text-xs font-bold text-brand-navy">
               <Eye className="h-3 w-3" />
               Viewed
             </span>

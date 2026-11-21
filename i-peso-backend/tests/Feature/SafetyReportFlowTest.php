@@ -429,6 +429,38 @@ class SafetyReportFlowTest extends TestCase
 
     // ── Helpers ─────────────────────────────────────────────────────────────
 
+    // ── Deleting a staff member who holds cases ─────────────────────────────
+
+    public function test_deleting_a_staff_member_returns_their_open_cases_to_the_queue_and_keeps_closed_history(): void
+    {
+        Sanctum::actingAs($this->seeker('ana@example.test'));
+        $aide = $this->staff('aide@peso.test');
+        $aide->forceFill(['first_name' => 'Maria', 'last_name' => 'Santos', 'status' => 'inactive', 'last_login_at' => now()->subWeek()])->save();
+
+        // One case the aide already closed, then a newer one still open with them.
+        $closedId = $this->fileAgainstEmployer()->assertCreated()->json('report.id');
+        SafetyReport::whereKey($closedId)->update(['assigned_admin_id' => $aide->admin_id, 'status' => 'resolved']);
+        $openId = $this->fileAgainstEmployer()->assertCreated()->json('report.id');
+        SafetyReport::whereKey($openId)->update(['assigned_admin_id' => $aide->admin_id]);
+
+        $manager = $this->staff('manager@peso.test', array_keys(AdminRole::MODULES));
+        $manager->forceFill(['role' => 'administrator'])->save();
+        Sanctum::actingAs($manager);
+
+        $this->deleteJson("/api/admin/staff/{$aide->admin_id}")
+            ->assertOk()
+            ->assertJsonPath('released_cases', 1);
+
+        $open = SafetyReport::find($openId);
+        $this->assertNull($open->assigned_admin_id);
+        $this->assertTrue($open->events()->where('kind', 'assigned')->where('body', 'like', '%staff account was deleted%')->exists());
+
+        // A closed case keeps who handled it, by name.
+        $closed = SafetyReport::find($closedId);
+        $this->assertSame($aide->admin_id, (int) $closed->assigned_admin_id);
+        $this->assertSame('Maria', $closed->assignedAdmin?->first_name);
+    }
+
     private function employerModel(): Employer
     {
         return Employer::find($this->employerId);

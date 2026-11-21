@@ -23,7 +23,7 @@ vi.mock('@/services/announcementService', async (importOriginal) => {
     },
   }
 })
-vi.mock('react-hot-toast', () => ({ default: { success: vi.fn(), error: vi.fn() } }))
+vi.mock('@/lib/toast', () => { const toast = Object.assign(vi.fn(), { success: vi.fn(), error: vi.fn(), warning: vi.fn(), loading: vi.fn(), dismiss: vi.fn() }); return { default: toast, toast } })
 
 const options = {
   audiences: [
@@ -58,8 +58,8 @@ describe('Admin announcement form', () => {
     await userEvent.type(screen.getByPlaceholderText(/PESO office closed/i), 'Office closed Friday')
     await userEvent.type(screen.getByPlaceholderText(/Write the full announcement/i), 'Holiday closure.')
     await userEvent.click(screen.getByRole('radio', { name: /job seekers/i }))
-    expect(await screen.findByText(/Job seekers only .* · 1,000 accounts/)).toBeInTheDocument()
-    await userEvent.click(screen.getByRole('checkbox', { name: /also notify the audience/i }))
+    expect(await screen.findByText(/Job seekers only .*, 1,000 accounts/)).toBeInTheDocument()
+    // Every announcement notifies its audience; publishing always confirms first.
     await userEvent.click(screen.getByRole('button', { name: /publish now/i }))
 
     const dialog = await screen.findByRole('dialog')
@@ -74,16 +74,12 @@ describe('Admin announcement form', () => {
     expect(values).toMatchObject({ title: 'Office closed Friday', body: 'Holiday closure.', audience: 'seekers', notify_users: true, publish_at: '' })
   })
 
-  it('publishes straight away when no notification is sent', async () => {
-    adminAnnouncementService.create.mockResolvedValue({ message: 'Announcement published.', announcement: { id: 8 } })
+  it('has no opt-out: readers are always notified and see it on their dashboard', async () => {
     renderWithProviders(<AnnouncementFormPage />)
 
-    await userEvent.type(screen.getByPlaceholderText(/PESO office closed/i), 'Office closed Friday')
-    await userEvent.type(screen.getByPlaceholderText(/Write the full announcement/i), 'Holiday closure.')
-    await userEvent.click(screen.getByRole('button', { name: /publish now/i }))
-
-    await waitFor(() => expect(adminAnnouncementService.create).toHaveBeenCalledWith(expect.objectContaining({ notify_users: false }), 'publish'))
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    await screen.findByPlaceholderText(/PESO office closed/i)
+    expect(screen.queryByRole('checkbox', { name: /notify/i })).not.toBeInTheDocument()
+    expect(screen.getByText(/Automatically: a bell notification/)).toHaveTextContent("a card on each reader's dashboard")
   })
 
   it('keeps optional settings folded away until asked for', async () => {

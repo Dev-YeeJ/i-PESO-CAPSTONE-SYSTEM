@@ -51,6 +51,6 @@ class SafetyReportEvent extends Model
 
     public function admin(): BelongsTo
     {
-        return $this->belongsTo(Administrator::class, 'actor_admin_id', 'admin_id');
+        return $this->belongsTo(Administrator::class, 'actor_admin_id', 'admin_id')->withTrashed();
     }
 }

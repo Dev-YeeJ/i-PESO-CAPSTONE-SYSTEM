@@ -34,6 +34,6 @@ class CitizenCharterService extends Model
 
     public function administrator(): BelongsTo
     {
-        return $this->belongsTo(Administrator::class, 'created_by_admin_id', 'admin_id');
+        return $this->belongsTo(Administrator::class, 'created_by_admin_id', 'admin_id')->withTrashed();
     }
 }

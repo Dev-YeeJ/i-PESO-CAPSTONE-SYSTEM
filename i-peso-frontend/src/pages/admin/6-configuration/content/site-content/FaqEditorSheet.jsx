@@ -1,18 +1,17 @@
 import { createElement, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import toast from 'react-hot-toast'
-import { AlertTriangle, Eye, History, Languages, Link2, PenLine, Save, Send, Sparkles, WandSparkles, X } from 'lucide-react'
+import toast from '@/lib/toast'
+import { AlertTriangle, Eye, History, Languages, PenLine, Save, Send, Sparkles, WandSparkles, X } from 'lucide-react'
 import { Button } from '@/components/ui'
 import { Sheet, SheetBody, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { adminContentInsightService, adminFaqService } from '@/services/siteContentService'
 import { similarQuestions } from '@/components/site-content/textSimilarity'
 import RichText from '@/components/site-content/RichText'
-import { FaqLink } from '@/components/site-content/HelpCenter'
 import { FAQ_AUDIENCES, FAQ_TOPICS } from '@/components/site-content/siteContentDefaults'
 import { Field } from './SiteContentBits'
 import { apiMessage, fieldErrorsOf, formatWhen, inputClass, labelClass } from './formStyles'
 
-const EMPTY = { question: '', answer: '', audience: 'everyone', topic: 'account', link_label: '', link_url: '' }
+const EMPTY = { question: '', answer: '', audience: 'everyone', topic: 'account' }
 const QUESTION_MAX = 200
 const ANSWER_MAX = 2000
 
@@ -46,11 +45,10 @@ const AI_TASKS = {
 
 function FaqEditorBody({ faq, initialQuestion, allFaqs, canEdit, office, onDone }) {
   const queryClient = useQueryClient()
-  const [form, setForm] = useState(() => (faq ? { ...EMPTY, ...faq, link_label: faq.link_label ?? '', link_url: faq.link_url ?? '' } : { ...EMPTY, question: initialQuestion ?? '', topic: guessTopic(initialQuestion ?? '') }))
+  const [form, setForm] = useState(() => (faq ? { ...EMPTY, ...faq } : { ...EMPTY, question: initialQuestion ?? '', topic: guessTopic(initialQuestion ?? '') }))
   const [suggestion, setSuggestion] = useState(null) // { task, text, note }
   // Topic follows the question until someone picks one by hand.
   const [topicTouched, setTopicTouched] = useState(Boolean(faq))
-  const [showLink, setShowLink] = useState(Boolean(faq?.link_url))
   const duplicates = similarQuestions(form.question, allFaqs, { excludeId: faq?.id ?? null })
 
   const ai = useMutation({
@@ -96,8 +94,6 @@ function FaqEditorBody({ faq, initialQuestion, allFaqs, canEdit, office, onDone 
         answer: form.answer,
         audience: form.audience,
         topic: form.topic,
-        link_label: form.link_label || null,
-        link_url: form.link_url || null,
       }
       const saved = faq ? await adminFaqService.update(faq.id, payload) : await adminFaqService.create(payload)
       if (publish && !saved.faq?.is_published) {
@@ -122,12 +118,9 @@ function FaqEditorBody({ faq, initialQuestion, allFaqs, canEdit, office, onDone 
     const next = {}
     if (!form.question.trim()) next.question = 'Write the question.'
     if (!form.answer.trim()) next.answer = 'Write the answer.'
-    if (form.link_url && !form.link_label) next.link_label = 'Add a label for the link button.'
-    if (form.link_label && !form.link_url) next.link_url = 'Add the link, or clear the label.'
     setErrors(next)
     if (Object.keys(next).length) {
       setMode('edit')
-      if (next.link_label || next.link_url) setShowLink(true)
       return
     }
     save.mutate(options)
@@ -141,7 +134,7 @@ function FaqEditorBody({ faq, initialQuestion, allFaqs, canEdit, office, onDone 
         <SheetTitle>{faq ? 'Edit FAQ' : 'New FAQ'}</SheetTitle>
         <SheetDescription>
           {faq
-            ? faq.is_published ? 'This FAQ is published — saving updates it on the Help pages right away.' : 'Unpublished — readers can’t see it until you publish it.'
+            ? faq.is_published ? 'This FAQ is published — saving updates the assistant’s answer right away.' : 'Unpublished — the assistant won’t use it until you publish it.'
             : 'Write it, then publish it straight away or save it as a draft.'}
         </SheetDescription>
         <div className="mt-3 flex gap-1" role="tablist" aria-label="Editor mode">
@@ -165,7 +158,6 @@ function FaqEditorBody({ faq, initialQuestion, allFaqs, canEdit, office, onDone 
           <div className="rounded-2xl border border-slate-200 bg-white p-5">
             <p className="text-[15px] font-bold text-slate-900">{form.question || 'Your question'}</p>
             <RichText text={form.answer || 'Your answer'} office={office} className="mt-3 space-y-3 text-sm leading-6 text-slate-700" />
-            {form.link_url && <FaqLink faq={form} className="mt-4" />}
           </div>
         ) : (
           <div className="space-y-5">
@@ -176,10 +168,10 @@ function FaqEditorBody({ faq, initialQuestion, allFaqs, canEdit, office, onDone 
                   <p className="flex items-center gap-1.5 font-bold"><AlertTriangle className="h-3.5 w-3.5 text-amber-500" aria-hidden="true" /> Looks like an FAQ you already have</p>
                   <ul className="mt-1 space-y-0.5">
                     {duplicates.map(({ faq: other }) => (
-                      <li key={other.id}>“{other.question}” <span className="text-slate-500">({other.is_published ? 'published' : 'unpublished'} · {other.audience_label ?? other.audience})</span></li>
+                      <li key={other.id}>“{other.question}” <span className="text-slate-500">({other.is_published ? 'published' : 'unpublished'}, {other.audience_label ?? other.audience})</span></li>
                     ))}
                   </ul>
-                  <p className="mt-1">Edit that one instead, so readers get one clear answer.</p>
+                  <p className="mt-1">Edit that one instead, so the assistant gets one clear answer.</p>
                 </div>
               )}
             </Field>
@@ -189,14 +181,14 @@ function FaqEditorBody({ faq, initialQuestion, allFaqs, canEdit, office, onDone 
               max={ANSWER_MAX}
               count={form.answer.length}
               error={errors.answer}
-              hint="Blank line = new paragraph · start a line with “- ” for a bullet · **bold** · links and emails become clickable."
+              hint="Blank line = new paragraph; start a line with “- ” for a bullet ; **bold**, links and emails become clickable."
             >
               <textarea value={form.answer} onChange={(e) => set('answer', e.target.value.slice(0, ANSWER_MAX))} disabled={!canEdit} rows={8} className={inputClass} placeholder="Write a short, direct answer." aria-label="Answer" />
             </Field>
 
             {canEdit && (
               <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-                <p className="text-xs font-extrabold uppercase tracking-wide text-slate-500">AI writing helper</p>
+                <p className="text-xs font-semibold text-slate-500">AI writing helper</p>
                 <div className="mt-2 flex flex-wrap gap-1.5">
                   {Object.entries(AI_TASKS).map(([task, meta]) => (
                     <Button
@@ -257,21 +249,6 @@ function FaqEditorBody({ faq, initialQuestion, allFaqs, canEdit, office, onDone 
               </select>
             </Field>
 
-            {showLink ? (
-              <div className="grid gap-4 sm:grid-cols-[1fr_2fr]">
-                <Field label="Link button" error={errors.link_label}>
-                  <input value={form.link_label} onChange={(e) => set('link_label', e.target.value.slice(0, 60))} disabled={!canEdit} className={inputClass} placeholder="See job fairs" aria-label="Link button label" />
-                </Field>
-                <Field label="Link" error={errors.link_url}>
-                  <input value={form.link_url} onChange={(e) => set('link_url', e.target.value)} disabled={!canEdit} className={inputClass} placeholder="/seeker/job-fairs or https://…" aria-label="Link" />
-                </Field>
-              </div>
-            ) : canEdit ? (
-              <button type="button" onClick={() => setShowLink(true)} className="inline-flex items-center gap-1 text-xs font-bold text-slate-500 hover:text-slate-900">
-                <Link2 className="h-3.5 w-3.5" aria-hidden="true" /> Add a link button
-              </button>
-            ) : null}
-
             {faq && (
               <div className="border-t border-slate-100 pt-4">
                 <button type="button" onClick={() => setShowHistory((v) => !v)} className="flex items-center gap-1.5 text-xs font-bold text-brand-navy hover:underline">
@@ -283,11 +260,11 @@ function FaqEditorBody({ faq, initialQuestion, allFaqs, canEdit, office, onDone 
                     {(history.data ?? []).map((revision, index) => (
                       <li key={revision.id} className="rounded-xl border border-slate-200 p-3 text-xs">
                         <div className="flex items-center justify-between gap-2">
-                          <span className="font-bold text-slate-800">{formatWhen(revision.created_at)} · {revision.author ?? 'former staff'}{index === 0 ? ' · current' : ''}</span>
+                          <span className="font-bold text-slate-800">{formatWhen(revision.created_at)}, {revision.author ?? 'former staff'}{index === 0 ? ', current' : ''}</span>
                           {canEdit && index > 0 && (
                             <button
                               type="button"
-                              onClick={() => { setForm((current) => ({ ...current, ...revision.value, link_label: revision.value.link_label ?? '', link_url: revision.value.link_url ?? '' })); toast('Earlier version loaded — save to keep it.') }}
+                              onClick={() => { setForm((current) => ({ ...current, question: revision.value.question, answer: revision.value.answer, audience: revision.value.audience, topic: revision.value.topic })); toast('Earlier version loaded — save to keep it.') }}
                               className="font-bold text-brand-navy hover:underline"
                             >
                               Use this version

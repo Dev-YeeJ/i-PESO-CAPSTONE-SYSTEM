@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import toast from 'react-hot-toast'
+import toast from '@/lib/toast'
 import { updateEmployerApplicationStatusBulk } from '@/services/employerApplicationService'
 
 const STATUS_LABELS = {
@@ -40,10 +40,7 @@ export default function useApplicationStatusActions({ invalidateKeys = [] } = {}
       if (processed === 0) {
         toast.error('No candidates were updated — they may have already reached a final stage.')
       } else if (processed < targets.length) {
-        toast(
-          `Moved ${processed} of ${targets.length} candidates to ${label}. The rest were already in a final stage.`,
-          { icon: '⚠️' },
-        )
+        toast.warning(`Moved ${processed} of ${targets.length} candidates to ${label}. The rest were already in a final stage.`)
       } else {
         toast.success(`Moved ${processed} candidate${processed > 1 ? 's' : ''} to ${label}.`)
       }

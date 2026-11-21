@@ -68,16 +68,13 @@ export default function EmployerReviewsPage() {
           className="relative isolate overflow-hidden rounded-[28px] bg-brand-navy p-6 text-white shadow-[0_24px_60px_-28px_rgba(18,53,99,0.75)] sm:p-10"
         >
           <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10">
-            <div className="absolute -right-20 -top-28 h-72 w-72 rounded-full bg-brand-gold/25 blur-3xl" />
-            <div className="absolute -bottom-36 left-10 h-72 w-96 rounded-full bg-sky-400/15 blur-3xl" />
             <div className="absolute inset-0 opacity-[0.07] [background-image:radial-gradient(white_1px,transparent_1px)] [background-size:18px_18px]" />
           </div>
 
           <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div className="max-w-2xl">
-              <p className="text-[11px] font-black uppercase tracking-[0.2em] text-brand-gold">Verified feedback</p>
-              <h1 className="mt-2 text-3xl font-black tracking-tight sm:text-[2.6rem] sm:leading-[1.1]">Reviews</h1>
-              <p className="mt-3 text-sm leading-6 text-blue-100/85 sm:text-[15px]">
+                            <h1 className="mt-2 text-3xl font-bold tracking-tight sm:text-[2.6rem] sm:leading-[1.1]">Reviews</h1>
+              <p className="mt-3 text-sm leading-6 text-white/85 sm:text-[15px]">
                 Reviews come only from people who applied or worked here through i-PESO, and you never see who wrote them.
                 Reply once to each review, or dispute one that breaks the guidelines.
               </p>
@@ -92,13 +89,13 @@ export default function EmployerReviewsPage() {
               <HeroTile key={tile.key} index={index} label={tile.label} onClick={tile.onClick} loading={reviews.isLoading}>
                 {tile.section?.enough ? (
                   <>
-                    <span className="flex items-baseline gap-1.5 text-3xl font-black"><CountUp value={tile.section.average} decimals={1} /><Star className="h-5 w-5 fill-brand-gold text-brand-gold" aria-hidden /></span>
-                    <span className="text-xs text-blue-100/75">{tile.section.reviewers} reviewers · {tile.section.recommend_percent}% recommend</span>
+                    <span className="flex items-baseline gap-1.5 text-3xl font-bold"><CountUp value={tile.section.average} decimals={1} /><Star className="h-5 w-5 fill-brand-gold text-brand-gold" aria-hidden /></span>
+                    <span className="text-xs text-white/75">{tile.section.reviewers} reviewers, {tile.section.recommend_percent}% recommend</span>
                   </>
                 ) : (
                   <>
-                    <span className="text-xl font-black">Not public yet</span>
-                    <span className="text-xs text-blue-100/75">{tile.section?.reviewers ?? 0} of {summary?.min_reviews ?? 3} reviews needed</span>
+                    <span className="text-xl font-bold">Not public yet</span>
+                    <span className="text-xs text-white/75">{tile.section?.reviewers ?? 0} of {summary?.min_reviews ?? 3} reviews needed</span>
                   </>
                 )}
               </HeroTile>
@@ -106,12 +103,12 @@ export default function EmployerReviewsPage() {
             <HeroTile index={2} label="Waiting for your reply" loading={reviews.isLoading} highlight={needsReply > 0}
               onClick={() => update({ tab: 'company', filter: 'needs_reply', page: null, type: (counts?.[type]?.needs_reply ?? 0) > 0 ? type : (counts?.recruitment?.needs_reply ? 'recruitment' : 'employment') })}
             >
-              <span className="text-3xl font-black"><CountUp value={needsReply} /></span>
-              <span className="text-xs text-blue-100/75">{needsReply ? 'Replies show you listen' : 'All caught up'}</span>
+              <span className="text-3xl font-bold"><CountUp value={needsReply} /></span>
+              <span className="text-xs text-white/75">{needsReply ? 'Replies show you listen' : 'All caught up'}</span>
             </HeroTile>
             <HeroTile index={3} label="Hires to rate" loading={hires.isLoading} highlight={hiresToRate > 0} onClick={() => update({ tab: 'hires' })}>
-              <span className="text-3xl font-black"><CountUp value={hiresToRate} /></span>
-              <span className="text-xs text-blue-100/75">{hiresToRate ? 'Private feedback for workers' : 'Nothing waiting'}</span>
+              <span className="text-3xl font-bold"><CountUp value={hiresToRate} /></span>
+              <span className="text-xs text-white/75">{hiresToRate ? 'Private feedback for workers' : 'Nothing waiting'}</span>
             </HeroTile>
           </ul>
         </Motion.header>
@@ -142,7 +139,7 @@ export default function EmployerReviewsPage() {
               >
                 <item.icon className="h-4 w-4" aria-hidden />
                 {item.label}
-                {badge > 0 && <span className="rounded-full bg-amber-100 px-1.5 text-[11px] font-black tabular-nums text-amber-800">{badge}</span>}
+                {badge > 0 && <span className="rounded-full bg-amber-100 px-1.5 text-[11px] font-bold tabular-nums text-amber-800">{badge}</span>}
                 {active && <Motion.span layoutId="reviews-tab-underline" className="absolute inset-x-0 -bottom-px h-0.5 rounded-full bg-brand-navy" aria-hidden="true" />}
               </button>
             )
@@ -178,11 +175,11 @@ function HeroTile({ index, label, onClick, loading, highlight, children }) {
         type="button"
         onClick={onClick}
         className={cn(
-          'group flex h-full w-full flex-col gap-1 rounded-2xl p-4 text-left ring-1 backdrop-blur-sm transition hover:-translate-y-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-gold',
+          'group flex h-full w-full flex-col gap-1 rounded-2xl p-4 text-left ring-1 transition hover:-translate-y-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-gold',
           highlight ? 'bg-brand-gold/15 ring-brand-gold/40 hover:bg-brand-gold/20' : 'bg-white/[0.07] ring-white/15 hover:bg-white/[0.11]',
         )}
       >
-        <span className="text-xs font-bold text-blue-100/80">{label}</span>
+        <span className="text-xs font-bold text-white/80">{label}</span>
         {loading ? <span className="mt-1 h-9 w-20 animate-pulse rounded-lg bg-white/15" aria-hidden="true" /> : children}
       </button>
     </Motion.li>
@@ -214,7 +211,7 @@ function CompanyReviews({ query, type, filter, page, onChange }) {
     <div className="grid gap-6 lg:grid-cols-[minmax(0,22rem)_1fr]">
       <div className="lg:sticky lg:top-6 lg:self-start">
         {isLoading
-          ? <div className="h-80 animate-pulse rounded-3xl bg-slate-100" aria-hidden="true" />
+          ? <div className="h-80 animate-pulse rounded-2xl bg-slate-100" aria-hidden="true" />
           : <RatingOverview section={data?.summary?.[type]} type={type} minReviews={data?.summary?.min_reviews} />}
       </div>
 
@@ -242,10 +239,10 @@ function CompanyReviews({ query, type, filter, page, onChange }) {
         <div className={cn('mt-5 transition-opacity', isFetching && isPlaceholderData && 'opacity-60')} aria-busy={isFetching}>
           {isLoading ? (
             <div className="space-y-4" aria-hidden="true">
-              {[0, 1, 2].map((key) => <div key={key} className="h-48 animate-pulse rounded-3xl bg-slate-100" />)}
+              {[0, 1, 2].map((key) => <div key={key} className="h-48 animate-pulse rounded-2xl bg-slate-100" />)}
             </div>
           ) : reviews.length === 0 ? (
-            <div className="rounded-3xl border border-dashed border-slate-300 bg-white px-6 py-12 text-center">
+            <div className="rounded-2xl border border-dashed border-slate-300 bg-white px-6 py-12 text-center">
               <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-slate-400"><Star className="h-6 w-6" aria-hidden /></span>
               <p className="mx-auto mt-3 max-w-sm text-sm text-slate-600">{empty}</p>
               {filter !== 'all' && <Button size="sm" variant="outline" className="mt-4" onClick={() => onChange({ filter: null, page: null })}>Show all reviews</Button>}

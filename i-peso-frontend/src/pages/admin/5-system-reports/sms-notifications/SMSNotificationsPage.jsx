@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { AlertTriangle, CheckCircle2, Clock3, MessageSquareText, RefreshCw, RotateCcw, Send, ShieldCheck, Trash2 } from 'lucide-react'
-import toast from 'react-hot-toast'
+import toast from '@/lib/toast'
 import { Button, Card, ConfirmDialog, EmptyState, StatCard } from '@/components/ui'
 import PageHeader from '@/pages/admin/_components/PageHeader'
 import { smsService } from '@/services/smsService'
@@ -116,8 +116,8 @@ export default function SMSNotificationsPage() {
               {gateway.log_only ? <ShieldCheck className="h-5 w-5" /> : <Send className="h-5 w-5" />}
             </span>
             <div>
-              <p className="text-xs font-black uppercase tracking-wider text-slate-500">Current SMS mode</p>
-              <h2 className="mt-1 text-2xl font-black text-slate-950">{gateway.effective_mode === 'unisms' && showLiveIndicator ? 'UniSMS Live' : 'Log Only'}</h2>
+              <p className="text-xs font-bold text-slate-500">Current SMS mode</p>
+              <h2 className="mt-1 text-2xl font-bold text-slate-950">{gateway.effective_mode === 'unisms' && showLiveIndicator ? 'UniSMS Live' : 'Log Only'}</h2>
               {gateway.notice ? <p className="mt-1 max-w-2xl text-sm text-slate-600">{gateway.notice}</p> : null}
             </div>
           </div>
@@ -151,7 +151,7 @@ export default function SMSNotificationsPage() {
         {loading && !data ? <TableSkeleton /> : logs.length ? <>
           <div className="overflow-x-auto" aria-busy={loading}>
             <table className="min-w-[1020px] w-full text-sm">
-              <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
+              <thead className="bg-slate-50 text-left text-xs text-slate-500">
                 <tr>
                   <th className="px-4 py-3">Date</th>
                   <th className="px-4 py-3">Recipient</th>
@@ -222,7 +222,7 @@ export default function SMSNotificationsPage() {
 
 function num(value) { return Number(value || 0).toLocaleString() }
 function Filter({ label, value, onChange, options, disabled }) { return <label className="min-w-0"><span className="mb-1 block text-xs font-bold text-slate-600">{label}</span><select value={value} disabled={disabled} onChange={(event) => onChange(event.target.value)} className="w-full min-w-0 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none disabled:bg-slate-100 sm:min-w-44 focus:border-brand-500 focus:ring-2 focus:ring-brand-200"><option value="">All</option>{options.map((option) => <option key={option} value={option}>{pretty(option)}</option>)}</select></label> }
-function Status({ status }) { const styles = { sent: 'bg-emerald-50 text-emerald-700', failed: 'bg-red-50 text-red-700', skipped: 'bg-slate-100 text-slate-700', log_only: 'bg-amber-50 text-amber-800', retrying: 'bg-blue-50 text-blue-700', pending: 'bg-blue-50 text-blue-700' }; return <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-bold ${styles[status] || styles.pending}`}>{pretty(status)}</span> }
+function Status({ status }) { const styles = { sent: 'bg-emerald-50 text-emerald-700', failed: 'bg-red-50 text-red-700', skipped: 'bg-slate-100 text-slate-700', log_only: 'bg-amber-50 text-amber-800', retrying: 'bg-[#e8f0fc] text-brand-navy', pending: 'bg-[#e8f0fc] text-brand-navy' }; return <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-bold ${styles[status] || styles.pending}`}>{pretty(status)}</span> }
 function Pagination({ page, lastPage, onChange, loading }) { if (lastPage <= 1) return null; return <div className="flex items-center justify-between border-t border-slate-100 p-4"><p className="text-xs text-slate-500">Page {page} of {lastPage}</p><div className="flex gap-2"><Button size="sm" variant="outline" disabled={loading || page <= 1} onClick={() => onChange(page - 1)}>Previous</Button><Button size="sm" variant="outline" disabled={loading || page >= lastPage} onClick={() => onChange(page + 1)}>Next</Button></div></div> }
 function TableSkeleton() { return <div className="divide-y divide-slate-100 animate-pulse">{[1, 2, 3, 4].map((item) => <div key={item} className="grid grid-cols-4 gap-4 p-4"><div className="h-4 rounded bg-slate-200" /><div className="h-4 rounded bg-slate-100" /><div className="h-4 rounded bg-slate-100" /><div className="h-4 rounded bg-slate-200" /></div>)}</div> }
 function formatDate(value) { return value ? new Date(value).toLocaleString('en-PH') : 'Not available' }

@@ -31,7 +31,7 @@ export default function SeekerAvatar({ seekerId, hasPhoto, initials }) {
   }
 
   return (
-    <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-brand-navy text-xs font-black text-white">
+    <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-brand-navy text-xs font-bold text-white">
       {initials}
     </span>
   )

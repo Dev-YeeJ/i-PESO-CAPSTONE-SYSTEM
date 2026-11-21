@@ -469,7 +469,7 @@ export default function EmployerDetailPage() {
                 <TabsContent value="documents" className="space-y-4">
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div>
-                      <h2 className="text-base font-extrabold text-slate-950">Verification documents</h2>
+                      <h2 className="text-base font-semibold text-slate-950">Verification documents</h2>
                       {verificationStatus === 'pending' && (
                         <p className="mt-0.5 text-sm text-slate-500">Review each document. Documents will be approved unless you flag them for rejection before finalizing.</p>
                       )}
@@ -518,10 +518,10 @@ export default function EmployerDetailPage() {
                             <TableCell className="whitespace-normal break-words">
                               <div className="flex items-center gap-2">
                                 <span className="font-bold text-slate-900">{label}</span>
-                                {row.required && <span className="rounded-md bg-blue-50 px-1.5 py-0.5 text-[11px] font-bold text-blue-700">Required</span>}
+                                {row.required && <span className="rounded-md bg-[#e8f0fc] px-1.5 py-0.5 text-[11px] font-bold text-brand-navy">Required</span>}
                               </div>
                               {doc ? (
-                                <p className="mt-1 break-words text-xs text-slate-400">{doc.original_filename} · Uploaded {formatDate(doc.uploaded_at || doc.created_at)}</p>
+                                <p className="mt-1 break-words text-xs text-slate-400">{doc.original_filename}, Uploaded {formatDate(doc.uploaded_at || doc.created_at)}</p>
                               ) : (
                                 <p className="mt-1 text-xs text-amber-600">No file submitted</p>
                               )}
@@ -537,7 +537,7 @@ export default function EmployerDetailPage() {
                               ) : doc.verification_status === 'approved' ? (
                                 <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700"><CheckCircle2 className="h-3.5 w-3.5" />Approved</span>
                               ) : viewedByMe(doc) ? (
-                                <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 border border-blue-200 px-2.5 py-1 text-xs font-bold text-blue-700">
+                                <span className="inline-flex items-center gap-1 rounded-full bg-[#e8f0fc] border border-[#c4d9f7] px-2.5 py-1 text-xs font-bold text-brand-navy">
                                   <Eye className="h-3.5 w-3.5" />
                                   Viewed by you
                                 </span>
@@ -616,8 +616,8 @@ export default function EmployerDetailPage() {
                       <Button variant="ghost" onClick={() => navigate('/admin/employers')} icon={ArrowLeft}>Back to Queue</Button>
 
                       {!canAct ? (
-                        <div className="flex items-center gap-2 rounded-xl border border-blue-200 bg-blue-50/70 px-4 py-2.5 text-xs font-semibold text-blue-900">
-                          <ShieldCheck className="h-4 w-4 text-blue-600 shrink-0" />
+                        <div className="flex items-center gap-2 rounded-xl border border-[#c4d9f7] bg-[#e8f0fc] px-4 py-2.5 text-xs font-semibold text-brand-navy">
+                          <ShieldCheck className="h-4 w-4 text-brand-navy shrink-0" />
                           <span>View-only mode: You can inspect submitted documents. Accreditation approval and rejection actions are restricted to authorized PESO officers.</span>
                         </div>
                       ) : !allRequiredViewed ? (
@@ -657,7 +657,7 @@ export default function EmployerDetailPage() {
             <>
               <DialogHeader>
                 <div className="flex items-center gap-3">
-                  <span className="rounded-xl bg-blue-50 p-3 text-blue-700"><Download className="h-6 w-6" /></span>
+                  <span className="rounded-xl bg-[#e8f0fc] p-3 text-brand-navy"><Download className="h-6 w-6" /></span>
                   <div>
                     <DialogTitle>Download Document</DialogTitle>
                     <DialogDescription>{DOCUMENT_LABELS[downloadDocument.document_type] ?? downloadDocument.document_type}</DialogDescription>
@@ -854,7 +854,7 @@ function WatermarkedPreview({ previewDocument, documentLabels, onClose }) {
       role="dialog"
       aria-modal="true"
       aria-labelledby="watermarked-preview-title"
-      className="fixed inset-0 z-50 flex flex-col bg-slate-950/95 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex flex-col bg-slate-950/95"
       onContextMenu={(e) => e.preventDefault()}
     >
       <div className="flex items-center justify-between border-b border-white/10 bg-slate-900 px-6 py-4 text-white">
@@ -891,14 +891,14 @@ function WatermarkedPreview({ previewDocument, documentLabels, onClose }) {
             <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center overflow-hidden select-none" style={{ userSelect: 'none', WebkitUserSelect: 'none' }}>
               <div className="absolute inset-[-50%] flex flex-wrap items-center justify-center gap-0" style={{ transform: 'rotate(-35deg)' }}>
                 {Array.from({ length: 48 }).map((_, i) => (
-                  <div key={i} className="whitespace-nowrap px-8 py-12 text-center" style={{ fontSize: '18px', fontWeight: 900, color: 'rgba(0, 0, 0, 0.08)', letterSpacing: '0.15em', textTransform: 'uppercase', textShadow: '0 0 8px rgba(0,0,0,0.03)' }}>
+                  <div key={i} className="whitespace-nowrap px-8 py-12 text-center" style={{ fontSize: '18px', fontWeight: 900, color: 'rgba(0, 0, 0, 0.08)', letterSpacing: '0.15em', textTransform: '', textShadow: '0 0 8px rgba(0,0,0,0.03)' }}>
                     CONFIDENTIAL — PESO REVIEW ONLY
                   </div>
                 ))}
               </div>
               <div className="absolute flex flex-col items-center gap-2" style={{ transform: 'rotate(-35deg)' }}>
-                <div style={{ fontSize: '36px', fontWeight: 900, color: 'rgba(239, 68, 68, 0.15)', letterSpacing: '0.2em', textTransform: 'uppercase', textShadow: '0 2px 12px rgba(239, 68, 68, 0.08)' }}>CONFIDENTIAL</div>
-                <div style={{ fontSize: '14px', fontWeight: 700, color: 'rgba(239, 68, 68, 0.12)', letterSpacing: '0.15em', textTransform: 'uppercase' }}>PESO REVIEW ONLY — DO NOT DISTRIBUTE</div>
+                <div style={{ fontSize: '36px', fontWeight: 900, color: 'rgba(239, 68, 68, 0.15)', letterSpacing: '0.2em', textTransform: '', textShadow: '0 2px 12px rgba(239, 68, 68, 0.08)' }}>CONFIDENTIAL</div>
+                <div style={{ fontSize: '14px', fontWeight: 700, color: 'rgba(239, 68, 68, 0.12)', letterSpacing: '0.15em', textTransform: '' }}>PESO REVIEW ONLY — DO NOT DISTRIBUTE</div>
                 <div style={{ fontSize: '11px', fontWeight: 600, color: 'rgba(239, 68, 68, 0.10)', marginTop: '4px' }}>{new Date().toLocaleString('en-PH')}</div>
               </div>
             </div>

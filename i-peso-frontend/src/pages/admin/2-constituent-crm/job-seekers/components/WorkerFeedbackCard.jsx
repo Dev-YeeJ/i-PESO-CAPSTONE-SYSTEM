@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import toast from 'react-hot-toast'
+import toast from '@/lib/toast'
 import { Lock } from 'lucide-react'
 import { Badge, Button, Card, CardHeader } from '@/components/ui'
 import { reviewModerationService } from '@/services/reviewModerationService'
@@ -41,7 +41,7 @@ export default function WorkerFeedbackCard({ seekerId }) {
           {feedback.map((item) => (
             <li key={item.id} className="rounded-lg border border-slate-200 p-3 text-sm">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <p className="font-bold text-slate-900">{item.employer}{item.job_title ? <span className="font-normal text-slate-500"> · {item.job_title}</span> : null}</p>
+                <p className="font-bold text-slate-900">{item.employer}{item.job_title ? <span className="font-normal text-slate-500">, {item.job_title}</span> : null}</p>
                 {item.status === 'hidden' ? <Badge variant="rejected" icon={false}>Hidden</Badge> : <span className="text-xs text-slate-600">Would rehire: <strong>{item.would_rehire}</strong></span>}
               </div>
               <ul className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-600">

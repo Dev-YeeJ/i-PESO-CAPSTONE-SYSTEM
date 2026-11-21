@@ -61,6 +61,7 @@ class AnnouncementPresenter
             'notify_users' => (bool) $announcement->notify_users,
             'notified_at' => $announcement->notified_at?->toISOString(),
             'notified_count' => (int) $announcement->notified_count,
+            'delivery' => app(\App\Services\AnnouncementService::class)->deliveryProgress($announcement),
             'created_by' => self::adminName($announcement->creator),
             'updated_by' => self::adminName($announcement->editor),
             'published_by' => self::adminName($announcement->publisher),

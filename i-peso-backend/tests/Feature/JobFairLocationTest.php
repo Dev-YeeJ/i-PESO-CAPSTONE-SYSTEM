@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Administrator;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Schema;
@@ -23,6 +24,9 @@ class JobFairLocationTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        // The fixtures use fixed calendar dates and the job fair rules only accept
+        // today or later, so pin "today" before the earliest of them.
+        Carbon::setTestNow('2026-09-01 09:00:00');
 
         config()->set('services.google_maps.server_key', 'test-key');
         config()->set('services.google_maps.geocoding_base_url', 'https://maps.googleapis.test/maps/api/geocode');
@@ -31,6 +35,12 @@ class JobFairLocationTest extends TestCase
         Cache::flush();
 
         $this->createTables();
+    }
+
+    protected function tearDown(): void
+    {
+        Carbon::setTestNow();
+        parent::tearDown();
     }
 
     public function test_creating_a_job_fair_with_a_dropped_pin_persists_the_location_as_is(): void
@@ -267,6 +277,7 @@ class JobFairLocationTest extends TestCase
         });
 
         Schema::create('administrators', function (Blueprint $t) {
+            $t->softDeletes();
             $t->id('admin_id');
             $t->string('first_name');
             $t->string('last_name');

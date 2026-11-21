@@ -1,7 +1,7 @@
 import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import toast from 'react-hot-toast'
+import toast from '@/lib/toast'
 import ContentModulesPage from '../ContentModulesPage'
 import { renderWithProviders } from '@/test/utils'
 import { adminContentInsightService, adminFaqService, adminPolicyService, adminSiteContentService } from '@/services/siteContentService'
@@ -15,7 +15,7 @@ vi.mock('@/services/siteContentService', async (importOriginal) => ({
   adminPolicyService: { list: vi.fn(), get: vi.fn(), version: vi.fn(), startDraft: vi.fn(), saveDraft: vi.fn(), publish: vi.fn(), discard: vi.fn() },
   adminContentInsightService: { health: vi.fn(), insights: vi.fn(), resolve: vi.fn(), assist: vi.fn() },
 }))
-vi.mock('react-hot-toast', () => ({ default: Object.assign(vi.fn(), { success: vi.fn(), error: vi.fn() }) }))
+vi.mock('@/lib/toast', () => { const toast = Object.assign(vi.fn(), { success: vi.fn(), error: vi.fn(), warning: vi.fn(), loading: vi.fn(), dismiss: vi.fn() }); return { default: toast, toast } })
 
 const labels = {
   office: { office_name: 'Office name', address: 'Address', map_url: 'Map link', hours: 'Office hours', phone: 'Phone', email: 'Email', facebook: 'Facebook page', fees_policy: 'Fees policy', employer_approval_time: 'Employer approval time' },
@@ -36,15 +36,13 @@ const health = {
   checks: [
     { id: 'office_blank', status: 'warn', title: 'Office info has blanks', detail: 'Not on record yet: Office hours.', module: 'office', action: 'Fill in Office info', items: [] },
     { id: 'faq_duplicates', status: 'warn', title: '1 possible duplicate FAQs', detail: 'These questions look alike.', module: 'faqs', action: 'Compare', items: [{ id: 4, label: 'How do I register?', other_id: 5, other_label: 'How to register?' }] },
-    { id: 'faq_published', status: 'ok', title: '2 FAQs published', detail: 'Readers can use them.', module: 'faqs', action: null, items: [] },
+    { id: 'faq_published', status: 'ok', title: '2 FAQs published', detail: 'The assistant answers from them.', module: 'faqs', action: null, items: [] },
   ],
-  counts: { faqs_published: 2, faqs_unpublished: 1, missed_searches: 4, chatbot_gaps: 2, votes: 3 },
+  counts: { faqs_published: 2, faqs_unpublished: 1, chatbot_gaps: 2 },
 }
 
 const insights = {
   days: 30,
-  faq_feedback: [{ faq_id: 4, question: 'How do I register?', helpful: 1, not_helpful: 5, total: 6, score: 17, needs_work: true, is_published: true }],
-  missed_searches: [{ normalized: 'tesda scholarship', text: 'tesda scholarship', count: 4, last_at: '2026-11-12T08:00:00Z', sources: ['public'], closest_faq: null }],
   chatbot_gaps: [{ normalized: 'saan ang tesda office', text: 'Saan ang TESDA office?', count: 2, last_at: '2026-11-12T08:00:00Z', sources: ['guest'], closest_faq: null }],
   gap_logging: true,
   retention_days: 90,
@@ -52,15 +50,15 @@ const insights = {
 
 const faqList = {
   data: [
-    { id: 4, question: 'How do I register as a job seeker?', answer: 'Use Register.', audience: 'everyone', audience_label: 'Everyone', topic: 'account', is_published: true, is_featured: false, helpful_votes: 1, unhelpful_votes: 5, updated_at: '2026-11-01T00:00:00Z' },
+    { id: 4, question: 'How do I register as a job seeker?', answer: 'Use Register.', audience: 'everyone', audience_label: 'Everyone', topic: 'account', is_published: true, updated_at: '2026-11-01T00:00:00Z' },
   ],
-  summary: { total: 1, published: 1, unpublished: 0, featured: 0, in_assistant: 1, assistant_limit: 40, max_featured: 5 },
+  summary: { total: 1, published: 1, unpublished: 0, in_assistant: 1, assistant_limit: 40 },
   can_add_starter_pack: false,
 }
 
 const emptyFaqs = {
   data: [],
-  summary: { total: 0, published: 0, unpublished: 0, featured: 0, in_assistant: 0, assistant_limit: 40, max_featured: 5 },
+  summary: { total: 0, published: 0, unpublished: 0, in_assistant: 0, assistant_limit: 40 },
   can_add_starter_pack: true,
 }
 
@@ -136,7 +134,7 @@ describe('Site Content admin', () => {
 
     const nav = screen.getByRole('navigation', { name: 'Content modules' })
     expect(within(nav).getByRole('button', { name: /health check/i })).toBeInTheDocument()
-    expect(within(nav).getByRole('button', { name: /reader insights/i })).toBeInTheDocument()
+    expect(within(nav).getByRole('button', { name: /assistant insights/i })).toBeInTheDocument()
     expect(within(nav).getByRole('button', { name: /faqs/i })).toBeInTheDocument()
     expect(within(nav).queryByRole('button', { name: /office info/i })).not.toBeInTheDocument()
     expect(within(nav).queryByRole('button', { name: /policy pages/i })).not.toBeInTheDocument()
@@ -157,16 +155,18 @@ describe('Site Content admin', () => {
     expect(await screen.findByRole('textbox', { name: 'Question' })).toHaveValue('How do I register as a job seeker?')
   })
 
-  it('turns a search nobody found into a new FAQ with an AI-cleaned question', async () => {
-    adminContentInsightService.assist.mockResolvedValue({ suggestion: 'Does PESO offer TESDA scholarships?', note: '' })
+  it('turns a question the assistant could not answer into a new FAQ with an AI-cleaned question', async () => {
+    adminContentInsightService.assist.mockResolvedValue({ suggestion: 'Where is the TESDA office?', note: '' })
     renderWithProviders(<ContentModulesPage />, { route: '/admin/content-modules?tab=insights' })
 
-    expect(await screen.findByText('“tesda scholarship”')).toBeInTheDocument()
-    expect(screen.getByText('Rewrite')).toBeInTheDocument()
-    await userEvent.click(screen.getAllByRole('button', { name: /write faq/i })[0])
+    expect(await screen.findByText('“Saan ang TESDA office?”')).toBeInTheDocument()
+    // The Help page went, and with it its search and vote reports.
+    expect(screen.queryByText(/help searches/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/was this helpful/i)).not.toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: /write faq/i }))
 
-    expect(adminContentInsightService.assist).toHaveBeenCalledWith({ task: 'suggest_question', text: 'tesda scholarship' })
-    expect(await screen.findByRole('textbox', { name: 'Question' })).toHaveValue('Does PESO offer TESDA scholarships?')
+    expect(adminContentInsightService.assist).toHaveBeenCalledWith({ task: 'suggest_question', text: 'Saan ang TESDA office?' })
+    expect(await screen.findByRole('textbox', { name: 'Question' })).toHaveValue('Where is the TESDA office?')
   })
 
   it('drafts an answer with AI, warns about a duplicate, and only fills the form when accepted', async () => {
@@ -174,11 +174,16 @@ describe('Site Content admin', () => {
     adminContentInsightService.assist.mockResolvedValue({ suggestion: 'Open **Register** and choose Job seeker.', note: 'Check every detail.' })
     renderWithProviders(<ContentModulesPage />, { route: '/admin/content-modules?tab=faqs' })
 
-    await userEvent.click(await screen.findByRole('button', { name: /new faq/i }))
+    // FAQs only feed the assistant: no landing-page toggle, no link button.
+    await screen.findByText('How do I register as a job seeker?')
+    expect(screen.queryByRole('button', { name: /show on home/i })).not.toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: /new faq/i }))
     await userEvent.type(screen.getByRole('textbox', { name: 'Question' }), 'How to register as job seeker?')
     expect(screen.getByText(/looks like an faq you already have/i)).toBeInTheDocument()
     expect(screen.getByRole('combobox', { name: 'Topic' })).toHaveValue('account')
     expect(screen.queryByRole('textbox', { name: 'Link' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /add a link button/i })).not.toBeInTheDocument()
 
     await userEvent.click(screen.getByRole('button', { name: /draft answer/i }))
     const suggestion = await screen.findByLabelText('AI suggestion')
@@ -192,7 +197,7 @@ describe('Site Content admin', () => {
 
   it('saves and publishes a new FAQ in one click', async () => {
     adminFaqService.create.mockResolvedValue({ message: 'FAQ saved.', faq: { id: 9, is_published: false } })
-    adminFaqService.publish.mockResolvedValue({ message: 'Published. It is on the Help pages now.' })
+    adminFaqService.publish.mockResolvedValue({ message: 'Published. The assistant can use it now.' })
     renderWithProviders(<ContentModulesPage />, { route: '/admin/content-modules?tab=faqs' })
 
     await userEvent.click(await screen.findByRole('button', { name: /new faq/i }))
@@ -202,8 +207,9 @@ describe('Site Content admin', () => {
     await userEvent.click(screen.getByRole('button', { name: /save & publish/i }))
 
     await waitFor(() => expect(adminFaqService.publish).toHaveBeenCalledWith(9))
-    expect(adminFaqService.create.mock.calls[0][0]).toMatchObject({ topic: 'job_fairs', link_url: null })
-    expect(toast.success).toHaveBeenCalledWith('Published. It is on the Help pages now.')
+    expect(adminFaqService.create.mock.calls[0][0]).toMatchObject({ topic: 'job_fairs' })
+    expect(adminFaqService.create.mock.calls[0][0]).not.toHaveProperty('link_url')
+    expect(toast.success).toHaveBeenCalledWith('Published. The assistant can use it now.')
   })
 
   it('switches landing page sections off', async () => {
@@ -214,7 +220,9 @@ describe('Site Content admin', () => {
     await userEvent.click(screen.getByRole('button', { name: /^save$/i }))
 
     await waitFor(() => expect(adminSiteContentService.save).toHaveBeenCalled())
-    expect(adminSiteContentService.save.mock.calls[0][1].show_sections).toMatchObject({ programs: false, faq: true })
+    expect(adminSiteContentService.save.mock.calls[0][1].show_sections).toMatchObject({ programs: false })
+    // The landing "Common questions" section is gone, so there is no switch for it.
+    expect(adminSiteContentService.save.mock.calls[0][1].show_sections).not.toHaveProperty('faq')
   })
 
   it('opens read-only for view-only staff', async () => {

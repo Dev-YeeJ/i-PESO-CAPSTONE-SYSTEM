@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import toast from 'react-hot-toast'
+import toast from '@/lib/toast'
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { Activity, CalendarClock, Download, RefreshCw, RotateCcw, ShieldAlert, UserRound, Users, X } from 'lucide-react'
 import { Badge, Button, Card, StatCard } from '@/components/ui'
@@ -116,10 +116,10 @@ export default function ActivityLogPage() {
       />
 
       {data?.actor && (
-        <div className="mt-4 flex flex-wrap items-center gap-3 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
+        <div className="mt-4 flex flex-wrap items-center gap-3 rounded-xl border border-[#c4d9f7] bg-[#e8f0fc] px-4 py-3 text-sm text-brand-navy">
           <UserRound className="h-4 w-4" />
-          <span>Showing activity for <strong>{data.actor.name}</strong> · {data.actor.role}</span>
-          <button type="button" onClick={clearPerson} className="ml-auto inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-bold text-blue-800 hover:bg-blue-100">
+          <span>Showing activity for <strong>{data.actor.name}</strong>, {data.actor.role}</span>
+          <button type="button" onClick={clearPerson} className="ml-auto inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-bold text-brand-navy hover:bg-[#e8f0fc]">
             <X className="h-3.5 w-3.5" /> Show everyone
           </button>
         </div>
@@ -268,7 +268,7 @@ export default function ActivityLogPage() {
         {paginator?.last_page > 1 && (
           <div className="flex items-center justify-between border-t border-slate-100 p-4">
             <p className="text-xs text-slate-500">
-              Page {paginator.current_page} of {paginator.last_page} · {count(paginator.total)} events
+              Page {paginator.current_page} of {paginator.last_page}, {count(paginator.total)} events
             </p>
             <div className="flex gap-2">
               <Button size="sm" variant="outline" disabled={isFetching || paginator.current_page <= 1} onClick={() => setPage((current) => current - 1)}>

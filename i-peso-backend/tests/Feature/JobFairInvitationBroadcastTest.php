@@ -14,6 +14,7 @@ use App\Notifications\JobFairPublished;
 use App\Services\JobFairService;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Schema;
 use Laravel\Sanctum\Sanctum;
@@ -32,7 +33,16 @@ class JobFairInvitationBroadcastTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        // Fixtures use fixed calendar dates and job fair rules only accept today or
+        // later, so pin "today" before the earliest of them.
+        Carbon::setTestNow('2026-09-01 09:00:00');
         $this->createTables();
+    }
+
+    protected function tearDown(): void
+    {
+        Carbon::setTestNow();
+        parent::tearDown();
     }
 
     public function test_publishing_notifies_every_verified_employer_and_tracks_them_as_invited(): void
@@ -474,6 +484,7 @@ class JobFairInvitationBroadcastTest extends TestCase
     private function createTables(): void
     {
         Schema::create('administrators', function (Blueprint $t) {
+            $t->softDeletes();
             $t->id('admin_id'); $t->string('first_name'); $t->string('last_name'); $t->string('email')->unique();
             $t->string('password'); $t->string('role')->nullable(); $t->string('status')->nullable();
             $t->timestamp('email_verified_at')->nullable(); $t->rememberToken(); $t->timestamps();

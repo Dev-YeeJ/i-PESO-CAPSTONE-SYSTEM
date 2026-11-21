@@ -124,6 +124,22 @@ export const getPlacementCompliance = async (params = {}) => {
   return response.data
 }
 
+/** Every reporting employer against every month of `year` that has come due. */
+export const getPlacementComplianceGrid = async (year) => {
+  const response = await api.get('/admin/placement-reports/compliance/grid', { params: { year } })
+  return response.data
+}
+
+/** One-off bell + email reminder to one employer for one month. */
+export const sendPlacementReminder = async ({ employerId, month, year }) => {
+  const response = await api.post('/admin/placement-reports/compliance/remind', {
+    employer_id: employerId,
+    coverage_month: month,
+    coverage_year: year,
+  })
+  return response.data
+}
+
 // ── Admin: resolve an ambiguous seeker match on one reported row ──────────
 
 export const getPlacementRecordCandidates = async (reportId, recordId) => {

@@ -41,7 +41,8 @@ describe('employer VacanciesPage', () => {
     renderPage()
 
     expect(await screen.findByText('No vacancies posted yet')).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: /post a job/i })).toBeInTheDocument()
+    // One in the page header, one in the empty state itself.
+    expect(screen.getAllByRole('link', { name: /post a job/i }).length).toBeGreaterThanOrEqual(2)
   })
 
   it('confirms deletion in an accessible dialog instead of window.confirm', async () => {

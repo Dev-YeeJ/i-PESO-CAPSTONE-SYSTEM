@@ -8,9 +8,13 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
- * A frequently asked question shown on /help, the seeker and employer Help
- * pages, the landing page (featured ones) and in the assistant's reference
- * text. New FAQs start unpublished so half-written answers never go live.
+ * A frequently asked question in the assistant's answer bank: published FAQs
+ * for the reader's audience go into the chatbot's reference text. There is no
+ * Help & FAQs page any more (removed 2026-11-14 — the chatbot covers it).
+ * New FAQs start unpublished so half-written answers never reach the assistant.
+ *
+ * is_featured, link_label and link_url are left over from the Help page and
+ * landing "Common questions" section; nothing reads them now.
  */
 class Faq extends Model
 {
@@ -35,8 +39,6 @@ class Faq extends Model
         'office' => 'Office & services',
     ];
 
-    /** The landing page shows at most this many featured FAQs. */
-    public const MAX_FEATURED = 5;
 
     protected $fillable = [
         'question', 'answer', 'audience', 'topic', 'link_label', 'link_url',
@@ -51,12 +53,12 @@ class Faq extends Model
 
     public function creator(): BelongsTo
     {
-        return $this->belongsTo(Administrator::class, 'created_by', 'admin_id');
+        return $this->belongsTo(Administrator::class, 'created_by', 'admin_id')->withTrashed();
     }
 
     public function editor(): BelongsTo
     {
-        return $this->belongsTo(Administrator::class, 'updated_by', 'admin_id');
+        return $this->belongsTo(Administrator::class, 'updated_by', 'admin_id')->withTrashed();
     }
 
     public function scopePublished(Builder $query): Builder

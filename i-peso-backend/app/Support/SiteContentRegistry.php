@@ -21,12 +21,20 @@ final class SiteContentRegistry
     public const KEYS = [self::OFFICE, self::LANDING, self::ABOUT];
 
     /** Landing page sections staff can switch off (the hero always shows). */
-    public const LANDING_SECTIONS = ['announcements', 'features', 'jobs', 'programs', 'faq'];
+    public const LANDING_SECTIONS = ['announcements', 'features', 'jobs', 'programs'];
 
     /** Who a PESO service is for (About page). */
     public const SERVICE_AUDIENCES = ['everyone', 'seekers', 'employers'];
 
     public const MAX_SERVICES = 12;
+
+    /**
+     * Organization chart tiers on the About page: the office head, the heads
+     * of each unit, then everyone else (grouped under their unit when given).
+     */
+    public const ORG_LEVELS = ['head', 'unit_head', 'staff'];
+
+    public const MAX_ORG_ENTRIES = 40;
 
     /** Same rule as FAQ and announcement links: an internal path or an https:// link. */
     public const LINK_PATTERN = '#^(/(?!/)[^\s]*|https://[^\s]+)$#i';
@@ -80,6 +88,7 @@ final class SiteContentRegistry
                 'vision' => 'Vision',
                 'mandate' => 'Legal mandate',
                 'services' => 'PESO services',
+                'org_chart' => 'Organization chart',
             ],
         };
     }
@@ -138,6 +147,8 @@ final class SiteContentRegistry
                     ['title' => 'Employer accreditation and job posting', 'description' => 'Verified employers can post vacancies, screen ranked applicants and join PESO job fairs.', 'audience' => 'employers', 'link_label' => 'Register your company', 'link_url' => '/register/employer'],
                     ['title' => 'Placement reporting', 'description' => 'Employers file a simple monthly placement report so PESO can track local employment.', 'audience' => 'employers', 'link_label' => null, 'link_url' => null],
                 ],
+                // Real people only: empty (and hidden) until PESO enters its own staff list.
+                'org_chart' => [],
             ],
         };
     }
@@ -190,6 +201,12 @@ final class SiteContentRegistry
                 'services.*.audience' => ['required', Rule::in(self::SERVICE_AUDIENCES)],
                 'services.*.link_label' => ['nullable', 'string', 'max:60', 'required_with:values.services.*.link_url'],
                 'services.*.link_url' => ['nullable', 'string', 'max:500', 'regex:'.self::LINK_PATTERN, 'required_with:values.services.*.link_label'],
+                // Optional in a save: older editors that don't send it keep what's stored.
+                'org_chart' => ['sometimes', 'array', 'max:'.self::MAX_ORG_ENTRIES],
+                'org_chart.*.name' => ['required', 'string', 'max:100'],
+                'org_chart.*.position' => ['required', 'string', 'max:100'],
+                'org_chart.*.level' => ['required', Rule::in(self::ORG_LEVELS)],
+                'org_chart.*.unit' => ['nullable', 'string', 'max:80'],
             ],
         };
 
@@ -212,6 +229,10 @@ final class SiteContentRegistry
             $attributes['values.services.*.description'] = 'service description';
             $attributes['values.services.*.link_label'] = 'link button';
             $attributes['values.services.*.link_url'] = 'link';
+            $attributes['values.org_chart.*.name'] = 'name';
+            $attributes['values.org_chart.*.position'] = 'position';
+            $attributes['values.org_chart.*.level'] = 'level';
+            $attributes['values.org_chart.*.unit'] = 'unit';
         }
 
         return $attributes;
@@ -250,6 +271,7 @@ final class SiteContentRegistry
         };
         if ($key === self::ABOUT) {
             $keepShape('services', ['title', 'description', 'audience', 'link_label', 'link_url']);
+            $keepShape('org_chart', ['name', 'position', 'level', 'unit']);
         }
         if ($key === self::LANDING && isset($normalized['show_sections']) && is_array($normalized['show_sections'])) {
             $normalized['show_sections'] = collect(self::LANDING_SECTIONS)

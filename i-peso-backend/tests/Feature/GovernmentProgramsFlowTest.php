@@ -497,6 +497,7 @@ class GovernmentProgramsFlowTest extends TestCase
     {
         if (! Schema::hasTable('administrators')) {
             Schema::create('administrators', function (Blueprint $table) {
+                $table->softDeletes();
                 $table->id('admin_id');
                 $table->string('first_name');
                 $table->string('last_name');
@@ -574,6 +575,7 @@ class GovernmentProgramsFlowTest extends TestCase
         if (! Schema::hasTable('job_vacancies')) {
             Schema::create('job_vacancies', function (Blueprint $table) {
                 $table->id('post_id');
+                $table->timestamp('seekers_notified_at')->nullable();
                 $table->foreignId('employer_id');
                 $table->foreignId('occupation_id')->nullable();
                 $table->string('job_title')->nullable();

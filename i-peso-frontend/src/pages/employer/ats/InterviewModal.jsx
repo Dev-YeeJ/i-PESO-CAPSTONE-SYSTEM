@@ -99,12 +99,12 @@ export default function InterviewModal({ open, onClose, targets = [], initialInt
           </label>
 
           {mode === 'online' && (
-            <div className="flex items-start gap-3 rounded-xl border border-blue-100 bg-blue-50 p-4">
-              <Video className="mt-0.5 h-5 w-5 shrink-0 text-blue-600" />
+            <div className="flex items-start gap-3 rounded-xl border border-[#c4d9f7] bg-[#e8f0fc] p-4">
+              <Video className="mt-0.5 h-5 w-5 shrink-0 text-brand-navy" />
               <div className="flex-1">
                 <label className="flex cursor-pointer items-center">
                   <input type="checkbox" {...register('autoMeet')} className="peer sr-only" />
-                  <div className="relative h-6 w-11 rounded-full bg-slate-300 transition-all after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:bg-white after:transition-all after:content-[''] peer-checked:bg-blue-600 peer-checked:after:translate-x-full peer-focus:ring-4 peer-focus:ring-blue-300" />
+                  <div className="relative h-6 w-11 rounded-full bg-slate-300 transition-all after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:bg-white after:transition-all after:content-[''] peer-checked:bg-brand-navy peer-checked:after:translate-x-full peer-focus:ring-4 peer-focus:ring-[#c4d9f7]" />
                   <span className="ml-3 text-sm font-semibold text-slate-900">Auto-generate video meeting link</span>
                 </label>
                 <p className="mt-1 text-xs text-slate-600">Creates an instant video call link and fills it in automatically — no account connection needed.</p>

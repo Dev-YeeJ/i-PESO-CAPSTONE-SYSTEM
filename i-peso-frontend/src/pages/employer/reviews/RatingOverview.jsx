@@ -26,9 +26,9 @@ export default function RatingOverview({ section, type, minReviews = 3 }) {
   if (!section.enough) {
     const have = section.reviewers ?? 0
     return (
-      <div className="rounded-3xl border border-slate-200/80 bg-white p-6 shadow-sm">
+      <div className="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm">
         <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-100 text-slate-500"><Lock className="h-5 w-5" aria-hidden /></span>
-        <h3 className="mt-4 text-base font-black text-slate-900">Rating not public yet</h3>
+        <h3 className="mt-4 text-base font-bold text-slate-900">Rating not public yet</h3>
         <p className="mt-1 text-sm leading-6 text-slate-600">
           Your average appears on your company page once {minReviews} verified {who} have reviewed you.
         </p>
@@ -47,9 +47,9 @@ export default function RatingOverview({ section, type, minReviews = 3 }) {
   const label = (key) => section.aspects?.[key]?.label ?? key
 
   return (
-    <div className="rounded-3xl border border-slate-200/80 bg-white p-6 shadow-[0_1px_2px_rgba(15,23,42,0.04),0_12px_32px_-16px_rgba(15,23,42,0.18)]">
+    <div className="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-[0_1px_2px_rgba(15,23,42,0.04),0_12px_32px_-16px_rgba(15,23,42,0.18)]">
       <div className="flex items-end gap-4">
-        <p className="text-5xl font-black leading-none tracking-tight text-slate-950"><CountUp value={section.average} decimals={1} /></p>
+        <p className="text-5xl font-bold leading-none tracking-tight text-slate-950"><CountUp value={section.average} decimals={1} /></p>
         <div className="pb-0.5">
           <Stars value={section.average} size="lg" />
           <p className="mt-1 text-xs text-slate-500">from {section.reviewers} verified {who}</p>
@@ -58,12 +58,12 @@ export default function RatingOverview({ section, type, minReviews = 3 }) {
 
       <p className="mt-4 flex items-center gap-2 rounded-2xl bg-emerald-50 px-3.5 py-2.5 text-sm text-emerald-900">
         <ThumbsUp className="h-4 w-4 shrink-0" aria-hidden />
-        <span><strong className="font-black">{section.recommend_percent}%</strong> would recommend {type === 'employment' ? 'working here' : 'applying here'}</span>
+        <span><strong className="font-bold">{section.recommend_percent}%</strong> would recommend {type === 'employment' ? 'working here' : 'applying here'}</span>
       </p>
 
       {distribution.length > 0 && (
         <figure className="mt-6">
-          <figcaption className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-400">Overall ratings</figcaption>
+          <figcaption className="text-xs font-bold text-slate-400">Overall ratings</figcaption>
           <table className="mt-3 w-full text-sm">
             <caption className="sr-only">How many reviewers gave each overall star rating</caption>
             <tbody>
@@ -81,7 +81,7 @@ export default function RatingOverview({ section, type, minReviews = 3 }) {
 
       {aspects.length > 0 && (
         <figure className="mt-6">
-          <figcaption className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-400">By aspect</figcaption>
+          <figcaption className="text-xs font-bold text-slate-400">By aspect</figcaption>
           <dl className="mt-3 space-y-3">
             {aspects.map(([key, aspect], index) => (
               <div key={key}>

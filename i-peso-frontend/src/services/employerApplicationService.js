@@ -17,13 +17,21 @@ export const getEmployerApplicationDetail = async (applicationId) => {
   return response.data
 }
 
+/** Fired after any status change so the sidebar "Applicants" badge refreshes at once. */
+export const APPLICANTS_CHANGED_EVENT = 'employer:applicants-changed'
+const announceChange = () => {
+  if (typeof window !== 'undefined') window.dispatchEvent(new Event(APPLICANTS_CHANGED_EVENT))
+}
+
 export const updateEmployerApplicationStatus = async (applicationId, payload) => {
   const response = await apiClient.patch(`/employer/applications/${applicationId}/status`, payload)
+  announceChange()
   return response.data
 }
 
 export const updateEmployerApplicationStatusBulk = async (payload) => {
   const response = await apiClient.patch(`/employer/applications/bulk-status`, payload)
+  announceChange()
   return response.data
 }
 

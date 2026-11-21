@@ -2,13 +2,20 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 
+/**
+ * Deleted staff accounts are soft-deleted tombstones: hidden from every query,
+ * unable to sign in, contact details wiped, but the name kept so the records
+ * they handled still say who did them. Relations that show "who created /
+ * reviewed this" use withTrashed() for that reason.
+ */
 class Administrator extends Authenticatable
 {
-    use HasApiTokens, Notifiable;
+    use HasApiTokens, Notifiable, SoftDeletes;
 
     public function governmentPrograms(): \Illuminate\Database\Eloquent\Relations\HasMany
     {
@@ -167,6 +174,7 @@ class Administrator extends Authenticatable
         'invited_at'                    => 'datetime',
         'password_changed_at'           => 'datetime',
         'last_login_at'                 => 'datetime',
+        'deleted_at'                    => 'datetime',
         'password'          => 'hashed',
     ];
 }

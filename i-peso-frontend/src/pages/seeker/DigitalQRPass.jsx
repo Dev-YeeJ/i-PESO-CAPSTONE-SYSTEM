@@ -1,7 +1,7 @@
 import { useRef } from 'react'
 import { Download, QrCode } from 'lucide-react'
 import { QRCodeCanvas } from 'qrcode.react'
-import { Button, Card } from '@/components/ui'
+import { Button } from '@/components/ui'
 
 export default function DigitalQRPass({ pass }) {
   const qrRef = useRef(null)
@@ -19,9 +19,9 @@ export default function DigitalQRPass({ pass }) {
 
     context.fillStyle = '#ffffff'
     context.fillRect(0, 0, canvas.width, canvas.height)
-    context.fillStyle = '#102a43'
+    context.fillStyle = '#123563'
     context.fillRect(0, 0, canvas.width, 96)
-    context.fillStyle = '#f6c343'
+    context.fillStyle = '#F59E0B'
     context.fillRect(0, 96, canvas.width, 8)
 
     context.fillStyle = '#ffffff'
@@ -59,18 +59,19 @@ export default function DigitalQRPass({ pass }) {
   }
 
   return (
-    <Card className="border-blue-200">
+    <div className="rounded-2xl border border-slate-200 bg-white p-5">
       <div className="grid gap-5 sm:grid-cols-[1fr_auto] sm:items-center">
         <div>
-          <div className="flex items-center gap-2 text-sm font-extrabold uppercase text-blue-700">
-            <QrCode className="h-4 w-4" /> Digital QR Pass
+          <div className="flex items-center gap-2 text-sm font-semibold text-brand-navy">
+            <QrCode className="h-4 w-4" aria-hidden="true" /> Your QR entry pass
           </div>
-          <h3 className="mt-2 text-xl font-black text-slate-950">{pass.event_name}</h3>
+          <h3 className="mt-2 text-lg font-semibold text-slate-900">{pass.event_name}</h3>
           <p className="mt-1 text-sm font-semibold text-slate-600">{pass.name}</p>
-          <p className="mt-3 text-sm text-slate-500">{pass.venue} · {pass.start_date}</p>
+          <p className="mt-3 text-sm text-slate-500">{[pass.venue, pass.start_date].filter(Boolean).join(', ')}</p>
+          <p className="mt-2 text-sm text-slate-600">Show this at the entrance. Staff scan it to check you in.</p>
           <div className="mt-4 flex flex-wrap gap-2">
             {(pass.skills ?? []).slice(0, 5).map((skill) => (
-              <span key={skill} className="rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-bold text-slate-700">{skill}</span>
+              <span key={skill} className="rounded-full bg-[#e8f0fc] px-2.5 py-1 text-xs font-semibold text-brand-navy">{skill}</span>
             ))}
           </div>
         </div>
@@ -79,9 +80,9 @@ export default function DigitalQRPass({ pass }) {
           <div ref={qrRef} className="rounded-lg border border-slate-200 bg-white p-3">
             <QRCodeCanvas value={pass.qr_code_uuid} size={164} includeMargin />
           </div>
-          <Button variant="outline" size="sm" icon={Download} onClick={downloadPass}>Download Pass</Button>
+          <Button variant="secondary" size="sm" icon={Download} onClick={downloadPass}>Download pass</Button>
         </div>
       </div>
-    </Card>
+    </div>
   )
 }

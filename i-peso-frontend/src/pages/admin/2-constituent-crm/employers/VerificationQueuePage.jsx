@@ -224,7 +224,7 @@ export default function VerificationQueuePage() {
         {pagination.last_page > 1 && (
           <div className="flex items-center justify-between border-t border-slate-100 p-4">
             <p className="text-xs text-slate-500">
-              Page {pagination.current_page} of {pagination.last_page} · {count(pagination.total)} pending
+              Page {pagination.current_page} of {pagination.last_page}, {count(pagination.total)} pending
             </p>
             <div className="flex gap-2">
               <Button size="sm" variant="outline" disabled={isFetching || pagination.current_page <= 1} onClick={() => setPage((current) => current - 1)}>
@@ -259,7 +259,7 @@ function QueueFact({ icon, label, value, progress }) {
   return (
     <div className="rounded-xl bg-slate-50 p-3">
       {createElement(icon, { className: 'h-4 w-4 text-brand-700' })}
-      <p className="mt-2 text-[10px] font-bold uppercase tracking-wide text-slate-400">{label}</p>
+      <p className="mt-2 text-xs font-bold text-slate-400">{label}</p>
       <p className="mt-1 text-xs font-bold text-slate-700">{value}</p>
       {typeof progress === 'number' && (
         <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-200" role="progressbar" aria-valuenow={Math.round(progress)} aria-valuemin={0} aria-valuemax={100}>

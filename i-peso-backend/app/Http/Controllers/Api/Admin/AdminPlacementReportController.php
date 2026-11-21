@@ -4,11 +4,14 @@ namespace App\Http\Controllers\Api\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Administrator;
+use App\Models\Employer;
 use App\Models\JobSeeker;
 use App\Models\PlacementRecord;
 use App\Models\PlacementReportUpload;
 use App\Services\PlacementComplianceService;
+use App\Notifications\PlacementReportDue;
 use App\Services\PlacementImportService;
+use App\Services\ActivityLogger;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -405,6 +408,47 @@ class AdminPlacementReportController extends Controller
             ],
             'data' => $statuses->values(),
         ]);
+    }
+
+    /** Employers x months for one year — the DOLE reporting compliance grid. */
+    public function complianceGrid(Request $request): JsonResponse
+    {
+        $this->admin($request);
+        $validated = $request->validate(['year' => ['nullable', 'integer', 'min:2020', 'max:2100']]);
+
+        return response()->json($this->compliance->yearGrid((int) ($validated['year'] ?? Carbon::now('Asia/Manila')->year)));
+    }
+
+    /**
+     * One-off reminder from the compliance grid: the same bell + email the
+     * scheduled `NotifyMissingPlacementReports` sends, for one employer and month.
+     */
+    public function remind(Request $request): JsonResponse
+    {
+        $admin = $this->admin($request);
+        $validated = $request->validate([
+            'employer_id' => ['required', 'integer', 'exists:employers,employer_id'],
+            'coverage_month' => ['required', 'integer', 'min:1', 'max:12'],
+            'coverage_year' => ['required', 'integer', 'min:2020', 'max:2100'],
+        ]);
+
+        $employer = Employer::findOrFail($validated['employer_id']);
+        $settled = PlacementReportUpload::query()
+            ->where('employer_id', $employer->employer_id)
+            ->where('coverage_year', $validated['coverage_year'])
+            ->where('coverage_month', $validated['coverage_month'])
+            ->whereIn('status', [PlacementReportUpload::STATUS_PENDING_REVIEW, PlacementReportUpload::STATUS_APPROVED])
+            ->exists();
+        abort_if($settled, 422, 'This employer already submitted that month\'s report.');
+
+        $due = $this->compliance->dueDate($validated['coverage_year'], $validated['coverage_month']);
+        $label = Carbon::create($validated['coverage_year'], $validated['coverage_month'], 1)->format('F Y');
+        $daysLeft = (int) Carbon::now('Asia/Manila')->startOfDay()->diffInDays($due->copy()->startOfDay(), false);
+
+        $employer->notify(new PlacementReportDue($label, $validated['coverage_month'], $validated['coverage_year'], $due->toDateString(), $daysLeft));
+        ActivityLogger::logAs($admin, 'placement_report_reminder', sprintf('Sent a %s placement report reminder to %s.', $label, $employer->company_name ?: $employer->trade_name));
+
+        return response()->json(['message' => "Reminder sent to {$employer->company_name} for {$label}."]);
     }
 
     public function candidates(Request $request, PlacementReportUpload $placementReport, PlacementRecord $record): JsonResponse

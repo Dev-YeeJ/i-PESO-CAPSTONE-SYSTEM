@@ -1,18 +1,20 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useMutation, useQuery } from '@tanstack/react-query'
-import toast from 'react-hot-toast'
-import { KeyRound, Pencil, UserCheck, UserX } from 'lucide-react'
+import toast from '@/lib/toast'
+import { KeyRound, Pencil, Trash2, UserCheck, UserX } from 'lucide-react'
 import { Badge, Button, ConfirmDialog } from '@/components/ui'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { staffService } from '@/services/staffService'
 import { adminService } from '@/services/adminService'
 import { ACCESS_LABELS, MODULE_LABELS } from '@/utils/adminAccess'
 import { accountStatus, errorMessage, formatDate, formatDateTime, initialsOf } from '../staffDisplay'
+import DeleteStaffDialog from './DeleteStaffDialog'
 
 /** One staff member's profile, with the system administrator's account actions. */
-export default function StaffDetailDialog({ staff, canManageAccounts, canViewActivity, isSelf, onOpenChange, onEdit, onChanged }) {
+export default function StaffDetailDialog({ staff, canManageAccounts, canViewActivity, isSelf, onOpenChange, onEdit, onChanged, onDeleted }) {
   const [confirm, setConfirm] = useState(null)
+  const [deleting, setDeleting] = useState(false)
   const open = !!staff
 
   const run = useMutation({
@@ -36,6 +38,8 @@ export default function StaffDetailDialog({ staff, canManageAccounts, canViewAct
 
   const status = accountStatus(staff)
   const setupPending = staff.account_status === 'invited' || staff.account_status === 'invite_expired'
+  // Same rule as the API: deactivate first, unless the invite was never used.
+  const canDelete = staff.status !== 'active' || !staff.last_login_at
   const access = Object.entries(staff.access ?? {})
 
   const confirmations = {
@@ -66,11 +70,11 @@ export default function StaffDetailDialog({ staff, canManageAccounts, canViewAct
 
   return (
     <>
-      <Dialog open={open && !confirm} onOpenChange={onOpenChange}>
+      <Dialog open={open && !confirm && !deleting} onOpenChange={onOpenChange}>
         <DialogContent className="max-h-[92vh] max-w-xl overflow-y-auto">
           <DialogHeader>
             <div className="flex items-center gap-4">
-              <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-brand-navy text-lg font-black text-white">
+              <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-brand-navy text-lg font-bold text-white">
                 {initialsOf(staff.name)}
               </span>
               <div className="min-w-0">
@@ -98,15 +102,15 @@ export default function StaffDetailDialog({ staff, canManageAccounts, canViewAct
           </dl>
 
           {staff.internship && (
-            <div className="rounded-xl border border-blue-200 bg-blue-50/50 p-4">
-              <h3 className="text-sm font-bold text-blue-900">Internship</h3>
+            <div className="rounded-xl border border-[#c4d9f7] bg-[#e8f0fc] p-4">
+              <h3 className="text-sm font-bold text-brand-navy">Internship</h3>
               <dl className="mt-3 grid gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
                 <Detail label="School" value={staff.internship.school} />
                 <Detail label="Course" value={staff.internship.course} />
                 <Detail label="Required hours" value={staff.internship.required_hours ? `${staff.internship.required_hours} hours` : null} />
                 <Detail label="Dates" value={staff.internship.start_date ? `${formatDate(staff.internship.start_date)} – ${formatDate(staff.internship.end_date)}` : null} />
               </dl>
-              <p className="mt-3 text-xs text-blue-800">Their hours and daily time record are in the OJT / Interns tab.</p>
+              <p className="mt-3 text-xs text-brand-navy">Their hours and daily time record are in the OJT / Interns tab.</p>
             </div>
           )}
 
@@ -119,7 +123,7 @@ export default function StaffDetailDialog({ staff, canManageAccounts, canViewAct
                 {access.map(([module, level]) => (
                   <li key={module} className="flex items-center justify-between rounded-lg border border-slate-200 px-3 py-2 text-sm">
                     <span className="font-medium text-slate-700">{MODULE_LABELS[module] ?? module}</span>
-                    <span className={`text-xs font-bold ${level === 'manage' ? 'text-emerald-700' : 'text-blue-700'}`}>{ACCESS_LABELS[level]}</span>
+                    <span className={`text-xs font-bold ${level === 'manage' ? 'text-emerald-700' : 'text-brand-navy'}`}>{ACCESS_LABELS[level]}</span>
                   </li>
                 ))}
               </ul>
@@ -145,12 +149,20 @@ export default function StaffDetailDialog({ staff, canManageAccounts, canViewAct
               ) : (
                 <Button variant="outline" size="sm" icon={UserCheck} onClick={() => setConfirm('reactivate')}>Reactivate</Button>
               )}
+              {canDelete && (
+                <Button variant="ghost" size="sm" icon={Trash2} className="text-red-700 hover:bg-red-50 hover:text-red-800 sm:ml-auto" onClick={() => setDeleting(true)}>
+                  Delete account
+                </Button>
+              )}
+              {!canDelete && (
+                <p className="w-full text-xs text-slate-500">To delete this account permanently, deactivate it first.</p>
+              )}
             </div>
           )}
           {canManageAccounts && isSelf && (
             <div className="flex flex-wrap items-center gap-3 border-t border-slate-200 pt-4">
               <Button variant="outline" size="sm" icon={Pencil} onClick={onEdit}>Edit my details</Button>
-              <p className="text-xs text-slate-500">You can't deactivate your own account or change your own position.</p>
+              <p className="text-xs text-slate-500">You can't deactivate or delete your own account, or change your own position.</p>
             </div>
           )}
         </DialogContent>
@@ -165,6 +177,16 @@ export default function StaffDetailDialog({ staff, canManageAccounts, canViewAct
         variant={pending?.variant}
         busy={run.isPending}
         onConfirm={() => run.mutate({ action: confirm })}
+      />
+
+      <DeleteStaffDialog
+        staff={staff}
+        open={deleting}
+        onOpenChange={setDeleting}
+        onDeleted={(data) => {
+          setDeleting(false)
+          onDeleted(data)
+        }}
       />
     </>
   )
@@ -210,7 +232,7 @@ function RecentActivity({ staff }) {
 function Detail({ label, value }) {
   return (
     <div className="min-w-0">
-      <dt className="text-xs font-bold uppercase tracking-wide text-slate-500">{label}</dt>
+      <dt className="text-xs font-bold text-slate-500">{label}</dt>
       <dd className="mt-0.5 break-words font-medium text-slate-900">{value || <span className="text-slate-400">—</span>}</dd>
     </div>
   )

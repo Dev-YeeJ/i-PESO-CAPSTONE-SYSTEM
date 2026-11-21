@@ -277,7 +277,7 @@ export default function Step2CompanyProfile({ initialData = {}, onComplete }) {
               <label
                 key={ind}
                 className={`flex cursor-pointer items-center gap-2 rounded-lg border p-2 text-sm ${
-                  checked ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-slate-200 text-slate-700'
+                  checked ? 'border-brand-navy bg-[#e8f0fc] text-brand-navy' : 'border-slate-200 text-slate-700'
                 }`}
               >
                 <input
@@ -301,7 +301,7 @@ export default function Step2CompanyProfile({ initialData = {}, onComplete }) {
               value={otherIndustryText}
               onChange={(e) => setOtherIndustryText(e.target.value)}
               className={`w-full px-3.5 py-2.5 text-sm rounded-xl border bg-white transition-all focus:outline-none focus:ring-2 focus:ring-blue-500/20 ${
-                getError('industry_other') ? 'border-red-400 focus:border-red-400' : 'border-slate-300 focus:border-blue-400'
+                getError('industry_other') ? 'border-red-400 focus:border-red-400' : 'border-slate-300 focus:border-brand-navy'
               }`}
             />
             {getError('industry_other') && (
@@ -336,8 +336,8 @@ export default function Step2CompanyProfile({ initialData = {}, onComplete }) {
               }}
               className={`flex flex-col items-center justify-center rounded-xl border p-3 text-center transition-all ${
                 form.company_size === size.value
-                  ? 'border-blue-600 bg-blue-50 text-blue-700 ring-1 ring-blue-600'
-                  : 'border-slate-200 bg-white text-slate-600 hover:border-blue-300 hover:bg-blue-50/50'
+                  ? 'border-brand-navy bg-[#e8f0fc] text-brand-navy ring-1 ring-[#2563b8]'
+                  : 'border-slate-200 bg-white text-slate-600 hover:border-[#c4d9f7] hover:bg-[#e8f0fc]'
               } ${getError('company_size') ? 'border-red-400' : ''}`}
             >
               <span className="text-sm font-semibold">{size.label.split(' (')[0]}</span>
@@ -415,7 +415,7 @@ export default function Step2CompanyProfile({ initialData = {}, onComplete }) {
           className={`w-full px-3.5 py-2.5 text-sm rounded-xl border bg-white transition-all focus:outline-none focus:ring-2 focus:ring-blue-500/20 ${
             getError('description')
               ? 'border-red-400 focus:border-red-400'
-              : 'border-slate-300 focus:border-blue-400'
+              : 'border-slate-300 focus:border-brand-navy'
           }`}
         />
         {getError('description') && (
@@ -433,7 +433,7 @@ export default function Step2CompanyProfile({ initialData = {}, onComplete }) {
         <label className="block text-sm font-medium text-slate-700 mb-1.5">
           Company Logo
         </label>
-        <div className="border-2 border-dashed border-slate-300 rounded-xl p-6 text-center hover:border-blue-400 transition-colors">
+        <div className="border-2 border-dashed border-slate-300 rounded-xl p-6 text-center hover:border-brand-navy transition-colors">
           {form.logo_preview ? (
             <div className="space-y-2">
               <img
@@ -471,7 +471,7 @@ export default function Step2CompanyProfile({ initialData = {}, onComplete }) {
               />
               <label
                 htmlFor="logo-input"
-                className="inline-block px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 cursor-pointer transition-colors text-sm font-medium"
+                className="inline-block px-4 py-2 bg-brand-navy text-white rounded-xl hover:bg-[#0f2d56] cursor-pointer transition-colors text-sm font-medium"
               >
                 Choose File
               </label>
@@ -492,7 +492,7 @@ export default function Step2CompanyProfile({ initialData = {}, onComplete }) {
       <button
         type="submit"
         disabled={isLoading}
-        className="w-full py-3 mt-2 bg-blue-700 hover:bg-blue-800 disabled:opacity-60 text-white font-semibold rounded-xl flex items-center justify-center gap-2 transition-colors"
+        className="w-full py-3 mt-2 bg-brand-navy hover:bg-[#0f2d56] disabled:opacity-60 text-white font-semibold rounded-xl flex items-center justify-center gap-2 transition-colors"
       >
         {isLoading ? 'Saving Profile...' : 'Save & Continue'}
       </button>

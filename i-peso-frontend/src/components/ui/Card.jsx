@@ -15,7 +15,7 @@ export default function Card({
 
   return (
     <section className={[
-      'overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm',
+      'overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-card',
       interactive ? 'transition duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md' : '',
       className,
     ].filter(Boolean).join(' ')}>
@@ -33,7 +33,7 @@ export function CardHeader({ title, subtitle, action, className = '' }) {
   return (
     <div className={`mb-5 flex flex-wrap items-start justify-between gap-3 ${className}`}>
       <div>
-        <h2 className="text-base font-extrabold tracking-tight text-slate-950 sm:text-lg">{title}</h2>
+        <h2 className="text-base font-semibold tracking-tight text-slate-900 sm:text-lg">{title}</h2>
         {subtitle && <p className="mt-1 text-sm leading-5 text-slate-500">{subtitle}</p>}
       </div>
       {action}

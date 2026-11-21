@@ -1,13 +1,14 @@
 import { useState } from 'react'
 import { Outlet, NavLink, Link, useLocation } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { ChevronLeft, KeyRound, LogOut, Menu, ShieldOff, X } from 'lucide-react'
+import { ChevronDown, ChevronLeft, ChevronRight, KeyRound, LogOut, Menu, ShieldOff, X } from 'lucide-react'
 import { useAuthStore } from '@/stores/authStore'
 import { adminService } from '@/services/adminService'
 import { adminSafetyReportService } from '@/services/safetyReportService'
 import IPesoLogo from '@/components/branding/IPesoLogo'
 import SignOutConfirmDialog from '@/components/common/SignOutConfirmDialog'
 import { canOpen, canOpenPath, isIntern, moduleForPath } from '@/utils/adminAccess'
+import ShellSearch from '@/components/shell/ShellSearch'
 
 const navGroups = [
   // ========== CATEGORY 1: OVERVIEW ==========
@@ -18,7 +19,7 @@ const navGroups = [
         to: '/admin/my-ojt',
         module: null,
         internOnly: true,
-        label: 'My OJT Hours',
+        label: 'My OJT hours',
         icon: <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
       },
       {
@@ -37,13 +38,13 @@ const navGroups = [
       {
         to: '/admin/verification-queue',
         module: moduleForPath('/admin/verification-queue'),
-        label: 'Employer Verification',
+        label: 'Verification queue',
         icon: <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
       },
       {
         to: '/admin/job-seekers',
         module: moduleForPath('/admin/job-seekers'),
-        label: 'Job Seekers',
+        label: 'Job seekers',
         icon: <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>,
       },
       {
@@ -55,13 +56,13 @@ const navGroups = [
       {
         to: '/admin/safety-reports',
         module: moduleForPath('/admin/safety-reports'),
-        label: 'Reports & Safety',
+        label: 'Safety reports',
         icon: <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 21v-4m0 0V5a2 2 0 012-2h6.28a1 1 0 01.948.684l.544 1.632a1 1 0 00.948.684H19a2 2 0 012 2v6a2 2 0 01-2 2h-6.28a1 1 0 01-.948-.684l-.544-1.632A1 1 0 009.28 15H3z" /></svg>,
       },
       {
         to: '/admin/reviews',
         module: moduleForPath('/admin/reviews'),
-        label: 'Reviews & Feedback',
+        label: 'Reviews',
         icon: <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M11.48 3.5a.56.56 0 011.04 0l2.13 5.11a.56.56 0 00.47.34l5.52.44c.5.04.7.66.32.99l-4.2 3.6a.56.56 0 00-.18.56l1.28 5.38a.56.56 0 01-.84.61l-4.72-2.88a.56.56 0 00-.59 0l-4.72 2.88a.56.56 0 01-.84-.61l1.28-5.38a.56.56 0 00-.18-.56l-4.2-3.6a.56.56 0 01.32-.99l5.52-.44a.56.56 0 00.47-.34l2.13-5.11z" /></svg>,
       },
     ]
@@ -74,7 +75,7 @@ const navGroups = [
       {
         to: '/admin/job-postings',
         module: moduleForPath('/admin/job-postings'),
-        label: 'Job Postings',
+        label: 'Job postings',
         icon: <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>,
       },
     ]
@@ -87,25 +88,25 @@ const navGroups = [
       {
         to: '/admin/government-programs',
         module: moduleForPath('/admin/government-programs'),
-        label: 'Gov Programs',
+        label: 'Government programs',
         icon: <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>,
       },
       {
         to: '/admin/job-fairs',
         module: moduleForPath('/admin/job-fairs'),
-        label: 'Job Fairs',
+        label: 'Job fairs',
         icon: <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>,
       },
       {
         to: '/admin/dole-reporting',
         module: moduleForPath('/admin/dole-reporting'),
-        label: 'DOLE Reporting',
+        label: 'DOLE reporting',
         icon: <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>,
       },
       {
         to: '/admin/placement-report',
         module: moduleForPath('/admin/placement-report'),
-        label: 'Placement Reports',
+        label: 'Placement reports',
         icon: <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>,
       },
     ]
@@ -118,19 +119,19 @@ const navGroups = [
       {
         to: '/admin/labor-analytics',
         module: moduleForPath('/admin/labor-analytics'),
-        label: 'Labor Analytics',
+        label: 'Labor analytics',
         icon: <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>,
       },
       {
         to: '/admin/sms-notifications',
         module: moduleForPath('/admin/sms-notifications'),
-        label: 'SMS Notifications',
+        label: 'SMS',
         icon: <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" /></svg>,
       },
       {
         to: '/admin/activity-logs',
         module: moduleForPath('/admin/activity-logs'),
-        label: 'Activity Logs',
+        label: 'Activity logs',
         icon: <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
       },
     ]
@@ -143,13 +144,13 @@ const navGroups = [
       {
         to: '/admin/staff',
         module: moduleForPath('/admin/staff'),
-        label: 'Staff Management',
+        label: 'Staff and OJT',
         icon: <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.856-1.487M15 10a3 3 0 11-6 0 3 3 0 016 0zM15 20H9m6 0h6v-2a9 9 0 00-9-9H6a9 9 0 00-9 9v2h6" /></svg>,
       },
       {
         to: '/admin/role-permissions',
         module: moduleForPath('/admin/role-permissions'),
-        label: 'Roles & Permissions',
+        label: 'Roles and permissions',
         icon: <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>,
       },
       {
@@ -161,13 +162,13 @@ const navGroups = [
       {
         to: '/admin/content-modules',
         module: moduleForPath('/admin/content-modules'),
-        label: 'Content Modules',
+        label: 'Content modules',
         icon: <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>,
       },
       {
         to: '/admin/settings',
         module: moduleForPath('/admin/settings'),
-        label: 'System Settings',
+        label: 'System settings',
         icon: <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>,
       },
     ]
@@ -211,28 +212,33 @@ const AdminLayout = () => {
     .map((group) => ({ ...group, items: group.items.filter((item) => (item.internOnly ? isIntern(user) : canOpen(user, item.module))) }))
     .filter((group) => group.items.length > 0)
   const accountLabel = user?.position_label ?? user?.admin_role?.name ?? 'Administrator Account'
+  const titleCase = (name) => name.toLowerCase().replace(/(^|\s)\S/g, (c) => c.toUpperCase()).replace('Dole', 'DOLE').replace('Crm', 'CRM').replace(' & ', ' and ')
+  const searchGroups = visibleGroups.map((group) => ({ heading: titleCase(group.name), items: group.items }))
+  const activeItem = visibleGroups.flatMap((group) => group.items.map((item) => ({ ...item, group: titleCase(group.name) })))
+    .filter((item) => location.pathname === item.to || location.pathname.startsWith(`${item.to}/`))
+    .sort((a, b) => b.to.length - a.to.length)[0]
 
   const sidebar = (
     <>
-        <div className={`flex h-[76px] items-center border-b border-white/10 ${collapsed ? 'justify-center px-4' : 'gap-3 px-5'}`}>
-          <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white shadow-sm"><IPesoLogo className="h-full w-full" /></div>
+        <div className={`flex h-[72px] items-center border-b border-white/10 ${collapsed ? 'justify-center px-4' : 'gap-3 px-5'}`}>
+          <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white"><IPesoLogo className="h-full w-full" /></div>
           {!collapsed && (
-            <div>
-              <p className="text-lg font-extrabold leading-none text-white">i-PESO</p>
-              <p className="mt-1 text-xs text-blue-200">PESO Admin Portal</p>
+            <div className="leading-tight">
+              <p className="text-base font-bold tracking-tight text-white">i-PESO</p>
+              <p className="text-xs text-white/60">PESO Staff</p>
             </div>
           )}
         </div>
 
-        <nav className="flex-1 space-y-5 overflow-y-auto p-3">
+        <nav className="flex-1 space-y-5 overflow-y-auto px-3 py-5" aria-label="Administration">
           {visibleGroups.map((group) => (
             <div key={group.name}>
               {!collapsed && (
-                <p className="portal-sidebar-eyebrow mb-2 px-3 py-2">
-                  {group.name}
+                <p className="portal-sidebar-eyebrow px-3 pb-1.5">
+                  {titleCase(group.name)}
                 </p>
               )}
-              <div className="space-y-1">
+              <div className="space-y-0.5">
                 {group.items.map(({ to, label, icon }) => {
                   const badgeCount = to === '/admin/verification-queue' ? pendingEmployerCount : to === '/admin/safety-reports' ? newSafetyReports : 0
 
@@ -244,7 +250,7 @@ const AdminLayout = () => {
                       title={collapsed ? label : undefined}
                       onClick={() => setMobileOpen(false)}
                       className={({ isActive }) =>
-                        `relative flex min-h-11 items-center rounded-xl px-3 py-2.5 text-sm font-bold transition-colors ${
+                        `min-h-10 px-3 py-2 ${
                           isActive
                             ? 'portal-sidebar-link-active'
                             : 'portal-sidebar-link'
@@ -254,8 +260,8 @@ const AdminLayout = () => {
                       <span className="flex-shrink-0">{icon}</span>
                       {!collapsed && label}
                       {badgeCount > 0 && !collapsed && (
-                        <span className="ml-auto inline-block px-2 py-0.5 text-xs font-bold bg-amber-100 text-amber-800 rounded-full">
-                          {badgeCount}
+                        <span className="portal-sidebar-badge" aria-label={`${badgeCount} waiting`}>
+                          {badgeCount > 99 ? '99+' : badgeCount}
                         </span>
                       )}
                     </NavLink>
@@ -309,28 +315,29 @@ const AdminLayout = () => {
       <div className="flex-1 flex flex-col min-w-0">
 
         {/* Top Header */}
-        <header className="sticky top-0 z-30 flex h-[76px] items-center justify-between border-b border-slate-200 bg-white px-6">
-          <div className="flex items-center gap-3">
+        <header className="sticky top-0 z-30 flex h-[72px] items-center justify-between gap-4 border-b border-slate-200 bg-white px-4 sm:px-6 lg:px-8">
+          <div className="flex min-w-0 items-center gap-3">
             <button onClick={() => { setCollapsed(false); setMobileOpen(true) }} className="rounded-lg border border-slate-200 p-2 text-slate-700 md:hidden" aria-label="Open navigation">
               {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
             </button>
-            <div className="flex items-center gap-2 text-sm font-bold">
-              <span className="text-brand-navy">i-PESO</span>
-              <span className="text-slate-300">/</span>
-              <span className="text-slate-600">PESO Administration</span>
-            </div>
+            <nav className="flex min-w-0 items-center gap-2 text-sm text-slate-500" aria-label="Breadcrumb">
+              <span className="hidden sm:inline">{activeItem?.group ?? 'PESO Administration'}</span>
+              {activeItem && <ChevronRight className="hidden h-3.5 w-3.5 text-slate-300 sm:block" aria-hidden="true" />}
+              {activeItem && <span className="truncate font-semibold text-slate-900" aria-current="page">{activeItem.label}</span>}
+            </nav>
           </div>
 
-          <div className="flex items-center gap-3">
-            <span className="hidden items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-extrabold text-emerald-700 sm:inline-flex">
-              <span className="h-2 w-2 rounded-full bg-emerald-500" /> Live System
+          <div className="flex flex-1 justify-end md:justify-center">
+            <ShellSearch groups={searchGroups} recordPortal="admin" placeholder="Search seekers, employers, job postings, pages…" />
+          </div>
+
+          <div className="flex items-center gap-3 rounded-xl p-1.5 lg:pr-3">
+            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#e8f0fc] text-xs font-bold text-brand-navy">{initials}</span>
+            <span className="hidden text-left leading-tight lg:block">
+              <span className="block max-w-44 truncate text-sm font-semibold text-slate-900">{user?.name}</span>
+              <span className="block max-w-44 truncate text-xs text-slate-500">{accountLabel}</span>
             </span>
-            <div className="flex items-center gap-2 border-l border-slate-200 pl-3">
-              <div className="w-9 h-9 bg-brand-800 rounded-full flex items-center justify-center text-white text-xs font-bold">
-                {initials}
-              </div>
-              <span className="hidden text-xs font-bold text-slate-600 sm:inline">{user?.name}</span>
-            </div>
+            <ChevronDown className="hidden h-4 w-4 text-slate-300 lg:block" aria-hidden="true" />
           </div>
         </header>
 
@@ -356,7 +363,7 @@ function NoAccess() {
       <p className="mt-2 text-sm text-slate-500">
         Your role doesn't include this section. If you need it for your work, ask the PESO system administrator.
       </p>
-      <Link to="/admin/dashboard" className="mt-6 inline-flex rounded-lg bg-brand-navy px-4 py-2 text-sm font-bold text-white hover:bg-blue-900">
+      <Link to="/admin/dashboard" className="mt-6 inline-flex rounded-xl bg-brand-navy px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#0f2d56]">
         Back to dashboard
       </Link>
     </div>

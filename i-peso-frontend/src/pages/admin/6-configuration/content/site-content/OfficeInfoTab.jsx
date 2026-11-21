@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import toast from 'react-hot-toast'
+import toast from '@/lib/toast'
 import { Bot, History, Save, Undo2 } from 'lucide-react'
 import { Button, Card } from '@/components/ui'
 import { adminSiteContentService } from '@/services/siteContentService'
@@ -108,8 +108,8 @@ function OfficeInfoForm({ section, canEdit }) {
       <Card>
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h2 className="text-lg font-black text-slate-950">Office information</h2>
-            <p className="mt-1 max-w-xl text-sm text-slate-600">Entered once, used everywhere: footer, Help pages, Privacy Policy, emails and the assistant.</p>
+            <h2 className="text-lg font-bold text-slate-950">Office information</h2>
+            <p className="mt-1 max-w-xl text-sm text-slate-600">Entered once, used everywhere: footer, About page, assistant, Privacy Policy, emails and the assistant.</p>
           </div>
           <Button size="sm" variant="ghost" icon={History} onClick={() => setHistoryOpen(true)}>History</Button>
         </div>
@@ -136,7 +136,7 @@ function OfficeInfoForm({ section, canEdit }) {
       </Card>
 
       <div className="space-y-4 xl:sticky xl:top-6 xl:self-start">
-        <p className="text-xs font-extrabold uppercase tracking-wide text-slate-500">Preview</p>
+        <p className="text-xs font-semibold text-slate-500">Preview</p>
         <OfficeContactCard office={normalized} role="employer" />
         {blanks.length > 0 && (
           <div className="flex gap-3 rounded-2xl border border-slate-200 bg-white p-4 text-sm">

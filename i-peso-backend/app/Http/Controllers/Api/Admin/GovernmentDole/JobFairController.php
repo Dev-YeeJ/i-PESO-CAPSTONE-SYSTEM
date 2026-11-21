@@ -243,8 +243,10 @@ class JobFairController extends Controller
         abort_unless($registration['open'], 422, $registration['reason'] ?? 'This event is no longer accepting employer participation.');
 
         $service->seedRequirements($jobFair);
-        set_time_limit(0);
-        $invited = $this->broadcastInvitations($jobFair, $service);
+        // The participation rows are created now (fast, and what stops a second
+        // press from inviting anyone twice); the emails and SMS go out after the
+        // response, like the first publish, so a long list can't time out.
+        $invited = $this->broadcastInvitations($jobFair, $service, notifyAfterResponse: true);
 
         return response()->json([
             'message' => $invited > 0
@@ -400,15 +402,16 @@ class JobFairController extends Controller
      * documentary requirements still outstanding for their company type and
      * accreditation record — see JobFairService::outstandingRequirementsFor().
      */
-    private function broadcastInvitations(JobFair $jobFair, JobFairService $service): int
+    private function broadcastInvitations(JobFair $jobFair, JobFairService $service, bool $notifyAfterResponse = false): int
     {
         $alreadyTracked = JobFairEmployer::where('job_fair_id', $jobFair->job_fair_id)->pluck('employer_id');
         $invited = 0;
+        $pending = [];
 
         Employer::query()
             ->where('verification_status', 'verified')
             ->whereNotIn('employer_id', $alreadyTracked)
-            ->chunkById(50, function ($employers) use ($jobFair, $service, &$invited) {
+            ->chunkById(50, function ($employers) use ($jobFair, $service, $notifyAfterResponse, &$invited, &$pending) {
                 foreach ($employers as $employer) {
                     $participation = JobFairEmployer::create([
                         'job_fair_id' => $jobFair->job_fair_id,
@@ -419,6 +422,13 @@ class JobFairController extends Controller
                         'invited_at' => now(),
                     ]);
                     $service->reuseVerifiedDocuments($jobFair, $participation);
+                    $invited++;
+
+                    if ($notifyAfterResponse) {
+                        $pending[] = [$employer->employer_id, $participation->getKey()];
+
+                        continue;
+                    }
 
                     // These notifications go out over SMTP and SMS, inline,
                     // one employer at a time. A single bad address or a
@@ -428,17 +438,38 @@ class JobFairController extends Controller
                     // invitation at all. The participation row above is
                     // what actually makes the fair actionable for them, and
                     // it is already committed, so log and keep going.
-                    try {
-                        $employer->notify(new JobFairNotification($jobFair, 'invited', $participation, $service->outstandingRequirementsFor($jobFair, $employer)));
-                    } catch (\Throwable $exception) {
-                        report($exception);
-                    }
-
-                    $invited++;
+                    $this->sendInvitation($jobFair, $service, $employer, $participation);
                 }
             }, 'employer_id');
 
+        if ($pending !== []) {
+            $jobFairId = $jobFair->job_fair_id;
+            defer(function () use ($jobFairId, $service, $pending) {
+                set_time_limit(0);
+                $jobFair = JobFair::find($jobFairId);
+                if (! $jobFair) {
+                    return;
+                }
+                foreach ($pending as [$employerId, $participationId]) {
+                    $employer = Employer::find($employerId);
+                    $participation = JobFairEmployer::find($participationId);
+                    if ($employer && $participation) {
+                        $this->sendInvitation($jobFair, $service, $employer, $participation);
+                    }
+                }
+            });
+        }
+
         return $invited;
+    }
+
+    private function sendInvitation(JobFair $jobFair, JobFairService $service, Employer $employer, JobFairEmployer $participation): void
+    {
+        try {
+            $employer->notify(new JobFairNotification($jobFair, 'invited', $participation, $service->outstandingRequirementsFor($jobFair, $employer)));
+        } catch (\Throwable $exception) {
+            report($exception);
+        }
     }
 
     /**

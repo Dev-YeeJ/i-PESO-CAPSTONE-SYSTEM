@@ -6,7 +6,7 @@ import {
 import { Card, CardHeader, Button, Badge, AlertBox } from '@/components/ui'
 import { ConfirmModal, PageHeader } from '@/pages/admin/_components'
 import DataTable from '@/pages/admin/_components/DataTable'
-import toast from 'react-hot-toast'
+import toast from '@/lib/toast'
 import {
   listAdminPlacementReports,
   getAdminPlacementReport,
@@ -122,7 +122,7 @@ export default function AdminPlacementReportPage() {
         <PageHeader
           eyebrow="DOLE Reporting"
           title="Placement report review"
-          subtitle={`${d.company_name || 'Employer'} · ${d.original_filename}`}
+          subtitle={`${d.company_name || 'Employer'}, ${d.original_filename}`}
           actions={[{ label: 'Back', icon: ArrowLeft, variant: 'ghost', onClick: () => setDetail(null) }]}
         />
 
@@ -137,7 +137,7 @@ export default function AdminPlacementReportPage() {
         <Card>
           <CardHeader
             title={`${d.record_count} placement record(s)`}
-            subtitle={`${d.coverage_month ? `${MONTHS[d.coverage_month - 1]} ${d.coverage_year} · ` : ''}${d.selected_sheet ? `sheet “${d.selected_sheet}” · ` : ''}Status: ${STATUS_LABEL[d.status] ?? d.status}`}
+            subtitle={`${d.coverage_month ? `${MONTHS[d.coverage_month - 1]} ${d.coverage_year}, ` : ''}${d.selected_sheet ? `sheet “${d.selected_sheet}”, ` : ''}Status: ${STATUS_LABEL[d.status] ?? d.status}`}
             action={<Badge variant={STATUS_TONE[d.status]} icon={false}>{STATUS_LABEL[d.status] ?? d.status}</Badge>}
           />
           {d.employer_remarks && <p className="mb-4 rounded-lg bg-slate-50 p-3 text-sm text-slate-600"><strong>Employer note:</strong> {d.employer_remarks}</p>}
@@ -146,7 +146,7 @@ export default function AdminPlacementReportPage() {
           <div className="max-h-[480px] overflow-auto">
             <table className="w-full text-xs">
               <thead className="sticky top-0 bg-white">
-                <tr className="border-b border-slate-200 text-left uppercase tracking-wide text-slate-500">
+                <tr className="border-b border-slate-200 text-left text-slate-500">
                   {Object.values(FIELD_LABELS).map((label) => <th key={label} className="py-2 pr-3 whitespace-nowrap">{label}</th>)}
                 </tr>
               </thead>

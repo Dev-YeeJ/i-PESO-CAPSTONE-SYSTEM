@@ -60,7 +60,7 @@ class JobFair extends Model
 
     public function administrator(): BelongsTo
     {
-        return $this->belongsTo(Administrator::class, 'admin_id', 'admin_id');
+        return $this->belongsTo(Administrator::class, 'admin_id', 'admin_id')->withTrashed();
     }
 
     public function employerJoins(): HasMany

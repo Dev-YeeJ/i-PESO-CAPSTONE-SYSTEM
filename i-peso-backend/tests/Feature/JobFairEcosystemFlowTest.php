@@ -9,6 +9,7 @@ use App\Models\JobVacancy;
 use App\Services\EnhancedJobMatchingService;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Support\Carbon;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
@@ -25,6 +26,9 @@ class JobFairEcosystemFlowTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        // The fixtures use fixed calendar dates and the job fair rules only accept
+        // today or later, so pin "today" before the earliest of them.
+        Carbon::setTestNow('2026-09-01 09:00:00');
         // This test verifies the safe *fallback* to log-only when live UniSMS
         // credentials aren't configured — so those credentials must be cleared
         // here rather than left to whatever happens to be in the environment.
@@ -39,6 +43,12 @@ class JobFairEcosystemFlowTest extends TestCase
             'services.sms.sender_id' => null,
         ]);
         $this->createTables();
+    }
+
+    protected function tearDown(): void
+    {
+        Carbon::setTestNow();
+        parent::tearDown();
     }
 
     public function test_omnichannel_job_fair_flow_with_seeker_qr_registration(): void
@@ -1090,7 +1100,7 @@ class JobFairEcosystemFlowTest extends TestCase
 
     private function createTables(): void
     {
-        Schema::create('administrators', function (Blueprint $t) { $t->id('admin_id'); $t->string('first_name'); $t->string('last_name'); $t->string('email')->unique(); $t->string('mobile_number')->nullable(); $t->string('password'); $t->string('role')->nullable(); $t->string('status')->nullable(); $t->timestamp('email_verified_at')->nullable(); $t->rememberToken(); $t->timestamps(); });
+        Schema::create('administrators', function (Blueprint $t) { $t->id('admin_id'); $t->softDeletes(); $t->string('first_name'); $t->string('last_name'); $t->string('email')->unique(); $t->string('mobile_number')->nullable(); $t->string('password'); $t->string('role')->nullable(); $t->string('status')->nullable(); $t->timestamp('email_verified_at')->nullable(); $t->rememberToken(); $t->timestamps(); });
         Schema::create('employers', function (Blueprint $t) { $t->id('employer_id'); $t->string('email')->unique(); $t->string('password'); $t->string('company_type')->nullable(); $t->string('company_name')->nullable(); $t->string('trade_name')->nullable(); $t->string('mobile_number')->nullable(); $t->string('representative_contact_number')->nullable(); $t->string('verification_status')->nullable(); $t->timestamp('verified_at')->nullable(); $t->timestamp('email_verified_at')->nullable(); $t->softDeletes(); $t->rememberToken(); $t->timestamps(); });
         Schema::create('employer_documents', function (Blueprint $t) { $t->id('document_id'); $t->unsignedBigInteger('employer_id'); $t->string('document_type'); $t->string('document_path'); $t->string('original_filename'); $t->integer('file_size'); $t->string('mime_type'); $t->timestamp('uploaded_at')->nullable(); $t->string('verification_status')->default('pending'); $t->text('admin_notes')->nullable(); $t->date('expiration_date')->nullable(); $t->timestamp('viewed_at')->nullable(); $t->timestamps(); });
         Schema::create('job_seekers', function (Blueprint $t) { $t->id('seeker_id'); $t->string('email')->nullable(); $t->string('password')->nullable(); $t->string('first_name')->nullable(); $t->string('middle_name')->nullable(); $t->string('last_name')->nullable(); $t->string('sex')->nullable(); $t->string('gender')->nullable(); $t->string('mobile_number')->nullable(); $t->string('address_municipality_city')->nullable(); $t->date('date_of_birth')->nullable(); $t->string('educ_attainment')->nullable(); $t->boolean('is_former_ofw')->default(false); $t->boolean('is_4ps_beneficiary')->default(false); $t->timestamps(); });

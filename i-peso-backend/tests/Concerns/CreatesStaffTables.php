@@ -23,6 +23,7 @@ trait CreatesStaffTables
 
         if (! Schema::hasTable('administrators')) {
             Schema::create('administrators', function (Blueprint $table) {
+                $table->softDeletes();
                 $table->id('admin_id');
                 $table->string('first_name');
                 $table->string('last_name');
@@ -51,6 +52,7 @@ trait CreatesStaffTables
                 $table->string('deactivated_reason', 40)->nullable();
                 $table->string('status')->default('active');
                 $table->timestamp('email_verified_at')->nullable();
+                $table->rememberToken();
                 $table->timestamps();
             });
         }

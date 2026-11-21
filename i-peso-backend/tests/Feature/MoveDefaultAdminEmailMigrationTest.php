@@ -20,6 +20,7 @@ class MoveDefaultAdminEmailMigrationTest extends TestCase
         // The suite runs on an empty SQLite database; create just what the migration reads.
         if (! Schema::hasTable('administrators')) {
             Schema::create('administrators', function (Blueprint $table) {
+                $table->softDeletes();
                 $table->id('admin_id');
                 $table->string('first_name');
                 $table->string('last_name');

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import toast from 'react-hot-toast'
+import toast from '@/lib/toast'
 import { ArrowDown, ArrowLeft, ArrowUp, Eye, FilePlus2, PenLine, Plus, Save, Send, Trash2, X } from 'lucide-react'
 import { Badge, Button, Card, ConfirmDialog, ErrorState, LoadingSkeleton } from '@/components/ui'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -45,7 +45,7 @@ export default function PolicyEditor({ slug, canEdit, office, onBack, tokens }) 
         <Card>
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <h2 className="text-lg font-black text-slate-950">{policy.title}</h2>
+              <h2 className="text-lg font-bold text-slate-950">{policy.title}</h2>
               <p className="mt-1 text-sm text-slate-600">
                 Version {current.version}, effective {formatPolicyDate(current.effective_at)}{current.is_builtin ? ' (the original text)' : ''}.
               </p>
@@ -58,7 +58,7 @@ export default function PolicyEditor({ slug, canEdit, office, onBack, tokens }) 
       )}
 
       <Card>
-        <h3 className="text-sm font-black text-slate-950">Published versions</h3>
+        <h3 className="text-sm font-bold text-slate-950">Published versions</h3>
         <ol className="mt-3 divide-y divide-slate-100 text-sm">
           {versions.map((version) => (
             <li key={version.version} className="flex flex-col gap-1 py-2.5 sm:flex-row sm:items-baseline sm:gap-4">
@@ -153,8 +153,8 @@ function DraftEditor({ slug, policy, draft, canEdit, office, tokens }) {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <div className="flex items-center gap-2">
-            <h2 className="text-lg font-black text-slate-950">{policy.title}</h2>
-            <Badge variant="pending">Draft · version {draft.version}</Badge>
+            <h2 className="text-lg font-bold text-slate-950">{policy.title}</h2>
+            <Badge variant="pending">Draft, version {draft.version}</Badge>
           </div>
           <p className="mt-1 text-sm text-slate-600">
             Readers still see the current version. {draft.updated_at ? `Draft last saved ${formatWhen(draft.updated_at)}.` : ''}
@@ -185,7 +185,7 @@ function DraftEditor({ slug, policy, draft, canEdit, office, tokens }) {
             {form.sections.map((section, index) => (
               <li key={index} className="rounded-2xl border border-slate-200 p-4">
                 <div className="flex items-center justify-between gap-2">
-                  <span className="text-xs font-black uppercase tracking-wide text-slate-500">Section {index + 1}</span>
+                  <span className="text-xs font-bold text-slate-500">Section {index + 1}</span>
                   {canEdit && (
                     <div className="flex gap-1">
                       <button type="button" onClick={() => moveSection(index, -1)} disabled={index === 0} aria-label={`Move section ${index + 1} up`} className="rounded-md p-1 text-slate-400 hover:bg-slate-100 disabled:opacity-30"><ArrowUp className="h-4 w-4" /></button>
@@ -266,7 +266,7 @@ function PolicyPreview({ version, office, className = '' }) {
       )}
       {version.sections.map((section, index) => (
         <section key={`${index}-${section.id}`} className="border-b border-[#0A192F]/10 py-6 first:pt-0 last:border-0">
-          <h3 className="text-lg font-extrabold tracking-tight text-[#0A192F]"><span className="mr-2 text-[#B45309]">{index + 1}.</span>{section.title || 'Untitled section'}</h3>
+          <h3 className="text-lg font-semibold tracking-tight text-[#0A192F]"><span className="mr-2 text-[#B45309]">{index + 1}.</span>{section.title || 'Untitled section'}</h3>
           <RichText text={section.body} office={office} className="mt-3 space-y-3 text-sm leading-7 text-slate-700" />
         </section>
       ))}

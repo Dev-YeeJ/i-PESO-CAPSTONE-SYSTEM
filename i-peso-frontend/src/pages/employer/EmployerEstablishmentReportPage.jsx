@@ -15,10 +15,9 @@ import {
   searchApplicantSuggestions,
   submitJobFairResults,
 } from '@/services/jobFairService'
-// react-hot-toast, not sonner: the app only mounts react-hot-toast's <Toaster/> (see
-// App.jsx) — this page importing from 'sonner' meant its success/error toasts were built
-// but never actually rendered anywhere. Matches every other page in the app.
-import { toast } from 'react-hot-toast'
+// Toasts go through '@/lib/toast' like every other page; it wraps the one
+// <Toaster/> mounted in App.jsx, so a page can't import a toast that never renders.
+import { toast } from '@/lib/toast'
 
 const MotionDiv = motion.div
 
@@ -39,7 +38,7 @@ const inputClass = 'w-full rounded-xl border border-slate-300 bg-white px-4 py-2
 
 function FormField({ label, value, onChange, className = '' }) {
   return (
-    <label className={`text-[11px] font-extrabold uppercase tracking-wider text-slate-500 ${className}`}>
+    <label className={`text-xs font-semibold text-slate-500 ${className}`}>
       {label}
       <input type="text" value={value} onChange={(e) => onChange(e.target.value)} className={`mt-2 normal-case ${inputClass}`} />
     </label>
@@ -52,10 +51,10 @@ function FairPickerCard({ fair, onClick }) {
     <button
       type="button"
       onClick={onClick}
-      className="group flex h-full flex-col items-start gap-3 rounded-3xl border border-slate-200 bg-white p-5 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:border-brand-navy hover:shadow-md"
+      className="group flex h-full flex-col items-start gap-3 rounded-2xl border border-slate-200 bg-white p-5 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:border-brand-navy hover:shadow-md"
     >
       <div className="flex w-full items-start justify-between gap-2">
-        <h3 className="font-black tracking-tight text-slate-950">{fair.title}</h3>
+        <h3 className="font-bold tracking-tight text-slate-950">{fair.title}</h3>
         <Badge variant={submitted ? 'verified' : 'warning'} className="shrink-0">{submitted ? 'Submitted' : 'Not yet submitted'}</Badge>
       </div>
       <span className="flex items-center gap-1.5 text-xs font-semibold text-slate-500">
@@ -201,7 +200,7 @@ export default function EmployerEstablishmentReportPage() {
         <AnimatePresence mode="wait">
           {!selected ? (
             <MotionDiv key="picker" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.18 }}>
-              <h2 className="text-lg font-black tracking-tight text-slate-950">Eligible Job Fairs</h2>
+              <h2 className="text-lg font-bold tracking-tight text-slate-950">Eligible Job Fairs</h2>
               <p className="mt-1.5 text-sm text-slate-500">Select an event to submit or review its Establishment Report.</p>
               <div className="mt-5 grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
                 {eligibleFairs.map((fair) => (
@@ -219,8 +218,8 @@ export default function EmployerEstablishmentReportPage() {
           <Card>
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div className="min-w-0">
-                <h2 className="text-2xl font-black tracking-tight text-slate-950">{selected.title}</h2>
-                <p className="mt-1.5 text-sm font-medium text-slate-500">{selected.start_date} · {selected.venue}</p>
+                <h2 className="text-2xl font-bold tracking-tight text-slate-950">{selected.title}</h2>
+                <p className="mt-1.5 text-sm font-medium text-slate-500">{[selected.start_date, selected.venue].filter(Boolean).join(', ')}</p>
               </div>
               <Badge variant={alreadySubmitted ? 'verified' : 'warning'} className="shrink-0">{alreadySubmitted ? 'Submitted' : 'Not yet submitted'}</Badge>
             </div>
@@ -239,13 +238,13 @@ export default function EmployerEstablishmentReportPage() {
           </Card>
 
           <Card>
-            <p className="text-lg font-black tracking-tight text-slate-950">{alreadySubmitted ? 'Resubmit Establishment Report' : 'Submit Establishment Report'}</p>
+            <p className="text-lg font-bold tracking-tight text-slate-950">{alreadySubmitted ? 'Resubmit Establishment Report' : 'Submit Establishment Report'}</p>
             <p className="mt-1.5 text-sm font-medium text-slate-500">Enter applicants from your physical notes after the event.</p>
 
             <div className="mt-5 flex flex-wrap gap-2">
               {RESULT_STATS.map(([key, label, status]) => (
                 <Badge key={key} variant={status} icon={false}>
-                  <span className="text-sm font-black">{totals[key]}</span> {label}
+                  <span className="text-sm font-bold">{totals[key]}</span> {label}
                 </Badge>
               ))}
             </div>
@@ -261,14 +260,14 @@ export default function EmployerEstablishmentReportPage() {
                   <div />
                   
                   <Controller name="vacancies.solicited" control={control} render={({ field: { value, onChange } }) => (
-                    <label className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500">
+                    <label className="text-xs font-semibold text-slate-500">
                       Vacancies solicited
                       <input type="number" min="0" value={value} onChange={(e) => onChange(Number(e.target.value))} className={`mt-2 ${inputClass}`} />
                     </label>
                   )} />
 
                   <Controller name="vacancies.offered" control={control} render={({ field: { value, onChange } }) => (
-                    <label className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500">
+                    <label className="text-xs font-semibold text-slate-500">
                       Vacancies offered
                       <input type="number" min="0" value={value} onChange={(e) => onChange(Number(e.target.value))} className={`mt-2 ${inputClass}`} />
                     </label>

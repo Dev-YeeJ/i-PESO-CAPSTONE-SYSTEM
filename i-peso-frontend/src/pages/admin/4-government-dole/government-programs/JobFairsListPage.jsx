@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { CalendarCheck2, CalendarClock, CalendarDays, CheckCircle2, ClipboardEdit, Flame, MapPin, Pencil, Plus, Radio, Trash2, Users, UsersRound, Download, FileText, FileSpreadsheet } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
-import toast from 'react-hot-toast'
+import toast from '@/lib/toast'
 import { Button, EmptyState, LoadingSkeleton, StatCard } from '@/components/ui'
 import { ConfirmModal, StatusBadge } from '@/pages/admin/_components'
 import { adminService } from '@/services/adminService'
@@ -11,6 +11,7 @@ import JobFairsCalendar from './components/JobFairsCalendar'
 import { LayoutList, Calendar as CalendarIcon } from 'lucide-react'
 import { useAuthStore } from '@/stores/authStore'
 import { canManage } from '@/utils/adminAccess'
+import PortalPageHeader from '@/components/shell/PortalPageHeader'
 
 const MotionDiv = motion.div
 
@@ -18,7 +19,7 @@ const formatDate = (value) => value ? new Date(value).toLocaleDateString() : 'TB
 
 const metricTiles = [
   ['approved', 'Approved', CheckCircle2, 'border-emerald-100 bg-emerald-50 text-emerald-700'],
-  ['total_applicants', 'Applicants', Users, 'border-blue-100 bg-blue-50 text-blue-700'],
+  ['total_applicants', 'Applicants', Users, 'border-[#c4d9f7] bg-[#e8f0fc] text-brand-navy'],
   ['total_hots', 'HOTS', Flame, 'border-amber-100 bg-amber-50 text-amber-700'],
   ['proxy_reports', 'Proxy Reports', ClipboardEdit, 'border-violet-100 bg-violet-50 text-violet-700'],
 ]
@@ -30,7 +31,7 @@ function Info({ icon: Icon, label, value }) {
         {Icon && <Icon className="h-4 w-4 text-indigo-400" />}
       </div>
       <div className="min-w-0">
-        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">{label}</p>
+        <p className="text-xs font-bold text-slate-400">{label}</p>
         <p className="mt-0.5 truncate text-sm font-bold text-slate-800">{value || 'To be announced'}</p>
       </div>
     </div>
@@ -100,35 +101,14 @@ export default function JobFairsListPage() {
   }
 
   return (
-    <div className="mx-auto max-w-7xl space-y-10 pb-12">
-      <MotionDiv
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, ease: "easeOut" }}
-        className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-900 via-blue-950 to-indigo-900 px-8 py-8 text-white shadow-2xl sm:px-12 sm:py-10"
+    <div className="portal-page pb-12">
+      <PortalPageHeader
+        title="Job fairs"
+        subtitle="Plan fairs, invite employers, review their requirements, run check-in on the day, and file the post-event reports."
       >
-        <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-blue-500/20 blur-3xl"></div>
-        <div className="absolute -bottom-32 -left-20 h-80 w-80 rounded-full bg-indigo-500/20 blur-3xl"></div>
-        <div className="relative z-10 flex flex-wrap items-end justify-between gap-6">
-          <div>
-            <p className="text-xs font-black uppercase tracking-widest text-blue-400 drop-shadow-sm">Government & DOLE</p>
-            <h1 className="mt-2 text-4xl font-black tracking-tight text-white drop-shadow-md">Job Fairs</h1>
-            <p className="mt-4 max-w-2xl text-base font-medium leading-relaxed text-blue-100/90">
-              Coordinate employers before the event and automate post-event government reports with seamless precision.
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-3">
-            <button type="button" onClick={refresh} className="rounded-xl border border-white/20 bg-white/5 px-5 py-2.5 text-sm font-bold text-white backdrop-blur-md transition hover:bg-white/10 hover:border-white/40 shadow-sm">
-              Refresh
-            </button>
-            {canAct && (
-              <Button variant="primary" icon={Plus} onClick={() => navigate('/admin/job-fairs/create')} className="shadow-lg shadow-blue-500/20">
-                Create Job Fair
-              </Button>
-            )}
-          </div>
-        </div>
-      </MotionDiv>
+        <Button variant="outline" onClick={refresh}>Refresh</Button>
+        {canAct && <Button icon={Plus} onClick={() => navigate('/admin/job-fairs/create')}>Plan a job fair</Button>}
+      </PortalPageHeader>
 
       <motion.section 
         initial="hidden"
@@ -159,7 +139,7 @@ export default function JobFairsListPage() {
       {errorMessage && (
         <div className="flex items-center justify-between gap-4 rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-sm font-semibold text-red-700">
           <span>{errorMessage}</span>
-          <button type="button" onClick={refresh} className="font-extrabold hover:underline">Try again</button>
+          <button type="button" onClick={refresh} className="font-semibold hover:underline">Try again</button>
         </div>
       )}
 
@@ -168,14 +148,14 @@ export default function JobFairsListPage() {
           <button 
             type="button" 
             onClick={() => setViewMode('list')} 
-            className={`flex items-center gap-2 rounded-md px-4 py-2 text-sm font-semibold transition-colors ${viewMode === 'list' ? 'bg-blue-50 text-blue-700' : 'text-slate-500 hover:bg-slate-50'}`}
+            className={`flex items-center gap-2 rounded-md px-4 py-2 text-sm font-semibold transition-colors ${viewMode === 'list' ? 'bg-[#e8f0fc] text-brand-navy' : 'text-slate-500 hover:bg-slate-50'}`}
           >
             <LayoutList className="h-4 w-4" /> List View
           </button>
           <button 
             type="button" 
             onClick={() => setViewMode('calendar')} 
-            className={`flex items-center gap-2 rounded-md px-4 py-2 text-sm font-semibold transition-colors ${viewMode === 'calendar' ? 'bg-blue-50 text-blue-700' : 'text-slate-500 hover:bg-slate-50'}`}
+            className={`flex items-center gap-2 rounded-md px-4 py-2 text-sm font-semibold transition-colors ${viewMode === 'calendar' ? 'bg-[#e8f0fc] text-brand-navy' : 'text-slate-500 hover:bg-slate-50'}`}
           >
             <CalendarIcon className="h-4 w-4" /> Calendar View
           </button>
@@ -188,7 +168,7 @@ export default function JobFairsListPage() {
         <motion.div 
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
-          className="rounded-3xl border border-slate-200 bg-white p-12 shadow-sm"
+          className="rounded-2xl border border-slate-200 bg-white p-12 shadow-sm"
         >
           <EmptyState
             icon={CalendarDays}
@@ -219,14 +199,14 @@ export default function JobFairsListPage() {
               key={fair.job_fair_id} 
               variants={{ hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0 } }}
               whileHover={{ y: -4, transition: { duration: 0.2 } }}
-              className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm transition-shadow hover:border-blue-300 hover:shadow-xl hover:shadow-blue-900/5 sm:p-8"
+              className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition-shadow hover:border-[#c4d9f7] hover:shadow-xl hover:shadow-blue-900/5 sm:p-8"
             >
               <div className="flex flex-wrap items-start justify-between gap-4">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-3">
                     <StatusBadge status={fair.status} />
                   </div>
-                  <h2 className="mt-4 truncate text-2xl font-black tracking-tight text-slate-950 sm:text-3xl">{fair.title}</h2>
+                  <h2 className="mt-4 truncate text-2xl font-bold tracking-tight text-slate-950 sm:text-3xl">{fair.title}</h2>
                 </div>
                 <div className="flex shrink-0 flex-wrap items-center gap-2">
                   <Button variant="outline" size="sm" icon={FileText} onClick={() => blobDownload(() => adminService.downloadJobFairAttendancePdf(fair.job_fair_id), `job-fair-attendance-${fair.job_fair_id}.pdf`)}>PDF</Button>
@@ -258,8 +238,8 @@ export default function JobFairsListPage() {
                   <div key={key} className={`flex items-center gap-3 rounded-2xl border px-4 py-3 transition-colors hover:opacity-90 ${tone}`}>
                     {Icon && <Icon className="h-5 w-5 shrink-0 opacity-75" />}
                     <div>
-                      <p className="text-lg font-black leading-none">{fair.metrics?.[key] ?? 0}</p>
-                      <p className="mt-1 text-[10px] font-black uppercase tracking-widest opacity-80">{label}</p>
+                      <p className="text-lg font-bold leading-none">{fair.metrics?.[key] ?? 0}</p>
+                      <p className="mt-1 text-xs font-bold opacity-80">{label}</p>
                     </div>
                   </div>
                 ))}

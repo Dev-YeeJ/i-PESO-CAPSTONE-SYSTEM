@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import { Download, Loader2 } from 'lucide-react'
-import toast from 'react-hot-toast'
+import toast from '@/lib/toast'
 import { CHART_EXPORT_FORMATS, EXPORT_IGNORE_ATTR, exportChart } from '@/utils/chartExport'
 
 /**

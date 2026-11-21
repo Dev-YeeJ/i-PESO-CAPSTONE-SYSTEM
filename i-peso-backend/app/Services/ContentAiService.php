@@ -137,8 +137,8 @@ class ContentAiService
     private function questionPrompt(string $text): string
     {
         return <<<PROMPT
-        People typed the search or chat message below on the help pages of i-PESO, a government
-        employment portal. Turn it into one clear FAQ question in English, the way a job seeker or
+        Someone asked the i-PESO assistant (the chatbot of a government employment portal) the
+        message below, and it could not answer. Turn it into one clear FAQ question in English, the way a job seeker or
         employer would ask it (under 15 words, ending with a question mark). Remove any personal
         details. Reply with the question only.
 

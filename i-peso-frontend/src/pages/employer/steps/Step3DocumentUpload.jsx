@@ -175,14 +175,14 @@ export default function Step3DocumentUpload({ companyType, onCompanyTypeSet, onC
           <label htmlFor="company_type" className="text-sm font-semibold text-slate-800">
             Company Type
           </label>
-          {savingCompanyType && <span className="text-xs font-medium text-blue-600">Saving...</span>}
+          {savingCompanyType && <span className="text-xs font-medium text-brand-navy">Saving...</span>}
         </div>
         <select
           id="company_type"
           value={selectedCompanyType}
           onChange={(e) => handleCompanyTypeChange(e.target.value)}
           disabled={savingCompanyType}
-          className="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-600 disabled:opacity-60"
+          className="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-brand-navy focus:outline-none focus:ring-1 focus:ring-[#2563b8] disabled:opacity-60"
         >
           <option value="" disabled>Select your company's legal type&hellip;</option>
           {COMPANY_TYPES.map((type) => (
@@ -201,7 +201,7 @@ export default function Step3DocumentUpload({ companyType, onCompanyTypeSet, onC
       ) : initialLoading ? (
         <div className="flex items-center justify-center py-10">
           <div className="text-center">
-            <div className="inline-block animate-spin rounded-full h-7 w-7 border-b-2 border-blue-600"></div>
+            <div className="inline-block animate-spin rounded-full h-7 w-7 border-b-2 border-brand-navy"></div>
             <p className="mt-2 text-sm text-slate-600">Loading required documents...</p>
           </div>
         </div>
@@ -218,7 +218,7 @@ export default function Step3DocumentUpload({ companyType, onCompanyTypeSet, onC
                 <h3 className="font-bold text-slate-900 text-base">Upload Required Documents</h3>
                 <p className="text-xs text-slate-500">Please provide clear copies of all required documents for account verification.</p>
               </div>
-              <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-200 w-fit">
+              <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-[#e8f0fc] text-brand-navy border border-[#c4d9f7] w-fit">
                 {requiredUploadedCount} of {requiredDocuments.length} Uploaded
               </span>
             </div>
@@ -267,7 +267,7 @@ export default function Step3DocumentUpload({ companyType, onCompanyTypeSet, onC
             type="button"
             onClick={handleContinue}
             disabled={!allDocumentsUploaded}
-            className="w-full py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full py-2 bg-brand-navy text-white font-medium rounded-lg hover:bg-[#0f2d56] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {allDocumentsUploaded ? 'Save & Continue' : `Upload all documents to continue (${requiredUploadedCount}/${requiredDocuments.length})`}
           </button>

@@ -185,31 +185,31 @@ export default function JobSeekerDetailPage() {
             {hasProfileImage && photoUrl ? (
               <img src={photoUrl} alt={name} className="h-20 w-20 shrink-0 rounded-2xl border border-white/20 object-cover" />
             ) : (
-              <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-2xl border border-white/20 bg-white/10 text-2xl font-black text-amber-300">
+              <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-2xl border border-white/20 bg-white/10 text-2xl font-bold text-amber-300">
                 {seeker.first_name?.[0] ?? profile.first_name?.[0] ?? 'J'}{seeker.last_name?.[0] ?? profile.last_name?.[0] ?? 'S'}
               </div>
             )}
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2">
-                <p className="text-xs font-bold uppercase tracking-[0.18em] text-blue-200">DOLE NSRP Case Profile</p>
+                <p className="text-xs font-bold text-white/80">DOLE NSRP Case Profile</p>
                 <Badge status={(seeker.profile_completed ?? profile.profile_completed) ? 'verified' : 'pending'}>
                   {(seeker.profile_completed ?? profile.profile_completed) ? 'NSRP Complete' : 'Needs Completion'}
                 </Badge>
               </div>
-              <h1 className="mt-2 text-2xl font-black sm:text-3xl">{name}</h1>
-              <p className="mt-2 text-sm text-blue-100">
-                Job Seeker ID #{seeker.seeker_id ?? profile.seeker_id} · Registered {formatDate(seeker.created_at)}
+              <h1 className="mt-2 text-2xl font-bold sm:text-3xl">{name}</h1>
+              <p className="mt-2 text-sm text-white/80">
+                Job Seeker ID #{seeker.seeker_id ?? profile.seeker_id}, Registered {formatDate(seeker.created_at)}
               </p>
             </div>
             <div className="w-full rounded-2xl border border-white/15 bg-white/10 p-4 lg:w-56">
               <div className="flex items-end justify-between">
-                <span className="text-xs font-bold uppercase tracking-wide text-blue-200">Profile readiness</span>
+                <span className="text-xs font-bold text-white/80">Profile readiness</span>
                 <strong className="text-2xl text-white">{profileScore}%</strong>
               </div>
               <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/15">
                 <div className="h-full rounded-full bg-amber-400" style={{ width: `${profileScore}%` }} />
               </div>
-              <p className="mt-2 text-xs text-blue-100">For PESO referral and matching services</p>
+              <p className="mt-2 text-xs text-white/80">For PESO referral and matching services</p>
             </div>
           </div>
         )}
@@ -258,7 +258,7 @@ export default function JobSeekerDetailPage() {
 
           <RecordSection icon={GraduationCap} title="Education History" subtitle="Formal education records included in the NSRP profile." records={education} empty="No education history recorded." render={(item) => <TimelineRecord key={item.id} title={formatValue(item.institution_name, 'School not specified')} subtitle={[formatValue(item.level), item.course_strand].filter(Boolean).join(' | ')} meta={educationMeta(item)} />} />
 
-          <RecordSection icon={BriefcaseBusiness} title="Work Experience" subtitle="Previous employment that may support job referrals." records={workExperience} empty="No work experience recorded." render={(item) => <TimelineRecord key={item.id} title={formatValue(item.position)} subtitle={formatValue(item.company_name)} meta={[item.number_of_months ? `${item.number_of_months} months` : null, item.employment_status ? formatValue(item.employment_status) : null].filter(Boolean).join(' · ') || 'Employment details not specified'} />} />
+          <RecordSection icon={BriefcaseBusiness} title="Work Experience" subtitle="Previous employment that may support job referrals." records={workExperience} empty="No work experience recorded." render={(item) => <TimelineRecord key={item.id} title={formatValue(item.position)} subtitle={formatValue(item.company_name)} meta={[item.number_of_months ? `${item.number_of_months} months` : null, item.employment_status ? formatValue(item.employment_status) : null].filter(Boolean).join(', ') || 'Employment details not specified'} />} />
 
           <div className="grid gap-6 lg:grid-cols-2">
             <RecordSection icon={BookOpen} title="Trainings" records={trainings} empty="No training records." render={(item) => <TimelineRecord key={item.id} title={formatValue(item.course)} subtitle={formatValue(item.training_institution, 'Institution not specified')} meta={item.hours_of_training ? `${item.hours_of_training} training hours` : 'Hours not specified'} />} />
@@ -297,10 +297,10 @@ export default function JobSeekerDetailPage() {
               <InfoItem label="Hired count" value={applicationsSummary.hired_count ?? 0} />
               <InfoItem label="Latest application" value={applicationsSummary.latest?.status ? formatValue(applicationsSummary.latest.status) : 'No applications'} />
               <div>
-                <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Status breakdown</p>
+                <p className="text-xs font-bold text-slate-400">Status breakdown</p>
                 {Object.keys(applicationStatusSummary).length ? (
                   <div className="mt-2 flex flex-wrap gap-2">
-                    {Object.entries(applicationStatusSummary).map(([status, count]) => <Badge key={status} status="review">{formatValue(status)} · {count}</Badge>)}
+                    {Object.entries(applicationStatusSummary).map(([status, count]) => <Badge key={status} status="review">{formatValue(status)}, {count}</Badge>)}
                   </div>
                 ) : <p className="mt-2 text-sm text-slate-500">No application status summary returned.</p>}
               </div>
@@ -332,7 +332,7 @@ export default function JobSeekerDetailPage() {
             {jobFairParticipation.length ? <div className="space-y-2">{jobFairParticipation.map((item) => <div key={item.id} className="rounded-xl bg-slate-50 p-3 text-sm text-slate-700">Joined on {formatDate(item.created_at || item.joined_at)}</div>)}</div> : <EmptyText>No job fair participation recorded.</EmptyText>}
           </Card>
 
-          <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm leading-6 text-blue-800">
+          <div className="rounded-xl border border-[#c4d9f7] bg-[#e8f0fc] p-4 text-sm leading-6 text-brand-navy">
             <div className="flex gap-3">
               <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0" />
               <p><strong>Read-only case record.</strong> Job seekers are not approved or rejected here. PESO staff use this page for employment assistance, referrals, and NSRP reporting.</p>
@@ -349,7 +349,7 @@ function HeroFact({ icon, label, value }) {
     <div className="flex min-w-0 items-center gap-3 p-4">
       <span className="rounded-xl bg-slate-100 p-2 text-brand-navy">{createElement(icon, { className: 'h-4 w-4' })}</span>
       <div className="min-w-0">
-        <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400">{label}</p>
+        <p className="text-xs font-bold text-slate-400">{label}</p>
         <p className="truncate text-sm font-bold capitalize text-slate-800">{formatValue(value)}</p>
       </div>
     </div>
@@ -359,7 +359,7 @@ function HeroFact({ icon, label, value }) {
 function InfoItem({ label, value }) {
   return (
     <div>
-      <p className="text-xs font-bold uppercase tracking-wide text-slate-400">{label}</p>
+      <p className="text-xs font-bold text-slate-400">{label}</p>
       <p className="mt-1 text-sm font-semibold capitalize text-slate-800">{formatValue(value)}</p>
     </div>
   )
@@ -368,12 +368,12 @@ function InfoItem({ label, value }) {
 function SectionDivider() { return <div className="my-6 border-t border-slate-100" /> }
 
 function TagSection({ title, items, empty, tone }) {
-  const colors = { navy: 'border-slate-300 bg-slate-100 text-brand-navy', blue: 'border-blue-200 bg-blue-50 text-blue-700', amber: 'border-amber-200 bg-amber-50 text-amber-800' }
+  const colors = { navy: 'border-slate-300 bg-slate-100 text-brand-navy', blue: 'border-[#c4d9f7] bg-[#e8f0fc] text-brand-navy', amber: 'border-amber-200 bg-amber-50 text-amber-800' }
   const uniqueItems = [...new Set(items.filter(Boolean))]
 
   return (
     <div>
-      <p className="text-xs font-bold uppercase tracking-wide text-slate-400">{title}</p>
+      <p className="text-xs font-bold text-slate-400">{title}</p>
       {uniqueItems.length ? <div className="mt-2 flex flex-wrap gap-2">{uniqueItems.map((item) => <span key={item} className={`rounded-full border px-3 py-1.5 text-xs font-bold ${colors[tone]}`}>{formatValue(item)}</span>)}</div> : <p className="mt-2 text-sm text-slate-500">{empty}</p>}
     </div>
   )

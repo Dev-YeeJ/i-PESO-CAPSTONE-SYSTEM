@@ -21,6 +21,6 @@ class SiteContent extends Model
 
     public function editor(): BelongsTo
     {
-        return $this->belongsTo(Administrator::class, 'updated_by', 'admin_id');
+        return $this->belongsTo(Administrator::class, 'updated_by', 'admin_id')->withTrashed();
     }
 }

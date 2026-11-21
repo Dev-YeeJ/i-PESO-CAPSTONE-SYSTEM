@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import toast from 'react-hot-toast'
+import toast from '@/lib/toast'
 import { CalendarClock, CheckCircle2, Clock, LogIn, LogOut, PartyPopper } from 'lucide-react'
 import { Badge, Button, Card, ErrorState, LoadingSkeleton } from '@/components/ui'
 import PageHeader from '@/pages/admin/_components/PageHeader'
@@ -67,7 +67,7 @@ export default function MyOjtPage() {
       <PageHeader
         title="My OJT Hours"
         eyebrow="OJT / Internship"
-        subtitle={progress?.school ? `${progress.school}${progress.course ? ` · ${progress.course}` : ''}` : 'Your daily time in and time out.'}
+        subtitle={progress?.school ? `${progress.school}${progress.course ? `, ${progress.course}` : ''}` : 'Your daily time in and time out.'}
       />
 
       {isLoading ? (
@@ -125,10 +125,10 @@ function TimeClock({ today, busy, onPunch }) {
 
   return (
     <Card className="flex flex-col items-center justify-center text-center">
-      <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
+      <p className="text-xs font-bold text-slate-500">
         {now.toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', weekday: 'long', month: 'long', day: 'numeric' })}
       </p>
-      <p className="mt-1 font-mono text-4xl font-black tabular-nums text-slate-950 sm:text-5xl" aria-live="off">
+      <p className="mt-1 font-mono text-4xl font-bold tabular-nums text-slate-950 sm:text-5xl" aria-live="off">
         {now.toLocaleTimeString('en-PH', { timeZone: 'Asia/Manila', hour: 'numeric', minute: '2-digit', second: '2-digit' })}
       </p>
       <p className="mt-1 text-xs text-slate-500">Philippine time</p>
@@ -139,14 +139,14 @@ function TimeClock({ today, busy, onPunch }) {
             <CheckCircle2 className="mx-auto h-7 w-7 text-emerald-600" />
             <p className="mt-2 text-sm font-bold text-emerald-900">Done for today</p>
             <p className="mt-1 text-sm text-emerald-800">
-              {formatClock(today.time_in)} – {formatClock(today.time_out)} · {formatHours(today.hours)}
+              {formatClock(today.time_in)} – {formatClock(today.time_out)}, {formatHours(today.hours)}
             </p>
             <div className="mt-2"><Badge status={ojtStatus(today.status).variant}>{ojtStatus(today.status).label}</Badge></div>
           </div>
         ) : timedIn ? (
           <>
             <p className="mb-3 flex items-center justify-center gap-2 text-sm text-slate-600">
-              <Clock className="h-4 w-4 text-blue-600" /> Timed in at <strong className="text-slate-900">{formatClock(today.time_in)}</strong>
+              <Clock className="h-4 w-4 text-brand-navy" /> Timed in at <strong className="text-slate-900">{formatClock(today.time_in)}</strong>
             </p>
             <Button size="lg" variant="navy" icon={LogOut} loading={busy} className="w-full" onClick={() => onPunch('out')}>
               Time Out
@@ -170,7 +170,7 @@ function TimeClock({ today, busy, onPunch }) {
 function Stat({ label, value, tone }) {
   return (
     <div>
-      <dt className="text-xs font-bold uppercase tracking-wide text-slate-500">{label}</dt>
+      <dt className="text-xs font-bold text-slate-500">{label}</dt>
       <dd className={`mt-0.5 font-semibold ${tone ?? 'text-slate-900'}`}>{value}</dd>
     </div>
   )

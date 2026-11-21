@@ -35,19 +35,19 @@ class ContentInsightController extends Controller
         return response()->json($this->insights->insights($days));
     }
 
-    /** Mark a missed search or chatbot question as dealt with. */
+    /** Mark a question the assistant couldn't answer as dealt with. */
     public function resolve(Request $request): JsonResponse
     {
         $admin = $this->admin($request);
         $data = $request->validate([
-            'kind' => ['required', Rule::in(['search', 'gap'])],
+            // Only chatbot gaps remain (Help-page searches went with the Help page).
+            'kind' => ['sometimes', Rule::in(['gap'])],
             'normalized' => ['required', 'string', 'max:191'],
         ]);
 
-        $count = $this->insights->resolve($data['kind'], $data['normalized']);
+        $count = $this->insights->resolve($data['normalized']);
         ActivityLogger::logAs($admin, 'content_insight_resolved', sprintf(
-            'Marked %s “%s” as dealt with (%d report%s).',
-            $data['kind'] === 'gap' ? 'the assistant question' : 'the Help search',
+            'Marked the assistant question “%s” as dealt with (%d report%s).',
             $data['normalized'],
             $count,
             $count === 1 ? '' : 's'

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { motion as Motion } from 'framer-motion'
-import toast from 'react-hot-toast'
+import toast from '@/lib/toast'
 import { ArrowLeft, ArrowRight, CalendarDays, CheckCircle2, ChevronDown, ClipboardList, FileText, FileUp, Info, Lock, Mail, MapPin, Save, Search, ShieldCheck, Trash2 } from 'lucide-react'
 import { Badge, Button, Card, EmptyState, LoadingSkeleton } from '@/components/ui'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -8,6 +8,7 @@ import ConfirmationSlipPreview from '@/components/reports/ConfirmationSlipPrevie
 import ConfirmationVacancyEditor, { blankConfirmationVacancy, stripBlankConfirmationVacancies } from '@/components/reports/ConfirmationVacancyEditor'
 import { expressJobFairInterest, listEmployerJobFairs, respondToJobFairInvitation, submitJobFairConfirmation, uploadJobFairRequirement, viewJobFairRequirement, deleteJobFairRequirement } from '@/services/jobFairService'
 import { getProfile, getVacancies } from '@/services/employerService'
+import PortalPageHeader from '@/components/shell/PortalPageHeader'
 
 const blankConfirmation = {
   representative_1_name: '', representative_1_contact: '', representative_position: '',
@@ -44,7 +45,7 @@ const PARTICIPATION_BADGE = {
 
 function FormField({ label, value, onChange, type = 'text', textarea = false, className = '' }) {
   return (
-    <label className={`text-xs font-bold uppercase tracking-wide text-slate-500 ${className}`}>
+    <label className={`text-xs font-bold text-slate-500 ${className}`}>
       {label}
       {textarea ? (
         <textarea value={value} onChange={(e) => onChange(e.target.value)} rows={2} className={`mt-1.5 resize-none normal-case ${inputClass}`} />
@@ -60,7 +61,7 @@ function DetailChip({ icon: Icon, label, value, action }) {
     <div className="flex items-start gap-3 rounded-xl bg-slate-50 p-3">
       <span className="mt-0.5 rounded-lg bg-white p-1.5 text-brand-navy shadow-sm">{Icon && <Icon className="h-4 w-4" />}</span>
       <div className="min-w-0 flex-1">
-        <p className="text-[11px] font-extrabold uppercase tracking-wide text-slate-400">{label}</p>
+        <p className="text-xs font-semibold text-slate-400">{label}</p>
         <p className="mt-0.5 truncate text-sm font-semibold text-slate-800">{value || 'Not specified'}</p>
         {action}
       </div>
@@ -83,7 +84,7 @@ function JobFairCard({ fair, onClick }) {
       whileHover={{ y: -4 }}
       whileTap={{ scale: 0.98 }}
       transition={{ type: 'spring', stiffness: 400, damping: 28 }}
-      className="group flex h-full flex-col items-start gap-3 rounded-3xl border border-slate-200 bg-white p-5 text-left shadow-sm transition-colors hover:border-blue-200 hover:shadow-md overflow-hidden"
+      className="group flex h-full flex-col items-start gap-3 rounded-2xl border border-slate-200 bg-white p-5 text-left shadow-sm transition-colors hover:border-[#c4d9f7] hover:shadow-md overflow-hidden"
     >
       {fair.banner_url && (
         <div className="-mx-5 -mt-5 mb-1 w-[calc(100%+2.5rem)]">
@@ -91,12 +92,12 @@ function JobFairCard({ fair, onClick }) {
         </div>
       )}
       <div className="flex w-full items-start justify-between gap-2">
-        <h3 className="font-black tracking-tight text-slate-950">{fair.title}</h3>
+        <h3 className="font-bold tracking-tight text-slate-950">{fair.title}</h3>
         <Badge status={status ? (PARTICIPATION_BADGE[status] ?? 'neutral') : 'neutral'} className="shrink-0">{status ? status.replaceAll('_', ' ') : 'Not joined'}</Badge>
       </div>
       {fair.description && <p className="line-clamp-2 text-sm text-slate-500">{fair.description}</p>}
       <div className="mt-auto flex w-full flex-col gap-1.5 border-t border-slate-100 pt-3 text-xs text-slate-500">
-        <span className="flex items-center gap-1.5"><CalendarDays className="h-3.5 w-3.5 shrink-0 text-slate-400" />{fair.start_date} · {fair.start_time}–{fair.end_time}</span>
+        <span className="flex items-center gap-1.5"><CalendarDays className="h-3.5 w-3.5 shrink-0 text-slate-400" />{fair.start_date}, {fair.start_time}–{fair.end_time}</span>
         <span className="flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5 shrink-0 text-slate-400" /><span className="truncate">{fair.venue}</span></span>
         {/* The registration deadline is the single most time-sensitive fact
             on this card and it was nowhere in the list — an employer had to
@@ -290,18 +291,11 @@ export default function EmployerJobFairDashboard() {
     .includes(selected?.participation?.status)
 
   return (
-    <div className="mx-auto max-w-7xl space-y-10 pb-12">
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-900 via-blue-950 to-indigo-900 px-8 py-8 text-white shadow-xl sm:px-12 sm:py-10">
-        <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-blue-500/20 blur-3xl"></div>
-        <div className="absolute -bottom-32 -left-20 h-80 w-80 rounded-full bg-indigo-500/20 blur-3xl"></div>
-        <div className="relative z-10">
-          <p className="text-xs font-bold uppercase tracking-widest text-blue-300">PESO Job Fairs</p>
-          <h1 className="mt-1 text-3xl font-black tracking-tight text-white drop-shadow-sm">Job Fair Coordination</h1>
-          <p className="mt-3 max-w-2xl text-base leading-relaxed text-blue-100">
-            Submit requirements, confirm attendance, and encode results for each job fair you join.
-          </p>
-        </div>
-      </div>
+    <div className="mx-auto max-w-[1440px] space-y-6 pb-12">
+      <PortalPageHeader
+        title="Job fairs"
+        subtitle="Join PESO job fairs, send your requirements, confirm attendance and encode your results after each event."
+      />
 
 
       {loading ? (
@@ -312,7 +306,7 @@ export default function EmployerJobFairDashboard() {
         <Card><EmptyState icon={CalendarDays} title="No job fairs announced yet" description="Every job fair PESO publishes appears here automatically — you don't need an invitation to see one. You'll also be emailed when a new event is announced." /></Card>
       ) : !selected ? (
         <div>
-          <h2 className="text-base font-extrabold text-slate-950">All Job Fairs</h2>
+          <h2 className="text-base font-semibold text-slate-950">All Job Fairs</h2>
           <p className="mt-1 text-sm text-slate-500">Select an event to view its coordination record.</p>
           <Motion.div
             initial="hidden"
@@ -340,7 +334,7 @@ export default function EmployerJobFairDashboard() {
             )}
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div className="min-w-0">
-                <h2 className="text-2xl font-black text-slate-950">{selected.title}</h2>
+                <h2 className="text-2xl font-bold text-slate-950">{selected.title}</h2>
                 {selected.description && <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">{selected.description}</p>}
               </div>
               {selected.participation?.status && (
@@ -349,7 +343,7 @@ export default function EmployerJobFairDashboard() {
             </div>
 
             <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-              <DetailChip icon={CalendarDays} label="Date & time" value={`${selected.start_date} · ${selected.start_time}–${selected.end_time}`} />
+              <DetailChip icon={CalendarDays} label="Date & time" value={`${selected.start_date}, ${selected.start_time}–${selected.end_time}`} />
               <DetailChip
                 icon={MapPin}
                 label="Venue"
@@ -412,7 +406,7 @@ export default function EmployerJobFairDashboard() {
 
                   <div className="pb-6 relative">
                     {selected.participation.status === 'invited' && (
-                      <div className="absolute inset-0 z-10 flex flex-col items-center justify-center rounded-b-xl bg-white/80 backdrop-blur-[2px]">
+                      <div className="absolute inset-0 z-10 flex flex-col items-center justify-center rounded-b-xl bg-white/90-[2px]">
                         <div className="flex max-w-sm flex-col items-center text-center">
                           <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-brand-50 text-brand-600">
                             <Lock className="h-6 w-6" />
@@ -542,7 +536,7 @@ export default function EmployerJobFairDashboard() {
                             <p className="mb-4 text-sm text-slate-500">Maximum {selected.maximum_representatives} representative(s) for this event.</p>
                             <div className="space-y-4">
                               <div className="rounded-xl border border-slate-200 p-4">
-                                <p className="mb-3 text-xs font-extrabold uppercase tracking-wide text-slate-600">Representative 1</p>
+                                <p className="mb-3 text-xs font-semibold text-slate-600">Representative 1</p>
                                 <div className="grid gap-4 sm:grid-cols-2">
                                   <FormField label="Full name" value={confirmation.representative_1_name} onChange={(v) => setConfirmation((x) => ({ ...x, representative_1_name: v }))} />
                                   <FormField label="Position/s" value={confirmation.representative_position} onChange={(v) => setConfirmation((x) => ({ ...x, representative_position: v }))} />
@@ -550,7 +544,7 @@ export default function EmployerJobFairDashboard() {
                                 </div>
                               </div>
                               <div className="rounded-xl border border-slate-200 p-4">
-                                <p className="mb-3 text-xs font-extrabold uppercase tracking-wide text-slate-600">Representative 2 <span className="font-normal normal-case text-slate-400">(optional)</span></p>
+                                <p className="mb-3 text-xs font-semibold text-slate-600">Representative 2 <span className="font-normal normal-case text-slate-400">(optional)</span></p>
                                 <div className="grid gap-4 sm:grid-cols-2">
                                   <FormField label="Full name" value={confirmation.representative_2_name} onChange={(v) => setConfirmation((x) => ({ ...x, representative_2_name: v }))} />
                                   <FormField label="Contact number" value={confirmation.representative_2_contact} onChange={(v) => setConfirmation((x) => ({ ...x, representative_2_contact: v }))} />
@@ -558,7 +552,7 @@ export default function EmployerJobFairDashboard() {
                               </div>
                             </div>
                             <div className="mt-6">
-                              <p className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500">List of Vacancies / Orders</p>
+                              <p className="mb-2 text-xs font-bold text-slate-500">List of Vacancies / Orders</p>
                               <ConfirmationVacancyEditor vacancies={confirmationVacancies} onChange={setConfirmationVacancies} myVacancies={myVacancies} />
                             </div>
                             <Button
