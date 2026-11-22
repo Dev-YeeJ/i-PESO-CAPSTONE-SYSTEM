@@ -21,7 +21,7 @@ const MODULE_HINTS = {
 }
 
 // The order positions appear on the org chart.
-const ROLE_ORDER = ['administrator', 'law-enforcement-officer', 'administrative-aide', 'ojt-intern']
+const ROLE_ORDER = ['administrator', 'law-enforcement-officer', 'administrative-aide', 'ojt-intern', 'gip-beneficiary']
 const sortRoles = (roles) => [...roles].sort((a, b) => {
   const rank = (role) => (ROLE_ORDER.includes(role.slug) ? ROLE_ORDER.indexOf(role.slug) : ROLE_ORDER.length)
   return rank(a) - rank(b) || a.name.localeCompare(b.name)

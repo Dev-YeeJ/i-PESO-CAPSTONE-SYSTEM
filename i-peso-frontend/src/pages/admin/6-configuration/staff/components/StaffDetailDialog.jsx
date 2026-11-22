@@ -60,7 +60,7 @@ export default function StaffDetailDialog({ staff, canManageAccounts, canViewAct
     reactivate: {
       title: `Reactivate ${staff.name}?`,
       description: staff.account_status === 'internship_ended'
-        ? 'If the internship was extended, edit the end date first. They will be able to sign in again with their existing password.'
+        ? 'If their internship or GIP placement was extended, edit the end date first. They will be able to sign in again with their existing password.'
         : 'They will be able to sign in again with their existing password.',
       confirmLabel: 'Reactivate account',
       variant: 'primary',
@@ -103,14 +103,17 @@ export default function StaffDetailDialog({ staff, canManageAccounts, canViewAct
 
           {staff.internship && (
             <div className="rounded-xl border border-[#c4d9f7] bg-[#e8f0fc] p-4">
-              <h3 className="text-sm font-bold text-brand-navy">Internship</h3>
+              <h3 className="text-sm font-bold text-brand-navy">{staff.position === 'gip_beneficiary' ? 'GIP placement' : 'Internship'}</h3>
               <dl className="mt-3 grid gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
-                <Detail label="School" value={staff.internship.school} />
-                <Detail label="Course" value={staff.internship.course} />
-                <Detail label="Required hours" value={staff.internship.required_hours ? `${staff.internship.required_hours} hours` : null} />
+                {staff.position !== 'gip_beneficiary' && (
+                  <>
+                    <Detail label="School" value={staff.internship.school} />
+                    <Detail label="Course" value={staff.internship.course} />
+                  </>
+                )}
                 <Detail label="Dates" value={staff.internship.start_date ? `${formatDate(staff.internship.start_date)} – ${formatDate(staff.internship.end_date)}` : null} />
               </dl>
-              <p className="mt-3 text-xs text-brand-navy">Their hours and daily time record are in the OJT / Interns tab.</p>
+              <p className="mt-3 text-xs text-brand-navy">The account closes automatically after the end date.</p>
             </div>
           )}
 

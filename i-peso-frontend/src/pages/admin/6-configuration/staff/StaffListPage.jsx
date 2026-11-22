@@ -15,7 +15,6 @@ import StaffFormDialog from './components/StaffFormDialog'
 import StaffDetailDialog from './components/StaffDetailDialog'
 import TemporaryPasswordDialog from './components/TemporaryPasswordDialog'
 import OrgChart from './components/OrgChart'
-import OjtInternsPanel from '../ojt/components/OjtInternsPanel'
 import { ACCOUNT_STATUS, accountStatus, formatDateTime, initialsOf } from './staffDisplay'
 
 const STAFF_KEY = ['admin', 'staff']
@@ -32,7 +31,7 @@ export default function StaffListPage() {
   const [form, setForm] = useState(null) // { staff } — staff is null when adding
   const [passwordResult, setPasswordResult] = useState(null)
   const [searchParams, setSearchParams] = useSearchParams()
-  const tab = ['directory', 'org-chart', 'ojt'].includes(searchParams.get('tab')) ? searchParams.get('tab') : 'directory'
+  const tab = ['directory', 'org-chart'].includes(searchParams.get('tab')) ? searchParams.get('tab') : 'directory'
   const setTab = (next) => setSearchParams(next === 'directory' ? {} : { tab: next }, { replace: true })
 
   const staffQuery = useQuery({ queryKey: STAFF_KEY, queryFn: staffService.getStaff })
@@ -44,7 +43,7 @@ export default function StaffListPage() {
   const counts = useMemo(() => ({
     active: staff.filter((member) => member.account_status === 'active').length,
     invited: staff.filter((member) => member.account_status === 'invited' || member.account_status === 'invite_expired').length,
-    interns: staff.filter((member) => member.position === 'ojt_intern' && member.status === 'active').length,
+    interns: staff.filter((member) => ['ojt_intern', 'gip_beneficiary'].includes(member.position) && member.status === 'active').length,
     deactivated: staff.filter((member) => member.account_status === 'deactivated' || member.account_status === 'internship_ended').length,
   }), [staff])
 
@@ -123,7 +122,7 @@ export default function StaffListPage() {
     <div className="portal-page">
       <PageHeader
         title="Staff Management"
-        subtitle="PESO Urdaneta staff and interns, their positions, and what each can open in i-PESO."
+        subtitle="PESO Urdaneta staff, OJT interns and GIP beneficiaries, their positions, and what each can open in i-PESO."
         eyebrow="Configuration"
         actions={canManageAccounts ? [
           { label: 'Add staff member', icon: UserPlus, onClick: () => setForm({ staff: null }), variant: 'primary' },
@@ -139,7 +138,7 @@ export default function StaffListPage() {
       <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard icon={UsersRound} color="blue" label="Active accounts" value={counts.active.toLocaleString()} subtitle="Signed in and set up" />
         <StatCard icon={MailCheck} color="amber" label="Waiting to set up" value={counts.invited.toLocaleString()} subtitle="Invited, password not set yet" />
-        <StatCard icon={GraduationCap} color="green" label="OJT / Interns" value={counts.interns.toLocaleString()} subtitle="Active intern accounts" />
+        <StatCard icon={GraduationCap} color="green" label="OJT and GIP" value={counts.interns.toLocaleString()} subtitle="Active intern and GIP accounts" />
         <StatCard icon={UserX} color="red" label="Deactivated" value={counts.deactivated.toLocaleString()} subtitle="Can no longer sign in" />
       </div>
 
@@ -147,7 +146,6 @@ export default function StaffListPage() {
         <TabsList className="max-w-full overflow-x-auto">
           <TabsTrigger value="directory">Staff directory</TabsTrigger>
           <TabsTrigger value="org-chart">Org chart</TabsTrigger>
-          <TabsTrigger value="ojt">OJT / Interns</TabsTrigger>
         </TabsList>
 
         <TabsContent value="directory">
@@ -203,9 +201,6 @@ export default function StaffListPage() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="ojt">
-          <OjtInternsPanel />
-        </TabsContent>
       </Tabs>
 
       <StaffDetailDialog
@@ -219,7 +214,6 @@ export default function StaffListPage() {
         onDeleted={() => {
           setSelectedId(null)
           refresh() // includes the org chart (['admin', 'staff', …])
-          queryClient.invalidateQueries({ queryKey: ['admin', 'ojt'] })
         }}
       />
 

@@ -52,9 +52,6 @@ export default function DeleteStaffDialog({ staff, open, onOpenChange, onDeleted
           <li className="flex gap-2"><span aria-hidden>•</span>They can never sign in again, and the account can't be restored.</li>
           <li className="flex gap-2"><span aria-hidden>•</span>Their email and mobile number are erased. {staff.email} can be used for a new account.</li>
           <li className="flex gap-2"><span aria-hidden>•</span>Open safety cases assigned to them go back to the unassigned queue.</li>
-          {staff.internship && (
-            <li className="flex gap-2 font-semibold"><span aria-hidden>•</span>Their OJT hours and time record will no longer be viewable here.</li>
-          )}
         </ul>
 
         <p className="flex gap-2 text-sm text-slate-600">

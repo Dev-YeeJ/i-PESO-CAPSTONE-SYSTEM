@@ -129,7 +129,7 @@ class StaffPositionsAndAccessTest extends TestCase
 
         $this->postJson('/api/admin/staff', $this->newStaff([
             'position' => 'ojt_intern', 'email' => 'Intern.One@Peso.test',
-            'ojt_school' => 'Urdaneta City University', 'ojt_required_hours' => 300,
+            'ojt_school' => 'Urdaneta City University',
             'ojt_start_date' => now()->subWeek()->toDateString(), 'ojt_end_date' => now()->addMonths(2)->toDateString(),
         ]))
             ->assertCreated()

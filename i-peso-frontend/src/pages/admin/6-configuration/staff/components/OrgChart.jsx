@@ -6,7 +6,8 @@ import { initialsOf } from '../staffDisplay'
 /**
  * PESO Urdaneta's organizational chart, filled in with the active staff in
  * each position: the Office Manager (the system administrator) on top, the Special Law Enforcement
- * Officer and Administrative Aides reporting to them, and OJT interns below.
+ * Officer and Administrative Aides reporting to them, and OJT interns and GIP
+ * beneficiaries (fixed-term placements) below.
  */
 export default function OrgChart({ onSelect }) {
   const { data, isLoading, error, refetch } = useQuery({
@@ -20,7 +21,7 @@ export default function OrgChart({ onSelect }) {
   const byKey = Object.fromEntries((data?.positions ?? []).map((position) => [position.value, position]))
   const top = byKey.peso_office_manager
   const middle = [byKey.special_law_enforcement_officer, byKey.administrative_aide].filter(Boolean)
-  const interns = byKey.ojt_intern
+  const placements = [byKey.ojt_intern, byKey.gip_beneficiary].filter(Boolean)
 
   return (
     <div className="overflow-x-auto pb-2">
@@ -43,10 +44,26 @@ export default function OrgChart({ onSelect }) {
           </>
         )}
 
-        {interns && (
+        {placements.length === 1 && (
           <>
             <Connector />
-            <PositionBox position={interns} onSelect={onSelect} muted />
+            <PositionBox position={placements[0]} onSelect={onSelect} muted />
+          </>
+        )}
+
+        {placements.length > 1 && (
+          <>
+            <Connector />
+            <div className="relative grid w-full grid-cols-2 gap-6 pt-5">
+              {/* horizontal bar joining the placement row */}
+              <span aria-hidden className="absolute left-1/4 right-1/4 top-0 h-px bg-slate-300" />
+              {placements.map((position) => (
+                <div key={position.value} className="relative flex flex-col items-center">
+                  <span aria-hidden className="absolute -top-5 h-5 w-px bg-slate-300" />
+                  <PositionBox position={position} onSelect={onSelect} muted />
+                </div>
+              ))}
+            </div>
           </>
         )}
 

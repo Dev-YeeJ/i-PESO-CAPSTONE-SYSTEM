@@ -23,6 +23,18 @@ class RemoveTestStaffAccountsMigrationTest extends TestCase
         $this->createStaffTables();
         DB::table('admin_roles')->insert(['name' => 'System Administrator', 'slug' => 'administrator', 'permissions' => '{}', 'is_system' => true]);
 
+        // ojt_time_logs as it existed when this migration ran (dropped on 2026-11-22).
+        Schema::create('ojt_time_logs', function (Blueprint $table) {
+            $table->id();
+            $table->unsignedBigInteger('admin_id');
+            $table->date('work_date');
+            $table->timestamp('time_in');
+            $table->string('status', 20)->default('open');
+            $table->unsignedBigInteger('reviewed_by')->nullable();
+            $table->foreign('admin_id')->references('admin_id')->on('administrators')->cascadeOnDelete();
+            $table->foreign('reviewed_by')->references('admin_id')->on('administrators')->nullOnDelete();
+        });
+
         // A table shaped like job_fairs: deleting its creator would cascade-delete it.
         Schema::create('job_fairs', function (Blueprint $table) {
             $table->id('job_fair_id');

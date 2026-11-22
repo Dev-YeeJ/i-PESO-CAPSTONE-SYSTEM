@@ -11,7 +11,7 @@ import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@
 import { adminService } from '@/services/adminService'
 import SafetyHistoryCard from '@/components/safety/SafetyHistoryCard'
 import { useAuthStore } from '@/stores/authStore'
-import { canManage, isIntern } from '@/utils/adminAccess'
+import { canManage, isFixedTerm } from '@/utils/adminAccess'
 
 const DOCUMENT_LABELS = {
   mayors_permit: "Mayor's Permit",
@@ -52,7 +52,7 @@ export default function EmployerDetailPage() {
   const { id } = useParams()
   const navigate = useNavigate()
   const user = useAuthStore((s) => s.user)
-  const canAct = canManage(user, 'constituent_crm') && !isIntern(user)
+  const canAct = canManage(user, 'constituent_crm') && !isFixedTerm(user)
 
   const [employer, setEmployer] = useState(null)
   const [loading, setLoading] = useState(true)

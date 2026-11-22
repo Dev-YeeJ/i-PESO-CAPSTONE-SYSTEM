@@ -7,7 +7,7 @@ import { adminService } from '@/services/adminService'
 import { adminSafetyReportService } from '@/services/safetyReportService'
 import IPesoLogo from '@/components/branding/IPesoLogo'
 import SignOutConfirmDialog from '@/components/common/SignOutConfirmDialog'
-import { canOpen, canOpenPath, isIntern, moduleForPath } from '@/utils/adminAccess'
+import { canOpen, canOpenPath, moduleForPath } from '@/utils/adminAccess'
 import ShellSearch from '@/components/shell/ShellSearch'
 
 const navGroups = [
@@ -15,13 +15,6 @@ const navGroups = [
   {
     name: 'OVERVIEW',
     items: [
-      {
-        to: '/admin/my-ojt',
-        module: null,
-        internOnly: true,
-        label: 'My OJT hours',
-        icon: <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
-      },
       {
         to: '/admin/dashboard',
         module: moduleForPath('/admin/dashboard'),
@@ -209,7 +202,7 @@ const AdminLayout = () => {
 
   // Only what this account's role can open; a category with nothing left is dropped.
   const visibleGroups = navGroups
-    .map((group) => ({ ...group, items: group.items.filter((item) => (item.internOnly ? isIntern(user) : canOpen(user, item.module))) }))
+    .map((group) => ({ ...group, items: group.items.filter((item) => canOpen(user, item.module)) }))
     .filter((group) => group.items.length > 0)
   const accountLabel = user?.position_label ?? user?.admin_role?.name ?? 'Administrator Account'
   const titleCase = (name) => name.toLowerCase().replace(/(^|\s)\S/g, (c) => c.toUpperCase()).replace('Dole', 'DOLE').replace('Crm', 'CRM').replace(' & ', ' and ')

@@ -384,7 +384,8 @@ class AuthController extends Controller
 
             return response()->json([
                 'message' => $user->internshipEnded()
-                    ? 'Your internship ended'.($user->ojt_end_date ? ' on '.$user->ojt_end_date->format('F j, Y') : '').', so this account is now closed. Thank you for your service to PESO Urdaneta.'
+                    ? ($user->isGipBeneficiary() ? 'Your GIP placement ended' : 'Your internship ended')
+                        .($user->ojt_end_date ? ' on '.$user->ojt_end_date->format('F j, Y') : '').', so this account is now closed. Thank you for your service to PESO Urdaneta.'
                     : 'This account has been deactivated. Contact the PESO system administrator.',
             ], 403);
         }

@@ -2,19 +2,23 @@
 
 namespace Tests\Feature;
 
-use App\Models\ActivityLog;
 use App\Models\AdminRole;
 use App\Models\Administrator;
-use App\Models\OjtTimeLog;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Schema;
 use Laravel\Sanctum\Sanctum;
 use Tests\Concerns\CreatesStaffTables;
 use Tests\TestCase;
 
+/**
+ * OJT interns: a limited login with school, course and internship dates; the account closes
+ * itself after the end date. OJT hours (required hours, daily time in / out, approvals) are
+ * not tracked since 2026-11-22.
+ */
 class OjtInternshipTest extends TestCase
 {
     use CreatesStaffTables, DatabaseTransactions;
@@ -32,6 +36,7 @@ class OjtInternshipTest extends TestCase
             'administrator' => [],
             'records-viewer' => ['configuration' => 'view', 'activity_logs' => 'view'],
             'ojt-intern' => ['employment_hub' => 'view'],
+            'gip-beneficiary' => ['employment_hub' => 'view'],
         ] as $slug => $permissions) {
             $this->roles[$slug] = AdminRole::create(['name' => ucfirst($slug), 'slug' => $slug, 'permissions' => $permissions, 'is_system' => true]);
         }
@@ -51,7 +56,7 @@ class OjtInternshipTest extends TestCase
 
     // ── Adding an intern ────────────────────────────────────────────────────
 
-    public function test_adding_an_intern_requires_school_hours_and_dates(): void
+    public function test_adding_an_intern_requires_school_and_dates_but_no_hours(): void
     {
         Mail::fake();
         Sanctum::actingAs($this->account('sleo@peso.test', 'peso_office_manager', 'administrator'));
@@ -60,20 +65,23 @@ class OjtInternshipTest extends TestCase
 
         $this->postJson('/api/admin/staff', $base)
             ->assertStatus(422)
-            ->assertJsonValidationErrors(['ojt_school', 'ojt_required_hours', 'ojt_start_date', 'ojt_end_date']);
+            ->assertJsonValidationErrors(['ojt_school', 'ojt_start_date', 'ojt_end_date'])
+            ->assertJsonMissingValidationErrors('ojt_required_hours');
 
         $this->postJson('/api/admin/staff', $base + [
             'ojt_school' => 'Pangasinan State University', 'ojt_course' => 'BS Information Technology',
-            'ojt_required_hours' => 486, 'ojt_start_date' => '2026-11-03', 'ojt_end_date' => '2026-11-02',
+            'ojt_start_date' => '2026-11-03', 'ojt_end_date' => '2026-11-02',
         ])->assertStatus(422)->assertJsonPath('errors.ojt_end_date.0', 'The end date must be on or after the start date.');
 
+        // An hours value from an old form is simply ignored.
         $this->postJson('/api/admin/staff', $base + [
             'ojt_school' => 'Pangasinan State University', 'ojt_course' => 'BS Information Technology',
             'ojt_required_hours' => 486, 'ojt_start_date' => '2026-11-03', 'ojt_end_date' => '2027-01-29',
         ])
             ->assertCreated()
-            ->assertJsonPath('staff.internship.required_hours', 486)
+            ->assertJsonPath('staff.internship.school', 'Pangasinan State University')
             ->assertJsonPath('staff.internship.end_date', '2027-01-29')
+            ->assertJsonMissingPath('staff.internship.required_hours')
             ->assertJsonPath('staff.role.slug', 'ojt-intern');
     }
 
@@ -83,7 +91,7 @@ class OjtInternshipTest extends TestCase
         Sanctum::actingAs($this->account('sleo@peso.test', 'peso_office_manager', 'administrator'));
         $base = [
             'first_name' => 'Ana', 'last_name' => 'Reyes', 'mobile_number' => '09171234567', 'position' => 'ojt_intern',
-            'ojt_school' => 'PSU', 'ojt_required_hours' => 486, 'ojt_end_date' => '2027-02-08',
+            'ojt_school' => 'PSU', 'ojt_end_date' => '2027-02-08',
         ];
 
         // Test clock: Nov 10, 2026 → earliest allowed start is Oct 11.
@@ -107,178 +115,46 @@ class OjtInternshipTest extends TestCase
             ->assertStatus(422)->assertJsonValidationErrors('ojt_start_date');
     }
 
-    // ── Time in / time out ──────────────────────────────────────────────────
-
-    public function test_an_intern_times_in_and_out_and_the_hours_wait_for_approval(): void
+    public function test_moving_someone_into_the_intern_position_needs_internship_details(): void
     {
-        $intern = $this->intern();
-        Sanctum::actingAs($intern);
+        $aide = $this->account('aide@peso.test', 'administrative_aide', 'records-viewer');
+        Sanctum::actingAs($this->account('sleo@peso.test', 'peso_office_manager', 'administrator'));
 
-        $this->postJson('/api/admin/ojt/me/time-in')
-            ->assertOk()
-            ->assertJsonPath('message', 'Timed in at 9:00 AM.')
-            ->assertJsonPath('today.status', 'open');
-
-        $this->postJson('/api/admin/ojt/me/time-in')->assertStatus(422)->assertJsonPath('message', 'You already timed in today.');
-
-        Carbon::setTestNow(Carbon::parse('2026-11-10 17:00:00', 'Asia/Manila')->utc());
-
-        $this->postJson('/api/admin/ojt/me/time-out')
-            ->assertOk()
-            ->assertJsonPath('message', 'Timed out at 5:00 PM. 8 hours sent for approval.')
-            ->assertJsonPath('today.status', 'pending')
-            ->assertJsonPath('today.minutes', 480)
-            ->assertJsonPath('progress.pending_hours', 8)
-            ->assertJsonPath('progress.approved_hours', 0);
-
-        $this->postJson('/api/admin/ojt/me/time-out')->assertStatus(422);
-        $this->postJson('/api/admin/ojt/me/time-in')->assertStatus(422)->assertJsonPath('message', 'You already timed in and out today.');
-
-        $this->assertSame('2026-11-10', OjtTimeLog::first()->work_date->toDateString());
-        $this->assertDatabaseHas('activity_logs', ['action' => 'timed_in']);
-        $this->assertDatabaseHas('activity_logs', ['action' => 'timed_out']);
-    }
-
-    public function test_the_work_date_follows_philippine_time_not_utc(): void
-    {
-        // 7:30 AM Nov 11 in Manila is still Nov 10 in UTC.
-        Carbon::setTestNow(Carbon::parse('2026-11-11 07:30:00', 'Asia/Manila')->utc());
-        Sanctum::actingAs($this->intern());
-
-        $this->postJson('/api/admin/ojt/me/time-in')->assertOk()->assertJsonPath('today.work_date', '2026-11-11');
-    }
-
-    public function test_an_intern_cannot_time_in_before_the_internship_starts(): void
-    {
-        Sanctum::actingAs($this->intern(['ojt_start_date' => '2026-11-16']));
-
-        $this->postJson('/api/admin/ojt/me/time-in')
+        $this->putJson("/api/admin/staff/{$aide->admin_id}", ['position' => 'ojt_intern'])
             ->assertStatus(422)
-            ->assertJsonPath('message', 'Your internship starts on November 16, 2026. You can time in from then.');
+            ->assertJsonValidationErrors(['ojt_school', 'ojt_start_date', 'ojt_end_date'])
+            ->assertJsonMissingValidationErrors('ojt_required_hours');
     }
 
-    public function test_only_interns_have_a_time_record(): void
-    {
-        Sanctum::actingAs($this->account('manager@peso.test', 'administrative_aide', 'records-viewer'));
+    // ── No hours tracking ───────────────────────────────────────────────────
 
-        $this->getJson('/api/admin/ojt/me')->assertForbidden();
-        $this->postJson('/api/admin/ojt/me/time-in')->assertForbidden();
-    }
-
-    public function test_a_forgotten_time_out_shows_as_incomplete_and_does_not_block_today(): void
+    public function test_the_time_record_and_hours_review_are_gone(): void
     {
         $intern = $this->intern();
-        $intern->ojtTimeLogs()->create([
-            'work_date' => '2026-11-09', 'time_in' => Carbon::parse('2026-11-09 08:00', 'Asia/Manila')->utc(), 'status' => 'open',
-        ]);
+
         Sanctum::actingAs($intern);
+        $this->getJson('/api/admin/ojt/me')->assertNotFound();
+        $this->postJson('/api/admin/ojt/me/time-in')->assertNotFound();
 
-        $me = $this->getJson('/api/admin/ojt/me')->assertOk();
-        $this->assertSame('incomplete', $me->json('logs.0.status'));
-        $this->assertSame(1, $me->json('progress.incomplete_entries'));
-
-        $this->postJson('/api/admin/ojt/me/time-in')->assertOk();
-    }
-
-    // ── Reviewing hours ─────────────────────────────────────────────────────
-
-    public function test_the_system_administrator_approves_rejects_and_approves_in_bulk(): void
-    {
-        $intern = $this->intern(['ojt_required_hours' => 16]);
-        $day1 = $this->entry($intern, '2026-11-05', '08:00', '17:00'); // 9 h
-        $day2 = $this->entry($intern, '2026-11-06', '08:00', '12:00'); // 4 h
-        $day3 = $this->entry($intern, '2026-11-09', '08:00', '11:00'); // 3 h
         Sanctum::actingAs($this->account('sleo@peso.test', 'peso_office_manager', 'administrator'));
-
-        $this->postJson("/api/admin/ojt/logs/{$day1->id}/approve")
-            ->assertOk()
-            ->assertJsonPath('log.status', 'approved')
-            ->assertJsonPath('intern.progress.approved_hours', 9);
-
-        $this->postJson("/api/admin/ojt/logs/{$day2->id}/reject")->assertStatus(422)->assertJsonValidationErrors('note');
-        $this->postJson("/api/admin/ojt/logs/{$day2->id}/reject", ['note' => 'You left at 10 AM per the logbook.'])
-            ->assertOk()
-            ->assertJsonPath('log.status', 'rejected');
-
-        $this->postJson("/api/admin/ojt/interns/{$intern->admin_id}/approve-pending")
-            ->assertOk()
-            ->assertJsonPath('message', 'Approved 1 entry.')
-            ->assertJsonPath('intern.progress.approved_hours', 12)
-            ->assertJsonPath('intern.progress.remaining_hours', 4)
-            ->assertJsonPath('intern.progress.percent', 75)
-            ->assertJsonPath('intern.progress.hours_completed', false);
-
-        $this->assertSame('rejected', $day2->fresh()->status);
-        $this->assertSame('approved', $day3->fresh()->status);
-        $this->assertStringContainsString('left at 10 AM', ActivityLog::where('action', 'rejected_ojt_hours')->value('description'));
+        $this->getJson('/api/admin/ojt/interns')->assertNotFound();
+        $this->getJson("/api/admin/ojt/interns/{$intern->admin_id}/logs")->assertNotFound();
     }
 
-    public function test_correcting_an_entry_fixes_the_hours_and_approves_it(): void
+    public function test_the_migration_deletes_the_recorded_hours(): void
     {
-        $intern = $this->intern();
-        $log = $intern->ojtTimeLogs()->create([
-            'work_date' => '2026-11-09', 'time_in' => Carbon::parse('2026-11-09 08:00', 'Asia/Manila')->utc(), 'status' => 'open',
-        ]);
-        Sanctum::actingAs($this->account('sleo@peso.test', 'peso_office_manager', 'administrator'));
+        $this->assertFalse(Schema::hasTable('ojt_time_logs'));
+        $this->assertFalse(Schema::hasColumn('administrators', 'ojt_required_hours'));
 
-        $this->postJson("/api/admin/ojt/logs/{$log->id}/approve")->assertStatus(422);
+        // On a database that still has them, the migration removes both.
+        Schema::create('ojt_time_logs', fn ($table) => $table->id());
+        DB::table('ojt_time_logs')->insert(['id' => 1]);
+        Schema::table('administrators', fn ($table) => $table->unsignedSmallInteger('ojt_required_hours')->nullable());
 
-        $this->putJson("/api/admin/ojt/logs/{$log->id}", ['time_in' => '08:00', 'time_out' => '07:00', 'note' => 'x'])
-            ->assertStatus(422)->assertJsonPath('errors.time_out.0', 'Time out must be later than time in.');
+        (require database_path('migrations/2026_11_22_000001_remove_ojt_hours_tracking.php'))->up();
 
-        $this->putJson("/api/admin/ojt/logs/{$log->id}", ['time_in' => '08:00', 'time_out' => '17:00', 'note' => 'Forgot to time out; confirmed with the logbook.'])
-            ->assertOk()
-            ->assertJsonPath('log.status', 'approved')
-            ->assertJsonPath('log.minutes', 540)
-            ->assertJsonPath('log.corrected', true);
-
-        $this->assertStringContainsString('8:00 AM–no time out to 8:00 AM–5:00 PM', ActivityLog::where('action', 'corrected_ojt_time')->value('description'));
-    }
-
-    public function test_adding_a_missed_day(): void
-    {
-        $intern = $this->intern();
-        $this->entry($intern, '2026-11-05', '08:00', '17:00');
-        Sanctum::actingAs($this->account('sleo@peso.test', 'peso_office_manager', 'administrator'));
-        $payload = ['time_in' => '08:00', 'time_out' => '16:00', 'note' => 'The system was down; signed the paper logbook.'];
-
-        $this->postJson("/api/admin/ojt/interns/{$intern->admin_id}/logs", $payload + ['work_date' => '2026-11-06'])
-            ->assertCreated()
-            ->assertJsonPath('log.hours', 8)
-            ->assertJsonPath('log.status', 'approved');
-
-        $this->postJson("/api/admin/ojt/interns/{$intern->admin_id}/logs", $payload + ['work_date' => '2026-11-05'])
-            ->assertStatus(422)->assertJsonValidationErrors('work_date');
-
-        $this->postJson("/api/admin/ojt/interns/{$intern->admin_id}/logs", $payload + ['work_date' => '2026-11-11'])
-            ->assertStatus(422)->assertJsonPath('errors.work_date.0', "You can't add hours for a future date.");
-    }
-
-    public function test_view_only_staff_can_see_interns_but_not_review_hours(): void
-    {
-        $intern = $this->intern();
-        $log = $this->entry($intern, '2026-11-05', '08:00', '17:00');
-        Sanctum::actingAs($this->account('manager@peso.test', 'administrative_aide', 'records-viewer'));
-
-        $this->getJson('/api/admin/ojt/interns')
-            ->assertOk()
-            ->assertJsonPath('data.0.progress.pending_hours', 9)
-            ->assertJsonPath('summary.pending_entries', 1);
-        $this->getJson("/api/admin/ojt/interns/{$intern->admin_id}/logs")->assertOk()->assertJsonCount(1, 'logs');
-
-        $this->postJson("/api/admin/ojt/logs/{$log->id}/approve")->assertForbidden();
-    }
-
-    public function test_finishing_the_required_hours_is_flagged(): void
-    {
-        $intern = $this->intern(['ojt_required_hours' => 8]);
-        $this->entry($intern, '2026-11-05', '08:00', '17:00', 'approved');
-        Sanctum::actingAs($intern);
-
-        $this->getJson('/api/admin/ojt/me')
-            ->assertJsonPath('progress.hours_completed', true)
-            ->assertJsonPath('progress.percent', 100)
-            ->assertJsonPath('progress.remaining_hours', 0);
+        $this->assertFalse(Schema::hasTable('ojt_time_logs'));
+        $this->assertFalse(Schema::hasColumn('administrators', 'ojt_required_hours'));
     }
 
     // ── End of the internship ───────────────────────────────────────────────
@@ -316,14 +192,76 @@ class OjtInternshipTest extends TestCase
         $this->assertNull($finished->fresh()->deactivated_reason);
     }
 
-    public function test_moving_someone_into_the_intern_position_needs_internship_details(): void
+    // ── GIP beneficiaries ───────────────────────────────────────────────────
+
+    public function test_adding_a_gip_beneficiary_needs_only_the_placement_dates(): void
+    {
+        Mail::fake();
+        Sanctum::actingAs($this->account('sleo@peso.test', 'peso_office_manager', 'administrator'));
+        $base = ['first_name' => 'Ben', 'last_name' => 'Cruz', 'email' => 'ben@gip.test', 'mobile_number' => '09171234567', 'position' => 'gip_beneficiary'];
+
+        $this->postJson('/api/admin/staff', $base)
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['ojt_start_date', 'ojt_end_date'])
+            ->assertJsonMissingValidationErrors('ojt_school');
+
+        $this->postJson('/api/admin/staff', $base + ['ojt_start_date' => '2026-11-16', 'ojt_end_date' => '2027-05-14'])
+            ->assertCreated()
+            ->assertJsonPath('staff.position', 'gip_beneficiary')
+            ->assertJsonPath('staff.position_label', 'GIP Beneficiary')
+            ->assertJsonPath('staff.role.slug', 'gip-beneficiary')
+            ->assertJsonPath('staff.internship.start_date', '2026-11-16')
+            ->assertJsonPath('staff.internship.end_date', '2027-05-14')
+            ->assertJsonPath('staff.internship.school', null);
+    }
+
+    public function test_moving_someone_into_the_gip_position_needs_the_dates(): void
     {
         $aide = $this->account('aide@peso.test', 'administrative_aide', 'records-viewer');
         Sanctum::actingAs($this->account('sleo@peso.test', 'peso_office_manager', 'administrator'));
 
-        $this->putJson("/api/admin/staff/{$aide->admin_id}", ['position' => 'ojt_intern'])
+        $this->putJson("/api/admin/staff/{$aide->admin_id}", ['position' => 'gip_beneficiary'])
             ->assertStatus(422)
-            ->assertJsonValidationErrors(['ojt_school', 'ojt_required_hours', 'ojt_start_date', 'ojt_end_date']);
+            ->assertJsonValidationErrors(['ojt_start_date', 'ojt_end_date'])
+            ->assertJsonMissingValidationErrors('ojt_school');
+    }
+
+    public function test_a_gip_account_closes_after_its_end_date(): void
+    {
+        $gip = $this->account('done@gip.test', 'gip_beneficiary', 'gip-beneficiary', ['ojt_start_date' => '2026-05-11', 'ojt_end_date' => '2026-11-09']);
+
+        Artisan::call('ojt:end-internships');
+
+        $this->assertSame('internship_ended', $gip->fresh()->deactivated_reason);
+        $this->assertDatabaseHas('activity_logs', ['action' => 'internship_ended', 'description' => 'GIP placement ended on Nov 9, 2026; the account was closed automatically.']);
+        $this->postJson('/api/auth/login', ['email' => 'done@gip.test', 'password' => 'password123'])
+            ->assertForbidden()
+            ->assertJsonPath('message', 'Your GIP placement ended on November 9, 2026, so this account is now closed. Thank you for your service to PESO Urdaneta.');
+    }
+
+    public function test_the_org_chart_lists_the_gip_position_beside_ojt(): void
+    {
+        $this->account('ben@gip.test', 'gip_beneficiary', 'gip-beneficiary', ['ojt_start_date' => '2026-11-03', 'ojt_end_date' => '2027-05-01']);
+        Sanctum::actingAs($this->account('sleo@peso.test', 'peso_office_manager', 'administrator'));
+
+        $positions = collect($this->getJson('/api/admin/staff/org-chart')->assertOk()->json('positions'))->keyBy('value');
+        $this->assertSame('Government Internship Program (GIP) Beneficiary', $positions['gip_beneficiary']['title']);
+        $this->assertSame('peso_office_manager', $positions['gip_beneficiary']['reports_to']);
+        $this->assertCount(1, $positions['gip_beneficiary']['members']);
+    }
+
+    public function test_the_migration_adds_the_gip_role_with_the_ojt_role_access(): void
+    {
+        DB::table('admin_roles')->where('slug', 'gip-beneficiary')->delete();
+        $this->roles['ojt-intern']->update(['permissions' => ['employment_hub' => 'view', 'government_dole' => 'view']]);
+
+        $migration = require database_path('migrations/2026_11_22_000002_add_gip_beneficiary_role.php');
+        $migration->up();
+        $migration->up(); // safe to run twice
+
+        $role = AdminRole::where('slug', 'gip-beneficiary')->sole();
+        $this->assertSame('GIP Beneficiary', $role->name);
+        $this->assertSame(['employment_hub' => 'view', 'government_dole' => 'view'], $role->permissions);
     }
 
     // ── Helpers ─────────────────────────────────────────────────────────────
@@ -332,7 +270,6 @@ class OjtInternshipTest extends TestCase
     {
         return $this->account($email, 'ojt_intern', 'ojt-intern', array_merge([
             'ojt_school' => 'Pangasinan State University',
-            'ojt_required_hours' => 486,
             'ojt_start_date' => '2026-11-03',
             'ojt_end_date' => '2027-01-29',
         ], $overrides));
@@ -346,16 +283,5 @@ class OjtInternshipTest extends TestCase
             'position' => $position, 'role' => $roleSlug, 'admin_role_id' => $this->roles[$roleSlug]->id,
             'status' => 'active', 'email_verified_at' => now(),
         ], $extra));
-    }
-
-    private function entry(Administrator $intern, string $date, string $in, string $out, string $status = 'pending'): OjtTimeLog
-    {
-        $timeIn = Carbon::parse("{$date} {$in}", 'Asia/Manila')->utc();
-        $timeOut = Carbon::parse("{$date} {$out}", 'Asia/Manila')->utc();
-
-        return $intern->ojtTimeLogs()->create([
-            'work_date' => $date, 'time_in' => $timeIn, 'time_out' => $timeOut,
-            'minutes' => OjtTimeLog::minutesBetween($timeIn, $timeOut), 'status' => $status,
-        ]);
     }
 }

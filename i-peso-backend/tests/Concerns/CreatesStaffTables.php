@@ -46,7 +46,6 @@ trait CreatesStaffTables
                 $table->timestamp('last_login_at')->nullable();
                 $table->string('ojt_school', 150)->nullable();
                 $table->string('ojt_course', 150)->nullable();
-                $table->unsignedSmallInteger('ojt_required_hours')->nullable();
                 $table->date('ojt_start_date')->nullable();
                 $table->date('ojt_end_date')->nullable();
                 $table->string('deactivated_reason', 40)->nullable();
@@ -79,26 +78,6 @@ trait CreatesStaffTables
                 $table->timestamp('last_used_at')->nullable();
                 $table->timestamp('expires_at')->nullable();
                 $table->timestamps();
-            });
-        }
-
-        if (! Schema::hasTable('ojt_time_logs')) {
-            Schema::create('ojt_time_logs', function (Blueprint $table) {
-                $table->id();
-                $table->unsignedBigInteger('admin_id');
-                $table->date('work_date');
-                $table->timestamp('time_in');
-                $table->timestamp('time_out')->nullable();
-                $table->unsignedInteger('minutes')->nullable();
-                $table->string('status', 20)->default('open');
-                $table->boolean('corrected')->default(false);
-                $table->string('note', 500)->nullable();
-                $table->unsignedBigInteger('reviewed_by')->nullable();
-                $table->timestamp('reviewed_at')->nullable();
-                $table->string('time_in_ip', 45)->nullable();
-                $table->string('time_out_ip', 45)->nullable();
-                $table->timestamps();
-                $table->unique(['admin_id', 'work_date']);
             });
         }
 

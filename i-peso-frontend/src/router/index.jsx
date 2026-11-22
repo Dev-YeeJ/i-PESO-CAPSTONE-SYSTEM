@@ -105,7 +105,6 @@ const AdminSMSTemplates = lazy(() => import('@/pages/admin/5-system-reports/sms-
 // Admin Pages - CATEGORY 6: CONFIGURATION
 const AdminStaffList = lazy(() => import('@/pages/admin/6-configuration/staff/StaffListPage'))
 const AdminRolePermissions = lazy(() => import('@/pages/admin/6-configuration/staff/RolePermissionsPage'))
-const AdminMyOjt = lazy(() => import('@/pages/admin/6-configuration/ojt/MyOjtPage'))
 const AdminAnnouncements = lazy(() => import('@/pages/admin/6-configuration/content/AnnouncementsPage'))
 const AdminAnnouncementForm = lazy(() => import('@/pages/admin/6-configuration/content/AnnouncementFormPage'))
 const AdminContentModules = lazy(() => import('@/pages/admin/6-configuration/content/ContentModulesPage'))
@@ -256,8 +255,9 @@ export const router = createBrowserRouter([
                       // CATEGORY 6: CONFIGURATION
                       { path: 'staff', element: S(AdminStaffList) },
                       { path: 'role-permissions', element: S(AdminRolePermissions) },
-                      { path: 'ojt-interns', element: <Navigate to="/admin/staff?tab=ojt" replace /> },
-                      { path: 'my-ojt', element: S(AdminMyOjt) },
+                      // OJT hours tracking was removed (2026-11-22); old links land somewhere sensible.
+                      { path: 'ojt-interns', element: <Navigate to="/admin/staff" replace /> },
+                      { path: 'my-ojt', element: <Navigate to="/admin/dashboard" replace /> },
                       { path: 'announcements', element: S(AdminAnnouncements) },
                       { path: 'announcements/new', element: S(AdminAnnouncementForm) },
                       { path: 'announcements/:id', element: S(AdminAnnouncementForm) },

@@ -21,6 +21,19 @@ final class StaffPositions
 
     public const OJT_INTERN = 'ojt_intern';
 
+    /** DOLE Government Internship Program beneficiary placed at PESO (graduates, usually 3–6 months). */
+    public const GIP_BENEFICIARY = 'gip_beneficiary';
+
+    /**
+     * Positions placed for a fixed period, and the placement details each needs. Their
+     * account closes itself after the end date (ojt:end-internships); the date columns are
+     * shared (ojt_start_date / ojt_end_date) since GIP is an internship programme too.
+     */
+    public const FIXED_TERM = [
+        self::OJT_INTERN => ['ojt_school', 'ojt_start_date', 'ojt_end_date'],
+        self::GIP_BENEFICIARY => ['ojt_start_date', 'ojt_end_date'],
+    ];
+
     public const ALL = [
         self::OFFICE_MANAGER => [
             'label' => 'PESO Office Manager',
@@ -46,7 +59,24 @@ final class StaffPositions
             'default_role' => 'ojt-intern',
             'reports_to' => self::OFFICE_MANAGER,
         ],
+        self::GIP_BENEFICIARY => [
+            'label' => 'GIP Beneficiary',
+            'title' => 'Government Internship Program (GIP) Beneficiary',
+            'default_role' => 'gip-beneficiary',
+            'reports_to' => self::OFFICE_MANAGER,
+        ],
     ];
+
+    public static function isFixedTerm(?string $position): bool
+    {
+        return $position !== null && array_key_exists($position, self::FIXED_TERM);
+    }
+
+    /** The placement fields a position must have filled in ([] for regular staff). */
+    public static function placementFields(?string $position): array
+    {
+        return self::FIXED_TERM[$position] ?? [];
+    }
 
     public static function keys(): array
     {

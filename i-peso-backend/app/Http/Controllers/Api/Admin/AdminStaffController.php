@@ -74,7 +74,7 @@ class AdminStaffController extends Controller
             ],
             'mobile_number' => ['required', 'string', 'max:20'],
             'position' => ['required', Rule::in(StaffPositions::keys())],
-            ...$this->internshipRules($request->input('position') === StaffPositions::OJT_INTERN),
+            ...$this->internshipRules($request->input('position')),
         ], [
             'email.unique' => 'This email is already used by another account.',
             ...self::INTERNSHIP_MESSAGES,
@@ -169,12 +169,14 @@ class AdminStaffController extends Controller
             'suffix' => ['nullable', Rule::in(self::SUFFIXES)],
             'mobile_number' => ['sometimes', 'string', 'max:20'],
             'position' => ['sometimes', Rule::in(StaffPositions::keys())],
-            ...$this->internshipRules(false),
+            ...$this->internshipRules(null),
         ], self::INTERNSHIP_MESSAGES);
 
-        $becomesIntern = ($data['position'] ?? $staffMember->position) === StaffPositions::OJT_INTERN;
-        if ($becomesIntern) {
-            $this->ensureInternshipDetails($staffMember, $data);
+        // OJT interns and GIP beneficiaries need their placement details, including when
+        // someone is moved into one of those positions.
+        $position = $data['position'] ?? $staffMember->position;
+        if (StaffPositions::isFixedTerm($position)) {
+            $this->ensureInternshipDetails($staffMember, $data, $position);
         }
 
         // An unchanged start date is fine even if it's now old; a new one must be recent.
@@ -252,7 +254,7 @@ class AdminStaffController extends Controller
         }
 
         abort_if(
-            $staffMember->isIntern() && $staffMember->ojt_end_date && $staffMember->ojt_end_date->toDateString() < \App\Models\OjtTimeLog::today(),
+            $staffMember->hasFixedTerm() && $staffMember->ojt_end_date && $staffMember->ojt_end_date->toDateString() < Administrator::internshipToday(),
             422,
             'This internship has already ended. Edit the internship end date first, then reactivate.'
         );
@@ -421,28 +423,31 @@ class AdminStaffController extends Controller
 
     private const INTERNSHIP_MESSAGES = [
         'ojt_school.required' => 'Enter the intern\'s school.',
-        'ojt_required_hours.required' => 'Enter the required OJT hours.',
         'ojt_start_date.required' => 'Enter the internship start date.',
         'ojt_end_date.required' => 'Enter the internship end date.',
         'ojt_end_date.after_or_equal' => 'The end date must be on or after the start date.',
         'ojt_start_date.after_or_equal' => "The start date can't be more than 30 days ago.",
     ];
 
-    /** School, required hours and dates: required when adding an intern. */
-    private function internshipRules(bool $required): array
+    /**
+     * Placement details. When adding someone, the fields their position needs are required:
+     * OJT interns → school and dates; GIP beneficiaries → dates. Edits pass null (all optional;
+     * ensureInternshipDetails() checks what's missing). OJT hours are not tracked.
+     */
+    private function internshipRules(?string $position): array
     {
-        $presence = $required ? 'required' : 'nullable';
+        $needed = StaffPositions::placementFields($position);
+        $presence = fn (string $field) => in_array($field, $needed, true) ? 'required' : 'nullable';
 
         return [
-            'ojt_school' => [$presence, 'string', 'max:150'],
+            'ojt_school' => [$presence('ojt_school'), 'string', 'max:150'],
             'ojt_course' => ['nullable', 'string', 'max:150'],
-            'ojt_required_hours' => [$presence, 'integer', 'min:1', 'max:2000'],
-            // New interns: up to OJT_START_LOOKBACK_DAYS back (recording someone who
+            // New placements: up to OJT_START_LOOKBACK_DAYS back (recording someone who
             // already started), or any future date. Edits are checked in update().
-            'ojt_start_date' => $required
-                ? [$presence, 'date', 'after_or_equal:'.$this->earliestOjtStart()]
-                : [$presence, 'date'],
-            'ojt_end_date' => [$presence, 'date', 'after_or_equal:ojt_start_date'],
+            'ojt_start_date' => $presence('ojt_start_date') === 'required'
+                ? ['required', 'date', 'after_or_equal:'.$this->earliestOjtStart()]
+                : ['nullable', 'date'],
+            'ojt_end_date' => [$presence('ojt_end_date'), 'date', 'after_or_equal:ojt_start_date'],
         ];
     }
 
@@ -453,11 +458,13 @@ class AdminStaffController extends Controller
         return \Illuminate\Support\Carbon::now('Asia/Manila')->subDays(self::OJT_START_LOOKBACK_DAYS)->toDateString();
     }
 
-    /** Someone moved into the intern position needs the same details a new intern does. */
-    private function ensureInternshipDetails(Administrator $staff, array $data): void
+    /** Someone moved into a fixed-term position needs the same details a new one does. */
+    private function ensureInternshipDetails(Administrator $staff, array $data, string $position): void
     {
+        $labels = ['ojt_school' => 'school', 'ojt_start_date' => 'start date', 'ojt_end_date' => 'end date'];
         $missing = [];
-        foreach (['ojt_school' => 'school', 'ojt_required_hours' => 'required OJT hours', 'ojt_start_date' => 'start date', 'ojt_end_date' => 'end date'] as $field => $label) {
+        foreach (StaffPositions::placementFields($position) as $field) {
+            $label = $labels[$field];
             if (blank($data[$field] ?? $staff->{$field})) {
                 $missing[$field] = "Enter the internship {$label}.";
             }
@@ -498,10 +505,10 @@ class AdminStaffController extends Controller
             'is_system_administrator' => $staff->isSystemAdministrator(),
             'role' => $staff->adminRole?->only(['id', 'name', 'slug']),
             'access' => $staff->accessMap(),
-            'internship' => $staff->isIntern() ? [
+            // OJT interns and GIP beneficiaries (school/course are OJT only).
+            'internship' => $staff->hasFixedTerm() ? [
                 'school' => $staff->ojt_school,
                 'course' => $staff->ojt_course,
-                'required_hours' => $staff->ojt_required_hours,
                 'start_date' => $staff->ojt_start_date?->toDateString(),
                 'end_date' => $staff->ojt_end_date?->toDateString(),
             ] : null,

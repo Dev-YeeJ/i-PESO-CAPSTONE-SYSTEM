@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest'
-import { accessLevel, adminLandingPath, canManage, canOpen, canOpenPath, moduleForPath } from '../adminAccess'
+import { accessLevel, adminLandingPath, canManage, canOpen, canOpenPath, isFixedTerm, moduleForPath } from '../adminAccess'
+
+describe('isFixedTerm', () => {
+  it('covers OJT interns and GIP beneficiaries, not regular staff', () => {
+    expect(isFixedTerm({ position: 'ojt_intern' })).toBe(true)
+    expect(isFixedTerm({ position: 'gip_beneficiary' })).toBe(true)
+    expect(isFixedTerm({ position: 'administrative_aide' })).toBe(false)
+    expect(isFixedTerm(null)).toBe(false)
+  })
+})
 
 const intern = { role: 'administrator', access: { constituent_crm: 'view', employment_hub: 'view' } }
 const aide = { access: { constituent_crm: 'manage', employment_hub: 'manage', government_dole: 'manage', system_reports: 'manage' } }
@@ -52,18 +61,19 @@ describe('adminLandingPath', () => {
   const manager = { position: 'office_manager', is_system_administrator: true, access: {} }
   const clerk = { position: 'clerk', access: { constituent_crm: 'view' } }
 
-  it('ignores an intern-only page left in ?redirect= by a previous session', () => {
+  it('sends the old My OJT hours page (removed 2026-11-22) to the dashboard', () => {
     expect(adminLandingPath(manager, '/admin/my-ojt')).toBe('/admin/dashboard')
+    expect(adminLandingPath(ojtIntern, '/admin/my-ojt')).toBe('/admin/dashboard')
   })
 
-  it('lands on the normal home without a redirect', () => {
+  it('lands everyone, interns included, on the dashboard without a redirect', () => {
     expect(adminLandingPath(manager, null)).toBe('/admin/dashboard')
-    expect(adminLandingPath(ojtIntern, null)).toBe('/admin/my-ojt')
+    expect(adminLandingPath(ojtIntern, null)).toBe('/admin/dashboard')
   })
 
   it('still returns someone to the page their own session ended on', () => {
     expect(adminLandingPath(manager, '/admin/job-fairs/12/check-in?tab=list')).toBe('/admin/job-fairs/12/check-in?tab=list')
-    expect(adminLandingPath(ojtIntern, '/admin/my-ojt')).toBe('/admin/my-ojt')
+    expect(adminLandingPath(ojtIntern, '/admin/job-seekers')).toBe('/admin/job-seekers')
     expect(adminLandingPath(clerk, '/admin/job-seekers')).toBe('/admin/job-seekers')
   })
 

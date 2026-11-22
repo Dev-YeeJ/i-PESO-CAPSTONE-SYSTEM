@@ -83,17 +83,18 @@ export const isSystemAdministrator = (user) => !!user?.is_system_administrator
 
 export const canOpenPath = (user, pathname) => canOpen(user, moduleForPath(pathname))
 
-export const isIntern = (user) => user?.position === 'ojt_intern'
+/** OJT interns and GIP beneficiaries: placed for a fixed period, never authorizing officers. */
+export const isFixedTerm = (user) => ['ojt_intern', 'gip_beneficiary'].includes(user?.position)
 
-/** Where a staff member lands after signing in: interns start on their time record. */
-export const adminHomePath = (user) => (isIntern(user) ? '/admin/my-ojt' : '/admin/dashboard')
+/** Where a staff member lands after signing in: the dashboard, interns included. */
+export const adminHomePath = () => '/admin/dashboard'
 
 /**
  * Where to go after signing in, given the login page's ?redirect=. The guard writes the
  * page that was open when the last session ended (expired, or signed out) into ?redirect=,
- * so it can belong to a DIFFERENT account — e.g. an intern's My OJT Hours page followed by
- * the Office Manager signing in. Only honour it when it's an in-app admin page that THIS
- * account may open; otherwise use their normal home (the dashboard, or My OJT for interns).
+ * so it can belong to a DIFFERENT account, e.g. a page an intern had open followed by the
+ * Office Manager signing in. Only honour it when it's an in-app admin page that THIS
+ * account may open; otherwise use their normal home (the dashboard).
  */
 export function adminLandingPath(user, redirect) {
   const home = adminHomePath(user)
@@ -103,8 +104,7 @@ export function adminLandingPath(user, redirect) {
   if (!/^\/admin(\/|$|\?|#)/.test(redirect) || redirect.startsWith('//') || redirect.includes('://')) return home
 
   const pathname = redirect.split(/[?#]/)[0].replace(/\/+$/, '') || '/admin'
-  if (pathname === '/admin' || pathname === '/admin/set-password') return home
-  if (pathname === '/admin/my-ojt' && !isIntern(user)) return home
+  if (pathname === '/admin' || pathname === '/admin/set-password' || pathname === '/admin/my-ojt') return home
   if (!canOpenPath(user, pathname)) return home
 
   return redirect

@@ -546,7 +546,8 @@ class EmployerVerificationController extends Controller
         }
         $isAuthorizingOfficer = $user instanceof \App\Models\Administrator
             && $user->canManageModule('constituent_crm')
-            && $user->position !== 'ojt_intern';
+            // OJT interns and GIP beneficiaries are never authorizing officers, whatever access they're given.
+            && ! $user->hasFixedTerm();
 
         if ($user instanceof \App\Models\Administrator && $document->staff_viewed_at === null) {
             $document->staff_viewed_at = now();

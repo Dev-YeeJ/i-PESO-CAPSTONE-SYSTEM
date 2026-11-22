@@ -92,15 +92,27 @@ class Administrator extends Authenticatable
         return $this->position === \App\Support\StaffPositions::OJT_INTERN;
     }
 
+    public function isGipBeneficiary(): bool
+    {
+        return $this->position === \App\Support\StaffPositions::GIP_BENEFICIARY;
+    }
+
+    /** OJT interns and GIP beneficiaries: placed until an end date, then closed automatically. */
+    public function hasFixedTerm(): bool
+    {
+        return \App\Support\StaffPositions::isFixedTerm($this->position);
+    }
+
     /** Closed automatically after the internship end date (vs. deactivated by the admin). */
     public function internshipEnded(): bool
     {
         return ! $this->isActive() && $this->deactivated_reason === 'internship_ended';
     }
 
-    public function ojtTimeLogs(): \Illuminate\Database\Eloquent\Relations\HasMany
+    /** Today's date in the Philippines (Y-m-d): internship dates are office dates. */
+    public static function internshipToday(): string
     {
-        return $this->hasMany(OjtTimeLog::class, 'admin_id', 'admin_id');
+        return now('Asia/Manila')->toDateString();
     }
 
     public function isActive(): bool
@@ -149,7 +161,6 @@ class Administrator extends Authenticatable
         'date_started',
         'ojt_school',
         'ojt_course',
-        'ojt_required_hours',
         'ojt_start_date',
         'ojt_end_date',
         'email_verified_at',
@@ -168,7 +179,6 @@ class Administrator extends Authenticatable
         'date_started'      => 'date',
         'ojt_start_date'    => 'date',
         'ojt_end_date'      => 'date',
-        'ojt_required_hours' => 'integer',
         'must_change_password'          => 'boolean',
         'temporary_password_expires_at' => 'datetime',
         'invited_at'                    => 'datetime',

@@ -16,8 +16,6 @@ use App\Http\Controllers\Api\Admin\AdminGovernmentProgramController;
 use App\Http\Controllers\Api\Admin\AdminHiringActivityReportController;
 use App\Http\Controllers\Api\Admin\AdminPlacementReportController;
 use App\Http\Controllers\Api\Admin\AdminAccountController;
-use App\Http\Controllers\Api\Admin\AdminOjtController;
-use App\Http\Controllers\Api\Admin\OjtTimeLogController;
 use App\Http\Controllers\Api\Admin\AdminRoleController;
 use App\Http\Controllers\Api\Admin\AdminStaffController;
 use App\Http\Controllers\Api\Admin\LocationDataQualityController;
@@ -300,10 +298,6 @@ Route::middleware('auth:sanctum')->group(function () {
             ->middleware('throttle:10,1')
             ->name('admin.account.password');
 
-        // An OJT intern's own daily time record (the controller checks the position).
-        Route::get('/ojt/me', [OjtTimeLogController::class, 'me']);
-        Route::post('/ojt/me/time-in', [OjtTimeLogController::class, 'timeIn'])->middleware('throttle:10,1');
-        Route::post('/ojt/me/time-out', [OjtTimeLogController::class, 'timeOut'])->middleware('throttle:10,1');
 
         // Dashboard — visible to every signed-in admin/staff account, no module gate
         Route::get('/dashboard/stats', [AdminDashboardController::class, 'stats']);
@@ -558,8 +552,6 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::get('/staff', [AdminStaffController::class, 'index']);
             Route::get('/staff/org-chart', [AdminStaffController::class, 'orgChart']);
             Route::get('/roles', [AdminRoleController::class, 'index']);
-            Route::get('/ojt/interns', [AdminOjtController::class, 'interns']);
-            Route::get('/ojt/interns/{intern}/logs', [AdminOjtController::class, 'logs']);
         });
 
         // System Settings: Configuration access can look; only the system administrator changes.
@@ -591,11 +583,6 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::put('/roles/{role}', [AdminRoleController::class, 'update']);
             Route::delete('/roles/{role}', [AdminRoleController::class, 'destroy']);
 
-            Route::post('/ojt/interns/{intern}/logs', [AdminOjtController::class, 'store']);
-            Route::post('/ojt/interns/{intern}/approve-pending', [AdminOjtController::class, 'approvePending']);
-            Route::put('/ojt/logs/{log}', [AdminOjtController::class, 'update']);
-            Route::post('/ojt/logs/{log}/approve', [AdminOjtController::class, 'approve']);
-            Route::post('/ojt/logs/{log}/reject', [AdminOjtController::class, 'reject']);
         });
     });
 });
