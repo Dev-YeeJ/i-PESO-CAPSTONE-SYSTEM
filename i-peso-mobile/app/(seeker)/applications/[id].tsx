@@ -6,7 +6,9 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { SeekerApplicationsResponse } from '@/services/seekerService'
 import { seekerService } from '@/services/seekerService'
 import { apiErrorMessage } from '@/utils/apiError'
-import { applicationNextStep, applicationStatusVariant, formatDate, formatInterviewMode, formatInterviewTime, formatSalary, interviewPhase, interviewPhaseText, jobCompany, jobLocation, textFrom, titleCase } from '@/utils/seekerView'
+import { applicationNextStep, applicationStatusVariant, formatDate, formatInterviewMode, formatInterviewTime, formatSalary, interviewPhase, interviewPhaseText, interviewPhaseVariant, jobCompany, jobLocation, textFrom, titleCase } from '@/utils/seekerView'
+import { useNow } from '@/hooks/useNow'
+import { LiveDot } from '@/components/interview/LiveDot'
 import { useToast } from '@/stores/toastStore'
 import { AlertBox } from '@/components/ui/AlertBox'
 import { Badge } from '@/components/ui/Badge'
@@ -30,6 +32,8 @@ export default function ApplicationDetailScreen() {
   const insets = useSafeAreaInsets()
   const [withdrawError, setWithdrawError] = useState('')
   const [reportOpen, setReportOpen] = useState(false)
+  // Re-checked every 30 seconds so the interview label flips Upcoming → Happening now → Call ended.
+  const now = useNow()
 
   const { data: application, isLoading, error } = useQuery({
     queryKey: ['application', id],
@@ -150,12 +154,12 @@ export default function ApplicationDetailScreen() {
           </View>
         </Card>
 
-        {applicationNextStep(application.status, application.interview) ? (
+        {applicationNextStep(application.status, application.interview, now) ? (
           <View style={styles.nextStepCard}>
             <MaterialIcons name="info-outline" size={20} color={colors.link} />
             <View style={styles.titleTextWrap}>
               <Text style={styles.nextStepTitle}>What happens next</Text>
-              <Text style={styles.nextStepText}>{applicationNextStep(application.status, application.interview)}</Text>
+              <Text style={styles.nextStepText}>{applicationNextStep(application.status, application.interview, now)}</Text>
             </View>
           </View>
         ) : null}
@@ -196,8 +200,11 @@ export default function ApplicationDetailScreen() {
             <View style={styles.interviewCard}>
               <View style={styles.interviewHead}>
                 <MaterialIcons name="event-available" size={22} color={colors.link} />
-                <Text style={styles.interviewTitle}>Interview</Text>
-                <Badge variant="info" style={styles.interviewPhase}>{interviewPhaseText(application.interview)}</Badge>
+                <Text style={styles.interviewTitle}>{interviewPhase(application.interview, now) === 'in_progress' ? 'Interview happening now' : 'Interview'}</Text>
+                <View style={styles.interviewPhaseRow}>
+                  {interviewPhase(application.interview, now) === 'in_progress' ? <LiveDot /> : null}
+                  <Badge variant={interviewPhaseVariant(application.interview, now)} style={interviewPhaseVariant(application.interview, now) === 'success' ? undefined : styles.interviewPhase}>{interviewPhaseText(application.interview, now)}</Badge>
+                </View>
               </View>
               <IconRow icon="schedule" label="Date and time" value={formatInterviewTime(application.interview.schedule)} />
               <IconRow icon="person-pin-circle" label="Mode" value={formatInterviewMode(application.interview.mode_of_interview)} />
@@ -211,9 +218,9 @@ export default function ApplicationDetailScreen() {
 
               {application.interview.mode_of_interview === 'online' ? (
                 <View style={styles.joinActionWrap}>
-                  {interviewPhase(application.interview) === 'cancelled' ? (
+                  {interviewPhase(application.interview, now) === 'cancelled' ? (
                     <Text style={styles.noLinkText}>Interview Cancelled</Text>
-                  ) : interviewPhase(application.interview) === 'ended' ? (
+                  ) : interviewPhase(application.interview, now) === 'ended' ? (
                     <Text style={styles.noLinkText}>Call ended. The employer will update your application with their decision.</Text>
                   ) : application.interview.venue_or_link && application.interview.venue_or_link.startsWith('http') ? (
                     <Button
@@ -354,6 +361,7 @@ const styles = StyleSheet.create({
   interviewHead: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   interviewTitle: { flex: 1, color: colors.textPrimary, fontSize: typography.title, fontFamily: typography.family.bold },
   interviewPhase: { backgroundColor: colors.surface },
+  interviewPhaseRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs + 2 },
   iconRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm + 2 },
   iconRowLabel: { color: colors.textSecondary, fontSize: typography.small, lineHeight: 16 },
   iconRowValue: { color: colors.textPrimary, fontSize: typography.body, lineHeight: 20, fontFamily: typography.family.bold },

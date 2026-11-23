@@ -201,9 +201,12 @@ export function interviewPhase(interview: InterviewLike, now = Date.now()) {
   return now >= start ? 'in_progress' : 'upcoming'
 }
 
-/** "Call ended" for online/phone, "Interview ended" for face-to-face. */
-export function interviewPhaseText(interview: InterviewLike) {
-  switch (interviewPhase(interview)) {
+/**
+ * "Call ended" for online/phone, "Interview ended" for face-to-face. Pass `now` from useNow()
+ * so a screen left open flips Upcoming → Happening now → Call ended on its own.
+ */
+export function interviewPhaseText(interview: InterviewLike, now = Date.now()) {
+  switch (interviewPhase(interview, now)) {
     case 'ended':
       return interview?.mode_of_interview === 'face_to_face' ? 'Interview ended' : 'Call ended'
     case 'in_progress':
@@ -215,8 +218,37 @@ export function interviewPhaseText(interview: InterviewLike) {
   }
 }
 
-export function applicationNextStep(status: string, interview?: InterviewLike) {
-  if (status === 'interview' && interviewPhase(interview) === 'ended') {
+/** Badge colour per phase: green while it is happening, quiet once it has ended. */
+export function interviewPhaseVariant(interview: InterviewLike, now = Date.now()): 'success' | 'info' | 'neutral' {
+  const phase = interviewPhase(interview, now)
+  if (phase === 'in_progress') return 'success'
+  return phase === 'upcoming' ? 'info' : 'neutral'
+}
+
+/** An online interview whose link can be opened (mirrors isJoinableLink in the web's utils/interview.js). */
+export function isJoinableLink(interview: { mode_of_interview?: string | null; venue_or_link?: string | null } | null | undefined) {
+  return interview?.mode_of_interview === 'online' && /^https?:\/\//.test(interview?.venue_or_link || '')
+}
+
+/**
+ * The interview a seeker should see first (mirrors nextInterviewOf in the web's
+ * utils/interview.js): one happening right now, else the soonest upcoming. Ended and
+ * cancelled interviews are left out.
+ */
+export function nextInterviewOf<T extends { status?: string | null; interview?: (InterviewLike & { schedule?: string | null }) | null }>(
+  applications: T[] = [],
+  now = Date.now(),
+): T | null {
+  const byStart = (a: T, b: T) => new Date(a.interview?.schedule ?? 0).getTime() - new Date(b.interview?.schedule ?? 0).getTime()
+  const live = applications.filter((application) => application.status === 'interview' && application.interview?.schedule)
+  const withPhase = live.map((application) => ({ application, phase: interviewPhase(application.interview, now) }))
+  return withPhase.filter((item) => item.phase === 'in_progress').map((item) => item.application).sort(byStart)[0]
+    ?? withPhase.filter((item) => item.phase === 'upcoming').map((item) => item.application).sort(byStart)[0]
+    ?? null
+}
+
+export function applicationNextStep(status: string, interview?: InterviewLike, now = Date.now()) {
+  if (status === 'interview' && interviewPhase(interview, now) === 'ended') {
     return 'Your interview is done. The employer will update this application with their decision, so keep your phone reachable.'
   }
   return APPLICATION_NEXT_STEPS[status] ?? null

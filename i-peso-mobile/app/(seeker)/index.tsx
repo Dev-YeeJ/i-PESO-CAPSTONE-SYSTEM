@@ -22,6 +22,7 @@ import { PressableScale } from '@/components/ui/PressableScale'
 import { MatchRing } from '@/components/ui/MatchRing'
 import { Skeleton, SkeletonGroup } from '@/components/ui/Skeleton'
 import { HOME_JOB_CARD_WIDTH, HomeJobCard } from '@/components/seeker/HomeJobCard'
+import { NextInterviewCard } from '@/components/seeker/NextInterviewCard'
 import { colors, gradients, isDark, radii, shadows, spacing, textStyles, typography } from '@/theme'
 
 type IconName = React.ComponentProps<typeof MaterialIcons>['name']
@@ -180,7 +181,7 @@ export default function SeekerHomeScreen() {
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true)
-    await Promise.allSettled([profileQuery.refetch(), recommendedQuery.refetch(), nearbyQuery.refetch(), latestQuery.refetch(), jobFairsQuery.refetch()])
+    await Promise.allSettled([profileQuery.refetch(), recommendedQuery.refetch(), nearbyQuery.refetch(), latestQuery.refetch(), jobFairsQuery.refetch(), queryClient.invalidateQueries({ queryKey: ['applications'] })])
     setRefreshing(false)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -291,6 +292,9 @@ export default function SeekerHomeScreen() {
         </View>
 
         {error ? <AlertBox variant="danger" style={styles.errorBox}>{error}</AlertBox> : null}
+
+        {/* (2b) Up next / Interview now — renders nothing without an interview ahead. */}
+        <NextInterviewCard />
 
         {/* (3) Quick actions */}
         <View style={styles.section}>
