@@ -25,13 +25,14 @@ final class StaffPositions
     public const GIP_BENEFICIARY = 'gip_beneficiary';
 
     /**
-     * Positions placed for a fixed period, and the placement details each needs. Their
-     * account closes itself after the end date (ojt:end-internships); the date columns are
-     * shared (ojt_start_date / ojt_end_date) since GIP is an internship programme too.
+     * Positions placed for a fixed period, and the placement details each must have.
+     * None are asked for any more: the Add staff member form no longer collects school,
+     * course or placement dates. An account that already has an end date on file still
+     * closes itself after it (ojt:end-internships).
      */
     public const FIXED_TERM = [
-        self::OJT_INTERN => ['ojt_school', 'ojt_start_date', 'ojt_end_date'],
-        self::GIP_BENEFICIARY => ['ojt_start_date', 'ojt_end_date'],
+        self::OJT_INTERN => [],
+        self::GIP_BENEFICIARY => [],
     ];
 
     public const ALL = [

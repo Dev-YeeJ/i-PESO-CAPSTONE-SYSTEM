@@ -253,18 +253,20 @@ class AdminStaffController extends Controller
             return response()->json(['message' => 'This account is already active.', 'staff' => $this->formatStaff($staffMember->fresh('adminRole'))]);
         }
 
-        abort_if(
-            $staffMember->hasFixedTerm() && $staffMember->ojt_end_date && $staffMember->ojt_end_date->toDateString() < Administrator::internshipToday(),
-            422,
-            'This internship has already ended. Edit the internship end date first, then reactivate.'
-        );
+        // Placement dates are no longer edited on the staff form, so reactivating an
+        // account whose end date has passed clears that date; otherwise the nightly
+        // ojt:end-internships run would close it again.
+        $endedOn = $staffMember->hasFixedTerm() && $staffMember->ojt_end_date && $staffMember->ojt_end_date->toDateString() < Administrator::internshipToday()
+            ? $staffMember->ojt_end_date->format('M j, Y')
+            : null;
 
-        $staffMember->forceFill(['status' => 'active', 'deactivated_reason' => null])->save();
+        $staffMember->forceFill(['status' => 'active', 'deactivated_reason' => null] + ($endedOn ? ['ojt_end_date' => null] : []))->save();
 
         ActivityLogger::log('reactivated_staff', sprintf(
-            'Reactivated staff account %s (%s).',
+            'Reactivated staff account %s (%s).%s',
             $this->displayName($staffMember),
-            $staffMember->email
+            $staffMember->email,
+            $endedOn ? " The placement end date ({$endedOn}) was cleared." : ''
         ));
 
         return response()->json(['message' => 'Staff account reactivated.', 'staff' => $this->formatStaff($staffMember->fresh('adminRole'))]);

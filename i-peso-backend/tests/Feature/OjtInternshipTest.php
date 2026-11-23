@@ -56,51 +56,18 @@ class OjtInternshipTest extends TestCase
 
     // ── Adding an intern ────────────────────────────────────────────────────
 
-    public function test_adding_an_intern_requires_school_and_dates_but_no_hours(): void
+    public function test_adding_an_intern_needs_no_school_or_dates(): void
     {
         Mail::fake();
         Sanctum::actingAs($this->account('sleo@peso.test', 'peso_office_manager', 'administrator'));
 
-        $base = ['first_name' => 'Ana', 'last_name' => 'Reyes', 'email' => 'ana@school.test', 'mobile_number' => '09171234567', 'position' => 'ojt_intern'];
-
-        $this->postJson('/api/admin/staff', $base)
-            ->assertStatus(422)
-            ->assertJsonValidationErrors(['ojt_school', 'ojt_start_date', 'ojt_end_date'])
-            ->assertJsonMissingValidationErrors('ojt_required_hours');
-
-        $this->postJson('/api/admin/staff', $base + [
-            'ojt_school' => 'Pangasinan State University', 'ojt_course' => 'BS Information Technology',
-            'ojt_start_date' => '2026-11-03', 'ojt_end_date' => '2026-11-02',
-        ])->assertStatus(422)->assertJsonPath('errors.ojt_end_date.0', 'The end date must be on or after the start date.');
-
-        // An hours value from an old form is simply ignored.
-        $this->postJson('/api/admin/staff', $base + [
-            'ojt_school' => 'Pangasinan State University', 'ojt_course' => 'BS Information Technology',
-            'ojt_required_hours' => 486, 'ojt_start_date' => '2026-11-03', 'ojt_end_date' => '2027-01-29',
+        $this->postJson('/api/admin/staff', [
+            'first_name' => 'Ana', 'last_name' => 'Reyes', 'email' => 'ana@school.test', 'mobile_number' => '09171234567', 'position' => 'ojt_intern',
         ])
             ->assertCreated()
-            ->assertJsonPath('staff.internship.school', 'Pangasinan State University')
-            ->assertJsonPath('staff.internship.end_date', '2027-01-29')
-            ->assertJsonMissingPath('staff.internship.required_hours')
-            ->assertJsonPath('staff.role.slug', 'ojt-intern');
-    }
-
-    public function test_a_new_interns_start_date_can_be_at_most_30_days_back(): void
-    {
-        Mail::fake();
-        Sanctum::actingAs($this->account('sleo@peso.test', 'peso_office_manager', 'administrator'));
-        $base = [
-            'first_name' => 'Ana', 'last_name' => 'Reyes', 'mobile_number' => '09171234567', 'position' => 'ojt_intern',
-            'ojt_school' => 'PSU', 'ojt_end_date' => '2027-02-08',
-        ];
-
-        // Test clock: Nov 10, 2026 → earliest allowed start is Oct 11.
-        $this->postJson('/api/admin/staff', $base + ['email' => 'old@school.test', 'ojt_start_date' => '2026-10-10'])
-            ->assertStatus(422)
-            ->assertJsonPath('errors.ojt_start_date.0', "The start date can't be more than 30 days ago.");
-
-        $this->postJson('/api/admin/staff', $base + ['email' => 'ok@school.test', 'ojt_start_date' => '2026-10-11'])->assertCreated();
-        $this->postJson('/api/admin/staff', $base + ['email' => 'future@school.test', 'ojt_start_date' => '2026-12-01'])->assertCreated();
+            ->assertJsonPath('staff.role.slug', 'ojt-intern')
+            ->assertJsonPath('staff.internship.school', null)
+            ->assertJsonPath('staff.internship.end_date', null);
     }
 
     public function test_editing_keeps_an_old_start_date_but_rejects_a_new_old_one(): void
@@ -115,15 +82,14 @@ class OjtInternshipTest extends TestCase
             ->assertStatus(422)->assertJsonValidationErrors('ojt_start_date');
     }
 
-    public function test_moving_someone_into_the_intern_position_needs_internship_details(): void
+    public function test_moving_someone_into_the_intern_position_needs_no_details(): void
     {
         $aide = $this->account('aide@peso.test', 'administrative_aide', 'records-viewer');
         Sanctum::actingAs($this->account('sleo@peso.test', 'peso_office_manager', 'administrator'));
 
         $this->putJson("/api/admin/staff/{$aide->admin_id}", ['position' => 'ojt_intern'])
-            ->assertStatus(422)
-            ->assertJsonValidationErrors(['ojt_school', 'ojt_start_date', 'ojt_end_date'])
-            ->assertJsonMissingValidationErrors('ojt_required_hours');
+            ->assertOk()
+            ->assertJsonPath('staff.position', 'ojt_intern');
     }
 
     // ── No hours tracking ───────────────────────────────────────────────────
@@ -183,47 +149,32 @@ class OjtInternshipTest extends TestCase
         $staff = collect($this->getJson('/api/admin/staff')->json('data'))->firstWhere('email', 'done@school.test');
         $this->assertSame('internship_ended', $staff['account_status']);
 
-        $this->postJson("/api/admin/staff/{$finished->admin_id}/reactivate")
-            ->assertStatus(422)
-            ->assertJsonPath('message', 'This internship has already ended. Edit the internship end date first, then reactivate.');
-
-        $this->putJson("/api/admin/staff/{$finished->admin_id}", ['ojt_end_date' => '2026-11-20'])->assertOk();
+        // Reactivating clears the past end date, so the nightly run doesn't close it again.
         $this->postJson("/api/admin/staff/{$finished->admin_id}/reactivate")->assertOk()->assertJsonPath('staff.account_status', 'active');
         $this->assertNull($finished->fresh()->deactivated_reason);
+        $this->assertNull($finished->fresh()->ojt_end_date);
+        Artisan::call('ojt:end-internships');
+        $this->assertSame('active', $finished->fresh()->status);
+        $this->assertDatabaseHas('activity_logs', ['action' => 'reactivated_staff', 'description' => 'Reactivated staff account '.$staff['name'].' (done@school.test). The placement end date (Nov 9, 2026) was cleared.']);
     }
 
     // ── GIP beneficiaries ───────────────────────────────────────────────────
 
-    public function test_adding_a_gip_beneficiary_needs_only_the_placement_dates(): void
+    public function test_adding_or_moving_someone_to_gip_needs_no_dates(): void
     {
         Mail::fake();
         Sanctum::actingAs($this->account('sleo@peso.test', 'peso_office_manager', 'administrator'));
-        $base = ['first_name' => 'Ben', 'last_name' => 'Cruz', 'email' => 'ben@gip.test', 'mobile_number' => '09171234567', 'position' => 'gip_beneficiary'];
 
-        $this->postJson('/api/admin/staff', $base)
-            ->assertStatus(422)
-            ->assertJsonValidationErrors(['ojt_start_date', 'ojt_end_date'])
-            ->assertJsonMissingValidationErrors('ojt_school');
-
-        $this->postJson('/api/admin/staff', $base + ['ojt_start_date' => '2026-11-16', 'ojt_end_date' => '2027-05-14'])
+        $this->postJson('/api/admin/staff', [
+            'first_name' => 'Ben', 'last_name' => 'Cruz', 'email' => 'ben@gip.test', 'mobile_number' => '09171234567', 'position' => 'gip_beneficiary',
+        ])
             ->assertCreated()
-            ->assertJsonPath('staff.position', 'gip_beneficiary')
             ->assertJsonPath('staff.position_label', 'GIP Beneficiary')
             ->assertJsonPath('staff.role.slug', 'gip-beneficiary')
-            ->assertJsonPath('staff.internship.start_date', '2026-11-16')
-            ->assertJsonPath('staff.internship.end_date', '2027-05-14')
-            ->assertJsonPath('staff.internship.school', null);
-    }
+            ->assertJsonPath('staff.internship.start_date', null);
 
-    public function test_moving_someone_into_the_gip_position_needs_the_dates(): void
-    {
         $aide = $this->account('aide@peso.test', 'administrative_aide', 'records-viewer');
-        Sanctum::actingAs($this->account('sleo@peso.test', 'peso_office_manager', 'administrator'));
-
-        $this->putJson("/api/admin/staff/{$aide->admin_id}", ['position' => 'gip_beneficiary'])
-            ->assertStatus(422)
-            ->assertJsonValidationErrors(['ojt_start_date', 'ojt_end_date'])
-            ->assertJsonMissingValidationErrors('ojt_school');
+        $this->putJson("/api/admin/staff/{$aide->admin_id}", ['position' => 'gip_beneficiary'])->assertOk();
     }
 
     public function test_a_gip_account_closes_after_its_end_date(): void

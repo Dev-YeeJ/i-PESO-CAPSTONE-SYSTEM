@@ -60,7 +60,7 @@ export default function StaffDetailDialog({ staff, canManageAccounts, canViewAct
     reactivate: {
       title: `Reactivate ${staff.name}?`,
       description: staff.account_status === 'internship_ended'
-        ? 'If their internship or GIP placement was extended, edit the end date first. They will be able to sign in again with their existing password.'
+        ? 'Their placement end date will be cleared so the account stays open. They will be able to sign in again with their existing password.'
         : 'They will be able to sign in again with their existing password.',
       confirmLabel: 'Reactivate account',
       variant: 'primary',
@@ -101,7 +101,8 @@ export default function StaffDetailDialog({ staff, canManageAccounts, canViewAct
             <Detail label="Account created" value={formatDate(staff.created_at)} />
           </dl>
 
-          {staff.internship && (
+          {/* Placement details are no longer collected; shown only for accounts that have them on file. */}
+          {staff.internship && Object.values(staff.internship).some(Boolean) && (
             <div className="rounded-xl border border-[#c4d9f7] bg-[#e8f0fc] p-4">
               <h3 className="text-sm font-bold text-brand-navy">{staff.position === 'gip_beneficiary' ? 'GIP placement' : 'Internship'}</h3>
               <dl className="mt-3 grid gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
