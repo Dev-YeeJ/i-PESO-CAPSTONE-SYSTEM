@@ -13,25 +13,20 @@ use Illuminate\Support\Collection;
 
 /**
  * Who may review which employer, and when. Every review comes from a real
- * interaction recorded in i-PESO:
+ * interaction recorded in i-PESO, and each interaction gets ONE review: the
+ * seeker chooses whether it is about the hiring process or about working there.
  *
- *  - Recruitment Experience: an application the employer has acted on (any
- *    stage past Pending) or that the seeker withdrew. An application left at
- *    Pending for NO_RESPONSE_DAYS can get a limited review (communication and
- *    posting accuracy only) — that's how ghosting gets reported.
- *  - Employment Experience: a hire whose start date has arrived — either an
- *    application marked Hired, or a placement-report row PESO linked to the
- *    seeker (for hires made outside the applicant tracker).
+ *  - Hiring process (recruitment): open as soon as the seeker has applied, with
+ *    every hiring aspect, whatever stage the application is at.
+ *  - Working there (employment): only for verified hires whose start date has
+ *    arrived — an application marked Hired, or a placement-report row PESO
+ *    linked to the seeker (for hires made outside the applicant tracker).
  *
  * Job fair results are names on a form, not linked to accounts, so they
  * can't verify anything and aren't used.
  */
 class FeedbackEligibility
 {
-    public const NO_RESPONSE_DAYS = 14;
-
-    private const ACTED_ON = ['reviewed', 'shortlisted', 'interview', 'hired', 'rejected', 'withdrawn'];
-
     /**
      * Everything this seeker has done with employers, and what they can
      * review for each. Feeds the "Reviews" list on their side.
@@ -51,7 +46,7 @@ class FeedbackEligibility
             ->filter(fn (Application $application) => $application->jobVacancy?->employer !== null);
 
         $items = $applications->map(function (Application $application) use ($byApplication) {
-            $existing = $byApplication->get($application->apply_id, collect())->keyBy('type');
+            $existing = $byApplication->get($application->apply_id, collect());
             $employer = $application->jobVacancy->employer;
 
             return [
@@ -60,8 +55,9 @@ class FeedbackEligibility
                 'employer' => ['id' => $employer->employer_id, 'name' => $employer->company_name],
                 'job_title' => $application->jobVacancy->job_title,
                 'status' => $application->status,
-                'recruitment' => $this->describe($this->recruitment($application), $existing->get(FeedbackAspects::RECRUITMENT)),
-                'employment' => $this->describe($this->employmentFromApplication($application), $existing->get(FeedbackAspects::EMPLOYMENT)),
+                'recruitment' => $this->describe($this->recruitment($application), $existing),
+                'employment' => $this->describe($this->employmentFromApplication($application), $existing),
+                'review' => $this->summary($existing),
             ];
         })->values();
 
@@ -73,7 +69,7 @@ class FeedbackEligibility
         $placements = $this->linkedPlacements($seeker)
             ->reject(fn (PlacementRecord $record) => $hiredEmployers->contains($record->employer_id))
             ->map(function (PlacementRecord $record) use ($byPlacement) {
-                $existing = $byPlacement->get($record->id, collect())->keyBy('type');
+                $existing = $byPlacement->get($record->id, collect());
 
                 return [
                     'source' => 'placement',
@@ -82,32 +78,40 @@ class FeedbackEligibility
                     'job_title' => $record->position,
                     'status' => 'hired',
                     'recruitment' => null,
-                    'employment' => $this->describe($this->employmentFromPlacement($record), $existing->get(FeedbackAspects::EMPLOYMENT)),
+                    'employment' => $this->describe($this->employmentFromPlacement($record), $existing),
+                    'review' => $this->summary($existing),
                 ];
             });
 
         return $items->concat($placements)->values();
     }
 
-    /** @return array{allowed: bool, limited?: bool, reason?: string, available_from?: string} */
+    /**
+     * The hiring process can be reviewed from the moment the seeker applies,
+     * with every hiring aspect.
+     *
+     * @return array{allowed: bool, limited: bool}
+     */
     public function recruitment(Application $application): array
     {
-        if (in_array($application->status, self::ACTED_ON, true)) {
-            return ['allowed' => true, 'limited' => false];
+        return ['allowed' => true, 'limited' => false];
+    }
+
+    /**
+     * Which kinds of review this interaction allows right now.
+     *
+     * @return list<string>
+     */
+    public function allowedTypes(?Application $application, ?PlacementRecord $placement): array
+    {
+        if ($application) {
+            return array_values(array_filter([
+                FeedbackAspects::RECRUITMENT,
+                $this->employmentFromApplication($application)['allowed'] ? FeedbackAspects::EMPLOYMENT : null,
+            ]));
         }
 
-        $since = $application->created_at ?? now();
-        $availableFrom = $since->copy()->addDays(self::NO_RESPONSE_DAYS);
-
-        if ($application->status === 'pending' && $availableFrom->lte(now())) {
-            return ['allowed' => true, 'limited' => true];
-        }
-
-        return [
-            'allowed' => false,
-            'reason' => 'Available once the employer responds to your application, or after '.self::NO_RESPONSE_DAYS.' days without a response.',
-            'available_from' => $availableFrom->toDateString(),
-        ];
+        return $placement && $this->employmentFromPlacement($placement)['allowed'] ? [FeedbackAspects::EMPLOYMENT] : [];
     }
 
     public function employmentFromApplication(Application $application): array
@@ -154,8 +158,22 @@ class FeedbackEligibility
             ];
     }
 
-    private function describe(array $rule, ?EmployerReview $existing): array
+    /**
+     * One review per interaction: once the seeker reviewed it (either kind),
+     * both kinds point at that review, so neither offers a new one.
+     */
+    private function describe(array $rule, Collection $existing): array
     {
-        return $rule + ['review_id' => $existing?->id, 'review_status' => $existing?->status];
+        $review = $existing->sortByDesc('id')->first();
+
+        return $rule + ['review_id' => $review?->id, 'review_status' => $review?->status];
+    }
+
+    /** @return array{id: int, type: string, status: string}|null */
+    private function summary(Collection $existing): ?array
+    {
+        $review = $existing->sortByDesc('id')->first();
+
+        return $review ? ['id' => $review->id, 'type' => $review->type, 'status' => $review->status] : null;
     }
 }

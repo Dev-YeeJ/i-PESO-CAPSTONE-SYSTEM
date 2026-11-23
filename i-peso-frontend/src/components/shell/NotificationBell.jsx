@@ -11,7 +11,6 @@ import {
   FileCheck2,
   Handshake,
   MailCheck,
-  Megaphone,
   Search,
   TriangleAlert,
   UserPlus,
@@ -23,10 +22,6 @@ import * as seekerService from '@/services/seekerService'
 import * as employerService from '@/services/employerService'
 
 const NAVY = 'bg-[#e8f0fc] text-brand-navy'
-
-function announcementLook(data) {
-  return { icon: Megaphone, classes: data?.priority === 'urgent' ? 'bg-red-100 text-red-700' : 'bg-[#fffbeb] text-[#b45309]' }
-}
 
 /**
  * Per-portal wiring. Each portal keeps its own API and React Query keys, so
@@ -40,7 +35,6 @@ const PORTALS = {
     key: 'seekerNotifications',
     service: seekerService,
     look(data) {
-      if (data?.type === 'announcement') return announcementLook(data)
       if (data?.type === 'job_fair') return { icon: CalendarDays, classes: NAVY }
       if (data?.type === 'job_vacancy') return { icon: BriefcaseBusiness, classes: 'bg-emerald-50 text-emerald-700' }
       switch (data?.status) {
@@ -58,7 +52,6 @@ const PORTALS = {
     key: 'employerNotifications',
     service: employerService,
     look(data) {
-      if (data?.type === 'announcement') return announcementLook(data)
       if (data?.type === 'application_received') return { icon: UserPlus, classes: NAVY }
       if (data?.status === 'verified') return { icon: CircleCheck, classes: 'bg-emerald-50 text-emerald-700' }
       if (data?.status === 'rejected' || data?.status === 'action_required') return { icon: TriangleAlert, classes: 'bg-red-100 text-red-700' }
@@ -217,7 +210,7 @@ export default function NotificationBell({ portal = 'seeker' }) {
               <div className="px-4 py-8 text-center">
                 <Bell className="mx-auto h-8 w-8 text-slate-300" aria-hidden="true" />
                 <p className="mt-2 text-sm text-slate-600">You&apos;re all caught up.</p>
-                <p className="text-xs text-slate-500">Updates on your applications and announcements from PESO show here.</p>
+                <p className="text-xs text-slate-500">Updates on your applications and from PESO show here.</p>
               </div>
             )}
             {!loading && notifications.map((notification) => {

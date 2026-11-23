@@ -100,8 +100,8 @@ describe('MyApplications (seeker application tracking)', () => {
     expect(screen.getByRole('button', { name: /try again/i })).toBeInTheDocument()
   })
 
-  it('offers to rate the employer once a review is allowed', async () => {
-    getSeekerApplications.mockResolvedValue({ applications: [{ ...application, status: 'rejected', can_withdraw: false }] })
+  it('offers to review the company as soon as you apply', async () => {
+    getSeekerApplications.mockResolvedValue({ applications: [{ ...application, status: 'pending' }] })
     reviewService.getMine.mockResolvedValue({
       opportunities: [{
         source: 'application', source_id: 1, employer: { name: 'Acme Corp' }, job_title: 'Data Encoder',
@@ -113,7 +113,7 @@ describe('MyApplications (seeker application tracking)', () => {
 
     renderPage()
 
-    expect(await screen.findByRole('button', { name: /rate this employer/i })).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: /review company/i })).toBeInTheDocument()
   })
 
   describe('on a wide screen', () => {

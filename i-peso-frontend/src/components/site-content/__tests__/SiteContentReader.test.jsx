@@ -17,10 +17,6 @@ vi.mock('@/services/systemSettingsService', async (importOriginal) => ({
   publicSystemStatusService: { get: vi.fn() },
 }))
 vi.mock('@/services/governmentProgramService', () => ({ default: { publicPrograms: vi.fn().mockResolvedValue([]) } }))
-vi.mock('@/services/announcementService', async (importOriginal) => ({
-  ...(await importOriginal()),
-  publicAnnouncementService: { list: vi.fn().mockResolvedValue([]), attachmentUrl: vi.fn() },
-}))
 
 const office = {
   office_name: 'PESO Urdaneta',
@@ -200,7 +196,7 @@ describe('About page and landing sections', () => {
   })
 
   it('leaves out a landing section PESO switched off, and its menu link', async () => {
-    publicSiteContentService.get.mockResolvedValue({ office, landing: { show_sections: { announcements: true, features: true, jobs: true, programs: false } } })
+    publicSiteContentService.get.mockResolvedValue({ office, landing: { show_sections: { features: true, jobs: true, programs: false } } })
 
     renderWithProviders(<LandingPage />)
 

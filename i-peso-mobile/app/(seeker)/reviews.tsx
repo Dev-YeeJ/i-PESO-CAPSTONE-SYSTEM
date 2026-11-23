@@ -98,7 +98,7 @@ export default function MyReviewsScreen() {
       >
         <Text style={styles.kicker}>Verified reviews</Text>
         <Text style={styles.intro}>
-          Help other job seekers by rating employers you&apos;ve applied to or worked for. Only people with a real application or job through i-PESO can review, and your name is never shown.
+          Review a company once you apply: one review per job, about the hiring process or, once you&apos;re hired, working there. Only people with a real application or job through i-PESO can review, and your name is never shown.
         </Text>
 
         <QueryState
@@ -113,7 +113,7 @@ export default function MyReviewsScreen() {
           {actions.length === 0 ? (
             <View style={styles.dashedBox}>
               <Text style={styles.mutedText}>
-                Nothing to review right now. You can rate an employer once they respond to your application, or once you start a job you got through i-PESO.
+                Nothing to review right now. Every company you apply to through i-PESO appears here.
               </Text>
             </View>
           ) : (
@@ -126,12 +126,12 @@ export default function MyReviewsScreen() {
                   <View style={styles.flexText}>
                     <Text style={styles.employerName} numberOfLines={1}>{action.employerName}</Text>
                     <Text style={styles.meta} numberOfLines={2}>
-                      {action.jobTitle}, {action.type === 'employment' ? 'employment experience' : action.limited ? 'no response from employer' : 'recruitment experience'}
+                      {[action.jobTitle, action.types.includes('employment') ? 'hiring process or working here' : 'hiring process'].filter(Boolean).join(', ')}
                     </Text>
                   </View>
                 </View>
                 <Button size="sm" onPress={() => setWriting(action)} style={styles.rateButton}>
-                  {action.type === 'employment' ? 'Rate workplace' : 'Rate hiring'}
+                  Review company
                 </Button>
               </Card>
             ))
@@ -177,7 +177,7 @@ function OwnReviewCard({ review, removing, onEdit, onRemove }: { review: OwnRevi
         <View style={styles.flexText}>
           <Text style={styles.employerName}>{review.employer?.name}</Text>
           <Text style={styles.meta}>
-            {review.job_title ? `${review.job_title} · ` : ''}{review.type === 'employment' ? 'Employment experience' : 'Recruitment experience'} · {review.month}{review.edited ? ' · edited' : ''}
+            {review.job_title ? `${review.job_title} · ` : ''}{review.type === 'employment' ? 'Working here' : 'Hiring process'} · {review.month}{review.edited ? ' · edited' : ''}
           </Text>
         </View>
         <Badge variant={status.variant}>{status.label}</Badge>

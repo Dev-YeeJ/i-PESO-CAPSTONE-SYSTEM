@@ -855,7 +855,6 @@ export default function ProfileScreen() {
         <SectionHeader title="Settings & help" />
         <View style={styles.listCard}>
           <LinkRow icon="notifications-none" label="Notifications" onPress={() => router.push({ pathname: '/(seeker)/notifications', params: { from: 'profile' } })} />
-          <LinkRow icon="campaign" label="Announcements" hint="Notices from PESO Urdaneta" onPress={() => router.push({ pathname: '/(seeker)/announcements', params: { from: 'profile' } })} />
           <LinkRow icon="help-outline" label="Help & FAQs" onPress={() => router.push({ pathname: '/(seeker)/help', params: { from: 'profile' } })} />
           {/* Versioned on the website, so the app opens them there instead of copying the text. */}
           <LinkRow icon="policy" label="Privacy Policy" external onPress={() => openInBrowser(PRIVACY_POLICY_URL)} />

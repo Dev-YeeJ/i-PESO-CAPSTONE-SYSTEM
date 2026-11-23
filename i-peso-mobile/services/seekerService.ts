@@ -288,8 +288,6 @@ export interface SeekerNotification {
     report_id?: number | string
     case_number?: string
     action?: string
-    // Announcements — type 'announcement'.
-    announcement_id?: number | string
     priority?: string
   }
   read_at: string | null
@@ -775,6 +773,8 @@ export interface ReviewOpportunity {
   /** null for placements (they only get an Employment review). */
   recruitment: ReviewRule | null
   employment: ReviewRule | null
+  /** The one review written for this job (either kind), if any. */
+  review?: { id: number; type: ReviewType; status: ReviewStatus } | null
 }
 
 export interface ReviewAspectRating {
@@ -808,6 +808,8 @@ export interface OwnReview extends PublicReview {
   application_id: number | null
   placement_record_id: number | null
   ratings_map: Record<string, number>
+  /** What this review may be about when edited (hiring process and/or working there). */
+  allowed_types?: ReviewType[]
   created_at: string
   edited_at: string | null
 }
@@ -879,45 +881,12 @@ export interface ReviewSubmitPayload {
 }
 
 export interface ReviewUpdatePayload {
+  /** Switch what the review is about (only to a kind in allowed_types). */
+  type?: ReviewType
   ratings: Record<string, number>
   recommend: boolean
   comment: string | null
-}
-
-// ── Announcements (mirrors AnnouncementPresenter::forReader) ──────────────
-// The API only returns what this seeker may see (audience, schedule, expiry);
-// the app never filters beyond the category the user picked.
-
-export type AnnouncementCategory = 'general' | 'job_fair' | 'program' | 'advisory' | 'system'
-export type AnnouncementPriority = 'normal' | 'important' | 'urgent'
-
-export interface Announcement {
-  id: number
-  title: string
-  body: string
-  excerpt: string
-  category: AnnouncementCategory | string
-  category_label: string
-  priority: AnnouncementPriority | string
-  priority_label: string
-  is_pinned: boolean
-  publish_at: string | null
-  expires_at: string | null
-  link_label: string | null
-  link_url: string | null
-  has_attachment: boolean
-  attachment_name: string | null
-  attachment_is_image: boolean
-  is_read: boolean
-  is_dismissed: boolean
-}
-
-export interface AnnouncementFeed {
-  data: Announcement[]
-  unread_count: number
-  total: number
-  last_page: number
-  current_page: number
+  confirm_started?: boolean
 }
 
 // ── Help & FAQs (GET /help) ───────────────────────────────────────────────
@@ -1119,43 +1088,6 @@ export const seekerService = {
     const form = safetyFormData({ details: payload.details }, payload.attachments)
     const res = await apiClient.post(`/seeker/safety-reports/${id}/details`, form, { headers: { 'Content-Type': 'multipart/form-data' } })
     return res.data as { message: string; report: SafetyReportDetail }
-  },
-
-  // ── Announcements (mirrors announcementService in announcementService.js) ─
-  async announcements(params: { category?: string; page?: number } = {}): Promise<AnnouncementFeed> {
-    const res = await apiClient.get('/announcements', { params: { ...(params.category ? { category: params.category } : {}), page: params.page ?? 1 } })
-    return res.data
-  },
-
-  async announcementBanner(): Promise<{ data: Announcement[]; unread_count: number }> {
-    const res = await apiClient.get('/announcements/banner')
-    return res.data
-  },
-
-  async announcementUnreadCount(): Promise<number> {
-    const res = await apiClient.get('/announcements/unread-count')
-    return Number(res.data?.unread_count ?? 0)
-  },
-
-  /** Opening an announcement is what marks it read. */
-  async announcement(id: number | string): Promise<{ announcement: Announcement; unread_count: number }> {
-    const res = await apiClient.get(`/announcements/${id}`)
-    return res.data
-  },
-
-  /** Hides it from the home banner only; it stays on the Announcements screen. */
-  async dismissAnnouncement(id: number | string) {
-    const res = await apiClient.post(`/announcements/${id}/dismiss`)
-    return res.data as { message: string; announcement: Announcement }
-  },
-
-  async readAllAnnouncements() {
-    const res = await apiClient.post('/announcements/read-all')
-    return res.data as { message: string; unread_count: number }
-  },
-
-  announcementAttachmentUrl(id: number | string) {
-    return `${API_BASE_URL}/announcements/${id}/attachment`
   },
 
   // ── Help & FAQs (mirrors helpService.get in siteContentService.js) ─────

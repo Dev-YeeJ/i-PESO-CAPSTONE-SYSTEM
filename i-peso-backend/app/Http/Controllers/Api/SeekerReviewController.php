@@ -96,9 +96,14 @@ class SeekerReviewController extends Controller
         abort_unless($review->seeker_id === $seeker->seeker_id, 404);
 
         $data = $request->validate([
+            'type' => ['nullable', Rule::in([FeedbackAspects::RECRUITMENT, FeedbackAspects::EMPLOYMENT])],
             'ratings' => ['required', 'array'],
             'recommend' => ['required', 'boolean'],
             'comment' => ['nullable', 'string', 'max:2000'],
+            // Switching an existing review to "working here" needs the same confirmation.
+            'confirm_started' => [Rule::excludeIf($request->input('type') !== FeedbackAspects::EMPLOYMENT || $review->type === FeedbackAspects::EMPLOYMENT), 'accepted'],
+        ], [
+            'confirm_started.accepted' => 'Please confirm that you started working for this employer.',
         ]);
 
         $this->reviews->update($review, $data);
@@ -242,6 +247,8 @@ class SeekerReviewController extends Controller
             'application_id' => $review->application_id,
             'placement_record_id' => $review->placement_record_id,
             'ratings_map' => $review->ratings,
+            // What this review may be about when edited (hiring process and/or working there).
+            'allowed_types' => $this->eligibility->allowedTypes($review->application, $review->placementRecord),
             'created_at' => $review->created_at,
             'edited_at' => $review->edited_at,
         ];

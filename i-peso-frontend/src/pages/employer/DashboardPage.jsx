@@ -4,7 +4,6 @@ import { BriefcaseBusiness, Building2, CheckCircle2, Clock3, UsersRound, Calenda
 import { Link } from 'react-router-dom'
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import PendingVerificationBanner from './components/PendingVerificationBanner'
-import DashboardAnnouncements from '@/components/announcements/DashboardAnnouncements'
 import { AlertBox, Badge, Button, Card, CardHeader, LoadingSkeleton, StatCard } from '@/components/ui'
 import LazyImage from '@/components/common/LazyImage'
 import * as employerService from '@/services/employerService'
@@ -160,7 +159,6 @@ export default function EmployerDashboard() {
 
       {effectiveStatus === 'verified' && <PlacementDeadlineStrip />}
 
-      <DashboardAnnouncements />
 
       {error && <Motion.div variants={itemVariants}><AlertBox variant="danger" title="Employer workspace unavailable">{error}</AlertBox></Motion.div>}
       {reuploadError && <Motion.div variants={itemVariants}><AlertBox variant="danger" title="Document re-upload failed">{reuploadError}</AlertBox></Motion.div>}

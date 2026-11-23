@@ -46,11 +46,10 @@ export const LANDING_DEFAULTS = {
     { icon: 'users', title: 'Centralized Screening', body: 'Review applications, schedule interviews, and hire directly from your dashboard.' },
   ],
   footer_tagline: 'Urdaneta City PESO Employment Portal',
-  show_sections: { announcements: true, features: true, jobs: true, programs: true },
+  show_sections: { features: true, jobs: true, programs: true },
 }
 
 export const LANDING_SECTIONS = [
-  { key: 'announcements', label: 'PESO announcements', help: 'Live announcements for the Public audience.' },
   { key: 'features', label: '“What you get” feature cards', help: 'The four cards edited above.' },
   { key: 'jobs', label: 'Job discovery', help: 'The seeker/employer preview.' },
   { key: 'programs', label: 'Government programs', help: 'Open programs from Government & DOLE.' },

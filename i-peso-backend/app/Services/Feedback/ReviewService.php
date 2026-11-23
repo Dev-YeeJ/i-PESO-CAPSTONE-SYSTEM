@@ -22,13 +22,14 @@ class ReviewService
     {
         [$employerId, $limited, $source] = $this->resolveInteraction($seeker, $data);
 
+        // One review per application or hire: the hiring process OR working there.
         $existing = EmployerReview::query()
-            ->where('type', $data['type'])
+            ->where('seeker_id', $seeker->seeker_id)
             ->where($source)
             ->exists();
         if ($existing) {
             throw ValidationException::withMessages([
-                'type' => 'You already reviewed this. You can edit your review instead.',
+                'type' => 'You already reviewed this company for this job. You can edit your review instead, including what it is about.',
             ]);
         }
 
@@ -56,12 +57,32 @@ class ReviewService
     }
 
     /**
-     * Edits keep the same review (one per interaction). A review PESO hid
-     * goes back to PESO instead of reappearing on its own.
+     * Edits keep the same review (one per interaction). The seeker may switch
+     * what it is about (hiring process ↔ working there) when that kind is
+     * allowed for the job. A review PESO hid goes back to PESO instead of
+     * reappearing on its own.
      */
     public function update(EmployerReview $review, array $data): EmployerReview
     {
-        $ratings = $this->validatedRatings($review->type, $review->limited, $data['ratings'] ?? []);
+        $type = $data['type'] ?? $review->type;
+        if ($type !== $review->type) {
+            $review->loadMissing(['application', 'placementRecord']);
+            if (! in_array($type, $this->eligibility->allowedTypes($review->application, $review->placementRecord), true)) {
+                $this->deny($type === FeedbackAspects::EMPLOYMENT
+                    ? 'You can review working here once the employer has hired you and your start date has arrived.'
+                    : 'This review can only be about working here.');
+            }
+        }
+
+        // Hiring reviews now rate every aspect. An older limited one stays limited
+        // until it is edited with all of them.
+        $full = FeedbackAspects::forReview($type);
+        $limited = $type === FeedbackAspects::RECRUITMENT
+            && $review->type === FeedbackAspects::RECRUITMENT
+            && $review->limited
+            && array_diff_key($full, $data['ratings'] ?? []) !== [];
+
+        $ratings = $this->validatedRatings($type, $limited, $data['ratings'] ?? []);
         $comment = $this->cleanComment($data['comment'] ?? null);
         $reasons = ContentScreen::check($comment);
 
@@ -74,6 +95,8 @@ class ReviewService
         };
 
         $review->update([
+            'type' => $type,
+            'limited' => $limited,
             'ratings' => $ratings,
             'recommend' => (bool) $data['recommend'],
             'comment' => $comment,
