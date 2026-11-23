@@ -517,8 +517,9 @@ Route::middleware('auth:sanctum')->group(function () {
                 });
         });
 
-        // Content Modules → Overview, Insights and the AI writing helper: anyone who keeps FAQs.
-        Route::middleware('admin.permission:configuration|constituent_crm')
+        // Content Modules → Health check, Assistant insights and the AI writing helper.
+        // Configuration access only: "No access" to Configuration hides all of Content Modules.
+        Route::middleware('admin.permission:configuration')
             ->prefix('content-modules')
             ->controller(\App\Http\Controllers\Api\Admin\Configuration\ContentInsightController::class)
             ->group(function () {
@@ -529,9 +530,9 @@ Route::middleware('auth:sanctum')->group(function () {
                 Route::post('/ai-assist', 'assist')->middleware('throttle:20,1');
             });
 
-        // FAQs are the assistant's answer bank, kept up to date by Configuration
-        // OR Constituent CRM (front desk) staff. Readers never see them as a page.
-        Route::middleware('admin.permission:configuration|constituent_crm')
+        // FAQs are the assistant's answer bank, kept up to date by Configuration staff
+        // (Constituent CRM access no longer opens them). Readers never see them as a page.
+        Route::middleware('admin.permission:configuration')
             ->prefix('faqs')
             ->controller(\App\Http\Controllers\Api\Admin\Configuration\FaqController::class)
             ->group(function () {

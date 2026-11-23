@@ -18,7 +18,7 @@ use Illuminate\Validation\ValidationException;
 /**
  * Content Modules → FAQs: the assistant's answer bank (there is no reader-facing
  * Help page). Managed by Configuration or Constituent CRM (front desk) staff:
- * admin.permission:configuration|constituent_crm.
+ * admin.permission:configuration.
  */
 class FaqController extends Controller
 {

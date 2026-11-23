@@ -20,8 +20,8 @@ export const ACCESS_LABELS = {
 }
 
 // Longest prefix wins. Paths not listed (the dashboard, set-password) are open
-// to every staff account. A list of modules means "any of these" (Content
-// Modules: FAQs are kept up to date by Configuration or front-desk CRM staff).
+// to every staff account. A list of modules would mean "any of these"; every
+// Configuration screen (Content Modules included) needs Configuration access.
 const PATH_MODULES = [
   ['/admin/verification-queue', 'constituent_crm'],
   ['/admin/job-seekers', 'constituent_crm'],
@@ -46,8 +46,8 @@ const PATH_MODULES = [
   ['/admin/role-permissions', 'configuration'],
   ['/admin/ojt-interns', 'configuration'],
   ['/admin/announcements', 'configuration'],
-  ['/admin/site-content', ['configuration', 'constituent_crm']],
-  ['/admin/content-modules', ['configuration', 'constituent_crm']],
+  ['/admin/site-content', 'configuration'],
+  ['/admin/content-modules', 'configuration'],
   ['/admin/settings', 'configuration'],
 ]
 

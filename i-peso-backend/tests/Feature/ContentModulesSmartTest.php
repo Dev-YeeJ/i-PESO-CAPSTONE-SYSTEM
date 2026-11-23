@@ -186,7 +186,11 @@ class ContentModulesSmartTest extends TestCase
             $insights->recordChatbotGap($question, 'guest');
         }
 
+        // Content Modules is Configuration only: CRM access alone doesn't open it.
         Sanctum::actingAs($this->staffWith(['constituent_crm' => 'manage'], 'frontdesk@example.test'));
+        $this->getJson('/api/admin/content-modules/insights')->assertForbidden();
+
+        Sanctum::actingAs($this->staffWith(['configuration' => 'manage'], 'content@example.test'));
         $data = $this->getJson('/api/admin/content-modules/insights')->assertOk()->json();
 
         $this->assertArrayNotHasKey('missed_searches', $data);
@@ -277,9 +281,12 @@ class ContentModulesSmartTest extends TestCase
         $this->postJson('/api/admin/content-modules/ai-assist', ['task' => 'simplify', 'text' => 'Some text.'])
             ->assertStatus(503)->assertJsonPath('message', 'The AI writing helper is turned off on this server.');
 
-        Sanctum::actingAs($this->staffWith(['constituent_crm' => 'view'], 'viewer@example.test'));
+        Sanctum::actingAs($this->staffWith(['configuration' => 'view'], 'viewer@example.test'));
         $this->postJson('/api/admin/content-modules/ai-assist', ['task' => 'simplify', 'text' => 'Some text.'])->assertForbidden();
         $this->getJson('/api/admin/content-modules/health')->assertOk();
+
+        Sanctum::actingAs($this->staffWith(['constituent_crm' => 'manage'], 'frontdesk@example.test'));
+        $this->getJson('/api/admin/content-modules/health')->assertForbidden();
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────
