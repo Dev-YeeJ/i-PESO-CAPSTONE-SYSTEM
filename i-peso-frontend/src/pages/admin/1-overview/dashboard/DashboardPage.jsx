@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useState } from 'react'
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import {
   AlertOctagon,
@@ -39,7 +39,6 @@ const PRESETS = [
 export default function DashboardPage() {
   const [preset, setPreset] = useState('this_month')
   const [range, setRange] = useState(presetRange('this_month'))
-  const trendChartRef = useRef(null)
   const [chartView, setChartView] = useState('chart')
   const user = useAuthStore((state) => state.user)
   const canSeeFairs = canOpenPath(user, '/admin/job-fairs')
@@ -184,7 +183,7 @@ export default function DashboardPage() {
       {/* Trends + needs attention */}
       <div className="grid gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
         <Card>
-          <div ref={trendChartRef} className="bg-white">
+          <div className="bg-white">
             <CardHeader
               title="Application trends"
               subtitle="Applications received across all employers in the selected range."
@@ -203,7 +202,15 @@ export default function DashboardPage() {
                       </button>
                     ))}
                   </div>
-                  <ChartDownloadMenu targetRef={trendChartRef} title="Application Trends" footnote={`I-PESO Operations Dashboard, ${range.date_from} to ${range.date_to}`} disabled={!stats?.chart_data?.length} />
+                  <ChartDownloadMenu
+                    spec={{
+                      id: 'application-trends', title: 'Application Trends', kind: 'line', xLabel: 'Date',
+                      subtitle: 'Applications received across all employers in the selected range.',
+                      rows: (stats?.chart_data ?? []).map((row) => ({ x: row.date, a: row.count })),
+                      series: [{ key: 'a', label: 'Applications' }],
+                    }}
+                    context={{ reportTitle: 'Operations Dashboard', coverage: [`Coverage: ${range.date_from} – ${range.date_to}`] }}
+                  />
                 </div>
               )}
             />

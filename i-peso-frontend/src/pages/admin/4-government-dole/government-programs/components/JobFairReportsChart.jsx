@@ -1,4 +1,3 @@
-import { useRef } from 'react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
 import { Card, CardHeader } from '@/components/ui'
 import ChartDownloadMenu from '@/components/common/ChartDownloadMenu'
@@ -26,9 +25,7 @@ const CustomTooltip = ({ active, payload, label }) => {
 }
 
 export default function JobFairReportsChart({ metrics, reports, fairTitle }) {
-  const participationRef = useRef(null)
-  const outcomesRef = useRef(null)
-  const footnote = fairTitle ? `I-PESO Job Fair, ${fairTitle}` : 'I-PESO Job Fair'
+  const exportContext = { reportTitle: 'Job Fair Report', coverage: [fairTitle ? `Job fair: ${fairTitle}` : 'Job fair'] }
   // Aggregate data for Pie Chart
   const pieData = [
     { name: 'Approved Employers', value: metrics?.approved ?? 0 },
@@ -45,11 +42,36 @@ export default function JobFairReportsChart({ metrics, reports, fairTitle }) {
     Rejected: r.total_rejected ?? 0
   })) || []
 
+  // Downloads: participation as plain counts (approved already includes attended, so a
+  // pie's percentages would mislead), and every employer's outcomes in the table.
+  const participationSpec = {
+    id: 'employer-participation', title: 'Employer Participation', subtitle: 'Approved vs attended employers',
+    kind: 'bar', itemLabel: 'Employers', valueLabel: 'Count',
+    items: [
+      { label: 'Approved employers', value: metrics?.approved ?? 0 },
+      { label: 'Attended', value: metrics?.attended ?? 0 },
+      { label: 'No show', value: Math.max(0, (metrics?.approved ?? 0) - (metrics?.attended ?? 0)) },
+    ].filter((item) => item.value > 0),
+    notes: ['Attended + No show = Approved employers.'],
+  }
+  const outcomesSpec = {
+    id: 'employer-outcomes', title: 'Top Employers by Outcomes', subtitle: 'Applicants and results reported by each employer',
+    kind: 'columns', xLabel: 'Employer', chartLimit: 8,
+    rows: barData.map((row) => ({ x: row.name, applicants: row.Applicants, hired: row.Hired, near: row.NearHired, rejected: row.Rejected })),
+    series: [
+      { key: 'applicants', label: 'Applicants', color: '#94a3b8' },
+      { key: 'hired', label: 'Hired on the spot', color: '#10b981' },
+      { key: 'near', label: 'Near hired', color: '#3b82f6' },
+      { key: 'rejected', label: 'Rejected', color: '#ef4444' },
+    ],
+    notes: barData.length > 8 ? [`The chart shows the first 8 employers; the table lists all ${barData.length}.`] : [],
+  }
+
   return (
     <div className="grid gap-6 lg:grid-cols-2">
       <Card>
-        <div ref={participationRef} className="bg-white">
-        <CardHeader title="Employer Participation" subtitle="Approved vs Attended" action={<ChartDownloadMenu targetRef={participationRef} title="Employer Participation" footnote={footnote} disabled={!pieData.length} />} />
+        <div className="bg-white">
+        <CardHeader title="Employer Participation" subtitle="Approved vs Attended" action={<ChartDownloadMenu spec={participationSpec} context={exportContext} />} />
         <div className="h-72 w-full p-4">
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
@@ -77,8 +99,8 @@ export default function JobFairReportsChart({ metrics, reports, fairTitle }) {
       </Card>
 
       <Card>
-        <div ref={outcomesRef} className="bg-white">
-        <CardHeader title="Top Employers by Outcomes" subtitle="Applicants and HOTS by Employer" action={<ChartDownloadMenu targetRef={outcomesRef} title="Top Employers by Outcomes" footnote={footnote} disabled={!barData.length} />} />
+        <div className="bg-white">
+        <CardHeader title="Top Employers by Outcomes" subtitle="Applicants and HOTS by Employer" action={<ChartDownloadMenu spec={outcomesSpec} context={exportContext} />} />
         <div className="h-72 w-full p-4">
           {barData.length > 0 ? (
             <ResponsiveContainer width="100%" height="100%">

@@ -1,4 +1,4 @@
-import { createElement, useRef } from 'react'
+import { createElement } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import api from '@/services/api'
 import {
@@ -23,11 +23,21 @@ import { ErrorState, LoadingSkeleton } from '@/components/ui'
 import { CHART_COLORS } from '@/design-system/chartColors'
 import ChartDownloadMenu from '@/components/common/ChartDownloadMenu'
 
-const EXPORT_FOOTNOTE = 'I-PESO Location Data Quality'
+const EXPORT_CONTEXT = { reportTitle: 'Location Data Quality', coverage: ['Coverage: all records to date'] }
+
+/** "1,820 of 2,302 job seeker records have GPS coordinates (79.1%)." for the download's notes. */
+const coordinateNote = (data, noun) => (data?.total
+  ? `${data.with_coordinates.toLocaleString('en-PH')} of ${data.total.toLocaleString('en-PH')} ${noun} records have GPS coordinates (${((data.with_coordinates / data.total) * 100).toFixed(1)}%).`
+  : null)
+
+const citySpec = (id, title, rows, valueLabel, color, note) => ({
+  id, title, kind: 'bar', itemLabel: 'City / Municipality', valueLabel, color,
+  subtitle: 'Top cities by number of records.',
+  items: (rows ?? []).map((row) => ({ label: row.city, value: row.count })),
+  notes: [note],
+})
 
 export default function LocationDataQualityPage() {
-  const seekersChartRef = useRef(null)
-  const vacanciesChartRef = useRef(null)
   const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['admin', 'locationDataQuality'],
     queryFn: async () => {
@@ -77,13 +87,13 @@ export default function LocationDataQualityPage() {
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
-        <div ref={seekersChartRef} className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
           <div className="mb-6 flex items-start justify-between gap-3">
             <h3 className="font-bold text-slate-900 flex items-center gap-2">
               <MapPin className="h-5 w-5 text-slate-400" />
               Top Cities for Job Seekers
             </h3>
-            <ChartDownloadMenu targetRef={seekersChartRef} title="Top Cities for Job Seekers" footnote={EXPORT_FOOTNOTE} disabled={!analytics?.seekers_by_city?.length} />
+            <ChartDownloadMenu spec={citySpec('top-cities-seekers', 'Top Cities for Job Seekers', analytics?.seekers_by_city, 'Job seekers', CHART_COLORS[0], coordinateNote(metrics?.job_seekers, 'job seeker'))} context={EXPORT_CONTEXT} />
           </div>
           <div className="h-[300px] w-full" role="img" aria-label={`Bar chart: top cities for job seekers. ${(analytics?.seekers_by_city || []).map((row) => `${row.city}: ${row.count}`).join(', ') || 'no data'}.`}>
             <ResponsiveContainer width="100%" height="100%">
@@ -98,13 +108,13 @@ export default function LocationDataQualityPage() {
           </div>
         </div>
 
-        <div ref={vacanciesChartRef} className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
           <div className="mb-6 flex items-start justify-between gap-3">
             <h3 className="font-bold text-slate-900 flex items-center gap-2">
               <MapPinned className="h-5 w-5 text-slate-400" />
               Top Cities for Job Vacancies
             </h3>
-            <ChartDownloadMenu targetRef={vacanciesChartRef} title="Top Cities for Job Vacancies" footnote={EXPORT_FOOTNOTE} disabled={!analytics?.vacancies_by_city?.length} />
+            <ChartDownloadMenu spec={citySpec('top-cities-vacancies', 'Top Cities for Job Vacancies', analytics?.vacancies_by_city, 'Vacancies', CHART_COLORS[2], coordinateNote(metrics?.job_vacancies, 'vacancy'))} context={EXPORT_CONTEXT} />
           </div>
           <div className="h-[300px] w-full" role="img" aria-label={`Bar chart: top cities for job vacancies. ${(analytics?.vacancies_by_city || []).map((row) => `${row.city}: ${row.count}`).join(', ') || 'no data'}.`}>
             <ResponsiveContainer width="100%" height="100%">

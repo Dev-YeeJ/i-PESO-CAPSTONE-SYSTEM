@@ -10,6 +10,7 @@ import LazyImage from '@/components/common/LazyImage'
 import * as employerService from '@/services/employerService'
 import * as employerDashboardService from '@/services/employerDashboardService'
 import { useAuthStore } from '@/stores/authStore'
+import ChartDownloadMenu from '@/components/common/ChartDownloadMenu'
 import { formatDistanceToNow } from 'date-fns'
 import PortalPageHeader from '@/components/shell/PortalPageHeader'
 import PlacementDeadlineStrip from './components/PlacementDeadlineStrip'
@@ -191,7 +192,25 @@ export default function EmployerDashboard() {
             {/* Trends - What changed? */}
             <Motion.div variants={itemVariants} className="xl:col-span-2">
               <Card className="h-full border-slate-200/60 shadow-sm transition-shadow hover:shadow-md">
-                <CardHeader title="Applications" subtitle="Applications received over the last 14 days." />
+                <CardHeader
+                  title="Applications"
+                  subtitle="Applications received over the last 14 days."
+                  action={(
+                    <ChartDownloadMenu
+                      spec={{
+                        id: 'applications-14-days', title: 'Applications', kind: 'area', xLabel: 'Date',
+                        subtitle: 'Applications received over the last 14 days.',
+                        rows: (stats.chart ?? []).map((row) => ({ x: row.date, a: row.count })),
+                        series: [{ key: 'a', label: 'Applications', color: '#2563eb' }],
+                      }}
+                      context={{
+                        reportTitle: 'Applications report',
+                        employer: profile?.employer?.company_name ?? user?.name ?? 'Employer',
+                        coverage: ['Coverage: last 14 days'],
+                      }}
+                    />
+                  )}
+                />
                 <div className="mt-6 h-[300px] w-full">
                   <ResponsiveContainer width="100%" height="100%">
                     <AreaChart data={stats.chart} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>

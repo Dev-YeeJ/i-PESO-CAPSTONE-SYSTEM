@@ -14,13 +14,15 @@ import { Button, Card } from '@/components/ui'
 import PageHeader from '@/pages/admin/_components/PageHeader'
 import StatCard from '@/pages/admin/_components/StatCard'
 import ChartDownloadMenu from '@/components/common/ChartDownloadMenu'
+import DownloadAllCharts from '@/components/reports/DownloadAllCharts'
 import { adminService } from '@/services/adminService'
 import { analyticsService } from '@/services/analyticsService'
 import { CHART_COLORS } from '@/design-system/chartColors'
+import { REPORT_TITLE, buildAnalyticsSpecs, buildForecastAppendix, buildSummary, coverageLines, formatPeriod, pretty } from './laborAnalyticsReport'
 
 const COLORS = CHART_COLORS
-// Applied-filter summary printed in the footer of downloaded chart PDFs.
-const ChartExportNoteContext = createContext('')
+// Report title and coverage (applied filters) printed on every chart download.
+const ChartExportContext = createContext(null)
 const today = new Date()
 const initialFilters = {
   date_from: new Date(today.getFullYear(), today.getMonth() - 11, 1).toISOString().slice(0, 10),
@@ -183,10 +185,13 @@ function AnalyticsView({ data, loading, error, filters, appliedFilters, setFilte
   const distributions = data?.distributions || {}
   const top = data?.top_lists || {}
   const forecast = data?.forecast || {}
-  const exportNote = ['I-PESO Analytics', formatDateRange(appliedFilters.date_from, appliedFilters.date_to), `Period: ${pretty(appliedFilters.period)}`, ...chips.map(([key, value]) => `${pretty(key)}: ${value}`)].join(', ')
+  // Downloads use the same data as the cards, with the applied filters as the coverage.
+  const specs = buildAnalyticsSpecs(data, appliedFilters)
+  const spec = Object.fromEntries(specs.map((item) => [item.id, item]))
+  const exportContext = { reportTitle: REPORT_TITLE, coverage: coverageLines(appliedFilters, chips) }
 
   return (
-    <ChartExportNoteContext.Provider value={exportNote}>
+    <ChartExportContext.Provider value={exportContext}>
       <Card padding="none" className="overflow-hidden transition-all duration-300 hover:shadow-lg hover:shadow-brand-500/5">
         <form onSubmit={applyFilters} className="bg-brand-canvas p-5 sm:p-6">
           <div className="mb-4 flex items-center justify-between gap-3">
@@ -207,6 +212,11 @@ function AnalyticsView({ data, loading, error, filters, appliedFilters, setFilte
           </div>
         </form>
       </Card>
+
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="text-sm text-slate-500">Every chart downloads with the PESO letterhead, the numbers behind it and the filters above.</p>
+        <DownloadAllCharts specs={specs} context={exportContext} summary={buildSummary(data)} appendix={buildForecastAppendix(data)} disabled={loading || !data} />
+      </div>
 
       {error && <div className="flex items-center gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700"><CircleAlert className="h-5 w-5" />{error}</div>}
       {loading && <div className="h-1 overflow-hidden rounded-full bg-brand-100"><div className="h-full w-1/2 animate-pulse rounded-full bg-brand-600" /></div>}
@@ -233,47 +243,47 @@ function AnalyticsView({ data, loading, error, filters, appliedFilters, setFilte
 
       <SectionTitle title="Applicant and employment trends" subtitle="Registered job seekers and job applications are intentionally reported as separate indicators." />
       <div className="grid gap-6 xl:grid-cols-2">
-        <ChartCard title="Registered Job Seekers vs Job Applications Submitted" subtitle={`${pretty(appliedFilters.period)} counts within the selected range.`}>
+        <ChartCard spec={spec['registrations-vs-applications']}>
           <TrendChart series={mergeTrends(trends.registered_job_seekers, trends.job_applications_submitted, 'Registered Job Seekers', 'Job Applications Submitted')} lines={['Registered Job Seekers', 'Job Applications Submitted']} />
         </ChartCard>
-        <ChartCard title="Employment Activity" subtitle="Hires and newly posted vacancies over time.">
+        <ChartCard spec={spec['employment-activity']}>
           <TrendChart series={mergeTrends(trends.hired_applicants, trends.vacancy_postings, 'Hired Applicants', 'Vacancy Postings')} lines={['Hired Applicants', 'Vacancy Postings']} />
         </ChartCard>
       </div>
 
       <div className="grid gap-6 xl:grid-cols-3">
-        <ChartCard title="Current Employment Status" subtitle="Current distribution; status history is not stored."><Donut data={distributions.employment_status} /></ChartCard>
-        <ChartCard title="Gender Distribution" subtitle="Registered job seekers with available sex data."><Donut data={distributions.gender} /></ChartCard>
-        <ChartCard title="Educational Attainment" subtitle="Top recorded attainment levels."><HorizontalBars data={distributions.educational_attainment} /></ChartCard>
+        <ChartCard spec={spec['employment-status']}><Donut data={distributions.employment_status} /></ChartCard>
+        <ChartCard spec={spec['gender']}><Donut data={distributions.gender} /></ChartCard>
+        <ChartCard spec={spec['educational-attainment']}><HorizontalBars data={distributions.educational_attainment} /></ChartCard>
       </div>
       <Insight icon={CircleAlert} title="Unemployment trend limitation">{data?.meta?.unemployment_note}</Insight>
 
       <SectionTitle title="Skills and job demand" subtitle="Supply from seeker profiles compared with demand recorded on vacancies." />
       <div className="grid gap-6 xl:grid-cols-3">
-        <ChartCard title="Common Job Seeker Skills"><HorizontalBars data={top.job_seeker_skills} /></ChartCard>
-        <ChartCard title="Demanded Vacancy Skills"><HorizontalBars data={top.vacancy_demanded_skills} color={COLORS[1]} /></ChartCard>
-        <ChartCard title="Most Applied Job Categories"><HorizontalBars data={top.most_applied_job_categories} color={COLORS[2]} /></ChartCard>
+        <ChartCard spec={spec['seeker-skills']}><HorizontalBars data={top.job_seeker_skills} /></ChartCard>
+        <ChartCard spec={spec['demanded-skills']}><HorizontalBars data={top.vacancy_demanded_skills} color={COLORS[1]} /></ChartCard>
+        <ChartCard spec={spec['applied-categories']}><HorizontalBars data={top.most_applied_job_categories} color={COLORS[2]} /></ChartCard>
       </div>
 
       <SectionTitle title="Location analytics" subtitle="Top locations are limited to keep the dashboard readable and responsive." />
       <div className="grid gap-6 md:grid-cols-2">
-        <ChartCard title="Job Seekers by Barangay"><HorizontalBars data={distributions.job_seeker_locations?.barangay} /></ChartCard>
-        <ChartCard title="Job Seekers by City / Municipality"><HorizontalBars data={distributions.job_seeker_locations?.city_municipality} color={COLORS[1]} /></ChartCard>
-        <ChartCard title="Employers by Location"><HorizontalBars data={distributions.employer_locations?.city_municipality} color={COLORS[3]} /></ChartCard>
-        <ChartCard title="Vacancies by Location"><HorizontalBars data={distributions.vacancy_locations?.city_municipality} color={COLORS[2]} /></ChartCard>
+        <ChartCard spec={spec['seekers-by-barangay']}><HorizontalBars data={distributions.job_seeker_locations?.barangay} /></ChartCard>
+        <ChartCard spec={spec['seekers-by-city']}><HorizontalBars data={distributions.job_seeker_locations?.city_municipality} color={COLORS[1]} /></ChartCard>
+        <ChartCard spec={spec['employers-by-location']}><HorizontalBars data={distributions.employer_locations?.city_municipality} color={COLORS[3]} /></ChartCard>
+        <ChartCard spec={spec['vacancies-by-location']}><HorizontalBars data={distributions.vacancy_locations?.city_municipality} color={COLORS[2]} /></ChartCard>
       </div>
 
       <SectionTitle title="Company and vacancy analytics" subtitle="Employer activity is separated into applications, vacancies, and confirmed hires." />
       <div className="grid gap-6 xl:grid-cols-3">
-        <ChartCard title="Most Active Hiring Companies"><RankList data={top.most_active_hiring_companies} unit="applications" /></ChartCard>
-        <ChartCard title="Companies with Most Vacancies"><RankList data={top.companies_with_most_vacancies} unit="vacancies" /></ChartCard>
-        <ChartCard title="Companies with Highest Hires"><RankList data={top.companies_with_highest_hires} unit="hires" /></ChartCard>
-        <ChartCard title="Job Vacancies by Status"><Donut data={distributions.vacancy_status} /></ChartCard>
-        <div className="xl:col-span-2"><ChartCard title="Job Vacancies by Category / Occupation"><HorizontalBars data={top.vacancies_by_category} /></ChartCard></div>
+        <ChartCard spec={spec['active-hiring-companies']}><RankList data={top.most_active_hiring_companies} unit="applications" /></ChartCard>
+        <ChartCard spec={spec['companies-most-vacancies']}><RankList data={top.companies_with_most_vacancies} unit="vacancies" /></ChartCard>
+        <ChartCard spec={spec['companies-highest-hires']}><RankList data={top.companies_with_highest_hires} unit="hires" /></ChartCard>
+        <ChartCard spec={spec['vacancies-by-status']}><Donut data={distributions.vacancy_status} /></ChartCard>
+        <div className="xl:col-span-2"><ChartCard spec={spec['vacancies-by-category']}><HorizontalBars data={top.vacancies_by_category} /></ChartCard></div>
       </div>
 
       <Forecast forecast={forecast} />
-    </ChartExportNoteContext.Provider>
+    </ChartExportContext.Provider>
   )
 }
 
@@ -309,18 +319,15 @@ function Forecast({ forecast }) {
   return <section className="overflow-hidden rounded-2xl border border-amber-200 bg-[#fffbeb] shadow-sm"><div className="flex items-start gap-4 border-b border-amber-100 p-5 sm:p-6"><span className="shrink-0 rounded-xl bg-amber-100 p-3 text-amber-800"><Sparkles className="h-6 w-6" /></span><div className="min-w-0"><p className="text-xs font-bold text-amber-700">Experimental Forecast</p><h2 className="mt-1 text-xl font-bold text-slate-950">Next-month labor demand signal</h2><p className="mt-1 text-sm leading-6 text-slate-600">{forecast.explanation || forecast.message || 'Forecast information is not available.'}</p></div></div>{forecast.available && items.length ? <div className="grid gap-4 p-5 sm:grid-cols-2 sm:p-6 xl:grid-cols-3 2xl:grid-cols-5">{items.map((item, index) => <div key={item.item || index} className="rounded-xl border border-amber-100 bg-white p-4"><p className="line-clamp-2 min-h-10 text-sm font-bold text-slate-900">{item.item || 'Unspecified category'}</p><p className="mt-3 text-3xl font-bold text-brand-900">{safeNumber(item.predicted_next_month_count)}</p><p className="text-xs text-slate-500">predicted postings, {item.trend_direction || 'stable'}</p><p className="mt-2 text-xs font-semibold text-amber-800">R² fit: {formatFit(item.r_squared)}</p></div>)}</div> : <div className="p-5 sm:p-6"><Empty label="Not enough historical data yet to generate reliable predictions." /></div>}{forecast.confidence_note && <p className="border-t border-amber-100 px-5 py-4 text-xs leading-5 text-slate-600 sm:px-6">{forecast.confidence_note}</p>}</section>
 }
 
-function ChartCard({ title, subtitle, children }) {
-  const exportRef = useRef(null)
-  const footnote = useContext(ChartExportNoteContext)
+function ChartCard({ spec, children }) {
+  const exportContext = useContext(ChartExportContext)
   return (
     <Card className="min-w-0 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg hover:shadow-brand-500/10">
-      <div ref={exportRef} className="bg-white">
-        <div className="mb-5 flex items-start justify-between gap-3">
-          <div className="min-w-0"><h3 className="font-bold leading-5 text-slate-950">{title}</h3>{subtitle && <p className="mt-1 text-xs leading-5 text-slate-500">{subtitle}</p>}</div>
-          <ChartDownloadMenu targetRef={exportRef} title={title} footnote={footnote} />
-        </div>
-        {children}
+      <div className="mb-5 flex items-start justify-between gap-3">
+        <div className="min-w-0"><h3 className="font-bold leading-5 text-slate-950">{spec.title}</h3>{spec.subtitle && <p className="mt-1 text-xs leading-5 text-slate-500">{spec.subtitle}</p>}</div>
+        <ChartDownloadMenu spec={spec} context={exportContext} />
       </div>
+      {children}
     </Card>
   )
 }
@@ -346,9 +353,7 @@ function mergeTrends(first = [], second = [], firstKey, secondKey) { const rows 
 function toOptions(values = [], humanize = false) { return values.map((value) => [value, humanize ? pretty(value) : value]) }
 function chipLabel(key, value, options) { if (key === 'occupation') return options.occupations?.find((item) => String(item.id) === String(value))?.title || 'Selected occupation'; return pretty(value) }
 function formatDateRange(from, to) { if (!from || !to) return 'Date range not set'; return `${new Date(`${from}T00:00:00`).toLocaleDateString('en-PH')} – ${new Date(`${to}T00:00:00`).toLocaleDateString('en-PH')}` }
-function formatPeriod(value) { const text = String(value || ''); if (/^\d{4}-\d{2}$/.test(text)) return new Date(`${text}-01T00:00:00`).toLocaleDateString('en-PH', { month: 'short', year: '2-digit' }); return text }
 function truncateLabel(value, limit) { const text = String(value || 'Not specified'); return text.length > limit ? `${text.slice(0, limit - 1)}…` : text }
 function safeNumber(value) { const numeric = Number(value); return Number.isFinite(numeric) ? numeric.toLocaleString() : '0' }
 function seriesSummary(data = [], max = 8) { return data.slice(0, max).map((item) => `${item.label}: ${safeNumber(item.value)}`).join(', ') || 'no data' }
 function formatFit(value) { const numeric = Number(value); return Number.isFinite(numeric) ? numeric.toFixed(2) : 'Not available' }
-function pretty(value = '') { return String(value).replaceAll('_', ' ').replace(/\b\w/g, (letter) => letter.toUpperCase()) }
