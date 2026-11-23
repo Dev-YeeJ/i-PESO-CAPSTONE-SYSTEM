@@ -83,7 +83,8 @@ class ContentModulesSmartTest extends TestCase
 
         Sanctum::actingAs($this->admin());
         $landing = $this->getJson('/api/admin/site-content')->assertOk()->json('sections.landing');
-        $this->assertSame(['announcements' => true, 'features' => true, 'jobs' => false, 'programs' => true], $landing['values']['show_sections']);
+        // The Announcements section was removed too, so its old switch is dropped as well.
+        $this->assertSame(['features' => true, 'jobs' => false, 'programs' => true], $landing['values']['show_sections']);
 
         // What the admin form sends back saves cleanly...
         $this->putJson('/api/admin/site-content/landing', ['version' => $landing['version'], 'values' => $landing['values']])->assertOk();

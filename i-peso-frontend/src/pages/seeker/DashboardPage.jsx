@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
 import JobSeekerHome from './JobSeekerHome'
-import DashboardAnnouncements from '@/components/announcements/DashboardAnnouncements'
 import { getNearbyJobs, getSeekerAnalytics, getSeekerApplications, getSeekerDashboardSummary } from '@/services/seekerService'
 import { useAuthStore } from '@/stores/authStore'
 import { listJobFairs } from '@/services/jobFairService'
@@ -108,7 +107,6 @@ export default function SeekerDashboard() {
 
   return (
     <>
-      <DashboardAnnouncements />
       <JobSeekerHome
         profile={profile}
         user={user}

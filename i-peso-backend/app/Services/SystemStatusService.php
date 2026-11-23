@@ -62,7 +62,7 @@ class SystemStatusService
 
         if (! $last) {
             return $this->check('scheduler', 'Scheduler (cron)', 'error', 'No sign of the scheduler running.', [],
-                fix: 'Reminders, scheduled announcements and queued emails depend on it. On Hostinger, add a cron job that runs `php artisan schedule:run` every minute.');
+                fix: 'Reminders, account clean-up and queued emails depend on it. On Hostinger, add a cron job that runs `php artisan schedule:run` every minute.');
         }
 
         $stale = $last->lt(now()->subMinutes(self::STALE_MINUTES));

@@ -3,7 +3,6 @@ import { Link, useNavigate } from 'react-router-dom';
 import { motion as Motion, useReducedMotion, AnimatePresence } from 'framer-motion';
 import governmentProgramService from '@/services/governmentProgramService';
 import PublicProgramCard from '@/components/government-programs/PublicProgramCard';
-import PublicAnnouncementsSection from '@/components/announcements/PublicAnnouncementsSection';
 import {
   ArrowRight,
   Briefcase,
@@ -49,7 +48,7 @@ const LandingPage = () => {
   // Falls back to the built-in wording, so the page is never blank.
   const { landing, office } = useSiteContent();
   // Sections staff switched off in Content Modules → Landing page (the hero always shows).
-  const show = { announcements: true, features: true, jobs: true, programs: true, ...(landing.show_sections ?? {}) };
+  const show = { features: true, jobs: true, programs: true, ...(landing.show_sections ?? {}) };
   const [activeTab, setActiveTab] = useState('seeker');
   const [programs, setPrograms] = useState([]);
   const [programsLoading, setProgramsLoading] = useState(true);
@@ -367,11 +366,6 @@ const LandingPage = () => {
           </Motion.div>
         </Motion.div>
       </main>
-
-      {/* ── Announcements (Public audience; renders nothing when there are none) ── */}
-      {show.announcements && (
-      <PublicAnnouncementsSection />
-      )}
 
       {/* ── Features ── */}
       {show.features && (

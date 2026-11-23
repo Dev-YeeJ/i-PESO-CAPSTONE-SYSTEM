@@ -110,7 +110,7 @@ export default function ContentModulesPage() {
       <PageHeader
         eyebrow="Configuration"
         title="Content Modules"
-        subtitle="Everything people read on i-PESO that isn’t a record — office details, the assistant’s FAQs and pages — plus what the assistant tells you is missing. Time-bound news belongs in Announcements."
+        subtitle="Everything people read on i-PESO that isn’t a record — office details, the assistant’s FAQs and pages — plus what the assistant tells you is missing."
       />
 
       <div className="grid gap-6 lg:grid-cols-[15rem_minmax(0,1fr)]">

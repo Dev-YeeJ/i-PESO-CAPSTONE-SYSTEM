@@ -22,7 +22,7 @@ const FEATURE_MATRIX = [
   { no: 12, feature: "Labor Analytics & Location Quality", role: "Administrator",    key: "Gender, skills, vacancy distribution charts",    priority: "Medium" },
   { no: 13, feature: "AI Chatbot (ACE)",                   role: "All Users",        key: "Intelligent assistant for common inquiries",     priority: "Medium" },
   { no: 14, feature: "Role & Staff Management",            role: "Administrator",    key: "RBAC, staff accounts, permissions",              priority: "Medium" },
-  { no: 15, feature: "Content & Announcements Module",     role: "Administrator",    key: "Portal content management, announcements",       priority: "Low" },
+  { no: 15, feature: "Content Module",                     role: "Administrator",    key: "Portal content management",       priority: "Low" },
 ];
 
 const ADVISER_COMMENTS = {

@@ -11,7 +11,7 @@ import { formatInterviewMode, formatInterviewTime, interviewPhase, interviewPhas
 import ReviewFormDialog from '@/components/reviews/ReviewFormDialog'
 import ReportEmployerModal from '@/components/ReportEmployerModal'
 import { reviewService } from '@/services/reviewService'
-import { MY_REVIEWS_KEY, openActions } from '@/utils/reviews'
+import { MY_REVIEWS_KEY, isReviewed, openActions } from '@/utils/reviews'
 import PortalPageHeader from '@/components/shell/PortalPageHeader'
 import useMediaQuery from '@/hooks/useMediaQuery'
 import { useNow } from '@/hooks/useNow'
@@ -195,7 +195,7 @@ export default function MyApplications() {
       )}
       {wide && reviewActionsFor(activeApplication.apply_id).map((action) => (
         <Button key={action.key} variant="outline" icon={Star} onClick={() => setWritingReview(action)}>
-          {action.type === 'employment' ? 'Rate the workplace' : 'Rate this employer'}
+          Review company
         </Button>
       ))}
       {!wide && <Button variant="ghost" onClick={() => setSelectedId(null)} className="font-bold">Close</Button>}
@@ -408,7 +408,7 @@ export default function MyApplications() {
                       onClick={() => setWritingReview(action)}
                       className="inline-flex items-center justify-center gap-2 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-900 shadow-sm transition hover:bg-amber-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-600"
                     >
-                      <Star className="h-4 w-4" /> {action.type === 'employment' ? 'Rate the workplace' : 'Rate this employer'}
+                      <Star className="h-4 w-4" /> Review company
                     </button>
                   ))}
                   {application.can_withdraw && (
@@ -588,18 +588,12 @@ function ApplicationDetailBody({ application }) {
 /** Under each application: "You reviewed this" or when a review opens up. */
 function ReviewNote({ item }) {
   if (!item) return null
-  const reviewed = ['recruitment', 'employment'].some((type) => item[type]?.review_id)
-  if (reviewed) {
+  if (isReviewed(item)) {
     return (
       <p className="mt-3 text-xs font-semibold text-slate-500">
-        You reviewed this employer. <Link to="/seeker/reviews" className="text-brand-navy underline-offset-2 hover:underline">See or edit your review</Link>
+        You reviewed this company. <Link to="/seeker/reviews" className="text-brand-navy underline-offset-2 hover:underline">See or edit your review</Link>
       </p>
     )
-  }
-  const upcoming = item.recruitment && !item.recruitment.allowed && item.recruitment.available_from
-  if (upcoming) {
-    const date = new Date(`${item.recruitment.available_from}T00:00:00`).toLocaleDateString('en-PH', { month: 'long', day: 'numeric' })
-    return <p className="mt-3 text-xs text-slate-500">You can rate this employer once they respond, or from {date} if they don't.</p>
   }
   return null
 }

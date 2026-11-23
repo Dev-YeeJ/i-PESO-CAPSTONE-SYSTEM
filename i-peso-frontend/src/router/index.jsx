@@ -18,8 +18,6 @@ import AdminLayout    from '@/layouts/AdminLayout'
 import App            from '@/App'
 import RouteErrorBoundary from './RouteErrorBoundary'
 import { RegistrationGate } from '@/components/system/SystemNotices'
-// Announcements live on the dashboard now; the old pages only redirect there.
-import AnnouncementsRedirect from '@/components/announcements/AnnouncementsRedirect'
 
 // --- LAZY LOADED PAGES ---
 const LandingPage        = lazy(() => import('@/pages/landing/LandingPage'))
@@ -105,8 +103,6 @@ const AdminSMSTemplates = lazy(() => import('@/pages/admin/5-system-reports/sms-
 // Admin Pages - CATEGORY 6: CONFIGURATION
 const AdminStaffList = lazy(() => import('@/pages/admin/6-configuration/staff/StaffListPage'))
 const AdminRolePermissions = lazy(() => import('@/pages/admin/6-configuration/staff/RolePermissionsPage'))
-const AdminAnnouncements = lazy(() => import('@/pages/admin/6-configuration/content/AnnouncementsPage'))
-const AdminAnnouncementForm = lazy(() => import('@/pages/admin/6-configuration/content/AnnouncementFormPage'))
 const AdminContentModules = lazy(() => import('@/pages/admin/6-configuration/content/ContentModulesPage'))
 const AdminSystemSettings = lazy(() => import('@/pages/admin/6-configuration/settings/SystemSettingsPage'))
 
@@ -177,7 +173,7 @@ export const router = createBrowserRouter([
                     children: [
                       { index: true, element: <Navigate to="dashboard" replace /> },
                       { path: 'dashboard', element: S(EmployerDashboard) },
-                      { path: 'announcements', element: <AnnouncementsRedirect to="/employer/dashboard" /> },
+                      { path: 'announcements', element: <Navigate to="/employer/dashboard" replace /> },
                       { path: 'help', element: <Navigate to="/employer/dashboard" replace /> },
                       {
                         element: <RequireApprovedEmployer />,
@@ -258,9 +254,8 @@ export const router = createBrowserRouter([
                       // OJT hours tracking was removed (2026-11-22); old links land somewhere sensible.
                       { path: 'ojt-interns', element: <Navigate to="/admin/staff" replace /> },
                       { path: 'my-ojt', element: <Navigate to="/admin/dashboard" replace /> },
-                      { path: 'announcements', element: S(AdminAnnouncements) },
-                      { path: 'announcements/new', element: S(AdminAnnouncementForm) },
-                      { path: 'announcements/:id', element: S(AdminAnnouncementForm) },
+                      // Announcements module removed; old bookmarks go to the dashboard.
+                      { path: 'announcements/*', element: <Navigate to="/admin/dashboard" replace /> },
                       { path: 'content-modules', element: S(AdminContentModules) },
                       { path: 'site-content', element: <Navigate to="/admin/content-modules" replace /> },
                       { path: 'settings', element: S(AdminSystemSettings) },
@@ -289,7 +284,7 @@ export const router = createBrowserRouter([
                           { path: 'applications', element: S(SeekerApplications) },
                           { path: 'reviews', element: S(SeekerReviews) },
                           { path: 'safety-reports', element: S(MySafetyReports, { role: 'seeker' }) },
-                          { path: 'announcements', element: <AnnouncementsRedirect to="/seeker/dashboard" /> },
+                          { path: 'announcements', element: <Navigate to="/seeker/dashboard" replace /> },
                           { path: 'help', element: <Navigate to="/seeker/dashboard" replace /> },
                           { path: 'profile', element: S(SeekerProfile) },
                           { path: 'profile/edit', element: S(SeekerProfileEdit) },

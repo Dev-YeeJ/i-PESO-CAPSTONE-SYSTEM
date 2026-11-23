@@ -64,9 +64,6 @@ Route::get('/health', function () {
 Route::get('/occupations', [OccupationController::class, 'index'])->middleware('throttle:60,1');
 Route::get('/skills', [SkillCatalogController::class, 'index'])->middleware('throttle:60,1');
 Route::get('/public/government-programs', [\App\Http\Controllers\Api\PublicGovernmentProgramController::class, 'index'])->middleware('throttle:60,1');
-// Landing page: live announcements addressed to the Public audience.
-Route::get('/public/announcements', [\App\Http\Controllers\Api\PublicAnnouncementController::class, 'index'])->middleware('throttle:60,1');
-Route::get('/public/announcements/{announcement}/attachment', [\App\Http\Controllers\Api\PublicAnnouncementController::class, 'attachment'])->middleware('throttle:60,1');
 // Landing page: a few open vacancies (keyword/location filter), the next public job fairs, headline counts.
 Route::controller(\App\Http\Controllers\Api\PublicLandingController::class)->middleware('throttle:60,1')->group(function () {
     Route::get('/public/featured-jobs', 'featuredJobs');
@@ -103,17 +100,6 @@ Route::prefix('auth')->group(function () {
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/auth/me', [AuthController::class, 'me']);
     Route::post('/auth/logout', [AuthController::class, 'logout']);
-
-    // PESO announcements for the signed-in job seeker or employer (web + seeker app).
-    Route::prefix('announcements')->controller(\App\Http\Controllers\Api\AnnouncementFeedController::class)->group(function () {
-        Route::get('/', 'index');
-        Route::get('/banner', 'banner');
-        Route::get('/unread-count', 'unread');
-        Route::post('/read-all', 'readAll')->middleware('throttle:20,1');
-        Route::get('/{announcement}', 'show');
-        Route::post('/{announcement}/dismiss', 'dismiss')->middleware('throttle:60,1');
-        Route::get('/{announcement}/attachment', 'attachment');
-    });
 
     Route::get('/job-fairs', [JobFairController::class, 'index']);
     Route::post('/job-fairs/{id}/rsvp', [JobFairController::class, 'rsvp']);
@@ -471,25 +457,6 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::get('/reports/{id}', [AdminReportController::class, 'show']);
             Route::delete('/reports/{id}', [AdminReportController::class, 'destroy']);
         });
-
-        // Announcements (Configuration → Announcements). Reading needs view,
-        // anything that changes an announcement needs full access.
-        Route::middleware('admin.permission:configuration')
-            ->prefix('announcements')
-            ->controller(\App\Http\Controllers\Api\Admin\Configuration\AnnouncementController::class)
-            ->group(function () {
-                Route::get('/', 'index');
-                Route::get('/options', 'options');
-                Route::post('/', 'store');
-                Route::get('/{announcement}', 'show');
-                Route::put('/{announcement}', 'update');
-                Route::post('/{announcement}/publish', 'publish');
-                Route::post('/{announcement}/unpublish', 'unpublish');
-                Route::post('/{announcement}/archive', 'archive');
-                Route::post('/{announcement}/restore', 'restore');
-                Route::delete('/{announcement}', 'destroy');
-                Route::get('/{announcement}/attachment', 'attachment');
-            });
 
         // Site Content (Configuration → Site Content): Office info, Landing page
         // text and the versioned Policy pages need Configuration access.

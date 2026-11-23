@@ -671,6 +671,46 @@ class HiringApplicationFlowTest extends TestCase
         ])->assertStatus(409);
     }
 
+    public function test_announcements_are_gone_and_their_old_notifications_stay_out_of_the_bell(): void
+    {
+        $seeker = $this->createSeeker();
+        $employer = $this->createEmployer();
+        foreach ([$seeker, $employer] as $user) {
+            foreach (['App\Notifications\AnnouncementPublished', 'App\Notifications\NewJobVacancyPosted'] as $type) {
+                DB::table('notifications')->insert([
+                    'id' => (string) Str::uuid(),
+                    'type' => $type,
+                    'notifiable_type' => $user::class,
+                    'notifiable_id' => $user->getKey(),
+                    'data' => json_encode(['title' => $type, 'message' => 'Test message']),
+                    'read_at' => null,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+            }
+        }
+
+        // The announcement notifications are kept in the database, just not shown.
+        $this->assertSame(2, DB::table('notifications')->where('type', 'App\Notifications\AnnouncementPublished')->count());
+
+        Sanctum::actingAs($seeker);
+        $this->getJson('/api/seeker/notifications/unread-count')->assertOk()->assertJsonPath('unread_count', 1);
+        $this->getJson('/api/seeker/notifications')->assertOk()
+            ->assertJsonCount(1, 'notifications')
+            ->assertJsonPath('notifications.0.type', 'App\Notifications\NewJobVacancyPosted');
+        $this->getJson('/api/announcements')->assertNotFound();
+        $this->getJson('/api/announcements/banner')->assertNotFound();
+
+        Sanctum::actingAs($employer);
+        $this->getJson('/api/employer/notifications/unread-count')->assertOk()->assertJsonPath('unread_count', 1);
+        $this->getJson('/api/employer/notifications')->assertOk()
+            ->assertJsonCount(1, 'notifications')
+            ->assertJsonPath('notifications.0.type', 'NewJobVacancyPosted');
+
+        $this->getJson('/api/public/announcements')->assertNotFound();
+        $this->assertFalse(collect(app('router')->getRoutes())->contains(fn ($route) => str_contains($route->uri(), 'announcements')), 'No announcement endpoints remain.');
+    }
+
     public function test_seeker_notification_bell_uses_count_first_and_bounded_history(): void
     {
         $seeker = $this->createSeeker();

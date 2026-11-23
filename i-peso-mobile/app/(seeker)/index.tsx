@@ -9,7 +9,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import type { JobFair, NearbyJob, NearbyJobsResponse, ProfileStrengthItem, SeekerProfile } from '@/services/seekerService'
 import { seekerService } from '@/services/seekerService'
 import { useProfilePhotoUri } from '@/hooks/useProfilePhotoUri'
-import { AnnouncementBanner } from '@/components/announcements/AnnouncementBanner'
 import { useSystemStatus } from '@/hooks/useSystemStatus'
 import { useAuthStore } from '@/stores/authStore'
 import { useMotion } from '@/hooks/useMotion'
@@ -293,12 +292,7 @@ export default function SeekerHomeScreen() {
 
         {error ? <AlertBox variant="danger" style={styles.errorBox}>{error}</AlertBox> : null}
 
-        {/* (3) PESO announcements (bell + push sourced). Renders nothing when there are none, and
-            carries its own bottom margin when it does — so it gets no wrapper margin here; the hero's
-            bottom margin is the gap above it either way. */}
-        <AnnouncementBanner />
-
-        {/* (4) Quick actions */}
+        {/* (3) Quick actions */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle} accessibilityRole="header">Quick actions</Text>
           <View style={styles.quickRow}>
@@ -512,8 +506,7 @@ const styles = StyleSheet.create({
   alertBox: { marginHorizontal: spacing.lg, marginBottom: spacing.md },
   errorBox: { marginHorizontal: spacing.lg, marginBottom: spacing.lg },
 
-  // Hero margin (16) + this (8) = the 24pt section gap, with or without the announcement banner
-  // (which ends with its own 16pt margin).
+  // Hero margin (16) + this (8) = the 24pt section gap.
   section: { paddingHorizontal: spacing.lg, paddingTop: spacing.sm },
   sectionTight: { paddingTop: spacing.xl },
   sectionHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },

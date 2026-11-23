@@ -7,7 +7,7 @@ import { Badge, Button, ConfirmDialog, EmptyState, ErrorState, LoadingSkeleton }
 import ReviewFormDialog from '@/components/reviews/ReviewFormDialog'
 import { Stars } from '@/components/reviews/StarRating'
 import { reviewService } from '@/services/reviewService'
-import { MY_REVIEWS_KEY, openActions } from '@/utils/reviews'
+import { MY_REVIEWS_KEY, findRequestedReview, openActions } from '@/utils/reviews'
 import PortalPageHeader from '@/components/shell/PortalPageHeader'
 
 const STATUS = {
@@ -27,17 +27,10 @@ export default function MyReviewsPage() {
   const actions = useMemo(() => openActions(data?.opportunities), [data])
   const reviews = useMemo(() => data?.reviews ?? [], [data])
 
-  // A notification links here as ?review=application-12-recruitment: open
-  // that form (or their existing review) straight away.
+  // A notification links here as ?review=application-12-employment: open the
+  // review for that job (or their existing one) with that kind preselected.
   const wanted = searchParams.get('review')
-  const requested = useMemo(() => {
-    if (!wanted || !data) return {}
-    const action = actions.find((item) => item.key === wanted)
-    if (action) return { action }
-    const [source, id, type] = wanted.split('-')
-    const mine = reviews.find((review) => review.type === type && String(review[source === 'placement' ? 'placement_record_id' : 'application_id']) === id)
-    return mine ? { review: mine } : {}
-  }, [wanted, data, actions, reviews])
+  const requested = useMemo(() => (data ? findRequestedReview(wanted, actions, reviews) : {}), [wanted, data, actions, reviews])
   const clearRequest = () => wanted && setSearchParams({}, { replace: true })
 
   const writingTarget = writing ?? requested.action ?? null
@@ -67,7 +60,7 @@ export default function MyReviewsPage() {
     <div className="mx-auto max-w-[1100px] space-y-6 pb-12">
       <PortalPageHeader
         title="Reviews"
-        subtitle="Rate employers you applied to or worked for. Only people with a real application or job through i-PESO can review, and your name is never shown."
+        subtitle="Review a company once you apply: one review per job, about the hiring process or, once you're hired, working there. Only people with a real application or job through i-PESO can review, and your name is never shown."
       >
         <Button to="/review-guidelines" variant="secondary" size="sm">Review guidelines</Button>
       </PortalPageHeader>
@@ -83,7 +76,7 @@ export default function MyReviewsPage() {
             <p className="mt-1 text-sm text-slate-700">PESO confirmed you applied to or worked for these employers.</p>
             {actions.length === 0 ? (
               <p className="mt-3 rounded-xl border border-dashed border-slate-300 bg-white p-5 text-sm text-slate-600">
-                Nothing to review right now. You can rate an employer once they respond to your application, or once you start a job you got through i-PESO.
+                Nothing to review right now. Every company you apply to through i-PESO appears here.
               </p>
             ) : (
               <ul className="mt-3 grid gap-3 md:grid-cols-2">
@@ -94,13 +87,11 @@ export default function MyReviewsPage() {
                       <div className="min-w-0">
                         <p className="truncate font-bold text-slate-900">{action.employerName}</p>
                         <p className="truncate text-xs text-slate-500">
-                          {action.jobTitle}, {action.type === 'employment' ? 'employment experience' : action.limited ? 'no response from employer' : 'recruitment experience'}
+                          {[action.jobTitle, action.types.includes('employment') ? 'hiring process or working here' : 'hiring process'].filter(Boolean).join(', ')}
                         </p>
                       </div>
                     </div>
-                    <Button size="sm" icon={Star} onClick={() => setWriting(action)}>
-                      {action.type === 'employment' ? 'Rate workplace' : 'Rate hiring'}
-                    </Button>
+                    <Button size="sm" icon={Star} onClick={() => setWriting(action)}>Review company</Button>
                   </li>
                 ))}
               </ul>
@@ -123,7 +114,7 @@ export default function MyReviewsPage() {
                         <div className="min-w-0">
                           <p className="font-semibold text-slate-900">{review.employer?.name}</p>
                           <p className="text-xs text-slate-500">
-                            {[review.job_title, review.type === 'employment' ? 'employment experience' : 'recruitment experience', review.month].filter(Boolean).join(', ')}{review.edited ? ' (edited)' : ''}
+                            {[review.job_title, review.type === 'employment' ? 'working here' : 'hiring process', review.month].filter(Boolean).join(', ')}{review.edited ? ' (edited)' : ''}
                           </p>
                         </div>
                         <Badge status={status.variant}>{status.label}</Badge>

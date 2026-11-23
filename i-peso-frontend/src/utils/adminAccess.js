@@ -45,7 +45,6 @@ const PATH_MODULES = [
   ['/admin/staff', 'configuration'],
   ['/admin/role-permissions', 'configuration'],
   ['/admin/ojt-interns', 'configuration'],
-  ['/admin/announcements', 'configuration'],
   ['/admin/site-content', 'configuration'],
   ['/admin/content-modules', 'configuration'],
   ['/admin/settings', 'configuration'],

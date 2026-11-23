@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Http\Controllers\Api\Concerns\HidesRetiredNotifications;
 use App\Http\Controllers\Controller;
 use App\Models\Employer;
 use Illuminate\Http\JsonResponse;
@@ -9,12 +10,14 @@ use Illuminate\Http\Request;
 
 class EmployerNotificationController extends Controller
 {
+    use HidesRetiredNotifications;
+
     public function index(Request $request): JsonResponse
     {
         $employer = $this->employer($request);
         $perPage = max(1, min((int) $request->integer('per_page', 20), 50));
 
-        $notifications = $employer->notifications()->latest()->paginate($perPage);
+        $notifications = $this->visible($employer->notifications())->latest()->paginate($perPage);
         $items = array_map(fn ($notification) => [
             'id' => $notification->id,
             'type' => class_basename($notification->type),
@@ -25,7 +28,7 @@ class EmployerNotificationController extends Controller
 
         return response()->json([
             'notifications' => $items,
-            'unread_count' => $employer->unreadNotifications()->count(),
+            'unread_count' => $this->visible($employer->unreadNotifications())->count(),
             'pagination' => [
                 'current_page' => $notifications->currentPage(),
                 'last_page' => $notifications->lastPage(),
@@ -39,7 +42,7 @@ class EmployerNotificationController extends Controller
         $employer = $this->employer($request);
 
         return response()->json([
-            'unread_count' => $employer->unreadNotifications()->count(),
+            'unread_count' => $this->visible($employer->unreadNotifications())->count(),
         ]);
     }
 

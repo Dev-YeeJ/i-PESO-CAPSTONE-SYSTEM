@@ -1,5 +1,4 @@
-// One place for website URLs and for opening a link that came from PESO staff (an announcement's
-// call-to-action, an FAQ's link). Staff enter either an i-PESO *web* path ("/seeker/job-fairs")
+// One place for website URLs and for opening a link that came from PESO staff (an FAQ's link). Staff enter either an i-PESO *web* path ("/seeker/job-fairs")
 // or a full https:// link — this decides where each one goes, and never opens anything else.
 import { Linking } from 'react-native'
 import type { Router } from 'expo-router'

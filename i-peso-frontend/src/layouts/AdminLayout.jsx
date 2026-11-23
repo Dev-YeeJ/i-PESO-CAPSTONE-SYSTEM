@@ -148,12 +148,6 @@ const navGroups = [
         icon: <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>,
       },
       {
-        to: '/admin/announcements',
-        module: moduleForPath('/admin/announcements'),
-        label: 'Announcements',
-        icon: <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M11 5.882V19.24a1.961 1.961 0 01-2.756 1.753L5.002 20.424a1.961 1.961 0 01-.757-1.753V5.882m0 0h.008v-.5a2 2 0 012-2h15.964m0 0v.5a2 2 0 01-2 2H3.25a2 2 0 01-2-2v-.5m19.964 0a2 2 0 00-1.965-2.693H6.965a2 2 0 00-1.965 2.693m17.928 2.693a1.961 1.961 0 00-1.207-1.753l-2.757-1.753a1.961 1.961 0 00-2.757 1.753m0 0v4.318a1.961 1.961 0 001.207 1.753l2.757 1.753a1.961 1.961 0 002.757-1.753m0-4.318v-2.5" /></svg>,
-      },
-      {
         to: '/admin/content-modules',
         module: moduleForPath('/admin/content-modules'),
         label: 'Content modules',

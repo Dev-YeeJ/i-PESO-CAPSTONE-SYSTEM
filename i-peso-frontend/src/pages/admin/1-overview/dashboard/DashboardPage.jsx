@@ -9,7 +9,6 @@ import {
   CheckCircle2,
   ChevronRight,
   ClipboardCheck,
-  Megaphone,
   PieChart,
   RefreshCw,
   ScanLine,
@@ -94,7 +93,6 @@ export default function DashboardPage() {
   const quickActions = [
     { to: '/admin/verification-queue', label: 'Verify employers', icon: ClipboardCheck },
     { to: '/admin/job-postings', label: 'Review postings', icon: BriefcaseBusiness },
-    { to: '/admin/announcements/new', label: 'New announcement', icon: Megaphone },
     { to: '/admin/labor-analytics', label: 'Labor analytics', icon: PieChart },
   ].filter((action) => canOpenPath(user, action.to))
   const fairIsToday = nextFair && isTodayWithin(nextFair)
