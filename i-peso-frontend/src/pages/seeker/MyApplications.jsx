@@ -14,6 +14,8 @@ import { reviewService } from '@/services/reviewService'
 import { MY_REVIEWS_KEY, openActions } from '@/utils/reviews'
 import PortalPageHeader from '@/components/shell/PortalPageHeader'
 import useMediaQuery from '@/hooks/useMediaQuery'
+import { useNow } from '@/hooks/useNow'
+import LiveDot from '@/components/interview/LiveDot'
 
 const MotionArticle = motion.article
 
@@ -78,6 +80,8 @@ export default function MyApplications() {
   // Wide screens show the list beside a details panel; smaller ones keep the
   // cards and open details in a dialog.
   const wide = useMediaQuery('(min-width: 1024px)')
+  // Redraws every 30 seconds so interview labels flip Upcoming → Happening now → Call ended.
+  useNow()
   const [writingReview, setWritingReview] = useState(null)
   // Which reviews each application allows (Verified Mutual Feedback System).
   const { data: reviewData } = useQuery({ queryKey: MY_REVIEWS_KEY, queryFn: reviewService.getMine, staleTime: 60_000 })
@@ -375,7 +379,7 @@ export default function MyApplications() {
                     <div className={`mt-4 rounded-2xl border p-4 ${muted ? 'border-slate-200 bg-slate-50' : 'border-[#c4d9f7] bg-[#e8f0fc]'}`}>
                       <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
                         <p className={`text-xs font-bold ${muted ? 'text-slate-600' : 'text-brand-navy'}`}>Interview</p>
-                        <span className={`rounded-full border px-2 py-0.5 text-[11px] font-bold ${phase.tone}`}>{phase.label}</span>
+                        <span className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[11px] font-bold ${phase.tone}`}>{phase.phase === 'in_progress' && <LiveDot />}{phase.label}</span>
                       </div>
                       <p className={`text-sm font-bold ${muted ? 'text-slate-700' : 'text-brand-navy'}`}>{formatInterviewTime(application.interview.schedule)}, {formatInterviewMode(application.interview.mode_of_interview)}</p>
                     </div>
@@ -523,10 +527,10 @@ function ApplicationDetailBody({ application }) {
         <div className={`rounded-2xl border p-5 ${muted ? 'border-slate-200 bg-slate-50' : 'border-[#c4d9f7] bg-[#e8f0fc]'}`}>
           <div className={`mb-4 flex flex-col justify-between gap-4 border-b pb-4 sm:flex-row sm:items-center ${muted ? 'border-slate-200' : 'border-[#c4d9f7]'}`}>
             <div>
-              <p className={`text-xs font-bold ${muted ? 'text-slate-600' : 'text-brand-navy'}`}>{ended ? phase.label : phase.phase === 'cancelled' ? 'Interview cancelled' : 'Interview scheduled'}</p>
+              <p className={`text-xs font-bold ${muted ? 'text-slate-600' : 'text-brand-navy'}`}>{ended ? phase.label : phase.phase === 'cancelled' ? 'Interview cancelled' : phase.phase === 'in_progress' ? 'Interview happening now' : 'Interview scheduled'}</p>
               <p className={`mt-1 text-lg font-bold ${muted ? 'text-slate-800' : 'text-brand-navy'}`}>{formatInterviewTime(interview.schedule)}</p>
             </div>
-            <span className={`self-start rounded-full border px-3 py-1.5 text-xs font-bold shadow-sm sm:self-auto ${phase.tone}`}>{phase.label}</span>
+            <span className={`inline-flex items-center gap-1.5 self-start rounded-full border px-3 py-1.5 text-xs font-bold shadow-sm sm:self-auto ${phase.tone}`}>{phase.phase === 'in_progress' && <LiveDot />}{phase.label}</span>
           </div>
           <p className={`text-sm font-semibold ${muted ? 'text-slate-700' : 'text-brand-navy'}`}>{formatInterviewMode(interview.mode_of_interview)}</p>
           {canJoin ? (

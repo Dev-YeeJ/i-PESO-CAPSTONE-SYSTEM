@@ -5,10 +5,12 @@ import FullCalendar from '@fullcalendar/react'
 import dayGridPlugin from '@fullcalendar/daygrid'
 import interactionPlugin from '@fullcalendar/interaction'
 import timeGridPlugin from '@fullcalendar/timegrid'
-import { CalendarPlus, ChevronLeft, ChevronRight, Video } from 'lucide-react'
+import { CalendarPlus, ChevronLeft, ChevronRight, ExternalLink, Video } from 'lucide-react'
 import { Button, Card, ErrorState } from '@/components/ui'
 import { getEmployerCalendarEvents } from '@/services/employerApplicationService'
-import { endedLabel } from '@/utils/interview'
+import { calendarEventPhase, endedLabel, formatInterviewMode } from '@/utils/interview'
+import { useNow } from '@/hooks/useNow'
+import LiveDot from '@/components/interview/LiveDot'
 import PortalPageHeader from '@/components/shell/PortalPageHeader'
 
 const VIEWS = [
@@ -17,6 +19,26 @@ const VIEWS = [
   { id: 'timeGridDay', label: 'Day' },
 ]
 const VIEW_KEY = 'ipeso.calendar.view'
+
+// Event look per live phase. "Happening now" also gets its own first line, so the
+// status survives the short blocks of the Week and Day views.
+const EVENT_TONES = {
+  upcoming: 'border-transparent bg-brand-navy text-white shadow-sm',
+  in_progress: 'border-emerald-700 bg-emerald-600 text-white shadow-md ring-2 ring-emerald-300',
+  ended: 'border-slate-300 bg-slate-100 text-slate-700',
+}
+
+const timeOf = (iso) => new Date(iso).toLocaleTimeString('en-PH', { hour: 'numeric', minute: '2-digit', timeZone: 'Asia/Manila' })
+
+/** Today in Manila as a UTC window ("YYYY-MM-DD HH:mm:ss"), which is how interview times are stored. */
+function manilaTodayWindow(now) {
+  const ymd = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Manila' }).format(now)
+  const [y, m, d] = ymd.split('-').map(Number)
+  const start = new Date(Date.UTC(y, m - 1, d) - 8 * 60 * 60 * 1000)
+  const end = new Date(start.getTime() + 24 * 60 * 60 * 1000)
+  const sql = (date) => date.toISOString().slice(0, 19).replace('T', ' ')
+  return { day: ymd, start: sql(start), end: sql(end) }
+}
 
 const readView = () => {
   try {
@@ -34,6 +56,8 @@ export default function InterviewCalendarPage() {
   const [view, setView] = useState(initialView)
   const [title, setTitle] = useState('')
   const [dateRange, setDateRange] = useState(null)
+  // Phases are re-checked every 30 seconds, so the page flips Upcoming → Happening now → Call ended.
+  const now = useNow()
 
   const eventsQuery = useQuery({
     queryKey: ['employerCalendarEvents', dateRange?.start, dateRange?.end],
@@ -53,7 +77,7 @@ export default function InterviewCalendarPage() {
       applicationId: event.application_id,
       seekerName: event.seeker_name,
       jobTitle: event.job_title,
-      ended: event.phase === 'ended',
+      phase: calendarEventPhase(event, now),
       endedLabel: endedLabel(event),
     },
   }))
@@ -87,6 +111,8 @@ export default function InterviewCalendarPage() {
       >
         <Button to="/employer/ats" icon={CalendarPlus}>Schedule interview</Button>
       </PortalPageHeader>
+
+      <TodayInterviews now={now} onOpen={(applicationId) => navigate(`/employer/ats/applicant/${applicationId}`)} />
 
       <Card className="overflow-hidden p-4 sm:p-6">
         <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -143,30 +169,89 @@ export default function InterviewCalendarPage() {
               datesSet={handleDatesSet}
               eventClick={handleEventClick}
               eventContent={(arg) => {
-                const { ended, endedLabel: endedText, seekerName, jobTitle, joinUrl } = arg.event.extendedProps
+                const { phase, endedLabel: endedText, seekerName, jobTitle, joinUrl } = arg.event.extendedProps
+                const status = phase === 'in_progress' ? 'Happening now' : phase === 'ended' ? endedText : 'Upcoming'
                 return (
-                  <div className={`w-full cursor-pointer overflow-hidden rounded border p-1 text-xs ${ended ? 'border-slate-300 bg-slate-100 text-slate-700' : 'border-transparent bg-brand-navy text-white shadow-sm'}`}>
+                  <div
+                    className={`h-full w-full cursor-pointer overflow-hidden rounded border p-1 text-xs leading-tight ${EVENT_TONES[phase] ?? EVENT_TONES.upcoming}`}
+                    title={[status, `${arg.timeText} ${seekerName || arg.event.title}`, jobTitle].filter(Boolean).join(' · ')}
+                  >
+                    {phase === 'in_progress' && (
+                      <div className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide"><LiveDot light />Happening now</div>
+                    )}
+                    {phase === 'ended' && <div className="truncate text-[10px] font-semibold">{endedText}</div>}
                     <div className="flex items-center gap-1 truncate font-bold">
                       {joinUrl && <Video className="h-3 w-3 shrink-0" aria-label="Online" />}
                       <span className="truncate">{arg.timeText} {seekerName || arg.event.title}</span>
                     </div>
-                    {jobTitle && seekerName && <div className={`truncate text-[10px] ${ended ? '' : 'opacity-80'}`}>{jobTitle}</div>}
-                    {ended && <div className="truncate text-[10px]">{endedText}</div>}
+                    {jobTitle && seekerName && <div className="truncate text-[10px] opacity-80">{jobTitle}</div>}
                   </div>
                 )
               }}
               height="100%"
+              eventBackgroundColor="transparent"
+              eventBorderColor="transparent"
             />
           </div>
         )}
 
         <p className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-xs text-slate-600">
-          <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-brand-navy" aria-hidden="true" />Scheduled</span>
-          <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm border border-slate-300 bg-slate-100" aria-hidden="true" />Held</span>
+          <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-brand-navy" aria-hidden="true" />Upcoming</span>
+          <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-emerald-600" aria-hidden="true" />Happening now</span>
+          <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm border border-slate-300 bg-slate-100" aria-hidden="true" />Call ended / Interview ended</span>
           <span className="flex items-center gap-1.5"><Video className="h-3 w-3" aria-hidden="true" />Online, the applicant page has the join link</span>
           <span>Select an interview to open the applicant.</span>
         </p>
       </Card>
     </div>
+  )
+}
+
+/**
+ * Today at a glance, whatever week or view the calendar shows: any interview
+ * happening now (with its join link), else the next one today.
+ */
+function TodayInterviews({ now, onOpen }) {
+  const today = manilaTodayWindow(now)
+  const todayQuery = useQuery({
+    queryKey: ['employerCalendarEvents', 'today', today.day],
+    queryFn: () => getEmployerCalendarEvents({ start: today.start, end: today.end }),
+    refetchInterval: 60_000,
+    staleTime: 30_000,
+    retry: false,
+  })
+
+  const events = (todayQuery.data?.events ?? []).map((event) => ({ ...event, livePhase: calendarEventPhase(event, now) }))
+  const live = events.filter((event) => event.livePhase === 'in_progress')
+  const next = events.filter((event) => event.livePhase === 'upcoming').sort((a, b) => new Date(a.start) - new Date(b.start))[0]
+  if (!live.length && !next) return null
+
+  return (
+    <section aria-label="Today's interviews" className="space-y-2">
+      {live.map((event) => (
+        <div key={event.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-3 sm:p-4">
+          <div className="flex min-w-0 items-center gap-3">
+            <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-emerald-600 px-2.5 py-1 text-xs font-bold text-white"><LiveDot light />Happening now</span>
+            <div className="min-w-0">
+              <p className="truncate font-semibold text-slate-900">{event.seeker_name || event.title}{event.job_title ? `, ${event.job_title}` : ''}</p>
+              <p className="text-xs text-slate-600">{timeOf(event.start)} – {timeOf(event.end)} · {formatInterviewMode(event.mode_of_interview)}</p>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            {event.url && (
+              <a href={event.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-700 px-3 py-1.5 text-sm font-semibold text-white hover:bg-emerald-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400">
+                Join call <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
+              </a>
+            )}
+            {event.application_id && <Button size="sm" variant="outline" onClick={() => onOpen(event.application_id)}>Open applicant</Button>}
+          </div>
+        </div>
+      ))}
+      {next && (
+        <p className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-600">
+          <span className="font-semibold text-slate-800">Next today:</span> {timeOf(next.start)} · {next.seeker_name || next.title}{next.job_title ? `, ${next.job_title}` : ''}
+        </p>
+      )}
+    </section>
   )
 }

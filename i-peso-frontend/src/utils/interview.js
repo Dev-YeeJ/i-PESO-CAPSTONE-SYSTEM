@@ -48,6 +48,26 @@ export function interviewPhaseLabel(interview, now) {
   }
 }
 
+/**
+ * A calendar event's phase, re-checked against the clock: the API's phase is only
+ * right when the page loaded. Events carry start/end instead of schedule/ends_at.
+ */
+export const calendarEventPhase = (event, now) =>
+  interviewPhase({ schedule: event.start, ends_at: event.end, phase: event.phase, mode_of_interview: event.mode_of_interview }, now)
+
+/**
+ * The interview a seeker should see first: one happening right now, else the
+ * soonest upcoming. Ended and cancelled interviews are left out.
+ */
+export function nextInterviewOf(applications = [], now = Date.now()) {
+  const live = (application) => application.status === 'interview' && application.interview?.schedule
+  const byStart = (a, b) => new Date(a.interview.schedule) - new Date(b.interview.schedule)
+  const withPhase = applications.filter(live).map((application) => ({ application, phase: interviewPhase(application.interview, now) }))
+  return withPhase.filter((item) => item.phase === 'in_progress').map((item) => item.application).sort(byStart)[0]
+    ?? withPhase.filter((item) => item.phase === 'upcoming').map((item) => item.application).sort(byStart)[0]
+    ?? null
+}
+
 export const isJoinableLink = (interview) =>
   interview?.mode_of_interview === 'online' && /^https?:\/\//.test(interview?.venue_or_link || '')
 

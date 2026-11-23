@@ -33,7 +33,9 @@ import EmployerPreferenceChip from '@/components/jobs/EmployerPreferenceChip'
 import EmployerProfileModal from './EmployerProfileModal'
 import { applyToJob, getProfileImage, toggleSavedJob as toggleSavedJobApi } from '@/services/seekerService'
 import { reviewService } from '@/services/reviewService'
-import { formatInterviewTime, interviewPhase } from '@/utils/interview'
+import { formatInterviewTime, interviewPhaseLabel, isJoinableLink, nextInterviewOf } from '@/utils/interview'
+import { useNow } from '@/hooks/useNow'
+import LiveDot from '@/components/interview/LiveDot'
 
 const sortOptions = [
   { value: 'match', label: 'Best match' },
@@ -722,9 +724,12 @@ function ApplicationsSummaryCard({ applications }) {
   const inProgress = list.filter((application) => IN_PROGRESS_STATUSES.includes(application.status)).length
   const interviews = list.filter((application) => application.status === 'interview').length
   const hired = list.filter((application) => application.status === 'hired').length
-  const nextInterview = list
-    .filter((application) => application.status === 'interview' && application.interview?.schedule && interviewPhase(application.interview) === 'upcoming')
-    .sort((a, b) => new Date(a.interview.schedule) - new Date(b.interview.schedule))[0]
+  // One happening right now first (with its join link), else the soonest upcoming;
+  // re-checked every 30 seconds so it doesn't vanish the moment it starts.
+  const now = useNow()
+  const nextInterview = nextInterviewOf(list, now)
+  const nextPhase = nextInterview ? interviewPhaseLabel(nextInterview.interview, now) : null
+  const live = nextPhase?.phase === 'in_progress'
 
   const rows = [
     { label: 'In progress', value: inProgress, icon: Send, tone: 'text-[#2563b8]' },
@@ -755,10 +760,25 @@ function ApplicationsSummaryCard({ applications }) {
             ))}
           </ul>
           {nextInterview && (
-            <div className="mt-4 rounded-xl border border-slate-200 p-3.5">
-              <p className="text-sm font-semibold text-slate-500">Up next</p>
+            <div className={`mt-4 rounded-xl border p-3.5 ${live ? 'border-emerald-200 bg-emerald-50' : 'border-slate-200'}`}>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-sm font-semibold text-slate-500">{live ? 'Interview now' : 'Up next'}</p>
+                <span className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[11px] font-bold ${nextPhase.tone}`}>
+                  {live && <LiveDot />}{nextPhase.label}
+                </span>
+              </div>
               <p className="mt-1 text-sm font-semibold text-slate-900">Interview for {nextInterview.job?.job_title || 'a vacancy'}{nextInterview.job?.employer?.company_name ? ` at ${nextInterview.job.employer.company_name}` : ''}</p>
               <p className="text-sm text-slate-500">{formatInterviewTime(nextInterview.interview.schedule)}</p>
+              {live && isJoinableLink(nextInterview.interview) && (
+                <a
+                  href={nextInterview.interview.venue_or_link}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-emerald-700 px-3 py-1.5 text-sm font-semibold text-white hover:bg-emerald-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400"
+                >
+                  Join call
+                </a>
+              )}
             </div>
           )}
         </>

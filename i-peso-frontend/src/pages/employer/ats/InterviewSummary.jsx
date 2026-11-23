@@ -1,4 +1,6 @@
 import { ExternalLink } from 'lucide-react'
+import { useNow } from '@/hooks/useNow'
+import LiveDot from '@/components/interview/LiveDot'
 import {
   formatInterviewMode,
   formatInterviewTime,
@@ -12,12 +14,14 @@ const HEADINGS = {
   cancelled: 'Interview cancelled',
 }
 
-/** Small status chip for applicant rows in the Interview tab. */
+/** Small status chip for applicant rows (table, board, grid). Flips live with the clock. */
 export function InterviewPhaseChip({ interview }) {
-  const phase = interviewPhaseLabel(interview)
+  const now = useNow()
+  const phase = interviewPhaseLabel(interview, now)
   if (!phase) return null
   return (
-    <span className={`mt-1 inline-flex rounded-full border px-2 py-0.5 text-[11px] font-bold ${phase.tone}`}>
+    <span className={`mt-1 inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[11px] font-bold ${phase.tone}`}>
+      {phase.phase === 'in_progress' && <LiveDot />}
       {phase.phase === 'upcoming' ? formatInterviewTime(interview.schedule) : phase.label}
     </span>
   )
@@ -29,11 +33,12 @@ export function InterviewPhaseChip({ interview }) {
  * applicant isn't left waiting in the Interview stage.
  */
 export default function InterviewSummary({ interview, applicationStatus }) {
+  const now = useNow()
   if (!interview) {
     return <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">No interview scheduled yet.</div>
   }
 
-  const { phase, label, tone } = interviewPhaseLabel(interview)
+  const { phase, label, tone } = interviewPhaseLabel(interview, now)
   const ended = phase === 'ended'
   const muted = ended || phase === 'cancelled'
   const canJoin = !muted && isJoinableLink(interview)
@@ -42,7 +47,7 @@ export default function InterviewSummary({ interview, applicationStatus }) {
     <div className={`rounded-xl border p-4 shadow-sm ${muted ? 'border-slate-200 bg-slate-50 text-slate-800' : 'border-[#c4d9f7] bg-[#e8f0fc] text-brand-navy'}`}>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-base font-bold">{ended ? label : HEADINGS[phase]}</p>
-        <span className={`rounded-full border px-2.5 py-0.5 text-xs font-bold ${tone}`}>{label}</span>
+        <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-bold ${tone}`}>{phase === 'in_progress' && <LiveDot />}{label}</span>
       </div>
       <p className="mt-1 font-medium">
         {formatInterviewTime(interview.schedule)}, {formatInterviewMode(interview.mode_of_interview)}
