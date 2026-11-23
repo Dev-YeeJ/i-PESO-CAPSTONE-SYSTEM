@@ -221,9 +221,9 @@ class SafetyReportFlowTest extends TestCase
             'resolution_summary' => 'No evidence of a fee after interviews with both sides.',
         ])->assertOk()->assertJsonPath('report.closed_by', 'Staff Member');
 
-        // Another staff member editing priority later does not re-attribute the closure.
+        // Another staff member working on the case later does not re-attribute the closure.
         Sanctum::actingAs($this->staff('second@peso.test'));
-        $this->patchJson("/api/admin/safety-reports/{$id}", ['priority' => 'low'])->assertOk();
+        $this->postJson("/api/admin/safety-reports/{$id}/notes", ['note' => 'Filed the interview notes with the case.'])->assertOk();
         $this->assertSame($first->admin_id, SafetyReport::find($id)->closed_by_admin_id);
 
         // Reopening needs an explanation.
@@ -348,7 +348,7 @@ class SafetyReportFlowTest extends TestCase
         $this->getJson('/api/admin/safety-reports')->assertForbidden();
     }
 
-    public function test_the_admin_list_filters_by_direction_status_and_priority(): void
+    public function test_the_admin_list_filters_by_direction_status_and_search(): void
     {
         Sanctum::actingAs($this->seeker('ana@example.test'));
         $this->fileAgainstEmployer(null, 'scam_fraud')->assertCreated();
@@ -362,11 +362,13 @@ class SafetyReportFlowTest extends TestCase
 
         Sanctum::actingAs($this->staff());
         $this->getJson('/api/admin/safety-reports/summary')
-            ->assertJsonPath('open', 2)->assertJsonPath('open_about_employers', 1)->assertJsonPath('open_about_seekers', 1)->assertJsonPath('open_high_priority', 1);
+            ->assertJsonPath('open', 2)->assertJsonPath('open_about_employers', 1)->assertJsonPath('open_about_seekers', 1)->assertJsonPath('action_required', 0);
 
         $this->assertSame(['employer'], collect($this->getJson('/api/admin/safety-reports?reporter_type=employer')->json('data'))->pluck('reporter_type')->all());
         $this->assertSame(['job_seeker'], collect($this->getJson('/api/admin/safety-reports?subject_type=job_seeker')->json('data'))->pluck('subject_type')->all());
-        $this->assertSame(['high', 'low'], collect($this->getJson('/api/admin/safety-reports?sort=priority&status=open')->json('data'))->pluck('priority')->all());
+        $oldestFirst = SafetyReport::query()->oldest('id')->pluck('case_number')->all();
+        $this->assertSame($oldestFirst, collect($this->getJson('/api/admin/safety-reports?sort=oldest&status=open')->json('data'))->pluck('case_number')->all());
+        $this->assertSame(array_reverse($oldestFirst), collect($this->getJson('/api/admin/safety-reports?status=open')->json('data'))->pluck('case_number')->all(), 'Newest first by default.');
         $this->assertCount(2, $this->getJson('/api/admin/safety-reports?search=Urdaneta')->json('data'), 'The company is reporter in one case and reported in the other.');
         $this->assertCount(1, $this->getJson('/api/admin/safety-reports?search=applicant@example')->json('data'));
         $caseNumber = SafetyReport::query()->where('reporter_type', 'employer')->value('case_number');
@@ -427,6 +429,142 @@ class SafetyReportFlowTest extends TestCase
         $this->assertStringNotContainsString('submitted', json_encode($workspace));
     }
 
+    // ── Priority and assignment are not part of the admin workspace ──────────
+
+    public function test_admins_no_longer_see_or_change_priority_or_assignment(): void
+    {
+        Sanctum::actingAs($this->seeker('ana@example.test'));
+        $id = $this->fileAgainstEmployer()->json('report.id');
+        $other = $this->staff('second@peso.test');
+        Sanctum::actingAs($this->staff());
+
+        $options = $this->getJson('/api/admin/safety-reports/options')->assertOk()->json();
+        $this->assertArrayNotHasKey('priorities', $options);
+        $this->assertArrayNotHasKey('assignees', $options);
+        $this->assertArrayNotHasKey('open_high_priority', $this->getJson('/api/admin/safety-reports/summary')->json());
+
+        $row = $this->getJson('/api/admin/safety-reports')->assertOk()->json('data.0');
+        $detail = $this->getJson("/api/admin/safety-reports/{$id}")->assertOk()->json('report');
+        foreach (['priority', 'priority_label', 'assigned_to'] as $key) {
+            $this->assertArrayNotHasKey($key, $row);
+            $this->assertArrayNotHasKey($key, $detail);
+        }
+        $this->assertArrayNotHasKey('assigned_admin_id', $detail);
+
+        // Old clients sending these fields change nothing and add nothing to the history.
+        $before = SafetyReport::find($id);
+        $this->patchJson("/api/admin/safety-reports/{$id}", ['priority' => 'urgent', 'assigned_admin_id' => $other->admin_id])->assertOk();
+        $after = SafetyReport::find($id);
+        $this->assertSame($before->priority, $after->priority);
+        $this->assertNull($after->assigned_admin_id);
+        $this->assertSame(0, $after->events()->whereIn('kind', ['priority', 'assigned'])->count());
+        $this->getJson('/api/admin/safety-reports?sort=priority')->assertStatus(422);
+    }
+
+    // ── Recording actions ───────────────────────────────────────────────────
+
+    public function test_suspending_a_job_seeker_ends_sessions_blocks_sign_in_and_can_be_lifted(): void
+    {
+        $seeker = $this->seeker('suspend-me@example.test');
+        $seeker->createToken('mobile');
+        $id = $this->fileAgainstSeeker($seeker);
+        Sanctum::actingAs($this->staff());
+
+        $this->postJson("/api/admin/safety-reports/{$id}/actions", [
+            'action' => 'suspend_account', 'reason' => 'Confirmed use of another person\'s identity documents.',
+            'notice' => 'Your account is suspended while PESO verifies your identity documents.',
+        ])->assertOk()
+            ->assertJsonPath('report.subject.restriction.type', 'suspended')
+            ->assertJsonPath('report.subject.restriction.ends_at', null);
+
+        $this->assertSame(0, DB::table('personal_access_tokens')->where('tokenable_type', JobSeeker::class)->count());
+        $notice = DB::table('notifications')->where('type', SafetyActionNotice::class)->first();
+        $this->assertSame(JobSeeker::class, $notice->notifiable_type);
+        $this->assertSame('Your i-PESO account is suspended', json_decode($notice->data, true)['title']);
+        $this->postJson('/api/auth/login', ['email' => 'suspend-me@example.test', 'password' => 'password123'])
+            ->assertForbidden()->assertJsonPath('account_suspended', true);
+
+        $this->postJson("/api/admin/safety-reports/{$id}/actions", [
+            'action' => 'lift_restriction', 'reason' => 'Identity confirmed at the PESO office.', 'notice' => 'Your identity is confirmed. Your account is active again.',
+        ])->assertOk()->assertJsonPath('report.subject.restriction', null);
+        $this->assertFalse($seeker->fresh()->isRestricted());
+        $this->assertSame(2, DB::table('notifications')->where('type', SafetyActionNotice::class)->count());
+    }
+
+    public function test_notice_only_actions_are_recorded_and_only_the_noticing_ones_notify(): void
+    {
+        $seeker = $this->seeker('clarify@example.test');
+        $id = $this->fileAgainstSeeker($seeker);
+        Sanctum::actingAs($this->staff());
+
+        $this->postJson("/api/admin/safety-reports/{$id}/actions", ['action' => 'request_clarification', 'reason' => 'The diploma year does not match the school records.'])
+            ->assertStatus(422)->assertJsonValidationErrors('notice');
+        $this->postJson("/api/admin/safety-reports/{$id}/actions", [
+            'action' => 'request_clarification', 'reason' => 'The diploma year does not match the school records.',
+            'notice' => 'Please bring your original diploma to the PESO office within two weeks.',
+        ])->assertOk()->assertJsonPath('message', 'Request profile or document clarification — recorded.');
+        $this->postJson("/api/admin/safety-reports/{$id}/actions", ['action' => 'escalate_external', 'reason' => 'Referred to the school registrar for verification.'])->assertOk();
+        $this->postJson("/api/admin/safety-reports/{$id}/actions", ['action' => 'no_action', 'reason' => 'Registrar confirmed the diploma is genuine.'])->assertOk();
+
+        // Each action is in the history, with who recorded it and why.
+        $timeline = collect($this->getJson("/api/admin/safety-reports/{$id}")->json('report.timeline'))->where('kind', 'action')->values();
+        $this->assertSame([
+            'Action: Request profile or document clarification',
+            'Action: Escalate under PESO procedures',
+            'Action: No action after review',
+        ], $timeline->pluck('title')->all());
+        $this->assertSame('Staff Member', $timeline[0]['actor']);
+        $this->assertSame('The diploma year does not match the school records.', $timeline[0]['body']);
+        $this->assertSame('Please bring your original diploma to the PESO office within two weeks.', $timeline[0]['notice']);
+        $this->assertSame(1, DB::table('notifications')->where('type', SafetyActionNotice::class)->count(), 'Only the clarification request reaches the job seeker.');
+        $this->assertNull($seeker->fresh()->activeRestriction(), 'None of these restrict the account.');
+    }
+
+    public function test_the_action_form_offers_only_actions_that_can_be_carried_out(): void
+    {
+        Sanctum::actingAs($this->seeker('ana@example.test'));
+        $id = $this->fileAgainstEmployer()->json('report.id');
+        Sanctum::actingAs($this->staff());
+        $offered = fn () => collect($this->getJson("/api/admin/safety-reports/{$id}")->json('report.available_actions'))->pluck('value')->all();
+
+        $this->assertNotContains('lift_restriction', $offered(), 'Nothing to lift yet.');
+        $this->postJson("/api/admin/safety-reports/{$id}/actions", ['action' => 'lift_restriction', 'reason' => 'Trying to lift nothing.'])
+            ->assertStatus(422)->assertJsonValidationErrors('action');
+        $this->postJson("/api/admin/safety-reports/{$id}/actions", ['action' => 'request_clarification', 'reason' => 'Not an employer action at all.'])
+            ->assertStatus(422)->assertJsonValidationErrors('action');
+
+        $this->postJson("/api/admin/safety-reports/{$id}/actions", [
+            'action' => 'restrict_account', 'reason' => 'Confirmed fee collection from two applicants.',
+            'notice' => 'New vacancies are paused while PESO completes its review.', 'ends_at' => now()->addDays(14)->toDateString(),
+        ])->assertOk();
+        $this->assertContains('lift_restriction', $offered());
+
+        // Once the employer account is gone, only a record or a referral is possible.
+        DB::table('employers')->where('employer_id', $this->employerId)->update(['deleted_at' => now()]);
+        $this->assertSame(['no_action', 'escalate_external'], $offered());
+        $this->postJson("/api/admin/safety-reports/{$id}/actions", ['action' => 'warning', 'reason' => 'Account is already deleted.', 'notice' => 'This notice cannot be sent.'])
+            ->assertStatus(422)->assertJsonValidationErrors('action');
+        $this->postJson("/api/admin/safety-reports/{$id}/actions", ['action' => 'escalate_external', 'reason' => 'Referred to DOLE for the fee collection.'])->assertOk();
+    }
+
+    public function test_a_restriction_end_date_must_be_after_today_and_within_the_limit(): void
+    {
+        $id = $this->fileAgainstSeeker($this->seeker('dates@example.test'));
+        Sanctum::actingAs($this->staff());
+        $payload = ['action' => 'restrict_account', 'reason' => 'Repeated copied applications confirmed.', 'notice' => 'New applications are paused while PESO reviews your account.'];
+
+        $this->postJson("/api/admin/safety-reports/{$id}/actions", [...$payload, 'ends_at' => now()->subDay()->toDateString()])
+            ->assertStatus(422)->assertJsonValidationErrors('ends_at');
+        $this->postJson("/api/admin/safety-reports/{$id}/actions", [...$payload, 'ends_at' => now()->addDays(400)->toDateString()])
+            ->assertStatus(422)->assertJsonValidationErrors('ends_at');
+        $this->postJson("/api/admin/safety-reports/{$id}/actions", ['action' => 'warning', 'reason' => 'short', 'notice' => 'Please follow the rules.'])
+            ->assertStatus(422)->assertJsonValidationErrors('reason');
+        $this->assertSame(0, SafetyReport::find($id)->events()->where('kind', 'action')->count(), 'Refused actions leave no record.');
+
+        $this->postJson("/api/admin/safety-reports/{$id}/actions", [...$payload, 'ends_at' => now()->addDays(10)->toDateString()])
+            ->assertOk()->assertJsonPath('report.subject.restriction.type', 'limited');
+    }
+
     // ── Helpers ─────────────────────────────────────────────────────────────
 
     // ── Deleting a staff member who holds cases ─────────────────────────────
@@ -459,6 +597,18 @@ class SafetyReportFlowTest extends TestCase
         $closed = SafetyReport::find($closedId);
         $this->assertSame($aide->admin_id, (int) $closed->assigned_admin_id);
         $this->assertSame('Maria', $closed->assignedAdmin?->first_name);
+    }
+
+    /** An employer report about a seeker who applied to them; returns the case id. */
+    private function fileAgainstSeeker(JobSeeker $seeker): int
+    {
+        [, $applicationId] = $this->applyTo($seeker, $this->employerId);
+        Sanctum::actingAs($this->employerModel());
+
+        return $this->postJson('/api/employer/safety-reports', [
+            'application_id' => $applicationId, 'category' => 'impersonation', 'acknowledge' => true,
+            'description' => 'The ID presented at the interview shows a different name from the application.',
+        ])->assertCreated()->json('report.id');
     }
 
     private function employerModel(): Employer

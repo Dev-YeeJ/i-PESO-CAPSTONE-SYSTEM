@@ -105,10 +105,3 @@ export const safetyStatusBadge = (status) => ({
   resolved: 'verified',
   dismissed: 'neutral',
 }[status] ?? 'neutral')
-
-export const safetyPriorityClass = (priority) => ({
-  urgent: 'border-red-300 bg-red-100 text-red-800',
-  high: 'border-orange-200 bg-orange-50 text-orange-800',
-  normal: 'border-slate-200 bg-slate-50 text-slate-700',
-  low: 'border-slate-200 bg-white text-slate-500',
-}[priority] ?? 'border-slate-200 bg-slate-50 text-slate-700')

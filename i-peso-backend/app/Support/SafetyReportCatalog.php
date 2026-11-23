@@ -199,7 +199,6 @@ final class SafetyReportCatalog
     {
         return [
             'statuses' => self::pairs(self::STATUSES),
-            'priorities' => self::pairs(self::PRIORITIES),
             'dismissal_reasons' => self::pairs(self::DISMISSAL_REASONS),
             'subject_types' => self::pairs([self::SUBJECT_EMPLOYER => 'Employer / company', self::SUBJECT_SEEKER => 'Job seeker']),
             'reporter_types' => self::pairs([

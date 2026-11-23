@@ -8,7 +8,7 @@ import {
 } from 'lucide-react'
 import { Badge, Button, Card, ConfirmDialog, LoadingSkeleton } from '@/components/ui'
 import PageHeader from '@/pages/admin/_components/PageHeader'
-import { adminSafetyReportService, safetyPriorityClass, safetyStatusBadge } from '@/services/safetyReportService'
+import { adminSafetyReportService, safetyStatusBadge } from '@/services/safetyReportService'
 
 const formatDateTime = (value) => (value ? new Date(value).toLocaleString('en-PH', { dateStyle: 'medium', timeStyle: 'short' }) : '—')
 const formatDate = (value) => (value ? new Date(value).toLocaleDateString('en-PH', { dateStyle: 'medium' }) : '—')
@@ -65,12 +65,10 @@ export default function SafetyReportDetailPage() {
 
       <div className="mb-6 flex flex-wrap items-center gap-2">
         <Badge status={safetyStatusBadge(report.status)}>{report.status_label}</Badge>
-        <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-bold ${safetyPriorityClass(report.priority)}`}>{report.priority_label} priority</span>
         <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs font-bold text-slate-600">
           {report.subject_type === 'employer' ? <Building2 className="h-3.5 w-3.5" /> : <UserRound className="h-3.5 w-3.5" />}
           Report about a{report.subject_type === 'employer' ? 'n employer' : ' job seeker'}
         </span>
-        {report.assigned_to && <span className="rounded-full border border-[#c4d9f7] bg-[#e8f0fc] px-2.5 py-1 text-xs font-bold text-brand-navy">Assigned to {report.assigned_to}</span>}
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[1.55fr_1fr]">
@@ -257,8 +255,6 @@ export default function SafetyReportDetailPage() {
 
 function ReviewCard({ report, options, onSaved }) {
   const [status, setStatus] = useState(report.status)
-  const [priority, setPriority] = useState(report.priority)
-  const [assignee, setAssignee] = useState(report.assigned_admin_id ? String(report.assigned_admin_id) : '')
   const [summary, setSummary] = useState('')
   const [dismissalReason, setDismissalReason] = useState('')
   const [note, setNote] = useState('')
@@ -269,8 +265,6 @@ function ReviewCard({ report, options, onSaved }) {
   if (synced !== report.updated_at) {
     setSynced(report.updated_at)
     setStatus(report.status)
-    setPriority(report.priority)
-    setAssignee(report.assigned_admin_id ? String(report.assigned_admin_id) : '')
     setSummary('')
     setDismissalReason('')
     setNote('')
@@ -278,15 +272,11 @@ function ReviewCard({ report, options, onSaved }) {
 
   const closing = (status === 'resolved' || status === 'dismissed') && status !== report.status
   const reopening = !['resolved', 'dismissed'].includes(status) && ['resolved', 'dismissed'].includes(report.status)
-  const dirty = status !== report.status || priority !== report.priority || assignee !== (report.assigned_admin_id ? String(report.assigned_admin_id) : '')
+  const dirty = status !== report.status
 
   const save = useMutation({
     mutationFn: () => adminSafetyReportService.update(report.id, {
-      status: status !== report.status ? status : undefined,
-      priority: priority !== report.priority ? priority : undefined,
-      ...(assignee !== (report.assigned_admin_id ? String(report.assigned_admin_id) : '')
-        ? (assignee ? { assigned_admin_id: Number(assignee) } : { unassign: true })
-        : {}),
+      status,
       resolution_summary: closing ? summary : undefined,
       dismissal_reason: status === 'dismissed' && closing ? dismissalReason : undefined,
       note: note || undefined,
@@ -329,22 +319,6 @@ function ReviewCard({ report, options, onSaved }) {
           </label>
         )}
 
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
-          <label className="block">
-            <span className={labelClass}>Priority</span>
-            <select value={priority} onChange={(event) => setPriority(event.target.value)} className={fieldClass}>
-              {(options?.priorities ?? []).map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-            </select>
-          </label>
-          <label className="block">
-            <span className={labelClass}>Assigned to</span>
-            <select value={assignee} onChange={(event) => setAssignee(event.target.value)} className={fieldClass}>
-              <option value="">Unassigned</option>
-              {(options?.assignees ?? []).map((option) => <option key={option.value} value={String(option.value)}>{option.label}</option>)}
-            </select>
-          </label>
-        </div>
-
         {(status === 'resolved' || status === 'dismissed') && closing && (
           <p className="rounded-lg bg-slate-50 p-3 text-xs text-slate-600">The reporter will be notified that the case was {status}. They won't see your notes or the action taken.</p>
         )}
@@ -368,6 +342,17 @@ function ActionCard({ report, onSaved }) {
   const vacancies = report.subject.vacancies ?? []
   const vacancyChoices = action === 'restore_vacancy' ? vacancies.filter((item) => item.on_hold) : vacancies.filter((item) => !item.on_hold)
   const restriction = report.subject.restriction
+
+  // Hide lists open vacancies and Restore lists held ones, so re-pick the
+  // vacancy for the new action: the reported one if it fits, otherwise none.
+  // A stale choice the list no longer shows would be sent anyway and refused.
+  const chooseAction = (value) => {
+    setAction(value)
+    setError('')
+    const holdWanted = value === 'restore_vacancy'
+    const reported = vacancies.find((item) => item.post_id === report.vacancy?.post_id)
+    setPostId(reported && Boolean(reported.on_hold) === holdWanted ? String(reported.post_id) : '')
+  }
 
   const record = useMutation({
     mutationFn: () => adminSafetyReportService.recordAction(report.id, {
@@ -398,8 +383,13 @@ function ActionCard({ report, onSaved }) {
     return selected?.severe ? setConfirming(true) : record.mutate()
   }
 
-  // Earliest end date for a restriction: tomorrow.
-  const [minDate] = useState(() => new Date(Date.now() + 86_400_000).toISOString().slice(0, 10))
+  // Earliest end date for a restriction: tomorrow, in local time (toISOString
+  // is UTC, which before 8 a.m. in the Philippines still reads as yesterday).
+  const [minDate] = useState(() => {
+    const tomorrow = new Date()
+    tomorrow.setDate(tomorrow.getDate() + 1)
+    return `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, '0')}-${String(tomorrow.getDate()).padStart(2, '0')}`
+  })
 
   return (
     <Card>
@@ -413,7 +403,7 @@ function ActionCard({ report, onSaved }) {
       <div className="mt-4 space-y-4">
         <label className="block">
           <span className={labelClass}>Action</span>
-          <select value={action} onChange={(event) => { setAction(event.target.value); setError('') }} className={fieldClass}>
+          <select value={action} onChange={(event) => chooseAction(event.target.value)} className={fieldClass}>
             <option value="">Choose…</option>
             {report.available_actions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
           </select>

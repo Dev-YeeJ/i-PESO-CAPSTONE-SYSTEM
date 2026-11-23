@@ -6,7 +6,7 @@ import { Badge, Button, Card } from '@/components/ui'
 import DataTable from '@/pages/admin/_components/DataTable'
 import PageHeader from '@/pages/admin/_components/PageHeader'
 import StatCard from '@/pages/admin/_components/StatCard'
-import { adminSafetyReportService, safetyPriorityClass, safetyStatusBadge } from '@/services/safetyReportService'
+import { adminSafetyReportService, safetyStatusBadge } from '@/services/safetyReportService'
 
 const PER_PAGE = 15
 const selectClass = 'mt-2 w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm'
@@ -16,7 +16,7 @@ export default function SafetyReportsListPage() {
   const navigate = useNavigate()
   const [search, setSearch] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
-  const [filters, setFilters] = useState({ status: 'open', subject_type: '', reporter_type: '', category: '', priority: '', date_from: '', date_to: '', sort: 'priority' })
+  const [filters, setFilters] = useState({ status: 'open', subject_type: '', reporter_type: '', category: '', date_from: '', date_to: '', sort: 'newest' })
   const [page, setPage] = useState(1)
 
   useEffect(() => {
@@ -91,11 +91,6 @@ export default function SafetyReportsListPage() {
       ),
     },
     { key: 'category_label', label: 'Category', render: (value) => <span className="text-sm font-semibold text-slate-700">{value}</span> },
-    {
-      key: 'priority',
-      label: 'Priority',
-      render: (value, row) => <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-bold ${safetyPriorityClass(value)}`}>{row.priority_label}</span>,
-    },
     { key: 'status', label: 'Status', render: (value, row) => <Badge status={safetyStatusBadge(value)}>{row.status_label}</Badge> },
     { key: 'id', label: '', render: () => <ArrowRight className="h-4 w-4 text-slate-400" /> },
   ], [])
@@ -114,7 +109,7 @@ export default function SafetyReportsListPage() {
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard icon={Inbox} color="amber" label="New" value={num(summary.submitted)} subtitle="Submitted, not yet reviewed" />
         <StatCard icon={ShieldAlert} color="blue" label="Open cases" value={num(summary.open)} subtitle={`${num(summary.open_about_employers)} about employers, ${num(summary.open_about_seekers)} about job seekers`} />
-        <StatCard icon={Flag} color="red" label="High priority open" value={num(summary.open_high_priority)} subtitle="Fraud, fees, harassment, identity" />
+        <StatCard icon={Flag} color="red" label="Action required" value={num(summary.action_required)} subtitle="Under investigation or awaiting action" />
         <StatCard icon={CheckCircle2} color="green" label="Closed" value={num((summary.resolved ?? 0) + (summary.dismissed ?? 0))} subtitle={`${num(summary.resolved)} resolved, ${num(summary.dismissed)} dismissed`} />
       </div>
 
@@ -143,7 +138,6 @@ export default function SafetyReportsListPage() {
           <label>
             <span className={labelClass}>Sort</span>
             <select value={filters.sort} onChange={(event) => setFilter('sort', event.target.value)} className={selectClass}>
-              <option value="priority">Priority, then oldest</option>
               <option value="newest">Newest first</option>
               <option value="oldest">Oldest first</option>
             </select>
@@ -167,13 +161,6 @@ export default function SafetyReportsListPage() {
             <select value={filters.category} onChange={(event) => setFilter('category', event.target.value)} className={selectClass}>
               <option value="">All categories</option>
               {categoryOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-            </select>
-          </label>
-          <label>
-            <span className={labelClass}>Priority</span>
-            <select value={filters.priority} onChange={(event) => setFilter('priority', event.target.value)} className={selectClass}>
-              <option value="">Any priority</option>
-              {(options?.priorities ?? []).map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
             </select>
           </label>
           <label>

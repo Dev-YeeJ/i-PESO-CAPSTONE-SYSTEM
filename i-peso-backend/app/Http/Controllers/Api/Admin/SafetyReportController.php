@@ -29,28 +29,19 @@ class SafetyReportController extends Controller
 {
     private const RELATIONS = [
         'reporterSeeker', 'reporterEmployer', 'filedByAdmin', 'subjectEmployer', 'subjectSeeker',
-        'vacancy', 'application', 'assignedAdmin', 'closedByAdmin',
+        'vacancy', 'application', 'closedByAdmin',
     ];
 
     public function __construct(private readonly SafetyCaseService $cases) {}
 
     public function options(): JsonResponse
     {
-        $assignees = Administrator::query()
-            ->where('status', 'active')
-            ->orderBy('first_name')
-            ->get()
-            ->filter(fn (Administrator $admin) => $admin->canManageModule('constituent_crm'))
-            ->map(fn (Administrator $admin) => ['value' => $admin->admin_id, 'label' => trim("{$admin->first_name} {$admin->last_name}")])
-            ->values();
-
-        return response()->json([...SafetyReportCatalog::adminOptions(), 'assignees' => $assignees]);
+        return response()->json(SafetyReportCatalog::adminOptions());
     }
 
     public function summary(): JsonResponse
     {
         $byStatus = SafetyReport::query()->selectRaw('status, COUNT(*) as total')->groupBy('status')->pluck('total', 'status');
-        $openUrgent = SafetyReport::query()->open()->whereIn('priority', ['high', 'urgent'])->count();
         $bySubject = SafetyReport::query()->open()->selectRaw('subject_type, COUNT(*) as total')->groupBy('subject_type')->pluck('total', 'subject_type');
 
         return response()->json([
@@ -61,7 +52,6 @@ class SafetyReportController extends Controller
             'action_required' => (int) $byStatus->get(SafetyReportCatalog::STATUS_ACTION_REQUIRED, 0),
             'resolved' => (int) $byStatus->get(SafetyReportCatalog::STATUS_RESOLVED, 0),
             'dismissed' => (int) $byStatus->get(SafetyReportCatalog::STATUS_DISMISSED, 0),
-            'open_high_priority' => $openUrgent,
             'open_about_employers' => (int) $bySubject->get(SafetyReportCatalog::SUBJECT_EMPLOYER, 0),
             'open_about_seekers' => (int) $bySubject->get(SafetyReportCatalog::SUBJECT_SEEKER, 0),
         ]);
@@ -71,7 +61,6 @@ class SafetyReportController extends Controller
     {
         $request->validate([
             'status' => ['nullable', 'string'],
-            'priority' => ['nullable', Rule::in(array_keys(SafetyReportCatalog::PRIORITIES))],
             'subject_type' => ['nullable', Rule::in([SafetyReportCatalog::SUBJECT_EMPLOYER, SafetyReportCatalog::SUBJECT_SEEKER])],
             'reporter_type' => ['nullable', Rule::in([SafetyReportCatalog::REPORTER_SEEKER, SafetyReportCatalog::REPORTER_EMPLOYER, SafetyReportCatalog::REPORTER_STAFF])],
             'category' => ['nullable', 'string', 'max:40'],
@@ -79,7 +68,7 @@ class SafetyReportController extends Controller
             'date_to' => ['nullable', 'date'],
             'subject_id' => ['nullable', 'integer'],
             'search' => ['nullable', 'string', 'max:100'],
-            'sort' => ['nullable', Rule::in(['newest', 'oldest', 'priority'])],
+            'sort' => ['nullable', Rule::in(['newest', 'oldest'])],
             'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
         ]);
 
@@ -92,7 +81,7 @@ class SafetyReportController extends Controller
             $query->where('status', $status);
         }
 
-        foreach (['priority', 'subject_type', 'reporter_type', 'category'] as $filter) {
+        foreach (['subject_type', 'reporter_type', 'category'] as $filter) {
             $query->when($request->string($filter)->toString(), fn (Builder $q, string $value) => $q->where($filter, $value));
         }
 
@@ -118,7 +107,6 @@ class SafetyReportController extends Controller
 
         match ($request->input('sort', 'newest')) {
             'oldest' => $query->oldest('id'),
-            'priority' => $query->orderByRaw("CASE priority WHEN 'urgent' THEN 0 WHEN 'high' THEN 1 WHEN 'normal' THEN 2 ELSE 3 END")->oldest('id'),
             default => $query->latest('id'),
         };
 
@@ -133,26 +121,17 @@ class SafetyReportController extends Controller
         return response()->json(['report' => $this->detail($safetyReport, $this->canManage($request))]);
     }
 
-    /** Status, priority and assignment — each change is written to the history. */
+    /** Moves the case through the review workflow; each change is written to the history. */
     public function update(Request $request, SafetyReport $safetyReport): JsonResponse
     {
         $validated = $request->validate([
             'status' => ['nullable', Rule::in(array_keys(SafetyReportCatalog::STATUSES))],
-            'priority' => ['nullable', Rule::in(array_keys(SafetyReportCatalog::PRIORITIES))],
-            'assigned_admin_id' => ['nullable', 'integer'],
-            'unassign' => ['nullable', 'boolean'],
             'resolution_summary' => ['nullable', 'string', 'max:5000'],
             'dismissal_reason' => ['nullable', Rule::in(array_keys(SafetyReportCatalog::DISMISSAL_REASONS))],
             'note' => ['nullable', 'string', 'max:2000'],
         ]);
         $admin = $this->admin($request);
 
-        if (! empty($validated['priority'])) {
-            $safetyReport = $this->cases->changePriority($safetyReport, $admin, $validated['priority']);
-        }
-        if ($request->boolean('unassign') || array_key_exists('assigned_admin_id', $validated) && $validated['assigned_admin_id']) {
-            $safetyReport = $this->cases->assign($safetyReport, $admin, $request->boolean('unassign') ? null : (int) $validated['assigned_admin_id']);
-        }
         if (! empty($validated['status'])) {
             $safetyReport = $this->cases->changeStatus($safetyReport, $admin, $validated['status'], $validated);
         }
@@ -245,11 +224,8 @@ class SafetyReportController extends Controller
             'category_label' => $report->categoryLabel(),
             'status' => $report->status,
             'status_label' => $report->statusLabel(),
-            'priority' => $report->priority,
-            'priority_label' => SafetyReportCatalog::PRIORITIES[$report->priority] ?? $report->priority,
             'vacancy_title' => $report->vacancy?->job_title,
             'application_id' => $report->application_id,
-            'assigned_to' => $report->assignedAdmin ? trim("{$report->assignedAdmin->first_name} {$report->assignedAdmin->last_name}") : null,
         ];
     }
 
@@ -269,7 +245,6 @@ class SafetyReportController extends Controller
             'resolution_summary' => $report->resolution_summary,
             'closed_at' => $report->closed_at?->toIso8601String(),
             'closed_by' => $report->closedByAdmin ? trim("{$report->closedByAdmin->first_name} {$report->closedByAdmin->last_name}") : null,
-            'assigned_admin_id' => $report->assigned_admin_id,
             'can_manage' => $canManage,
 
             'reporter' => [
@@ -338,7 +313,7 @@ class SafetyReportController extends Controller
 
             'timeline' => $report->events->map(fn (SafetyReportEvent $event) => $this->timelineEntry($report, $event))->values(),
 
-            'available_actions' => collect(SafetyReportCatalog::actionsFor($report->subject_type))
+            'available_actions' => collect($this->availableActions($report, $subject))
                 ->map(fn (string $label, string $value) => [
                     'value' => $value,
                     'label' => $label,
@@ -348,6 +323,27 @@ class SafetyReportController extends Controller
                     'severe' => in_array($value, ['suspend_account', 'restrict_account', 'hide_vacancy'], true),
                 ])->values(),
         ];
+    }
+
+    /**
+     * The actions that can actually be recorded on this case right now, so the
+     * form never offers one the server would refuse: only "no action" or an
+     * external escalation once the reported account is gone, and "lift" only
+     * while a restriction or suspension is in force.
+     */
+    private function availableActions(SafetyReport $report, mixed $subject): array
+    {
+        $actions = SafetyReportCatalog::actionsFor($report->subject_type);
+
+        if (! $subject || ($subject instanceof Employer && $subject->trashed())) {
+            return array_intersect_key($actions, array_flip(['no_action', 'escalate_external']));
+        }
+
+        if (! $subject->isRestricted()) {
+            unset($actions['lift_restriction']);
+        }
+
+        return $actions;
     }
 
     private function timelineEntry(SafetyReport $report, SafetyReportEvent $event): array

@@ -107,43 +107,6 @@ class SafetyCaseService
         return $report->fresh();
     }
 
-    public function changePriority(SafetyReport $report, Administrator $admin, string $priority, ?string $note = null): SafetyReport
-    {
-        if ($report->priority === $priority) {
-            return $report;
-        }
-
-        $from = $report->priority;
-        $report->update(['priority' => $priority]);
-        $report->events()->create([
-            'actor_type' => 'admin', 'actor_admin_id' => $admin->admin_id, 'kind' => SafetyReportEvent::KIND_PRIORITY,
-            'from_value' => $from, 'to_value' => $priority, 'body' => filled($note) ? trim($note) : null,
-        ]);
-
-        return $report->fresh();
-    }
-
-    public function assign(SafetyReport $report, Administrator $admin, ?int $assigneeId): SafetyReport
-    {
-        if ((int) $report->assigned_admin_id === (int) $assigneeId) {
-            return $report;
-        }
-
-        $assignee = $assigneeId ? Administrator::query()->find($assigneeId) : null;
-        if ($assigneeId && (! $assignee || ! $assignee->canManageModule('constituent_crm'))) {
-            throw ValidationException::withMessages(['assigned_admin_id' => ['Assign the case to a staff member with full Constituent CRM access.']]);
-        }
-
-        $report->update(['assigned_admin_id' => $assignee?->admin_id]);
-        $report->events()->create([
-            'actor_type' => 'admin', 'actor_admin_id' => $admin->admin_id, 'kind' => SafetyReportEvent::KIND_ASSIGNED,
-            'to_value' => $assignee ? (string) $assignee->admin_id : null,
-            'body' => $assignee ? trim("{$assignee->first_name} {$assignee->last_name}") : 'Unassigned',
-        ]);
-
-        return $report->fresh();
-    }
-
     public function addNote(SafetyReport $report, Administrator $admin, string $note): SafetyReport
     {
         $report->events()->create([
@@ -171,6 +134,11 @@ class SafetyCaseService
         $needsSubject = ! in_array($action, ['no_action', 'escalate_external'], true);
         if ($needsSubject && (! $subject || ($subject instanceof Employer && $subject->trashed()))) {
             throw ValidationException::withMessages(['action' => ['The reported account no longer exists, so only "no action" or an external escalation can be recorded.']]);
+        }
+
+        // Checked before the notice so staff hear the real reason first.
+        if ($action === 'lift_restriction' && ! $subject->isRestricted()) {
+            throw ValidationException::withMessages(['action' => ['This account has no active restriction to lift.']]);
         }
 
         $notifies = in_array($action, SafetyReportCatalog::NOTIFYING_ACTIONS, true);
@@ -242,9 +210,6 @@ class SafetyCaseService
                     break;
 
                 case 'lift_restriction':
-                    if (! $subject->isRestricted()) {
-                        throw ValidationException::withMessages(['action' => ['This account has no active restriction to lift.']]);
-                    }
                     $meta['lifted'] = $subject->activeRestriction();
                     $subject->forceFill([
                         'account_restriction' => null,
