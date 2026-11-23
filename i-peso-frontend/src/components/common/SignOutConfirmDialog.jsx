@@ -10,14 +10,22 @@ import { useAuthStore } from '@/stores/authStore'
 // caller only owns the open state and its own button styling.
 export default function SignOutConfirmDialog({ open, onOpenChange }) {
   const logout = useAuthStore((state) => state.logout)
+  const role = useAuthStore((state) => state.user?.role)
   const navigate = useNavigate()
   const [signingOut, setSigningOut] = useState(false)
 
   const confirmSignOut = async () => {
+    // Decided before the session ends: PESO staff and admins go back to the staff
+    // sign-in (/administrator), job seekers and employers to the public sign-in.
+    const signInPath = role === 'administrator' ? '/administrator' : '/login'
     setSigningOut(true)
     try {
-      await logout()
-      navigate('/login', { replace: true })
+      try {
+        await logout()
+      } catch {
+        // The session is already cleared on this device even when the server call fails.
+      }
+      navigate(signInPath, { replace: true })
     } finally {
       setSigningOut(false)
       onOpenChange(false)

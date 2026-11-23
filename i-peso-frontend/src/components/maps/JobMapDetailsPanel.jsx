@@ -65,7 +65,7 @@ export default function JobMapDetailsPanel({ job, onViewCompanyReviews, isLoadin
 
   return (
     <aside
-      className={`fixed inset-x-0 bottom-0 z-[700] flex max-h-[78vh] flex-col overflow-hidden rounded-t-3xl border border-slate-200 bg-white shadow-[0_-20px_60px_rgba(15,23,42,0.22)] transition-transform duration-300 ease-out md:absolute md:inset-y-3 md:left-auto md:right-3 md:max-h-none md:w-[400px] md:rounded-2xl md:shadow-[0_20px_60px_rgba(15,23,42,0.24)] ${isOpen ? 'pointer-events-auto translate-y-0 md:translate-x-0' : 'pointer-events-none translate-y-full md:translate-y-0 md:translate-x-[110%]'}`}
+      className={`fixed inset-x-0 bottom-0 z-[700] flex max-h-[78vh] supports-[height:100dvh]:max-h-[78dvh] flex-col overflow-hidden rounded-t-3xl border border-slate-200 bg-white shadow-[0_-20px_60px_rgba(15,23,42,0.22)] transition-transform duration-300 ease-out md:absolute md:inset-y-3 md:left-auto md:right-3 md:max-h-none md:w-[400px] md:rounded-2xl md:shadow-[0_20px_60px_rgba(15,23,42,0.24)] ${isOpen ? 'pointer-events-auto translate-y-0 md:translate-x-0' : 'pointer-events-none translate-y-full md:translate-y-0 md:translate-x-[110%]'}`}
       role="dialog"
       aria-modal={isOpen}
       aria-labelledby="job-details-title"
