@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { calendarEventPhase, interviewPhase, interviewPhaseLabel, nextInterviewOf } from '../interview'
+import { calendarEventPhase, interviewPhase, interviewPhaseLabel, nextInterviewOf, calendarVisibleHours } from '../interview'
 
 const start = new Date('2026-11-10T09:00:00+08:00').getTime()
 const online = { mode_of_interview: 'online', schedule: '2026-11-10T09:00:00+08:00', ends_at: '2026-11-10T10:00:00+08:00', phase: 'upcoming' }
@@ -56,5 +56,27 @@ describe('nextInterviewOf', () => {
     const hired = { status: 'hired', interview: { schedule: '2026-11-10T10:30:00+08:00' } }
     expect(nextInterviewOf([later, ended, cancelled, hired, soon], start + 90 * 60_000)).toBe(soon)
     expect(nextInterviewOf([ended], start)).toBeNull()
+  })
+})
+
+describe('calendarVisibleHours', () => {
+  // Built in local time, as FullCalendar lays the grid out, so this passes in any timezone.
+  const at = (day, hour, minute = 0) => new Date(2026, 10, day, hour, minute).toISOString()
+  const hourLong = (day, hour, minute = 0) => ({ start: at(day, hour, minute), end: new Date(new Date(at(day, hour, minute)).getTime() + 60 * 60_000).toISOString() })
+
+  it('keeps office hours when every interview fits inside them', () => {
+    expect(calendarVisibleHours([hourLong(25, 9, 30), hourLong(25, 13, 30)])).toEqual({ min: 7, max: 20 })
+    expect(calendarVisibleHours([])).toEqual({ min: 7, max: 20 })
+  })
+
+  it('stretches to an early or late interview so it is never cut off the grid', () => {
+    expect(calendarVisibleHours([hourLong(25, 6, 15)])).toEqual({ min: 6, max: 20 })
+    expect(calendarVisibleHours([hourLong(25, 20, 30)])).toEqual({ min: 7, max: 22 })
+  })
+
+  it('opens the whole day for an interview that runs past midnight, like 11:31 p.m.', () => {
+    expect(calendarVisibleHours([hourLong(23, 23, 31)])).toEqual({ min: 0, max: 24 })
+    // Ending exactly at midnight still fits on its own day.
+    expect(calendarVisibleHours([hourLong(23, 23)])).toEqual({ min: 7, max: 24 })
   })
 })

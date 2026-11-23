@@ -8,7 +8,7 @@ import timeGridPlugin from '@fullcalendar/timegrid'
 import { CalendarPlus, ChevronLeft, ChevronRight, ExternalLink, Video } from 'lucide-react'
 import { Button, Card, ErrorState } from '@/components/ui'
 import { getEmployerCalendarEvents } from '@/services/employerApplicationService'
-import { calendarEventPhase, endedLabel, formatInterviewMode } from '@/utils/interview'
+import { calendarEventPhase, calendarVisibleHours, endedLabel, formatInterviewMode } from '@/utils/interview'
 import { useNow } from '@/hooks/useNow'
 import LiveDot from '@/components/interview/LiveDot'
 import PortalPageHeader from '@/components/shell/PortalPageHeader'
@@ -27,6 +27,14 @@ const EVENT_TONES = {
   in_progress: 'border-emerald-700 bg-emerald-600 text-white shadow-md ring-2 ring-emerald-300',
   ended: 'border-slate-300 bg-slate-100 text-slate-700',
 }
+
+// Status line shown at the top of every block, so all three phases read the same way.
+const STATUS_LINE_TONES = {
+  upcoming: 'text-blue-100',
+  ended: 'text-slate-500',
+}
+
+const slotTime = (hour) => `${String(hour).padStart(2, '0')}:00:00`
 
 const timeOf = (iso) => new Date(iso).toLocaleTimeString('en-PH', { hour: 'numeric', minute: '2-digit', timeZone: 'Asia/Manila' })
 
@@ -82,6 +90,8 @@ export default function InterviewCalendarPage() {
     },
   }))
 
+  const hours = calendarVisibleHours(events)
+
   const api = () => calendarRef.current?.getApi()
 
   // FullCalendar reports every navigation here: keep the toolbar title and
@@ -97,10 +107,14 @@ export default function InterviewCalendarPage() {
     try { window.localStorage.setItem(VIEW_KEY, next) } catch { /* not remembered in a private window */ }
   }
 
+  // Tells the applicant page it was opened from here, so its back link
+  // returns to this calendar (same week and view) instead of Applicants.
+  const openApplicant = (applicationId) => navigate(`/employer/ats/applicant/${applicationId}`, { state: { from: 'calendar' } })
+
   const handleEventClick = (info) => {
     info.jsEvent.preventDefault()
     const { applicationId } = info.event.extendedProps
-    if (applicationId) navigate(`/employer/ats/applicant/${applicationId}`)
+    if (applicationId) openApplicant(applicationId)
   }
 
   return (
@@ -112,7 +126,7 @@ export default function InterviewCalendarPage() {
         <Button to="/employer/ats" icon={CalendarPlus}>Schedule interview</Button>
       </PortalPageHeader>
 
-      <TodayInterviews now={now} onOpen={(applicationId) => navigate(`/employer/ats/applicant/${applicationId}`)} />
+      <TodayInterviews now={now} onOpen={openApplicant} />
 
       <Card className="overflow-hidden p-4 sm:p-6">
         <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -162,8 +176,11 @@ export default function InterviewCalendarPage() {
               initialView={initialView}
               headerToolbar={false}
               nowIndicator
-              slotMinTime="07:00:00"
-              slotMaxTime="20:00:00"
+              slotMinTime={slotTime(hours.min)}
+              slotMaxTime={slotTime(hours.max)}
+              scrollTime={slotTime(Math.max(hours.min, Math.min(7, ...events.map((item) => new Date(item.start).getHours()))))}
+              // An evening interview that ends after midnight stays on its own day in Month view.
+              nextDayThreshold="09:00:00"
               allDaySlot={false}
               events={events}
               datesSet={handleDatesSet}
@@ -176,10 +193,11 @@ export default function InterviewCalendarPage() {
                     className={`h-full w-full cursor-pointer overflow-hidden rounded border p-1 text-xs leading-tight ${EVENT_TONES[phase] ?? EVENT_TONES.upcoming}`}
                     title={[status, `${arg.timeText} ${seekerName || arg.event.title}`, jobTitle].filter(Boolean).join(' · ')}
                   >
-                    {phase === 'in_progress' && (
+                    {phase === 'in_progress' ? (
                       <div className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide"><LiveDot light />Happening now</div>
+                    ) : (
+                      <div className={`truncate text-[10px] font-semibold ${STATUS_LINE_TONES[phase] ?? STATUS_LINE_TONES.upcoming}`}>{status}</div>
                     )}
-                    {phase === 'ended' && <div className="truncate text-[10px] font-semibold">{endedText}</div>}
                     <div className="flex items-center gap-1 truncate font-bold">
                       {joinUrl && <Video className="h-3 w-3 shrink-0" aria-label="Online" />}
                       <span className="truncate">{arg.timeText} {seekerName || arg.event.title}</span>

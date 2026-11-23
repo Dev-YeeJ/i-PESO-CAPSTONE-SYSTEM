@@ -56,6 +56,27 @@ export const calendarEventPhase = (event, now) =>
   interviewPhase({ schedule: event.start, ends_at: event.end, phase: event.phase, mode_of_interview: event.mode_of_interview }, now)
 
 /**
+ * The hours the Week and Day grids show: office hours (7 a.m. to 8 p.m.),
+ * stretched to cover every loaded interview so none falls outside the grid,
+ * e.g. one set for 11:30 p.m. An interview that runs past midnight opens the
+ * whole day, since it shows on both dates.
+ */
+export function calendarVisibleHours(events, { from = 7, to = 20 } = {}) {
+  let min = from
+  let max = to
+  for (const event of events) {
+    const start = new Date(event.start)
+    const end = event.end ? new Date(event.end) : new Date(start.getTime() + 60 * 60_000)
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) continue
+    if (end.toDateString() !== start.toDateString() && (end.getHours() || end.getMinutes())) return { min: 0, max: 24 }
+    min = Math.min(min, start.getHours())
+    const endHour = end.toDateString() !== start.toDateString() ? 24 : end.getHours() + (end.getMinutes() ? 1 : 0)
+    max = Math.max(max, endHour)
+  }
+  return { min, max }
+}
+
+/**
  * The interview a seeker should see first: one happening right now, else the
  * soonest upcoming. Ended and cancelled interviews are left out.
  */

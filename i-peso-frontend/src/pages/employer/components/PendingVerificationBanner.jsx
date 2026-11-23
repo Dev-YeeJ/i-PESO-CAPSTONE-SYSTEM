@@ -19,7 +19,7 @@ const DOCUMENT_LABELS = {
 const STATUS_CONFIG = {
   approved: { icon: CheckCircle2, color: 'text-emerald-600', bg: 'bg-emerald-50 border-emerald-200', label: 'Approved' },
   rejected: { icon: XCircle, color: 'text-red-600', bg: 'bg-red-50 border-red-200', label: 'Rejected' },
-  pending: { icon: Clock3, color: 'text-amber-600', bg: 'bg-amber-50 border-amber-200', label: 'Under Review' },
+  pending: { icon: Clock3, color: 'text-amber-600', bg: 'bg-amber-50 border-amber-200', label: 'Pending Review' },
   expired: { icon: XCircle, color: 'text-red-600', bg: 'bg-red-50 border-red-200', label: 'Expired' },
 }
 
@@ -245,7 +245,7 @@ export default function PendingVerificationBanner({ status, rejectionReason, doc
               ))}
             </div>
             {rejectedDocs.length === 0 && (
-              <p className="mt-3 text-xs font-semibold text-amber-700">All documents are under review — your application has been resubmitted to PESO.</p>
+              <p className="mt-3 text-xs font-semibold text-amber-700">All documents are pending review — your application has been resubmitted to PESO.</p>
             )}
           </div>
         )}

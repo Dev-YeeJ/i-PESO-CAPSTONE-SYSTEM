@@ -59,6 +59,14 @@ describe('InterviewCalendarPage status labels', () => {
     expect(within(screen.getByTestId('event-3')).queryByText('Happening now')).not.toBeInTheDocument()
   })
 
+  it('labels every block with its status: Upcoming, Happening now or Call ended', async () => {
+    renderWithProviders(<InterviewCalendarPage />, { route: '/employer/calendar' })
+
+    expect(within(await screen.findByTestId('event-3')).getByText('Upcoming')).toBeInTheDocument()
+    expect(within(screen.getByTestId('event-1')).getByText('Happening now')).toBeInTheDocument()
+    expect(within(screen.getByTestId('event-2')).getByText('Call ended')).toBeInTheDocument()
+  })
+
   it('shows today at a glance with a join link, and a legend for every status', async () => {
     renderWithProviders(<InterviewCalendarPage />, { route: '/employer/calendar' })
 

@@ -109,7 +109,7 @@ export default function EmployerDashboard() {
     setReuploadNotice('')
     try {
       await employerService.reuploadDocument(documentType, file, expirationDate)
-      setReuploadNotice(`${DOCUMENT_LABELS[documentType] ?? documentType} has been re-uploaded and is now under review.`)
+      setReuploadNotice(`${DOCUMENT_LABELS[documentType] ?? documentType} has been re-uploaded and is now pending review.`)
       await loadDashboard()
     } catch (requestError) {
       const msg = requestError.response?.data?.message

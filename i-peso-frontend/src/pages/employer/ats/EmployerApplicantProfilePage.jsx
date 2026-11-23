@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useParams, Link, useLocation, useNavigate } from 'react-router-dom'
 import { getEmployerApplicationDetail, getApplicantResume } from '@/services/employerApplicationService'
 import WorkerRatingBadge from '@/components/reviews/WorkerRatingBadge'
 import { ChevronLeft, Briefcase, FileText, Mail, MapPin, Phone, Sparkles, GraduationCap, Building } from 'lucide-react'
@@ -25,6 +25,42 @@ function SectionHeading({ icon: Icon, title }) {
     <h3 className="mb-4 flex items-center gap-2 text-sm font-bold text-slate-800">
       <Icon className="h-4 w-4 text-brand-navy" /> {title}
     </h3>
+  )
+}
+
+/**
+ * "Back" goes where the employer came from. The interview calendar marks its
+ * links with state.from = 'calendar'; going back in history then returns to
+ * the same week and view. Anything else (Applicants, search, a new tab) goes
+ * to Applicants.
+ */
+function BackLink() {
+  const location = useLocation()
+  const navigate = useNavigate()
+  const linkClass = 'inline-flex items-center text-sm font-medium text-slate-500 hover:text-slate-800'
+
+  if (location.state?.from === 'calendar') {
+    return (
+      <Link
+        to="/employer/calendar"
+        onClick={(event) => {
+          // Only step back when this page was reached in-app; otherwise follow the link.
+          if (window.history.state?.idx > 0) {
+            event.preventDefault()
+            navigate(-1)
+          }
+        }}
+        className={linkClass}
+      >
+        <ChevronLeft className="mr-1 h-4 w-4" /> Back to interview calendar
+      </Link>
+    )
+  }
+
+  return (
+    <Link to="/employer/ats" className={linkClass}>
+      <ChevronLeft className="mr-1 h-4 w-4" /> Back to ATS
+    </Link>
   )
 }
 
@@ -60,9 +96,7 @@ export default function EmployerApplicantProfilePage() {
     return (
       <div className="mx-auto max-w-4xl p-6 text-center">
         <h2 className="text-xl font-bold text-slate-800">Application not found</h2>
-        <Link to="/employer/ats" className="mt-4 inline-flex items-center text-brand-navy hover:underline">
-          <ChevronLeft className="mr-1 h-4 w-4" /> Back to ATS
-        </Link>
+        <div className="mt-4 flex justify-center"><BackLink /></div>
       </div>
     )
   }
@@ -92,9 +126,7 @@ export default function EmployerApplicantProfilePage() {
   return (
     <div className="mx-auto max-w-5xl space-y-6 pb-20">
       <div className="flex items-center justify-between">
-        <Link to="/employer/ats" className="inline-flex items-center text-sm font-medium text-slate-500 hover:text-slate-800">
-          <ChevronLeft className="mr-1 h-4 w-4" /> Back to ATS
-        </Link>
+        <BackLink />
       </div>
 
       <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
