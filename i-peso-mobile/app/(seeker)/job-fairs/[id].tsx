@@ -146,13 +146,13 @@ export default function JobFairDetailScreen() {
         </Animated.View>
       ) : registrableStatuses.includes(textFrom(fair.status, '').toLowerCase()) ? (
         <Card padding="md" style={styles.registerCard}>
-          <Text style={styles.registerTitle}>{fair.is_rsvped ? 'You’re registered' : 'Reserve your spot'}</Text>
+          <Text style={styles.registerTitle}>{fair.is_rsvped ? 'You’re registered' : 'Registration is open'}</Text>
           <Text style={styles.registerSubtitle}>
-            {fair.is_rsvped ? 'Get your digital QR pass to show at the venue.' : 'Register to get a digital QR pass — walk-ins are still welcome too.'}
+            {fair.is_rsvped ? 'Open your QR pass to show at the entrance.' : 'You’ll get a QR pass right away. Walk-ins are welcome too.'}
           </Text>
           {registerError ? <AlertBox variant="danger" style={styles.registerAlert}>{registerError}</AlertBox> : null}
           <Button onPress={register} loading={registering} style={styles.registerButton}>
-            {fair.is_rsvped ? 'View my QR pass' : 'Register for this job fair'}
+            {fair.is_rsvped ? 'View my QR pass' : 'Register for this fair'}
           </Button>
         </Card>
       ) : null}

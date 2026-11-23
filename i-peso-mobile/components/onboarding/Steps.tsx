@@ -521,7 +521,12 @@ export function Step1Personal({
     }
     const withoutNone = value.disabilities.filter((d) => d !== 'none')
     const next = withoutNone.includes(option) ? withoutNone.filter((d) => d !== option) : [...withoutNone, option]
-    set('disabilities', next.length ? next : ['none'])
+    // Unticking Physical drops its description, as on the website.
+    onChange({
+      ...value,
+      disabilities: next.length ? next : ['none'],
+      ...(option === 'physical' && !next.includes('physical') ? { physical_disability_details: '' } : {}),
+    })
   }
 
   return (
@@ -657,6 +662,19 @@ export function Step1Personal({
           <Choice key={option.value} label={option.label} active={value.disabilities.includes(option.value)} onPress={() => toggleDisability(option.value)} />
         ))}
       </View>
+      {value.disabilities.includes('physical') ? (
+        <Field
+          label="Describe your physical disability"
+          required
+          value={value.physical_disability_details}
+          onChangeText={(v) => set('physical_disability_details', v)}
+          error={fieldError(errors, 'physical_disability_details')}
+          placeholder="e.g. Left leg amputation, uses crutches"
+          autoCapitalize="sentences"
+          maxLength={255}
+          help="Only PESO staff see this, to help with referrals and workplace support. Employers never see it."
+        />
+      ) : null}
       {value.disabilities.includes('others') ? (
         <Field label="Specify Disability" required value={value.disability_specification} onChangeText={(v) => set('disability_specification', v)} error={fieldError(errors, 'disability_specification')} />
       ) : null}

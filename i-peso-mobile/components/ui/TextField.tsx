@@ -20,6 +20,7 @@ interface TextFieldProps {
   editable?: boolean
   /** Helper text shown under the field when there's no error — e.g. why it's locked. */
   help?: string
+  maxLength?: number
 }
 
 export function TextField({
@@ -38,6 +39,7 @@ export function TextField({
   style,
   editable = true,
   help,
+  maxLength,
 }: TextFieldProps) {
   const [focused, setFocused] = useState(false)
 
@@ -57,6 +59,7 @@ export function TextField({
         ]}
         value={value}
         onChangeText={onChangeText}
+        maxLength={maxLength}
         onFocus={() => setFocused(true)}
         onBlur={() => {
           setFocused(false)

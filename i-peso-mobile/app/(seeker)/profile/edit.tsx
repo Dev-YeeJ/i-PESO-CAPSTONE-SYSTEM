@@ -1,5 +1,6 @@
-import { memo, useCallback, useEffect, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
+  Alert,
   BackHandler,
   KeyboardAvoidingView,
   Platform,
@@ -51,7 +52,10 @@ const SECTIONS = [
 // all mount several SelectField modals) never re-renders this row — that sibling churn was
 // the actual cause of the intermittent text ghosting/doubling on some Android GPUs, not
 // something a hardware-texture hint alone could paper over.
-const SectionTabs = memo(function SectionTabs({ activeStep, onChange }: { activeStep: number; onChange: (step: number) => void }) {
+type StepKey = `step${1 | 2 | 3 | 4 | 5 | 6 | 7}`
+const stepKey = (step: number) => `step${step}` as StepKey
+
+const SectionTabs = memo(function SectionTabs({ activeStep, onChange, dirtySteps }: { activeStep: number; onChange: (step: number) => void; dirtySteps: string }) {
   return (
     <ScrollView
       horizontal
@@ -68,8 +72,13 @@ const SectionTabs = memo(function SectionTabs({ activeStep, onChange }: { active
           onPress={() => onChange(section.step)}
           accessibilityRole="button"
           accessibilityState={{ selected: activeStep === section.step }}
+          accessibilityLabel={dirtySteps.includes(String(section.step)) ? `${section.label}, unsaved changes` : section.label}
         >
           <Text style={[styles.tabText, activeStep === section.step && styles.tabTextActive]}>{section.label}</Text>
+          {/* Unsaved changes in this section (the website marks its section list the same way). */}
+          {dirtySteps.includes(String(section.step)) ? (
+            <View style={[styles.dirtyDot, activeStep === section.step && styles.dirtyDotActive]} />
+          ) : null}
         </PressableScale>
       ))}
     </ScrollView>
@@ -84,6 +93,8 @@ export default function ProfileEditScreen() {
   const { showToast } = useToast()
   const [activeStep, setActiveStep] = useState(() => Number(params.section) || 1)
   const [form, setForm] = useState<OnboardingFormValue>(emptyOnboardingForm)
+  // The last saved copy of each section, to tell which ones hold unsaved edits (as on the website).
+  const [savedForm, setSavedForm] = useState<OnboardingFormValue>(emptyOnboardingForm)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -118,12 +129,44 @@ export default function ProfileEditScreen() {
   // (and similar profile-strength suggestions) links here directly, bypassing Profile — so
   // unlike resume-studio.tsx (which only has one entry point), this screen needs to know
   // which one it was opened from to send the seeker back to the right place.
-  const goBack = useCallback(() => {
+  // Which sections differ from their saved copy, e.g. "15" for Personal and Education.
+  const dirtySteps = useMemo(
+    () => SECTIONS.filter(({ step }) => JSON.stringify(form[stepKey(step)]) !== JSON.stringify(savedForm[stepKey(step)]))
+      .map(({ step }) => step).join(''),
+    [form, savedForm],
+  )
+  const activeDirty = dirtySteps.includes(String(activeStep))
+  const activeLabel = SECTIONS.find((s) => s.step === activeStep)?.label ?? 'this section'
+
+  const leave = useCallback(() => {
     router.replace({
       pathname: params.from === 'home' ? '/(seeker)' : '/(seeker)/profile',
       params: { returnSection: String(activeStep) },
     })
   }, [params.from, activeStep])
+
+  // Leaving with unsaved edits asks first — same wording as the website's dialog.
+  const goBack = useCallback(() => {
+    if (!dirtySteps) {
+      leave()
+      return
+    }
+    Alert.alert(
+      'Leave without saving?',
+      "You have unsaved changes in your profile. If you leave now, they'll be lost.",
+      [
+        { text: 'Stay and keep editing', style: 'cancel' },
+        { text: 'Leave without saving', style: 'destructive', onPress: leave },
+      ],
+    )
+  }, [dirtySteps, leave])
+
+  const discardActive = () => {
+    const key = stepKey(activeStep)
+    setForm((current) => ({ ...current, [key]: savedForm[key] }))
+    setError('')
+    setErrors({})
+  }
 
   // The ScreenHeader back button above only covers a tap on its own arrow — Android's
   // hardware/system back key bypasses that and goes straight to React Navigation, which
@@ -142,7 +185,10 @@ export default function ProfileEditScreen() {
     let active = true
     seekerService.getProfile()
       .then((profile) => {
-        if (active) setForm(mapProfileToForm(profile))
+        if (!active) return
+        const initial = mapProfileToForm(profile)
+        setForm(initial)
+        setSavedForm(initial)
       })
       .catch(() => setError('Unable to load your profile. Check the backend connection.'))
       .finally(() => { if (active) setLoading(false) })
@@ -197,6 +243,8 @@ export default function ProfileEditScreen() {
 
       const data = await seekerService.saveStep(activeStep, payload)
       if (data.user) updateUser(data.user)
+      const key = stepKey(activeStep)
+      setSavedForm((current) => ({ ...current, [key]: form[key] }))
       showToast('Saved successfully.', 'success')
     } catch (caught: unknown) {
       const err = caught as AxiosError<{ message?: string; errors?: ServerErrors }>
@@ -224,7 +272,7 @@ export default function ProfileEditScreen() {
     <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScreenHeader title="Edit Profile" onBack={goBack} backLabel="Close" />
 
-      <SectionTabs activeStep={activeStep} onChange={changeSection} />
+      <SectionTabs activeStep={activeStep} onChange={changeSection} dirtySteps={dirtySteps} />
 
       <ScrollView ref={scrollRef} contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
         {error ? <AlertBox variant="danger" style={styles.alertBox}>{error}</AlertBox> : null}
@@ -245,8 +293,14 @@ export default function ProfileEditScreen() {
       </ScrollView>
 
       <View style={[styles.saveBar, { paddingBottom: insets.bottom + spacing.md }]}>
+        {activeDirty ? (
+          <View style={styles.unsavedRow} accessibilityRole="summary">
+            <Text style={styles.unsavedText}>You have unsaved changes in {activeLabel}.</Text>
+            <Button variant="ghost" size="sm" onPress={discardActive} disabled={saving}>Discard</Button>
+          </View>
+        ) : null}
         <Button size="lg" fullWidth onPress={save} loading={saving}>
-          Save {SECTIONS.find((s) => s.step === activeStep)?.label}
+          Save {activeLabel}
         </Button>
       </View>
     </KeyboardAvoidingView>
@@ -306,4 +360,9 @@ const styles = StyleSheet.create({
   card: { borderRadius: radii.lg, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, padding: spacing.lg },
   // Sticky save bar (redesign "23 — Edit profile"): always reachable, never lost under a long form.
   saveBar: { paddingHorizontal: spacing.lg, paddingTop: spacing.md, backgroundColor: colors.surface, borderTopWidth: 1, borderTopColor: colors.border },
+  unsavedRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm, marginBottom: spacing.sm },
+  unsavedText: { flex: 1, fontSize: typography.small, fontFamily: typography.family.medium, color: colors.textSecondary },
+  // Blue, not the website's gold: on mobile amber is reserved for things the seeker earned.
+  dirtyDot: { position: 'absolute', top: 6, right: 8, width: 8, height: 8, borderRadius: 4, backgroundColor: colors.secondary },
+  dirtyDotActive: { backgroundColor: colors.white },
 })

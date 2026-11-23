@@ -21,6 +21,8 @@ export interface Step1Value {
   longitude: number | null
   disabilities: string[]
   disability_specification: string
+  /** Short description while Physical is ticked. Sensitive: PESO staff and the NSRP form only. */
+  physical_disability_details: string
 }
 
 export interface Step2Value {
@@ -155,6 +157,7 @@ export const emptyStep1: Step1Value = {
   longitude: null,
   disabilities: [],
   disability_specification: '',
+  physical_disability_details: '',
 }
 
 export const emptyStep2: Step2Value = {

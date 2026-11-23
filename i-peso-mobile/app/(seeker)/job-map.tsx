@@ -48,7 +48,7 @@ const DEFAULT_REGION = { latitude: 15.9762, longitude: 120.5714, latitudeDelta: 
 // mirrors i-peso-frontend's jobMapService.js ALLOWED_RADII.
 const RADIUS_OPTIONS = [5, 10, 15, 25, 50, 100, 200, 300]
 const MIN_MATCH_OPTIONS = [0, 50, 70, 80]
-const SORT_OPTIONS: Array<{ label: string; value: NonNullable<JobFilters['sort']> }> = [
+const SORT_OPTIONS: { label: string; value: NonNullable<JobFilters['sort']> }[] = [
   { label: 'Distance', value: 'distance' },
   { label: 'Match', value: 'match' },
   { label: 'Newest', value: 'newest' },
@@ -130,7 +130,7 @@ export default function JobMapScreen() {
     return () => clearTimeout(timer)
   }, [filters])
 
-  const { data, isLoading, isFetching, error, refetch } = useQuery({
+  const { data, isLoading, isFetching, error } = useQuery({
     queryKey: ['jobMap', debouncedFilters],
     queryFn: async () => {
       try {

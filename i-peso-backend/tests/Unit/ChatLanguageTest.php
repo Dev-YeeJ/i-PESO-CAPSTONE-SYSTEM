@@ -24,6 +24,46 @@ class ChatLanguageTest extends TestCase
         }
     }
 
+    public function test_pangasinan_is_recognised_from_its_own_words(): void
+    {
+        foreach ([
+            'Anto ray requirements ed TUPAD?',
+            'Wala ray bakante ed Urdaneta?',
+            'Paano ak man-apply ed job fair?',
+            'Pwede ak onla ed job fair natan?',
+            'Iner so opisina na PESO?',
+            'Kapigan so job fair?',
+            'Antoy job vacancies ya saragto ed siyak?',
+            'Anto ray requirements for the job fair?',
+        ] as $message) {
+            $language = ChatLanguage::fromMessages([$message]);
+            $this->assertTrue($language->latestLooksPangasinan(), $message);
+            $this->assertSame(ChatLanguage::PANGASINAN, $language->guessed(), $message);
+            $this->assertFalse($language->latestIsClearlyTagalog(), $message);
+        }
+    }
+
+    public function test_tagalog_ilocano_and_english_are_not_taken_for_pangasinan(): void
+    {
+        foreach ([
+            'Paano po ba mag-register?',
+            'May job vacancies ba?',
+            'Ania ti kasapulan tapno makapag-apply ak?',  // Ilocano, even with "ak"
+            'Adda kadi bakante idiay Urdaneta?',
+            'How do I apply for the job fair?',
+            'Are there jobs in Pangasinan?',
+        ] as $message) {
+            $this->assertFalse(ChatLanguage::fromMessages([$message])->latestLooksPangasinan(), $message);
+        }
+    }
+
+    public function test_a_pangasinan_request_survives_a_pangasinan_message_with_english_words(): void
+    {
+        $language = ChatLanguage::fromMessages(['Sagutin mo sa Pangasinan', 'Anto ray requirements for the job fair?']);
+
+        $this->assertSame(ChatLanguage::PANGASINAN, $language->activeRequest());
+    }
+
     public function test_the_province_name_is_not_a_language_request(): void
     {
         foreach ([

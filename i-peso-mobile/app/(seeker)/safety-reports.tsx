@@ -57,7 +57,7 @@ export default function MySafetyReportsScreen() {
       >
         <Text style={styles.kicker}>Report &amp; Safety</Text>
         <Text style={styles.intro}>
-          Concerns you reported to PESO about employers, companies or job vacancies. Reports are confidential — the employer is never told who filed them.
+          Concerns you reported to PESO about employers, companies or job vacancies. Reports are confidential: the employer is never told who filed them.
         </Text>
 
         <AlertBox variant="info" style={styles.infoBox}>

@@ -58,6 +58,7 @@ export function Field({
   autoCapitalize = 'words',
   editable = true,
   help,
+  maxLength,
 }: {
   label: string
   value: string
@@ -72,6 +73,7 @@ export function Field({
   editable?: boolean
   /** Helper text shown under the field when there's no error — e.g. why it's locked. */
   help?: string
+  maxLength?: number
 }) {
   return (
     <TextField
@@ -85,6 +87,7 @@ export function Field({
       error={error}
       editable={editable}
       help={help}
+      maxLength={maxLength}
     />
   )
 }

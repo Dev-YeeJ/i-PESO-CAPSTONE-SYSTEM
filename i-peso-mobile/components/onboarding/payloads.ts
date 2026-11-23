@@ -118,6 +118,9 @@ export function buildStep1Payload(v: Step1Value) {
     longitude: v.longitude,
     disabilities: v.disabilities.length ? v.disabilities : ['none'],
     disability_specification: v.disabilities.includes('others') ? textOrNull(v.disability_specification) : null,
+    // Always sent, as on the website: the API requires a description only from screens that
+    // send this key, and keeps the saved one when it's absent.
+    physical_disability_details: v.disabilities.includes('physical') ? v.physical_disability_details.trim() : null,
   }
 }
 
@@ -331,6 +334,7 @@ export function validateStep(step: number, form: OnboardingFormValue): string {
     if (!v.religion) return 'Select your religion.'
     if (!v.disabilities.length) return 'Select a disability disclosure option.'
     if (v.religion === 'other' && !v.religion_other.trim()) return 'Please specify your religion.'
+    if (v.disabilities.includes('physical') && !v.physical_disability_details.trim()) return 'Please describe your physical disability.'
     if (v.disabilities.includes('others') && !v.disability_specification.trim()) return 'Please specify your disability.'
     return ''
   }
@@ -439,7 +443,9 @@ export function mapProfileToForm(profile: SeekerProfile): OnboardingFormValue {
     latitude: profile.latitude != null ? Number(profile.latitude) : null,
     longitude: profile.longitude != null ? Number(profile.longitude) : null,
     disabilities: disabilityList,
+    // Each description comes from its own row (Others / Physical), never "the first with text".
     disability_specification: (profile.disabilities ?? []).find((d) => d.disability_type === 'others')?.disability_specification ?? '',
+    physical_disability_details: (profile.disabilities ?? []).find((d) => d.disability_type === 'physical')?.disability_specification ?? '',
   }
 
   const step2: OnboardingFormValue['step2'] = {

@@ -31,7 +31,7 @@ function backTargetFor(from: string | undefined, fromId: string | undefined): st
 function timeAgo(iso?: string | null): string {
   if (!iso) return ''
   const seconds = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 1000))
-  const units: Array<[string, number]> = [['year', 31536000], ['month', 2592000], ['week', 604800], ['day', 86400], ['hour', 3600], ['minute', 60]]
+  const units: [string, number][] = [['year', 31536000], ['month', 2592000], ['week', 604800], ['day', 86400], ['hour', 3600], ['minute', 60]]
   for (const [label, secondsPerUnit] of units) {
     const value = Math.floor(seconds / secondsPerUnit)
     if (value >= 1) return `${value} ${label}${value === 1 ? '' : 's'} ago`
@@ -149,7 +149,7 @@ export default function EmployerBoothScreen() {
           ) : null}
 
           <View style={styles.sectionHeaderRow}>
-            <Text style={styles.sectionTitle}>Job Vacancies at this Booth</Text>
+            <Text style={styles.sectionTitle}>Vacancies at this booth</Text>
             <Badge variant="info">{data.vacancies.length} role{data.vacancies.length === 1 ? '' : 's'}</Badge>
           </View>
 

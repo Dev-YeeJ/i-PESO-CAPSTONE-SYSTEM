@@ -126,7 +126,7 @@ export default function MyReviewsScreen() {
                   <View style={styles.flexText}>
                     <Text style={styles.employerName} numberOfLines={1}>{action.employerName}</Text>
                     <Text style={styles.meta} numberOfLines={2}>
-                      {action.jobTitle} · {action.type === 'employment' ? 'Employment experience' : action.limited ? 'No response from employer' : 'Recruitment experience'}
+                      {action.jobTitle}, {action.type === 'employment' ? 'employment experience' : action.limited ? 'no response from employer' : 'recruitment experience'}
                     </Text>
                   </View>
                 </View>

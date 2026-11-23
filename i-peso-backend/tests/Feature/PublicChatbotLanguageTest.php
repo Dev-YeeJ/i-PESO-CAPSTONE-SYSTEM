@@ -51,7 +51,8 @@ class PublicChatbotLanguageTest extends TestCase
 
             return str_contains($instruction, self::THIS_TURN . ': The visitor asked you to use Pangasinan')
                 && str_contains($instruction, 'not Ilocano or Tagalog')
-                && str_contains($instruction, 'ask whether Filipino or English would be okay')
+                && str_contains($instruction, 'Do not offer to switch languages')
+                && ! str_contains($instruction, 'ask whether Filipino or English would be okay')
                 // Both visitor turns are sent; the client's model turn is not.
                 && $contents->pluck('role')->all() === ['user', 'user']
                 && data_get($contents->last(), 'parts.0.text') === 'Production operator';
@@ -92,9 +93,10 @@ class PublicChatbotLanguageTest extends TestCase
             $this->assertStringNotContainsString(self::THIS_TURN, $instruction);
         }
 
-        $this->assertStringContainsString('it may be Pangasinan or Ilocano', $instructions[0]);
-        $this->assertStringContainsString('Do not fall back to Tagalog', $instructions[0]);
-        $this->assertStringContainsString('Never say you can speak a language while replying in a different one', $instructions[0]);
+        // Pangasinan-only words ("antoy", "ed"): recognised and named, not just hinted at.
+        $this->assertStringContainsString('This message is written in Pangasinan. Reply in Pangasinan', $instructions[0]);
+        $this->assertStringContainsString('Do not offer to switch languages', $instructions[0]);
+        $this->assertStringNotContainsString('may be Pangasinan or Ilocano', $instructions[0]);
 
         $this->assertStringNotContainsString('may be Pangasinan or Ilocano', $instructions[1]);
         $this->assertStringNotContainsString('Mirror the same natural mix', $instructions[1]);
@@ -147,7 +149,7 @@ class PublicChatbotLanguageTest extends TestCase
         }
     }
 
-    public function test_a_pangasinan_message_with_borrowed_words_still_gets_the_pangasinan_caution(): void
+    public function test_a_pangasinan_message_with_borrowed_words_is_answered_in_pangasinan(): void
     {
         $this->fakeGemini('Reply text.');
 
@@ -159,9 +161,33 @@ class PublicChatbotLanguageTest extends TestCase
         $this->assertCount(2, $instructions);
 
         foreach ($instructions as $instruction) {
-            $this->assertStringContainsString('it may be Pangasinan or Ilocano', $instruction);
-            $this->assertStringContainsString('Do not fall back to Tagalog', $instruction);
+            $this->assertStringContainsString('This message is written in Pangasinan. Reply in Pangasinan', $instruction);
         }
+    }
+
+    public function test_pangasinan_written_without_any_request_is_answered_in_pangasinan(): void
+    {
+        $this->fakeGemini('Reply text.');
+
+        foreach ([
+            'Anto ray requirements ed TUPAD?',
+            'Paano ak onla ed job fair?',                // one Tagalog word in a Pangasinan sentence
+            'Iner so opisina na PESO?',                  // a single Pangasinan word
+            'Anto ray requirements for the job fair?',   // mixed with English
+        ] as $message) {
+            $this->postJson('/api/chat/public', ['message' => $message])->assertOk();
+        }
+        // Tagalog and Ilocano are left alone.
+        $this->postJson('/api/chat/public', ['message' => 'Paano po ba mag-register?'])->assertOk();
+        $this->postJson('/api/chat/public', ['message' => 'Ania ti kasapulan tapno makapag-register ak?'])->assertOk();
+
+        $instructions = collect(Http::recorded())->map(fn (array $pair) => $this->instruction($pair[0]))->values();
+        $this->assertCount(6, $instructions);
+        foreach ($instructions->take(4) as $i => $instruction) {
+            $this->assertStringContainsString('This message is written in Pangasinan. Reply in Pangasinan', $instruction, "message #{$i}");
+        }
+        $this->assertStringNotContainsString('written in Pangasinan', $instructions[4]);
+        $this->assertStringNotContainsString('written in Pangasinan', $instructions[5]);
     }
 
     public function test_a_language_request_still_carries_over_to_a_neutral_message(): void
@@ -224,7 +250,7 @@ class PublicChatbotLanguageTest extends TestCase
             $instruction = $this->instruction($request);
 
             return str_contains($instruction, 'Pangasinan (also called Pangasinense)')
-                && str_contains($instruction, 'do not make up Pangasinan words')
+                && str_contains($instruction, 'keep the English word (as Pangasinan speakers commonly do) rather than making a word up')
                 && str_contains($instruction, 'Language choice never changes the grounding, privacy, safety, or role rules')
                 && str_contains($instruction, 'GROUNDING — your most important rule')
                 && str_contains($instruction, 'Never ask the visitor for personal information')

@@ -214,14 +214,17 @@ export default function ProfileScreen() {
     setRefreshing(false)
   }, [refetch])
 
+  // Re-sync the summary only when a different profile loads or the saved summary itself
+  // changes — never on a plain background refetch, which would wipe a draft being typed.
+  const profileRecord = profile as Record<string, unknown> | undefined
+  const profileKey = profileRecord ? String(profileRecord.id ?? profileRecord.seeker_id ?? 'me') : ''
+  const savedSummaryText = (profileRecord?.professional_summary as string | undefined) ?? (profileRecord?.summary as string | undefined) ?? ''
   useEffect(() => {
-    if (!profile) return
-    const p = profile as Record<string, unknown>
-    const savedSummary = (p.professional_summary as string | undefined) ?? (p.summary as string | undefined) ?? ''
-    setProfessionalSummary(savedSummary)
-    setSummaryDraft(savedSummary)
+    if (!profileKey) return
+    setProfessionalSummary(savedSummaryText)
+    setSummaryDraft(savedSummaryText)
     setSummaryEditing(false)
-  }, [profile?.id, (profile as Record<string, unknown>)?.seeker_id])
+  }, [profileKey, savedSummaryText])
 
   useEffect(() => {
     const returnSection = params.returnSection

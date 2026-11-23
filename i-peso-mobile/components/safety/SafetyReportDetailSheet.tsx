@@ -101,7 +101,7 @@ export function SafetyReportDetailSheet({ id, onClose }: { id: number | string; 
             <Badge variant={safetyStatusBadge(report.status)}>{report.status_label}</Badge>
           </View>
           <Text style={styles.meta}>
-            Case <Text style={styles.caseNumber}>{report.case_number}</Text> · filed {formatSafetyDate(report.created_at, true)}
+            Case <Text style={styles.caseNumber}>{report.case_number}</Text>, filed {formatSafetyDate(report.created_at, true)}
           </Text>
 
           {/* Blue while open, plain once closed (resolved or dismissed), as on the website. */}

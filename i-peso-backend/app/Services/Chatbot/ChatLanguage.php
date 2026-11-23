@@ -23,9 +23,13 @@ namespace App\Services\Chatbot;
  *    Tagalog — may be Pangasinan or Ilocano"; "mirror the mix") — see
  *    GeminiChatService::latestMessageLanguageCheck().
  *
- * There is deliberately no Pangasinan word list here: the repository has no reliable
- * Pangasinan reference material, and a home-made lexicon would be guesswork. Pangasinan is
- * recognised from an explicit request, or left to the model (guessed() returns UNKNOWN).
+ * Pangasinan is recognised from an explicit request, or from the visitor's own words with a
+ * deliberately short list of Pangasinan function words that Tagalog, Ilocano and English do
+ * not use (PANGASINAN_MARKERS) — "ed", "anto", "iner", plural "ray"… A Pangasinan message
+ * otherwise looked "unknown" (or, with one borrowed Tagalog word, Tagalog), and the model,
+ * given only a soft hint, kept answering in Tagalog. Words Pangasinan shares with another
+ * language ("siak"/"sika" with Ilocano, "say"/"so" with English) are left out, and Ilocano
+ * markers are counted too, so an Ilocano message is never taken for Pangasinan.
  */
 final class ChatLanguage
 {
@@ -123,6 +127,25 @@ final class ChatLanguage
         'hindi', 'ako', 'ikaw', 'ninyo',
     ];
 
+    /**
+     * Pangasinan words that are not everyday Tagalog, Ilocano or English: the locative "ed",
+     * "tan" (and), plural "ray", question words (anto/antoy, iner, kapigan, panon, pigara),
+     * pronouns (ak, sikato, sikami, sikayo, sikara), "natan" (now), "pian" (so that) and a few
+     * common verbs and nouns. Conservative on purpose: a miss only means the model decides.
+     */
+    private const PANGASINAN_MARKERS = [
+        'ed', 'tan', 'ray', 'anto', 'antoy', 'iner', 'inerman', 'kapigan', 'panon', 'pigara',
+        'ak', 'sikato', 'sikami', 'sikayo', 'sikara', 'sikatayo', 'natan', 'pian', 'labay',
+        'kaukolan', 'nengneng', 'ompan', 'balet', 'lapud', 'anggapo', 'aliwan', 'agew', 'diad',
+        'ditan', 'saray', 'manpapasalamat', 'amta', 'ibaga', 'baleg', 'dakel', 'mangiter',
+    ];
+
+    /** Common Ilocano words, so Ilocano is never mistaken for Pangasinan. */
+    private const ILOCANO_MARKERS = [
+        'ti', 'dagiti', 'ken', 'ania', 'apay', 'sadino', 'kaano', 'adda', 'awan', 'kayat',
+        'idiay', 'kadagiti', 'ngamin', 'agyamanak', 'wen', 'isuna', 'dakayo', 'datayo',
+    ];
+
     /** @param  array<int, string>  $userMessages  The visitor's messages, oldest first. */
     private function __construct(private readonly array $userMessages)
     {
@@ -171,7 +194,10 @@ final class ChatLanguage
 
         [$english, $filipino] = $this->latestCounts();
         $switchedToTagalog = $this->latestIsClearlyTagalog() && $requested !== self::FILIPINO;
-        $switchedToEnglish = $english >= 2 && $filipino === 0 && $requested !== self::ENGLISH;
+        // A Pangasinan message keeps a Pangasinan request even with English words in it
+        // ("Anto ray requirements for the job fair?").
+        $switchedToEnglish = $english >= 2 && $filipino === 0 && $requested !== self::ENGLISH
+            && ! ($requested === self::PANGASINAN && $this->latestLooksPangasinan());
 
         return ($switchedToTagalog || $switchedToEnglish) ? null : $requested;
     }
@@ -185,14 +211,34 @@ final class ChatLanguage
      */
     public function latestIsClearlyTagalog(): bool
     {
+        if ($this->latestLooksPangasinan()) {
+            return false; // "Paano ak man-apply ed job fair?" is Pangasinan with one Tagalog word
+        }
         [, $filipino, $sentence] = $this->latestCounts();
 
         return $filipino >= 2 || $sentence >= 1;
     }
 
-    /** A rough read of the latest message. For fixed replies only — see the class comment. */
+    /**
+     * Whether the latest message is written in Pangasinan: two Pangasinan words outnumbering
+     * any Ilocano ones (a borrowed Tagalog "paano" or English "requirements" doesn't change
+     * that), or a single Pangasinan word in a message with no Tagalog or Ilocano words at all
+     * ("Iner so opisina na PESO?").
+     */
+    public function latestLooksPangasinan(): bool
+    {
+        [, $filipino, , $pangasinan, $ilocano] = $this->latestCounts();
+
+        return ($pangasinan >= 2 && $pangasinan > $ilocano)
+            || ($pangasinan === 1 && $filipino === 0 && $ilocano === 0);
+    }
+
+    /** A rough read of the latest message — see the class comment. */
     public function guessed(): string
     {
+        if ($this->latestLooksPangasinan()) {
+            return self::PANGASINAN; // also when mixed with English, as Pangasinan speakers often do
+        }
         [$english, $filipino] = $this->latestCounts();
 
         return match (true) {
@@ -215,9 +261,10 @@ final class ChatLanguage
         return $this->userMessages[array_key_last($this->userMessages)] ?? '';
     }
 
-    /** @return array{0: int, 1: int, 2: int} English, Tagalog and Tagalog-sentence marker counts in the latest message. */
+    /** @return array{0: int, 1: int, 2: int, 3: int, 4: int} English, Tagalog, Tagalog-sentence, Pangasinan and Ilocano marker counts in the latest message. */
     private function latestCounts(): array
     {
+        // Hyphens split words, so "man-apply" yields "man" and "apply".
         preg_match_all('/[\p{L}\']+/u', mb_strtolower($this->latestMessage()), $matches);
         $words = $matches[0];
 
@@ -225,6 +272,8 @@ final class ChatLanguage
             count(array_intersect($words, self::ENGLISH_MARKERS)),
             count(array_intersect($words, self::FILIPINO_MARKERS)),
             count(array_intersect($words, self::TAGALOG_SENTENCE_MARKERS)),
+            count(array_intersect($words, self::PANGASINAN_MARKERS)),
+            count(array_intersect($words, self::ILOCANO_MARKERS)),
         ];
     }
 
