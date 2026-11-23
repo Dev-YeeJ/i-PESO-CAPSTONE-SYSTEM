@@ -65,6 +65,9 @@ function pageNameFor(pathname) {
 export default function SeekerLayout() {
   const navigate = useNavigate()
   const location = useLocation()
+  // The job map fills the screen under the header (and above the phone bottom bar)
+  // instead of sitting in the padded, scrolling page area.
+  const fullBleed = /^\/seeker\/job-map(\/|$)/.test(location.pathname)
   const user = useAuthStore((state) => state.user)
   const [collapsed, setCollapsed] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
@@ -125,8 +128,8 @@ export default function SeekerLayout() {
           <aside className="portal-sidebar relative flex h-full w-[280px] flex-col shadow-2xl">{sidebar}</aside>
         </div>
       )}
-      <div className="min-w-0 flex-1">
-        <header className="sticky top-0 z-30 flex h-[64px] items-center justify-between gap-4 border-b border-slate-200 bg-white px-4 sm:h-[72px] sm:px-6 lg:px-8">
+      <div className={fullBleed ? 'flex h-screen min-w-0 flex-1 flex-col supports-[height:100dvh]:h-dvh' : 'min-w-0 flex-1'}>
+        <header className="sticky top-0 z-30 flex h-[64px] shrink-0 items-center justify-between gap-4 border-b border-slate-200 bg-white px-4 sm:h-[72px] sm:px-6 lg:px-8">
           <div className="flex min-w-0 items-center gap-3">
             <button onClick={() => { setCollapsed(false); setMobileOpen(true) }} className="rounded-lg border border-slate-200 p-2 text-slate-700 md:hidden" aria-label="Open navigation">
               {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
@@ -155,9 +158,11 @@ export default function SeekerLayout() {
             </button>
           </div>
         </header>
-        <main className="px-3 pb-28 pt-4 sm:px-6 sm:py-6 lg:px-8 lg:py-8"><Outlet /></main>
+        <main className={fullBleed ? 'relative min-h-0 flex-1 overflow-hidden' : 'px-3 pb-28 pt-4 sm:px-6 sm:py-6 lg:px-8 lg:py-8'}><Outlet /></main>
+        {/* Full-screen pages keep the phone bottom bar in the flow, so they end exactly above it. */}
+        {fullBleed && <MobileBottomNav links={mobileLinks} inline />}
       </div>
-      <MobileBottomNav links={mobileLinks} />
+      {!fullBleed && <MobileBottomNav links={mobileLinks} />}
       <SignOutConfirmDialog open={signOutOpen} onOpenChange={setSignOutOpen} />
     </div>
   )

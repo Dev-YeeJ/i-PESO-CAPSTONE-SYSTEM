@@ -550,7 +550,7 @@ export default function JobMapPage() {
   )
 
   return (
-    <div className="relative -mx-4 -my-6 flex h-[calc(100vh-76px)] flex-col overflow-hidden bg-slate-100 sm:-mx-6 lg:-mx-8 lg:-my-8">
+    <div className="relative flex h-full flex-col overflow-hidden bg-slate-100">
       {wide ? (
         <div className={`grid min-h-0 flex-1 ${panelOpen ? 'grid-cols-[300px_380px_minmax(0,1fr)]' : 'grid-cols-[300px_minmax(0,1fr)]'}`}>
           <aside aria-label="Filters" className="flex min-h-0 flex-col overflow-y-auto border-r border-slate-200 bg-white">

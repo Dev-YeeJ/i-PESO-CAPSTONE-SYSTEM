@@ -1,10 +1,11 @@
 import { createElement } from 'react'
 import { NavLink } from 'react-router-dom'
 
-export default function MobileBottomNav({ links }) {
+/** `inline`: part of the page's layout (full-screen pages) instead of floating over it. */
+export default function MobileBottomNav({ links, inline = false }) {
   return (
     <nav
-      className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200/80 bg-white/90 px-2 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] pt-2 shadow-[0_-10px_30px_rgba(15,23,42,0.08)] backdrop-blur-xl md:hidden"
+      className={`${inline ? 'relative shrink-0' : 'fixed inset-x-0 bottom-0'} z-40 border-t border-slate-200/80 bg-white/90 px-2 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] pt-2 shadow-[0_-10px_30px_rgba(15,23,42,0.08)] backdrop-blur-xl md:hidden`}
       aria-label="Primary mobile navigation"
     >
       <div className="mx-auto grid max-w-md grid-cols-5 gap-1">
