@@ -1,4 +1,7 @@
 import { createElement, useState } from 'react'
+import { useUnsavedEntries } from '@/hooks/useUnsavedChanges'
+import UnsavedChangesBar from '@/components/common/UnsavedChangesBar'
+import { useUnsavedChanges } from '@/hooks/useUnsavedChanges'
 import { useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import toast from '@/lib/toast'
@@ -41,6 +44,8 @@ const describeOffset = (key, day) => {
  */
 export default function SystemSettingsPage() {
   const [params, setParams] = useSearchParams()
+  // Sections with unsaved changes get a dot (ids are 'settings:<section>').
+  const unsaved = new Set(useUnsavedEntries().map((entry) => entry.id))
   const active = SECTIONS.some((s) => s.value === params.get('section')) ? params.get('section') : 'status'
   const settings = useQuery({ queryKey: ['admin-system-settings'], queryFn: adminSystemSettingsService.list })
   const status = useQuery({ queryKey: ['admin-system-status'], queryFn: adminSystemSettingsService.status, staleTime: 30 * 1000 })
@@ -72,6 +77,7 @@ export default function SystemSettingsPage() {
                 >
                   {createElement(section.icon, { className: 'h-4 w-4 shrink-0', 'aria-hidden': true })}
                   <span className="flex-1 whitespace-nowrap">{section.label}</span>
+                  {unsaved.has(`settings:${section.value}`) && (<><span className="h-2 w-2 shrink-0 rounded-full bg-amber-500" title="Unsaved changes" aria-hidden="true" /><span className="sr-only">(unsaved changes)</span></>)}
                   {section.value === 'status' && problems > 0 && (
                     <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold bg-slate-200 text-slate-700`} aria-label={`${problems} to check`}>{problems}</span>
                   )}
@@ -234,6 +240,7 @@ function SettingsGroup({ group, title, settings, canEdit, smsUsage }) {
   // Switches save on their own; only text, numbers and day lists wait for Save.
   const typed = settings.filter((s) => s.type !== 'bool')
   const changed = typed.filter((s) => JSON.stringify(form[s.key]) !== JSON.stringify(initial[s.key]))
+  useUnsavedChanges(`settings:${group}`, changed.length, `${title} settings`)
   const set = (key, value) => {
     setForm((current) => ({ ...current, [key]: value }))
     if (errors[`values.${key}`]) setErrors((current) => ({ ...current, [`values.${key}`]: undefined }))
@@ -311,10 +318,12 @@ function SettingsGroup({ group, title, settings, canEdit, smsUsage }) {
       </div>
 
       {canEdit && typed.length > 0 && (
-        <div className="mt-4 flex flex-wrap items-center justify-end gap-2 border-t border-slate-100 pt-4">
-          {changed.length > 0 && <Button variant="ghost" size="sm" icon={Undo2} onClick={() => { setForm((current) => ({ ...current, ...Object.fromEntries(typed.map((s) => [s.key, initial[s.key]])) })); setErrors({}) }}>Discard</Button>}
-          <Button variant="navy" icon={Save} loading={save.isPending} disabled={changed.length === 0} onClick={() => save.mutate()}>Save</Button>
-        </div>
+        <UnsavedChangesBar count={changed.length}>
+          <div className="flex flex-wrap gap-2">
+            {changed.length > 0 && <Button variant="ghost" size="sm" icon={Undo2} onClick={() => { setForm((current) => ({ ...current, ...Object.fromEntries(typed.map((s) => [s.key, initial[s.key]])) })); setErrors({}) }}>Discard</Button>}
+            <Button variant="navy" icon={Save} loading={save.isPending} disabled={changed.length === 0} onClick={() => save.mutate()}>Save</Button>
+          </div>
+        </UnsavedChangesBar>
       )}
 
       <Dialog open={confirmMaintenance} onOpenChange={setConfirmMaintenance}>

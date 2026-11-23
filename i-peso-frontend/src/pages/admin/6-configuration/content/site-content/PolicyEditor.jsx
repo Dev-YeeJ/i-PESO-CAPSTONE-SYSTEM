@@ -1,4 +1,6 @@
 import { useState } from 'react'
+import UnsavedChangesBar from '@/components/common/UnsavedChangesBar'
+import { useUnsavedChanges } from '@/hooks/useUnsavedChanges'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import toast from '@/lib/toast'
 import { ArrowDown, ArrowLeft, ArrowUp, Eye, FilePlus2, PenLine, Plus, Save, Send, Trash2, X } from 'lucide-react'
@@ -88,6 +90,7 @@ function DraftEditor({ slug, policy, draft, canEdit, office, tokens }) {
   const [discardOpen, setDiscardOpen] = useState(false)
   const [effectiveAt, setEffectiveAt] = useState(todayInput())
   const dirty = !sameValue(initial, form)
+  useUnsavedChanges('content:policies', dirty, `the ${policy.title} draft`)
 
   const refresh = () => {
     queryClient.invalidateQueries({ queryKey: ['admin-policy', slug] })
@@ -213,13 +216,13 @@ function DraftEditor({ slug, policy, draft, canEdit, office, tokens }) {
       )}
 
       {canEdit && (
-        <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4">
-          <Button variant="ghost" size="sm" icon={Trash2} className="text-red-600 hover:bg-red-50" onClick={() => setDiscardOpen(true)}>Discard draft</Button>
+        <UnsavedChangesBar count={dirty ? 1 : 0}>
           <div className="flex flex-wrap gap-2">
+            <Button variant="ghost" size="sm" icon={Trash2} className="text-red-600 hover:bg-red-50" onClick={() => setDiscardOpen(true)}>Discard draft</Button>
             <Button variant="outline" icon={Save} loading={save.isPending} disabled={!dirty} onClick={() => save.mutate()}>Save draft</Button>
             <Button variant="navy" icon={Send} onClick={submitPublish}>Publish…</Button>
           </div>
-        </div>
+        </UnsavedChangesBar>
       )}
 
       <Dialog open={publishOpen} onOpenChange={setPublishOpen}>

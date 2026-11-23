@@ -1,4 +1,6 @@
 import { createElement, useState } from 'react'
+import UnsavedChangesBar from '@/components/common/UnsavedChangesBar'
+import { useUnsavedChanges } from '@/hooks/useUnsavedChanges'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import toast from '@/lib/toast'
 import { ExternalLink, History, Monitor, RotateCcw, Save, Smartphone, Undo2 } from 'lucide-react'
@@ -29,6 +31,7 @@ function LandingForm({ section, canEdit }) {
   const [device, setDevice] = useState('desktop')
 
   const dirty = changedKeys(saved, form, KEYS)
+  useUnsavedChanges('content:landing', dirty.length, 'Landing page')
   const err = (key) => errors[`values.${key}`]
 
   const set = (key, value) => setForm((current) => ({ ...current, [key]: value }))
@@ -152,10 +155,9 @@ function LandingForm({ section, canEdit }) {
           </div>
         </MoreSection>
 
-        <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4">
-          <p className="text-xs text-slate-500">
+        <UnsavedChangesBar count={dirty.length} note={<p className="text-xs text-slate-500">
             {section.updated_at ? `Last saved ${formatWhen(section.updated_at)}${section.updated_by ? ` by ${section.updated_by}` : ''}.` : 'Showing the original text.'}
-          </p>
+          </p>}>
           {canEdit && (
             <div className="flex flex-wrap gap-2">
               {!sameValue(form, defaults) && section.version > 0 && <Button variant="ghost" size="sm" icon={RotateCcw} onClick={() => setResetOpen(true)}>Use the original text</Button>}
@@ -163,7 +165,7 @@ function LandingForm({ section, canEdit }) {
               <Button variant="navy" icon={Save} loading={save.isPending} disabled={dirty.length === 0} onClick={() => save.mutate()}>Save</Button>
             </div>
           )}
-        </div>
+        </UnsavedChangesBar>
       </Card>
 
       <div className="space-y-3 2xl:sticky 2xl:top-6 2xl:self-start">

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { clearUnsavedChanges, useUnsavedChanges } from '@/hooks/useUnsavedChanges'
 import toast from '@/lib/toast'
 import { AlertTriangle, Archive, ArrowLeft, BellRing, ChevronDown, Eye, FileText, Megaphone, Paperclip, RotateCcw, Save, Send, SlidersHorizontal, Trash2, Undo2 } from 'lucide-react'
 import { Badge, Button, Card, ConfirmDialog, ErrorState, LoadingSkeleton } from '@/components/ui'
@@ -33,6 +34,15 @@ const EMPTY = {
   remove_attachment: false,
 }
 
+const UNSAVED_ID = 'announcement-form'
+
+/** How many fields differ from the loaded (or last saved) version. A picked attachment counts. */
+const changedFields = (form, baseline) => Object.keys(EMPTY).filter((key) => (
+  key === 'attachment' || key === 'remove_attachment'
+    ? Boolean(form[key])
+    : JSON.stringify(form[key]) !== JSON.stringify(baseline[key])
+)).length
+
 /** Fields that live under "More options". */
 const EXTRA_FIELDS = ['category', 'is_pinned', 'expires_at', 'link_label', 'link_url', 'attachment']
 
@@ -58,6 +68,8 @@ export default function AnnouncementFormPage() {
   const canEdit = canManage(user, 'configuration')
 
   const [form, setForm] = useState(EMPTY)
+  // The form as loaded or last saved, to tell unsaved edits apart.
+  const [baseline, setBaseline] = useState(EMPTY)
   const [errors, setErrors] = useState({})
   const [busy, setBusy] = useState(null)
   const [confirm, setConfirm] = useState(null)
@@ -76,10 +88,11 @@ export default function AnnouncementFormPage() {
   const state = announcement?.state ?? 'draft'
   const isPublished = announcement?.status === 'published'
   const readOnly = !canEdit || state === 'archived'
+  useUnsavedChanges(UNSAVED_ID, readOnly ? 0 : changedFields(form, baseline), 'this announcement')
 
   useEffect(() => {
     if (!announcement) return
-    setForm({
+    const loaded = {
       ...EMPTY,
       title: announcement.title,
       body: announcement.body,
@@ -94,7 +107,9 @@ export default function AnnouncementFormPage() {
       expires_at: isoToLocalInput(announcement.expires_at),
       link_label: announcement.link_label ?? '',
       link_url: announcement.link_url ?? '',
-    })
+    }
+    setForm(loaded)
+    setBaseline(loaded)
     if (announcement.category !== 'general' || announcement.is_pinned || announcement.expires_at || announcement.link_url || announcement.has_attachment) {
       setShowMore(true)
     }
@@ -175,6 +190,7 @@ export default function AnnouncementFormPage() {
       toast.success(result.message)
       refresh(result.announcement)
       setForm((current) => ({ ...current, attachment: null, remove_attachment: false }))
+      clearUnsavedChanges(UNSAVED_ID)
       if (isNew) navigate(`/admin/announcements/${result.announcement.id}`, { replace: true })
     } catch (error) {
       handleError(error, 'Unable to save the announcement.')
@@ -191,6 +207,7 @@ export default function AnnouncementFormPage() {
         await adminAnnouncementService.remove(id)
         toast.success('Draft deleted.')
         queryClient.invalidateQueries({ queryKey: ['admin', 'announcements'] })
+        clearUnsavedChanges(UNSAVED_ID)
         navigate('/admin/announcements', { replace: true })
         return
       }

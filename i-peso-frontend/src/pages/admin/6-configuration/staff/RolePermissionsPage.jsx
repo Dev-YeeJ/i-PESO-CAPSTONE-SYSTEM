@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useUnsavedChanges } from '@/hooks/useUnsavedChanges'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import toast from '@/lib/toast'
 import { Lock, ShieldCheck, Trash2 } from 'lucide-react'
@@ -70,7 +71,9 @@ function RoleCard({ role, modules, canEdit }) {
   const locked = role.slug === 'administrator'
   const [levels, setLevels] = useState(role.access)
   const [confirmDelete, setConfirmDelete] = useState(false)
-  const dirty = modules.some((module) => (levels[module] ?? 'none') !== (role.access[module] ?? 'none'))
+  const changedModules = modules.filter((module) => (levels[module] ?? 'none') !== (role.access[module] ?? 'none')).length
+  const dirty = changedModules > 0
+  useUnsavedChanges(`roles:${role.id}`, changedModules, `${role.name} access`)
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ['admin', 'roles'] })

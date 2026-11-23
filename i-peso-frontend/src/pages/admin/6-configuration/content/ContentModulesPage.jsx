@@ -1,4 +1,5 @@
 import { createElement } from 'react'
+import { useUnsavedEntries } from '@/hooks/useUnsavedChanges'
 import { useSearchParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { Activity, Building2, Landmark, Lightbulb, MessageCircleQuestion, PanelsTopLeft, ScrollText } from 'lucide-react'
@@ -53,6 +54,8 @@ const GROUPS = [
 export default function ContentModulesPage() {
   const user = useAuthStore((s) => s.user)
   const [params, setParams] = useSearchParams()
+  // Tabs whose editor holds unsaved changes get a dot (ids are 'content:<tab>').
+  const unsaved = new Set(useUnsavedEntries().map((entry) => entry.id))
 
   const groups = GROUPS
     .map((group) => ({ ...group, items: group.items.filter((item) => canOpen(user, item.module)) }))
@@ -132,6 +135,7 @@ export default function ContentModulesPage() {
                     >
                       {createElement(item.icon, { className: 'h-4 w-4 shrink-0', 'aria-hidden': true })}
                       <span className="flex-1 whitespace-nowrap">{item.label}</span>
+                      {unsaved.has(`content:${item.value}`) && (<><span className="h-2 w-2 shrink-0 rounded-full bg-amber-500" title="Unsaved changes" aria-hidden="true" /><span className="sr-only">(unsaved changes)</span></>)}
                       {badge ? (
                         <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold bg-slate-200 text-slate-700`} aria-label={`${badge} to look at`}>
                           {badge}

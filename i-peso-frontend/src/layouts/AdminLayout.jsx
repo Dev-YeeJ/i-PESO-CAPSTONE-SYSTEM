@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import UnsavedChangesGuard from '@/components/common/UnsavedChangesGuard'
 import { Outlet, NavLink, Link, useLocation } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { ChevronDown, ChevronLeft, ChevronRight, KeyRound, LogOut, Menu, ShieldOff, X } from 'lucide-react'
@@ -337,6 +338,7 @@ const AdminLayout = () => {
         {/* Page Content */}
         <main className="flex-1 overflow-y-auto px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
           {canOpenPath(user, location.pathname) ? <Outlet /> : <NoAccess />}
+          <UnsavedChangesGuard />
         </main>
       </div>
       <SignOutConfirmDialog open={signOutOpen} onOpenChange={setSignOutOpen} />

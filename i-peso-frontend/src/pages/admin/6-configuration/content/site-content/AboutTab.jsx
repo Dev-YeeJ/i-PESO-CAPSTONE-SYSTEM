@@ -1,4 +1,6 @@
 import { useState } from 'react'
+import UnsavedChangesBar from '@/components/common/UnsavedChangesBar'
+import { useUnsavedChanges } from '@/hooks/useUnsavedChanges'
 import { ArrowDown, ArrowUp, ExternalLink, History, Link2, Plus, Save, Undo2, X } from 'lucide-react'
 import { Button, Card } from '@/components/ui'
 import { ABOUT_LIMITS, ORG_LEVELS, SERVICE_AUDIENCES } from '@/components/site-content/siteContentDefaults'
@@ -44,6 +46,7 @@ export default function AboutTab({ section, canEdit }) {
 function AboutForm({ section, canEdit }) {
   const editor = useSectionEditor('about', section, { normalize })
   const { form, set, err, dirty } = editor
+  useUnsavedChanges('content:about', dirty.length, 'About PESO')
   const services = form.services ?? []
   const people = form.org_chart ?? []
   const setPerson = (index, patch) => set('org_chart', people.map((p, i) => (i === index ? { ...p, ...patch } : p)))
@@ -179,17 +182,16 @@ function AboutForm({ section, canEdit }) {
         </div>
       </MoreSection>
 
-      <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4">
-        <p className="text-xs text-slate-500">
+      <UnsavedChangesBar count={dirty.length} note={<p className="text-xs text-slate-500">
           {section.updated_at ? `Last saved ${formatWhen(section.updated_at)}${section.updated_by ? ` by ${section.updated_by}` : ''}.` : 'Showing the starting text.'}
-        </p>
+        </p>}>
         {canEdit && (
           <div className="flex gap-2">
             {dirty.length > 0 && <Button variant="ghost" size="sm" icon={Undo2} onClick={editor.discard}>Discard</Button>}
             <Button variant="navy" icon={Save} loading={editor.save.isPending} disabled={dirty.length === 0} onClick={() => editor.save.mutate()}>Save</Button>
           </div>
         )}
-      </div>
+      </UnsavedChangesBar>
 
       <SectionHistoryDialog sectionKey="about" open={editor.historyOpen} onOpenChange={editor.setHistoryOpen} canEdit={canEdit} busy={editor.restore.isPending} onRestore={(revision) => editor.restore.mutate(revision)} />
     </Card>

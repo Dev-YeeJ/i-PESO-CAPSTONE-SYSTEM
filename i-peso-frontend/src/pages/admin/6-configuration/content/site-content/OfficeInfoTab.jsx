@@ -1,4 +1,6 @@
 import { useState } from 'react'
+import UnsavedChangesBar from '@/components/common/UnsavedChangesBar'
+import { useUnsavedChanges } from '@/hooks/useUnsavedChanges'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import toast from '@/lib/toast'
 import { Bot, History, Save, Undo2 } from 'lucide-react'
@@ -45,6 +47,7 @@ function OfficeInfoForm({ section, canEdit }) {
 
   const normalized = Object.fromEntries(ALL_KEYS.map((key) => [key, form[key]?.trim?.() ? form[key].trim() : null]))
   const dirty = changedKeys(saved, normalized, ALL_KEYS)
+  useUnsavedChanges('content:office', dirty.length, 'Office info')
 
   const set = (key, value) => {
     setForm((current) => ({ ...current, [key]: value }))
@@ -122,17 +125,16 @@ function OfficeInfoForm({ section, canEdit }) {
           <div className="grid gap-5 sm:grid-cols-2">{MORE_FIELDS.map(field)}</div>
         </MoreSection>
 
-        <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4">
-          <p className="text-xs text-slate-500">
+        <UnsavedChangesBar count={dirty.length} note={<p className="text-xs text-slate-500">
             {section.updated_at ? `Last saved ${formatWhen(section.updated_at)}${section.updated_by ? ` by ${section.updated_by}` : ''}.` : 'Nothing saved yet.'}
-          </p>
+          </p>}>
           {canEdit && (
             <div className="flex gap-2">
               {dirty.length > 0 && <Button variant="ghost" size="sm" icon={Undo2} onClick={() => { setForm(saved); setErrors({}) }}>Discard</Button>}
               <Button variant="navy" icon={Save} loading={save.isPending} disabled={dirty.length === 0} onClick={() => save.mutate()}>Save</Button>
             </div>
           )}
-        </div>
+        </UnsavedChangesBar>
       </Card>
 
       <div className="space-y-4 xl:sticky xl:top-6 xl:self-start">
