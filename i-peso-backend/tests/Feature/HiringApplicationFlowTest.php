@@ -593,7 +593,7 @@ class HiringApplicationFlowTest extends TestCase
         $vacancy = $this->createVacancy($employer);
         $otherVacancy = $this->createVacancy($this->createEmployer());
 
-        foreach (range(1, 3) as $i) {
+        foreach (range(1, 4) as $i) {
             Sanctum::actingAs($this->createSeeker());
             $this->postJson("/api/seeker/jobs/{$vacancy->post_id}/apply")->assertCreated();
         }
@@ -603,6 +603,8 @@ class HiringApplicationFlowTest extends TestCase
         $applications = Application::query()->where('post_id', $vacancy->post_id)->orderBy('apply_id')->get();
         $applications[0]->update(['status' => 'reviewed']);
         $applications[1]->update(['status' => 'rejected']);
+        // Withdrawn has no tab on the Applicants page, so the badge leaves it out too.
+        $applications[3]->update(['status' => 'withdrawn']);
 
         Sanctum::actingAs($employer);
         $this->getJson('/api/employer/applications/counts')

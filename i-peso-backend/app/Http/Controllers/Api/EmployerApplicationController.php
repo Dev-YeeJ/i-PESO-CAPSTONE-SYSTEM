@@ -102,7 +102,9 @@ class EmployerApplicationController extends Controller
     /**
      * Applicant counts for the sidebar badge: `new` = still "pending" (nobody
      * on the employer's side has moved them yet), `active` = still in the
-     * pipeline, `total` = every application to this employer's vacancies.
+     * pipeline, `total` = every application the Applicants page shows in its
+     * tabs (Inbox through Rejected), so the badge matches the tab counts.
+     * Withdrawn applications have no tab and are left out.
      * Cheap on purpose: the employer portal polls it.
      */
     public function counts(Request $request): JsonResponse
@@ -119,7 +121,7 @@ class EmployerApplicationController extends Controller
         return response()->json([
             'new' => $byStatus->get('pending', 0),
             'active' => collect(['pending', 'reviewed', 'shortlisted', 'interview'])->sum(fn ($status) => $byStatus->get($status, 0)),
-            'total' => $byStatus->sum(),
+            'total' => collect(['pending', 'reviewed', 'shortlisted', 'interview', 'hired', 'rejected'])->sum(fn ($status) => $byStatus->get($status, 0)),
         ]);
     }
 
