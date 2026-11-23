@@ -17,15 +17,15 @@ import FaqsTab from './site-content/FaqsTab'
 import LandingTab from './site-content/LandingTab'
 import PoliciesTab from './site-content/PoliciesTab'
 
-const BOTH = ['configuration', 'constituent_crm']
+const CONFIG = 'configuration'
 
 /** Every module, grouped as in the sidebar. `module` = who may open it (docs/content-module-plan.md §2). */
 const GROUPS = [
   {
     name: 'Overview',
     items: [
-      { value: 'overview', label: 'Health check', icon: Activity, module: BOTH },
-      { value: 'insights', label: 'Assistant insights', icon: Lightbulb, module: BOTH },
+      { value: 'overview', label: 'Health check', icon: Activity, module: CONFIG },
+      { value: 'insights', label: 'Assistant insights', icon: Lightbulb, module: CONFIG },
     ],
   },
   {
@@ -35,7 +35,7 @@ const GROUPS = [
       { value: 'about', label: 'About PESO', icon: Landmark, module: 'configuration' },
     ],
   },
-  { name: 'Assistant', items: [{ value: 'faqs', label: 'FAQs', icon: MessageCircleQuestion, module: BOTH }] },
+  { name: 'Assistant', items: [{ value: 'faqs', label: 'FAQs', icon: MessageCircleQuestion, module: CONFIG }] },
   {
     name: 'Pages',
     items: [
@@ -65,7 +65,7 @@ export default function ContentModulesPage() {
   const active = allowed.includes(requested) ? requested : allowed[0]
   const needsSections = canOpen(user, 'configuration')
   const canEditConfig = canManage(user, 'configuration')
-  const canEditFaqs = canManage(user, BOTH)
+  const canEditFaqs = canManage(user, CONFIG)
 
   const sections = useQuery({ queryKey: ['admin-site-content'], queryFn: adminSiteContentService.list, enabled: needsSections })
   const health = useQuery({ queryKey: ['content-health'], queryFn: adminContentInsightService.health, staleTime: 60 * 1000 })

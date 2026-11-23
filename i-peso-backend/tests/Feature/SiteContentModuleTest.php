@@ -161,7 +161,7 @@ class SiteContentModuleTest extends TestCase
 
     // ── Permissions ───────────────────────────────────────────────────────
 
-    public function test_view_only_staff_can_read_but_not_change_and_crm_staff_manage_only_faqs(): void
+    public function test_view_only_staff_can_read_but_not_change_and_crm_access_alone_opens_nothing(): void
     {
         $viewer = $this->staffWith(['configuration' => 'view'], 'viewer@example.test');
         Sanctum::actingAs($viewer);
@@ -170,16 +170,14 @@ class SiteContentModuleTest extends TestCase
         $this->putJson('/api/admin/site-content/office', ['version' => 0, 'values' => ['hours' => 'x']])->assertForbidden();
         $this->postJson('/api/admin/faqs', $this->faqPayload())->assertForbidden();
 
-        $frontDesk = $this->staffWith(['constituent_crm' => 'manage'], 'frontdesk@example.test');
+        // Configuration set to No access: Content Modules (FAQs included) stays closed,
+        // even with full Constituent CRM access.
+        $frontDesk = $this->staffWith(['constituent_crm' => 'manage', 'configuration' => 'none'], 'frontdesk@example.test');
         Sanctum::actingAs($frontDesk);
-        $this->postJson('/api/admin/faqs', $this->faqPayload())->assertCreated();
+        $this->getJson('/api/admin/faqs')->assertForbidden();
+        $this->postJson('/api/admin/faqs', $this->faqPayload())->assertForbidden();
         $this->getJson('/api/admin/site-content')->assertForbidden();
         $this->getJson('/api/admin/policies')->assertForbidden();
-
-        $crmViewer = $this->staffWith(['constituent_crm' => 'view'], 'crm-viewer@example.test');
-        Sanctum::actingAs($crmViewer);
-        $this->getJson('/api/admin/faqs')->assertOk();
-        $this->postJson('/api/admin/faqs', $this->faqPayload())->assertForbidden();
 
         $nobody = $this->staffWith(['employment_hub' => 'manage'], 'hub@example.test');
         Sanctum::actingAs($nobody);

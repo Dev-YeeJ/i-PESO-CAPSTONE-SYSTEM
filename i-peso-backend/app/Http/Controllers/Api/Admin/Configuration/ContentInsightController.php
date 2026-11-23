@@ -15,7 +15,7 @@ use RuntimeException;
 /**
  * Content Modules → Overview (health check), Insights (what readers need)
  * and the AI writing helper. Open to Configuration or Constituent CRM staff:
- * admin.permission:configuration|constituent_crm.
+ * admin.permission:configuration.
  */
 class ContentInsightController extends Controller
 {

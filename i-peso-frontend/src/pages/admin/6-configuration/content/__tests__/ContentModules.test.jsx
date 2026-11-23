@@ -128,19 +128,6 @@ describe('Site Content admin', () => {
     expect(toast.success).toHaveBeenCalledWith('12 suggested FAQs added.')
   })
 
-  it('gives front-desk CRM staff the health check, insights and FAQs only', async () => {
-    useAuthStore.setState({ user: { admin_id: 2, access: { constituent_crm: 'manage', configuration: 'none' } } })
-    renderWithProviders(<ContentModulesPage />, { route: '/admin/content-modules?tab=faqs' })
-
-    const nav = screen.getByRole('navigation', { name: 'Content modules' })
-    expect(within(nav).getByRole('button', { name: /health check/i })).toBeInTheDocument()
-    expect(within(nav).getByRole('button', { name: /assistant insights/i })).toBeInTheDocument()
-    expect(within(nav).getByRole('button', { name: /faqs/i })).toBeInTheDocument()
-    expect(within(nav).queryByRole('button', { name: /office info/i })).not.toBeInTheDocument()
-    expect(within(nav).queryByRole('button', { name: /policy pages/i })).not.toBeInTheDocument()
-    expect(adminSiteContentService.list).not.toHaveBeenCalled()
-    expect(await screen.findByRole('button', { name: /new faq/i })).toBeInTheDocument()
-  })
 
   it('opens on the health check and takes you to what needs fixing', async () => {
     adminFaqService.list.mockResolvedValue(faqList)
