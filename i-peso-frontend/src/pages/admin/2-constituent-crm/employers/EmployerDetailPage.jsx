@@ -537,15 +537,16 @@ export default function EmployerDetailPage() {
                               ) : doc.verification_status === 'approved' ? (
                                 <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700"><CheckCircle2 className="h-3.5 w-3.5" />Approved</span>
                               ) : viewedByMe(doc) ? (
-                                <span className="inline-flex items-center gap-1 rounded-full bg-[#e8f0fc] border border-[#c4d9f7] px-2.5 py-1 text-xs font-bold text-brand-navy">
+                                // "Pending review" clears per file as soon as this account opens it.
+                                <span className="inline-flex items-center gap-1 rounded-full bg-[#e8f0fc] border border-[#c4d9f7] px-2.5 py-1 text-xs font-bold text-brand-navy" title="You opened this file">
                                   <Eye className="h-3.5 w-3.5" />
-                                  Viewed by you
+                                  Viewed
                                 </span>
                               ) : (
                                 <div>
-                                  <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 border border-amber-200 px-2.5 py-1 text-xs font-bold text-amber-700">
-                                    <AlertTriangle className="h-3.5 w-3.5" />
-                                    Not yet viewed by you
+                                  <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 border border-amber-200 px-2.5 py-1 text-xs font-bold text-amber-700" title="Open this file to review it">
+                                    <Clock className="h-3.5 w-3.5" />
+                                    Pending review
                                   </span>
                                   {doc.viewed_by?.length > 0 && (
                                     <p className="mt-1 whitespace-normal break-words text-xs text-slate-400">

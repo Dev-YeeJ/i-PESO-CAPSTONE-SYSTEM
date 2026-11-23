@@ -48,14 +48,14 @@ describe('EmployerDetailPage document viewed state', () => {
 
     renderWithProviders(<EmployerDetailPage />)
 
-    expect(await screen.findByText('Not yet viewed by you')).toBeInTheDocument()
+    expect(await screen.findByText('Pending review')).toBeInTheDocument()
     expect(screen.getByText('Opened by Maria Santos')).toBeInTheDocument()
-    expect(screen.getByText('Viewed by you')).toBeInTheDocument()
+    expect(screen.getByText('Viewed')).toBeInTheDocument()
     // The finalize hint names exactly the document this account hasn't opened.
     expect(screen.getByText(/Open Mayor's Permit before completing the review/)).toBeInTheDocument()
   })
 
-  it('flips to viewed once this account opens the document', async () => {
+  it('clears Pending review per file once this account opens it', async () => {
     adminService.getEmployerDetail.mockResolvedValue(employer([
       doc({ document_id: 1, document_type: 'mayors_permit' }),
       doc({ document_id: 2, document_type: 'government_id', viewed_by_me_at: '2026-11-12T02:00:00Z' }),
@@ -66,11 +66,11 @@ describe('EmployerDetailPage document viewed state', () => {
 
     renderWithProviders(<EmployerDetailPage />)
 
-    expect(await screen.findByText('Not yet viewed by you')).toBeInTheDocument()
+    expect(await screen.findByText('Pending review')).toBeInTheDocument()
     await userEvent.click(screen.getAllByRole('button', { name: /^view$/i })[0])
 
-    expect(await screen.findAllByText('Viewed by you')).toHaveLength(2)
-    expect(screen.queryByText('Not yet viewed by you')).not.toBeInTheDocument()
+    expect(await screen.findAllByText('Viewed')).toHaveLength(2)
+    expect(screen.queryByText('Pending review')).not.toBeInTheDocument()
   })
 
   it('marks the Government ID as required', async () => {
