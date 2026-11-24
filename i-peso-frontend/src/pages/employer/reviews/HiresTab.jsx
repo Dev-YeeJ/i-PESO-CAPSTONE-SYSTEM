@@ -1,24 +1,25 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { AnimatePresence, motion as Motion } from 'framer-motion'
 import toast from '@/lib/toast'
-import { CalendarClock, Check, Lock, Pencil, Star, UsersRound } from 'lucide-react'
+import { CalendarClock, Check, ChevronDown, FileSpreadsheet, Lock, Pencil, Star, UsersRound } from 'lucide-react'
 import { Button, EmptyState, ErrorState } from '@/components/ui'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { StarInput, Stars } from '@/components/reviews/StarRating'
 import { employerFeedbackService } from '@/services/employerFeedbackService'
 import { cn } from '@/lib/utils'
+import HireAvatar from './HireAvatar'
 import { HIRES_KEY } from './reviewKeys'
 import Segmented from './Segmented'
+import { sortHires } from './sortHires'
 
-const GRADIENTS = ['from-sky-500 to-brand-navy', 'from-emerald-500 to-teal-700', 'from-amber-400 to-orange-600', 'from-violet-500 to-indigo-700', 'from-rose-400 to-pink-700']
-
-const initials = (name = '') => name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join('').toUpperCase() || '?'
 const average = (ratings = {}) => {
   const values = Object.values(ratings).map(Number).filter(Boolean)
   return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : null
 }
 const startedOn = (date) => new Date(`${date}T00:00:00`).toLocaleDateString('en-PH', { dateStyle: 'medium' })
+const updatedOn = (date) => new Date(date).toLocaleDateString('en-PH', { dateStyle: 'medium' })
 
 /** People this employer hired, and the private feedback given (or still to give) about each. */
 export default function HiresTab() {
@@ -29,14 +30,11 @@ export default function HiresTab() {
 
   const given = hires.filter((hire) => hire.feedback).length
   const waiting = hires.filter((hire) => !hire.feedback && hire.can_give_feedback).length
-  const visible = hires.filter((hire) => (show === 'waiting' ? !hire.feedback : show === 'done' ? hire.feedback : true))
+  const visible = sortHires(hires.filter((hire) => (show === 'waiting' ? !hire.feedback : show === 'done' ? hire.feedback : true)))
 
   return (
     <div className="space-y-5">
-      <p className="flex gap-3 rounded-2xl border border-sky-100 bg-sky-50/70 p-4 text-sm leading-6 text-sky-950">
-        <Lock className="mt-1 h-4 w-4 shrink-0 text-sky-700" aria-hidden />
-        <span>Your <strong>comments are private</strong>: only PESO and the worker can read them. Employers the worker applies to later see only their <strong>star average and would-rehire count</strong>, never your comments or your company name.</span>
-      </p>
+      <PrivacyNote />
 
       {isLoading ? (
         <div className="grid gap-4 md:grid-cols-2" aria-hidden="true">
@@ -73,55 +71,18 @@ export default function HiresTab() {
               {show === 'waiting' ? "You're all caught up. Every hire has feedback." : 'No feedback given yet.'}
             </p>
           ) : (
-            <ul className="grid gap-4 md:grid-cols-2">
+            <ul className="grid items-start gap-4 md:grid-cols-2">
               <AnimatePresence initial={false}>
-                {visible.map((hire, index) => {
-                  const score = average(hire.feedback?.ratings)
-                  return (
-                    <Motion.li
-                      key={`${hire.source}-${hire.source_id}`}
-                      layout
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0, transition: { delay: Math.min(index, 8) * 0.04 } }}
-                      exit={{ opacity: 0, scale: 0.97 }}
-                      className="flex flex-col gap-4 rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_1px_2px_rgba(15,23,42,0.04),0_10px_28px_-18px_rgba(15,23,42,0.22)]"
-                    >
-                      <div className="flex items-start gap-3.5">
-                        <span className={cn('flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br text-base font-bold text-white shadow-md', GRADIENTS[(hire.seeker_id ?? index) % GRADIENTS.length])} aria-hidden="true">
-                          {initials(hire.name)}
-                        </span>
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-base font-bold text-slate-900">{hire.name}</p>
-                          <p className="truncate text-sm text-slate-500">{hire.job_title ?? 'Position not set'}</p>
-                          {hire.start_date && <p className="mt-0.5 text-xs text-slate-400">Started {startedOn(hire.start_date)}</p>}
-                        </div>
-                        {hire.feedback && (
-                          <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-bold text-emerald-800 ring-1 ring-emerald-200">
-                            <Check className="h-3 w-3" aria-hidden /> Rated
-                          </span>
-                        )}
-                      </div>
-
-                      <div className="mt-auto flex items-center justify-between gap-3 border-t border-slate-100 pt-4">
-                        {hire.feedback ? (
-                          <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-600">
-                            {score && <span className="flex items-center gap-1.5"><Stars value={score} /><strong className="text-slate-800">{score.toFixed(1)}</strong></span>}
-                            <span>Rehire: <strong className="text-slate-800">{data?.would_rehire?.[hire.feedback.would_rehire] ?? hire.feedback.would_rehire}</strong></span>
-                          </div>
-                        ) : hire.can_give_feedback ? (
-                          <span className="text-xs font-semibold text-amber-700">Waiting for your feedback</span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1.5 text-xs text-slate-500"><CalendarClock className="h-3.5 w-3.5" aria-hidden />Opens on their start date</span>
-                        )}
-                        {hire.can_give_feedback && (
-                          <Button size="sm" variant={hire.feedback ? 'outline' : 'navy'} icon={hire.feedback ? Pencil : Star} onClick={() => setGiving(hire)}>
-                            {hire.feedback ? 'Edit' : 'Give feedback'}
-                          </Button>
-                        )}
-                      </div>
-                    </Motion.li>
-                  )
-                })}
+                {visible.map((hire, index) => (
+                  <HireCard
+                    key={`${hire.source}-${hire.source_id}`}
+                    hire={hire}
+                    index={index}
+                    aspects={data?.aspects ?? {}}
+                    rehireLabels={data?.would_rehire ?? {}}
+                    onGive={() => setGiving(hire)}
+                  />
+                ))}
               </AnimatePresence>
             </ul>
           )}
@@ -130,6 +91,137 @@ export default function HiresTab() {
 
       {giving && <WorkerFeedbackDialog hire={giving} aspects={data?.aspects ?? {}} rehireOptions={data?.would_rehire ?? {}} onClose={() => setGiving(null)} />}
     </div>
+  )
+}
+
+function PrivacyNote() {
+  const [open, setOpen] = useState(false)
+  return (
+    <div className="rounded-2xl border border-sky-100 bg-sky-50/70 px-4 py-3 text-sm text-sky-950">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+        <Lock className="h-4 w-4 shrink-0 text-sky-700" aria-hidden />
+        <span className="font-semibold">Comments are private — only PESO and the worker read them.</span>
+        <button
+          type="button"
+          onClick={() => setOpen((value) => !value)}
+          aria-expanded={open}
+          aria-controls="hires-privacy-details"
+          className="inline-flex items-center gap-1 rounded text-xs font-bold text-sky-800 underline-offset-2 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+        >
+          How this works <ChevronDown className={cn('h-3.5 w-3.5 transition', open && 'rotate-180')} aria-hidden />
+        </button>
+      </div>
+      {open && (
+        <p id="hires-privacy-details" className="mt-2 pl-7 leading-6 text-sky-900">
+          Employers the worker applies to later see only their <strong>star average and would-rehire count</strong>, never your comments or your company name.
+        </p>
+      )}
+    </div>
+  )
+}
+
+const REHIRE_PILL = {
+  yes: 'bg-emerald-50 text-emerald-800 ring-emerald-200',
+  maybe: 'bg-amber-50 text-amber-800 ring-amber-200',
+  no: 'bg-slate-100 text-slate-700 ring-slate-300',
+}
+
+function HireCard({ hire, index, aspects, rehireLabels, onGive }) {
+  const [details, setDetails] = useState(false)
+  const score = average(hire.feedback?.ratings)
+  const detailsId = `hire-details-${hire.source}-${hire.source_id}`
+  const nameClass = 'block truncate text-base font-bold text-slate-900'
+
+  return (
+    <Motion.li
+      layout
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0, transition: { delay: Math.min(index, 8) * 0.04 } }}
+      exit={{ opacity: 0, scale: 0.97 }}
+      className="flex flex-col gap-4 rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_1px_2px_rgba(15,23,42,0.04),0_10px_28px_-18px_rgba(15,23,42,0.22)]"
+    >
+      <div className="flex items-start gap-3.5">
+        <HireAvatar seekerId={hire.seeker_id} name={hire.name} hasPhoto={hire.has_photo} />
+        <div className="min-w-0 flex-1">
+          {hire.application_id ? (
+            <Link
+              to={`/employer/ats/applicant/${hire.application_id}`}
+              data-testid="hire-name"
+              className={cn(nameClass, 'rounded underline-offset-2 hover:text-brand-navy hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-focus')}
+            >
+              {hire.name}
+            </Link>
+          ) : (
+            <p data-testid="hire-name" className={nameClass}>{hire.name}</p>
+          )}
+          <p className="truncate text-sm text-slate-500">{hire.job_title ?? 'Position not set'}</p>
+          <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-400">
+            {hire.start_date && <span>Started {startedOn(hire.start_date)}</span>}
+            {hire.source === 'placement' && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 font-semibold text-slate-600">
+                <FileSpreadsheet className="h-3 w-3" aria-hidden /> From placement report
+              </span>
+            )}
+          </div>
+        </div>
+        {hire.feedback && (
+          <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-bold text-emerald-800 ring-1 ring-emerald-200">
+            <Check className="h-3 w-3" aria-hidden /> Rated
+          </span>
+        )}
+      </div>
+
+      <div className="mt-auto flex items-center justify-between gap-3 border-t border-slate-100 pt-4">
+        {hire.feedback ? (
+          <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-600">
+            {score && <span className="flex items-center gap-1.5"><Stars value={score} /><strong className="text-slate-800">{score.toFixed(1)}</strong></span>}
+            <span className={cn('rounded-full px-2 py-0.5 font-bold ring-1', REHIRE_PILL[hire.feedback.would_rehire] ?? REHIRE_PILL.no)}>
+              Rehire: {rehireLabels[hire.feedback.would_rehire] ?? hire.feedback.would_rehire}
+            </span>
+          </div>
+        ) : hire.can_give_feedback ? (
+          <span className="text-xs font-semibold text-amber-700">Waiting for your feedback</span>
+        ) : (
+          <span className="inline-flex items-center gap-1.5 text-xs text-slate-500"><CalendarClock className="h-3.5 w-3.5" aria-hidden />Opens on their start date</span>
+        )}
+        {hire.can_give_feedback && (
+          <Button size="sm" variant={hire.feedback ? 'outline' : 'navy'} icon={hire.feedback ? Pencil : Star} onClick={onGive}>
+            {hire.feedback ? 'Edit' : 'Give feedback'}
+          </Button>
+        )}
+      </div>
+
+      {hire.feedback && (
+        <div>
+          <button
+            type="button"
+            onClick={() => setDetails((value) => !value)}
+            aria-expanded={details}
+            aria-controls={detailsId}
+            className="inline-flex items-center gap-1 rounded text-xs font-bold text-brand-navy underline-offset-2 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+          >
+            {details ? 'Hide details' : 'Show details'}
+            <ChevronDown className={cn('h-3.5 w-3.5 transition', details && 'rotate-180')} aria-hidden />
+          </button>
+          {details && (
+            <div id={detailsId} data-testid="hire-feedback-details" className="mt-3 space-y-3 rounded-xl bg-slate-50 p-3">
+              <ul className="grid gap-2 sm:grid-cols-2">
+                {Object.entries(aspects).map(([key, label]) => (
+                  <li key={key} className="flex items-center justify-between gap-2 rounded-lg bg-white px-3 py-1.5 text-xs ring-1 ring-slate-100">
+                    <span className="text-slate-600">{label}</span>
+                    <span className="flex items-center gap-1"><Stars value={hire.feedback.ratings?.[key] ?? 0} /><strong className="text-slate-800">{hire.feedback.ratings?.[key] ?? '–'}</strong></span>
+                  </li>
+                ))}
+              </ul>
+              {hire.feedback.comment && (
+                <blockquote className="whitespace-pre-line border-l-4 border-slate-300 pl-3 text-sm italic text-slate-700">{hire.feedback.comment}</blockquote>
+              )}
+              {hire.feedback.updated_at && <p className="text-[11px] text-slate-500">Updated {updatedOn(hire.feedback.updated_at)}</p>}
+            </div>
+          )}
+        </div>
+      )}
+    </Motion.li>
   )
 }
 
