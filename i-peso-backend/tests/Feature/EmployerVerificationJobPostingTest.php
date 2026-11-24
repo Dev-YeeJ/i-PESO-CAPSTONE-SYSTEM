@@ -1003,7 +1003,7 @@ class EmployerVerificationJobPostingTest extends TestCase
         ]);
     }
 
-    public function test_ojt_document_view_is_recorded_without_satisfying_officer_review(): void
+    public function test_whether_an_interns_view_counts_follows_their_roles_access(): void
     {
         Storage::fake('public');
         $employer = $this->createEmployer();
@@ -1017,15 +1017,45 @@ class EmployerVerificationJobPostingTest extends TestCase
             'uploaded_at' => now(),
         ]);
         Storage::disk('public')->put($document->document_path, 'mock pdf data');
-        $ojt = $this->createAdmin('ojt-reviewer@example.com');
-        $ojt->forceFill(['position' => 'ojt_intern'])->save();
+        // This suite builds a slim schema: add the staff-role pieces this test needs.
+        if (! Schema::hasTable('admin_roles')) {
+            Schema::create('admin_roles', function (Blueprint $table) {
+                $table->id();
+                $table->string('name', 100);
+                $table->string('slug', 60)->unique();
+                $table->json('permissions');
+                $table->boolean('is_system')->default(false);
+                $table->timestamps();
+            });
+        }
+        foreach (['admin_role_id' => 'unsignedBigInteger', 'position' => 'string'] as $column => $type) {
+            if (! Schema::hasColumn('administrators', $column)) {
+                Schema::table('administrators', fn (Blueprint $table) => $table->{$type}($column)->nullable());
+            }
+        }
 
-        Sanctum::actingAs($ojt);
+        $internRole = fn (string $level) => \App\Models\AdminRole::create([
+            'name' => "Intern {$level}", 'slug' => "ojt-intern-{$level}", 'is_system' => false,
+            'permissions' => ['constituent_crm' => $level],
+        ]);
+        $intern = function (string $email, string $level) use ($internRole): Administrator {
+            $admin = $this->createAdmin($email);
+            $admin->forceFill(['position' => 'ojt_intern', 'role' => 'ojt-intern', 'admin_role_id' => $internRole($level)->id])->save();
+
+            return $admin->fresh();
+        };
+
+        // View access (the intern role's default): seen by staff, not an officer's review.
+        Sanctum::actingAs($intern('ojt-viewer@example.com', 'view'));
         $this->get("/api/admin/documents/{$document->document_id}/view")->assertOk();
-
         $document->refresh();
         $this->assertNotNull($document->staff_viewed_at);
         $this->assertNull($document->viewed_at);
+
+        // Full access given in Roles & Permissions: their review counts, like any officer's.
+        Sanctum::actingAs($intern('ojt-officer@example.com', 'manage'));
+        $this->get("/api/admin/documents/{$document->document_id}/view")->assertOk();
+        $this->assertNotNull($document->fresh()->viewed_at);
     }
 
     public function test_admin_download_requires_reason_and_creates_audit_log(): void

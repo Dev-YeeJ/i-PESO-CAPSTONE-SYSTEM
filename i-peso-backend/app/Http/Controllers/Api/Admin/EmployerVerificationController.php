@@ -534,8 +534,8 @@ class EmployerVerificationController extends Controller
             $document->employer_id
         ));
 
-        // Keep staff access visible without allowing a view-only role or OJT
-        // to satisfy the authorized officer's separate review requirement.
+        // Keep staff access visible without letting a view-only role satisfy
+        // the authorized officer's separate review requirement.
         // These two shared columns only feed the employer-facing "PESO has opened
         // your document" indicator; the admin-side "Viewed" badge and the finalize
         // guard read the per-account record below.
@@ -544,10 +544,11 @@ class EmployerVerificationController extends Controller
         if ($user instanceof \App\Models\Administrator) {
             EmployerDocumentView::record((int) $document->document_id, (int) $user->getKey());
         }
+        // Roles & Permissions decides who is an authorizing officer: Full access to
+        // Constituent CRM, whatever the position (interns included, if the Office Manager
+        // gives their position Full access).
         $isAuthorizingOfficer = $user instanceof \App\Models\Administrator
-            && $user->canManageModule('constituent_crm')
-            // OJT interns and GIP beneficiaries are never authorizing officers, whatever access they're given.
-            && ! $user->hasFixedTerm();
+            && $user->canManageModule('constituent_crm');
 
         if ($user instanceof \App\Models\Administrator && $document->staff_viewed_at === null) {
             $document->staff_viewed_at = now();

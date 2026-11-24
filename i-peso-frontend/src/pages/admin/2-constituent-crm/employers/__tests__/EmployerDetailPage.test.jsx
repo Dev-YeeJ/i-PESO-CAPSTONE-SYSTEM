@@ -73,6 +73,28 @@ describe('EmployerDetailPage document viewed state', () => {
     expect(screen.queryByText('Pending review')).not.toBeInTheDocument()
   })
 
+  it.each([
+    ['an intern whose role has Full access', 'manage', false],
+    ['an intern whose role is View only', 'view', true],
+  ])('follows Roles & Permissions for %s', async (_, level, viewOnly) => {
+    useAuthStore.setState({ user: { admin_id: 7, first_name: 'Angelo', position: 'ojt_intern', access: { constituent_crm: level } } })
+    adminService.getEmployerDetail.mockResolvedValue(employer([
+      doc({ document_id: 1, document_type: 'mayors_permit', viewed_by_me_at: '2026-11-12T02:00:00Z' }),
+      doc({ document_id: 2, document_type: 'government_id', viewed_by_me_at: '2026-11-12T02:00:00Z' }),
+    ]))
+
+    renderWithProviders(<EmployerDetailPage />)
+
+    await screen.findAllByText('Viewed')
+    if (viewOnly) {
+      expect(screen.getByText(/View-only mode/)).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: /complete review/i })).not.toBeInTheDocument()
+    } else {
+      expect(screen.queryByText(/View-only mode/)).not.toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /complete review/i })).toBeInTheDocument()
+    }
+  })
+
   it('marks the Government ID as required', async () => {
     adminService.getEmployerDetail.mockResolvedValue(employer([
       doc({ document_id: 1, document_type: 'mayors_permit' }),
