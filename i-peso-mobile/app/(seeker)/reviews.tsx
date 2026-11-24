@@ -231,7 +231,7 @@ function EmployerFeedbackSection({ items }: { items: EmployerFeedbackItem[] }) {
       <Text style={[styles.sectionTitle, styles.sectionGap]} accessibilityRole="header">Feedback from employers</Text>
       <View style={[styles.inline, styles.privateNote]}>
         <MaterialIcons name="lock" size={16} color={colors.textSecondary} />
-        <Text style={[styles.bodyText, styles.flexText]}>Only you and PESO can read the comments. Employers you apply to see only your average rating and how many would hire you again.</Text>
+        <Text style={[styles.bodyText, styles.flexText]}>Only you and PESO can read the comments. Employers you apply to see only your average rating.</Text>
       </View>
       {items.map((item) => (
         <Card key={item.id} padding="md" style={styles.itemCard}>
@@ -248,9 +248,6 @@ function EmployerFeedbackSection({ items }: { items: EmployerFeedbackItem[] }) {
               </View>
             ))}
           </View>
-          <Text style={[styles.bodyText, styles.comment]}>
-            Would hire you again: <Text style={styles.strong}>{item.would_rehire}</Text>
-          </Text>
           {item.comment ? <Text style={[styles.bodyText, styles.comment]}>{item.comment}</Text> : null}
           <Text style={[styles.meta, styles.comment]}>
             Think something here is unfair or not about your work? Tell PESO at the office; staff can remove feedback that breaks the{' '}

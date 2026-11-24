@@ -25,8 +25,6 @@ export const reviewService = {
     return data
   },
 
-  // Report someone else's review to PESO.
-
   // Small ratings for the job cards on screen: { [employerId]: { average, reviewers } }
   ratings: async (employerIds) => {
     const { data } = await api.get('/seeker/employer-ratings', { params: { ids: employerIds } })

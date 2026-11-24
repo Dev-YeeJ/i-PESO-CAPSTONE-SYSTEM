@@ -56,6 +56,7 @@ class AdminReviewModerationTest extends TestCase
             });
         }
         (require database_path('migrations/2026_11_12_000001_create_employer_feedback_tables.php'))->up();
+        (require database_path('migrations/2026_11_25_000001_make_worker_feedback_would_rehire_optional.php'))->up();
         (require database_path('migrations/2026_11_13_000001_create_safety_reports_tables.php'))->up();
 
         $this->employerId = $this->employer('Urdaneta Rice Mill Corp.');
@@ -173,7 +174,8 @@ class AdminReviewModerationTest extends TestCase
         $this->getJson("/api/admin/seekers/{$worker->seeker_id}/worker-feedback")
             ->assertOk()
             ->assertJsonPath('feedback.0.employer', 'Urdaneta Rice Mill Corp.')
-            ->assertJsonPath('feedback.0.would_rehire', 'No');
+            // Would-rehire is no longer asked; an older answer is not shown.
+            ->assertJsonMissingPath('feedback.0.would_rehire');
         $this->assertDatabaseHas('activity_logs', ['action' => 'viewed_worker_feedback']);
 
         $this->postJson("/api/admin/worker-feedback/{$feedback->id}/visibility", ['visible' => false])->assertStatus(422);

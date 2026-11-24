@@ -1,4 +1,4 @@
-import { screen, waitFor } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { renderWithProviders } from '@/test/utils'
@@ -56,7 +56,7 @@ describe('EmployerReviewsPage', () => {
         ? response([review(2)])
         : response([review(1, { own_reply: { body: 'Thank you for applying.', status: 'published', edited: false } }), review(2)])
     ))
-    employerFeedbackService.getHires.mockResolvedValue({ hires: [], aspects: {}, would_rehire: {} })
+    employerFeedbackService.getHires.mockResolvedValue({ hires: [], aspects: {} })
   })
 
   it('shows the summary, star distribution and reviews', async () => {
@@ -91,6 +91,31 @@ describe('EmployerReviewsPage', () => {
 
     expect(await screen.findByText('Review number 1.')).toBeInTheDocument()
     expect(screen.getByText('Thank you for applying.')).toBeInTheDocument()
+  })
+
+  it('asks for stars and an optional comment about a hire, not whether you would hire them again', async () => {
+    employerFeedbackService.getHires.mockResolvedValue({
+      hires: [{ source: 'application', source_id: 5, name: 'Glory Ann Padilla', job_title: 'Real estate broker', start_date: '2026-11-20', can_give_feedback: true, feedback: null }],
+      aspects: { professionalism: 'Professionalism', communication: 'Communication', reliability: 'Reliability', job_performance: 'Job performance' },
+    })
+    employerFeedbackService.saveWorkerFeedback.mockResolvedValue({ message: 'Saved.' })
+    renderWithProviders(<EmployerReviewsPage />, { route: '/employer/reviews?tab=hires' })
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Give feedback' }))
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).queryByText(/hire glory again/i)).not.toBeInTheDocument()
+    expect(within(dialog).queryByRole('radio', { name: 'Maybe' })).not.toBeInTheDocument()
+    expect(within(dialog).getByText(/Your stars count toward the rating other employers see/)).toBeInTheDocument()
+
+    for (const group of within(dialog).getAllByRole('group').filter((node) => node.querySelector('input[type="radio"][aria-label]'))) {
+      await userEvent.click(within(group).getByLabelText(/^4 of 5 stars/))
+    }
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Save feedback' }))
+
+    await waitFor(() => expect(employerFeedbackService.saveWorkerFeedback).toHaveBeenCalled())
+    const payload = employerFeedbackService.saveWorkerFeedback.mock.calls[0][0]
+    expect(payload).toMatchObject({ application_id: 5, ratings: { professionalism: 4, communication: 4, reliability: 4, job_performance: 4 } })
+    expect(payload).not.toHaveProperty('would_rehire')
   })
 
   it('opens the hires tab from the URL', async () => {

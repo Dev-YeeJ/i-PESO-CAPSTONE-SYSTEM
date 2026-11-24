@@ -820,7 +820,6 @@ export interface EmployerFeedbackItem {
   /** YYYY-MM-DD */
   visible_from: string
   ratings?: ReviewAspectRating[]
-  would_rehire?: string
   comment?: string | null
   updated_at?: string
 }

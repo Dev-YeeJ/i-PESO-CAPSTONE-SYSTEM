@@ -215,12 +215,6 @@ function ReadyToReview({ actions, onReview }) {
   )
 }
 
-const REHIRE_PILL = {
-  Yes: 'bg-emerald-50 text-emerald-800 ring-emerald-200',
-  Maybe: 'bg-amber-50 text-amber-800 ring-amber-200',
-  No: 'bg-slate-100 text-slate-700 ring-slate-300',
-}
-
 const overall = (ratings = []) => {
   const values = ratings.map((rating) => Number(rating.value)).filter(Boolean)
   return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : null
@@ -233,7 +227,7 @@ function EmployerFeedbackSection({ items }) {
   return (
     <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-card" aria-labelledby="employer-feedback-heading">
       <h2 id="employer-feedback-heading" className="text-lg font-semibold text-slate-900">Feedback from employers</h2>
-      <p className="mt-1 flex items-start gap-1.5 text-sm text-slate-600"><Lock className="mt-0.5 h-4 w-4 shrink-0" aria-hidden /> Only you and PESO can read the comments. Employers you apply to see only your average rating and how many would hire you again.</p>
+      <p className="mt-1 flex items-start gap-1.5 text-sm text-slate-600"><Lock className="mt-0.5 h-4 w-4 shrink-0" aria-hidden /> Only you and PESO can read the comments. Employers you apply to see only your average rating.</p>
       <ul className="mt-4 space-y-3">
         {items.map((item) => {
           const score = overall(item.ratings)
@@ -254,9 +248,6 @@ function EmployerFeedbackSection({ items }) {
                       <span className="text-lg font-bold text-slate-900">{score.toFixed(1)}</span>
                     </span>
                   )}
-                  <span className={cn('rounded-full px-2.5 py-1 text-xs font-bold ring-1', REHIRE_PILL[item.would_rehire] ?? REHIRE_PILL.No)}>
-                    Would hire again: {item.would_rehire}
-                  </span>
                 </div>
               </div>
               <ul className="mt-3 grid gap-x-6 gap-y-1.5 text-sm sm:grid-cols-2">

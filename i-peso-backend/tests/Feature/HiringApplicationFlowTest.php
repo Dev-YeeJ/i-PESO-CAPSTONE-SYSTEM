@@ -507,6 +507,7 @@ class HiringApplicationFlowTest extends TestCase
     public function test_employers_see_an_applicants_rating_from_other_employers_without_comments(): void
     {
         (require database_path('migrations/2026_11_12_000001_create_employer_feedback_tables.php'))->up();
+        (require database_path('migrations/2026_11_25_000001_make_worker_feedback_would_rehire_optional.php'))->up();
         $employer = $this->createEmployer();
         $pastEmployer = $this->createEmployer();
         $anotherPastEmployer = $this->createEmployer();
@@ -533,8 +534,8 @@ class HiringApplicationFlowTest extends TestCase
             ->assertOk()
             ->assertJsonPath('worker_rating.average', 4.5)
             ->assertJsonPath('worker_rating.employers', 2)
-            ->assertJsonPath('worker_rating.would_rehire.yes', 2)
-            ->assertJsonPath('worker_rating.would_rehire.no', 0);
+            // Would-rehire answers (including older ones) are no longer counted or shown.
+            ->assertJsonMissingPath('worker_rating.would_rehire');
 
         $this->assertStringNotContainsString('Private comment', $response->getContent());
     }

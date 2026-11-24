@@ -31,6 +31,7 @@ class EmployerReviewTest extends TestCase
         $this->createStaffTables();
         $this->createHiringTables();
         (require database_path('migrations/2026_11_12_000001_create_employer_feedback_tables.php'))->up();
+        (require database_path('migrations/2026_11_25_000001_make_worker_feedback_would_rehire_optional.php'))->up();
 
         $this->employerId = $this->employer('Urdaneta Rice Mill Corp.');
     }

@@ -59,7 +59,7 @@ describe('MyReviewsPage', () => {
     const section = await screen.findByRole('region', { name: 'Feedback from employers' })
     const [first] = within(section).getAllByTestId('employer-feedback')
     expect(within(first).getByText('4.0')).toBeInTheDocument()
-    expect(within(first).getByText('Would hire again: Maybe')).toBeInTheDocument()
+    expect(within(first).queryByText(/hire again/i)).not.toBeInTheDocument()
     expect(within(first).getByRole('link', { name: 'GreenCycle Solutions' })).toHaveAttribute('href', '/seeker/employers/3')
     expect(within(section).getAllByText(/Think something here is unfair/)).toHaveLength(1)
   })

@@ -33,7 +33,6 @@ class WorkerFeedbackVisibility
                     'ratings' => collect(FeedbackAspects::WORKER_ASPECTS)
                         ->map(fn ($label, $key) => ['key' => $key, 'label' => $label, 'value' => $feedback->ratings[$key] ?? null])
                         ->values(),
-                    'would_rehire' => FeedbackAspects::WOULD_REHIRE[$feedback->would_rehire] ?? $feedback->would_rehire,
                     'comment' => $feedback->comment,
                     'updated_at' => $feedback->updated_at,
                 ];

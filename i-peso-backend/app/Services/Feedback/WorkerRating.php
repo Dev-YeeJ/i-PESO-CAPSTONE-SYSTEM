@@ -7,19 +7,19 @@ use App\Support\FeedbackAspects;
 
 /**
  * The summary employers see on an applicant's profile: average stars across
- * all employers' feedback, how many employers gave it, and the would-rehire
- * count. No comments and no company names. Feedback PESO hid isn't counted.
+ * all employers' feedback and how many employers gave it. No comments and no
+ * company names. Feedback PESO hid isn't counted.
  */
 class WorkerRating
 {
-    /** @return array{average: float, employers: int, would_rehire: array{yes: int, maybe: int, no: int}}|null */
+    /** @return array{average: float, employers: int}|null */
     public static function forSeeker(int $seekerId): ?array
     {
         $feedback = WorkerFeedback::query()
             ->where('seeker_id', $seekerId)
             ->where('status', 'visible')
             ->latest('updated_at')
-            ->get(['employer_id', 'ratings', 'would_rehire', 'updated_at'])
+            ->get(['employer_id', 'ratings', 'updated_at'])
             // One entry per employer (their latest), so one company can't count twice.
             ->unique('employer_id')
             ->values();
@@ -43,11 +43,6 @@ class WorkerRating
         return [
             'average' => round($averages->avg(), 1),
             'employers' => $feedback->count(),
-            'would_rehire' => [
-                'yes' => $feedback->where('would_rehire', 'yes')->count(),
-                'maybe' => $feedback->where('would_rehire', 'maybe')->count(),
-                'no' => $feedback->where('would_rehire', 'no')->count(),
-            ],
         ];
     }
 }
