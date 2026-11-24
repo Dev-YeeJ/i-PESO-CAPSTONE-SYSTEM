@@ -12,6 +12,7 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage;
 use Laravel\Sanctum\Sanctum;
 use Tests\Concerns\CreatesFeedbackTables;
 use Tests\Concerns\CreatesStaffTables;
@@ -228,6 +229,67 @@ class EmployerFeedbackTest extends TestCase
         $this->postJson('/api/employer/worker-feedback', $this->workerPayload(['application_id' => $hire]))->assertNotFound();
     }
 
+    // ── Hire photos ─────────────────────────────────────────────────────────
+
+    public function test_hires_say_whether_a_photo_exists_and_which_application_they_came_from(): void
+    {
+        $withPhoto = $this->seeker('photo@example.test');
+        $withPhoto->forceFill(['profile_image' => 'seeker_profile_images/1/a.jpg'])->save();
+        $hired = $this->application($withPhoto, 'hired');
+        $placed = $this->placement($this->seeker('placed@example.test'), $this->employerId, 'approved');
+        Sanctum::actingAs($this->employerModel());
+
+        $hires = collect($this->getJson('/api/employer/hires')->assertOk()->json('hires'));
+        $application = $hires->firstWhere('source', 'application');
+        $placement = $hires->firstWhere('source', 'placement');
+
+        $this->assertTrue($application['has_photo']);
+        $this->assertSame($hired, $application['application_id']);
+        $this->assertFalse($placement['has_photo']);
+        $this->assertSame($placed, $placement['source_id']);
+        $this->assertNull($placement['application_id']);
+    }
+
+    public function test_employers_can_load_the_photo_of_anyone_they_hired(): void
+    {
+        Storage::fake('local');
+        Storage::disk('local')->put('seeker_profile_images/hire.jpg', 'jpeg-bytes');
+        $hired = $this->seekerWithPhoto('hired@example.test');
+        $this->application($hired, 'hired');
+        $placed = $this->seekerWithPhoto('placed@example.test');
+        $this->placement($placed, $this->employerId, 'approved');
+        Sanctum::actingAs($this->employerModel());
+
+        $response = $this->get("/api/employer/hires/{$hired->seeker_id}/photo")->assertOk();
+        $this->assertSame('inline', $response->headers->get('Content-Disposition'));
+        $this->assertStringContainsString('no-store', $response->headers->get('Cache-Control'));
+        $this->assertSame('nosniff', $response->headers->get('X-Content-Type-Options'));
+
+        $this->get("/api/employer/hires/{$placed->seeker_id}/photo")->assertOk();
+    }
+
+    public function test_the_hire_photo_is_not_available_for_people_they_did_not_hire(): void
+    {
+        Storage::fake('local');
+        Storage::disk('local')->put('seeker_profile_images/hire.jpg', 'jpeg-bytes');
+        $applicant = $this->seekerWithPhoto('applicant@example.test');
+        $this->application($applicant, 'reviewed');
+        $pendingPlacement = $this->seekerWithPhoto('pending@example.test');
+        $this->placement($pendingPlacement, $this->employerId, 'pending');
+        $rejectedPlacement = $this->seekerWithPhoto('rejected@example.test');
+        $this->placement($rejectedPlacement, $this->employerId, 'rejected');
+        $elsewhere = $this->seekerWithPhoto('elsewhere@example.test');
+        $this->placement($elsewhere, $this->employer('Pangasinan Bakeshop'), 'approved');
+        $missingFile = $this->seeker('missing@example.test');
+        $missingFile->forceFill(['profile_image' => 'seeker_profile_images/gone.jpg'])->save();
+        $this->application($missingFile, 'hired');
+        Sanctum::actingAs($this->employerModel());
+
+        foreach ([$applicant, $pendingPlacement, $rejectedPlacement, $elsewhere, $missingFile] as $seeker) {
+            $this->get("/api/employer/hires/{$seeker->seeker_id}/photo")->assertNotFound();
+        }
+    }
+
     // ── The worker's view (mutual reveal) ──────────────────────────────────
 
     public function test_the_worker_sees_employer_feedback_straight_away(): void
@@ -279,6 +341,14 @@ class EmployerFeedbackTest extends TestCase
     private function employerModel(): Employer
     {
         return Employer::find($this->employerId);
+    }
+
+    private function seekerWithPhoto(string $email): JobSeeker
+    {
+        $seeker = $this->seeker($email);
+        $seeker->forceFill(['profile_image' => 'seeker_profile_images/hire.jpg'])->save();
+
+        return $seeker;
     }
 
     private function review(string $comment, string $status = 'published', ?int $employerId = null): int

@@ -75,6 +75,7 @@ trait CreatesFeedbackTables
             $table->string('company_name');
             $table->string('email')->unique();
             $table->string('verification_status')->default('pending');
+            $table->string('company_logo')->nullable();
             $table->timestamps();
             $table->softDeletes();
         });
@@ -85,6 +86,7 @@ trait CreatesFeedbackTables
             $table->string('last_name');
             $table->string('email')->unique();
             $table->string('password');
+            $table->string('profile_image')->nullable();
             $table->timestamps();
         });
 

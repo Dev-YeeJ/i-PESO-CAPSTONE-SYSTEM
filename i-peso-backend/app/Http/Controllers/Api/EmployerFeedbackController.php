@@ -8,6 +8,7 @@ use App\Models\Employer;
 use App\Models\EmployerReview;
 use App\Models\EmployerReviewFlag;
 use App\Models\EmployerReviewReply;
+use App\Models\JobSeeker;
 use App\Models\PlacementRecord;
 use App\Models\PlacementReportUpload;
 use App\Models\WorkerFeedback;
@@ -20,8 +21,10 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
  * The employer's side of the Verified Mutual Feedback System:
@@ -150,6 +153,41 @@ class EmployerFeedbackController extends Controller
         ]);
     }
 
+    /**
+     * The 2x2 photo of someone this employer hired: through a hired application on
+     * one of their vacancies, or a row PESO linked in one of their APPROVED placement
+     * reports. Placement hires never applied here, so this is the only part of their
+     * profile the employer gets.
+     */
+    public function hirePhoto(Request $request, int $seeker): StreamedResponse
+    {
+        $employer = $this->employer($request);
+
+        $hired = Application::query()
+            ->where('seeker_id', $seeker)
+            ->where('status', 'hired')
+            ->whereHas('jobVacancy', fn ($query) => $query->where('employer_id', $employer->employer_id))
+            ->exists()
+            || PlacementRecord::query()
+                ->where('employer_id', $employer->employer_id)
+                ->where('seeker_id', $seeker)
+                ->whereHas('upload', fn ($query) => $query->where('status', PlacementReportUpload::STATUS_APPROVED))
+                ->exists();
+        abort_unless($hired, 404, 'Profile photo not found.');
+
+        $path = JobSeeker::query()->whereKey($seeker)->value('profile_image');
+        abort_unless(filled($path), 404, 'Profile photo not found.');
+
+        $disk = Storage::disk('local')->exists($path) ? 'local' : 'public';
+        abort_unless(Storage::disk($disk)->exists($path), 404, 'Profile photo not found.');
+
+        return Storage::disk($disk)->response($path, 'profile-photo', [
+            'Content-Disposition' => 'inline',
+            'X-Content-Type-Options' => 'nosniff',
+            'Cache-Control' => 'private, no-store, no-cache, must-revalidate',
+        ]);
+    }
+
     public function saveWorkerFeedback(Request $request): JsonResponse
     {
         $employer = $this->employer($request);
@@ -235,6 +273,9 @@ class EmployerFeedbackController extends Controller
             'source' => $source,
             'source_id' => $id,
             'seeker_id' => $seeker->seeker_id,
+            // Opens the applicant profile; null for placement hires (they never applied here).
+            'application_id' => $source === 'application' ? $id : null,
+            'has_photo' => filled($seeker->profile_image),
             'name' => trim("{$seeker->first_name} {$seeker->last_name}"),
             'job_title' => $title,
             'start_date' => $start,

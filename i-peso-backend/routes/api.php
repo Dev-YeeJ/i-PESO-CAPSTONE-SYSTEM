@@ -142,6 +142,7 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::post('/reviews/{review}/reply', [EmployerFeedbackController::class, 'reply'])->middleware('throttle:10,1');
             Route::delete('/reviews/{review}/reply', [EmployerFeedbackController::class, 'deleteReply']);
             Route::get('/hires', [EmployerFeedbackController::class, 'hires']);
+            Route::get('/hires/{seeker}/photo', [EmployerFeedbackController::class, 'hirePhoto'])->whereNumber('seeker');
             Route::post('/worker-feedback', [EmployerFeedbackController::class, 'saveWorkerFeedback'])->middleware('throttle:20,1');
 
             // Report & Safety: reporting a job seeker who applied to this employer.
