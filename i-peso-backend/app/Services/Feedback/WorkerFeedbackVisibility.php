@@ -25,7 +25,7 @@ class WorkerFeedbackVisibility
             ->map(function (WorkerFeedback $feedback) {
                 return [
                     'id' => $feedback->id,
-                    'employer' => ['id' => $feedback->employer_id, 'name' => $feedback->employer?->company_name],
+                    'employer' => ['id' => $feedback->employer_id, 'name' => $feedback->employer?->company_name, 'logo' => $feedback->employer?->company_logo],
                     'job_title' => $feedback->application?->jobVacancy?->job_title,
                     // Kept for app builds that still check them: never locked now.
                     'locked' => false,

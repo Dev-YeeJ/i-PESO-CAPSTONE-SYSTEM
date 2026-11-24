@@ -290,6 +290,26 @@ class EmployerFeedbackTest extends TestCase
         }
     }
 
+    public function test_the_seeker_reviews_page_gets_each_employers_logo(): void
+    {
+        DB::table('employers')->where('employer_id', $this->employerId)->update(['company_logo' => 'company_logos/rice.png']);
+        $worker = $this->seeker('worker@example.test');
+        $this->application($worker, 'reviewed');
+        $this->review('Fair and organized.');
+        EmployerReview::query()->latest('id')->first()->update(['seeker_id' => $worker->seeker_id]);
+        WorkerFeedback::create([
+            'employer_id' => $this->employerId, 'seeker_id' => $worker->seeker_id,
+            'ratings' => ['professionalism' => 4, 'communication' => 4, 'reliability' => 4, 'job_performance' => 4],
+            'would_rehire' => 'yes',
+        ]);
+        Sanctum::actingAs($worker);
+
+        $this->getJson('/api/seeker/reviews')->assertOk()
+            ->assertJsonPath('opportunities.0.employer.logo', 'company_logos/rice.png')
+            ->assertJsonPath('employer_feedback.0.employer.logo', 'company_logos/rice.png')
+            ->assertJsonPath('reviews.0.employer.logo', 'company_logos/rice.png');
+    }
+
     // ── The worker's view (mutual reveal) ──────────────────────────────────
 
     public function test_the_worker_sees_employer_feedback_straight_away(): void

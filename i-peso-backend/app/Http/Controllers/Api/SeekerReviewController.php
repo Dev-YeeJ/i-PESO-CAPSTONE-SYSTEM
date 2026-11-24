@@ -183,7 +183,7 @@ class SeekerReviewController extends Controller
             'status' => $review->status,
             'hold_reason' => $review->status === EmployerReview::HELD ? $review->hold_reason : null,
             'moderation_note' => $review->status === EmployerReview::HIDDEN ? $review->moderation_note : null,
-            'employer' => ['id' => $review->employer_id, 'name' => $review->employer?->company_name],
+            'employer' => ['id' => $review->employer_id, 'name' => $review->employer?->company_name, 'logo' => $review->employer?->company_logo],
             'job_title' => $review->application?->jobVacancy?->job_title ?? $review->placementRecord?->position,
             'application_id' => $review->application_id,
             'placement_record_id' => $review->placement_record_id,

@@ -48,7 +48,7 @@ class FeedbackEligibility
             return [
                 'source' => 'application',
                 'source_id' => $application->apply_id,
-                'employer' => ['id' => $employer->employer_id, 'name' => $employer->company_name],
+                'employer' => ['id' => $employer->employer_id, 'name' => $employer->company_name, 'logo' => $employer->company_logo],
                 'job_title' => $application->jobVacancy->job_title,
                 'status' => $application->status,
                 'recruitment' => $this->describe($this->recruitment($application), $existing),
