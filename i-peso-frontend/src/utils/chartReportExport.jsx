@@ -1,7 +1,8 @@
 // Chart downloads in the official PESO template.
 //
-// PNG / JPG: <ReportFrame> (letterhead, chart, table, notes) is drawn off screen at a
-// fixed print size and captured with html-to-image, so it looks the same from any screen.
+// PNG / JPG: <ReportFrame> (letterhead, chart, table, notes) is drawn off screen as an
+// A4 page (same shape as the PDF) and captured with html-to-image at 2× (2000 × 2830 px),
+// so it looks the same from any screen and prints at the same size as the PDF.
 // PDF: jsPDF draws the same layout with real text (sharp when printed); only the chart
 // itself is an image. "Download all" builds one PDF (cover, contents, summary, a page
 // per chart) or a ZIP of the chart images plus their data as CSV.
@@ -48,9 +49,10 @@ export async function downloadChart(spec, context, format) {
  * @param {object}   [options.summary] { title, rows: [[label, value, detail]] , notes: string[] }
  * @param {object[]} [options.appendix] extra tables: [{ title, columns: [label], rows: [[...]], notes }]
  * @param {'pdf'|'zip'} options.format
+ * @param {'png'|'jpg'} [options.imageFormat]  image type inside the ZIP
  * @param {(p: { done: number, total: number, label: string }) => void} [options.onProgress]
  */
-export async function downloadAllCharts({ context, specs, summary, appendix = [], format, onProgress = () => {} }) {
+export async function downloadAllCharts({ context, specs, summary, appendix = [], format, imageFormat = 'png', onProgress = () => {} }) {
   const ctx = withDefaults(context)
   const drawable = specs.filter(hasChartData)
   const total = drawable.length
@@ -62,8 +64,8 @@ export async function downloadAllCharts({ context, specs, summary, appendix = []
     for (const [index, spec] of drawable.entries()) {
       onProgress({ done: index, total, label: spec.title })
       const prefix = String(index + 1).padStart(2, '0')
-      const { dataUrl } = await renderToImage(<ReportFrame spec={spec} context={ctx} />, 'png')
-      zip.file(`${prefix}-${reportFileName(spec.title, 'png', ctx.generatedAt)}`, dataUrl.split(',')[1], { base64: true })
+      const { dataUrl } = await renderToImage(<ReportFrame spec={spec} context={ctx} />, imageFormat)
+      zip.file(`${prefix}-${reportFileName(spec.title, imageFormat, ctx.generatedAt)}`, dataUrl.split(',')[1], { base64: true })
       zip.file(`data/${prefix}-${reportFileName(spec.title, 'csv', ctx.generatedAt)}`, `\uFEFF${tableToCsv(spec, ctx)}`)
     }
     if (summary?.rows?.length) {

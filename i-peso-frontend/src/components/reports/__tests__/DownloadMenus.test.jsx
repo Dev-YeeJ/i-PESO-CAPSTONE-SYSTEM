@@ -52,4 +52,15 @@ describe('chart download menus', () => {
     finish()
     await waitFor(() => expect(screen.getByRole('button', { name: /Download all/ })).toBeEnabled())
   })
+
+  it('offers every chart as a ZIP of JPG images', async () => {
+    exportMock.downloadAllCharts.mockResolvedValue()
+    const user = userEvent.setup()
+    render(<DownloadAllCharts specs={[gender]} context={context} summary={{ rows: [] }} />)
+
+    await user.click(screen.getByRole('button', { name: /Download all/ }))
+    await user.click(screen.getByRole('menuitem', { name: /All charts as JPG \(ZIP\)/ }))
+
+    await waitFor(() => expect(exportMock.downloadAllCharts).toHaveBeenCalledWith(expect.objectContaining({ format: 'zip', imageFormat: 'jpg' })))
+  })
 })

@@ -1,12 +1,13 @@
 import { createElement, useEffect, useId, useRef, useState } from 'react'
-import { ChevronDown, FileArchive, FileDown } from 'lucide-react'
+import { ChevronDown, FileArchive, FileDown, FileImage } from 'lucide-react'
 import toast from '@/lib/toast'
 import { Button } from '@/components/ui'
 import { hasChartData } from '@/utils/chartTable'
 
 const OPTIONS = [
-  { format: 'pdf', icon: FileDown, label: 'Full report (PDF)', hint: 'Cover, contents, summary, then every chart with its numbers.' },
-  { format: 'zip', icon: FileArchive, label: 'All charts as images (ZIP)', hint: 'Each chart as a PNG in the template, plus its data as CSV.' },
+  { id: 'pdf', format: 'pdf', icon: FileDown, label: 'Full report (PDF)', hint: 'Cover, contents, summary, then every chart with its numbers.' },
+  { id: 'zip-png', format: 'zip', imageFormat: 'png', icon: FileArchive, label: 'All charts as PNG (ZIP)', hint: 'Each chart as an A4 PNG in the template, plus its data as CSV.' },
+  { id: 'zip-jpg', format: 'zip', imageFormat: 'jpg', icon: FileImage, label: 'All charts as JPG (ZIP)', hint: 'Each chart as an A4 JPG (smaller files), plus its data as CSV.' },
 ]
 
 /**
@@ -32,12 +33,12 @@ export default function DownloadAllCharts({ specs, context, summary, appendix, d
     }
   }, [open])
 
-  const run = async (format) => {
+  const run = async ({ format, imageFormat }) => {
     setOpen(false)
     setProgress({ done: 0, total: chartCount, label: 'Starting…' })
     try {
       const { downloadAllCharts } = await import('@/utils/chartReportExport')
-      await downloadAllCharts({ context, specs, summary, appendix, format, onProgress: setProgress })
+      await downloadAllCharts({ context, specs, summary, appendix, format, imageFormat, onProgress: setProgress })
       toast.success(format === 'pdf' ? 'Full report downloaded.' : 'All charts downloaded as a ZIP file.')
     } catch (error) {
       console.error('Download all failed', error)
@@ -78,18 +79,18 @@ export default function DownloadAllCharts({ specs, context, summary, appendix, d
 
       {open && !busy && (
         <div id={menuId} role="menu" className="absolute right-0 top-full z-20 mt-2 w-80 overflow-hidden rounded-lg border border-slate-200 bg-white py-1 shadow-lg">
-          {OPTIONS.map(({ format, icon, label, hint }) => (
+          {OPTIONS.map((option) => (
             <button
-              key={format}
+              key={option.id}
               type="button"
               role="menuitem"
-              onClick={() => run(format)}
+              onClick={() => run(option)}
               className="flex w-full items-start gap-3 px-3 py-2.5 text-left hover:bg-slate-50 focus:bg-slate-50 focus:outline-none"
             >
-              {createElement(icon, { className: 'mt-0.5 h-4 w-4 shrink-0 text-brand-navy', 'aria-hidden': true })}
+              {createElement(option.icon, { className: 'mt-0.5 h-4 w-4 shrink-0 text-brand-navy', 'aria-hidden': true })}
               <span>
-                <span className="block text-sm font-semibold text-slate-800">{label}</span>
-                <span className="block text-xs leading-5 text-slate-500">{hint}</span>
+                <span className="block text-sm font-semibold text-slate-800">{option.label}</span>
+                <span className="block text-xs leading-5 text-slate-500">{option.hint}</span>
               </span>
             </button>
           ))}
