@@ -1,14 +1,33 @@
 import { useMemo, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import toast from '@/lib/toast'
-import { Building2, Lock, MessageSquareReply, Pencil, Star, Trash2 } from 'lucide-react'
+import { Lock, MessageSquareReply, Pencil, Star, Trash2 } from 'lucide-react'
 import { Badge, Button, ConfirmDialog, EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui'
+import CompanyLogo from '@/components/reviews/CompanyLogo'
 import ReviewFormDialog from '@/components/reviews/ReviewFormDialog'
 import { Stars } from '@/components/reviews/StarRating'
 import { reviewService } from '@/services/reviewService'
-import { MY_REVIEWS_KEY, findRequestedReview, openActions } from '@/utils/reviews'
+import { cn } from '@/lib/utils'
+import { MY_REVIEWS_KEY, findRequestedReview, groupActionsByCompany, openActions } from '@/utils/reviews'
 import PortalPageHeader from '@/components/shell/PortalPageHeader'
+
+const COMPANIES_SHOWN = 4
+const formatDate = (date) => new Date(date).toLocaleDateString('en-PH', { dateStyle: 'medium' })
+
+/** A company name that opens its page (plain text when the id is unknown). */
+function CompanyName({ employer, className }) {
+  const name = employer?.name ?? 'Company'
+  if (!employer?.id) return <span className={className}>{name}</span>
+  return (
+    <Link
+      to={`/seeker/employers/${employer.id}`}
+      className={cn('rounded underline-offset-2 hover:text-brand-navy hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-focus', className)}
+    >
+      {name}
+    </Link>
+  )
+}
 
 const STATUS = {
   published: { label: 'Published', variant: 'approved' },
@@ -71,32 +90,7 @@ export default function MyReviewsPage() {
         <ErrorState description="Your reviews could not be loaded." onRetry={refetch} error={error} />
       ) : (
         <>
-          <section className="rounded-2xl border border-brand-gold/40 bg-[#fffbeb] p-5" aria-labelledby="ready-heading">
-            <h2 id="ready-heading" className="text-lg font-semibold text-slate-900">Ready to review <span className="font-normal text-slate-500">({actions.length})</span></h2>
-            <p className="mt-1 text-sm text-slate-700">PESO confirmed you applied to these employers.</p>
-            {actions.length === 0 ? (
-              <p className="mt-3 rounded-xl border border-dashed border-slate-300 bg-white p-5 text-sm text-slate-600">
-                Nothing to review right now. Every company you apply to through i-PESO appears here.
-              </p>
-            ) : (
-              <ul className="mt-3 grid gap-3 md:grid-cols-2">
-                {actions.map((action) => (
-                  <li key={action.key} className="flex items-center justify-between gap-4 rounded-xl border border-slate-200 bg-white p-4">
-                    <div className="flex min-w-0 items-start gap-3">
-                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#e8f0fc] text-brand-navy"><Building2 className="h-5 w-5" /></span>
-                      <div className="min-w-0">
-                        <p className="truncate font-bold text-slate-900">{action.employerName}</p>
-                        <p className="truncate text-xs text-slate-500">
-                          {[action.jobTitle, 'hiring process'].filter(Boolean).join(', ')}
-                        </p>
-                      </div>
-                    </div>
-                    <Button size="sm" icon={Star} onClick={() => setWriting(action)}>Review company</Button>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
+          <ReadyToReview actions={actions} onReview={setWriting} />
 
           <EmployerFeedbackSection items={data?.employer_feedback ?? []} />
 
@@ -111,11 +105,14 @@ export default function MyReviewsPage() {
                   return (
                     <li key={review.id} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-card">
                       <div className="flex flex-wrap items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <p className="font-semibold text-slate-900">{review.employer?.name}</p>
-                          <p className="text-xs text-slate-500">
-                            {[review.job_title, review.type === 'employment' ? 'working here' : 'hiring process', review.month].filter(Boolean).join(', ')}{review.edited ? ' (edited)' : ''}
-                          </p>
+                        <div className="flex min-w-0 items-start gap-3">
+                          <CompanyLogo logo={review.employer?.logo} name={review.employer?.name} />
+                          <div className="min-w-0">
+                            <CompanyName employer={review.employer} className="font-semibold text-slate-900" />
+                            <p className="text-xs text-slate-500">
+                              {[review.job_title, review.type === 'employment' ? 'working here' : 'hiring process', review.month].filter(Boolean).join(', ')}{review.edited ? ' (edited)' : ''}
+                            </p>
+                          </div>
                         </div>
                         <Badge status={status.variant}>{status.label}</Badge>
                       </div>
@@ -170,6 +167,65 @@ export default function MyReviewsPage() {
   )
 }
 
+/** Jobs the seeker can review, one row per company with each job under it. */
+function ReadyToReview({ actions, onReview }) {
+  const [showAll, setShowAll] = useState(false)
+  const companies = groupActionsByCompany(actions)
+  const shown = showAll ? companies : companies.slice(0, COMPANIES_SHOWN)
+
+  return (
+    <section className="rounded-2xl border border-slate-200 border-l-4 border-l-brand-gold bg-white p-5 shadow-card" aria-labelledby="ready-heading">
+      <h2 id="ready-heading" className="text-lg font-semibold text-slate-900">Ready to review <span className="font-normal text-slate-500">({actions.length})</span></h2>
+      <p className="mt-1 text-sm text-slate-600">PESO confirmed you applied to these employers. Rate how they handled your application.</p>
+      {companies.length === 0 ? (
+        <p className="mt-3 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-5 text-sm text-slate-600">
+          Nothing to review right now. Every company you apply to through i-PESO appears here.
+        </p>
+      ) : (
+        <>
+          <ul className="mt-4 grid gap-3 md:grid-cols-2">
+            {shown.map((company) => (
+              <li key={company.employerId ?? company.employerName} data-testid="review-company" className="rounded-xl border border-slate-200 p-4">
+                <div className="flex min-w-0 items-center gap-3">
+                  <CompanyLogo logo={company.employerLogo} name={company.employerName} />
+                  <div className="min-w-0">
+                    <CompanyName employer={{ id: company.employerId, name: company.employerName }} className="block truncate font-bold text-slate-900" />
+                    <p className="text-xs text-slate-500">{company.jobs.length === 1 ? '1 job' : `${company.jobs.length} jobs`} to review</p>
+                  </div>
+                </div>
+                <ul className="mt-3 divide-y divide-slate-100 border-t border-slate-100">
+                  {company.jobs.map((job) => (
+                    <li key={job.key} className="flex items-center justify-between gap-3 pt-2.5 [&:not(:first-child)]:mt-2.5">
+                      <span className="min-w-0 truncate text-sm text-slate-700">{job.jobTitle ?? 'Job'} <span className="text-slate-400">· hiring process</span></span>
+                      <Button size="sm" variant="navy" icon={Star} onClick={() => onReview(job)} aria-label={`Review ${company.employerName}, ${job.jobTitle ?? 'job'}`}>Review</Button>
+                    </li>
+                  ))}
+                </ul>
+              </li>
+            ))}
+          </ul>
+          {companies.length > COMPANIES_SHOWN && (
+            <Button size="sm" variant="ghost" className="mt-3" onClick={() => setShowAll((value) => !value)}>
+              {showAll ? 'Show fewer' : `Show all (${companies.length})`}
+            </Button>
+          )}
+        </>
+      )}
+    </section>
+  )
+}
+
+const REHIRE_PILL = {
+  Yes: 'bg-emerald-50 text-emerald-800 ring-emerald-200',
+  Maybe: 'bg-amber-50 text-amber-800 ring-amber-200',
+  No: 'bg-slate-100 text-slate-700 ring-slate-300',
+}
+
+const overall = (ratings = []) => {
+  const values = ratings.map((rating) => Number(rating.value)).filter(Boolean)
+  return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : null
+}
+
 /** What employers privately said about this job seeker. Only they and PESO can read it, and it shows straight away. */
 function EmployerFeedbackSection({ items }) {
   if (!items.length) return null
@@ -177,29 +233,49 @@ function EmployerFeedbackSection({ items }) {
   return (
     <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-card" aria-labelledby="employer-feedback-heading">
       <h2 id="employer-feedback-heading" className="text-lg font-semibold text-slate-900">Feedback from employers</h2>
-      <p className="mt-1 flex items-center gap-1.5 text-sm text-slate-600"><Lock className="h-4 w-4" aria-hidden /> Only you and PESO can read the comments. Employers you apply to see only your average rating and how many would hire you again.</p>
-      <ul className="mt-3 space-y-3">
-        {items.map((item) => (
-          <li key={item.id} className="rounded-xl bg-brand-canvas p-4">
-            <p className="font-semibold text-slate-900">{item.employer?.name}</p>
-            {item.job_title && <p className="text-xs text-slate-500">{item.job_title}</p>}
-            <ul className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
-              {item.ratings?.map((rating) => (
-                <li key={rating.key} className="flex items-center justify-between rounded-lg border border-slate-100 px-3 py-1.5">
-                  <span className="text-slate-700">{rating.label}</span>
-                  <span className="flex items-center gap-1.5"><Stars value={rating.value} /><span className="font-bold">{rating.value}</span></span>
-                </li>
-              ))}
-            </ul>
-            <p className="mt-3 text-sm text-slate-700">Would hire you again: <strong>{item.would_rehire}</strong></p>
-            {item.comment && <p className="mt-2 whitespace-pre-line text-sm text-slate-700">{item.comment}</p>}
-            <p className="mt-3 text-xs text-slate-500">
-              Think something here is unfair or not about your work? Tell PESO at the office; staff can remove feedback that breaks the{' '}
-              <a href="/review-guidelines" target="_blank" rel="noreferrer" className="font-semibold text-brand-navy underline-offset-2 hover:underline">guidelines</a>.
-            </p>
-          </li>
-        ))}
+      <p className="mt-1 flex items-start gap-1.5 text-sm text-slate-600"><Lock className="mt-0.5 h-4 w-4 shrink-0" aria-hidden /> Only you and PESO can read the comments. Employers you apply to see only your average rating and how many would hire you again.</p>
+      <ul className="mt-4 space-y-3">
+        {items.map((item) => {
+          const score = overall(item.ratings)
+          return (
+            <li key={item.id} data-testid="employer-feedback" className="rounded-xl border border-slate-200 p-4">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="flex min-w-0 items-center gap-3">
+                  <CompanyLogo logo={item.employer?.logo} name={item.employer?.name} />
+                  <div className="min-w-0">
+                    <CompanyName employer={item.employer} className="block truncate font-semibold text-slate-900" />
+                    <p className="text-xs text-slate-500">{[item.job_title, item.updated_at && formatDate(item.updated_at)].filter(Boolean).join(' · ')}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  {score && (
+                    <span className="flex items-center gap-1.5">
+                      <Stars value={score} />
+                      <span className="text-lg font-bold text-slate-900">{score.toFixed(1)}</span>
+                    </span>
+                  )}
+                  <span className={cn('rounded-full px-2.5 py-1 text-xs font-bold ring-1', REHIRE_PILL[item.would_rehire] ?? REHIRE_PILL.No)}>
+                    Would hire again: {item.would_rehire}
+                  </span>
+                </div>
+              </div>
+              <ul className="mt-3 grid gap-x-6 gap-y-1.5 text-sm sm:grid-cols-2">
+                {item.ratings?.map((rating) => (
+                  <li key={rating.key} className="flex items-center justify-between gap-2">
+                    <span className="text-slate-600">{rating.label}</span>
+                    <span className="flex items-center gap-1.5"><Stars value={rating.value} /><span className="w-3 text-right font-bold text-slate-800">{rating.value}</span></span>
+                  </li>
+                ))}
+              </ul>
+              {item.comment && <blockquote className="mt-3 whitespace-pre-line border-l-4 border-slate-300 pl-3 text-sm italic text-slate-700">{item.comment}</blockquote>}
+            </li>
+          )
+        })}
       </ul>
+      <p className="mt-4 text-xs text-slate-500">
+        Think something here is unfair or not about your work? Tell PESO at the office; staff can remove feedback that breaks the{' '}
+        <a href="/review-guidelines" target="_blank" rel="noreferrer" className="font-semibold text-brand-navy underline-offset-2 hover:underline">guidelines</a>.
+      </p>
     </section>
   )
 }
