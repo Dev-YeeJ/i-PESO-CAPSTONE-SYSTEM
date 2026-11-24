@@ -37,89 +37,62 @@ class EmployerReviewTest extends TestCase
 
     // ── Who can review what, and when ───────────────────────────────────────
 
-    public function test_any_application_can_review_the_hiring_process_and_only_hires_the_workplace(): void
+    public function test_any_application_can_review_the_hiring_process_and_nothing_offers_working_here(): void
     {
         $seeker = $this->seeker('ana@example.test');
         $justApplied = $this->application($seeker, 'pending');
-        $reviewed = $this->application($seeker, 'reviewed');
-        $hiredLater = $this->application($seeker, 'hired', ['placement_start_date' => now()->addDays(5)->toDateString()]);
         $hired = $this->application($seeker, 'hired', ['placement_start_date' => now()->subDay()->toDateString()]);
+        $this->placement($seeker, $this->employer('Pangasinan Bakeshop'), 'approved');
         Sanctum::actingAs($seeker);
 
-        $items = collect($this->getJson('/api/seeker/reviews')->assertOk()->json('opportunities'))->keyBy('source_id');
-
-        foreach ([$justApplied, $reviewed, $hiredLater, $hired] as $id) {
-            $this->assertTrue($items[$id]['recruitment']['allowed'], 'The hiring process can be reviewed as soon as you apply.');
-            $this->assertFalse($items[$id]['recruitment']['limited'], 'Every hiring aspect can be rated.');
-            $this->assertNull($items[$id]['review']);
+        $items = collect($this->getJson('/api/seeker/reviews')->assertOk()->json('opportunities'));
+        $this->assertSame(['application'], $items->pluck('source')->unique()->values()->all(), 'Placement hires only had working-here reviews, so they are no longer listed.');
+        foreach ([$justApplied, $hired] as $id) {
+            $item = $items->firstWhere('source_id', $id);
+            $this->assertTrue($item['recruitment']['allowed'], 'The hiring process can be reviewed as soon as you apply.');
+            $this->assertNull($item['employment'], 'Working-here reviews are no longer offered, even to hires.');
         }
-        $this->assertFalse($items[$justApplied]['employment']['allowed'], 'Only hires can review the workplace.');
-        $this->assertFalse($items[$reviewed]['employment']['allowed']);
-        $this->assertFalse($items[$hiredLater]['employment']['allowed'], 'Not before the start date.');
-        $this->assertTrue($items[$hired]['employment']['allowed']);
     }
 
-    public function test_one_review_per_application_either_hiring_or_working_there(): void
+    public function test_one_review_per_application_about_the_hiring_process(): void
     {
         $seeker = $this->seeker('ana@example.test');
-        $application = $this->application($seeker, 'pending');
+        $application = $this->application($seeker, 'hired', ['placement_start_date' => now()->subDay()->toDateString()]);
         Sanctum::actingAs($seeker);
 
-        // Right after applying, with all four hiring ratings.
-        $this->postJson('/api/seeker/reviews', $this->recruitmentPayload($application))
+        // A working-here review is refused, even from a hire.
+        $this->postJson('/api/seeker/reviews', $this->employmentPayload(['application_id' => $application]))
+            ->assertStatus(422)->assertJsonPath('errors.type.0', "Reviews are about the company's hiring process.");
+
+        // No type needed: it is a hiring-process review.
+        $payload = $this->recruitmentPayload($application);
+        unset($payload['type']);
+        $this->postJson('/api/seeker/reviews', $payload)
             ->assertCreated()
-            ->assertJsonPath('review.status', 'published')
+            ->assertJsonPath('review.type', 'recruitment')
             ->assertJsonPath('review.reviewer', 'Verified applicant')
-            ->assertJsonPath('review.limited', false)
-            ->assertJsonCount(4, 'review.ratings')
-            ->assertJsonPath('review.job_title', 'Machine Operator')
             ->assertJsonPath('review.allowed_types', ['recruitment']);
 
-        // No second review for the same application, of either kind.
-        $this->postJson('/api/seeker/reviews', $this->recruitmentPayload($application))
-            ->assertStatus(422)
-            ->assertJsonPath('errors.type.0', 'You already reviewed this company for this job. You can edit your review instead, including what it is about.');
-        DB::table('applications')->where('apply_id', $application)->update(['status' => 'hired', 'placement_start_date' => now()->subDay()->toDateString()]);
-        $this->postJson('/api/seeker/reviews', $this->employmentPayload(['application_id' => $application]))->assertStatus(422);
-
-        // Both kinds point at the one review, so neither offers a new one.
-        $item = collect($this->getJson('/api/seeker/reviews')->json('opportunities'))->firstWhere('source_id', $application);
-        $reviewId = EmployerReview::query()->value('id');
-        $this->assertSame($reviewId, $item['recruitment']['review_id']);
-        $this->assertSame($reviewId, $item['employment']['review_id']);
-        $this->assertSame(['id' => $reviewId, 'type' => 'recruitment', 'status' => 'published'], $item['review']);
-
+        $this->postJson('/api/seeker/reviews', $this->recruitmentPayload($application))->assertStatus(422);
+        $this->assertSame(1, EmployerReview::query()->count());
         $this->assertDatabaseHas('activity_logs', ['action' => 'submitted_employer_review']);
     }
 
-    public function test_a_review_can_switch_to_working_there_once_hired_and_back(): void
+    public function test_an_older_working_here_review_stays_published_and_editable(): void
     {
         $seeker = $this->seeker('ana@example.test');
-        $application = $this->application($seeker, 'interview');
+        $application = $this->application($seeker, 'hired', ['placement_start_date' => now()->subMonth()->toDateString()]);
         Sanctum::actingAs($seeker);
-        $id = $this->postJson('/api/seeker/reviews', $this->recruitmentPayload($application))->assertCreated()->json('review.id');
-        $working = ['type' => 'employment', 'recommend' => true, 'confirm_started' => true,
-            'ratings' => ['work_environment' => 5, 'management' => 4, 'job_accuracy' => 5, 'overall' => 5]];
+        $id = $this->postJson('/api/seeker/reviews', $this->recruitmentPayload($application))->json('review.id');
+        $working = ['work_environment' => 4, 'management' => 3, 'job_accuracy' => 4, 'overall' => 4];
+        EmployerReview::whereKey($id)->update(['type' => 'employment', 'ratings' => json_encode($working)]);
 
-        // Not hired yet: can't be about working there.
-        $this->putJson("/api/seeker/reviews/{$id}", $working)
-            ->assertStatus(422)
-            ->assertJsonPath('errors.type.0', 'You can review working here once the employer has hired you and your start date has arrived.');
-
-        DB::table('applications')->where('apply_id', $application)->update(['status' => 'hired', 'placement_start_date' => now()->subDay()->toDateString()]);
-        $this->putJson("/api/seeker/reviews/{$id}", ['confirm_started' => null] + $working)
-            ->assertStatus(422)->assertJsonValidationErrors('confirm_started');
-        $this->putJson("/api/seeker/reviews/{$id}", $working)
-            ->assertOk()
-            ->assertJsonPath('review.type', 'employment')
-            ->assertJsonPath('review.reviewer', 'Verified employee')
-            ->assertJsonPath('review.allowed_types', ['recruitment', 'employment']);
-        $this->assertSame(['work_environment' => 5, 'management' => 4, 'job_accuracy' => 5, 'overall' => 5], EmployerReview::find($id)->ratings);
-
-        // And back to the hiring process, still the same single review.
+        // Its author can still edit it with its own aspects, and it stays a working-here review.
+        $this->putJson("/api/seeker/reviews/{$id}", ['recommend' => true, 'ratings' => ['overall' => 5] + $working])
+            ->assertOk()->assertJsonPath('review.type', 'employment')->assertJsonPath('review.reviewer', 'Verified employee');
+        // It can be switched to a hiring-process review (the only kind written now).
         $this->putJson("/api/seeker/reviews/{$id}", ['type' => 'recruitment', 'recommend' => true, 'ratings' => $this->recruitmentRatings()])
             ->assertOk()->assertJsonPath('review.type', 'recruitment');
-        $this->assertSame(1, EmployerReview::query()->count());
     }
 
     public function test_reviews_need_a_real_interaction_and_the_guidelines_agreement(): void
@@ -165,44 +138,6 @@ class EmployerReviewTest extends TestCase
         $this->postJson('/api/seeker/reviews', $payload)
             ->assertStatus(422)
             ->assertJsonPath('errors', fn ($errors) => isset($errors['ratings.process'], $errors['ratings.communication']));
-    }
-
-    public function test_employment_reviews_need_a_started_hire_and_confirmation(): void
-    {
-        $seeker = $this->seeker('ana@example.test');
-        $notYet = $this->application($seeker, 'hired', ['placement_start_date' => now()->addWeek()->toDateString()]);
-        $started = $this->application($seeker, 'hired', ['placement_start_date' => now()->subWeek()->toDateString()]);
-        Sanctum::actingAs($seeker);
-
-        $this->postJson('/api/seeker/reviews', $this->employmentPayload(['application_id' => $notYet]))
-            ->assertStatus(422)->assertJsonPath('errors.type.0', 'Available from your start date.');
-
-        $this->postJson('/api/seeker/reviews', ['confirm_started' => null] + $this->employmentPayload(['application_id' => $started]))
-            ->assertStatus(422)->assertJsonValidationErrors('confirm_started');
-
-        $this->postJson('/api/seeker/reviews', $this->employmentPayload(['application_id' => $started]))
-            ->assertCreated()
-            ->assertJsonPath('review.reviewer', 'Verified employee');
-    }
-
-    public function test_hires_from_approved_placement_reports_can_be_reviewed(): void
-    {
-        $seeker = $this->seeker('ana@example.test');
-        $otherEmployer = $this->employer('Pangasinan Bakeshop');
-        $approved = $this->placement($seeker, $otherEmployer, 'approved');
-        $pendingReport = $this->placement($seeker, $otherEmployer, 'pending_review');
-        // Already hired by the first employer through the tracker: no second employment entry.
-        $this->application($seeker, 'hired', ['placement_start_date' => now()->subMonth()->toDateString()]);
-        $duplicate = $this->placement($seeker, $this->employerId, 'approved');
-        Sanctum::actingAs($seeker);
-
-        $placements = collect($this->getJson('/api/seeker/reviews')->json('opportunities'))->where('source', 'placement');
-        $this->assertSame([$approved], $placements->pluck('source_id')->all());
-
-        $this->postJson('/api/seeker/reviews', $this->employmentPayload(['placement_record_id' => $approved]))->assertCreated();
-        $this->postJson('/api/seeker/reviews', $this->employmentPayload(['placement_record_id' => $pendingReport]))
-            ->assertStatus(422)->assertJsonPath('errors.type.0', 'That hire was not found.');
-        $this->assertNotNull($duplicate);
     }
 
     // ── Automatic checks and editing ────────────────────────────────────────
@@ -322,32 +257,39 @@ class EmployerReviewTest extends TestCase
 
     // ── Reporting a review, job-card ratings ────────────────────────────────
 
-    public function test_other_job_seekers_can_report_a_review_and_three_reports_hold_it(): void
+    public function test_job_seekers_can_no_longer_report_a_review(): void
     {
         $author = $this->seeker('author@example.test');
         Sanctum::actingAs($author);
         $id = $this->postJson('/api/seeker/reviews', $this->recruitmentPayload($this->application($author, 'reviewed')))->json('review.id');
 
-        $this->postJson("/api/seeker/reviews/{$id}/report", ['reason' => 'harassment'])
-            ->assertStatus(422)->assertJsonPath('message', 'You can edit or take back your own review instead.');
+        Sanctum::actingAs($this->seeker('other@example.test'));
+        $this->postJson("/api/seeker/reviews/{$id}/report", ['reason' => 'false_information'])->assertNotFound();
+        $this->assertSame('published', EmployerReview::find($id)->status);
+        $this->assertSame(0, EmployerReviewFlag::where('reporter_type', 'seeker')->count());
+    }
 
-        foreach (['r1', 'r2'] as $name) {
-            Sanctum::actingAs($this->seeker("{$name}@example.test"));
-            $this->postJson("/api/seeker/reviews/{$id}/report", ['reason' => 'false_information', 'details' => 'Never happened.'])->assertOk();
+    public function test_the_company_shows_one_summary_and_list_of_both_kinds_of_review(): void
+    {
+        foreach (['a', 'b', 'c'] as $name) {
+            $seeker = $this->seeker("{$name}@example.test");
+            Sanctum::actingAs($seeker);
+            $this->postJson('/api/seeker/reviews', $this->recruitmentPayload($this->application($seeker, 'reviewed')))->assertCreated();
         }
-        $this->postJson("/api/seeker/reviews/{$id}/report", ['reason' => 'harassment'])
-            ->assertStatus(422)->assertJsonPath('message', 'You already reported this review. PESO is looking into it.');
-        $this->assertSame('published', EmployerReview::find($id)->status, 'Two reports keep it up while PESO looks.');
+        // One of them was written about working there, before reviews were unified.
+        EmployerReview::query()->latest('id')->first()->update(['type' => 'employment', 'ratings' => ['work_environment' => 3, 'management' => 3, 'job_accuracy' => 3, 'overall' => 3]]);
 
-        Sanctum::actingAs($this->seeker('r3@example.test'));
-        $this->postJson("/api/seeker/reviews/{$id}/report", ['reason' => 'not_genuine'])->assertOk();
-        $this->assertSame('held', EmployerReview::find($id)->status);
-        $this->assertSame(3, EmployerReviewFlag::where('reporter_type', 'seeker')->count());
-        $this->assertDatabaseHas('activity_logs', ['action' => 'reported_employer_review']);
-
-        // Held reviews can't be reported further (they're no longer public).
-        Sanctum::actingAs($this->seeker('r4@example.test'));
-        $this->postJson("/api/seeker/reviews/{$id}/report", ['reason' => 'other'])->assertNotFound();
+        $response = $this->getJson("/api/seeker/employers/{$this->employerId}/reviews")->assertOk();
+        $response->assertJsonPath('summary.overall.reviewers', 3)
+            ->assertJsonPath('summary.overall.enough', true)
+            // (5 + 5 + 3) / 3: each review's own average counts once.
+            ->assertJsonPath('summary.overall.average', 4.3)
+            ->assertJsonPath('summary.overall.aspects.communication.ratings', 2)
+            ->assertJsonPath('summary.overall.aspects.work_environment.ratings', 1)
+            ->assertJsonCount(3, 'reviews.data');
+        // Older app builds read summary.recruitment and pass ?type=recruitment: they get the unified list.
+        $this->assertSame($response->json('summary.overall'), $response->json('summary.recruitment'));
+        $this->getJson("/api/seeker/employers/{$this->employerId}/reviews?type=recruitment")->assertJsonCount(3, 'reviews.data');
     }
 
     public function test_job_cards_get_a_rating_only_from_three_people(): void
@@ -389,19 +331,9 @@ class EmployerReviewTest extends TestCase
         $this->assertSame(1, DB::table('notifications')->where('type', ReviewInvitationNotification::class)->count());
     }
 
-    public function test_hires_are_invited_to_review_the_workplace_once_they_start(): void
+    public function test_hires_are_no_longer_invited_to_review_the_workplace(): void
     {
-        $seeker = $this->seeker('ana@example.test');
-        $started = $this->application($seeker, 'hired', ['placement_start_date' => now()->subDays(2)->toDateString()]);
-        $this->application($seeker, 'hired', ['placement_start_date' => now()->addDays(3)->toDateString()]);
-        $this->application($seeker, 'hired', ['placement_start_date' => now()->subDays(90)->toDateString()]); // too long ago
-
-        $this->artisan('reviews:invite-employment')->assertSuccessful();
-        $this->artisan('reviews:invite-employment')->assertSuccessful(); // the next day: no repeat
-
-        $invites = DB::table('notifications')->where('type', ReviewInvitationNotification::class)->get();
-        $this->assertCount(1, $invites);
-        $this->assertStringContainsString("application-{$started}-employment", $invites[0]->data);
+        $this->assertArrayNotHasKey('reviews:invite-employment', \Illuminate\Support\Facades\Artisan::all());
     }
 
     // ── Helpers ─────────────────────────────────────────────────────────────

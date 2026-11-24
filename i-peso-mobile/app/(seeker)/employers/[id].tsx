@@ -288,7 +288,7 @@ export default function EmployerProfileScreen() {
 
         <Card padding="md" style={[styles.sectionCard, styles.afterJobs]}>
           <Text style={styles.sectionTitle} accessibilityRole="header">Reviews</Text>
-          <Text style={styles.reviewsSubtitle}>From people who applied or worked here through i-PESO.</Text>
+          <Text style={styles.reviewsSubtitle}>From people who applied here through i-PESO.</Text>
           <CompanyReviews employerId={employer.employer_id} />
         </Card>
 

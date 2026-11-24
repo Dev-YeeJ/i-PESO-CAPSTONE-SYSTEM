@@ -13,6 +13,8 @@ export const adminSystemSettingsService = {
   list: async () => (await api.get('/admin/system-settings')).data,
   /** values: { 'sms.enabled': false, 'placement.deadline_day': 12, … } */
   save: async (values) => (await api.put('/admin/system-settings', { values })).data,
+  /** Put one setting back to its default. */
+  reset: async (key) => (await api.post('/admin/system-settings/reset', { key })).data,
   status: async () => (await api.get('/admin/system-settings/status')).data,
   testEmail: async () => (await api.post('/admin/system-settings/test-email')).data,
   testSms: async (phone) => (await api.post('/admin/system-settings/test-sms', { phone })).data,

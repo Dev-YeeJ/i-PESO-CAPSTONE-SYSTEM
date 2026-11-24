@@ -344,6 +344,16 @@ class JobFairService
         return $payload;
     }
 
+    /** Public URL for an employer logo, built the same way as on job cards and the company profile. */
+    private function logoUrl(?string $path): ?string
+    {
+        if (blank($path)) {
+            return null;
+        }
+
+        return str_starts_with($path, 'http') ? $path : url('storage/'.ltrim($path, '/'));
+    }
+
     public function participationPayload(JobFairEmployer $participation): array
     {
         // Reused/auto-satisfied documents are now populated the moment a
@@ -360,6 +370,9 @@ class JobFairService
             'employer_id' => $participation->employer_id,
             'company_name' => $participation->employer?->company_name ?: $participation->employer?->trade_name,
             'company_logo' => $participation->employer?->company_logo,
+            // The stored value is a path on the public disk (or, for some older
+            // accounts, already a full URL); clients need a URL they can load.
+            'company_logo_url' => $this->logoUrl($participation->employer?->company_logo),
             'representative_name' => $participation->employer?->representative_name,
             'status' => $participation->participation_status,
             'source' => $participation->source,

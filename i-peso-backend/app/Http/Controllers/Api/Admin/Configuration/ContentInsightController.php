@@ -4,58 +4,18 @@ namespace App\Http\Controllers\Api\Admin\Configuration;
 
 use App\Http\Controllers\Controller;
 use App\Models\Administrator;
-use App\Services\ActivityLogger;
 use App\Services\ContentAiService;
-use App\Services\ContentInsightService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use RuntimeException;
 
 /**
- * Content Modules → Overview (health check), Insights (what readers need)
- * and the AI writing helper. Open to Configuration or Constituent CRM staff:
- * admin.permission:configuration.
+ * Content Modules → the AI writing helper used by the FAQ editor (draft an
+ * answer, simplify, translate). Needs Configuration access.
  */
 class ContentInsightController extends Controller
 {
-    public function __construct(private readonly ContentInsightService $insights)
-    {
-    }
-
-    public function health(): JsonResponse
-    {
-        return response()->json($this->insights->health());
-    }
-
-    public function insights(Request $request): JsonResponse
-    {
-        $days = (int) ($request->validate(['days' => ['nullable', Rule::in([7, 30, 90])]])['days'] ?? 30);
-
-        return response()->json($this->insights->insights($days));
-    }
-
-    /** Mark a question the assistant couldn't answer as dealt with. */
-    public function resolve(Request $request): JsonResponse
-    {
-        $admin = $this->admin($request);
-        $data = $request->validate([
-            // Only chatbot gaps remain (Help-page searches went with the Help page).
-            'kind' => ['sometimes', Rule::in(['gap'])],
-            'normalized' => ['required', 'string', 'max:191'],
-        ]);
-
-        $count = $this->insights->resolve($data['normalized']);
-        ActivityLogger::logAs($admin, 'content_insight_resolved', sprintf(
-            'Marked the assistant question “%s” as dealt with (%d report%s).',
-            $data['normalized'],
-            $count,
-            $count === 1 ? '' : 's'
-        ));
-
-        return response()->json(['message' => 'Marked as dealt with.', 'resolved' => $count]);
-    }
-
     public function assist(Request $request, ContentAiService $ai): JsonResponse
     {
         $data = $request->validate([

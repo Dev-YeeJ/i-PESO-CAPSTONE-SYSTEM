@@ -1,38 +1,27 @@
-import { useState } from 'react'
 import { Linking, StyleSheet, Text, View } from 'react-native'
 import { useInfiniteQuery } from '@tanstack/react-query'
 import MaterialIcons from '@expo/vector-icons/MaterialIcons'
-import type { PublicReview, ReviewType } from '@/services/seekerService'
+import type { PublicReview } from '@/services/seekerService'
 import { seekerService } from '@/services/seekerService'
 import { REVIEW_GUIDELINES_URL } from '@/utils/reviews'
 import { Button } from '@/components/ui/Button'
-import { PressableScale } from '@/components/ui/PressableScale'
 import { QueryState } from '@/components/ui/QueryState'
-import { SegmentedControl } from '@/components/ui/SegmentedControl'
 import { colors, radii, spacing, textStyles } from '@/theme'
-import { ReportReviewSheet } from './ReportReviewSheet'
 import { ReputationSummaryCard } from './ReputationSummaryCard'
 import { Stars } from './StarRating'
 
 // Rebuilt from i-peso-frontend/src/components/reviews/CompanyReviews.jsx. The website pages
 // with Newer/Older; on a phone the list grows with "Show more" instead.
-const TABS: { type: ReviewType; label: string; who: string }[] = [
-  { type: 'recruitment', label: 'Hiring process', who: 'applicants' },
-  { type: 'employment', label: 'Working here', who: 'employees' },
-]
-
 /**
- * A company's reputation on its profile: hiring and working there shown separately, a
- * summary only once 3 people have reviewed, then the reviews themselves — anonymous, with
- * no job titles — and the employer's reply.
+ * A company's reputation on its profile: ONE summary of every verified review (shown once 3
+ * people have reviewed), then the reviews themselves — anonymous, with no job titles — and
+ * the employer's reply. Reviews are about the hiring process; ones written earlier about
+ * working there are part of the same list.
  */
 export function CompanyReviews({ employerId }: { employerId: number | string }) {
-  const [type, setType] = useState<ReviewType>('recruitment')
-  const [reporting, setReporting] = useState<PublicReview | null>(null)
-
   const query = useInfiniteQuery({
-    queryKey: ['seeker', 'employer-reviews', String(employerId), type],
-    queryFn: ({ pageParam }) => seekerService.getEmployerReviews(employerId, { type, page: pageParam }),
+    queryKey: ['seeker', 'employer-reviews', String(employerId), 'list'],
+    queryFn: ({ pageParam }) => seekerService.getEmployerReviews(employerId, { page: pageParam }),
     initialPageParam: 1,
     getNextPageParam: (last) => (last.reviews.current_page < last.reviews.last_page ? last.reviews.current_page + 1 : undefined),
     enabled: Boolean(employerId),
@@ -41,19 +30,9 @@ export function CompanyReviews({ employerId }: { employerId: number | string }) 
   const firstPage = query.data?.pages[0]
   const summary = firstPage?.summary
   const reviews = query.data?.pages.flatMap((page) => page.reviews.data) ?? []
-  const tab = TABS.find((item) => item.type === type) ?? TABS[0]
 
   return (
     <View>
-      <SegmentedControl
-        options={TABS.map((item) => ({
-          value: item.type,
-          label: summary?.[item.type] ? `${item.label} (${summary[item.type].reviewers})` : item.label,
-        }))}
-        value={type}
-        onChange={setType}
-      />
-
       <View style={styles.panel}>
         <QueryState
           isLoading={query.isLoading}
@@ -62,13 +41,13 @@ export function CompanyReviews({ employerId }: { employerId: number | string }) 
           onRetry={() => query.refetch()}
           skeletonRows={2}
         >
-          <ReputationSummaryCard section={summary?.[type]} type={type} minReviews={summary?.min_reviews ?? 3} />
+          <ReputationSummaryCard section={summary?.overall} minReviews={summary?.min_reviews ?? 3} />
 
           {reviews.length > 0 ? (
-            reviews.map((review) => <PublicReviewCard key={review.id} review={review} onReport={() => setReporting(review)} />)
+            reviews.map((review) => <PublicReviewCard key={review.id} review={review} />)
           ) : (
             <View style={styles.dashedBox}>
-              <Text style={styles.mutedText}>No reviews from verified {tab.who} yet.</Text>
+              <Text style={styles.mutedText}>No verified reviews yet.</Text>
             </View>
           )}
 
@@ -79,7 +58,7 @@ export function CompanyReviews({ employerId }: { employerId: number | string }) 
           ) : null}
 
           <Text style={styles.footer}>
-            Only people who applied or worked here through i-PESO can review. Names are never shown.{' '}
+            Only people who applied here through i-PESO can review. Names are never shown.{' '}
             <Text
               style={styles.link}
               onPress={() => { Linking.openURL(REVIEW_GUIDELINES_URL).catch(() => undefined) }}
@@ -91,12 +70,11 @@ export function CompanyReviews({ employerId }: { employerId: number | string }) 
         </QueryState>
       </View>
 
-      {reporting ? <ReportReviewSheet key={reporting.id} review={reporting} onClose={() => setReporting(null)} /> : null}
     </View>
   )
 }
 
-function PublicReviewCard({ review, onReport }: { review: PublicReview; onReport: () => void }) {
+function PublicReviewCard({ review }: { review: PublicReview }) {
   const average = review.average ?? 0
 
   return (
@@ -142,23 +120,12 @@ function PublicReviewCard({ review, onReport }: { review: PublicReview; onReport
         </View>
       ) : null}
 
-      <PressableScale
-        scaleTo="buttonPress"
-        ripple={null}
-        onPress={onReport}
-        style={styles.reportBtn}
-        accessibilityRole="button"
-        accessibilityLabel="Report this review"
-      >
-        <MaterialIcons name="flag" size={14} color={colors.textSecondary} />
-        <Text style={styles.reportText}>Report</Text>
-      </PressableScale>
     </View>
   )
 }
 
 const styles = StyleSheet.create({
-  panel: { marginTop: spacing.md, gap: spacing.md },
+  panel: { gap: spacing.md },
   dashedBox: { borderWidth: 1, borderStyle: 'dashed', borderColor: colors.borderStrong, borderRadius: radii.lg, padding: spacing.lg, backgroundColor: colors.surface },
   mutedText: { ...textStyles.small, color: colors.textSecondary },
   showMore: { alignSelf: 'center' },
@@ -179,6 +146,4 @@ const styles = StyleSheet.create({
   reply: { marginTop: spacing.md, borderLeftWidth: 4, borderLeftColor: colors.tintBorder, backgroundColor: colors.tint, borderRadius: radii.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
   replyTitle: { ...textStyles.smallBold, color: colors.blue900 },
   replyBody: { ...textStyles.small, color: colors.textPrimary, lineHeight: 18, marginTop: spacing.xs },
-  reportBtn: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, alignSelf: 'flex-end', minHeight: 44, paddingHorizontal: spacing.sm, marginBottom: -spacing.sm },
-  reportText: { ...textStyles.smallBold, color: colors.textSecondary },
 })

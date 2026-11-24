@@ -101,6 +101,19 @@ export default function FaqsTab({ canEdit, office }) {
 
         {!canEdit && <div className="mt-4"><ReadOnlyNote>You can view FAQs but not change them.</ReadOnlyNote></div>}
 
+        {canEdit && faqs.length > 0 && query.data?.suggestions_available > 0 && (
+          <div className="mt-4 flex flex-col gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 sm:flex-row sm:items-center sm:justify-between">
+            <p className="flex items-start gap-2 text-sm text-amber-950">
+              <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" aria-hidden="true" />
+              <span>
+                <strong>{query.data.suggestions_available} suggested FAQ{query.data.suggestions_available === 1 ? '' : 's'}</strong> you don&apos;t have yet, written from how i-PESO works.
+                They are added unpublished so you can check each one first.
+              </span>
+            </p>
+            <Button size="sm" variant="navy" icon={Sparkles} loading={starter.isPending} onClick={() => starter.mutate()} className="shrink-0">Add suggested FAQs</Button>
+          </div>
+        )}
+
         <div className="mt-4 flex flex-wrap gap-2">
           <label className="relative min-w-[14rem] flex-1">
             <span className="sr-only">Search FAQs</span>
@@ -134,8 +147,9 @@ export default function FaqsTab({ canEdit, office }) {
               <Sparkles className="mx-auto h-8 w-8 text-amber-500" aria-hidden="true" />
               <h3 className="mt-3 text-lg font-bold text-slate-950">No FAQs yet</h3>
               <p className="mx-auto mt-1 max-w-lg text-sm text-slate-600">
-                Start from about a dozen suggested questions written from how i-PESO works — registration steps, employer documents,
-                passwords, reports. They are added <strong>unpublished</strong> so you can check and adjust each one first.
+                Start from {query.data.suggestions_available ? `${query.data.suggestions_available} ` : ''}suggested questions written from how i-PESO works — registration, applications,
+                interviews, government programs, employer documents and reports. They are added <strong>unpublished</strong> so you can
+                check and adjust each one first.
               </p>
               {canEdit && (
                 <div className="mt-5 flex flex-wrap justify-center gap-2">

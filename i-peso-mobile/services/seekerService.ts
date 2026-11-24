@@ -749,9 +749,6 @@ function toFormData(fields: Record<string, unknown>, file?: { uri: string; name:
 export type ReviewType = 'recruitment' | 'employment'
 export type ReviewSource = 'application' | 'placement'
 export type ReviewStatus = 'published' | 'held' | 'hidden'
-export type ReviewReportReason =
-  | 'false_information' | 'not_genuine' | 'harassment' | 'personal_information' | 'discrimination' | 'other'
-
 /** FeedbackEligibility::describe — one review type for one interaction. Never compute this in the app. */
 export interface ReviewRule {
   allowed: boolean
@@ -859,7 +856,8 @@ export type ReputationSection =
     }
 
 export interface EmployerReviewsResponse {
-  summary: { min_reviews: number; recruitment: ReputationSection; employment: ReputationSection }
+  /** One summary of every review (`recruitment`/`employment` are kept only for older builds). */
+  summary: { min_reviews: number; overall: ReputationSection; recruitment?: ReputationSection; employment?: ReputationSection }
   reviews: { data: PublicReview[]; current_page: number; last_page: number; total: number; per_page: number }
 }
 
@@ -1131,10 +1129,6 @@ export const seekerService = {
   },
 
   /** Report someone else's review to PESO. */
-  async reportReview(id: number, payload: { reason: ReviewReportReason; details: string | null }) {
-    const res = await apiClient.post(`/seeker/reviews/${id}/report`, payload)
-    return res.data as { message: string }
-  },
 
   /** Small ratings for the job cards on screen: { [employerId]: { average, reviewers } }. */
   async getEmployerRatings(employerIds: number[]): Promise<Record<string, EmployerRatingBadge>> {
@@ -1143,7 +1137,7 @@ export const seekerService = {
   },
 
   /** A company's reputation summary and published reviews (anonymous). */
-  async getEmployerReviews(employerId: number | string, params: { type?: ReviewType; page?: number } = {}): Promise<EmployerReviewsResponse> {
+  async getEmployerReviews(employerId: number | string, params: { page?: number } = {}): Promise<EmployerReviewsResponse> {
     const res = await apiClient.get(`/seeker/employers/${employerId}/reviews`, { params })
     return res.data
   },

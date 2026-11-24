@@ -256,17 +256,28 @@ class SiteContentModuleTest extends TestCase
         $this->assertSame(['B', 'A'], app(SiteContentService::class)->faqsForChatbot(null)->pluck('question')->all());
     }
 
-    public function test_the_starter_pack_adds_unpublished_drafts_only_once(): void
+    public function test_suggested_faqs_can_be_added_any_time_and_only_missing_ones_are_added(): void
     {
         Sanctum::actingAs($this->admin());
-        $this->getJson('/api/admin/faqs')->assertJsonPath('can_add_starter_pack', true);
+        $all = count(\App\Support\FaqStarterPack::items());
+        $this->assertGreaterThanOrEqual(25, $all);
 
-        $this->postJson('/api/admin/faqs/starter-pack')->assertCreated();
+        // Staff already wrote one of the suggested questions (different case and punctuation).
+        Faq::create(['question' => 'do i need an account to look for jobs', 'answer' => 'Our own answer.', 'audience' => 'everyone', 'topic' => 'account', 'is_published' => true, 'sort_order' => 1]);
+        $this->getJson('/api/admin/faqs')
+            ->assertJsonPath('can_add_starter_pack', true)
+            ->assertJsonPath('suggestions_available', $all - 1);
 
-        $this->assertGreaterThan(5, Faq::query()->count());
-        $this->assertSame(0, Faq::query()->published()->count());
-        $this->postJson('/api/admin/faqs/starter-pack')->assertStatus(422);
-        $this->getJson('/api/admin/faqs')->assertJsonPath('can_add_starter_pack', false);
+        $this->postJson('/api/admin/faqs/starter-pack')->assertCreated()->assertJsonPath('added', $all - 1);
+
+        $this->assertSame($all, Faq::query()->count());
+        $this->assertSame(1, Faq::query()->published()->count(), 'Suggestions are added unpublished; staff\'s own FAQ is untouched.');
+        $this->assertSame('Our own answer.', Faq::query()->where('question', 'do i need an account to look for jobs')->value('answer'));
+        // New drafts go after what the topic already had.
+        $this->assertGreaterThan(1, (int) Faq::query()->where('topic', 'account')->where('is_published', false)->min('sort_order'));
+
+        $this->postJson('/api/admin/faqs/starter-pack')->assertStatus(422)->assertJsonValidationErrors('starter_pack');
+        $this->getJson('/api/admin/faqs')->assertJsonPath('can_add_starter_pack', false)->assertJsonPath('suggestions_available', 0);
     }
 
     public function test_the_assistant_uses_office_info_and_published_faqs_only(): void

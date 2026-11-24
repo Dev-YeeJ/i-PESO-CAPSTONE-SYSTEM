@@ -7,7 +7,7 @@ import MaterialIcons from '@expo/vector-icons/MaterialIcons'
 import type { EmployerFeedbackItem, OwnReview, ReviewStatus } from '@/services/seekerService'
 import { seekerService } from '@/services/seekerService'
 import { apiErrorMessage } from '@/utils/apiError'
-import { formatReviewDate, MY_REVIEWS_KEY, openActions, resolveReviewKey, REVIEW_GUIDELINES_URL, type ReviewAction } from '@/utils/reviews'
+import { MY_REVIEWS_KEY, openActions, resolveReviewKey, REVIEW_GUIDELINES_URL, type ReviewAction } from '@/utils/reviews'
 import { useToast } from '@/stores/toastStore'
 import { ReviewFormSheet } from '@/components/reviews/ReviewFormSheet'
 import { Stars } from '@/components/reviews/StarRating'
@@ -98,7 +98,7 @@ export default function MyReviewsScreen() {
       >
         <Text style={styles.kicker}>Verified reviews</Text>
         <Text style={styles.intro}>
-          Review a company once you apply: one review per job, about the hiring process or, once you&apos;re hired, working there. Only people with a real application or job through i-PESO can review, and your name is never shown.
+          Review a company&apos;s hiring process once you apply, one review per job. Only people with a real application through i-PESO can review, and your name is never shown.
         </Text>
 
         <QueryState
@@ -126,7 +126,7 @@ export default function MyReviewsScreen() {
                   <View style={styles.flexText}>
                     <Text style={styles.employerName} numberOfLines={1}>{action.employerName}</Text>
                     <Text style={styles.meta} numberOfLines={2}>
-                      {[action.jobTitle, action.types.includes('employment') ? 'hiring process or working here' : 'hiring process'].filter(Boolean).join(', ')}
+                      {[action.jobTitle, 'hiring process'].filter(Boolean).join(', ')}
                     </Text>
                   </View>
                 </View>
@@ -222,10 +222,7 @@ function OwnReviewCard({ review, removing, onEdit, onRemove }: { review: OwnRevi
   )
 }
 
-/**
- * What employers privately said about this job seeker. Only they and PESO can read it,
- * and it opens once they've reviewed that workplace (or after the waiting period).
- */
+/** What employers privately said about this job seeker. Only they and PESO can read it, and it shows straight away. */
 function EmployerFeedbackSection({ items }: { items: EmployerFeedbackItem[] }) {
   if (!items.length) return null
 
@@ -240,35 +237,25 @@ function EmployerFeedbackSection({ items }: { items: EmployerFeedbackItem[] }) {
         <Card key={item.id} padding="md" style={styles.itemCard}>
           <Text style={styles.employerName}>{item.employer?.name}</Text>
           {item.job_title ? <Text style={styles.meta}>{item.job_title}</Text> : null}
-          {item.locked ? (
-            <View style={styles.lockedBox}>
-              <Text style={styles.bodyText}>
-                {item.employer?.name} left feedback about you. Review this workplace to read it now, or it opens on {formatReviewDate(item.visible_from)}.
-              </Text>
-            </View>
-          ) : (
-            <>
-              <View style={styles.feedbackRatings}>
-                {item.ratings?.map((rating) => (
-                  <View key={rating.key} style={styles.feedbackRating}>
-                    <Text style={[styles.bodyText, styles.flexText]}>{rating.label}</Text>
-                    <View style={styles.inline}>
-                      <Stars value={rating.value} />
-                      <Text style={styles.average}>{rating.value}</Text>
-                    </View>
-                  </View>
-                ))}
+          <View style={styles.feedbackRatings}>
+            {item.ratings?.map((rating) => (
+              <View key={rating.key} style={styles.feedbackRating}>
+                <Text style={[styles.bodyText, styles.flexText]}>{rating.label}</Text>
+                <View style={styles.inline}>
+                  <Stars value={rating.value} />
+                  <Text style={styles.average}>{rating.value}</Text>
+                </View>
               </View>
-              <Text style={[styles.bodyText, styles.comment]}>
-                Would hire you again: <Text style={styles.strong}>{item.would_rehire}</Text>
-              </Text>
-              {item.comment ? <Text style={[styles.bodyText, styles.comment]}>{item.comment}</Text> : null}
-              <Text style={[styles.meta, styles.comment]}>
-                Think something here is unfair or not about your work? Tell PESO at the office; staff can remove feedback that breaks the{' '}
-                <Text style={styles.link} onPress={openGuidelines} accessibilityRole="link">guidelines</Text>.
-              </Text>
-            </>
-          )}
+            ))}
+          </View>
+          <Text style={[styles.bodyText, styles.comment]}>
+            Would hire you again: <Text style={styles.strong}>{item.would_rehire}</Text>
+          </Text>
+          {item.comment ? <Text style={[styles.bodyText, styles.comment]}>{item.comment}</Text> : null}
+          <Text style={[styles.meta, styles.comment]}>
+            Think something here is unfair or not about your work? Tell PESO at the office; staff can remove feedback that breaks the{' '}
+            <Text style={styles.link} onPress={openGuidelines} accessibilityRole="link">guidelines</Text>.
+          </Text>
         </Card>
       ))}
     </View>
@@ -306,7 +293,6 @@ const styles = StyleSheet.create({
   reviewActions: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md },
   takeBack: { ...textStyles.smallBold, color: colors.error },
   privateNote: { alignItems: 'flex-start', marginBottom: spacing.md },
-  lockedBox: { marginTop: spacing.md, backgroundColor: colors.sunken, borderRadius: radii.md, padding: spacing.md },
   feedbackRatings: { marginTop: spacing.md, gap: spacing.sm },
   feedbackRating: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, borderWidth: 1, borderColor: colors.border, borderRadius: radii.md, paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
   link: { ...textStyles.smallBold, color: colors.link, textDecorationLine: 'underline' },

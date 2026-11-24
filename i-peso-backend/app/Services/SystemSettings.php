@@ -88,6 +88,28 @@ class SystemSettings
         return $changes;
     }
 
+    /**
+     * Put one setting back to its default by removing the saved value.
+     * Returns [before, after] when it had been changed, null otherwise.
+     */
+    public function reset(string $key): ?array
+    {
+        if (! array_key_exists($key, $this->saved())) {
+            return null;
+        }
+
+        $before = $this->get($key);
+        DB::table('system_settings')->where('key', $key)->delete();
+        $this->flush();
+
+        $definition = SystemSettingsRegistry::definitions()[$key];
+        if (isset($definition['config'])) {
+            config([$definition['config'] => $definition['default']]);
+        }
+
+        return [$before, $this->get($key)];
+    }
+
     /** Put saved values over the config they replace (called at boot). */
     public function applyToConfig(): void
     {

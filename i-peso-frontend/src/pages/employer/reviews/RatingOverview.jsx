@@ -14,12 +14,12 @@ function Bar({ percent, delay = 0, className = 'bg-amber-400' }) {
 }
 
 /**
- * Summary for one review type: the overall score, how many people gave each
+ * The company's one summary: the overall score, how many people gave each
  * star rating, the average per aspect, and what stands out. Below the
  * minimum number of reviewers it shows progress toward a public rating.
  */
-export default function RatingOverview({ section, type, minReviews = 3 }) {
-  const who = type === 'employment' ? 'employees' : 'applicants'
+export default function RatingOverview({ section, minReviews = 3 }) {
+  const who = 'people'
 
   if (!section) return null
 
@@ -58,7 +58,7 @@ export default function RatingOverview({ section, type, minReviews = 3 }) {
 
       <p className="mt-4 flex items-center gap-2 rounded-2xl bg-emerald-50 px-3.5 py-2.5 text-sm text-emerald-900">
         <ThumbsUp className="h-4 w-4 shrink-0" aria-hidden />
-        <span><strong className="font-bold">{section.recommend_percent}%</strong> would recommend {type === 'employment' ? 'working here' : 'applying here'}</span>
+        <span><strong className="font-bold">{section.recommend_percent}%</strong> would recommend your company</span>
       </p>
 
       {distribution.length > 0 && (

@@ -8,7 +8,7 @@ import timeGridPlugin from '@fullcalendar/timegrid'
 import { CalendarPlus, ChevronLeft, ChevronRight, ExternalLink, Video } from 'lucide-react'
 import { Button, Card, ErrorState } from '@/components/ui'
 import { getEmployerCalendarEvents } from '@/services/employerApplicationService'
-import { calendarEventPhase, calendarVisibleHours, endedLabel, formatInterviewMode } from '@/utils/interview'
+import { calendarDisplayEnd, calendarEventPhase, calendarVisibleHours, endedLabel, formatInterviewMode } from '@/utils/interview'
 import { useNow } from '@/hooks/useNow'
 import LiveDot from '@/components/interview/LiveDot'
 import PortalPageHeader from '@/components/shell/PortalPageHeader'
@@ -79,8 +79,11 @@ export default function InterviewCalendarPage() {
     id: event.id,
     title: event.title || 'Interview',
     start: event.start,
-    end: event.end,
+    // Past midnight is drawn on the start day only; the phase and label use the real end.
+    end: calendarDisplayEnd(event.start, event.end),
     extendedProps: {
+      realStart: event.start,
+      realEnd: event.end,
       joinUrl: event.url,
       applicationId: event.application_id,
       seekerName: event.seeker_name,
@@ -178,7 +181,6 @@ export default function InterviewCalendarPage() {
               nowIndicator
               slotMinTime={slotTime(hours.min)}
               slotMaxTime={slotTime(hours.max)}
-              scrollTime={slotTime(Math.max(hours.min, Math.min(7, ...events.map((item) => new Date(item.start).getHours()))))}
               // An evening interview that ends after midnight stays on its own day in Month view.
               nextDayThreshold="09:00:00"
               allDaySlot={false}
@@ -186,12 +188,14 @@ export default function InterviewCalendarPage() {
               datesSet={handleDatesSet}
               eventClick={handleEventClick}
               eventContent={(arg) => {
-                const { phase, endedLabel: endedText, seekerName, jobTitle, joinUrl } = arg.event.extendedProps
+                const { phase, endedLabel: endedText, seekerName, jobTitle, joinUrl, realStart, realEnd } = arg.event.extendedProps
                 const status = phase === 'in_progress' ? 'Happening now' : phase === 'ended' ? endedText : 'Upcoming'
+                // Real times, so an interview drawn up to midnight still reads 11:31 PM – 12:31 AM.
+                const time = arg.view?.type === 'dayGridMonth' || !realEnd ? arg.timeText : `${timeOf(realStart)} – ${timeOf(realEnd)}`
                 return (
                   <div
                     className={`h-full w-full cursor-pointer overflow-hidden rounded border p-1 text-xs leading-tight ${EVENT_TONES[phase] ?? EVENT_TONES.upcoming}`}
-                    title={[status, `${arg.timeText} ${seekerName || arg.event.title}`, jobTitle].filter(Boolean).join(' · ')}
+                    title={[status, `${time} ${seekerName || arg.event.title}`, jobTitle].filter(Boolean).join(' · ')}
                   >
                     {phase === 'in_progress' ? (
                       <div className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide"><LiveDot light />Happening now</div>
@@ -200,7 +204,7 @@ export default function InterviewCalendarPage() {
                     )}
                     <div className="flex items-center gap-1 truncate font-bold">
                       {joinUrl && <Video className="h-3 w-3 shrink-0" aria-label="Online" />}
-                      <span className="truncate">{arg.timeText} {seekerName || arg.event.title}</span>
+                      <span className="truncate">{time} {seekerName || arg.event.title}</span>
                     </div>
                     {jobTitle && seekerName && <div className="truncate text-[10px] opacity-80">{jobTitle}</div>}
                   </div>

@@ -4,7 +4,7 @@ import { ShieldCheck } from 'lucide-react'
 import { Button } from '@/components/ui'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { reviewService } from '@/services/reviewService'
-import { REVIEW_TYPES, aspectsFor } from '@/utils/reviews'
+import { aspectsFor } from '@/utils/reviews'
 import { StarInput } from './StarRating'
 
 const HINTS = {
@@ -19,28 +19,23 @@ const HINTS = {
 }
 
 /**
- * Write or edit THE review of one application or hire. The seeker picks what
- * it is about: the hiring process (open from the moment they apply) or working
- * there (verified hires only). They can switch it when editing, too.
- * target: { type, types, source: 'application' | 'placement', sourceId, employerName, jobTitle, employmentReason }
- * existing: the seeker's own review when editing (with allowed_types).
+ * Write or edit THE review of one application: a review of the company's
+ * hiring process, open from the moment the seeker applies. A review written
+ * earlier about working there keeps its own questions when edited.
+ * target: { source: 'application', sourceId, employerName, jobTitle }
+ * existing: the seeker's own review when editing.
  */
 export default function ReviewFormDialog({ target, existing, onClose, onSaved }) {
   const isEdit = !!existing
-  const allowedTypes = existing ? (existing.allowed_types?.length ? existing.allowed_types : [existing.type]) : (target.types ?? [target.type])
-  const fromApplication = existing ? !!existing.application_id : target.source === 'application'
-  const [type, setType] = useState(() => existing?.preferredType ?? existing?.type ?? target.type)
+  const type = existing?.type ?? 'recruitment'
   // Every hiring aspect is rated now; an older limited review is completed when edited.
   const aspects = aspectsFor(type, false)
   const employment = type === 'employment'
-  const needsStartConfirmation = employment && existing?.type !== 'employment'
-  const employmentReason = target?.employmentReason ?? 'Available once the employer hires you and your start date arrives.'
 
   const [ratings, setRatings] = useState(() => existing?.ratings_map ?? {})
   const [recommend, setRecommend] = useState(existing ? existing.recommend : null)
   const [comment, setComment] = useState(existing?.comment ?? '')
   const [agree, setAgree] = useState(isEdit)
-  const [confirmStarted, setConfirmStarted] = useState(false)
   const [errors, setErrors] = useState({})
 
   const save = useMutation({
@@ -51,14 +46,9 @@ export default function ReviewFormDialog({ target, existing, onClose, onSaved })
         ratings: Object.fromEntries(Object.keys(aspects).filter((key) => ratings[key]).map((key) => [key, ratings[key]])),
         recommend,
         comment: comment.trim() || null,
-        ...(needsStartConfirmation ? { confirm_started: confirmStarted } : {}),
       }
       if (isEdit) return reviewService.update(existing.id, body)
-      return reviewService.submit({
-        ...body,
-        [target.source === 'placement' ? 'placement_record_id' : 'application_id']: target.sourceId,
-        agree_guidelines: agree,
-      })
+      return reviewService.submit({ ...body, application_id: target.sourceId, agree_guidelines: agree })
     },
     onSuccess: (data) => onSaved(data),
     onError: (error) => {
@@ -75,7 +65,6 @@ export default function ReviewFormDialog({ target, existing, onClose, onSaved })
     })
     if (recommend === null) next.recommend = 'Choose yes or no.'
     if (!isEdit && !agree) next.agree_guidelines = 'Please confirm your review follows the guidelines.'
-    if (needsStartConfirmation && !confirmStarted) next.confirm_started = 'Please confirm that you started working here.'
     setErrors(next)
     if (!Object.keys(next).length) save.mutate()
   }
@@ -104,38 +93,6 @@ export default function ReviewFormDialog({ target, existing, onClose, onSaved })
         {errors.type && <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{errors.type}</p>}
 
         <form id="review-form" onSubmit={submit} noValidate className="space-y-5">
-          {fromApplication && (
-            <fieldset>
-              <legend className="text-sm font-bold text-slate-800">What are you reviewing?</legend>
-              <div className="mt-2 grid gap-2 sm:grid-cols-2">
-                {Object.entries(REVIEW_TYPES).map(([value, option]) => {
-                  const allowed = allowedTypes.includes(value)
-                  const chosen = type === value
-                  return (
-                    <label
-                      key={value}
-                      className={`rounded-lg border p-3 text-sm transition has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-blue-600 ${
-                        !allowed ? 'cursor-not-allowed border-slate-200 bg-slate-50 text-slate-400'
-                          : chosen ? 'cursor-pointer border-blue-700 bg-blue-50 text-blue-900' : 'cursor-pointer border-slate-300 bg-white text-slate-700 hover:border-blue-400'
-                      }`}
-                    >
-                      <input
-                        type="radio"
-                        name="review-type"
-                        className="sr-only"
-                        value={value}
-                        checked={chosen}
-                        disabled={!allowed}
-                        onChange={() => { setType(value); setErrors({}) }}
-                      />
-                      <span className="block font-bold">{option.label}</span>
-                      <span className="mt-0.5 block text-xs">{allowed ? option.hint : employmentReason}</span>
-                    </label>
-                  )
-                })}
-              </div>
-            </fieldset>
-          )}
 
           {Object.entries(aspects).map(([key, label]) => (
             <div key={key}>
@@ -179,24 +136,8 @@ export default function ReviewFormDialog({ target, existing, onClose, onSaved })
             {errors.comment && <span className="mt-1 block text-xs font-medium text-red-600">{errors.comment}</span>}
           </label>
 
-          {isEdit && needsStartConfirmation && (
-            <div className="space-y-2 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm">
-              <label className="flex items-start gap-2">
-                <input type="checkbox" checked={confirmStarted} onChange={(event) => setConfirmStarted(event.target.checked)} className="mt-0.5" />
-                <span>I started working for this employer.</span>
-              </label>
-              {errors.confirm_started && <p className="text-xs font-medium text-red-600">{errors.confirm_started}</p>}
-            </div>
-          )}
           {!isEdit && (
             <div className="space-y-2 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm">
-              {employment && (
-                <label className="flex items-start gap-2">
-                  <input type="checkbox" checked={confirmStarted} onChange={(event) => setConfirmStarted(event.target.checked)} className="mt-0.5" />
-                  <span>I started working for this employer.</span>
-                </label>
-              )}
-              {errors.confirm_started && <p className="text-xs font-medium text-red-600">{errors.confirm_started}</p>}
               <label className="flex items-start gap-2">
                 <input type="checkbox" checked={agree} onChange={(event) => setAgree(event.target.checked)} className="mt-0.5" />
                 <span>

@@ -57,7 +57,6 @@ function OfficeInfoForm({ section, canEdit }) {
   const refresh = () => {
     queryClient.invalidateQueries({ queryKey: ['admin-site-content'] })
     queryClient.invalidateQueries({ queryKey: ['site-content'] })
-    queryClient.invalidateQueries({ queryKey: ['content-health'] })
     queryClient.invalidateQueries({ queryKey: ['admin-site-content-revisions', 'office'] })
   }
   const onError = (error) => {

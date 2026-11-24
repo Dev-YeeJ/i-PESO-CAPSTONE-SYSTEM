@@ -8,11 +8,14 @@ use App\Support\FeedbackAspects;
 use Illuminate\Support\Collection;
 
 /**
- * What job seekers see about an employer: recruitment and employment shown
- * separately, built only from published, verified reviews.
+ * What job seekers see about an employer: ONE summary of every published,
+ * verified review. Reviews are about the company's hiring process; reviews
+ * written earlier about working there are kept and counted in the same summary.
  *
- *  - Each person counts once per employer and type (their latest review), so
- *    applying to five jobs doesn't give five votes.
+ *  - Each person counts once per employer (their latest review), so applying
+ *    to five jobs doesn't give five votes.
+ *  - The overall rating is the average of each counted review's own stars;
+ *    aspect bars average whichever aspects those reviews rated.
  *  - Averages, strengths and areas to improve only appear once MIN_REVIEWS
  *    people have reviewed; below that the page says there aren't enough yet.
  */
@@ -33,10 +36,15 @@ class ReputationSummary
             ->orderByDesc('id')
             ->get();
 
+        $overall = self::section($reviews, FeedbackAspects::RECRUITMENT_ASPECTS + FeedbackAspects::EMPLOYMENT_ASPECTS);
+
         return [
             'min_reviews' => self::MIN_REVIEWS,
-            'recruitment' => self::section($reviews->where('type', FeedbackAspects::RECRUITMENT), FeedbackAspects::RECRUITMENT_ASPECTS),
-            'employment' => self::section($reviews->where('type', FeedbackAspects::EMPLOYMENT), FeedbackAspects::EMPLOYMENT_ASPECTS),
+            'overall' => $overall,
+            // App builds from before the reviews were unified read these two: they
+            // get the same unified summary under the first tab and an empty second.
+            'recruitment' => $overall,
+            'employment' => ['reviewers' => 0, 'enough' => false],
         ];
     }
 
@@ -59,7 +67,8 @@ class ReputationSummary
             }
         }
 
-        $overall = collect($averages)->avg('average');
+        // Each review's own average, so reviews that rated different aspects weigh the same.
+        $overall = $counted->map(fn (EmployerReview $review) => $review->averageRating())->filter(fn ($value) => $value !== null)->avg();
 
         // How many people gave each overall star rating (their review's average, rounded).
         $stars = $counted->map(fn (EmployerReview $review) => (int) round((float) $review->averageRating()))->countBy();
@@ -79,7 +88,7 @@ class ReputationSummary
 
     /**
      * The small rating on job cards, for many employers in one query. Only
-     * employers with MIN_REVIEWS different reviewers (either type) get one.
+     * employers with MIN_REVIEWS different reviewers get one.
      *
      * @return array<int, array{average: float, reviewers: int}>
      */
@@ -98,9 +107,9 @@ class ReputationSummary
             ->get(['id', 'employer_id', 'seeker_id', 'type', 'ratings', 'limited', 'created_at'])
             ->groupBy('employer_id')
             ->map(function (Collection $reviews) {
-                // Latest review per person and type, then each review's own average.
-                $counted = $reviews->unique(fn (EmployerReview $review) => $review->seeker_id.'|'.$review->type);
-                $people = $counted->unique('seeker_id')->count();
+                // Latest review per person (same rule as the summary), then each review's own average.
+                $counted = $reviews->unique('seeker_id');
+                $people = $counted->count();
                 $average = $counted->map(fn (EmployerReview $review) => $review->averageRating())->filter()->avg();
 
                 return $people >= self::MIN_REVIEWS && $average !== null

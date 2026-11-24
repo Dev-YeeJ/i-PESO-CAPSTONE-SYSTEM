@@ -1,5 +1,5 @@
 import { StyleSheet, Text, View } from 'react-native'
-import type { ReputationSection, ReviewType } from '@/services/seekerService'
+import type { ReputationSection } from '@/services/seekerService'
 import { colors, radii, spacing, textStyles } from '@/theme'
 import { Stars } from './StarRating'
 
@@ -7,25 +7,24 @@ import { Stars } from './StarRating'
 
 interface ReputationSummaryCardProps {
   section: ReputationSection | undefined
-  type: ReviewType
   minReviews?: number
 }
 
 /**
- * The reputation summary for one review type: average, how many verified people it's based
- * on, a bar per aspect, strengths and areas to improve. Below the minimum number of
- * reviewers it says there aren't enough yet.
+ * A company's one reputation summary: average, how many verified people it's based on, a
+ * bar per aspect, strengths and areas to improve. Below the minimum number of reviewers it
+ * says there aren't enough yet.
  */
-export function ReputationSummaryCard({ section, type, minReviews = 3 }: ReputationSummaryCardProps) {
-  const who = type === 'employment' ? 'employees' : 'applicants'
+export function ReputationSummaryCard({ section, minReviews = 3 }: ReputationSummaryCardProps) {
   if (!section) return null
+  const who = section.reviewers === 1 ? 'person' : 'people'
 
   if (!section.enough) {
     return (
       <View style={[styles.card, styles.cardMuted]}>
         <Text style={styles.notEnoughTitle}>Not enough verified reviews yet</Text>
         <Text style={styles.bodyText}>
-          A summary appears once {minReviews} verified {who} have reviewed this company
+          A summary appears once {minReviews} verified people have reviewed this company
           {section.reviewers > 0 ? ` (${section.reviewers} so far)` : ''}.
         </Text>
       </View>
@@ -48,7 +47,7 @@ export function ReputationSummaryCard({ section, type, minReviews = 3 }: Reputat
             Based on <Text style={styles.strong}>{section.reviewers}</Text> verified {who}
           </Text>
           <Text style={styles.bodyText}>
-            <Text style={styles.strong}>{section.recommend_percent}%</Text> would recommend {type === 'employment' ? 'working here' : 'applying here'}
+            <Text style={styles.strong}>{section.recommend_percent}%</Text> would recommend this company
           </Text>
         </View>
       </View>

@@ -6,7 +6,7 @@ import { useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import toast from '@/lib/toast'
 import {
-  Activity, AlertTriangle, Building2, CheckCircle2, KeyRound, MessageSquareText, Plus, RefreshCw, Save, Send, ShieldCheck, Undo2, X, XCircle,
+  Activity, AlertTriangle, Bot, Building2, CheckCircle2, KeyRound, MessageSquareText, Plus, RefreshCw, RotateCcw, Save, Search, Send, Undo2, UserPlus, Wrench, X, XCircle,
 } from 'lucide-react'
 import { Button, Card, ErrorState, LoadingSkeleton } from '@/components/ui'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -16,10 +16,32 @@ import { formatWhen, inputClass, labelClass } from '@/pages/admin/6-configuratio
 
 const SECTIONS = [
   { value: 'status', label: 'System status', icon: Activity },
-  { value: 'access', label: 'Access', icon: ShieldCheck },
+  { value: 'maintenance', label: 'Maintenance', icon: Wrench },
+  { value: 'registration', label: 'Registration', icon: UserPlus },
+  { value: 'assistant', label: 'Assistant', icon: Bot },
   { value: 'sms', label: 'SMS', icon: MessageSquareText },
   { value: 'employer_rules', label: 'Employer rules', icon: Building2 },
 ]
+const SETTING_SECTIONS = SECTIONS.filter((section) => section.value !== 'status')
+
+/** A setting's default, in words, for the "Reset to default" link. */
+const describeDefault = (setting) => {
+  const value = setting.default
+  if (setting.type === 'bool') return value ? 'on' : 'off'
+  if (setting.type === 'text') return 'the original message'
+  if (setting.type === 'int_list') return value?.length ? value.map((day) => describeOffset(setting.key, day)).join(', ') : 'no reminders'
+  if (setting.key === 'sms.monthly_cap' && value === 0) return 'no limit'
+  return String(value)
+}
+
+const isDefault = (setting, value) => JSON.stringify(value) === JSON.stringify(setting.default)
+
+/** Case- and spacing-insensitive match on a setting's name and description. */
+const matches = (setting, query) => {
+  const words = query.toLowerCase().split(/\s+/).filter(Boolean)
+  const text = `${setting.label} ${setting.help}`.toLowerCase()
+  return words.every((word) => text.includes(word))
+}
 
 const STATUS_META = {
   ok: { icon: CheckCircle2, className: 'text-emerald-500', ring: 'border-slate-200 bg-white', label: 'Working' },
@@ -49,28 +71,45 @@ export default function SystemSettingsPage() {
   const active = SECTIONS.some((s) => s.value === params.get('section')) ? params.get('section') : 'status'
   const settings = useQuery({ queryKey: ['admin-system-settings'], queryFn: adminSystemSettingsService.list })
   const status = useQuery({ queryKey: ['admin-system-status'], queryFn: adminSystemSettingsService.status, staleTime: 30 * 1000 })
+  const [search, setSearch] = useState('')
+  const query = search.trim()
 
   const problems = status.data?.checks.filter((check) => check.status !== 'ok').length ?? 0
+  const smsUsage = status.data?.checks.find((c) => c.id === 'sms')?.details
+  const open = (section) => { setSearch(''); setParams(section === 'status' ? {} : { section }) }
 
   return (
     <div className="w-full space-y-6">
       <PageHeader
         eyebrow="Configuration"
         title="System Settings"
-        subtitle="How i-PESO behaves: whether each service is working, maintenance and registration switches, SMS limits and employer deadlines. API keys stay in the server's .env file and never appear here."
+        subtitle="How i-PESO behaves: whether each service is working, maintenance, registration, the assistant, SMS limits and employer deadlines. API keys stay in the server's .env file and never appear here."
       />
+
+      {settings.data && <SettingsSummary settings={settings.data.settings} smsUsage={smsUsage} onOpen={open} />}
 
       <div className="grid gap-6 lg:grid-cols-[14rem_minmax(0,1fr)]">
         <nav aria-label="Settings sections" className="lg:sticky lg:top-6 lg:self-start">
+          <label className="relative mb-3 block">
+            <span className="sr-only">Search settings</span>
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" aria-hidden="true" />
+            <input
+              type="search"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Search settings"
+              className="w-full rounded-xl border border-slate-300 bg-white py-2 pl-9 pr-3 text-sm focus:border-brand-navy focus:outline-none focus:ring-2 focus:ring-brand-navy/15"
+            />
+          </label>
           <div className="flex gap-2 overflow-x-auto pb-1 lg:flex-col lg:gap-1 lg:pb-0">
             {SECTIONS.map((section) => {
-              const selected = section.value === active
+              const selected = !query && section.value === active
               return (
                 <button
                   key={section.value}
                   type="button"
                   aria-current={selected ? 'page' : undefined}
-                  onClick={() => setParams(section.value === 'status' ? {} : { section: section.value })}
+                  onClick={() => open(section.value)}
                   className={`flex shrink-0 items-center gap-2.5 rounded-xl px-3 py-2 text-left text-sm font-bold transition ${
                     selected ? 'bg-white text-slate-950 shadow-sm ring-1 ring-slate-200' : 'border border-slate-200 bg-white text-slate-600 hover:text-slate-900 lg:border-transparent lg:bg-transparent lg:hover:bg-white/70'
                   }`}
@@ -100,7 +139,9 @@ export default function SystemSettingsPage() {
                   You can view these settings. Only the system administrator (PESO Office Manager) can change them or send test messages.
                 </div>
               )}
-              {active === 'status' ? (
+              {query ? (
+                <SearchResults query={query} data={settings.data} smsUsage={smsUsage} />
+              ) : active === 'status' ? (
                 <StatusPanel status={status} canEdit={settings.data.can_edit} />
               ) : (
                 <SettingsGroup
@@ -109,7 +150,7 @@ export default function SystemSettingsPage() {
                   title={settings.data.groups[active]}
                   settings={settings.data.settings.filter((s) => s.group === active)}
                   canEdit={settings.data.can_edit}
-                  smsUsage={status.data?.checks.find((c) => c.id === 'sms')?.details}
+                  smsUsage={smsUsage}
                 />
               )}
             </>
@@ -118,6 +159,70 @@ export default function SystemSettingsPage() {
       </div>
     </div>
   )
+}
+
+// ── At a glance and search ─────────────────────────────────────────────
+
+/** The switches people ask about most, readable at a glance; each opens its section. */
+function SettingsSummary({ settings, smsUsage, onOpen }) {
+  const value = (key) => settings.find((s) => s.key === key)?.value
+  const cap = Number(value('sms.monthly_cap') ?? 0)
+  const sent = Number(smsUsage?.['Sent this month'] ?? 0)
+  const items = [
+    { section: 'maintenance', label: 'Maintenance', text: value('maintenance.enabled') ? 'On, portal closed' : 'Off', alert: Boolean(value('maintenance.enabled')) },
+    { section: 'registration', label: 'Job seeker sign-ups', text: value('registration.seekers_open') === false ? 'Paused' : 'Open', alert: value('registration.seekers_open') === false },
+    { section: 'registration', label: 'Employer sign-ups', text: value('registration.employers_open') === false ? 'Paused' : 'Open', alert: value('registration.employers_open') === false },
+    { section: 'assistant', label: 'Assistant', text: value('chatbot.enabled') === false ? 'Off' : 'On', alert: value('chatbot.enabled') === false },
+    {
+      section: 'sms',
+      label: 'SMS this month',
+      text: value('sms.enabled') === false ? 'Sending off' : `${sent}${cap > 0 ? ` of ${cap}` : ' sent'}`,
+      alert: value('sms.enabled') === false || (cap > 0 && sent >= cap),
+    },
+  ]
+
+  return (
+    <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5" aria-label="Settings at a glance">
+      {items.map((item) => (
+        <li key={item.label}>
+          <button
+            type="button"
+            onClick={() => onOpen(item.section)}
+            className={`flex h-full w-full flex-col rounded-2xl border px-4 py-3 text-left transition hover:shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-navy/30 ${item.alert ? 'border-amber-300 bg-amber-50' : 'border-slate-200 bg-white'}`}
+          >
+            <span className="text-xs font-bold text-slate-500">{item.label}</span>
+            <span className={`mt-0.5 text-sm font-bold ${item.alert ? 'text-amber-900' : 'text-slate-950'}`}>{item.text}</span>
+          </button>
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+/** Settings whose name or description matches the search, still editable, grouped by section. */
+function SearchResults({ query, data, smsUsage }) {
+  const groups = SETTING_SECTIONS
+    .map((section) => ({ ...section, settings: data.settings.filter((s) => s.group === section.value && matches(s, query)) }))
+    .filter((group) => group.settings.length)
+
+  if (!groups.length) {
+    return (
+      <Card>
+        <p className="text-sm text-slate-600">No settings match “{query}”. Try a word like “maintenance”, “SMS” or “reminder”.</p>
+      </Card>
+    )
+  }
+
+  return groups.map((group) => (
+    <SettingsGroup
+      key={`search-${group.value}-${query}`}
+      group={group.value}
+      title={data.groups[group.value]}
+      settings={group.settings}
+      canEdit={data.can_edit}
+      smsUsage={smsUsage}
+    />
+  ))
 }
 
 // ── System status ──────────────────────────────────────────────────────
@@ -262,6 +367,17 @@ function SettingsGroup({ group, title, settings, canEdit, smsUsage }) {
     onError: showErrors,
   })
 
+  const reset = useMutation({
+    mutationFn: (key) => adminSystemSettingsService.reset(key),
+    onSuccess: (data, key) => {
+      setForm((current) => ({ ...current, [key]: data.value }))
+      setErrors((current) => ({ ...current, [`values.${key}`]: undefined }))
+      toast.success(data.message)
+      refresh()
+    },
+    onError: (error) => toast.error(error?.response?.data?.message ?? 'Could not reset the setting.'),
+  })
+
   const flip = useMutation({
     mutationFn: ({ key, value }) => adminSystemSettingsService.save({ [key]: value }),
     onSuccess: (_, { key, value }) => {
@@ -293,6 +409,11 @@ function SettingsGroup({ group, title, settings, canEdit, smsUsage }) {
       error={errors[`values.${setting.key}`]}
       disabled={!canEdit || (setting.key.startsWith('sms.types.') && !form['sms.enabled'])}
       extra={setting.key === 'sms.monthly_cap' && smsUsage ? `Sent so far this month: ${smsUsage['Sent this month'] ?? 0}.` : null}
+      // Offered when the saved value differs from the default; unsaved edits are discarded instead.
+      onReset={canEdit && !isDefault(setting, setting.value) && JSON.stringify(form[setting.key]) === JSON.stringify(initial[setting.key])
+        ? () => reset.mutate(setting.key)
+        : null}
+      resetting={reset.isPending && reset.variables === setting.key}
     />
   )
 
@@ -354,9 +475,20 @@ function SettingsGroup({ group, title, settings, canEdit, smsUsage }) {
   )
 }
 
-function SettingField({ setting, value, onChange, error, disabled, extra }) {
+function SettingField({ setting, value, onChange, error, disabled, extra, onReset, resetting }) {
   const meta = setting.updated_at ? `Changed ${formatWhen(setting.updated_at)}${setting.updated_by ? ` by ${setting.updated_by}` : ''}` : null
   const id = `setting-${setting.key.replace(/\W/g, '-')}`
+  const resetLink = onReset ? (
+    <button
+      type="button"
+      onClick={onReset}
+      disabled={resetting}
+      className="mt-1 inline-flex items-center gap-1 text-[11px] font-bold text-brand-navy hover:underline disabled:opacity-50"
+      aria-label={`Reset ${setting.label} to its default (${describeDefault(setting)})`}
+    >
+      <RotateCcw className="h-3 w-3" aria-hidden="true" /> Reset to default ({describeDefault(setting)})
+    </button>
+  ) : null
 
   if (setting.type === 'bool') {
     return (
@@ -365,6 +497,7 @@ function SettingField({ setting, value, onChange, error, disabled, extra }) {
           <p id={`${id}-label`} className="text-sm font-bold text-slate-950">{setting.label}</p>
           <p className="mt-0.5 text-xs text-slate-600">{setting.help}</p>
           {meta && <p className="mt-1 text-[11px] text-slate-400">{meta}</p>}
+          {resetLink}
           {error && <p className="mt-1 text-xs font-semibold text-red-600">{error}</p>}
         </div>
         <button
@@ -398,6 +531,7 @@ function SettingField({ setting, value, onChange, error, disabled, extra }) {
       {setting.type === 'int_list' && <DayListEditor id={id} setting={setting} value={value ?? []} onChange={onChange} disabled={disabled} />}
       {extra && <p className="mt-1 text-xs font-semibold text-slate-600">{extra}</p>}
       {meta && <p className="mt-1 text-[11px] text-slate-400">{meta}</p>}
+      {resetLink}
       {error && <p className="mt-1 text-xs font-semibold text-red-600">{error}</p>}
     </div>
   )
