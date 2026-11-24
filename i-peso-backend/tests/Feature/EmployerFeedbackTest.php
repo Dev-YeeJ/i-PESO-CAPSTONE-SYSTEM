@@ -40,6 +40,7 @@ class EmployerFeedbackTest extends TestCase
             });
         }
         (require database_path('migrations/2026_11_12_000001_create_employer_feedback_tables.php'))->up();
+        (require database_path('migrations/2026_11_25_000001_make_worker_feedback_would_rehire_optional.php'))->up();
 
         $this->employerId = $this->employer('Urdaneta Rice Mill Corp.');
     }
@@ -199,14 +200,20 @@ class EmployerFeedbackTest extends TestCase
         $this->postJson('/api/employer/worker-feedback', $this->workerPayload(['application_id' => $later]))
             ->assertStatus(422)->assertJsonPath('errors.application_id.0', 'You can give feedback from their start date.');
 
+        // No "would you hire them again?" question: stars and an optional comment are enough.
         $this->postJson('/api/employer/worker-feedback', $this->workerPayload(['application_id' => $started]))
             ->assertCreated()
-            ->assertJsonPath('feedback.would_rehire', 'yes');
+            ->assertJsonMissingPath('feedback.would_rehire')
+            ->assertJsonPath('message', "Saved. Your comment stays private; the stars count toward the worker's rating.");
+        $this->assertNull(WorkerFeedback::first()->would_rehire);
 
-        $this->postJson('/api/employer/worker-feedback', $this->workerPayload(['application_id' => $started, 'would_rehire' => 'maybe']))
+        // An answer sent by an older page is ignored.
+        $this->postJson('/api/employer/worker-feedback', $this->workerPayload(['application_id' => $started, 'would_rehire' => 'no', 'comment' => 'Edited.']))
             ->assertOk()
-            ->assertJsonPath('feedback.would_rehire', 'maybe');
+            ->assertJsonPath('feedback.comment', 'Edited.');
+        $this->assertNull(WorkerFeedback::first()->would_rehire);
         $this->assertSame(1, WorkerFeedback::count());
+        $this->getJson('/api/employer/hires')->assertJsonMissingPath('would_rehire');
 
         $this->postJson('/api/employer/worker-feedback', $this->workerPayload(['placement_record_id' => $placed]))->assertCreated();
     }
@@ -236,7 +243,7 @@ class EmployerFeedbackTest extends TestCase
         $hire = $this->application($worker, 'hired', ['placement_start_date' => now()->subWeek()->toDateString()]);
         Sanctum::actingAs($this->employerModel());
         $this->postJson('/api/employer/worker-feedback', $this->workerPayload(['application_id' => $hire]))->assertCreated();
-        $this->postJson('/api/employer/worker-feedback', $this->workerPayload(['application_id' => $hire, 'would_rehire' => 'maybe']))->assertOk();
+        $this->postJson('/api/employer/worker-feedback', $this->workerPayload(['application_id' => $hire, 'comment' => 'Always on time and quick to learn.']))->assertOk();
 
         $notes = DB::table('notifications')->where('type', \App\Notifications\WorkerFeedbackReceivedNotification::class)->get();
         $this->assertCount(1, $notes, 'Told once, not on every edit.');
@@ -248,7 +255,7 @@ class EmployerFeedbackTest extends TestCase
         Sanctum::actingAs($worker);
         $feedback = $this->getJson('/api/seeker/reviews')->assertOk()->json('employer_feedback.0');
         $this->assertFalse($feedback['locked']);
-        $this->assertSame('Maybe', $feedback['would_rehire']);
+        $this->assertArrayNotHasKey('would_rehire', $feedback);
         $this->assertSame('Always on time and quick to learn.', $feedback['comment']);
     }
 
@@ -310,7 +317,6 @@ class EmployerFeedbackTest extends TestCase
     {
         return array_merge([
             'ratings' => ['professionalism' => 5, 'communication' => 4, 'reliability' => 5, 'job_performance' => 4],
-            'would_rehire' => 'yes',
             'comment' => 'Always on time and quick to learn.',
         ], $overrides);
     }

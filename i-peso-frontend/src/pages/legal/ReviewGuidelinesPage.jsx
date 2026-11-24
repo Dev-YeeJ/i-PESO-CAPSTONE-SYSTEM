@@ -95,8 +95,7 @@ export default function ReviewGuidelinesPage({ notice = null, after = null }) {
           <li>
             Employers can give feedback about people they hired. The comments are private: only you and PESO can read them,
             on your My Reviews page, as soon as they are written. Employers you apply to can see your average rating from
-            employers, how many employers rated you and how many would hire you again, but never the comments or which
-            companies wrote them.
+            employers and how many employers rated you, but never the comments or which companies wrote them.
           </li>
         </ul>
         <p>

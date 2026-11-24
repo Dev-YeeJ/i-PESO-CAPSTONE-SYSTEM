@@ -263,7 +263,6 @@ class AdminReviewController extends Controller
                 'employer' => $item->employer?->company_name,
                 'job_title' => $item->application?->jobVacancy?->job_title,
                 'ratings' => collect(FeedbackAspects::WORKER_ASPECTS)->map(fn ($label, $key) => ['key' => $key, 'label' => $label, 'value' => $item->ratings[$key] ?? null])->values(),
-                'would_rehire' => FeedbackAspects::WOULD_REHIRE[$item->would_rehire] ?? $item->would_rehire,
                 'comment' => $item->comment,
                 'status' => $item->status,
                 'moderation_note' => $item->moderation_note,

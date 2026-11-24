@@ -146,7 +146,6 @@ class EmployerFeedbackController extends Controller
         return response()->json([
             'hires' => $applications->concat($placements)->values(),
             'aspects' => FeedbackAspects::WORKER_ASPECTS,
-            'would_rehire' => FeedbackAspects::WOULD_REHIRE,
         ]);
     }
 
@@ -158,7 +157,6 @@ class EmployerFeedbackController extends Controller
             'application_id' => ['nullable', 'integer', 'required_without:placement_record_id'],
             'placement_record_id' => ['nullable', 'integer'],
             'ratings' => ['required', 'array'],
-            'would_rehire' => ['required', Rule::in(array_keys(FeedbackAspects::WOULD_REHIRE))],
             'comment' => ['nullable', 'string', 'max:2000'],
         ]);
 
@@ -191,7 +189,6 @@ class EmployerFeedbackController extends Controller
             'employer_id' => $employer->employer_id,
             'seeker_id' => $seekerId,
             'ratings' => $ratings,
-            'would_rehire' => $data['would_rehire'],
             'comment' => $comment,
             'edited_at' => $existing ? now() : null,
         ]);
@@ -209,7 +206,7 @@ class EmployerFeedbackController extends Controller
         ));
 
         return response()->json([
-            'message' => "Saved. Your comment stays private; the stars and would-rehire answer count toward the worker's rating.",
+            'message' => "Saved. Your comment stays private; the stars count toward the worker's rating.",
             'feedback' => $this->feedbackView($feedback),
         ], $existing ? 200 : 201);
     }
@@ -248,7 +245,6 @@ class EmployerFeedbackController extends Controller
         return [
             'id' => $feedback->id,
             'ratings' => $feedback->ratings,
-            'would_rehire' => $feedback->would_rehire,
             'comment' => $feedback->comment,
             'status' => $feedback->status,
             'updated_at' => $feedback->updated_at,

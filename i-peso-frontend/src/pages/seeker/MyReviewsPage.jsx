@@ -177,7 +177,7 @@ function EmployerFeedbackSection({ items }) {
   return (
     <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-card" aria-labelledby="employer-feedback-heading">
       <h2 id="employer-feedback-heading" className="text-lg font-semibold text-slate-900">Feedback from employers</h2>
-      <p className="mt-1 flex items-center gap-1.5 text-sm text-slate-600"><Lock className="h-4 w-4" aria-hidden /> Only you and PESO can read the comments. Employers you apply to see only your average rating and how many would hire you again.</p>
+      <p className="mt-1 flex items-center gap-1.5 text-sm text-slate-600"><Lock className="h-4 w-4" aria-hidden /> Only you and PESO can read the comments. Employers you apply to see only your average rating.</p>
       <ul className="mt-3 space-y-3">
         {items.map((item) => (
           <li key={item.id} className="rounded-xl bg-brand-canvas p-4">
@@ -191,7 +191,6 @@ function EmployerFeedbackSection({ items }) {
                 </li>
               ))}
             </ul>
-            <p className="mt-3 text-sm text-slate-700">Would hire you again: <strong>{item.would_rehire}</strong></p>
             {item.comment && <p className="mt-2 whitespace-pre-line text-sm text-slate-700">{item.comment}</p>}
             <p className="mt-3 text-xs text-slate-500">
               Think something here is unfair or not about your work? Tell PESO at the office; staff can remove feedback that breaks the{' '}

@@ -31,7 +31,7 @@ export default function WorkerFeedbackCard({ seekerId }) {
 
   return (
     <Card>
-      <CardHeader title="Feedback from employers" subtitle="Comments are private to PESO and this job seeker. Employers they apply to see only the star average and would-rehire count." />
+      <CardHeader title="Feedback from employers" subtitle="Comments are private to PESO and this job seeker. Employers they apply to see only the star average." />
       {isLoading ? (
         <p className="text-sm text-slate-500">Loading…</p>
       ) : feedback.length === 0 ? (
@@ -42,7 +42,7 @@ export default function WorkerFeedbackCard({ seekerId }) {
             <li key={item.id} className="rounded-lg border border-slate-200 p-3 text-sm">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className="font-bold text-slate-900">{item.employer}{item.job_title ? <span className="font-normal text-slate-500">, {item.job_title}</span> : null}</p>
-                {item.status === 'hidden' ? <Badge variant="rejected" icon={false}>Hidden</Badge> : <span className="text-xs text-slate-600">Would rehire: <strong>{item.would_rehire}</strong></span>}
+                {item.status === 'hidden' && <Badge variant="rejected" icon={false}>Hidden</Badge>}
               </div>
               <ul className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-600">
                 {item.ratings.map((rating) => <li key={rating.key}>{rating.label}: <strong className="text-slate-800">{rating.value}</strong>/5</li>)}

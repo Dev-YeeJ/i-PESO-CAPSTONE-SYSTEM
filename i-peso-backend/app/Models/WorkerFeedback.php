@@ -7,8 +7,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
  * An employer's feedback about someone they hired. The comment is private
- * (PESO staff and the worker); the star average and would-rehire count are
- * shown to employers viewing the person's applications (WorkerRating).
+ * (PESO staff and the worker); the star average is shown to employers viewing
+ * the person's applications (WorkerRating). would_rehire is no longer asked:
+ * it stays only on feedback given before 2026-11-25 and is not shown.
  */
 class WorkerFeedback extends Model
 {

@@ -35,7 +35,7 @@ export default function HiresTab() {
     <div className="space-y-5">
       <p className="flex gap-3 rounded-2xl border border-sky-100 bg-sky-50/70 p-4 text-sm leading-6 text-sky-950">
         <Lock className="mt-1 h-4 w-4 shrink-0 text-sky-700" aria-hidden />
-        <span>Your <strong>comments are private</strong>: only PESO and the worker can read them. Employers the worker applies to later see only their <strong>star average and would-rehire count</strong>, never your comments or your company name.</span>
+        <span>Your <strong>comments are private</strong>: only PESO and the worker can read them. Employers the worker applies to later see only their <strong>star average</strong>, never your comments or your company name.</span>
       </p>
 
       {isLoading ? (
@@ -106,7 +106,6 @@ export default function HiresTab() {
                         {hire.feedback ? (
                           <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-600">
                             {score && <span className="flex items-center gap-1.5"><Stars value={score} /><strong className="text-slate-800">{score.toFixed(1)}</strong></span>}
-                            <span>Rehire: <strong className="text-slate-800">{data?.would_rehire?.[hire.feedback.would_rehire] ?? hire.feedback.would_rehire}</strong></span>
                           </div>
                         ) : hire.can_give_feedback ? (
                           <span className="text-xs font-semibold text-amber-700">Waiting for your feedback</span>
@@ -128,21 +127,14 @@ export default function HiresTab() {
         </>
       )}
 
-      {giving && <WorkerFeedbackDialog hire={giving} aspects={data?.aspects ?? {}} rehireOptions={data?.would_rehire ?? {}} onClose={() => setGiving(null)} />}
+      {giving && <WorkerFeedbackDialog hire={giving} aspects={data?.aspects ?? {}} onClose={() => setGiving(null)} />}
     </div>
   )
 }
 
-const REHIRE_TONE = {
-  yes: 'border-emerald-600 bg-emerald-600 text-white',
-  maybe: 'border-amber-500 bg-amber-500 text-white',
-  no: 'border-slate-700 bg-slate-700 text-white',
-}
-
-function WorkerFeedbackDialog({ hire, aspects, rehireOptions, onClose }) {
+function WorkerFeedbackDialog({ hire, aspects, onClose }) {
   const queryClient = useQueryClient()
   const [ratings, setRatings] = useState(hire.feedback?.ratings ?? {})
-  const [rehire, setRehire] = useState(hire.feedback?.would_rehire ?? '')
   const [comment, setComment] = useState(hire.feedback?.comment ?? '')
   const [errors, setErrors] = useState({})
   const firstName = hire.name.split(' ')[0]
@@ -151,7 +143,6 @@ function WorkerFeedbackDialog({ hire, aspects, rehireOptions, onClose }) {
     mutationFn: () => employerFeedbackService.saveWorkerFeedback({
       [hire.source === 'placement' ? 'placement_record_id' : 'application_id']: hire.source_id,
       ratings,
-      would_rehire: rehire,
       comment: comment.trim() || null,
     }),
     onSuccess: (res) => { toast.success(res.message); queryClient.invalidateQueries({ queryKey: HIRES_KEY }); onClose() },
@@ -164,7 +155,6 @@ function WorkerFeedbackDialog({ hire, aspects, rehireOptions, onClose }) {
   const submit = () => {
     const next = {}
     Object.entries(aspects).forEach(([key, label]) => { if (!ratings[key]) next[`ratings.${key}`] = `Rate ${label.toLowerCase()}.` })
-    if (!rehire) next.would_rehire = 'Choose an answer.'
     setErrors(next)
     if (!Object.keys(next).length) save.mutate()
   }
@@ -177,7 +167,7 @@ function WorkerFeedbackDialog({ hire, aspects, rehireOptions, onClose }) {
       <DialogContent className="max-h-[92vh] max-w-lg overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Feedback on {hire.name}</DialogTitle>
-          <DialogDescription>Your comment is private (PESO and {firstName} only). Your stars and would-rehire answer count toward the rating other employers see.</DialogDescription>
+          <DialogDescription>Your comment is private (PESO and {firstName} only). Your stars count toward the rating other employers see.</DialogDescription>
         </DialogHeader>
         {errors.form && <p role="alert" className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{errors.form}</p>}
 
@@ -189,21 +179,6 @@ function WorkerFeedbackDialog({ hire, aspects, rehireOptions, onClose }) {
           ))}
         </div>
 
-        <fieldset>
-          <legend className="text-sm font-bold text-slate-900">Would you hire {firstName} again?</legend>
-          <div className="mt-2 grid grid-cols-3 gap-2">
-            {Object.entries(rehireOptions).map(([value, label]) => (
-              <label key={value} className={cn(
-                'cursor-pointer rounded-xl border px-3 py-2.5 text-center text-sm font-bold transition has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-focus',
-                rehire === value ? REHIRE_TONE[value] ?? 'border-brand-navy bg-brand-navy text-white' : 'border-slate-300 bg-white text-slate-700 hover:border-slate-400',
-              )}>
-                <input type="radio" name="would-rehire" className="sr-only" checked={rehire === value} onChange={() => { setRehire(value); setErrors((current) => ({ ...current, would_rehire: undefined })) }} />
-                {label}
-              </label>
-            ))}
-          </div>
-          {errors.would_rehire && <p className="mt-1 text-xs font-semibold text-red-600">{errors.would_rehire}</p>}
-        </fieldset>
 
         <div>
           <label htmlFor="worker-comment" className="text-sm font-bold text-slate-900">Comment <span className="font-normal text-slate-500">(optional, private)</span></label>

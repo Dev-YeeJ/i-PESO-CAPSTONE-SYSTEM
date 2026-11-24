@@ -131,7 +131,7 @@ class EmployerApplicationController extends Controller
 
         return response()->json([
             'application' => $this->formatApplication($application),
-            // Star average and would-rehire count from all employers' feedback (no comments, no names).
+            // Star average from all employers' feedback (no comments, no names).
             'worker_rating' => $this->workerRating($application),
         ]);
     }

@@ -36,8 +36,6 @@ final class FeedbackAspects
         'job_performance' => 'Job performance',
     ];
 
-    public const WOULD_REHIRE = ['yes' => 'Yes', 'maybe' => 'Maybe', 'no' => 'No'];
-
     /** Why someone reports or disputes a review. */
     public const FLAG_REASONS = [
         'false_information' => 'False or misleading',
