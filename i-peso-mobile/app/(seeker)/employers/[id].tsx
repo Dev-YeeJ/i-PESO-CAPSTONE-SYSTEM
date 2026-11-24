@@ -100,6 +100,7 @@ function backTargetFor(from: string | undefined, fromId: string | undefined): st
   if (from === 'application' && fromId) return `/(seeker)/applications/${fromId}`
   if (from === 'poster') return '/(seeker)/employer-posters'
   if (from === 'feed') return '/(seeker)/jobs'
+  if (from === 'reviews') return '/(seeker)/reviews'
   return '/(seeker)'
 }
 

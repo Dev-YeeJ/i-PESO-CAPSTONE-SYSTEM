@@ -19,6 +19,9 @@ import {
   listFrom,
   textFrom,
   titleCase,
+  applicationIsClosed,
+  applicationStatusLabel,
+  formatKm,
 } from '@/utils/seekerView'
 import { AlertBox } from '@/components/ui/AlertBox'
 import { Badge } from '@/components/ui/Badge'
@@ -217,11 +220,11 @@ export default function JobDetailsScreen() {
         </View>
 
         <View style={styles.badgeRow}>
-          <Fact icon="place" text={[job.distance_km ? `${Number(job.distance_km).toFixed(1)} km` : '', jobLocation(job)].filter(Boolean).join(' · ')} />
+          <Fact icon="place" text={[job.distance_km != null ? formatKm(job.distance_km) : '', jobLocation(job)].filter(Boolean).join(' · ')} />
           <Fact icon="business-center" text={titleCase(job.employment_type, 'Type not listed')} />
           {job.job_fair?.is_available_at_job_fair ? <Badge variant="info">Available at Job Fair</Badge> : null}
           {job.upskill?.recommended ? <Badge variant="info">Upskill recommended</Badge> : null}
-          {applied ? <Badge variant="brand">{titleCase(job.application_status, 'Applied')}</Badge> : null}
+          {applied ? <Badge variant={applicationIsClosed(job.application_status) ? 'neutral' : 'brand'}>{applicationStatusLabel(job.application_status)}</Badge> : null}
         </View>
 
         <EmployerPreferenceChip job={job} style={styles.preferenceChip} />
@@ -345,7 +348,7 @@ export default function JobDetailsScreen() {
               <View style={styles.mapFoot}>
                 <View style={styles.flexOne}>
                   <Text style={styles.mapPlace} numberOfLines={2}>{jobLocation(job)}</Text>
-                  {job.distance_km ? <Text style={styles.mapMeta}>{Number(job.distance_km).toFixed(1)} km from your address</Text> : null}
+                  {job.distance_km != null ? <Text style={styles.mapMeta}>{formatKm(job.distance_km)} from your address</Text> : null}
                 </View>
                 <Button variant="outline" size="sm" icon="directions" onPress={openDirections} accessibilityLabel="Get directions in Maps">
                   Directions
@@ -390,15 +393,18 @@ export default function JobDetailsScreen() {
           />
         </PressableScale>
 
+        {/* One application per job: once applied, open it instead of a disabled button (as on the website). */}
         <Button
           variant={applied ? 'secondary' : 'primary'}
           size="lg"
-          onPress={confirmApply}
-          disabled={applied || applying}
+          onPress={applied
+            ? () => router.push(job.application_id ? `/(seeker)/applications/${job.application_id}` : '/(seeker)/applications')
+            : confirmApply}
+          disabled={applying}
           loading={applying}
           style={styles.applyBtn}
         >
-          {applied ? `Applied · ${titleCase(job.application_status, 'Pending')}` : 'Apply now'}
+          {applied ? `View application · ${applicationStatusLabel(job.application_status)}` : 'Apply now'}
         </Button>
       </View>
 

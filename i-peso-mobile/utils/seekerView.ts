@@ -253,3 +253,29 @@ export function applicationNextStep(status: string, interview?: InterviewLike, n
   }
   return APPLICATION_NEXT_STEPS[status] ?? null
 }
+
+/** "0.0 km" reads like a bug; anything under 100 m is "under 0.1 km" (mirrors the website's formatKm). */
+export function formatKm(km: number | string | null | undefined): string {
+  const value = Number(km)
+  return value < 0.1 ? 'under 0.1 km' : `${value.toFixed(1)} km`
+}
+
+const APPLICATION_STATUS_LABELS: Record<string, string> = {
+  pending: 'Applied',
+  reviewed: 'Applied · Reviewed',
+  shortlisted: 'Shortlisted',
+  interview: 'Interview',
+  hired: 'Hired',
+  rejected: 'Not selected',
+  withdrawn: 'Withdrawn',
+}
+
+/** How the seeker's own application reads on a job (mirrors the website's job map chips). */
+export function applicationStatusLabel(status: string | null | undefined): string {
+  return APPLICATION_STATUS_LABELS[status ?? 'pending'] ?? 'Applied'
+}
+
+/** Not selected or withdrawn: shown quietly, not as an active application. */
+export function applicationIsClosed(status: string | null | undefined): boolean {
+  return status === 'rejected' || status === 'withdrawn'
+}

@@ -764,7 +764,8 @@ export interface ReviewRule {
 export interface ReviewOpportunity {
   source: ReviewSource
   source_id: number
-  employer: { id: number; name: string | null }
+  /** logo: the stored path (see utils/companyLogoUrl). */
+  employer: { id: number; name: string | null; logo?: string | null }
   job_title: string | null
   status: string
   /** null for placements (they only get an Employment review). */
@@ -800,7 +801,8 @@ export interface OwnReview extends PublicReview {
   status: ReviewStatus
   hold_reason: string | null
   moderation_note: string | null
-  employer: { id: number; name: string | null }
+  /** logo: the stored path (see utils/companyLogoUrl). */
+  employer: { id: number; name: string | null; logo?: string | null }
   job_title: string | null
   application_id: number | null
   placement_record_id: number | null
@@ -814,7 +816,8 @@ export interface OwnReview extends PublicReview {
 /** WorkerFeedbackVisibility::forWorker — locked until reviewed or visible_from. */
 export interface EmployerFeedbackItem {
   id: number
-  employer: { id: number; name: string | null }
+  /** logo: the stored path (see utils/companyLogoUrl). */
+  employer: { id: number; name: string | null; logo?: string | null }
   job_title: string | null
   locked: boolean
   /** YYYY-MM-DD */

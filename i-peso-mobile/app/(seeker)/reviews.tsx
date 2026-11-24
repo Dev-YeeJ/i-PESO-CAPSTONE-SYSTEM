@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Alert, Linking, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { Alert, Linking, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -7,7 +7,9 @@ import MaterialIcons from '@expo/vector-icons/MaterialIcons'
 import type { EmployerFeedbackItem, OwnReview, ReviewStatus } from '@/services/seekerService'
 import { seekerService } from '@/services/seekerService'
 import { apiErrorMessage } from '@/utils/apiError'
-import { MY_REVIEWS_KEY, openActions, resolveReviewKey, REVIEW_GUIDELINES_URL, type ReviewAction } from '@/utils/reviews'
+import { groupActionsByCompany, MY_REVIEWS_KEY, openActions, resolveReviewKey, REVIEW_GUIDELINES_URL, type ReviewAction } from '@/utils/reviews'
+import { companyLogoUrl } from '@/utils/companyLogoUrl'
+import { CompanyLogo } from '@/components/seeker/CompanyLogo'
 import { useToast } from '@/stores/toastStore'
 import { ReviewFormSheet } from '@/components/reviews/ReviewFormSheet'
 import { Stars } from '@/components/reviews/StarRating'
@@ -25,6 +27,33 @@ const STATUS: Record<ReviewStatus, { label: string; variant: 'success' | 'warnin
   published: { label: 'Published', variant: 'success' },
   held: { label: 'Waiting for PESO', variant: 'warning' },
   hidden: { label: 'Hidden by PESO', variant: 'danger' },
+}
+
+const COMPANIES_SHOWN = 4
+
+const formatDate = (value: string) => new Date(value).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })
+
+/** The average of an employer's star ratings, or null when there are none. */
+const overall = (ratings: { value: number | null }[] = []) => {
+  const values = ratings.map((rating) => Number(rating.value)).filter(Boolean)
+  return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : null
+}
+
+/** A company's name that opens its page (plain text when the id is unknown), as on the website. */
+function CompanyName({ employer, numberOfLines = 1 }: { employer: { id?: number | null; name?: string | null } | null | undefined; numberOfLines?: number }) {
+  const router = useRouter()
+  const name = employer?.name ?? 'Company'
+  if (!employer?.id) return <Text style={styles.employerName} numberOfLines={numberOfLines}>{name}</Text>
+  return (
+    <Pressable
+      onPress={() => router.push({ pathname: '/(seeker)/employers/[id]', params: { id: String(employer.id), from: 'reviews' } })}
+      accessibilityRole="link"
+      accessibilityLabel={`${name}, open company page`}
+      hitSlop={6}
+    >
+      <Text style={[styles.employerName, styles.companyLink]} numberOfLines={numberOfLines}>{name}</Text>
+    </Pressable>
+  )
 }
 
 // reviews is a flat sibling in the Tabs navigator, so router.back() has no real history.
@@ -107,35 +136,7 @@ export default function MyReviewsScreen() {
           errorFallback="Your reviews could not be loaded."
           onRetry={() => refetch()}
         >
-          <Text style={styles.sectionTitle} accessibilityRole="header">
-            Ready to review <Text style={styles.count}>({actions.length})</Text>
-          </Text>
-          {actions.length === 0 ? (
-            <View style={styles.dashedBox}>
-              <Text style={styles.mutedText}>
-                Nothing to review right now. Every company you apply to through i-PESO appears here.
-              </Text>
-            </View>
-          ) : (
-            actions.map((action) => (
-              <Card key={action.key} padding="md" style={styles.itemCard}>
-                <View style={styles.actionRow}>
-                  <View style={styles.iconBadge}>
-                    <MaterialIcons name="business" size={20} color={colors.iconBlue} />
-                  </View>
-                  <View style={styles.flexText}>
-                    <Text style={styles.employerName} numberOfLines={1}>{action.employerName}</Text>
-                    <Text style={styles.meta} numberOfLines={2}>
-                      {[action.jobTitle, 'hiring process'].filter(Boolean).join(', ')}
-                    </Text>
-                  </View>
-                </View>
-                <Button size="sm" onPress={() => setWriting(action)} style={styles.rateButton}>
-                  Review company
-                </Button>
-              </Card>
-            ))
-          )}
+          <ReadyToReview actions={actions} onReview={setWriting} />
 
           <EmployerFeedbackSection items={data?.employer_feedback ?? []} />
 
@@ -174,8 +175,9 @@ function OwnReviewCard({ review, removing, onEdit, onRemove }: { review: OwnRevi
   return (
     <Card padding="md" style={styles.itemCard}>
       <View style={styles.reviewHeader}>
+        <CompanyLogo uri={companyLogoUrl(review.employer?.logo)} name={review.employer?.name} size={40} />
         <View style={styles.flexText}>
-          <Text style={styles.employerName}>{review.employer?.name}</Text>
+          <CompanyName employer={review.employer} numberOfLines={2} />
           <Text style={styles.meta}>
             {review.job_title ? `${review.job_title} · ` : ''}{review.type === 'employment' ? 'Working here' : 'Hiring process'} · {review.month}{review.edited ? ' · edited' : ''}
           </Text>
@@ -233,10 +235,23 @@ function EmployerFeedbackSection({ items }: { items: EmployerFeedbackItem[] }) {
         <MaterialIcons name="lock" size={16} color={colors.textSecondary} />
         <Text style={[styles.bodyText, styles.flexText]}>Only you and PESO can read the comments. Employers you apply to see only your average rating.</Text>
       </View>
-      {items.map((item) => (
+      {items.map((item) => {
+        const score = overall(item.ratings ?? [])
+        return (
         <Card key={item.id} padding="md" style={styles.itemCard}>
-          <Text style={styles.employerName}>{item.employer?.name}</Text>
-          {item.job_title ? <Text style={styles.meta}>{item.job_title}</Text> : null}
+          <View style={styles.reviewHeader}>
+            <CompanyLogo uri={companyLogoUrl(item.employer?.logo)} name={item.employer?.name} size={40} />
+            <View style={styles.flexText}>
+              <CompanyName employer={item.employer} />
+              <Text style={styles.meta}>{[item.job_title, item.updated_at ? formatDate(item.updated_at) : null].filter(Boolean).join(' · ')}</Text>
+            </View>
+            {score ? (
+              <View style={styles.inline} accessibilityLabel={`Overall ${score.toFixed(1)} out of 5`}>
+                <Stars value={score} />
+                <Text style={styles.scoreText}>{score.toFixed(1)}</Text>
+              </View>
+            ) : null}
+          </View>
           <View style={styles.feedbackRatings}>
             {item.ratings?.map((rating) => (
               <View key={rating.key} style={styles.feedbackRating}>
@@ -248,13 +263,66 @@ function EmployerFeedbackSection({ items }: { items: EmployerFeedbackItem[] }) {
               </View>
             ))}
           </View>
-          {item.comment ? <Text style={[styles.bodyText, styles.comment]}>{item.comment}</Text> : null}
-          <Text style={[styles.meta, styles.comment]}>
-            Think something here is unfair or not about your work? Tell PESO at the office; staff can remove feedback that breaks the{' '}
-            <Text style={styles.link} onPress={openGuidelines} accessibilityRole="link">guidelines</Text>.
-          </Text>
+          {item.comment ? <Text style={[styles.bodyText, styles.quote]}>{item.comment}</Text> : null}
         </Card>
-      ))}
+        )
+      })}
+      <Text style={styles.meta}>
+        Think something here is unfair or not about your work? Tell PESO at the office; staff can remove feedback that breaks the{' '}
+        <Text style={styles.link} onPress={openGuidelines} accessibilityRole="link">guidelines</Text>.
+      </Text>
+    </View>
+  )
+}
+
+/** Jobs the seeker can review, one card per company with each job under it (mirrors the website). */
+function ReadyToReview({ actions, onReview }: { actions: ReviewAction[]; onReview: (action: ReviewAction) => void }) {
+  const [showAll, setShowAll] = useState(false)
+  const companies = useMemo(() => groupActionsByCompany(actions), [actions])
+  const shown = showAll ? companies : companies.slice(0, COMPANIES_SHOWN)
+
+  return (
+    <View>
+      <Text style={styles.sectionTitle} accessibilityRole="header">
+        Ready to review <Text style={styles.count}>({actions.length})</Text>
+      </Text>
+      {companies.length === 0 ? (
+        <View style={styles.dashedBox}>
+          <Text style={styles.mutedText}>
+            Nothing to review right now. Every company you apply to through i-PESO appears here.
+          </Text>
+        </View>
+      ) : (
+        <>
+          <Text style={[styles.mutedText, styles.readyIntro]}>PESO confirmed you applied to these employers. Rate how they handled your application.</Text>
+          {shown.map((company) => (
+            <Card key={String(company.employerId ?? company.employerName)} padding="md" style={styles.itemCard}>
+              <View style={styles.actionRow}>
+                <CompanyLogo uri={companyLogoUrl(company.employerLogo)} name={company.employerName} size={40} />
+                <View style={styles.flexText}>
+                  <CompanyName employer={{ id: company.employerId, name: company.employerName }} />
+                  <Text style={styles.meta}>{company.jobs.length === 1 ? '1 job' : `${company.jobs.length} jobs`} to review</Text>
+                </View>
+              </View>
+              {company.jobs.map((job) => (
+                <View key={job.key} style={styles.jobRow}>
+                  <Text style={[styles.bodyText, styles.flexText]} numberOfLines={2}>
+                    {job.jobTitle ?? 'Job'} <Text style={styles.count}>· hiring process</Text>
+                  </Text>
+                  <Button size="sm" onPress={() => onReview(job)} accessibilityLabel={`Review ${company.employerName ?? 'company'}, ${job.jobTitle ?? 'job'}`}>
+                    Review
+                  </Button>
+                </View>
+              ))}
+            </Card>
+          ))}
+          {companies.length > COMPANIES_SHOWN ? (
+            <Button size="sm" variant="ghost" onPress={() => setShowAll((value) => !value)} style={styles.showAll}>
+              {showAll ? 'Show fewer' : `Show all (${companies.length})`}
+            </Button>
+          ) : null}
+        </>
+      )}
     </View>
   )
 }
@@ -270,7 +338,13 @@ const styles = StyleSheet.create({
   dashedBox: { borderWidth: 1, borderStyle: 'dashed', borderColor: colors.borderStrong, borderRadius: radii.lg, padding: spacing.lg, backgroundColor: colors.surface },
   mutedText: { ...textStyles.small, color: colors.textSecondary, lineHeight: 18 },
   itemCard: { marginBottom: spacing.md },
-  actionRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md },
+  actionRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  readyIntro: { marginTop: -spacing.sm, marginBottom: spacing.md },
+  jobRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginTop: spacing.md, paddingTop: spacing.md, borderTopWidth: 1, borderTopColor: colors.border },
+  showAll: { alignSelf: 'flex-start', marginBottom: spacing.md },
+  companyLink: { color: colors.link },
+  scoreText: { ...textStyles.bodyBold, color: colors.textPrimary },
+  quote: { marginTop: spacing.md, paddingLeft: spacing.md, borderLeftWidth: 4, borderLeftColor: colors.borderStrong, fontStyle: 'italic' },
   iconBadge: { width: 40, height: 40, borderRadius: radii.md, backgroundColor: colors.tint, alignItems: 'center', justifyContent: 'center' },
   flexText: { flex: 1 },
   employerName: { ...textStyles.bodyBold, color: colors.textPrimary },

@@ -13,7 +13,7 @@ import { useEmployerRatings } from '@/hooks/useEmployerRatings'
 import { useToggleSavedJob } from '@/hooks/use-toggle-saved-job'
 import { useMotion } from '@/hooks/useMotion'
 import { mergeParsedFilters } from '@/utils/mapQueryParser'
-import { formatSalary, jobCompany, jobLocation } from '@/utils/seekerView'
+import { formatSalary, jobCompany, jobLocation, formatKm } from '@/utils/seekerView'
 import { AlertBox } from '@/components/ui/AlertBox'
 import { Button } from '@/components/ui/Button'
 import { BottomSheet } from '@/components/ui/BottomSheet'
@@ -372,7 +372,7 @@ export default function JobMapScreen() {
               <Text style={styles.summaryText}>
                 <Text style={styles.summaryStrong}>{data.summary.total_found ?? allJobs.length} jobs</Text> found
                 {typeof data.summary.high_match_count === 'number' ? ` · ${data.summary.high_match_count} high-match` : ''}
-                {data.summary.nearest_distance_km != null ? ` · nearest ${Number(data.summary.nearest_distance_km).toFixed(1)} km` : ''}
+                {data.summary.nearest_distance_km != null ? ` · nearest ${formatKm(data.summary.nearest_distance_km)}` : ''}
               </Text>
             </View>
           ) : null}
@@ -475,7 +475,7 @@ export default function JobMapScreen() {
               </View>
               {selectedMapJob.distance_km != null ? (
                 <View style={styles.previewBadgeNeutral}>
-                  <Text style={styles.previewBadgeNeutralText}>{Number(selectedMapJob.distance_km).toFixed(1)} km away</Text>
+                  <Text style={styles.previewBadgeNeutralText}>{formatKm(selectedMapJob.distance_km)} away</Text>
                 </View>
               ) : null}
             </View>

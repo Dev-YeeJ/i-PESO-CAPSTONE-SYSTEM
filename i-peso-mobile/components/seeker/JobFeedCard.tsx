@@ -23,7 +23,7 @@ import { MatchRing, STRONG_MATCH } from '@/components/ui/MatchRing'
 import { PressableScale } from '@/components/ui/PressableScale'
 import { useMotion } from '@/hooks/useMotion'
 import { colors, gradients, radii, shadows, spacing, textStyles } from '@/theme'
-import { formatSalary, jobCompany, jobLocation, listFrom, textFrom, titleCase } from '@/utils/seekerView'
+import { formatSalary, jobCompany, jobLocation, listFrom, textFrom, titleCase, applicationIsClosed, applicationStatusLabel, formatKm } from '@/utils/seekerView'
 
 interface JobFeedCardProps {
   job: NearbyJob
@@ -50,7 +50,7 @@ export function JobFeedCard({ job, index = 0, saving = false, onPress, onToggleS
   // for the same bug on i-peso-frontend's JobSeekerHome.jsx).
   const missing = job.match_deferred ? [] : job.missing_skills?.slice(0, 2) ?? []
   const match = Math.round(Number(job.match_percentage ?? job.match?.percentage ?? 0))
-  const distance = job.distance_km ? `${Number(job.distance_km).toFixed(Number(job.distance_km) >= 10 ? 0 : 1)} km away` : ''
+  const distance = job.distance_km != null ? (Number(job.distance_km) >= 10 ? `${Number(job.distance_km).toFixed(0)} km away` : `${formatKm(job.distance_km)} away`) : ''
 
   const translateX = useSharedValue(0)
   // Drives the bookmark's reward pop. Kept separate from the drag so a tap-save animates too.
@@ -178,7 +178,7 @@ export function JobFeedCard({ job, index = 0, saving = false, onPress, onToggleS
             </View>
 
             <View style={styles.badgeRow}>
-              {job.has_applied ? <Badge variant="info">{titleCase(job.application_status, 'Applied')}</Badge> : null}
+              {job.has_applied ? <Badge variant={applicationIsClosed(job.application_status) ? 'neutral' : 'info'}>{applicationStatusLabel(job.application_status)}</Badge> : null}
               {job.job_fair?.is_available_at_job_fair ? <Badge variant="info">Job Fair</Badge> : null}
               {/* The two amber badges: things the seeker earned. */}
               {!job.match_deferred && match >= STRONG_MATCH ? <Badge variant="earned">★ Strong Match</Badge> : null}

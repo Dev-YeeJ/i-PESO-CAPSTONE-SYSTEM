@@ -37,8 +37,19 @@ export interface ReviewAction {
   type: ReviewType
   source: ReviewSource
   sourceId: number
+  employerId: number | null | undefined
   employerName: string | null | undefined
+  /** Stored logo path (see utils/companyLogoUrl). */
+  employerLogo: string | null
   jobTitle: string | null | undefined
+}
+
+/** One company in the "Ready to review" list, with every job there still to review. */
+export interface ReviewCompanyGroup {
+  employerId: number | null | undefined
+  employerName: string | null | undefined
+  employerLogo: string | null
+  jobs: ReviewAction[]
 }
 
 /** Has the seeker already reviewed this application? */
@@ -54,9 +65,24 @@ export function openActions(opportunities: ReviewOpportunity[] = []): ReviewActi
       type: 'recruitment' as ReviewType,
       source: item.source,
       sourceId: item.source_id,
+      employerId: item.employer?.id,
       employerName: item.employer?.name,
+      employerLogo: item.employer?.logo ?? null,
       jobTitle: item.job_title,
     }))
+}
+
+/** One row per company for "Ready to review", each with its jobs, in first-seen order (mirrors the web helper). */
+export function groupActionsByCompany(actions: ReviewAction[] = []): ReviewCompanyGroup[] {
+  const groups = new Map<string | number, ReviewCompanyGroup>()
+  for (const action of actions) {
+    const key = action.employerId ?? action.employerName ?? action.key
+    if (!groups.has(key)) {
+      groups.set(key, { employerId: action.employerId, employerName: action.employerName, employerLogo: action.employerLogo, jobs: [] })
+    }
+    groups.get(key)!.jobs.push(action)
+  }
+  return [...groups.values()]
 }
 
 /**
