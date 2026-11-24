@@ -20,11 +20,17 @@ export const employerFeedbackService = {
     const { data } = await api.delete(`/employer/reviews/${reviewId}/reply`)
     return data
   },
-
+
 
   // People this employer hired, with any private feedback already given.
   getHires: async () => {
     const { data } = await api.get('/employer/hires')
+    return data
+  },
+
+  // The 2x2 photo of someone this employer hired (authenticated, so fetched as a blob).
+  getHirePhoto: async (seekerId) => {
+    const { data } = await api.get(`/employer/hires/${seekerId}/photo`, { responseType: 'blob' })
     return data
   },
 

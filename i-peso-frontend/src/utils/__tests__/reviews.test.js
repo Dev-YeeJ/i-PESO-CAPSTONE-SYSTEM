@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { aspectsFor, findRequestedReview, isReviewed, openActions } from '../reviews'
+import { aspectsFor, findRequestedReview, groupActionsByCompany, isReviewed, openActions } from '../reviews'
 
 const opportunities = [
   {
-    source: 'application', source_id: 12, employer: { name: 'Rice Mill' }, job_title: 'Operator',
+    source: 'application', source_id: 12, employer: { id: 7, name: 'Rice Mill', logo: 'company_logos/rice.png' }, job_title: 'Operator',
     recruitment: { allowed: true, limited: false, review_id: null },
     employment: null,
     review: null,
@@ -27,8 +27,29 @@ const opportunities = [
 describe('openActions', () => {
   it('offers one hiring-process review per application not reviewed yet', () => {
     expect(openActions(opportunities)).toEqual([
-      { key: 'application-12', type: 'recruitment', source: 'application', sourceId: 12, employerName: 'Rice Mill', jobTitle: 'Operator' },
+      { key: 'application-12', type: 'recruitment', source: 'application', sourceId: 12, employerId: 7, employerName: 'Rice Mill', employerLogo: 'company_logos/rice.png', jobTitle: 'Operator' },
     ])
+  })
+})
+
+describe('groupActionsByCompany', () => {
+  const action = (key, employerId, employerName, jobTitle) => ({ key, employerId, employerName, employerLogo: null, jobTitle })
+
+  it('puts every job at one company under a single row, in first-seen order', () => {
+    const groups = groupActionsByCompany([
+      action('application-1', 3, 'GreenCycle Solutions', 'Service Crew'),
+      action('application-2', 5, 'IchiTech Solutions', 'Chef'),
+      action('application-3', 3, 'GreenCycle Solutions', 'Janitor'),
+    ])
+
+    expect(groups.map((group) => group.employerName)).toEqual(['GreenCycle Solutions', 'IchiTech Solutions'])
+    expect(groups[0]).toMatchObject({ employerId: 3, employerLogo: null })
+    expect(groups[0].jobs.map((job) => job.jobTitle)).toEqual(['Service Crew', 'Janitor'])
+    expect(groups[1].jobs).toHaveLength(1)
+  })
+
+  it('returns nothing for no actions', () => {
+    expect(groupActionsByCompany([])).toEqual([])
   })
 })
 

@@ -40,9 +40,24 @@ export function openActions(opportunities = []) {
       type: 'recruitment',
       source: item.source,
       sourceId: item.source_id,
+      employerId: item.employer?.id,
       employerName: item.employer?.name,
+      employerLogo: item.employer?.logo ?? null,
       jobTitle: item.job_title,
     }))
+}
+
+/** One row per company for the "Ready to review" list, each with its jobs, in first-seen order. */
+export function groupActionsByCompany(actions = []) {
+  const groups = new Map()
+  for (const action of actions) {
+    const key = action.employerId ?? action.employerName
+    if (!groups.has(key)) {
+      groups.set(key, { employerId: action.employerId, employerName: action.employerName, employerLogo: action.employerLogo, jobs: [] })
+    }
+    groups.get(key).jobs.push(action)
+  }
+  return [...groups.values()]
 }
 
 /**
