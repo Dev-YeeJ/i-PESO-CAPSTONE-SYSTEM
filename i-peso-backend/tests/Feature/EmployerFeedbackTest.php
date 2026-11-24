@@ -123,28 +123,29 @@ class EmployerFeedbackTest extends TestCase
         $this->postJson("/api/employer/reviews/{$elsewhere}/reply", ['body' => 'This is not our review at all.'])->assertNotFound();
     }
 
-    public function test_reviews_can_be_filtered_to_those_needing_a_reply_or_disputed(): void
+    public function test_reviews_are_one_list_that_can_be_filtered_to_those_needing_a_reply(): void
     {
         $replied = $this->review('Quick and fair.');
         $waiting = $this->review('Slow to answer.');
-        $disputed = $this->review('They asked for a placement fee.');
+        // Written about working there before reviews were unified: same list, same counts.
+        $older = $this->review('Good place to work.');
+        EmployerReview::whereKey($older)->update(['type' => 'employment', 'ratings' => json_encode(['work_environment' => 4, 'management' => 4, 'job_accuracy' => 4, 'overall' => 4])]);
         Sanctum::actingAs($this->employerModel());
 
         $this->postJson("/api/employer/reviews/{$replied}/reply", ['body' => 'Thank you for applying with us.'])->assertOk();
-        $this->postJson("/api/employer/reviews/{$disputed}/dispute", [
-            'reason' => 'false_information', 'details' => 'We never charge applicants any fee; our records show no such request.',
-        ])->assertOk();
 
-        $ids = fn (string $filter) => collect($this->getJson("/api/employer/reviews?type=recruitment&filter={$filter}")->assertOk()->json('reviews.data'))->pluck('id')->sort()->values()->all();
+        $ids = fn (string $query) => collect($this->getJson("/api/employer/reviews{$query}")->assertOk()->json('reviews.data'))->pluck('id')->sort()->values()->all();
 
-        $this->assertSame(collect([$waiting, $disputed])->sort()->values()->all(), $ids('needs_reply'));
-        $this->assertSame([$disputed], $ids('disputed'));
-        $this->assertCount(3, $ids('all'));
+        $this->assertSame(collect([$waiting, $older])->sort()->values()->all(), $ids('?filter=needs_reply'));
+        $this->assertCount(3, $ids(''));
+        // A type from an older client no longer splits the list.
+        $this->assertCount(3, $ids('?type=recruitment'));
 
-        $this->getJson('/api/employer/reviews?type=recruitment')
-            ->assertJsonPath('counts.recruitment', ['all' => 3, 'needs_reply' => 2, 'disputed' => 1])
-            ->assertJsonPath('counts.employment', ['all' => 0, 'needs_reply' => 0, 'disputed' => 0]);
-        $this->getJson('/api/employer/reviews?filter=everything')->assertStatus(422);
+        $this->getJson('/api/employer/reviews')
+            ->assertJsonPath('counts', ['all' => 3, 'needs_reply' => 2])
+            ->assertJsonMissingPath('dispute_reasons')
+            ->assertJsonMissingPath('reviews.data.0.dispute');
+        $this->getJson('/api/employer/reviews?filter=disputed')->assertStatus(422);
     }
 
     public function test_the_summary_includes_how_many_people_gave_each_star_rating(): void
@@ -164,27 +165,17 @@ class EmployerFeedbackTest extends TestCase
 
     // ── Dispute ─────────────────────────────────────────────────────────────
 
-    public function test_disputing_sends_it_to_peso_and_the_review_stays_up(): void
+    public function test_employers_can_no_longer_dispute_a_review(): void
     {
         $id = $this->review('They asked for a placement fee.');
         Sanctum::actingAs($this->employerModel());
 
-        $this->postJson("/api/employer/reviews/{$id}/dispute", ['reason' => 'false_information', 'details' => 'Too short'])
-            ->assertStatus(422)->assertJsonValidationErrors('details');
-
         $this->postJson("/api/employer/reviews/{$id}/dispute", [
             'reason' => 'false_information', 'details' => 'We never charge applicants any fee; our records show no such request.',
-        ])
-            ->assertOk()
-            ->assertJsonPath('review.dispute.status', 'open')
-            ->assertJsonPath('review.dispute.reason', 'False or misleading');
-
-        $this->postJson("/api/employer/reviews/{$id}/dispute", ['reason' => 'other', 'details' => 'Another try at disputing this same review.'])
-            ->assertStatus(422)->assertJsonPath('message', 'You already disputed this review. PESO is looking into it.');
+        ])->assertNotFound();
 
         $this->assertSame('published', EmployerReview::find($id)->status);
-        $this->assertSame(1, EmployerReviewFlag::where('reporter_type', 'employer')->count());
-        $this->assertDatabaseHas('activity_logs', ['action' => 'disputed_review']);
+        $this->assertSame(0, EmployerReviewFlag::where('reporter_type', 'employer')->count());
     }
 
     // ── Private feedback about hires ────────────────────────────────────────
@@ -239,7 +230,7 @@ class EmployerFeedbackTest extends TestCase
 
     // ── The worker's view (mutual reveal) ──────────────────────────────────
 
-    public function test_the_worker_sees_employer_feedback_after_reviewing_or_after_fourteen_days(): void
+    public function test_the_worker_sees_employer_feedback_straight_away(): void
     {
         $worker = $this->seeker('worker@example.test');
         $hire = $this->application($worker, 'hired', ['placement_start_date' => now()->subWeek()->toDateString()]);
@@ -250,26 +241,18 @@ class EmployerFeedbackTest extends TestCase
         $notes = DB::table('notifications')->where('type', \App\Notifications\WorkerFeedbackReceivedNotification::class)->get();
         $this->assertCount(1, $notes, 'Told once, not on every edit.');
         $this->assertStringContainsString('Urdaneta Rice Mill Corp. left feedback about you', $notes[0]->data);
+        $this->assertStringContainsString('Open My Reviews to read it.', $notes[0]->data);
+        $this->assertStringNotContainsString('opens on', $notes[0]->data);
 
-        // Locked: no ratings or comment until they review the workplace.
+        // No waiting and no review needed: the ratings and comment show right away.
         Sanctum::actingAs($worker);
-        $locked = $this->getJson('/api/seeker/reviews')->assertOk()->json('employer_feedback.0');
-        $this->assertTrue($locked['locked']);
-        $this->assertArrayNotHasKey('comment', $locked);
-        $this->assertSame(now()->addDays(14)->toDateString(), $locked['visible_from']);
-
-        // Writing their own Employment review unlocks it.
-        $this->postJson('/api/seeker/reviews', [
-            'type' => 'employment', 'application_id' => $hire, 'recommend' => true, 'agree_guidelines' => true, 'confirm_started' => true,
-            'ratings' => ['work_environment' => 4, 'management' => 4, 'job_accuracy' => 4, 'overall' => 4],
-        ])->assertCreated();
-        $open = $this->getJson('/api/seeker/reviews')->json('employer_feedback.0');
-        $this->assertFalse($open['locked']);
-        $this->assertSame('Maybe', $open['would_rehire']);
-        $this->assertSame('Always on time and quick to learn.', $open['comment']);
+        $feedback = $this->getJson('/api/seeker/reviews')->assertOk()->json('employer_feedback.0');
+        $this->assertFalse($feedback['locked']);
+        $this->assertSame('Maybe', $feedback['would_rehire']);
+        $this->assertSame('Always on time and quick to learn.', $feedback['comment']);
     }
 
-    public function test_feedback_opens_by_itself_after_fourteen_days_and_hidden_feedback_never_shows(): void
+    public function test_older_feedback_shows_and_hidden_feedback_never_shows(): void
     {
         $worker = $this->seeker('worker@example.test');
         $old = WorkerFeedback::create([

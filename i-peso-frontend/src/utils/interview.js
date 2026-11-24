@@ -56,10 +56,26 @@ export const calendarEventPhase = (event, now) =>
   interviewPhase({ schedule: event.start, ends_at: event.end, phase: event.phase, mode_of_interview: event.mode_of_interview }, now)
 
 /**
+ * Where a calendar block ends: its real end, except that an interview running
+ * past midnight stops at midnight so it is drawn on the day it starts only
+ * (an 11:31 p.m. call is a Monday interview, not a sliver at the top of
+ * Tuesday). The block's label still shows the real times.
+ */
+export function calendarDisplayEnd(start, end) {
+  const startDate = new Date(start)
+  const endDate = end ? new Date(end) : null
+  if (!endDate || Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) return end
+  if (endDate.toDateString() === startDate.toDateString()) return end
+  const midnight = new Date(startDate)
+  midnight.setHours(24, 0, 0, 0)
+  return midnight.toISOString()
+}
+
+/**
  * The hours the Week and Day grids show: office hours (7 a.m. to 8 p.m.),
  * stretched to cover every loaded interview so none falls outside the grid,
- * e.g. one set for 11:30 p.m. An interview that runs past midnight opens the
- * whole day, since it shows on both dates.
+ * e.g. one set for 11:30 p.m. runs the grid to midnight, while the morning
+ * still starts at 7 a.m. Expects display ends (see calendarDisplayEnd).
  */
 export function calendarVisibleHours(events, { from = 7, to = 20 } = {}) {
   let min = from
@@ -68,7 +84,6 @@ export function calendarVisibleHours(events, { from = 7, to = 20 } = {}) {
     const start = new Date(event.start)
     const end = event.end ? new Date(event.end) : new Date(start.getTime() + 60 * 60_000)
     if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) continue
-    if (end.toDateString() !== start.toDateString() && (end.getHours() || end.getMinutes())) return { min: 0, max: 24 }
     min = Math.min(min, start.getHours())
     const endHour = end.toDateString() !== start.toDateString() ? 24 : end.getHours() + (end.getMinutes() ? 1 : 0)
     max = Math.max(max, endHour)

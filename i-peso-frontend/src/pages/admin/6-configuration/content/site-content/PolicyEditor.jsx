@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import UnsavedChangesBar from '@/components/common/UnsavedChangesBar'
 import { useUnsavedChanges } from '@/hooks/useUnsavedChanges'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -15,7 +15,7 @@ import { apiMessage, fieldErrorsOf, formatWhen, inputClass, sameValue, todayInpu
 const TITLE_MAX = 120
 const BODY_MAX = 8000
 
-export default function PolicyEditor({ slug, canEdit, office, onBack, tokens }) {
+export default function PolicyEditor({ slug, canEdit, office, onBack, tokens, startEditing = false, onEditing }) {
   const queryClient = useQueryClient()
   const query = useQuery({ queryKey: ['admin-policy', slug], queryFn: () => adminPolicyService.get(slug) })
 
@@ -26,8 +26,19 @@ export default function PolicyEditor({ slug, canEdit, office, onBack, tokens }) 
       queryClient.invalidateQueries({ queryKey: ['admin-policy', slug] })
       queryClient.invalidateQueries({ queryKey: ['admin-policies'] })
     },
-    onError: (error) => toast.error(apiMessage(error, 'Could not start a new version.')),
+    onError: (error) => toast.error(apiMessage(error, 'Could not open the policy for editing.')),
   })
+
+  // "Edit" from the policy list: open the editor straight away, starting a draft
+  // (a copy of the current text) when there isn't one yet. Runs once per visit.
+  const autoStarted = useRef(false)
+  const hasDraft = Boolean(query.data?.draft)
+  useEffect(() => {
+    if (!startEditing || !canEdit || !query.data || autoStarted.current) return
+    autoStarted.current = true
+    if (!hasDraft) start.mutate()
+    onEditing?.()
+  }, [startEditing, canEdit, query.data, hasDraft, start, onEditing])
 
   if (query.isLoading) return <LoadingSkeleton variant="card" rows={3} />
   if (query.isError) return <ErrorState onRetry={() => query.refetch()} />
@@ -52,7 +63,7 @@ export default function PolicyEditor({ slug, canEdit, office, onBack, tokens }) 
                 Version {current.version}, effective {formatPolicyDate(current.effective_at)}{current.is_builtin ? ' (the original text)' : ''}.
               </p>
             </div>
-            {canEdit && <Button variant="navy" icon={FilePlus2} loading={start.isPending} onClick={() => start.mutate()}>Start a new version</Button>}
+            {canEdit && <Button variant="navy" icon={FilePlus2} loading={start.isPending} onClick={() => start.mutate()}>Edit this policy</Button>}
           </div>
           {!canEdit && <div className="mt-4"><ReadOnlyNote>You can read the policy versions but not change them.</ReadOnlyNote></div>}
           <PolicyPreview version={current} office={office} className="mt-5" />

@@ -82,7 +82,6 @@ return [
      | missing FAQs. Kept 90 days. Set CHATBOT_GAP_LOGGING=false to stop.
      */
     'chatbot' => [
-        'gap_logging' => (bool) env('CHATBOT_GAP_LOGGING', true),
     ],
 
     'google' => [

@@ -2,15 +2,13 @@ import { createElement } from 'react'
 import { useUnsavedEntries } from '@/hooks/useUnsavedChanges'
 import { useSearchParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { Activity, Building2, Landmark, Lightbulb, MessageCircleQuestion, PanelsTopLeft, ScrollText } from 'lucide-react'
+import { Building2, Landmark, MessageCircleQuestion, PanelsTopLeft, ScrollText } from 'lucide-react'
 import { ErrorState, LoadingSkeleton } from '@/components/ui'
 import PageHeader from '@/pages/admin/_components/PageHeader'
-import { adminContentInsightService, adminSiteContentService } from '@/services/siteContentService'
+import { adminSiteContentService } from '@/services/siteContentService'
 import { useAuthStore } from '@/stores/authStore'
 import { canManage, canOpen } from '@/utils/adminAccess'
 import { OFFICE_DEFAULTS, withDefaults } from '@/components/site-content/siteContentDefaults'
-import OverviewModule from './site-content/OverviewModule'
-import InsightsModule from './site-content/InsightsModule'
 import OfficeInfoTab from './site-content/OfficeInfoTab'
 import AboutTab from './site-content/AboutTab'
 import FaqsTab from './site-content/FaqsTab'
@@ -21,13 +19,6 @@ const CONFIG = 'configuration'
 
 /** Every module, grouped as in the sidebar. `module` = who may open it (docs/content-module-plan.md §2). */
 const GROUPS = [
-  {
-    name: 'Overview',
-    items: [
-      { value: 'overview', label: 'Health check', icon: Activity, module: CONFIG },
-      { value: 'insights', label: 'Assistant insights', icon: Lightbulb, module: CONFIG },
-    ],
-  },
   {
     name: 'Information',
     items: [
@@ -46,10 +37,10 @@ const GROUPS = [
 ]
 
 /**
- * Configuration → Content Modules: the portal's standing information and
- * the tools that keep it good — a health check and what the assistant could
- * not answer (FAQs are the assistant's answer bank; there is no Help page).
- * Full width, with a module sidebar; `?tab=` picks the module.
+ * Configuration → Content Modules: the portal's standing information — office
+ * details, About PESO, the assistant's FAQs (its answer bank; there is no Help
+ * page), the landing page and the policy pages. Full width, with a module
+ * sidebar; `?tab=` picks the module.
  */
 export default function ContentModulesPage() {
   const user = useAuthStore((s) => s.user)
@@ -68,7 +59,6 @@ export default function ContentModulesPage() {
   const canEditFaqs = canManage(user, CONFIG)
 
   const sections = useQuery({ queryKey: ['admin-site-content'], queryFn: adminSiteContentService.list, enabled: needsSections })
-  const health = useQuery({ queryKey: ['content-health'], queryFn: adminContentInsightService.health, staleTime: 60 * 1000 })
   const office = withDefaults(OFFICE_DEFAULTS, sections.data?.sections?.office?.values)
 
   /** Open a module, optionally with extra params (e.g. { faq: 12 } or { new: 'question' }). */
@@ -79,15 +69,6 @@ export default function ContentModulesPage() {
     setParams(next)
   }
 
-  const badgeFor = (value) => {
-    const data = health.data
-    if (!data) return null
-    if (value === 'overview') return data.checks.filter((check) => check.status === 'warn').length || null
-    if (value === 'insights') return data.counts.chatbot_gaps || null
-    if (value === 'faqs') return data.counts.faqs_unpublished || null
-    return null
-  }
-
   const sectionModule = (render) => {
     if (!needsSections) return null
     if (sections.isLoading) return <LoadingSkeleton variant="card" rows={3} />
@@ -96,8 +77,6 @@ export default function ContentModulesPage() {
   }
 
   const content = {
-    overview: () => <OverviewModule health={health} onGo={go} allowed={allowed} />,
-    insights: () => <InsightsModule onGo={go} canEdit={canEditFaqs} allowed={allowed} />,
     office: () => sectionModule((all) => <OfficeInfoTab section={all.office} canEdit={canEditConfig} />),
     about: () => sectionModule((all) => <AboutTab section={all.about} canEdit={canEditConfig} office={office} />),
     faqs: () => <FaqsTab canEdit={canEditFaqs} office={office} />,
@@ -110,7 +89,7 @@ export default function ContentModulesPage() {
       <PageHeader
         eyebrow="Configuration"
         title="Content Modules"
-        subtitle="Everything people read on i-PESO that isn’t a record — office details, the assistant’s FAQs and pages — plus what the assistant tells you is missing."
+        subtitle="Everything people read on i-PESO that isn’t a record: office details, About PESO, the assistant’s FAQs, the landing page and the policy pages."
       />
 
       <div className="grid gap-6 lg:grid-cols-[15rem_minmax(0,1fr)]">
@@ -122,7 +101,6 @@ export default function ContentModulesPage() {
                 <p className="hidden px-3 text-xs font-bold text-slate-400 lg:block">{group.name}</p>
                 {group.items.map((item) => {
                   const selected = item.value === active
-                  const badge = badgeFor(item.value)
                   return (
                     <button
                       key={item.value}
@@ -136,11 +114,6 @@ export default function ContentModulesPage() {
                       {createElement(item.icon, { className: 'h-4 w-4 shrink-0', 'aria-hidden': true })}
                       <span className="flex-1 whitespace-nowrap">{item.label}</span>
                       {unsaved.has(`content:${item.value}`) && (<><span className="h-2 w-2 shrink-0 rounded-full bg-amber-500" title="Unsaved changes" aria-hidden="true" /><span className="sr-only">(unsaved changes)</span></>)}
-                      {badge ? (
-                        <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold bg-slate-200 text-slate-700`} aria-label={`${badge} to look at`}>
-                          {badge}
-                        </span>
-                      ) : null}
                     </button>
                   )
                 })}

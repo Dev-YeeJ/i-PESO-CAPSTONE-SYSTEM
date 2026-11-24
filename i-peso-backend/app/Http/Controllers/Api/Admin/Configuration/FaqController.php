@@ -67,7 +67,9 @@ class FaqController extends Controller
             ],
             'topics' => $this->content->topics(),
             'audiences' => collect(Faq::AUDIENCES)->map(fn ($label, $value) => ['value' => $value, 'label' => $label])->values(),
-            'can_add_starter_pack' => $all->isEmpty(),
+            // Suggested FAQs not in the list yet (added as drafts, any time).
+            'suggestions_available' => $suggestions = count(FaqStarterPack::missing(Faq::query()->pluck('question'))),
+            'can_add_starter_pack' => $suggestions > 0,
         ]);
     }
 
@@ -175,19 +177,27 @@ class FaqController extends Controller
         return response()->json(['message' => 'FAQ deleted.']);
     }
 
-    /** One-time suggested drafts, only while the FAQ list is empty. */
+    /**
+     * Add the suggested FAQs that aren't in the list yet, as unpublished drafts.
+     * Questions already there (same wording, any case or punctuation) are skipped,
+     * so this can be used any time, e.g. after new suggestions ship.
+     */
     public function starterPack(Request $request): JsonResponse
     {
         $admin = $this->admin($request);
+        $missing = FaqStarterPack::missing(Faq::query()->pluck('question'));
 
-        if (Faq::query()->exists()) {
-            throw ValidationException::withMessages(['starter_pack' => 'Suggested FAQs can only be added while the FAQ list is empty.']);
+        if ($missing === []) {
+            throw ValidationException::withMessages(['starter_pack' => 'Every suggested FAQ is already in your list.']);
         }
 
-        $order = [];
-        DB::transaction(function () use ($admin, &$order) {
-            foreach (FaqStarterPack::items() as $item) {
+        // New drafts go after what each topic already has.
+        $order = Faq::query()->selectRaw('topic, MAX(sort_order) as top')->groupBy('topic')->pluck('top', 'topic')->map(fn ($top) => (int) $top)->all();
+        $added = 0;
+        DB::transaction(function () use ($admin, $missing, &$order, &$added) {
+            foreach ($missing as $item) {
                 $order[$item['topic']] = ($order[$item['topic']] ?? 0) + 1;
+                $added++;
                 $faq = Faq::create([
                     'link_label' => null,
                     'link_url' => null,
@@ -202,10 +212,12 @@ class FaqController extends Controller
         });
         $this->content->flush();
 
-        $count = array_sum($order);
-        ActivityLogger::logAs($admin, 'faq_starter_pack', sprintf('Added %d suggested FAQs (unpublished) for review.', $count));
+        ActivityLogger::logAs($admin, 'faq_starter_pack', sprintf('Added %d suggested FAQs (unpublished) for review.', $added));
 
-        return response()->json(['message' => "{$count} suggested FAQs added as unpublished drafts. Review each one, then publish it."], 201);
+        return response()->json([
+            'message' => "{$added} suggested FAQ".($added === 1 ? '' : 's').' added as unpublished drafts. Review each one, then publish it.',
+            'added' => $added,
+        ], 201);
     }
 
     private function setPublished(Request $request, Faq $faq, bool $published): JsonResponse

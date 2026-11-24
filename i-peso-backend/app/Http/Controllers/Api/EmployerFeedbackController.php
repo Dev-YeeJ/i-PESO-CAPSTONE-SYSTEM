@@ -14,7 +14,6 @@ use App\Models\WorkerFeedback;
 use App\Services\ActivityLogger;
 use App\Services\Feedback\ContentScreen;
 use App\Services\Feedback\ReputationSummary;
-use App\Services\Feedback\WorkerFeedbackVisibility;
 use App\Notifications\WorkerFeedbackReceivedNotification;
 use App\Support\FeedbackAspects;
 use Illuminate\Http\JsonResponse;
@@ -28,7 +27,6 @@ use Illuminate\Validation\ValidationException;
  * The employer's side of the Verified Mutual Feedback System:
  *  - reviews of their company (anonymous; they can never edit, hide or delete them),
  *  - one public reply per review,
- *  - disputing a review to PESO,
  *  - private feedback about people they hired (only PESO and the worker can read it).
  */
 class EmployerFeedbackController extends Controller
@@ -39,39 +37,29 @@ class EmployerFeedbackController extends Controller
     {
         $employer = $this->employer($request);
 
+        // One list of every published review (hiring process, plus any written
+        // earlier about working there). A `type` from older clients is ignored.
         $filters = $request->validate([
-            'type' => ['nullable', Rule::in([FeedbackAspects::RECRUITMENT, FeedbackAspects::EMPLOYMENT])],
-            'filter' => ['nullable', Rule::in(['all', 'needs_reply', 'disputed'])],
+            'filter' => ['nullable', Rule::in(['all', 'needs_reply'])],
         ]);
-
-        $disputed = fn ($query) => $query->where('reporter_type', EmployerReviewFlag::BY_EMPLOYER);
 
         $reviews = EmployerReview::query()
             ->published()
-            ->with(['reply', 'flags' => fn ($query) => $query->where('reporter_type', EmployerReviewFlag::BY_EMPLOYER)->latest()])
+            ->with('reply')
             ->where('employer_id', $employer->employer_id)
-            ->when($filters['type'] ?? null, fn ($query, $type) => $query->where('type', $type))
             ->when(($filters['filter'] ?? null) === 'needs_reply', fn ($query) => $query->whereDoesntHave('reply'))
-            ->when(($filters['filter'] ?? null) === 'disputed', fn ($query) => $query->whereHas('flags', $disputed))
             ->latest()
             ->paginate(10);
 
-        // Per type: how many reviews are still waiting for a reply, and how many were disputed.
         $base = fn () => EmployerReview::query()->published()->where('employer_id', $employer->employer_id);
-        $counts = [];
-        foreach ([FeedbackAspects::RECRUITMENT, FeedbackAspects::EMPLOYMENT] as $type) {
-            $counts[$type] = [
-                'all' => $base()->where('type', $type)->count(),
-                'needs_reply' => $base()->where('type', $type)->whereDoesntHave('reply')->count(),
-                'disputed' => $base()->where('type', $type)->whereHas('flags', $disputed)->count(),
-            ];
-        }
 
         return response()->json([
             'summary' => ReputationSummary::for($employer),
-            'counts' => $counts,
+            'counts' => [
+                'all' => $base()->count(),
+                'needs_reply' => $base()->whereDoesntHave('reply')->count(),
+            ],
             'reviews' => $reviews->through(fn (EmployerReview $review) => $this->employerView($review)),
-            'dispute_reasons' => FeedbackAspects::FLAG_REASONS,
         ]);
     }
 
@@ -106,7 +94,7 @@ class EmployerFeedbackController extends Controller
 
         return response()->json([
             'message' => $existing ? 'Your reply was updated.' : 'Your reply is now shown under the review.',
-            'review' => $this->employerView($review->fresh(['reply', 'flags'])),
+            'review' => $this->employerView($review->fresh('reply')),
         ]);
     }
 
@@ -118,44 +106,7 @@ class EmployerFeedbackController extends Controller
         $review->reply()->delete();
         ActivityLogger::logAs($employer, 'deleted_review_reply', "Removed their reply to review #{$review->id}.");
 
-        return response()->json(['message' => 'Your reply was removed.', 'review' => $this->employerView($review->fresh(['reply', 'flags']))]);
-    }
-
-    /** Ask PESO to look at a review the employer believes breaks the guidelines. It stays up meanwhile. */
-    public function dispute(Request $request, EmployerReview $review): JsonResponse
-    {
-        $employer = $this->employer($request);
-        $this->ownReview($employer, $review);
-
-        $data = $request->validate([
-            'reason' => ['required', Rule::in(array_keys(FeedbackAspects::FLAG_REASONS))],
-            'details' => ['required', 'string', 'min:20', 'max:2000'],
-        ], [
-            'details.required' => 'Explain what is wrong, so PESO can check it.',
-            'details.min' => 'Explain what is wrong in a bit more detail (at least 20 characters).',
-        ]);
-
-        $open = $review->flags()
-            ->where('reporter_type', EmployerReviewFlag::BY_EMPLOYER)
-            ->where('status', EmployerReviewFlag::OPEN)
-            ->exists();
-        abort_if($open, 422, 'You already disputed this review. PESO is looking into it.');
-
-        $review->flags()->create([
-            'reporter_type' => EmployerReviewFlag::BY_EMPLOYER,
-            'reporter_id' => $employer->employer_id,
-            'reason' => $data['reason'],
-            'details' => $data['details'],
-        ]);
-
-        ActivityLogger::logAs($employer, 'disputed_review', sprintf(
-            'Disputed review #%d to PESO (%s).', $review->id, FeedbackAspects::FLAG_REASONS[$data['reason']]
-        ));
-
-        return response()->json([
-            'message' => 'Sent to PESO. The review stays up while they look into it.',
-            'review' => $this->employerView($review->fresh(['reply', 'flags'])),
-        ]);
+        return response()->json(['message' => 'Your reply was removed.', 'review' => $this->employerView($review->fresh('reply'))]);
     }
 
     // ── Feedback about hires (private) ──────────────────────────────────────
@@ -247,10 +198,7 @@ class EmployerFeedbackController extends Controller
 
         if (! $existing) {
             try {
-                $feedback->loadMissing('seeker')->seeker?->notify(new WorkerFeedbackReceivedNotification(
-                    $employer->company_name,
-                    WorkerFeedbackVisibility::visibleFrom($feedback)->timezone('Asia/Manila')->format('F j, Y'),
-                ));
+                $feedback->loadMissing('seeker')->seeker?->notify(new WorkerFeedbackReceivedNotification($employer->company_name));
             } catch (\Throwable $exception) {
                 report($exception);
             }
@@ -270,20 +218,11 @@ class EmployerFeedbackController extends Controller
 
     private function employerView(EmployerReview $review): array
     {
-        $dispute = $review->relationLoaded('flags')
-            ? $review->flags->where('reporter_type', EmployerReviewFlag::BY_EMPLOYER)->sortByDesc('id')->first()
-            : null;
-
         return ReputationSummary::publicReview($review) + [
             'own_reply' => $review->reply ? [
                 'body' => $review->reply->body,
                 'status' => $review->reply->status,
                 'edited' => $review->reply->edited_at !== null,
-            ] : null,
-            'dispute' => $dispute ? [
-                'status' => $dispute->status,
-                'reason' => FeedbackAspects::FLAG_REASONS[$dispute->reason] ?? $dispute->reason,
-                'resolution_note' => $dispute->resolution_note,
             ] : null,
         ];
     }

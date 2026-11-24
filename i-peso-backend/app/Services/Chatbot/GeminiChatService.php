@@ -8,7 +8,6 @@ use Illuminate\Foundation\Auth\User;
 use App\Models\JobSeeker;
 use App\Models\Employer;
 use App\Models\Administrator;
-use App\Services\ContentInsightService;
 use App\Services\SiteContentService;
 
 /**
@@ -122,7 +121,6 @@ class GeminiChatService
         }
 
         Log::warning('[chatbot] tool loop hit MAX_TOOL_ROUNDS without a final answer.');
-        $this->recordGap($lastQuestion, $user);
 
         return [
             'text' => ChatbotMessages::get('unresolved', $fixedLanguage),
@@ -322,7 +320,6 @@ class GeminiChatService
             return $text;
         }
 
-        $this->recordGap($question, $user);
         $clean = trim(preg_replace('/\s*\[\[NO_ANSWER\]?\]?/', '', $text));
 
         return $clean !== '' ? $clean : $text;
@@ -344,17 +341,6 @@ class GeminiChatService
         $clean = trim(preg_replace("/[ \t]+\n/", "\n", preg_replace("/\n{3,}/", "\n\n", $clean)) ?? $clean);
 
         return $clean !== '' ? $clean : ChatbotMessages::get('no_answer', $language);
-    }
-
-    private function recordGap(string $question, ?User $user): void
-    {
-        $audience = match (true) {
-            $user instanceof JobSeeker => 'seeker',
-            $user instanceof Employer => 'employer',
-            default => 'guest',
-        };
-
-        app(ContentInsightService::class)->recordChatbotGap($question, $audience);
     }
 
     /** Office details as PESO staff last saved them (Site Content → Office info). */

@@ -2,7 +2,7 @@ import { forwardRef, useId, useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { AnimatePresence, motion as Motion } from 'framer-motion'
 import toast from '@/lib/toast'
-import { ChevronDown, Clock3, CornerDownRight, EyeOff, Flag, MessageSquareReply, Pencil, ShieldCheck, ThumbsDown, ThumbsUp, Trash2 } from 'lucide-react'
+import { ChevronDown, Clock3, CornerDownRight, EyeOff, MessageSquareReply, Pencil, ShieldCheck, ThumbsDown, ThumbsUp, Trash2 } from 'lucide-react'
 import { Button, ConfirmDialog } from '@/components/ui'
 import { Stars } from '@/components/reviews/StarRating'
 import { employerFeedbackService } from '@/services/employerFeedbackService'
@@ -16,8 +16,8 @@ const TIPS = ['Thank them for the feedback', 'Answer the specific point', 'Say w
 
 const scoreTone = (value) => (value >= 4 ? 'bg-emerald-50 text-emerald-800 ring-emerald-200' : value >= 3 ? 'bg-amber-50 text-amber-900 ring-amber-200' : 'bg-red-50 text-red-800 ring-red-200')
 
-/** One review of the company, with the employer's single public reply and the dispute route. */
-const ReviewCard = forwardRef(function ReviewCard({ review, onDispute }, ref) {
+/** One review of the company, with the employer's single public reply. */
+const ReviewCard = forwardRef(function ReviewCard({ review }, ref) {
   const queryClient = useQueryClient()
   const replyId = useId()
   const [editing, setEditing] = useState(false)
@@ -43,8 +43,6 @@ const ReviewCard = forwardRef(function ReviewCard({ review, onDispute }, ref) {
   const submit = () => (body.trim().length >= 10 ? save.mutate() : setError('Write at least a short sentence.'))
   const cancel = () => { setEditing(false); setBody(review.own_reply?.body ?? ''); setError('') }
 
-  const dispute = review.dispute
-  const disputeOpen = dispute?.status === 'open'
   const reply = review.own_reply
   const long = (review.comment?.length ?? 0) > LONG_COMMENT
   const left = MAX_REPLY - body.length
@@ -130,16 +128,6 @@ const ReviewCard = forwardRef(function ReviewCard({ review, onDispute }, ref) {
         )}
       </AnimatePresence>
 
-      {dispute && (
-        <p className={`mt-4 flex gap-2 rounded-2xl px-3.5 py-2.5 text-xs leading-5 ${disputeOpen ? 'bg-amber-50 text-amber-900' : 'bg-slate-50 text-slate-700'}`}>
-          <Flag className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
-          <span>
-            {disputeOpen
-              ? `You disputed this review (${dispute.reason}). PESO is looking into it; it stays up meanwhile.`
-              : `PESO reviewed your dispute (${dispute.reason}): ${dispute.status === 'upheld' ? 'upheld' : 'the review stays up'}.${dispute.resolution_note ? ` ${dispute.resolution_note}` : ''}`}
-          </span>
-        </p>
-      )}
 
       {/* The one public reply, or the composer */}
       <AnimatePresence mode="wait" initial={false}>
@@ -197,9 +185,6 @@ const ReviewCard = forwardRef(function ReviewCard({ review, onDispute }, ref) {
                 </>
               ) : (
                 <Button size="sm" variant="navy" icon={MessageSquareReply} onClick={() => setEditing(true)}>Reply</Button>
-              )}
-              {!disputeOpen && (
-                <Button size="sm" variant="ghost" icon={Flag} className="ml-auto text-slate-500 hover:bg-red-50 hover:text-red-700" onClick={onDispute}>Dispute</Button>
               )}
             </div>
           </Motion.div>

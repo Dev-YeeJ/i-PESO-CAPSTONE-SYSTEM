@@ -11,7 +11,6 @@ vi.mock('@/services/employerFeedbackService', () => ({
     getHires: vi.fn(),
     reply: vi.fn(),
     deleteReply: vi.fn(),
-    dispute: vi.fn(),
     saveWorkerFeedback: vi.fn(),
   },
 }))
@@ -28,28 +27,25 @@ const review = (id, extra = {}) => ({
   comment: `Review number ${id}.`,
   edited: false,
   own_reply: null,
-  dispute: null,
   ...extra,
 })
 
+const overall = {
+  reviewers: 4,
+  enough: true,
+  average: 4.2,
+  recommend_percent: 75,
+  aspects: { communication: { label: 'Communication', average: 4.2, ratings: 4 } },
+  distribution: [{ stars: 5, count: 1 }, { stars: 4, count: 3 }, { stars: 3, count: 0 }, { stars: 2, count: 0 }, { stars: 1, count: 0 }],
+  strengths: ['communication'],
+  to_improve: [],
+}
+
+// One unified summary and list: no hiring/working-here split, no disputes.
 const response = (reviews) => ({
-  summary: {
-    min_reviews: 3,
-    recruitment: {
-      reviewers: 4,
-      enough: true,
-      average: 4.2,
-      recommend_percent: 75,
-      aspects: { communication: { label: 'Communication', average: 4.2, ratings: 4 } },
-      distribution: [{ stars: 5, count: 1 }, { stars: 4, count: 3 }, { stars: 3, count: 0 }, { stars: 2, count: 0 }, { stars: 1, count: 0 }],
-      strengths: ['communication'],
-      to_improve: [],
-    },
-    employment: { reviewers: 1, enough: false },
-  },
-  counts: { recruitment: { all: 2, needs_reply: 1, disputed: 0 }, employment: { all: 0, needs_reply: 0, disputed: 0 } },
+  summary: { min_reviews: 3, overall },
+  counts: { all: 2, needs_reply: 1 },
   reviews: { data: reviews, current_page: 1, last_page: 1 },
-  dispute_reasons: { false_information: 'False or misleading' },
 })
 
 describe('EmployerReviewsPage', () => {
@@ -70,15 +66,19 @@ describe('EmployerReviewsPage', () => {
     expect(screen.queryByText('Review number 1.')).not.toBeInTheDocument()
     expect(screen.getByRole('table', { name: /each overall star rating/i })).toBeInTheDocument()
     expect(screen.getByText('75%')).toBeInTheDocument()
-    // Working-here isn't public yet: 1 of the 3 reviewers needed.
-    expect(screen.getByText('1 of 3 reviews needed')).toBeInTheDocument()
+    expect(screen.getByText('Company rating')).toBeInTheDocument()
+    // No type tabs and no dispute.
+    expect(screen.queryByText('Working here')).not.toBeInTheDocument()
+    expect(screen.queryByText('Hiring process')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /dispute/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('radio', { name: /disputed/i })).not.toBeInTheDocument()
   })
 
   it('opens on reviews that still need a reply', async () => {
     renderWithProviders(<EmployerReviewsPage />, { route: '/employer/reviews' })
     await screen.findByText('Review number 2.')
 
-    await waitFor(() => expect(employerFeedbackService.getReviews).toHaveBeenLastCalledWith({ type: 'recruitment', page: 1, filter: 'needs_reply' }))
+    await waitFor(() => expect(employerFeedbackService.getReviews).toHaveBeenLastCalledWith({ page: 1, filter: 'needs_reply' }))
     await waitFor(() => expect(screen.queryByText('Review number 1.')).not.toBeInTheDocument())
     expect(screen.getByText('Review number 2.')).toBeInTheDocument()
   })
@@ -87,7 +87,7 @@ describe('EmployerReviewsPage', () => {
     renderWithProviders(<EmployerReviewsPage />, { route: '/employer/reviews' })
     await screen.findByText('Review number 2.')
 
-    await userEvent.click(screen.getByRole('radio', { name: /^all$/i }))
+    await userEvent.click(screen.getByRole('radio', { name: /^all\d*$/i }))
 
     expect(await screen.findByText('Review number 1.')).toBeInTheDocument()
     expect(screen.getByText('Thank you for applying.')).toBeInTheDocument()

@@ -128,7 +128,7 @@ export default function EmployerProfile() {
 
           <div id="reviews" className="scroll-mt-24">
             <Card>
-              <CardHeader title="Reviews" subtitle="From people who applied or worked here through i-PESO." />
+              <CardHeader title="Reviews" subtitle="From people who applied here through i-PESO." />
               <CompanyReviews employerId={employer.employer_id} />
             </Card>
           </div>

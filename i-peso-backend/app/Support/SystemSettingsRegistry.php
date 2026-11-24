@@ -18,7 +18,9 @@ namespace App\Support;
 final class SystemSettingsRegistry
 {
     public const GROUPS = [
-        'access' => 'Access',
+        'maintenance' => 'Maintenance',
+        'registration' => 'Registration',
+        'assistant' => 'Assistant',
         'sms' => 'SMS',
         'employer_rules' => 'Employer rules',
     ];
@@ -43,43 +45,38 @@ final class SystemSettingsRegistry
         }
 
         return [
-            // ── Access ──
+            // ── Maintenance, registration and the assistant ──
             'maintenance.enabled' => [
-                'group' => 'access', 'type' => 'bool', 'default' => false,
+                'group' => 'maintenance', 'type' => 'bool', 'default' => false,
                 'label' => 'Maintenance mode',
                 'help' => 'Job seekers, employers and visitors see the message below instead of the portal and app. PESO staff can still sign in and work.',
             ],
             'maintenance.message' => [
-                'group' => 'access', 'type' => 'text', 'max' => 300,
+                'group' => 'maintenance', 'type' => 'text', 'max' => 300,
                 'default' => 'i-PESO is being updated right now. Please try again in a little while — your account and applications are safe.',
                 'label' => 'Maintenance message',
                 'help' => 'Shown on every page while maintenance mode is on.',
             ],
             'registration.seekers_open' => [
-                'group' => 'access', 'type' => 'bool', 'default' => true,
+                'group' => 'registration', 'type' => 'bool', 'default' => true,
                 'label' => 'Job seeker registration open',
                 'help' => 'Turn off to pause new job seeker accounts. Existing accounts are not affected.',
             ],
             'registration.employers_open' => [
-                'group' => 'access', 'type' => 'bool', 'default' => true,
+                'group' => 'registration', 'type' => 'bool', 'default' => true,
                 'label' => 'Employer registration open',
                 'help' => 'Turn off to pause new employer accounts, e.g. while verifications are backed up.',
             ],
             'registration.closed_message' => [
-                'group' => 'access', 'type' => 'text', 'max' => 300,
+                'group' => 'registration', 'type' => 'text', 'max' => 300,
                 'default' => 'New registrations are paused for now. Please check back soon, or visit the PESO office for help.',
                 'label' => 'Paused registration message',
                 'help' => 'Shown to people who try to register while registration is paused.',
             ],
             'chatbot.enabled' => [
-                'group' => 'access', 'type' => 'bool', 'default' => true,
+                'group' => 'assistant', 'type' => 'bool', 'default' => true,
                 'label' => 'Assistant (chatbot)',
                 'help' => 'Turn off to hide the chat assistant on the website and stop it answering.',
-            ],
-            'chatbot.gap_logging' => [
-                'group' => 'access', 'type' => 'bool', 'default' => true, 'config' => 'services.chatbot.gap_logging',
-                'label' => 'Record questions the assistant can’t answer',
-                'help' => 'Feeds Content Modules → Reader insights. Names, emails and numbers are removed; kept 90 days.',
             ],
 
             // ── SMS ──

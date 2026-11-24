@@ -141,7 +141,6 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::get('/reviews', [EmployerFeedbackController::class, 'reviews']);
             Route::post('/reviews/{review}/reply', [EmployerFeedbackController::class, 'reply'])->middleware('throttle:10,1');
             Route::delete('/reviews/{review}/reply', [EmployerFeedbackController::class, 'deleteReply']);
-            Route::post('/reviews/{review}/dispute', [EmployerFeedbackController::class, 'dispute'])->middleware('throttle:10,1');
             Route::get('/hires', [EmployerFeedbackController::class, 'hires']);
             Route::post('/worker-feedback', [EmployerFeedbackController::class, 'saveWorkerFeedback'])->middleware('throttle:20,1');
 
@@ -232,13 +231,12 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('/profile-image', [SeekerProfileImageController::class, 'destroy']);
         // Public Employer Profile for Job Seekers
         Route::get('/employers/{employer}', [SeekerController::class, 'getPublicEmployerProfile']);
-        // Verified reviews of employers (Recruitment / Employment Experience).
+        // Verified reviews of employers' hiring process (one per application).
         Route::get('/reviews', [SeekerReviewController::class, 'index']);
         Route::post('/reviews', [SeekerReviewController::class, 'store'])->middleware('throttle:10,1');
         Route::put('/reviews/{review}', [SeekerReviewController::class, 'update'])->middleware('throttle:10,1');
         Route::delete('/reviews/{review}', [SeekerReviewController::class, 'destroy']);
         Route::get('/employers/{employer}/reviews', [SeekerReviewController::class, 'employerReviews']);
-        Route::post('/reviews/{review}/report', [SeekerReviewController::class, 'report'])->middleware('throttle:10,1');
         Route::get('/employer-ratings', [SeekerReviewController::class, 'ratings']);
 
         // Report & Safety: reporting an employer, company or job vacancy.
@@ -484,15 +482,12 @@ Route::middleware('auth:sanctum')->group(function () {
                 });
         });
 
-        // Content Modules → Health check, Assistant insights and the AI writing helper.
+        // Content Modules → the AI writing helper used by the FAQ editor.
         // Configuration access only: "No access" to Configuration hides all of Content Modules.
         Route::middleware('admin.permission:configuration')
             ->prefix('content-modules')
             ->controller(\App\Http\Controllers\Api\Admin\Configuration\ContentInsightController::class)
             ->group(function () {
-                Route::get('/health', 'health');
-                Route::get('/insights', 'insights');
-                Route::post('/insights/resolve', 'resolve');
                 // Only staff who can edit have a reason to draft text, so this POST keeps full access.
                 Route::post('/ai-assist', 'assist')->middleware('throttle:20,1');
             });
@@ -529,6 +524,7 @@ Route::middleware('auth:sanctum')->group(function () {
         });
         Route::middleware('admin.system')->prefix('system-settings')->controller(\App\Http\Controllers\Api\Admin\Configuration\SystemSettingsController::class)->group(function () {
             Route::put('/', 'update');
+            Route::post('/reset', 'reset');
             Route::post('/test-email', 'testEmail')->middleware('throttle:5,1');
             Route::post('/test-sms', 'testSms')->middleware('throttle:3,1');
             Route::post('/test-ai', 'testAi')->middleware('throttle:5,1');

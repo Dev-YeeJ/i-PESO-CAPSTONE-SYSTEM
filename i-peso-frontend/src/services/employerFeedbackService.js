@@ -20,11 +20,7 @@ export const employerFeedbackService = {
     const { data } = await api.delete(`/employer/reviews/${reviewId}/reply`)
     return data
   },
-
-  dispute: async (reviewId, payload) => {
-    const { data } = await api.post(`/employer/reviews/${reviewId}/dispute`, payload)
-    return data
-  },
+
 
   // People this employer hired, with any private feedback already given.
   getHires: async () => {

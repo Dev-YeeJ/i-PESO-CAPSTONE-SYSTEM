@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { calendarEventPhase, interviewPhase, interviewPhaseLabel, nextInterviewOf, calendarVisibleHours } from '../interview'
+import { calendarDisplayEnd, calendarEventPhase, interviewPhase, interviewPhaseLabel, nextInterviewOf, calendarVisibleHours } from '../interview'
 
 const start = new Date('2026-11-10T09:00:00+08:00').getTime()
 const online = { mode_of_interview: 'online', schedule: '2026-11-10T09:00:00+08:00', ends_at: '2026-11-10T10:00:00+08:00', phase: 'upcoming' }
@@ -74,9 +74,24 @@ describe('calendarVisibleHours', () => {
     expect(calendarVisibleHours([hourLong(25, 20, 30)])).toEqual({ min: 7, max: 22 })
   })
 
-  it('opens the whole day for an interview that runs past midnight, like 11:31 p.m.', () => {
-    expect(calendarVisibleHours([hourLong(23, 23, 31)])).toEqual({ min: 0, max: 24 })
-    // Ending exactly at midnight still fits on its own day.
+  it('runs the grid to midnight for an 11:31 p.m. interview but still starts the morning at 7 a.m.', () => {
+    const late = hourLong(23, 23, 31)
+    const drawn = { ...late, end: calendarDisplayEnd(late.start, late.end) }
+    expect(calendarVisibleHours([drawn, hourLong(25, 9, 20)])).toEqual({ min: 7, max: 24 })
+    // Ending exactly at midnight fits on its own day too.
     expect(calendarVisibleHours([hourLong(23, 23)])).toEqual({ min: 7, max: 24 })
+  })
+})
+
+describe('calendarDisplayEnd', () => {
+  const at = (day, hour, minute = 0) => new Date(2026, 10, day, hour, minute).toISOString()
+
+  it('stops an interview that runs past midnight at midnight, so it is drawn on its start day only', () => {
+    expect(calendarDisplayEnd(at(23, 23, 31), at(24, 0, 31))).toBe(at(24, 0, 0))
+  })
+
+  it('leaves a same-day interview and a missing end alone', () => {
+    expect(calendarDisplayEnd(at(25, 9, 20), at(25, 10, 20))).toBe(at(25, 10, 20))
+    expect(calendarDisplayEnd(at(25, 9, 20), null)).toBeNull()
   })
 })

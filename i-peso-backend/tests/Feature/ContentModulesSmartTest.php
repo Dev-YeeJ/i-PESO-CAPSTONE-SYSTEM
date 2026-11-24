@@ -154,7 +154,7 @@ class ContentModulesSmartTest extends TestCase
         $this->assertSame(0, DB::table('help_search_misses')->count());
     }
 
-    public function test_the_assistant_flags_what_it_could_not_answer_and_the_marker_never_reaches_the_visitor(): void
+    public function test_the_no_answer_marker_never_reaches_the_visitor_and_nothing_is_recorded(): void
     {
         Http::fake(['*generateContent*' => Http::response(['candidates' => [['content' => ['role' => 'model', 'parts' => [[
             'text' => 'Wala po akong impormasyon tungkol diyan. Pakitanong sa PESO office. [[NO_ANSWER]]',
@@ -165,51 +165,17 @@ class ContentModulesSmartTest extends TestCase
             ->json();
 
         $this->assertStringNotContainsString('NO_ANSWER', json_encode($reply));
-        $this->assertSame(1, DB::table('chatbot_gaps')->count());
-        $gap = DB::table('chatbot_gaps')->first();
-        $this->assertSame('guest', $gap->audience);
-        $this->assertStringNotContainsString('0917', $gap->question);
-
-        Http::assertSent(fn (HttpRequest $request) => str_contains(data_get($request->data(), 'systemInstruction.parts.0.text', ''), '[[NO_ANSWER]]'));
-
-        config(['services.chatbot.gap_logging' => false]);
-        $this->postJson('/api/chat/public', ['message' => 'Another unknown thing?'])->assertOk();
-        $this->assertSame(1, DB::table('chatbot_gaps')->count());
+        $this->assertStringContainsString('Pakitanong sa PESO office', json_encode($reply));
+        // Assistant insights were removed: unanswered questions are no longer stored.
+        $this->assertSame(0, DB::table('chatbot_gaps')->count());
     }
 
-    public function test_insights_group_unanswered_questions_suggest_the_closest_faq_and_can_be_resolved(): void
+    public function test_the_health_check_and_assistant_insights_are_gone(): void
     {
-        $this->faq(['question' => 'How do I reset my password?', 'answer' => 'Use the Forgot password link.']);
-        $insights = app(ContentInsightService::class);
-        $insights->recordChatbotGap('Saan ang TESDA office?', 'seeker');
-        $insights->recordChatbotGap('saan ang tesda office', 'guest');
-        foreach (['Reset password', 'reset password!', 'RESET PASSWORD'] as $question) {
-            $insights->recordChatbotGap($question, 'guest');
-        }
-
-        // Content Modules is Configuration only: CRM access alone doesn't open it.
-        Sanctum::actingAs($this->staffWith(['constituent_crm' => 'manage'], 'frontdesk@example.test'));
-        $this->getJson('/api/admin/content-modules/insights')->assertForbidden();
-
-        Sanctum::actingAs($this->staffWith(['configuration' => 'manage'], 'content@example.test'));
-        $data = $this->getJson('/api/admin/content-modules/insights')->assertOk()->json();
-
-        $this->assertArrayNotHasKey('missed_searches', $data);
-        $this->assertArrayNotHasKey('faq_feedback', $data);
-        $gaps = collect($data['chatbot_gaps'])->keyBy('normalized');
-        $this->assertSame(3, $gaps['reset password']['count']);
-        $this->assertSame('How do I reset my password?', $gaps['reset password']['closest_faq']['question']);
-        $this->assertSame(2, $gaps['saan ang tesda office']['count']);
-        $this->assertNull($gaps['saan ang tesda office']['closest_faq']);
-
-        $this->postJson('/api/admin/content-modules/insights/resolve', ['kind' => 'gap', 'normalized' => 'reset password'])
-            ->assertOk()->assertJsonPath('resolved', 3);
-        $this->postJson('/api/admin/content-modules/insights/resolve', ['kind' => 'search', 'normalized' => 'reset password'])
-            ->assertStatus(422);
-        $this->assertSame(
-            ['saan ang tesda office'],
-            array_column($this->getJson('/api/admin/content-modules/insights')->json('chatbot_gaps'), 'normalized')
-        );
+        Sanctum::actingAs($this->admin());
+        $this->getJson('/api/admin/content-modules/health')->assertNotFound();
+        $this->getJson('/api/admin/content-modules/insights')->assertNotFound();
+        $this->postJson('/api/admin/content-modules/insights/resolve', ['normalized' => 'reset password'])->assertNotFound();
     }
 
     public function test_assistant_insights_expire_after_ninety_days(): void
@@ -220,39 +186,6 @@ class ContentModulesSmartTest extends TestCase
         $this->artisan('site-content:prune-history')->assertSuccessful();
 
         $this->assertSame(['new'], DB::table('chatbot_gaps')->pluck('question')->all());
-    }
-
-    // ── Health check ──────────────────────────────────────────────────────
-
-    public function test_the_health_check_finds_what_to_fix(): void
-    {
-        $this->faq(['question' => 'How do I register as a job seeker?']);
-        $this->faq(['question' => 'How to register as job seeker?']);
-        $old = $this->faq(['question' => 'Old question about permits']);
-        Faq::query()->whereKey($old->id)->update(['updated_at' => now()->subDays(200)]);
-
-        Sanctum::actingAs($this->admin());
-        $health = $this->getJson('/api/admin/content-modules/health')->assertOk()->json();
-
-        $ids = array_column($health['checks'], 'id');
-        $this->assertContains('office_blank', $ids);
-        $this->assertContains('faq_duplicates', $ids);
-        $this->assertContains('faq_stale', $ids);
-        $this->assertContains('privacy_notice', $ids);
-        $this->assertLessThan(100, $health['score']);
-        $this->assertSame('warn', $health['checks'][0]['status']);
-
-        // Help-page-only checks went with the Help page.
-        foreach (['faq_bad_links', 'faq_unhelpful', 'missed_searches', 'searches', 'landing_faq_empty'] as $gone) {
-            $this->assertNotContains($gone, $ids);
-        }
-        $this->assertSame(['faqs_published', 'faqs_unpublished', 'chatbot_gaps'], array_keys($health['counts']));
-    }
-
-    public function test_similarity_helper(): void
-    {
-        $this->assertGreaterThanOrEqual(0.6, ContentInsightService::similarity('How do I reset my password?', 'reset password'));
-        $this->assertLessThan(0.3, ContentInsightService::similarity('How do I reset my password?', 'Where is the office?'));
     }
 
     // ── AI writing helper ─────────────────────────────────────────────────
@@ -284,10 +217,9 @@ class ContentModulesSmartTest extends TestCase
 
         Sanctum::actingAs($this->staffWith(['configuration' => 'view'], 'viewer@example.test'));
         $this->postJson('/api/admin/content-modules/ai-assist', ['task' => 'simplify', 'text' => 'Some text.'])->assertForbidden();
-        $this->getJson('/api/admin/content-modules/health')->assertOk();
 
         Sanctum::actingAs($this->staffWith(['constituent_crm' => 'manage'], 'frontdesk@example.test'));
-        $this->getJson('/api/admin/content-modules/health')->assertForbidden();
+        $this->postJson('/api/admin/content-modules/ai-assist', ['task' => 'simplify', 'text' => 'Some text.'])->assertForbidden();
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────

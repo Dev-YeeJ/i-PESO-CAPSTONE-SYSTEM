@@ -129,31 +129,46 @@ describe('Site Content admin', () => {
   })
 
 
-  it('opens on the health check and takes you to what needs fixing', async () => {
+  it('opens on Office info, with no Health check or Assistant insights', async () => {
     adminFaqService.list.mockResolvedValue(faqList)
     renderWithProviders(<ContentModulesPage />, { route: '/admin/content-modules' })
 
     expect(await screen.findByRole('heading', { name: 'Content Modules' })).toBeInTheDocument()
-    expect(await screen.findByRole('progressbar', { name: /content health score/i })).toHaveAttribute('aria-valuenow', '60')
-    expect(screen.getByText('Office info has blanks')).toBeInTheDocument()
-
-    await userEvent.click(screen.getByRole('button', { name: 'How do I register?' }))
-    // The duplicate opens straight in the FAQ editor.
-    expect(await screen.findByRole('textbox', { name: 'Question' })).toHaveValue('How do I register as a job seeker?')
+    expect(screen.getByRole('button', { name: 'Office info' })).toHaveAttribute('aria-current', 'page')
+    expect(screen.queryByRole('button', { name: /health check/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /assistant insights/i })).not.toBeInTheDocument()
+    expect(adminContentInsightService.health).not.toHaveBeenCalled()
   })
 
-  it('turns a question the assistant could not answer into a new FAQ with an AI-cleaned question', async () => {
-    adminContentInsightService.assist.mockResolvedValue({ suggestion: 'Where is the TESDA office?', note: '' })
+  it('an old Insights link falls back to the first module', async () => {
     renderWithProviders(<ContentModulesPage />, { route: '/admin/content-modules?tab=insights' })
 
-    expect(await screen.findByText('“Saan ang TESDA office?”')).toBeInTheDocument()
-    // The Help page went, and with it its search and vote reports.
-    expect(screen.queryByText(/help searches/i)).not.toBeInTheDocument()
-    expect(screen.queryByText(/was this helpful/i)).not.toBeInTheDocument()
-    await userEvent.click(screen.getByRole('button', { name: /write faq/i }))
+    expect(await screen.findByRole('button', { name: 'Office info' })).toHaveAttribute('aria-current', 'page')
+  })
 
-    expect(adminContentInsightService.assist).toHaveBeenCalledWith({ task: 'suggest_question', text: 'Saan ang TESDA office?' })
-    expect(await screen.findByRole('textbox', { name: 'Question' })).toHaveValue('Where is the TESDA office?')
+  it('offers the suggested FAQs that are missing even when the list is not empty', async () => {
+    adminFaqService.list.mockResolvedValue({ ...faqList, suggestions_available: 16, can_add_starter_pack: true })
+    adminFaqService.starterPack.mockResolvedValue({ message: '16 suggested FAQs added as unpublished drafts.', added: 16 })
+    renderWithProviders(<ContentModulesPage />, { route: '/admin/content-modules?tab=faqs' })
+
+    expect(await screen.findByText(/16 suggested FAQs/)).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Add suggested FAQs' }))
+    await waitFor(() => expect(adminFaqService.starterPack).toHaveBeenCalled())
+  })
+
+  it('edits a policy straight from the list: Edit opens the editor and starts the draft', async () => {
+    const version = { version: 1, effective_at: '2026-11-12', is_builtin: true, summary: null, change_note: 'Original text', published_by: null,
+      sections: [{ id: 'intro', title: 'Introduction', body: 'We collect what we need.' }] }
+    const policy = { slug: 'privacy-policy', title: 'Privacy Policy', current: version, upcoming: null, draft: null, version_count: 1 }
+    adminPolicyService.list.mockResolvedValue({ policies: [policy], tokens: [] })
+    adminPolicyService.get.mockResolvedValue({ policy: { slug: 'privacy-policy', title: 'Privacy Policy' }, current: version, draft: null, versions: [version] })
+    adminPolicyService.startDraft.mockResolvedValue({ message: 'Draft started.' })
+    renderWithProviders(<ContentModulesPage />, { route: '/admin/content-modules?tab=policies' })
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Edit' }))
+
+    await waitFor(() => expect(adminPolicyService.startDraft).toHaveBeenCalledWith('privacy-policy'))
+    expect(adminPolicyService.startDraft).toHaveBeenCalledTimes(1)
   })
 
   it('drafts an answer with AI, warns about a duplicate, and only fills the form when accepted', async () => {

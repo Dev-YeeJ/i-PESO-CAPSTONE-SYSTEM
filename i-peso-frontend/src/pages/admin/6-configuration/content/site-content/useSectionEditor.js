@@ -25,7 +25,6 @@ export default function useSectionEditor(sectionKey, section, { normalize = (val
   const refresh = () => {
     queryClient.invalidateQueries({ queryKey: ['admin-site-content'] })
     queryClient.invalidateQueries({ queryKey: ['site-content'] })
-    queryClient.invalidateQueries({ queryKey: ['content-health'] })
     queryClient.invalidateQueries({ queryKey: ['admin-site-content-revisions', sectionKey] })
   }
 

@@ -8,7 +8,7 @@ import { adminSystemSettingsService, publicSystemStatusService } from '@/service
 import { MaintenanceScreen, RegistrationGate } from '@/components/system/SystemNotices'
 
 vi.mock('@/services/systemSettingsService', () => ({
-  adminSystemSettingsService: { list: vi.fn(), save: vi.fn(), status: vi.fn(), testEmail: vi.fn(), testSms: vi.fn(), testAi: vi.fn() },
+  adminSystemSettingsService: { list: vi.fn(), save: vi.fn(), reset: vi.fn(), status: vi.fn(), testEmail: vi.fn(), testSms: vi.fn(), testAi: vi.fn() },
   publicSystemStatusService: { get: vi.fn() },
 }))
 vi.mock('@/lib/toast', () => { const toast = Object.assign(vi.fn(), { success: vi.fn(), error: vi.fn(), warning: vi.fn(), loading: vi.fn(), dismiss: vi.fn() }); return { default: toast, toast } })
@@ -16,15 +16,17 @@ vi.mock('@/lib/toast', () => { const toast = Object.assign(vi.fn(), { success: v
 const setting = (key, group, type, value, extra = {}) => ({ key, group, type, value, default: value, label: extra.label ?? key, help: `${key} help`, changed: false, updated_at: null, updated_by: null, ...extra })
 
 const list = (canEdit = true) => ({
-  groups: { access: 'Access', sms: 'SMS', employer_rules: 'Employer rules' },
+  groups: { maintenance: 'Maintenance', registration: 'Registration', assistant: 'Assistant', sms: 'SMS', employer_rules: 'Employer rules' },
   can_edit: canEdit,
   settings: [
-    setting('maintenance.enabled', 'access', 'bool', false, { label: 'Maintenance mode' }),
-    setting('maintenance.message', 'access', 'text', 'i-PESO is being updated right now.', { label: 'Maintenance message', max: 300 }),
+    setting('maintenance.enabled', 'maintenance', 'bool', false, { label: 'Maintenance mode' }),
+    setting('maintenance.message', 'maintenance', 'text', 'i-PESO is being updated right now.', { label: 'Maintenance message', max: 300 }),
+    setting('registration.seekers_open', 'registration', 'bool', false, { label: 'Job seeker registration open', default: true }),
+    setting('chatbot.enabled', 'assistant', 'bool', true, { label: 'Assistant (chatbot)' }),
     setting('sms.enabled', 'sms', 'bool', true, { label: 'Send SMS' }),
     setting('sms.types.interview', 'sms', 'bool', true, { label: 'Interview messages' }),
     setting('sms.monthly_cap', 'sms', 'int', 0, { label: 'Monthly SMS limit', min: 0, max: 100000 }),
-    setting('placement.deadline_day', 'employer_rules', 'int', 10, { label: 'Placement report due day', min: 1, max: 28 }),
+    setting('placement.deadline_day', 'employer_rules', 'int', 15, { label: 'Placement report due day', min: 1, max: 28, default: 10, changed: true }),
     setting('placement.reminder_offsets', 'employer_rules', 'int_list', [3, 0, -7], { label: 'Placement report reminders', min: -30, max: 28, max_items: 5 }),
   ],
 })
@@ -60,7 +62,7 @@ describe('System Settings', () => {
 
   it('asks only before turning maintenance mode on', async () => {
     adminSystemSettingsService.save.mockResolvedValue({ message: 'Settings saved.', changed: ['maintenance.enabled'] })
-    renderWithProviders(<SystemSettingsPage />, { route: '/admin/settings?section=access' })
+    renderWithProviders(<SystemSettingsPage />, { route: '/admin/settings?section=maintenance' })
 
     await userEvent.click(await screen.findByRole('switch', { name: 'Maintenance mode' }))
     expect(adminSystemSettingsService.save).not.toHaveBeenCalled()
@@ -110,9 +112,45 @@ describe('System Settings', () => {
     expect(interview).toBeDisabled()
   })
 
+  it('shows the main switches at a glance and opens their section', async () => {
+    renderWithProviders(<SystemSettingsPage />, { route: '/admin/settings' })
+
+    const glance = await screen.findByRole('list', { name: 'Settings at a glance' })
+    expect(within(glance).getByText('Job seeker sign-ups').nextSibling).toHaveTextContent('Paused')
+    expect(within(glance).getByText('SMS this month').nextSibling).toHaveTextContent('4 sent')
+
+    await userEvent.click(within(glance).getByText('Job seeker sign-ups'))
+    expect(await screen.findByRole('switch', { name: 'Job seeker registration open' })).toBeInTheDocument()
+  })
+
+  it('finds settings by name or description across sections', async () => {
+    renderWithProviders(<SystemSettingsPage />, { route: '/admin/settings' })
+
+    await userEvent.type(await screen.findByRole('searchbox', { name: 'Search settings' }), 'reminders')
+    expect(screen.getByText('Placement report reminders')).toBeInTheDocument()
+    expect(screen.queryByRole('switch', { name: 'Maintenance mode' })).not.toBeInTheDocument()
+
+    await userEvent.clear(screen.getByRole('searchbox', { name: 'Search settings' }))
+    await userEvent.type(screen.getByRole('searchbox', { name: 'Search settings' }), 'zzz')
+    expect(screen.getByText(/No settings match/)).toBeInTheDocument()
+  })
+
+  it('puts a changed setting back to its default', async () => {
+    adminSystemSettingsService.reset.mockResolvedValue({ message: 'Back to the default. It applies right away.', value: 10 })
+    renderWithProviders(<SystemSettingsPage />, { route: '/admin/settings?section=employer_rules' })
+
+    // Only the setting that differs from its default offers a reset.
+    const reset = await screen.findByRole('button', { name: 'Reset Placement report due day to its default (10)' })
+    expect(screen.queryByRole('button', { name: /reset placement report reminders/i })).not.toBeInTheDocument()
+    await userEvent.click(reset)
+
+    await waitFor(() => expect(adminSystemSettingsService.reset).toHaveBeenCalledWith('placement.deadline_day'))
+    expect(toast.success).toHaveBeenCalledWith('Back to the default. It applies right away.')
+  })
+
   it('is read-only for staff who are not the system administrator', async () => {
     adminSystemSettingsService.list.mockResolvedValue(list(false))
-    renderWithProviders(<SystemSettingsPage />, { route: '/admin/settings?section=access' })
+    renderWithProviders(<SystemSettingsPage />, { route: '/admin/settings?section=maintenance' })
 
     expect(await screen.findByText(/only the system administrator/i)).toBeInTheDocument()
     expect(screen.getByRole('switch', { name: 'Maintenance mode' })).toBeDisabled()

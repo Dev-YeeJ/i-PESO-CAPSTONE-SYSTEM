@@ -4,42 +4,34 @@ import { ArrowRight, MessageSquareReply, Star } from 'lucide-react'
 import { employerFeedbackService } from '@/services/employerFeedbackService'
 import { reviewsQueryKey } from '@/pages/employer/reviews/reviewKeys'
 
-const SECTIONS = [
-  { type: 'recruitment', label: 'Hiring process' },
-  { type: 'employment', label: 'Working here' },
-]
-
 /** What job seekers see of the company's reviews, with a way into the Reviews page. */
 export default function ReputationSnapshotCard() {
   const { data, isLoading, isError } = useQuery({
-    queryKey: reviewsQueryKey('recruitment', 'all', 1),
-    queryFn: () => employerFeedbackService.getReviews({ type: 'recruitment', page: 1 }),
+    queryKey: reviewsQueryKey('all', 1),
+    queryFn: () => employerFeedbackService.getReviews({ page: 1 }),
     retry: false,
     staleTime: 60 * 1000,
   })
 
   if (isError) return null
 
-  const waiting = (data?.counts?.recruitment?.needs_reply ?? 0) + (data?.counts?.employment?.needs_reply ?? 0)
+  const waiting = data?.counts?.needs_reply ?? 0
+  const section = data?.summary?.overall
 
   return (
     <section aria-labelledby="reputation-snapshot" className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04),0_12px_32px_-16px_rgba(15,23,42,0.18)]">
       <div className="p-6">
         <h2 id="reputation-snapshot" className="text-base font-bold text-slate-900">Your reputation</h2>
-        <p className="mt-0.5 text-sm text-slate-600">From verified applicants and employees.</p>
+        <p className="mt-0.5 text-sm text-slate-600">From people who applied through i-PESO.</p>
 
         {isLoading ? (
           <div className="mt-4 space-y-3" aria-hidden="true">
             <div className="h-12 animate-pulse rounded-2xl bg-slate-100" />
-            <div className="h-12 animate-pulse rounded-2xl bg-slate-100" />
           </div>
         ) : (
-          <dl className="mt-4 grid grid-cols-2 gap-3">
-            {SECTIONS.map(({ type, label }) => {
-              const section = data?.summary?.[type]
-              return (
-                <div key={type} className="rounded-2xl bg-slate-50 p-3.5">
-                  <dt className="text-xs font-bold text-slate-500">{label}</dt>
+          <dl className="mt-4">
+                <div className="rounded-2xl bg-slate-50 p-3.5">
+                  <dt className="text-xs font-bold text-slate-500">Company rating</dt>
                   <dd className="mt-1">
                     {section?.enough ? (
                       <>
@@ -57,8 +49,6 @@ export default function ReputationSnapshotCard() {
                     )}
                   </dd>
                 </div>
-              )
-            })}
           </dl>
         )}
       </div>

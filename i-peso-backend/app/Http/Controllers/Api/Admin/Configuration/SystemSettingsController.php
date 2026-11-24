@@ -14,6 +14,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use RuntimeException;
 
@@ -89,6 +90,29 @@ class SystemSettingsController extends Controller
         return response()->json([
             'message' => $changes ? 'Settings saved. They apply right away.' : 'Nothing changed.',
             'changed' => array_keys($changes),
+        ]);
+    }
+
+    /** Put one setting back to its default. */
+    public function reset(Request $request): JsonResponse
+    {
+        $admin = $this->admin($request);
+        $key = $request->validate(['key' => ['required', 'string', Rule::in(array_keys(SystemSettingsRegistry::definitions()))]])['key'];
+
+        $change = $this->settings->reset($key);
+        if ($change) {
+            [$before, $after] = $change;
+            ActivityLogger::logAs($admin, 'system_setting_changed', sprintf(
+                'Reset “%s” to its default (%s, was %s).',
+                SystemSettingsRegistry::definitions()[$key]['label'],
+                $this->describe($after),
+                $this->describe($before)
+            ));
+        }
+
+        return response()->json([
+            'message' => $change ? 'Back to the default. It applies right away.' : 'This setting is already at its default.',
+            'value' => $this->settings->get($key),
         ]);
     }
 

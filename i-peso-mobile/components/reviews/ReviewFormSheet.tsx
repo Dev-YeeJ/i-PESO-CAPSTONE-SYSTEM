@@ -6,7 +6,7 @@ import MaterialIcons from '@expo/vector-icons/MaterialIcons'
 import type { OwnReview, ReviewType } from '@/services/seekerService'
 import { seekerService } from '@/services/seekerService'
 import { apiErrorMessage } from '@/utils/apiError'
-import { aspectsFor, MY_REVIEWS_KEY, REVIEW_GUIDELINES_URL, REVIEW_TYPE_OPTIONS, type ReviewAction } from '@/utils/reviews'
+import { aspectsFor, MY_REVIEWS_KEY, REVIEW_GUIDELINES_URL, type ReviewAction } from '@/utils/reviews'
 import { useToast } from '@/stores/toastStore'
 import { AlertBox } from '@/components/ui/AlertBox'
 import { BottomSheet } from '@/components/ui/BottomSheet'
@@ -32,17 +32,17 @@ type FieldErrors = Record<string, string | undefined>
 interface ReviewFormSheetProps {
   /** Write a new review for this open action… */
   target?: ReviewAction | null
-  /** …or edit the seeker's own review (preferredType: a notification asked for that kind). */
-  existing?: (OwnReview & { preferredType?: ReviewType }) | null
+  /** …or edit the seeker's own review. */
+  existing?: OwnReview | null
   onClose: () => void
   /** Called after a successful save (the toast and cache refresh are already done). */
   onSaved?: (result: { message: string; review: OwnReview }) => void
 }
 
 /**
- * Write or edit THE review of one application or hire. The seeker picks what it is about:
- * the hiring process (open from the moment they apply) or working there (verified hires only),
- * and can switch it when editing. Mount it only while open (`{target && <ReviewFormSheet … />}`):
+ * Write or edit THE review of one application: a review of the company's hiring process, open
+ * from the moment the seeker applies. A review written earlier about working there keeps its
+ * own questions when edited. Mount it only while open (`{target && <ReviewFormSheet … />}`):
  * the form state is initialised from the props once.
  */
 export function ReviewFormSheet({ target, existing, onClose, onSaved }: ReviewFormSheetProps) {
@@ -50,22 +50,15 @@ export function ReviewFormSheet({ target, existing, onClose, onSaved }: ReviewFo
   const { showToast } = useToast()
 
   const isEdit = !!existing
-  const allowedTypes: ReviewType[] = existing
-    ? (existing.allowed_types?.length ? existing.allowed_types : [existing.type])
-    : (target?.types ?? [target?.type ?? 'recruitment'])
-  const fromApplication = existing ? !!existing.application_id : target?.source === 'application'
-  const [type, setType] = useState<ReviewType>(() => existing?.preferredType ?? existing?.type ?? target?.type ?? 'recruitment')
+  const type: ReviewType = existing?.type ?? 'recruitment'
   // Every hiring aspect is rated now; an older limited review is completed when edited.
   const aspects = aspectsFor(type, false)
   const employment = type === 'employment'
-  const needsStartConfirmation = employment && existing?.type !== 'employment'
-  const employmentReason = target?.employmentReason ?? 'Available once the employer hires you and your start date arrives.'
 
   const [ratings, setRatings] = useState<Record<string, number>>(() => ({ ...(existing?.ratings_map ?? {}) }))
   const [recommend, setRecommend] = useState<boolean | null>(existing ? existing.recommend : null)
   const [comment, setComment] = useState(existing?.comment ?? '')
   const [agree, setAgree] = useState(isEdit)
-  const [confirmStarted, setConfirmStarted] = useState(false)
   const [errors, setErrors] = useState<FieldErrors>({})
 
   // Keeps the comment box above the keyboard. The sheet is a Modal, whose Android window does
@@ -92,15 +85,10 @@ export function ReviewFormSheet({ target, existing, onClose, onSaved }: ReviewFo
         ratings: Object.fromEntries(Object.keys(aspects).filter((key) => ratings[key]).map((key) => [key, ratings[key]])),
         recommend: recommend as boolean,
         comment: comment.trim() || null,
-        ...(needsStartConfirmation ? { confirm_started: confirmStarted } : {}),
       }
       if (existing) return seekerService.updateReview(existing.id, body)
       if (!target) throw new Error('Nothing to review.')
-      return seekerService.submitReview({
-        ...body,
-        ...(target.source === 'placement' ? { placement_record_id: target.sourceId } : { application_id: target.sourceId }),
-        agree_guidelines: agree,
-      })
+      return seekerService.submitReview({ ...body, application_id: target.sourceId, agree_guidelines: agree })
     },
     onSuccess: (data) => {
       showToast(data.message, 'success')
@@ -130,7 +118,6 @@ export function ReviewFormSheet({ target, existing, onClose, onSaved }: ReviewFo
     })
     if (recommend === null) next.recommend = 'Choose yes or no.'
     if (!isEdit && !agree) next.agree_guidelines = 'Please confirm your review follows the guidelines.'
-    if (needsStartConfirmation && !confirmStarted) next.confirm_started = 'Please confirm that you started working here.'
     setErrors(next)
     if (!Object.values(next).some(Boolean)) save.mutate()
   }
@@ -159,32 +146,6 @@ export function ReviewFormSheet({ target, existing, onClose, onSaved }: ReviewFo
           {jobTitle ? `${jobTitle} · ` : ''}{employment ? 'Working here' : 'Hiring process'}
         </Text>
 
-        {fromApplication ? (
-          <View style={styles.typeField}>
-            <Text style={styles.legend}>What are you reviewing?</Text>
-            <View style={styles.typeRow} accessibilityRole="radiogroup">
-              {(Object.keys(REVIEW_TYPE_OPTIONS) as ReviewType[]).map((value) => {
-                const option = REVIEW_TYPE_OPTIONS[value]
-                const allowed = allowedTypes.includes(value)
-                const selected = type === value
-                return (
-                  <Pressable
-                    key={value}
-                    onPress={() => { setType(value); setErrors({}) }}
-                    disabled={!allowed || save.isPending}
-                    style={[styles.typeOption, selected && styles.typeOptionSelected, !allowed && styles.typeOptionDisabled]}
-                    accessibilityRole="radio"
-                    accessibilityState={{ checked: selected, disabled: !allowed }}
-                    accessibilityLabel={`${option.label}. ${allowed ? option.hint : employmentReason}`}
-                  >
-                    <Text style={[styles.typeLabel, !allowed && styles.typeTextDisabled]}>{option.label}</Text>
-                    <Text style={[styles.typeHint, !allowed && styles.typeTextDisabled]}>{allowed ? option.hint : employmentReason}</Text>
-                  </Pressable>
-                )
-              })}
-            </View>
-          </View>
-        ) : null}
 
         <View style={styles.anonNote}>
           <MaterialIcons name="verified-user" size={16} color={colors.info} style={styles.noteIcon} />
@@ -259,30 +220,8 @@ export function ReviewFormSheet({ target, existing, onClose, onSaved }: ReviewFo
           {errors.comment ? <Text style={styles.error}>{errors.comment}</Text> : null}
         </View>
 
-        {isEdit && needsStartConfirmation ? (
-          <View style={styles.confirmBox}>
-            <Checkbox
-              checked={confirmStarted}
-              onToggle={() => { setConfirmStarted((current) => !current); clearError('confirm_started') }}
-              label="I started working for this employer."
-            >
-              <Text style={styles.checkText}>I started working for this employer.</Text>
-            </Checkbox>
-            {errors.confirm_started ? <Text style={styles.error}>{errors.confirm_started}</Text> : null}
-          </View>
-        ) : null}
         {!isEdit ? (
           <View style={styles.confirmBox}>
-            {employment ? (
-              <Checkbox
-                checked={confirmStarted}
-                onToggle={() => { setConfirmStarted((current) => !current); clearError('confirm_started') }}
-                label="I started working for this employer."
-              >
-                <Text style={styles.checkText}>I started working for this employer.</Text>
-              </Checkbox>
-            ) : null}
-            {errors.confirm_started ? <Text style={styles.error}>{errors.confirm_started}</Text> : null}
             <Checkbox
               checked={agree}
               onToggle={() => { setAgree((current) => !current); clearError('agree_guidelines') }}
@@ -334,14 +273,6 @@ function Checkbox({ checked, onToggle, label, onOpenLink, children }: {
 const styles = StyleSheet.create({
   body: { paddingHorizontal: spacing.xl, paddingBottom: spacing.xl },
   description: { ...textStyles.small, color: colors.textSecondary, marginBottom: spacing.md },
-  typeField: { marginBottom: spacing.md },
-  typeRow: { gap: spacing.sm, marginTop: spacing.sm },
-  typeOption: { minHeight: 44, borderRadius: radii.md, borderWidth: 1, borderColor: colors.borderStrong, backgroundColor: colors.surface, padding: spacing.md },
-  typeOptionSelected: { borderColor: colors.blue700, backgroundColor: colors.infoBackground },
-  typeOptionDisabled: { borderColor: colors.border, backgroundColor: colors.sunken },
-  typeLabel: { ...textStyles.smallBold, color: colors.textPrimary },
-  typeHint: { ...textStyles.small, color: colors.textSecondary, marginTop: 2 },
-  typeTextDisabled: { color: colors.subtle },
   anonNote: { flexDirection: 'row', gap: spacing.sm, borderWidth: 1, borderColor: colors.infoBorder, backgroundColor: colors.infoBackground, borderRadius: radii.md, padding: spacing.md },
   noteIcon: { marginTop: 1 },
   anonText: { ...textStyles.small, color: colors.textPrimary, flex: 1, lineHeight: 18 },

@@ -1,24 +1,19 @@
-import { useRef, useState } from 'react'
+import { useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { AnimatePresence, MotionConfig, motion as Motion } from 'framer-motion'
-import { ArrowLeft, ArrowRight, BookOpenCheck, Briefcase, Building2, Flag, MessageSquareReply, Star, UsersRound } from 'lucide-react'
+import { ArrowLeft, ArrowRight, BookOpenCheck, MessageSquareReply, Star, UsersRound } from 'lucide-react'
 import { Button, ErrorState } from '@/components/ui'
 import CountUp from '@/components/motion/CountUp'
 import { employerFeedbackService } from '@/services/employerFeedbackService'
 import { cn } from '@/lib/utils'
-import DisputeDialog from './reviews/DisputeDialog'
 import HiresTab from './reviews/HiresTab'
 import RatingOverview from './reviews/RatingOverview'
 import ReviewCard from './reviews/ReviewCard'
 import Segmented from './reviews/Segmented'
 import { HIRES_KEY, reviewsQueryKey } from './reviews/reviewKeys'
 
-const TYPES = [
-  { value: 'recruitment', label: 'Hiring process', icon: Briefcase },
-  { value: 'employment', label: 'Working here', icon: Building2 },
-]
-const FILTERS = ['all', 'needs_reply', 'disputed']
+const FILTERS = ['all', 'needs_reply']
 const TABS = [
   { value: 'company', label: 'Reviews of your company', icon: Star },
   { value: 'hires', label: 'Feedback on your hires', icon: UsersRound },
@@ -26,11 +21,10 @@ const TABS = [
 
 const pick = (value, allowed, fallback) => (allowed.includes(value) ? value : fallback)
 
-/** Reviews of the company (read, reply once, dispute) and private feedback about hires. */
+/** Reviews of the company (one list; read and reply once) and private feedback about hires. */
 export default function EmployerReviewsPage() {
   const [params, setParams] = useSearchParams()
   const tab = pick(params.get('tab'), TABS.map((item) => item.value), 'company')
-  const type = pick(params.get('type'), TYPES.map((item) => item.value), 'recruitment')
   const filter = pick(params.get('filter'), FILTERS, 'needs_reply')
   const page = Math.max(1, Number(params.get('page')) || 1)
 
@@ -42,20 +36,19 @@ export default function EmployerReviewsPage() {
   }, { replace: true })
 
   const reviews = useQuery({
-    queryKey: reviewsQueryKey(type, filter, page),
-    queryFn: () => employerFeedbackService.getReviews({ type, page, filter: filter === 'all' ? undefined : filter }),
+    queryKey: reviewsQueryKey(filter, page),
+    queryFn: () => employerFeedbackService.getReviews({ page, filter: filter === 'all' ? undefined : filter }),
     placeholderData: keepPreviousData,
   })
   const hires = useQuery({ queryKey: HIRES_KEY, queryFn: employerFeedbackService.getHires })
 
   const summary = reviews.data?.summary
   const counts = reviews.data?.counts
-  const needsReply = (counts?.recruitment?.needs_reply ?? 0) + (counts?.employment?.needs_reply ?? 0)
+  const needsReply = counts?.needs_reply ?? 0
   const hiresToRate = (hires.data?.hires ?? []).filter((hire) => hire.can_give_feedback && !hire.feedback).length
 
   const tiles = [
-    { key: 'recruitment', label: 'Hiring process', section: summary?.recruitment, onClick: () => update({ tab: 'company', type: 'recruitment', filter: null, page: null }) },
-    { key: 'employment', label: 'Working here', section: summary?.employment, onClick: () => update({ tab: 'company', type: 'employment', filter: null, page: null }) },
+    { key: 'overall', label: 'Company rating', section: summary?.overall, onClick: () => update({ tab: null, filter: 'all', page: null }) },
   ]
 
   return (
@@ -75,8 +68,8 @@ export default function EmployerReviewsPage() {
             <div className="max-w-2xl">
                             <h1 className="mt-2 text-3xl font-bold tracking-tight sm:text-[2.6rem] sm:leading-[1.1]">Reviews</h1>
               <p className="mt-3 text-sm leading-6 text-white/85 sm:text-[15px]">
-                Reviews come only from people who applied or worked here through i-PESO, and you never see who wrote them.
-                Reply once to each review, or dispute one that breaks the guidelines.
+                Reviews come only from people who applied here through i-PESO, and you never see who wrote them.
+                Reply once to each review.
               </p>
             </div>
             <a href="/review-guidelines" target="_blank" rel="noreferrer" className="inline-flex shrink-0 items-center gap-2 self-start rounded-xl bg-white/10 px-4 py-2.5 text-sm font-bold ring-1 ring-white/20 transition hover:bg-white/15 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-gold lg:self-end">
@@ -84,7 +77,7 @@ export default function EmployerReviewsPage() {
             </a>
           </div>
 
-          <ul className="mt-8 grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <ul className="mt-8 grid grid-cols-2 gap-3 lg:grid-cols-3">
             {tiles.map((tile, index) => (
               <HeroTile key={tile.key} index={index} label={tile.label} onClick={tile.onClick} loading={reviews.isLoading}>
                 {tile.section?.enough ? (
@@ -100,13 +93,13 @@ export default function EmployerReviewsPage() {
                 )}
               </HeroTile>
             ))}
-            <HeroTile index={2} label="Waiting for your reply" loading={reviews.isLoading} highlight={needsReply > 0}
-              onClick={() => update({ tab: 'company', filter: 'needs_reply', page: null, type: (counts?.[type]?.needs_reply ?? 0) > 0 ? type : (counts?.recruitment?.needs_reply ? 'recruitment' : 'employment') })}
+            <HeroTile index={1} label="Waiting for your reply" loading={reviews.isLoading} highlight={needsReply > 0}
+              onClick={() => update({ tab: null, filter: 'needs_reply', page: null })}
             >
               <span className="text-3xl font-bold"><CountUp value={needsReply} /></span>
               <span className="text-xs text-white/75">{needsReply ? 'Replies show you listen' : 'All caught up'}</span>
             </HeroTile>
-            <HeroTile index={3} label="Hires to rate" loading={hires.isLoading} highlight={hiresToRate > 0} onClick={() => update({ tab: 'hires' })}>
+            <HeroTile index={2} label="Hires to rate" loading={hires.isLoading} highlight={hiresToRate > 0} onClick={() => update({ tab: 'hires' })}>
               <span className="text-3xl font-bold"><CountUp value={hiresToRate} /></span>
               <span className="text-xs text-white/75">{hiresToRate ? 'Private feedback for workers' : 'Nothing waiting'}</span>
             </HeroTile>
@@ -160,7 +153,7 @@ export default function EmployerReviewsPage() {
           >
             {tab === 'hires'
               ? <HiresTab />
-              : <CompanyReviews query={reviews} type={type} filter={filter} page={page} onChange={update} />}
+              : <CompanyReviews query={reviews} filter={filter} page={page} onChange={update} />}
           </Motion.div>
         </AnimatePresence>
       </div>
@@ -186,13 +179,12 @@ function HeroTile({ index, label, onClick, loading, highlight, children }) {
   )
 }
 
-function CompanyReviews({ query, type, filter, page, onChange }) {
+function CompanyReviews({ query, filter, page, onChange }) {
   const listTop = useRef(null)
-  const [disputing, setDisputing] = useState(null)
   const { data, isLoading, error, refetch, isFetching, isPlaceholderData } = query
   const paginator = data?.reviews
   const reviews = paginator?.data ?? []
-  const counts = data?.counts?.[type]
+  const counts = data?.counts
 
   const goTo = (next) => {
     onChange({ page: next > 1 ? next : null })
@@ -202,9 +194,8 @@ function CompanyReviews({ query, type, filter, page, onChange }) {
   if (error) return <ErrorState description="Your reviews could not be loaded." onRetry={refetch} error={error} />
 
   const empty = {
-    all: 'No reviews of this kind yet. Applicants can review you once you respond to their application.',
-    needs_reply: "You've replied to every review here. Nice work.",
-    disputed: "You haven't disputed any reviews here.",
+    all: 'No reviews yet. Anyone who applies to your vacancies through i-PESO can review your hiring process.',
+    needs_reply: "You've replied to every review. Nice work.",
   }[filter]
 
   return (
@@ -212,26 +203,19 @@ function CompanyReviews({ query, type, filter, page, onChange }) {
       <div className="lg:sticky lg:top-6 lg:self-start">
         {isLoading
           ? <div className="h-80 animate-pulse rounded-2xl bg-slate-100" aria-hidden="true" />
-          : <RatingOverview section={data?.summary?.[type]} type={type} minReviews={data?.summary?.min_reviews} />}
+          : <RatingOverview section={data?.summary?.overall} minReviews={data?.summary?.min_reviews} />}
       </div>
 
       <div ref={listTop} className="min-w-0 scroll-mt-6">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <Segmented
-            label="Review type"
-            value={type}
-            onChange={(value) => onChange({ type: value === 'recruitment' ? null : value, page: null })}
-            options={TYPES.map((item) => ({ value: item.value, label: <><item.icon className="h-4 w-4" aria-hidden />{item.label}</>, count: data?.counts?.[item.value]?.all }))}
-          />
           <Segmented
             label="Filter reviews"
             size="sm"
             value={filter}
             onChange={(value) => onChange({ filter: value, page: null })}
             options={[
-              { value: 'all', label: 'All' },
+              { value: 'all', label: 'All', count: counts?.all },
               { value: 'needs_reply', label: <><MessageSquareReply className="h-3.5 w-3.5" aria-hidden />Needs reply</>, count: counts?.needs_reply, highlight: true },
-              { value: 'disputed', label: <><Flag className="h-3.5 w-3.5" aria-hidden />Disputed</>, count: counts?.disputed },
             ]}
           />
         </div>
@@ -251,7 +235,7 @@ function CompanyReviews({ query, type, filter, page, onChange }) {
             <ul className="space-y-4">
               <AnimatePresence mode="popLayout" initial={false}>
                 {reviews.map((review) => (
-                  <ReviewCard key={review.id} review={review} onDispute={() => setDisputing(review)} />
+                  <ReviewCard key={review.id} review={review} />
                 ))}
               </AnimatePresence>
             </ul>
@@ -267,7 +251,6 @@ function CompanyReviews({ query, type, filter, page, onChange }) {
         )}
       </div>
 
-      {disputing && <DisputeDialog review={disputing} reasons={data?.dispute_reasons ?? {}} onClose={() => setDisputing(null)} />}
     </div>
   )
 }

@@ -60,7 +60,7 @@ export default function MyReviewsPage() {
     <div className="mx-auto max-w-[1100px] space-y-6 pb-12">
       <PortalPageHeader
         title="Reviews"
-        subtitle="Review a company once you apply: one review per job, about the hiring process or, once you're hired, working there. Only people with a real application or job through i-PESO can review, and your name is never shown."
+        subtitle="Review a company's hiring process once you apply, one review per job. Only people with a real application through i-PESO can review, and your name is never shown."
       >
         <Button to="/review-guidelines" variant="secondary" size="sm">Review guidelines</Button>
       </PortalPageHeader>
@@ -73,7 +73,7 @@ export default function MyReviewsPage() {
         <>
           <section className="rounded-2xl border border-brand-gold/40 bg-[#fffbeb] p-5" aria-labelledby="ready-heading">
             <h2 id="ready-heading" className="text-lg font-semibold text-slate-900">Ready to review <span className="font-normal text-slate-500">({actions.length})</span></h2>
-            <p className="mt-1 text-sm text-slate-700">PESO confirmed you applied to or worked for these employers.</p>
+            <p className="mt-1 text-sm text-slate-700">PESO confirmed you applied to these employers.</p>
             {actions.length === 0 ? (
               <p className="mt-3 rounded-xl border border-dashed border-slate-300 bg-white p-5 text-sm text-slate-600">
                 Nothing to review right now. Every company you apply to through i-PESO appears here.
@@ -87,7 +87,7 @@ export default function MyReviewsPage() {
                       <div className="min-w-0">
                         <p className="truncate font-bold text-slate-900">{action.employerName}</p>
                         <p className="truncate text-xs text-slate-500">
-                          {[action.jobTitle, action.types.includes('employment') ? 'hiring process or working here' : 'hiring process'].filter(Boolean).join(', ')}
+                          {[action.jobTitle, 'hiring process'].filter(Boolean).join(', ')}
                         </p>
                       </div>
                     </div>
@@ -170,11 +170,7 @@ export default function MyReviewsPage() {
   )
 }
 
-/**
- * What employers privately said about this job seeker. Only they and PESO can
- * read it, and it opens once they've reviewed that workplace (or after the
- * waiting period), so neither side writes in reaction to the other.
- */
+/** What employers privately said about this job seeker. Only they and PESO can read it, and it shows straight away. */
 function EmployerFeedbackSection({ items }) {
   if (!items.length) return null
 
@@ -187,29 +183,20 @@ function EmployerFeedbackSection({ items }) {
           <li key={item.id} className="rounded-xl bg-brand-canvas p-4">
             <p className="font-semibold text-slate-900">{item.employer?.name}</p>
             {item.job_title && <p className="text-xs text-slate-500">{item.job_title}</p>}
-            {item.locked ? (
-              <p className="mt-3 rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-600">
-                {item.employer?.name} left feedback about you. Review this workplace to read it now, or it opens on{' '}
-                {new Date(`${item.visible_from}T00:00:00`).toLocaleDateString('en-PH', { month: 'long', day: 'numeric', year: 'numeric' })}.
-              </p>
-            ) : (
-              <>
-                <ul className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
-                  {item.ratings?.map((rating) => (
-                    <li key={rating.key} className="flex items-center justify-between rounded-lg border border-slate-100 px-3 py-1.5">
-                      <span className="text-slate-700">{rating.label}</span>
-                      <span className="flex items-center gap-1.5"><Stars value={rating.value} /><span className="font-bold">{rating.value}</span></span>
-                    </li>
-                  ))}
-                </ul>
-                <p className="mt-3 text-sm text-slate-700">Would hire you again: <strong>{item.would_rehire}</strong></p>
-                {item.comment && <p className="mt-2 whitespace-pre-line text-sm text-slate-700">{item.comment}</p>}
-                <p className="mt-3 text-xs text-slate-500">
-                  Think something here is unfair or not about your work? Tell PESO at the office; staff can remove feedback that breaks the{' '}
-                  <a href="/review-guidelines" target="_blank" rel="noreferrer" className="font-semibold text-brand-navy underline-offset-2 hover:underline">guidelines</a>.
-                </p>
-              </>
-            )}
+            <ul className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
+              {item.ratings?.map((rating) => (
+                <li key={rating.key} className="flex items-center justify-between rounded-lg border border-slate-100 px-3 py-1.5">
+                  <span className="text-slate-700">{rating.label}</span>
+                  <span className="flex items-center gap-1.5"><Stars value={rating.value} /><span className="font-bold">{rating.value}</span></span>
+                </li>
+              ))}
+            </ul>
+            <p className="mt-3 text-sm text-slate-700">Would hire you again: <strong>{item.would_rehire}</strong></p>
+            {item.comment && <p className="mt-2 whitespace-pre-line text-sm text-slate-700">{item.comment}</p>}
+            <p className="mt-3 text-xs text-slate-500">
+              Think something here is unfair or not about your work? Tell PESO at the office; staff can remove feedback that breaks the{' '}
+              <a href="/review-guidelines" target="_blank" rel="noreferrer" className="font-semibold text-brand-navy underline-offset-2 hover:underline">guidelines</a>.
+            </p>
           </li>
         ))}
       </ul>

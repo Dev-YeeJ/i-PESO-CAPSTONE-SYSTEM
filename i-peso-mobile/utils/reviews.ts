@@ -30,68 +30,51 @@ export function aspectsFor(type: ReviewType, limited?: boolean): Record<string, 
   return RECRUITMENT_ASPECTS
 }
 
-export const REVIEW_TYPE_OPTIONS: Record<ReviewType, { label: string; hint: string }> = {
-  recruitment: { label: 'The hiring process', hint: 'Applying, interviews and how they kept you informed.' },
-  employment: { label: 'Working here', hint: 'What it is like to work for this company.' },
-}
-
-/** The review the seeker can still write for one job — what the form needs. */
+/** The review the seeker can still write for one application — what the form needs. */
 export interface ReviewAction {
-  /** e.g. "application-12" — a `review` route param may add the kind ("application-12-employment"). */
+  /** e.g. "application-12" — a `review` route param may add a kind ("application-12-recruitment"). */
   key: string
-  /** What it may be about: the hiring process (from applying) and/or working there (verified hires). */
-  types: ReviewType[]
-  /** Preselected kind. */
   type: ReviewType
   source: ReviewSource
   sourceId: number
   employerName: string | null | undefined
   jobTitle: string | null | undefined
-  /** Why "Working here" isn't open yet (applications only). */
-  employmentReason: string | null
 }
 
-/** Has the seeker already reviewed this application or hire (either kind)? */
+/** Has the seeker already reviewed this application? */
 export const isReviewed = (item: ReviewOpportunity | undefined): boolean =>
   !!(item?.review || item?.recruitment?.review_id || item?.employment?.review_id)
 
-/** ONE review per application or hire that isn't reviewed yet, from the API's opportunities list. */
+/** ONE review of the hiring process per application not reviewed yet, from the API's opportunities list. */
 export function openActions(opportunities: ReviewOpportunity[] = []): ReviewAction[] {
   return opportunities
-    .filter((item) => !isReviewed(item) && (item.recruitment?.allowed || item.employment?.allowed))
-    .map((item) => {
-      const types = (['recruitment', 'employment'] as ReviewType[]).filter((type) => item[type]?.allowed)
-      return {
-        key: `${item.source}-${item.source_id}`,
-        types,
-        // Someone who worked there most likely wants to review the workplace.
-        type: types.includes('employment') ? 'employment' : types[0],
-        source: item.source,
-        sourceId: item.source_id,
-        employerName: item.employer?.name,
-        jobTitle: item.job_title,
-        employmentReason: item.source === 'application' && !item.employment?.allowed ? item.employment?.reason ?? null : null,
-      }
-    })
+    .filter((item) => item.source === 'application' && !isReviewed(item) && item.recruitment?.allowed)
+    .map((item) => ({
+      key: `${item.source}-${item.source_id}`,
+      type: 'recruitment' as ReviewType,
+      source: item.source,
+      sourceId: item.source_id,
+      employerName: item.employer?.name,
+      jobTitle: item.job_title,
+    }))
 }
 
 /**
- * Resolves a `review` deep-link key ("application-12-employment") the way MyReviewsPage
- * does: the open review for that job with that kind preselected (when allowed), else the
- * seeker's existing review for it.
+ * Resolves a `review` deep-link key ("application-12-recruitment") the way MyReviewsPage
+ * does: the open review for that application, else the seeker's existing review for it.
+ * Any kind named in the key is ignored.
  */
 export function resolveReviewKey(
   key: string | undefined,
   actions: ReviewAction[],
   reviews: OwnReview[],
-): { action?: ReviewAction; review?: OwnReview & { preferredType?: ReviewType } } {
+): { action?: ReviewAction; review?: OwnReview } {
   if (!key) return {}
-  const [source, id, type] = key.split('-')
+  const [source, id] = key.split('-')
   const action = actions.find((item) => item.key === `${source}-${id}`)
-  if (action) return { action: action.types.includes(type as ReviewType) ? { ...action, type: type as ReviewType } : action }
+  if (action) return { action }
   const mine = reviews.find((review) => String(review[source === 'placement' ? 'placement_record_id' : 'application_id']) === id)
-  if (!mine) return {}
-  return { review: type && (mine.allowed_types ?? []).includes(type as ReviewType) ? { ...mine, preferredType: type as ReviewType } : mine }
+  return mine ? { review: mine } : {}
 }
 
 /** The `review` route param a review_invitation notification points at, or null. */

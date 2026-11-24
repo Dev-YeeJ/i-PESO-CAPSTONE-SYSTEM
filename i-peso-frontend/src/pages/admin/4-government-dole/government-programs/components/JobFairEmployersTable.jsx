@@ -15,13 +15,7 @@ export default function JobFairEmployersTable({ participants, onReviewRequiremen
       header: 'Employer',
       cell: ({ row }) => (
         <div className="flex items-center gap-3 py-1">
-          {row.original.company_logo ? (
-            <img src={row.original.company_logo} alt={row.original.company_name} className="h-10 w-10 shrink-0 rounded-lg object-cover" />
-          ) : (
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[#e8f0fc] text-brand-navy font-bold">
-              {row.original.company_name.substring(0, 1).toUpperCase()}
-            </div>
-          )}
+          <EmployerLogo employer={row.original} className="h-10 w-10 rounded-lg" />
           <div className="min-w-0">
             <p className="truncate text-sm font-bold text-slate-900">{row.original.company_name}</p>
             {row.original.representative_name && (
@@ -117,13 +111,7 @@ export default function JobFairEmployersTable({ participants, onReviewRequiremen
           table.getRowModel().rows.map(row => (
             <div key={row.id} className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition hover:shadow-md flex flex-col justify-between">
               <div className="flex items-start gap-4">
-                {row.original.company_logo ? (
-                  <img src={row.original.company_logo} alt={row.original.company_name} className="h-12 w-12 shrink-0 rounded-xl object-cover border border-slate-100" />
-                ) : (
-                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[#e8f0fc] text-brand-navy font-bold text-lg">
-                    {row.original.company_name.substring(0, 1).toUpperCase()}
-                  </div>
-                )}
+                <EmployerLogo employer={row.original} className="h-12 w-12 rounded-xl border border-slate-100 text-lg" />
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-base font-bold text-slate-900 leading-tight mb-1">{row.original.company_name}</p>
                   {row.original.representative_name ? (
@@ -216,6 +204,24 @@ export default function JobFairEmployersTable({ participants, onReviewRequiremen
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+/**
+ * The employer's logo, or their initial when there is none or the file can't be loaded
+ * (e.g. it was deleted), instead of a broken image. Uses company_logo_url: company_logo
+ * is the stored path, which the browser would resolve against the current page.
+ */
+function EmployerLogo({ employer, className = '' }) {
+  const [failed, setFailed] = useState(false)
+  const name = employer.company_name || 'Employer'
+  if (employer.company_logo_url && !failed) {
+    return <img src={employer.company_logo_url} alt={`${name} logo`} onError={() => setFailed(true)} className={`shrink-0 object-cover ${className}`} />
+  }
+  return (
+    <div className={`flex shrink-0 items-center justify-center bg-[#e8f0fc] font-bold text-brand-navy ${className}`} aria-hidden="true">
+      {name.substring(0, 1).toUpperCase()}
     </div>
   )
 }

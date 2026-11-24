@@ -68,9 +68,7 @@ class ReviewService
         if ($type !== $review->type) {
             $review->loadMissing(['application', 'placementRecord']);
             if (! in_array($type, $this->eligibility->allowedTypes($review->application, $review->placementRecord), true)) {
-                $this->deny($type === FeedbackAspects::EMPLOYMENT
-                    ? 'You can review working here once the employer has hired you and your start date has arrived.'
-                    : 'This review can only be about working here.');
+                $this->deny('Reviews are about the company\'s hiring process.');
             }
         }
 

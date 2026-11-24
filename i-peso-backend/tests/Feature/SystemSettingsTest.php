@@ -82,11 +82,10 @@ class SystemSettingsTest extends TestCase
             'placement.deadline_day' => 5,
             'placement.reminder_offsets' => [2, -3],
             'permits.reminder_days' => [60, 30, 0],
-            'chatbot.gap_logging' => false,
         ]])->assertOk();
 
         // As on the next request: config back to the file values, then boot applies the settings.
-        config(['placement_reports.deadline_day' => 10, 'placement_reports.reminder_offsets' => [3, 0, -7], 'permits.reminder_days' => [30, 14, 7, 1, 0], 'services.chatbot.gap_logging' => true]);
+        config(['placement_reports.deadline_day' => 10, 'placement_reports.reminder_offsets' => [3, 0, -7], 'permits.reminder_days' => [30, 14, 7, 1, 0]]);
         $settings = app(SystemSettings::class);
         $settings->flush();
         $settings->applyToConfig();
@@ -94,7 +93,49 @@ class SystemSettingsTest extends TestCase
         $this->assertSame(5, config('placement_reports.deadline_day'));
         $this->assertSame([2, -3], config('placement_reports.reminder_offsets'));
         $this->assertSame([60, 30, 0], config('permits.reminder_days'));
-        $this->assertFalse(config('services.chatbot.gap_logging'));
+    }
+
+    public function test_settings_are_grouped_into_clear_sections_without_the_insights_switch(): void
+    {
+        Sanctum::actingAs($this->admin());
+        $data = $this->getJson('/api/admin/system-settings')->assertOk()->json();
+
+        $this->assertSame(['maintenance', 'registration', 'assistant', 'sms', 'employer_rules'], array_keys($data['groups']));
+        $groups = collect($data['settings'])->pluck('group', 'key');
+        $this->assertSame('maintenance', $groups['maintenance.enabled']);
+        $this->assertSame('registration', $groups['registration.seekers_open']);
+        $this->assertSame('assistant', $groups['chatbot.enabled']);
+        $this->assertArrayNotHasKey('chatbot.gap_logging', $groups->all());
+        $this->assertSame(10, collect($data['settings'])->firstWhere('key', 'placement.deadline_day')['default']);
+
+        $this->putJson('/api/admin/system-settings', ['values' => ['chatbot.gap_logging' => false]])
+            ->assertStatus(422)->assertJsonValidationErrors('values');
+    }
+
+    public function test_a_setting_can_be_reset_to_its_default_by_the_system_administrator_only(): void
+    {
+        $admin = $this->admin();
+        Sanctum::actingAs($admin);
+        $this->putJson('/api/admin/system-settings', ['values' => ['placement.deadline_day' => 20, 'permits.reminder_days' => [45]]])->assertOk();
+        $this->assertSame(20, config('placement_reports.deadline_day'));
+
+        Sanctum::actingAs($this->staffWith(['configuration' => 'manage'], 'config-manager@example.test'));
+        $this->postJson('/api/admin/system-settings/reset', ['key' => 'placement.deadline_day'])->assertForbidden();
+
+        Sanctum::actingAs($admin);
+        $this->postJson('/api/admin/system-settings/reset', ['key' => 'placement.deadline_day'])
+            ->assertOk()->assertJsonPath('value', 10);
+        $this->assertSame(10, config('placement_reports.deadline_day'), 'The reminder jobs read the default again right away.');
+        $this->assertDatabaseMissing('system_settings', ['key' => 'placement.deadline_day']);
+        $this->assertDatabaseHas('activity_logs', ['action' => 'system_setting_changed', 'description' => 'Reset “Placement report due day” to its default (10, was 20).']);
+        $this->getJson('/api/admin/system-settings')->assertJsonFragment(['key' => 'placement.deadline_day', 'value' => 10, 'changed' => false]);
+
+        // Already at its default: nothing to do. Unknown keys are refused.
+        $this->postJson('/api/admin/system-settings/reset', ['key' => 'placement.deadline_day'])
+            ->assertOk()->assertJsonPath('message', 'This setting is already at its default.');
+        $this->postJson('/api/admin/system-settings/reset', ['key' => 'no.such.setting'])->assertStatus(422);
+        // Other changed settings are left alone.
+        $this->getJson('/api/admin/system-settings')->assertJsonFragment(['key' => 'permits.reminder_days', 'value' => [45]]);
     }
 
     public function test_maintenance_mode_shows_the_message_to_everyone_but_staff(): void

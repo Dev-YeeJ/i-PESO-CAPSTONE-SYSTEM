@@ -2,4 +2,5 @@
 export const REVIEWS_KEY = ['employer', 'reviews']
 export const HIRES_KEY = ['employer', 'hires']
 
-export const reviewsQueryKey = (type, filter = 'all', page = 1) => [...REVIEWS_KEY, type, filter, page]
+// Reviews are one list now (no hiring/working-here split).
+export const reviewsQueryKey = (filter = 'all', page = 1) => [...REVIEWS_KEY, filter, page]

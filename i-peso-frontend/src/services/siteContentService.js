@@ -22,11 +22,8 @@ export const adminSiteContentService = {
   restore: async (key, revisionId, version) => (await api.post(`/admin/site-content/${key}/revisions/${revisionId}/restore`, { version })).data,
 }
 
-/** Content Modules → Overview, Insights and the AI writing helper. */
+/** Content Modules → the AI writing helper used by the FAQ editor. */
 export const adminContentInsightService = {
-  health: async () => (await api.get('/admin/content-modules/health')).data,
-  insights: async (days = 30) => (await api.get('/admin/content-modules/insights', { params: { days } })).data,
-  resolve: async (normalized) => (await api.post('/admin/content-modules/insights/resolve', { kind: 'gap', normalized })).data,
   /** task: draft_answer | simplify | translate_filipino | suggest_question */
   assist: async (payload) => (await api.post('/admin/content-modules/ai-assist', payload)).data,
 }

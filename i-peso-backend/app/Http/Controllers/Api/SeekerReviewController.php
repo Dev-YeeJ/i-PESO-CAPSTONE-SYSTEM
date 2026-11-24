@@ -44,6 +44,7 @@ class SeekerReviewController extends Controller
             'aspects' => [
                 'recruitment' => FeedbackAspects::RECRUITMENT_ASPECTS,
                 'limited_recruitment' => FeedbackAspects::LIMITED_RECRUITMENT_ASPECTS,
+                // For editing a review written about working there before reviews were unified.
                 'employment' => FeedbackAspects::EMPLOYMENT_ASPECTS,
             ],
         ]);
@@ -54,19 +55,18 @@ class SeekerReviewController extends Controller
         $seeker = $this->seeker($request);
 
         $data = $request->validate([
-            'type' => ['required', Rule::in([FeedbackAspects::RECRUITMENT, FeedbackAspects::EMPLOYMENT])],
-            'application_id' => ['nullable', 'integer', 'required_without:placement_record_id'],
-            'placement_record_id' => ['nullable', 'integer'],
+            // Reviews are about the hiring process; "working here" reviews are no longer written.
+            'type' => ['nullable', Rule::in([FeedbackAspects::RECRUITMENT])],
+            'application_id' => ['required', 'integer'],
             'ratings' => ['required', 'array'],
             'recommend' => ['required', 'boolean'],
             'comment' => ['nullable', 'string', 'max:2000'],
             'agree_guidelines' => ['accepted'],
-            // An employment review needs the seeker's word that they actually started.
-            'confirm_started' => ['accepted_if:type,'.FeedbackAspects::EMPLOYMENT],
         ], [
+            'type.in' => 'Reviews are about the company\'s hiring process.',
             'agree_guidelines.accepted' => 'Please confirm your review follows the community guidelines.',
-            'confirm_started.accepted_if' => 'Please confirm that you started working for this employer.',
         ]);
+        $data['type'] = FeedbackAspects::RECRUITMENT;
 
         $review = $this->reviews->submit($seeker, $data, $request->ip());
         $review->load(['employer', 'reply', 'application.jobVacancy', 'placementRecord']);
@@ -100,10 +100,6 @@ class SeekerReviewController extends Controller
             'ratings' => ['required', 'array'],
             'recommend' => ['required', 'boolean'],
             'comment' => ['nullable', 'string', 'max:2000'],
-            // Switching an existing review to "working here" needs the same confirmation.
-            'confirm_started' => [Rule::excludeIf($request->input('type') !== FeedbackAspects::EMPLOYMENT || $review->type === FeedbackAspects::EMPLOYMENT), 'accepted'],
-        ], [
-            'confirm_started.accepted' => 'Please confirm that you started working for this employer.',
         ]);
 
         $this->reviews->update($review, $data);
@@ -142,15 +138,12 @@ class SeekerReviewController extends Controller
         $this->seeker($request);
         abort_unless($employer->verification_status === 'verified', 404, 'Employer is not publicly visible.');
 
-        $filters = $request->validate([
-            'type' => ['nullable', Rule::in([FeedbackAspects::RECRUITMENT, FeedbackAspects::EMPLOYMENT])],
-        ]);
-
+        // One list of every published review. A `type` sent by older app builds is
+        // ignored, so their "Hiring process" tab shows the whole unified list.
         $reviews = EmployerReview::query()
             ->published()
             ->with('reply')
             ->where('employer_id', $employer->employer_id)
-            ->when($filters['type'] ?? null, fn ($query, $type) => $query->where('type', $type))
             ->latest()
             ->paginate(10);
 
@@ -173,55 +166,6 @@ class SeekerReviewController extends Controller
         return response()->json(['ratings' => (object) ReputationSummary::badges($data['ids'])]);
     }
 
-    /**
-     * Another job seeker reports a review to PESO. It stays up while PESO
-     * looks, unless AUTO_HOLD_REPORTS different people report it.
-     */
-    public function report(Request $request, EmployerReview $review): JsonResponse
-    {
-        $seeker = $this->seeker($request);
-        abort_unless($review->status === EmployerReview::PUBLISHED, 404);
-        abort_if($review->seeker_id === $seeker->seeker_id, 422, 'You can edit or take back your own review instead.');
-
-        $data = $request->validate([
-            'reason' => ['required', Rule::in(array_keys(FeedbackAspects::FLAG_REASONS))],
-            'details' => ['nullable', 'string', 'max:1000'],
-        ]);
-
-        $alreadyReported = $review->flags()
-            ->where('reporter_type', EmployerReviewFlag::BY_SEEKER)
-            ->where('reporter_id', $seeker->seeker_id)
-            ->where('status', EmployerReviewFlag::OPEN)
-            ->exists();
-        abort_if($alreadyReported, 422, 'You already reported this review. PESO is looking into it.');
-
-        $review->flags()->create([
-            'reporter_type' => EmployerReviewFlag::BY_SEEKER,
-            'reporter_id' => $seeker->seeker_id,
-            'reason' => $data['reason'],
-            'details' => $data['details'] ?? null,
-        ]);
-
-        $openReports = $review->flags()
-            ->where('reporter_type', EmployerReviewFlag::BY_SEEKER)
-            ->where('status', EmployerReviewFlag::OPEN)
-            ->distinct()
-            ->count('reporter_id');
-
-        if ($openReports >= self::AUTO_HOLD_REPORTS) {
-            $review->update(['status' => EmployerReview::HELD, 'hold_reason' => "Reported by {$openReports} people"]);
-        }
-
-        $review->loadMissing('employer');
-        ActivityLogger::logAs($seeker, 'reported_employer_review', sprintf(
-            'Reported a review of %s to PESO (%s).',
-            $review->employer?->company_name ?? 'an employer',
-            FeedbackAspects::FLAG_REASONS[$data['reason']]
-        ));
-
-        return response()->json(['message' => 'Thanks. PESO will look at this review.']);
-    }
-
     /** The employer hears about a new review (never who wrote it). */
     private function notifyEmployer(EmployerReview $review): void
     {
@@ -231,9 +175,6 @@ class SeekerReviewController extends Controller
             report($exception);
         }
     }
-
-    /** Reports from this many different people hide a review until PESO decides. */
-    private const AUTO_HOLD_REPORTS = 3;
 
     /** The reviewer's own view: includes status and PESO's note if it was held or hidden. */
     private function ownReview(EmployerReview $review): array

@@ -13,15 +13,28 @@ export default function PoliciesTab({ canEdit, office }) {
   const selected = params.get('policy')
   const query = useQuery({ queryKey: ['admin-policies'], queryFn: adminPolicyService.list })
 
-  const open = (slug) => {
+  /** Open a policy; `edit` goes straight into the editor (a draft is started if there isn't one). */
+  const open = (slug, { edit = false } = {}) => {
     const next = new URLSearchParams(params)
     if (slug) next.set('policy', slug)
     else next.delete('policy')
+    if (edit) next.set('edit', '1')
+    else next.delete('edit')
     setParams(next)
   }
 
   if (selected) {
-    return <PolicyEditor slug={selected} canEdit={canEdit} office={office} onBack={() => open(null)} tokens={query.data?.tokens ?? []} />
+    return (
+      <PolicyEditor
+        slug={selected}
+        canEdit={canEdit}
+        office={office}
+        startEditing={params.get('edit') === '1'}
+        onEditing={() => open(selected)}
+        onBack={() => open(null)}
+        tokens={query.data?.tokens ?? []}
+      />
+    )
   }
 
   if (query.isLoading) return <LoadingSkeleton variant="card" rows={3} />
@@ -32,8 +45,9 @@ export default function PoliciesTab({ canEdit, office }) {
       <Card>
         <h2 className="text-lg font-bold text-slate-950">Policy pages</h2>
         <p className="mt-1 max-w-3xl text-sm text-slate-600">
-          Legal text is never edited in place. Each change becomes a new <strong>version</strong> with its own effective date;
-          earlier versions stay readable so anyone can see exactly what they agreed to. Readers see nothing new until you publish.
+          Choose <strong>Edit</strong> to change a policy. Your changes are saved as a draft until you publish them; each published change
+          becomes a new <strong>version</strong> with its own effective date, and earlier versions stay readable so anyone can see exactly
+          what they agreed to.
         </p>
       </Card>
 
@@ -58,9 +72,16 @@ export default function PoliciesTab({ canEdit, office }) {
               <Badge variant="neutral">{policy.version_count} version{policy.version_count === 1 ? '' : 's'}</Badge>
             </div>
             <div className="mt-auto flex flex-wrap gap-2 pt-4">
-              <Button size="sm" variant={policy.draft ? 'navy' : 'outline'} icon={FilePenLine} onClick={() => open(policy.slug)}>
-                {policy.draft ? 'Continue draft' : canEdit ? 'Open' : 'View'}
-              </Button>
+              {canEdit ? (
+                <Button size="sm" variant="navy" icon={FilePenLine} onClick={() => open(policy.slug, { edit: true })}>
+                  {policy.draft ? 'Continue editing' : 'Edit'}
+                </Button>
+              ) : (
+                <Button size="sm" variant="outline" icon={FilePenLine} onClick={() => open(policy.slug)}>View</Button>
+              )}
+              {canEdit && !policy.draft && (
+                <Button size="sm" variant="ghost" onClick={() => open(policy.slug)}>Versions</Button>
+              )}
               <Button size="sm" variant="ghost" icon={ExternalLink} to={`/${policy.slug}`} target="_blank">View page</Button>
             </div>
           </Card>

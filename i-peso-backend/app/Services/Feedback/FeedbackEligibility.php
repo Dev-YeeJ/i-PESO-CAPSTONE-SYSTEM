@@ -13,14 +13,11 @@ use Illuminate\Support\Collection;
 
 /**
  * Who may review which employer, and when. Every review comes from a real
- * interaction recorded in i-PESO, and each interaction gets ONE review: the
- * seeker chooses whether it is about the hiring process or about working there.
+ * application recorded in i-PESO, and each application gets ONE review of the
+ * company's hiring process, open as soon as the seeker has applied.
  *
- *  - Hiring process (recruitment): open as soon as the seeker has applied, with
- *    every hiring aspect, whatever stage the application is at.
- *  - Working there (employment): only for verified hires whose start date has
- *    arrived — an application marked Hired, or a placement-report row PESO
- *    linked to the seeker (for hires made outside the applicant tracker).
+ * "Working here" (employment) reviews are no longer written. Ones written
+ * earlier stay published and their authors can still edit or take them back.
  *
  * Job fair results are names on a form, not linked to accounts, so they
  * can't verify anything and aren't used.
@@ -37,7 +34,6 @@ class FeedbackEligibility
     {
         $reviews = EmployerReview::query()->where('seeker_id', $seeker->seeker_id)->get();
         $byApplication = $reviews->whereNotNull('application_id')->groupBy('application_id');
-        $byPlacement = $reviews->whereNotNull('placement_record_id')->groupBy('placement_record_id');
 
         $applications = $seeker->applications()
             ->with('jobVacancy.employer')
@@ -45,7 +41,7 @@ class FeedbackEligibility
             ->get()
             ->filter(fn (Application $application) => $application->jobVacancy?->employer !== null);
 
-        $items = $applications->map(function (Application $application) use ($byApplication) {
+        return $applications->map(function (Application $application) use ($byApplication) {
             $existing = $byApplication->get($application->apply_id, collect());
             $employer = $application->jobVacancy->employer;
 
@@ -56,34 +52,11 @@ class FeedbackEligibility
                 'job_title' => $application->jobVacancy->job_title,
                 'status' => $application->status,
                 'recruitment' => $this->describe($this->recruitment($application), $existing),
-                'employment' => $this->describe($this->employmentFromApplication($application), $existing),
+                // Working-here reviews are no longer offered.
+                'employment' => null,
                 'review' => $this->summary($existing),
             ];
         })->values();
-
-        // Hires PESO linked from placement reports, unless the same employer
-        // already hired them through the applicant tracker (one employment
-        // review per job, not two).
-        $hiredEmployers = $applications->where('status', 'hired')->map(fn ($application) => $application->jobVacancy->employer_id)->unique();
-
-        $placements = $this->linkedPlacements($seeker)
-            ->reject(fn (PlacementRecord $record) => $hiredEmployers->contains($record->employer_id))
-            ->map(function (PlacementRecord $record) use ($byPlacement) {
-                $existing = $byPlacement->get($record->id, collect());
-
-                return [
-                    'source' => 'placement',
-                    'source_id' => $record->id,
-                    'employer' => ['id' => $record->employer_id, 'name' => $record->employer?->company_name],
-                    'job_title' => $record->position,
-                    'status' => 'hired',
-                    'recruitment' => null,
-                    'employment' => $this->describe($this->employmentFromPlacement($record), $existing),
-                    'review' => $this->summary($existing),
-                ];
-            });
-
-        return $items->concat($placements)->values();
     }
 
     /**
@@ -98,20 +71,14 @@ class FeedbackEligibility
     }
 
     /**
-     * Which kinds of review this interaction allows right now.
+     * Which kinds of review this interaction allows: the hiring process, for an
+     * application. (An older working-here review keeps its own kind when edited.)
      *
      * @return list<string>
      */
     public function allowedTypes(?Application $application, ?PlacementRecord $placement): array
     {
-        if ($application) {
-            return array_values(array_filter([
-                FeedbackAspects::RECRUITMENT,
-                $this->employmentFromApplication($application)['allowed'] ? FeedbackAspects::EMPLOYMENT : null,
-            ]));
-        }
-
-        return $placement && $this->employmentFromPlacement($placement)['allowed'] ? [FeedbackAspects::EMPLOYMENT] : [];
+        return $application ? [FeedbackAspects::RECRUITMENT] : [];
     }
 
     public function employmentFromApplication(Application $application): array

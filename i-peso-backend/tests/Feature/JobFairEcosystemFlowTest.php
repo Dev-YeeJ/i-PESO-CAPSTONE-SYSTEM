@@ -394,6 +394,17 @@ class JobFairEcosystemFlowTest extends TestCase
         $beforeAccept = $this->getJson("/api/admin/job-fairs/{$fairId}")->assertOk()->json();
         $participantBefore = collect($beforeAccept['participants'])->firstWhere('employer_id', $employer->employer_id);
         $this->assertSame('invited', $participantBefore['status']);
+        // The logo comes as a URL the browser can load, not the stored path.
+        $this->assertNull($participantBefore['company_logo_url']);
+        if (! \Illuminate\Support\Facades\Schema::hasColumn('employers', 'company_logo')) {
+            \Illuminate\Support\Facades\Schema::table('employers', fn ($table) => $table->string('company_logo')->nullable());
+        }
+        $employer->forceFill(['company_logo' => 'employer_logos/acme.png'])->save();
+        $withLogo = collect($this->getJson("/api/admin/job-fairs/{$fairId}")->json('participants'))->firstWhere('employer_id', $employer->employer_id);
+        $this->assertSame(url('storage/employer_logos/acme.png'), $withLogo['company_logo_url']);
+        $employer->forceFill(['company_logo' => 'https://cdn.example.test/logo.png'])->save();
+        $withUrl = collect($this->getJson("/api/admin/job-fairs/{$fairId}")->json('participants'))->firstWhere('employer_id', $employer->employer_id);
+        $this->assertSame('https://cdn.example.test/logo.png', $withUrl['company_logo_url'], 'An absolute logo URL is used as is.');
         $approvedBeforeAccept = collect($participantBefore['requirements'])->where('status', 'approved')->count();
         $this->assertSame(4, $approvedBeforeAccept, 'Reused documents should already show even before the employer accepts.');
 

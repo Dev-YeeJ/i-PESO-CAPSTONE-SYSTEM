@@ -9,6 +9,8 @@ import type { SeekerApplication, SeekerApplicationsResponse } from '@/services/s
 import { seekerService } from '@/services/seekerService'
 import { apiErrorMessage } from '@/utils/apiError'
 import { applicationNextStep, applicationStatusVariant, formatDate, formatInterviewMode, formatInterviewTime, interviewPhase, interviewPhaseText, jobCompany, jobLocation, textFrom, titleCase } from '@/utils/seekerView'
+import { useNow } from '@/hooks/useNow'
+import { LiveDot } from '@/components/interview/LiveDot'
 import { useMotion } from '@/hooks/useMotion'
 import { useToast } from '@/stores/toastStore'
 import { AlertBox } from '@/components/ui/AlertBox'
@@ -262,8 +264,11 @@ function ApplicationCard({
   const job = application.job
   const m = useMotion()
   const interview = application.interview
-  const interviewEnded = interview ? interviewPhase(interview) === 'ended' : false
-  const nextStep = applicationNextStep(application.status, interview)
+  // Re-checked every 30 seconds so the label flips Upcoming → Happening now → Call ended.
+  const now = useNow()
+  const phase = interview ? interviewPhase(interview, now) : null
+  const interviewEnded = phase === 'ended'
+  const nextStep = applicationNextStep(application.status, interview, now)
   const match = Math.round(Number(application.match_percentage ?? 0))
   const open = () => router.push(`/(seeker)/applications/${application.apply_id}`)
 
@@ -292,7 +297,10 @@ function ApplicationCard({
           <View style={styles.interviewBox}>
             <MaterialIcons name="event-available" size={20} color={colors.link} />
             <View style={styles.flexOne}>
-              <Text style={styles.interviewWhen}>{formatInterviewTime(interview.schedule)} · {interviewPhaseText(interview)}</Text>
+              <View style={styles.interviewWhenRow}>
+                {phase === 'in_progress' ? <LiveDot /> : null}
+                <Text style={[styles.interviewWhen, styles.flexOne]}>{formatInterviewTime(interview.schedule)} · {interviewPhaseText(interview, now)}</Text>
+              </View>
               <Text style={styles.interviewWhere} numberOfLines={2}>
                 {formatInterviewMode(interview.mode_of_interview)} · {textFrom(interview.venue_or_link, 'Venue or link to follow')}
               </Text>
@@ -301,7 +309,7 @@ function ApplicationCard({
         ) : null}
 
         {interview && interviewEnded ? (
-          <AlertBox variant="info" title={interviewPhaseText(interview)} style={styles.inlineAlert}>
+          <AlertBox variant="info" title={interviewPhaseText(interview, now)} style={styles.inlineAlert}>
             {`${formatInterviewMode(interview.mode_of_interview)} on ${formatInterviewTime(interview.schedule)}\nThe employer will update this application with their decision.`}
           </AlertBox>
         ) : nextStep && application.status !== 'interview' ? (
@@ -380,6 +388,7 @@ const styles = StyleSheet.create({
 
   interviewBox: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm + 2, marginTop: spacing.md, padding: spacing.md, borderRadius: radii.md, backgroundColor: colors.tint },
   interviewWhen: { ...textStyles.smallBold, color: colors.textPrimary },
+  interviewWhenRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs + 2 },
   interviewWhere: { ...textStyles.small, color: colors.textSecondary, marginTop: 2 },
   nextStep: { ...textStyles.small, lineHeight: 18, color: colors.textSecondary, marginTop: spacing.sm },
   inlineAlert: { marginTop: spacing.md },

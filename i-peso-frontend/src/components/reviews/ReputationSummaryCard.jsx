@@ -1,12 +1,11 @@
 import { Stars } from './StarRating'
 
 /**
- * The reputation summary for one review type: average, how many verified
- * people it's based on, a bar per aspect, strengths and areas to improve.
- * Below the minimum number of reviewers it says there aren't enough yet.
+ * A company's one reputation summary: average, how many verified people it's
+ * based on, a bar per aspect, strengths and areas to improve. Below the minimum
+ * number of reviewers it says there aren't enough yet.
  */
-export default function ReputationSummaryCard({ section, type, minReviews = 3 }) {
-  const tab = { type, who: type === 'employment' ? 'employees' : 'applicants' }
+export default function ReputationSummaryCard({ section, minReviews = 3 }) {
   if (!section) return null
 
   if (!section.enough) {
@@ -14,7 +13,7 @@ export default function ReputationSummaryCard({ section, type, minReviews = 3 })
       <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
         <p className="text-sm font-bold text-slate-800">Not enough verified reviews yet</p>
         <p className="mt-1 text-sm text-slate-600">
-          A summary appears once {minReviews} verified {tab.who} have reviewed this company
+          A summary appears once {minReviews} verified people have reviewed this company
           {section.reviewers > 0 ? ` (${section.reviewers} so far)` : ''}.
         </p>
       </div>
@@ -32,8 +31,8 @@ export default function ReputationSummaryCard({ section, type, minReviews = 3 })
           <Stars value={section.average} size="lg" />
         </div>
         <div className="text-sm text-slate-600">
-          <p>Based on <strong className="text-slate-900">{section.reviewers}</strong> verified {tab.who}</p>
-          <p><strong className="text-slate-900">{section.recommend_percent}%</strong> would recommend {tab.type === 'employment' ? 'working here' : 'applying here'}</p>
+          <p>Based on <strong className="text-slate-900">{section.reviewers}</strong> verified {section.reviewers === 1 ? 'person' : 'people'}</p>
+          <p><strong className="text-slate-900">{section.recommend_percent}%</strong> would recommend this company</p>
         </div>
       </div>
 
