@@ -5,6 +5,7 @@ import { AlertCircle, BriefcaseBusiness, Loader2, LocateFixed, MapPinned, PanelL
 import toast from '@/lib/toast'
 import JobMapAssistant from '../../components/maps/JobMapAssistant'
 import JobMapCard from '../../components/maps/JobMapCard'
+import { formatKm } from '../../components/maps/jobMapFormat'
 import JobMapFilters from '../../components/maps/JobMapFilters'
 import JobMapDetailsPanel from '../../components/maps/JobMapDetailsPanel'
 import ReportEmployerModal from '../../components/ReportEmployerModal'
@@ -64,7 +65,7 @@ function SmartSummary({ summary }) {
       <p className="text-sm leading-5 text-slate-600">
         <strong className="text-slate-900">{summary.total_found} jobs</strong> found
         {', '}<strong className="text-emerald-700">{summary.high_match_count}</strong> strong matches
-        {summary.nearest_distance_km !== null && <>{', '}nearest <strong className="text-brand-navy">{Number(summary.nearest_distance_km).toFixed(1)} km</strong></>}
+        {summary.nearest_distance_km !== null && <>{', '}nearest <strong className="text-brand-navy">{formatKm(summary.nearest_distance_km)}</strong></>}
       </p>
     </div>
   )
@@ -451,18 +452,20 @@ export default function JobMapPage() {
     filters.max_missing_skills !== '' && { key: 'max_missing_skills', label: `≤${filters.max_missing_skills} missing skills` },
   ].filter(Boolean)
 
+  // Title on its own line, actions underneath: in a narrow panel, squeezing both into one
+  // row wrapped the description into a tall column of single words.
   const panelHeader = (
-    <header className="z-20 flex items-center justify-between gap-2 border-b border-slate-200/50 bg-transparent px-4 py-3">
+    <header className="z-20 space-y-3 border-b border-slate-200/70 bg-white px-4 py-3">
       <div className="flex min-w-0 items-center gap-2.5">
-        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-brand-navy text-amber-400 shadow-inner"><MapPinned className="h-4 w-4" aria-hidden="true" /></span>
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand-navy text-amber-400 shadow-inner"><MapPinned className="h-4 w-4" aria-hidden="true" /></span>
         <div className="min-w-0">
           <h1 className="text-sm font-bold text-slate-900">Job map</h1>
-          <p className="text-[11px] leading-4 text-slate-500">Vacancies near you, ranked by how well you match.</p>
+          <p className="text-xs leading-4 text-slate-500">Vacancies near you, ranked by how well you match.</p>
         </div>
       </div>
-      <div className="flex shrink-0 items-center gap-1.5">
-        <button type="button" onClick={() => setAssistantOpen((open) => !open)} aria-expanded={assistantOpen} className={`flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-[11px] font-bold shadow-sm transition ${assistantOpen ? 'border-brand-navy bg-brand-navy text-white' : 'border-slate-200 bg-white text-brand-navy hover:bg-slate-50'}`} title="Describe the job you want in your own words"><Sparkles className="h-3.5 w-3.5" aria-hidden="true" /> Smart search</button>
-        <button type="button" onClick={useCurrentLocation} disabled={isLocating} className="flex h-8 w-8 items-center justify-center rounded-md border border-slate-200 bg-white text-brand-navy shadow-sm transition hover:bg-slate-50 disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700" aria-label={isLocating ? 'Locating…' : 'Use current location'} title="Use current location">{isLocating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <LocateFixed className="h-3.5 w-3.5" />}</button>
+      <div className="flex gap-2">
+        <button type="button" onClick={() => setAssistantOpen((open) => !open)} aria-expanded={assistantOpen} className={`flex h-9 flex-1 items-center justify-center gap-1.5 rounded-lg border px-3 text-xs font-bold shadow-sm transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700 ${assistantOpen ? 'border-brand-navy bg-brand-navy text-white' : 'border-slate-200 bg-white text-brand-navy hover:bg-slate-50'}`} title="Describe the job you want in your own words"><Sparkles className="h-3.5 w-3.5" aria-hidden="true" /> Smart search</button>
+        <button type="button" onClick={useCurrentLocation} disabled={isLocating} className="flex h-9 flex-1 items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-xs font-bold text-brand-navy shadow-sm transition hover:bg-slate-50 disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700">{isLocating ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" /> : <LocateFixed className="h-3.5 w-3.5" aria-hidden="true" />}{isLocating ? 'Locating…' : 'Use my location'}</button>
       </div>
     </header>
   )
@@ -512,7 +515,7 @@ export default function JobMapPage() {
         </div>
       ) : jobs.map((job) => (
         <div id={`map-job-${job.post_id}`} key={job.post_id}>
-          <JobMapCard job={job} rating={employerRatings[job.employer_id || job.employer?.employer_id]} isActive={selectedJobId === job.post_id} isApplying={applyingIds.includes(job.post_id)} isSaving={savingIds.includes(job.post_id)} onClick={() => openDetails(job)} onView={openDetails} onApply={requestApply} onSave={handleSave} onTraining={viewTraining} onJobFair={handleJobFair} />
+          <JobMapCard job={job} rating={employerRatings[job.employer_id || job.employer?.employer_id]} isActive={selectedJobId === job.post_id} isApplying={applyingIds.includes(job.post_id)} isSaving={savingIds.includes(job.post_id)} onClick={() => openDetails(job)} onView={openDetails} onApply={requestApply} onSave={handleSave} onTraining={viewTraining} onJobFair={handleJobFair} onViewApplication={() => navigate('/seeker/applications')} />
         </div>
       ))}
       {!isFetching && !error && jobs.length >= Number(filters.limit) && Number(filters.limit) < 100 && (
@@ -552,21 +555,26 @@ export default function JobMapPage() {
   return (
     <div className="relative flex h-full flex-col overflow-hidden bg-slate-100">
       {wide ? (
-        <div className={`grid min-h-0 flex-1 ${panelOpen ? 'grid-cols-[300px_380px_minmax(0,1fr)]' : 'grid-cols-[300px_minmax(0,1fr)]'}`}>
-          <aside aria-label="Filters" className="flex min-h-0 flex-col overflow-y-auto border-r border-slate-200 bg-white">
-            {panelHeader}
-            {filterBlock}
-            {locationBlock}
-          </aside>
+        // One panel (search, filters, results) beside the map. It used to be two columns,
+        // the first mostly empty space, which narrowed the map for nothing.
+        <div className={`grid min-h-0 flex-1 ${panelOpen ? 'grid-cols-[400px_minmax(0,1fr)] 2xl:grid-cols-[440px_minmax(0,1fr)]' : 'grid-cols-[minmax(0,1fr)]'}`}>
           {panelOpen && (
-            <section aria-label="Results" className="flex min-h-0 flex-col border-r border-slate-200 bg-white">
+            <aside aria-label="Search and results" className="flex min-h-0 flex-col border-r border-slate-200 bg-white">
+              {panelHeader}
+              {filterBlock}
+              {locationBlock}
               <SmartSummary summary={liveSummary} />
               {chipsBlock}
               {listBlock}
-            </section>
+            </aside>
           )}
           <section aria-label="Map" className="relative min-h-0">
             {mapBlock}
+            {!panelOpen && (
+              <button type="button" onClick={() => setPanelOpen(true)} className="absolute left-4 top-4 z-20 flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-bold text-brand-navy shadow-lg hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700">
+                <PanelLeftOpen className="h-4 w-4" aria-hidden="true" /> Show {jobs.length} jobs
+              </button>
+            )}
             {detailsBlock}
           </section>
         </div>
