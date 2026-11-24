@@ -114,6 +114,28 @@ describe('chart report export', () => {
     expect(clicked).toEqual(['labor-market-analytics-report-2026-11-23.zip'])
   })
 
+  it('zips the charts as JPG when asked', async () => {
+    await downloadAllCharts({ context, format: 'zip', imageFormat: 'jpg', specs: [gender, skills] })
+
+    const [zip] = zips
+    expect(Object.keys(zip.files).filter((name) => !name.startsWith('data/')).sort()).toEqual([
+      '01-gender-distribution-2026-11-23.jpg',
+      '02-common-job-seeker-skills-2026-11-23.jpg',
+    ])
+  })
+
+  it('captures PNG and JPG as an A4 page, the same shape as the PDF', async () => {
+    const { toPng, toJpeg } = await import('html-to-image')
+    await downloadChart(gender, context, 'png')
+    await downloadChart(gender, context, 'jpg')
+
+    for (const node of [toPng.mock.lastCall[0], toJpeg.mock.lastCall[0]]) {
+      expect(node.style.width).toBe('1000px')
+      expect(node.style.height).toBe('1415px') // 1000 × 842 / 595
+    }
+    expect(clicked).toEqual(['gender-distribution-2026-11-23.png', 'gender-distribution-2026-11-23.jpg'])
+  })
+
   it('saves the numbers alone as CSV', async () => {
     await downloadChart(skills, context, 'csv')
     expect(clicked).toEqual(['common-job-seeker-skills-2026-11-23.csv'])
